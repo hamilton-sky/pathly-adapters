@@ -5,7 +5,7 @@
 | Conversation | Title | Status |
 |---|---|---|
 | Conv 1 | Python security fixes and tests | DONE |
-| Conv 2 | README Known Limitations | TODO |
+| Conv 2 | README Known Limitations | DONE |
 
 ---
 
@@ -29,13 +29,13 @@
 
 ## Conversation 2 — README Known Limitations
 
-**Status:** TODO
+**Status:** DONE
 
 **Stories:** 6
 
 **Phases:**
-- [ ] Phase 1 — Verify section absent
-- [ ] Phase 2 — Add Known Limitations section
+- [x] Phase 1 — Verify section absent
+- [x] Phase 2 — Add Known Limitations section
 
 **Done when:** `README.md` contains `## Known Limitations` with the four
 documented items, and `pytest -q` still passes.
@@ -45,7 +45,7 @@ documented items, and `pytest -q` still passes.
 ## Completion gate
 
 Feature is complete when:
-- [ ] Both conversations are marked DONE above.
+- [x] Both conversations are marked DONE above.
 - [ ] `pytest -q` passes (no skips on the new test files).
 - [ ] `docs/SECURITY.md` production readiness checklist items covered by this
   feature are verifiably satisfied.
