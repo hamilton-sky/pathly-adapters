@@ -6,3 +6,8 @@ skills:
   destination: ~/.claude/skills/
   structure: nested
 telemetry: true
+hooks:
+  - event: post_tool_call
+    script: hooks/classify_feedback.py
+  - event: post_tool_call
+    script: hooks/inject_feedback_ttl.py
