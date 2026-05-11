@@ -1,0 +1,7 @@
+﻿host: copilot
+destination: ~/.vscode/extensions/pathly/agents/
+files:
+  - source: agents/
+skills:
+  destination: ~/.vscode/extensions/pathly/skills/
+  structure: flat

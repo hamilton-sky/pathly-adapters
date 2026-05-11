@@ -1,0 +1,17 @@
+# Feedback Protocol Contract
+#
+# Single source of truth for feedback file names exchanged between
+# pathly-engine (FSM / orchestrator) and pathly-adapters (skills / agents).
+#
+# UPDATING THIS CONTRACT:
+#   1. Edit this file.
+#   2. Copy the identical change to pathly-engine/protocol_contract.yaml.
+#   3. Both repos' tests will fail until both files are in sync — that is intentional.
+
+feedback_files:
+  - ARCH_FEEDBACK.md
+  - DESIGN_QUESTIONS.md
+  - HUMAN_QUESTIONS.md
+  - IMPL_QUESTIONS.md
+  - REVIEW_FAILURES.md
+  - TEST_FAILURES.md

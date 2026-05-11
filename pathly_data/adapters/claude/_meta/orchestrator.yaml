@@ -1,0 +1,5 @@
+﻿name: orchestrator
+description: Pipeline orchestrator — deterministic filesystem FSM for the feature pipeline. Recovers state from disk, processes one event, emits one next action, and never implements anything itself.
+model: haiku
+tools: [Read, Glob, Grep, Write, Edit, Bash]
+can_spawn: [architect, planner, builder, reviewer, tester, quick]

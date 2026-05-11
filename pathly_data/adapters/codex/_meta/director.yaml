@@ -1,0 +1,3 @@
+﻿name: director
+description: Natural-language front door for the framework. Classifies user intent, chooses the lightest safe workflow, and invokes the pipeline behind the scenes.
+model: gpt-5.5

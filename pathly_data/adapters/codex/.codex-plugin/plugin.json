@@ -1,0 +1,39 @@
+{
+  "name": "pathly",
+  "version": "2.0.0",
+  "description": "Guided agent workflows for planning, building, reviewing, debugging, testing, and learning from software changes.",
+  "author": {
+    "name": "hamilton",
+    "url": "https://github.com/hamilton-sky"
+  },
+  "homepage": "https://github.com/hamilton-sky/pathly",
+  "repository": "https://github.com/hamilton-sky/pathly",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "codex",
+    "workflow",
+    "software-development",
+    "planning"
+  ],
+  "skills": "core/skills/",
+  "agents": "adapters/codex/agents/",
+  "interface": {
+    "displayName": "Pathly",
+    "shortDescription": "Tell it what you want. Pathly chooses the path.",
+    "longDescription": "Pathly provides guided agent workflows for real software development: plan features, build in checkpoints, review changes, debug bugs, explore codebases, test results, and capture lessons.",
+    "developerName": "hamilton",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/hamilton-sky/pathly",
+    "defaultPrompt": [
+      "Use Pathly help",
+      "Use Pathly doctor on this project",
+      "Use Pathly to add password reset"
+    ],
+    "brandColor": "#2563EB"
+  }
+}

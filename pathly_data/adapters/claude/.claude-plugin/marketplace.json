@@ -1,0 +1,29 @@
+{
+  "name": "pathly",
+  "owner": {
+    "name": "hamilton"
+  },
+  "description": "Guided agent workflows for planning, building, reviewing, debugging, testing, and learning from software changes.",
+  "version": "2.0.0",
+  "plugins": [
+    {
+      "name": "pathly",
+      "source": "./",
+      "description": "Guided agent workflows for real software development. Tell Pathly what you want; it chooses the path through planning, building, review, debug, test, and retro.",
+      "version": "2.0.0",
+      "author": {
+        "name": "hamilton"
+      },
+      "homepage": "https://github.com/hamilton-sky/pathly",
+      "repository": "https://github.com/hamilton-sky/pathly",
+      "license": "MIT",
+      "category": "Developer Tools",
+      "tags": [
+        "agents",
+        "workflow",
+        "planning",
+        "software-development"
+      ]
+    }
+  ]
+}

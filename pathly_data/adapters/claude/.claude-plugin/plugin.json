@@ -1,0 +1,8 @@
+{
+  "name": "pathly",
+  "version": "2.0.0",
+  "description": "Guided agent workflows for real software development. Tell Pathly what you want; it chooses the path through planning, building, review, debug, test, and retro.",
+  "author": "hamilton",
+  "skills": "core/skills/",
+  "agents": "adapters/claude/agents/"
+}

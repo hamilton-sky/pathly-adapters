@@ -1,0 +1,8 @@
+﻿host: codex
+destination: ~/.codex/agents/
+files:
+  - source: agents/
+skills:
+  destination: ~/.codex/skills/
+  structure: nested
+telemetry: true

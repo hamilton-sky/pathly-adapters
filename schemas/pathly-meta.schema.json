@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pathly adapter meta",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "model": { "type": "string" },
+    "tools": { "type": "array", "items": { "type": "string" } },
+    "can_spawn": { "type": "array", "items": { "type": "string" } },
+    "spawn_section": { "type": "string" },
+    "skill": { "type": "string" },
+    "invocation": { "type": "string" },
+    "wrapper": { "type": "string" },
+    "strip_frontmatter": { "type": "boolean" },
+    "filename": { "type": "string" },
+    "host": { "type": "string" },
+    "destination": { "type": "string" },
+    "files": { "type": "array" },
+    "skills": { "type": "object" },
+    "structure": { "type": "string" }
+  },
+  "additionalProperties": false
+}
