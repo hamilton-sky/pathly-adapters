@@ -75,7 +75,7 @@ Required before production-ready:
 - `python -m build` produces a wheel with all `pathly_data/` assets included.
 - `pip install dist/pathly-adapters-*.whl` in a fresh venv:
   - `pathly-setup --version` works.
-  - `pathly-setup doctor` works.
+  - `pathly-setup --dry-run` reports detected hosts without error.
   - All `pathly_data/` resources are readable from installed wheel.
   - No command depends on the source checkout path.
 - `twine upload dist/*` succeeds for PyPI release.

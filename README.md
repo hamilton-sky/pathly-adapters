@@ -31,7 +31,7 @@ That's it. Pathly detects Claude Code, Codex, and Copilot automatically.
 ## All commands
 
 ```bash
-pathly-setup                        # detect hosts; no writes
+pathly-setup                        # detect hosts; launch interactive menu
 pathly-setup --dry-run              # preview what would be written
 pathly-setup --apply                # install into all detected hosts
 pathly-setup claude --apply         # install for Claude Code only

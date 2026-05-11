@@ -74,27 +74,14 @@ friend's Codex install at a path that only exists on your machine.
 Recommended CLI fallback from inside a Codex workspace:
 
 ```text
-pathly doctor
-pathly init <feature>
-pathly run <feature>
+pathly-setup codex --dry-run
+pathly-setup codex --apply
 ```
 
-The local marketplace points Codex at `adapters/codex`, whose plugin manifest
-loads `./skills/`. These wrappers are
-Codex-safe: they load the same canonical `core/prompts/*.md` workflows but do
-not include Claude-only model frontmatter such as `haiku`, `sonnet`, or `opus`.
-Core model intent should stay portable as `simple`, `normal`, or `advanced`;
-Codex wrappers can map those tiers to Codex-native models only when that is
-explicitly supported.
-
-## Direct Agent Skill Discovery
-
-Pathly also exposes `.agents/skills/` at the repository root for tools that scan
-direct skill folders instead of loading a Codex marketplace plugin. That
-directory mirrors `adapters/codex/skills/` exactly and is verified by tests.
-
-Do not edit `.agents/skills/` directly. Change the wrapper under
-`adapters/codex/skills/`, refresh the mirror, and run packaging tests.
+The Codex adapter uses `_meta/*.yaml` metadata files that are stitched with
+content from `core/agents/` and `core/skills/` at install time. The resulting
+files are deployed to `~/.codex/agents/` and `~/.codex/skills/` by
+`pathly-setup codex --apply`.
 
 Claude Code keeps its own model-specific wrappers under
-`adapters/claude-code/skills/` for the Claude plugin package.
+`adapters/claude/` for the Claude plugin package.

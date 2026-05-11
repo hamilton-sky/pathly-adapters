@@ -28,6 +28,7 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   │   ├── planner.md
 │       │   │   ├── po.md
 │       │   │   ├── quick.md
+│       │   │   ├── README_routing.md  ← routing guide (not deployed)
 │       │   │   ├── reviewer.md
 │       │   │   ├── scout.md
 │       │   │   ├── tester.md
@@ -154,7 +155,7 @@ metadata only; there is no `.agents/skills/` directory.
 ## pathly-setup Commands
 
 ```bash
-pathly-setup                        # detect hosts; no writes
+pathly-setup                        # detect hosts; launch interactive menu
 pathly-setup --dry-run              # preview what would be written
 pathly-setup --apply                # install into all detected hosts
 pathly-setup claude --apply         # install for Claude Code only
@@ -174,7 +175,12 @@ For Claude Code:
 ```
 ~/.claude/
 ├── agents/                    ← 11 behavioral contracts (.md files)
-├── skills/                    ← installed Claude Code lifecycle skills
+├── skills/                    ← installed Claude Code lifecycle skills (nested)
+│   ├── pathly/SKILL.md
+│   ├── build/SKILL.md
+│   ├── review/SKILL.md
+│   ├── team-flow/SKILL.md
+│   └── ... (one folder per skill)
 └── plugins/pathly/
     └── templates/pathly plan/
         └── *.template.md

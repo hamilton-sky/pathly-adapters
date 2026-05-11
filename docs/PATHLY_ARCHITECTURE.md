@@ -37,7 +37,7 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │   │   ├── resources.py
 │   │   └── __main__.py
 │   ├── pathly_telemetry/        ← Cross-host activity telemetry (src-layout package)
-│   └── src/pathly_data/         ← Package resource layout for installed data files
+│   └── pathly_data/             ← Package resource layout for installed data files
 │       ├── core/                ← SINGLE SOURCE OF TRUTH (tool-agnostic)
 │       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax)
 │       │   │   ├── architect.md
@@ -47,6 +47,7 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── planner.md
 │       │   │   ├── po.md
 │       │   │   ├── quick.md
+│       │   │   ├── README_routing.md  ← routing guide (not deployed)
 │       │   │   ├── reviewer.md
 │       │   │   ├── scout.md
 │       │   │   ├── tester.md

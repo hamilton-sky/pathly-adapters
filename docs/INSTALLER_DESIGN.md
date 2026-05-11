@@ -6,8 +6,8 @@ Consolidated from `INSTALLABLE_WORKFLOW_ARCHITECTURE_PROPOSAL.md` and
 ## Goal
 
 ```text
-pip install pathly
-pathly setup
+pip install pathly-adapters
+pathly-setup --apply
 ```
 
 After setup, the user works from the AI coding tool they already use:
@@ -15,8 +15,10 @@ After setup, the user works from the AI coding tool they already use:
 ```text
 Claude Code: /pathly add password reset
 Codex:      Use Pathly to add password reset
-CLI:        pathly go "add password reset"
 ```
+
+> Long-term aspirational: `pip install pathly` + `pathly setup` (single-word CLI).
+> Current reality: `pip install pathly-adapters` + `pathly-setup`.
 
 Pathly remains the workflow brain. Claude Code, Codex, Copilot, and the CLI are host surfaces.
 
@@ -76,7 +78,7 @@ The key principle: **prove installability before automating setup.**
 | Phase | Purpose | Why it comes here |
 |---|---|---|
 | 0 | Package resource contract | Removes repo-relative assumptions before setup depends on assets |
-| 1 | Clean install smoke | Proves `pip install pathly` works outside the source checkout |
+| 1 | Clean install smoke | Proves `pip install pathly-adapters` works outside the source checkout |
 | 2 | Setup diagnostics and dry run | Lets users see planned writes before mutation |
 | 3 | Adapter materialization | Installs or repairs host adapters from packaged resources |
 | 4 | Status and doctor UX | Makes interrupted workflow state understandable |
@@ -96,9 +98,9 @@ Give Pathly one host-neutral way to load packaged assets.
 ```bash
 python -m build
 python -m venv .tmp/pathly-install-smoke
-.tmp/pathly-install-smoke/Scripts/pip install dist/pathly-*.whl
-.tmp/pathly-install-smoke/Scripts/pathly --version
-.tmp/pathly-install-smoke/Scripts/pathly doctor
+.tmp/pathly-install-smoke/Scripts/pip install dist/pathly-adapters-*.whl
+.tmp/pathly-install-smoke/Scripts/pathly-setup --version
+.tmp/pathly-install-smoke/Scripts/pathly-setup --dry-run
 ```
 
 ### Phase 1 — Clean Install Smoke
@@ -106,7 +108,7 @@ python -m venv .tmp/pathly-install-smoke
 Prove Pathly works without the source checkout.
 
 - Build the wheel; install into a fresh venv.
-- Run `pathly --version`, `pathly --help`, `pathly doctor`, `pathly help` from a temp non-Pathly project directory.
+- Run `pathly-setup --version`, `pathly-setup --help`, `pathly-setup --dry-run` from a temp non-Pathly project directory.
 - Confirm no command depends on `C:\Users\Yafit\pathly` or another checkout path.
 
 **Acceptance criteria:**
@@ -119,11 +121,11 @@ Prove Pathly works without the source checkout.
 Make setup transparent before it writes files.
 
 ```text
-pathly setup           # report only (no mutation)
-pathly setup --dry-run # same
-pathly setup --apply   # mutate
-pathly setup claude --dry-run
-pathly setup codex --dry-run
+pathly-setup           # detect hosts; launch interactive menu
+pathly-setup --dry-run # preview writes (no mutation)
+pathly-setup --apply   # mutate
+pathly-setup claude --dry-run
+pathly-setup codex --dry-run
 ```
 
 Dry-run output must show: detected hosts, Pathly version, planned adapter writes, planned hook registration, existing files that would be replaced, final start command per host.
@@ -153,16 +155,16 @@ Install or repair host adapter files from packaged resources.
 
 Let users recover after interruption without reading raw FSM internals.
 
-- Add or refine `pathly status [feature]`.
+- Add `pathly-setup status [feature]` (future).
 - Summarize: current state, active feedback, next owner, suggested command.
 - Keep raw event names hidden unless `--verbose` is passed.
-- Make `doctor` distinguish install problems, adapter problems, and workflow state problems.
+- Make a `pathly-setup doctor` subcommand (future) that distinguishes install problems, adapter problems, and workflow state problems.
 
 **Acceptance criteria:**
 - Missing state is reported clearly.
 - Feedback-blocked state names the blocking feedback file.
 - Done state is obvious.
-- The next suggested action is a real command for the active host or CLI.
+- The next suggested action is a real `pathly-setup` command or host invocation.
 
 ### Phase 5 — Hook Hardening
 
@@ -188,7 +190,7 @@ Hook failures must be visible and recoverable. They must not corrupt workflow st
 
 | Surface | Smoke check |
 |---|---|
-| CLI | `pathly go "add password reset"` routes through Director |
+| CLI | `pathly-setup --apply` installs to all detected hosts without error |
 | Claude Code | `/pathly help` and `/pathly add password reset` reach the adapter |
 | Codex | `Use Pathly help` and `Use Pathly to add password reset` select the plugin skill |
 | Hooks | Optional hook install reports exact registered commands and diagnostics |
@@ -218,8 +220,8 @@ That chain creates uncontrolled agent-to-agent conversation and bypasses FSM sta
 
 | Story | Accepted when |
 |---|---|
-| One-command install | `pip install pathly` + `pathly doctor` works outside source checkout |
-| Guided setup | `pathly setup` detects hosts and ends with host-specific start commands |
+| One-command install | `pip install pathly-adapters` + `pathly-setup --version` works outside source checkout |
+| Guided setup | `pathly-setup` detects hosts and shows interactive menu or `--dry-run` output |
 | Host chat surface | Claude Code, Codex, and CLI docs show correct invocations |
 | Deterministic FSM | Orchestrator applies one event per step; state recovers from disk after restart |
 | Safe hooks | Hooks classify and validate only; never run a full pipeline |

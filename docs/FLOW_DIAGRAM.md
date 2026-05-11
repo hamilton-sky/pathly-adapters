@@ -51,12 +51,16 @@ flowchart TD
 │   ├── reviewer.md
 │   ├── architect.md
 │   └── ... (8 more)
-├── skills/                    ← stitched skill files
-│   ├── pathly.md              ← main dispatcher
+├── skills/                    ← stitched skill files (nested: each skill is a folder)
+│   ├── pathly/
+│   │   └── SKILL.md           ← main dispatcher
+│   ├── build/
+│   │   └── SKILL.md
+│   ├── review/
+│   │   └── SKILL.md
 │   ├── team-flow/
-│   ├── build.md
-│   ├── review.md
-│   └── ...
+│   │   └── SKILL.md
+│   └── ... (one folder per skill)
 └── plugins/pathly/
     └── templates/pathly plan/
         └── *.template.md
@@ -125,7 +129,7 @@ settings after install.
 ## pathly-setup Commands
 
 ```bash
-pathly-setup                      # detect hosts; no writes
+pathly-setup                      # detect hosts; launch interactive menu
 pathly-setup --dry-run            # preview what would be written
 pathly-setup --apply              # install into all detected hosts
 pathly-setup claude --apply       # install for Claude Code only
