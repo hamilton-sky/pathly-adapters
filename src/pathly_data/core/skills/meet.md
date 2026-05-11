@@ -221,9 +221,12 @@ Consultation rules for every role:
 - Must not claim the workflow has advanced.
 - Must answer the user's question directly and concretely.
 
-Write the consultation note to:
+Write the consultation note to two locations simultaneously:
 
-`plans/$FEATURE/consults/YYYYMMDD-HHMMSS-<role>.md`
+1. `plans/$FEATURE/consults/YYYYMMDD-HHMMSS-<role>.md` — live reference for planner/architect promotion
+2. `pipeline-walkthrough/$FEATURE/artifacts/YYYYMMDD-HHMMSS-<role>-consult.md` — permanent pipeline record
+
+Create `pipeline-walkthrough/$FEATURE/artifacts/` if it does not exist.
 
 Use this structure:
 
@@ -261,7 +264,9 @@ Promotion target rules:
 After writing the consult note, print:
 
 ```text
-Meet note written: plans/<feature>/consults/<timestamp>-<role>.md
+Meet note written:
+  plans/<feature>/consults/<timestamp>-<role>.md
+  pipeline-walkthrough/<feature>/artifacts/<timestamp>-<role>-consult.md
 
 What do you want to do next?
 
