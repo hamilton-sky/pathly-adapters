@@ -77,6 +77,22 @@ python -m build
 twine upload dist/*
 ```
 
+## Docs
+
+| Doc | What's in it |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Adapter surfaces per host (Claude, Codex, Copilot), deployment structure, how skills/agents are materialized, host detection, installed manifests |
+| [docs/FLOW_DIAGRAM.md](docs/FLOW_DIAGRAM.md) | How a user invokes Pathly from each host, install flow, what files get deployed where, host-specific entry points |
+| [docs/PATHLY_ARCHITECTURE.md](docs/PATHLY_ARCHITECTURE.md) | install_cli packages, pathly_data layout, stitch pipeline, resource loading, host adapter structure, pyproject entry points |
+| [docs/INSTALLER_DESIGN.md](docs/INSTALLER_DESIGN.md) | Design goals, implementation phases, subagent policy, user stories, main risks |
+| [docs/MULTI_TOOL_DESIGN.md](docs/MULTI_TOOL_DESIGN.md) | Current adapter structure, source-of-truth rules, current adapters, installed manifests, future adapter work |
+| [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) | Adapter release criteria: install checks for each host, pathly-setup flags, package build/publish, marketplace manifests |
+| [docs/SECURITY.md](docs/SECURITY.md) | Hook injection risks, subprocess calls in installer, file write safety, trust boundaries, marketplace manifest integrity |
+| [docs/SYSTEM_REVIEW.md](docs/SYSTEM_REVIEW.md) | Adapter strengths, risks, design decisions, hardening recommendations |
+
+For engine-specific docs (FSM, orchestrator, state machine, team-flow driver):
+see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) — `pathly-engine/docs/` folder.
+
 ## Release Status
 
 Stable (1.0.0). Core install path (`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on failure. Copilot destination paths follow the VS Code Copilot agent spec and may require `--repair` after a VS Code update.

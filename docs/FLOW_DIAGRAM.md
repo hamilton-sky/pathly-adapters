@@ -1,0 +1,157 @@
+# Pathly Adapters Flow Diagram
+
+How a user invokes Pathly from each supported host, what install produces, and
+where files land.
+
+## Host Entry Points
+
+Pathly has three public front doors:
+
+- Claude Code slash skills: `/pathly ...` and `/path ...`
+- Codex plugin skills: `Use Pathly ...`
+- CLI fallback: `pathly ...`
+
+```mermaid
+flowchart TD
+    A[plain-English request] --> B{host}
+    B --> CC["Claude Code\n/pathly <request>"]
+    B --> CX["Codex\nUse Pathly <request>"]
+    B --> CLI["CLI\npathly <command>"]
+
+    CC --> CA[claude adapter\n~/.claude/agents/ + ~/.claude/skills/]
+    CX --> XA[codex adapter\n~/.codex/agents/ + ~/.codex/skills/]
+    CLI --> LA[pathly-engine CLI\npathly-engine/engine_cli/]
+```
+
+## Install Flow
+
+```mermaid
+flowchart TD
+    A[pathly-setup] --> B[detect.py\nscans for host tools]
+    B --> C{detected hosts}
+    C --> D[Claude Code]
+    C --> E[Codex]
+    C --> F[Copilot]
+    D --> G[stitch.py\ncore/ + claude/_meta/*.yaml]
+    E --> H[stitch.py\ncore/ + codex/_meta/*.yaml]
+    F --> I[stitch.py\ncore/ + copilot/_meta/*.yaml]
+    G --> J[materialize.py\n→ ~/.claude/agents/\n→ ~/.claude/skills/]
+    H --> K[materialize.py\n→ ~/.codex/agents/\n→ ~/.codex/skills/]
+    I --> L[materialize.py\n→ VS Code agents folder]
+```
+
+## What Files Get Deployed Where
+
+### Claude Code
+
+```text
+~/.claude/
+├── agents/                    ← 11 stitched behavioral contracts
+│   ├── builder.md
+│   ├── reviewer.md
+│   ├── architect.md
+│   └── ... (8 more)
+├── skills/                    ← stitched skill files
+│   ├── pathly.md              ← main dispatcher
+│   ├── team-flow/
+│   ├── build.md
+│   ├── review.md
+│   └── ...
+└── plugins/pathly/
+    └── templates/pathly plan/
+        └── *.template.md
+```
+
+Source: `adapters/claude/_meta/*.yaml` + `core/` content
+Plugin manifest: `adapters/claude/.claude-plugin/plugin.json`
+
+### Codex
+
+```text
+~/.codex/
+├── agents/                    ← stitched agent contracts (natural-language format)
+└── skills/                    ← stitched skill files (natural language, not slash commands)
+```
+
+Source: `adapters/codex/_meta/*.yaml` + `core/` content
+Plugin manifest: `adapters/codex/.codex-plugin/plugin.json`
+Public marketplace metadata: `.agents/plugins/marketplace.json`
+
+### Copilot
+
+```text
+VS Code agents folder/
+└── stitched agent + skill files (Copilot-compatible format)
+```
+
+Source: `adapters/copilot/_meta/*.yaml` + `core/` content
+
+## Host-Specific Invocation
+
+### Claude Code
+
+```text
+/pathly start                           ← full journey map
+/pathly po checkout-flow                ← clarify requirements first
+/pathly storm                           ← brainstorm with architect
+/pathly go add password reset           ← director routes new feature
+/pathly build                           ← implement next conversation
+/pathly meet checkout-flow              ← context-aware role consultation
+/pathly debug checkout button does nothing
+/pathly explore how does checkout state flow through the app?
+/pathly verify                          ← check for stale feedback
+/pathly end                             ← wrap up + retro
+```
+
+### Codex
+
+```text
+Use Pathly help
+Use Pathly flow for checkout-flow
+Use Pathly po for checkout-flow
+Use Pathly to debug checkout button does nothing
+Use Pathly to explore how checkout state flows
+```
+
+Current Codex builds do not expose `/pathly` slash commands. Use explicit
+natural-language invocation. If Codex replies by inspecting the current repo
+instead of using Pathly, the plugin was not selected — retry with `Use Pathly ...`.
+
+### Copilot
+
+Invocation syntax varies by VS Code / Copilot version — check Copilot chat
+settings after install.
+
+## pathly-setup Commands
+
+```bash
+pathly-setup                      # detect hosts; no writes
+pathly-setup --dry-run            # preview what would be written
+pathly-setup --apply              # install into all detected hosts
+pathly-setup claude --apply       # install for Claude Code only
+pathly-setup codex --apply        # install for Codex only
+pathly-setup copilot --apply      # install for Copilot / VS Code only
+pathly-setup --repair             # overwrite Pathly-owned files
+pathly-setup --force              # overwrite all files, even non-Pathly-owned
+pathly-setup --uninstall          # remove all Pathly-owned files
+```
+
+Dry-run output shows: detected hosts, Pathly version, planned adapter writes,
+existing files that would be replaced, final start command per host.
+
+## Stitch: Core + Adapter Metadata
+
+`core/skills/` contains skill *logic* in natural language. Each adapter's
+`_meta/*.yaml` adds only the tool-specific spawn call on top:
+
+```
+# core/skills/team-flow.md
+Delegate implementation to the builder agent.
+Then delegate review to the reviewer agent.
+
+# adapters/claude/_meta/go_skill.yaml  (adds Agent() spawn calls for Claude Code)
+Spawn Agent(subagent_type="builder") for implementation.
+Spawn Agent(subagent_type="reviewer") for review.
+```
+
+This keeps `core/` host-neutral. A new host adapter only needs new `_meta/` files.
