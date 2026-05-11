@@ -18,10 +18,11 @@ pathly-tokens = "pathly_telemetry.report:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src"]
 addopts = ["-p", "no:cacheprovider"]
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["install_cli*", "pathly_telemetry*", "pathly_data*"]
 
 [tool.setuptools.package-data]

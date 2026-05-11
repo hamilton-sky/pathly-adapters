@@ -37,9 +37,9 @@ _UPPER_MD = re.compile(r'\b([A-Z][A-Z0-9_]+\.md)\b')
 
 def _feedback_names_in_docs() -> set[str]:
     """Return all feedback-style UPPER_CASE.md names found in skill/agent Markdown files."""
-    skill_dir = _REPO_ROOT / "pathly_data" / "core" / "skills"
-    agent_dir = _REPO_ROOT / "pathly_data" / "core" / "agents"
-    adapters_dir = _REPO_ROOT / "pathly_data" / "adapters"
+    skill_dir = _REPO_ROOT / "src" / "pathly_data" / "core" / "skills"
+    agent_dir = _REPO_ROOT / "src" / "pathly_data" / "core" / "agents"
+    adapters_dir = _REPO_ROOT / "src" / "pathly_data" / "adapters"
 
     found: set[str] = set()
     for search_dir in (skill_dir, agent_dir, adapters_dir):
