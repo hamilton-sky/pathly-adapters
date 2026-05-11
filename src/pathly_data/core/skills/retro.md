@@ -83,7 +83,53 @@ Total: $X.XX
 
 If `EVENTS.jsonl` doesn't exist or has no `cost_usd` data, omit the Cost Summary section entirely — do not show a table of zeros.
 
-## Step 4: Extract lessons
+## Step 4: Generate pipeline-walkthrough files
+
+Using the EVENTS.jsonl data already read in Step 3, fill and write the three pipeline-walkthrough
+documents to `pipeline-walkthrough/$ARGUMENTS/`. Create the directory if it does not exist.
+
+**Read context:**
+- Run `git branch --show-current` for `{{BRANCH}}`.
+- Use today's date for `{{DATE}}`.
+- From EVENTS.jsonl: first `HUMAN_RESPONSE` value → `{{USER_INTENT}}` (or "not recorded").
+- STATE_TRANSITION events → `{{FSM_STATES}}` (ordered `to` values, one per line).
+- AGENT_DONE events → per-agent token/cost rows. If all `cost_usd == 0.0`, replace cost
+  columns with "not captured".
+- Files in `pipeline-walkthrough/$ARGUMENTS/artifacts/` → `{{FEEDBACK_FILE_ROWS}}`.
+- Run `git diff --name-only` against the main branch → `{{SOURCE_FILE_ROWS}}`.
+
+**Write `pipeline-walkthrough/$ARGUMENTS/01-PIPELINE-FLOW.md`:**
+Fill from the template at `src/pathly_data/core/templates/pipeline-walkthrough/01-PIPELINE-FLOW.md`.
+- `{{DISCOVERY_TRACE}}` — STATE_TRANSITION events for IDLE/EXPLORING/STORMING states, formatted as
+  `│  Orchestrator → [STATE] (auto-advance)` per line.
+- `{{ARCHITECT_CONSULT_TRACE}}` — AGENT_DONE events where agent is architect/scout, or empty line.
+- `{{CONVERSATION_TRACES}}` — AGENT_DONE events for builder/reviewer grouped by conversation number.
+- `{{TEST_TRACES}}` — AGENT_DONE events where agent is tester.
+- `{{FEEDBACK_LOOP_TABLE}}` — RETRY events as `| [stage] | [N] | [cause] | [resolution] |` rows,
+  or `| — | 0 | — | — |` if none.
+- `{{FSM_STATES}}` — all STATE_TRANSITION `to` values, one per line with `→` prefix.
+
+**Write `pipeline-walkthrough/$ARGUMENTS/02-TOKEN-USAGE.md`:**
+Fill from `src/pathly_data/core/templates/pipeline-walkthrough/02-TOKEN-USAGE.md`.
+- `{{AGENT_TOKEN_ROWS}}` — one row per AGENT_DONE event: `| N | agent | role | in | out | total | tools | wall | cost |`.
+  If `cost_usd == 0.0` for all events, write "not captured" in cost/token columns.
+- `{{TOTAL_SPAWNS}}` — count of AGENT_DONE events.
+- `{{TOTAL_TOKENS}}` / `{{TOTAL_COST_USD}}` — sum across events, or "not captured".
+- `{{TOTAL_TOOL_USES}}` / `{{TOTAL_WALL_TIME}}` — sum, or "not captured".
+- Stage breakdown — group AGENT_DONE by FSM state at time of event; or "not captured".
+- `{{COST_ANALYSIS}}` / `{{RIGOR_VERDICT}}` — write "Cost data was not captured at spawn time."
+  if all zeros; otherwise summarise which agent drove the most cost.
+
+**Write `pipeline-walkthrough/$ARGUMENTS/03-ARTIFACT-MAP.md`:**
+Fill from `src/pathly_data/core/templates/pipeline-walkthrough/03-ARTIFACT-MAP.md`.
+- `{{FEEDBACK_FILE_ROWS}}` — one row per file in `pipeline-walkthrough/$ARGUMENTS/artifacts/`,
+  with written-by and resolved-by inferred from filename. If folder is empty: `| — | — | — | — |`.
+- `{{SOURCE_FILE_ROWS}}` — one row per changed file from git diff: `| path | [story ref] | [what changed] |`.
+  Story ref: match file path against USER_STORIES.md content; if no match write "—".
+
+If EVENTS.jsonl does not exist, write all three files with every placeholder replaced by "not recorded".
+
+## Step 5: Extract lessons
 
 From the user's answers and RETRO.md, extract 1–3 lessons — patterns that a planner should know before starting a similar feature. Only write a lesson if something concrete went wrong or was missing. If nothing stands out, skip this step.
 
@@ -108,10 +154,14 @@ Feature: $ARGUMENTS | Stage: <planning/implementation/review/test> | Date: <toda
 
 Do NOT invent lessons. Only extract from what the user actually said.
 
-## Step 5: Report
+## Step 6: Report
 
 ```
 Retro written: plans/$ARGUMENTS/RETRO.md
+Pipeline walkthrough written:
+  pipeline-walkthrough/$ARGUMENTS/01-PIPELINE-FLOW.md
+  pipeline-walkthrough/$ARGUMENTS/02-TOKEN-USAGE.md
+  pipeline-walkthrough/$ARGUMENTS/03-ARTIFACT-MAP.md
 Lessons appended: LESSONS_CANDIDATE.md
 
 To use in your next storm session:

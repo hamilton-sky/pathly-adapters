@@ -1,0 +1,4 @@
+{"type": "STATE_TRANSITION", "to": "IDLE", "ts": "2026-05-11T00:00:00Z"}
+{"type": "STATE_TRANSITION", "to": "PLANNING", "ts": "2026-05-11T00:01:00Z"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-11T00:02:00Z"}
+{"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-11T00:02:00Z"}

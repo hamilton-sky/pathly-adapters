@@ -28,12 +28,35 @@ After quick completes:
 - Write `plans/[feature]/RETRO.md` with the summary provided.
 - Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or plans/).
 - Append `{"type": "AGENT_DONE", "agent": "quick"}` to EVENTS.jsonl.
+
+**Generate pipeline-walkthrough files:**
+Read `plans/[feature]/EVENTS.jsonl`. Fill and write the three templates from
+`src/pathly_data/core/templates/pipeline-walkthrough/` to `pipeline-walkthrough/[feature]/`:
+
+- `01-PIPELINE-FLOW.md` — FSM state sequence, conversation traces, feedback loops.
+  Replace `{{FSM_STATES}}` with ordered STATE_TRANSITION `to` values;
+  `{{CONVERSATION_TRACES}}` with AGENT_DONE events grouped by conversation;
+  `{{FEEDBACK_LOOP_TABLE}}` with RETRY events or `| — | 0 | — | — |` if none.
+- `02-TOKEN-USAGE.md` — per-agent token/cost breakdown from AGENT_DONE events.
+  If all `cost_usd == 0.0`: replace cost/token columns with "not captured".
+  Set `{{TOTAL_SPAWNS}}` to count of AGENT_DONE events.
+- `03-ARTIFACT-MAP.md` — feedback file archive from `pipeline-walkthrough/[feature]/artifacts/`
+  and source files changed (`git diff --name-only` against main branch).
+
+Use today's date for `{{DATE}}`, `git branch --show-current` for `{{BRANCH}}`,
+first HUMAN_RESPONSE value for `{{USER_INTENT}}` (or "not recorded").
+If EVENTS.jsonl does not exist, write all three files with placeholders → "not recorded".
+
 - Transition state → DONE.
 
 Print:
 ```
 [Stage 5 — Retro complete]
 Pipeline complete. RETRO.md written to plans/[feature]/.
+Pipeline walkthrough written:
+  pipeline-walkthrough/[feature]/01-PIPELINE-FLOW.md
+  pipeline-walkthrough/[feature]/02-TOKEN-USAGE.md
+  pipeline-walkthrough/[feature]/03-ARTIFACT-MAP.md
 Lessons appended to LESSONS_CANDIDATE.md (if any were extracted).
 Feature '[feature]' is DONE.
 
