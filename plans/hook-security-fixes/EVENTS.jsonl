@@ -10,3 +10,4 @@
 {"type":"AGENT_DONE","agent":"reviewer","conversation":1,"result":"PASS","timestamp":"2026-05-11T00:11:00Z"}
 {"type":"AGENT_SPAWNED","agent":"builder","model":"claude-sonnet-4-6","conversation":2,"role":"Conv 2 — README Known Limitations","timestamp":"2026-05-11T00:14:00Z"}
 {"type":"AGENT_DONE","agent":"builder","conversation":2,"result":"DONE","tokens_in":3000,"tokens_out":600,"timestamp":"2026-05-11T00:15:00Z"}
+{"type":"STAGE_TRANSITION","to":"DONE","feature":"hook-security-fixes","timestamp":"2026-05-11T00:16:00Z"}

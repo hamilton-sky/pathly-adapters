@@ -9,6 +9,7 @@ should refer back to these core templates first.
 Current template sets:
 
 - `plan/`: Pathly plan files used by planning and import workflows.
+- `pipeline-walkthrough/`: Per-run metrics templates (pipeline flow, token usage, artifact map).
 
 Repo-root `templates/` is intentionally absent; do not add a duplicate install
 surface there.
