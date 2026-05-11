@@ -74,6 +74,16 @@ def uninstall(dest: Path, *, dry_run: bool = False) -> list[str]:
     manifest = _load_manifest(dest)
     removed: list[str] = []
 
+    # Pass 1: validate all entries before touching the filesystem.
+    # This prevents partial deletion when a manifest is tampered.
+    for name in list(manifest["files"]):
+        target = dest / name
+        if not target.resolve().is_relative_to(dest.resolve()):
+            raise ValueError(
+                f"Path traversal detected in manifest: {name!r} escapes destination {dest}"
+            )
+
+    # Pass 2: all entries are clean — perform deletions.
     for name in list(manifest["files"]):
         target = dest / name
         removed.append(name)

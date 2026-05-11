@@ -12,6 +12,8 @@ import sys
 
 from .storage import append_activity
 
+_MAX_BODY = 1_048_576  # 1 MiB
+
 _TOOLS = [
     {
         "name": "record_activity",
@@ -74,7 +76,12 @@ def _read_message() -> dict | None:
             key, _, val = line.partition(":")
             headers[key.strip().lower()] = val.strip()
 
-    length = int(headers.get("content-length", 0))
+    try:
+        length = int(headers.get("content-length", 0))
+    except ValueError:
+        return None
+    if length < 0 or length > _MAX_BODY:
+        return None
     if not length:
         return None
 

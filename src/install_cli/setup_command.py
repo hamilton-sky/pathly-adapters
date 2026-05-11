@@ -12,6 +12,10 @@ from .resources import adapter_meta_path, adapter_install_yaml, core_agents_path
 from .stitch import stitch_agent, stitch_skill
 from .materialize import materialize, uninstall
 
+# Must stay in sync with detect_hosts() — any host returned by detect_hosts()
+# must appear here, or auto-detected installs will fail with a confusing error.
+ALLOWED_HOSTS = {"claude", "codex", "copilot"}
+
 _TELEMETRY_FOOTER = """
 ---
 
@@ -168,6 +172,10 @@ def main() -> None:
     args = parser.parse_args()
 
     hosts = [args.host] if args.host else detect_hosts()
+    for h in hosts:
+        if h not in ALLOWED_HOSTS:
+            print(f"Error: unsupported host {h!r}. Allowed: {', '.join(sorted(ALLOWED_HOSTS))}", file=sys.stderr)
+            sys.exit(1)
     if not hosts:
         print("No supported hosts detected. Install Claude Code, Codex, or VS Code + Copilot first.")
         sys.exit(1)
@@ -281,7 +289,7 @@ def _uninstall_package() -> None:
         cmd = [sys.executable, "-m", "pip", "uninstall", "pathly-adapters", "-y"]
 
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd)
+    result = subprocess.run(cmd, timeout=60)
     if result.returncode == 0:
         print("pathly-adapters removed. Goodbye!")
     else:

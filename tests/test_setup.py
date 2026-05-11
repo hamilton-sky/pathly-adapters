@@ -94,13 +94,14 @@ def test_materialize_without_repair_skips_owned(tmp_path):
 # setup_command
 # ---------------------------------------------------------------------------
 
-def test_no_flags_prints_no_writes_message(capsys):
+def test_no_flags_launches_interactive_menu(capsys):
+    # With no flags, main() delegates to _interactive_menu rather than writing
+    # files directly. Patch the menu to return immediately (simulating Exit).
     with patch.object(sys, "argv", ["pathly-setup"]):
         with patch("install_cli.setup_command.detect_hosts", return_value=["claude"]):
-            main()
-    captured = capsys.readouterr()
-    assert "no writes" in captured.out.lower()
-    assert "claude" in captured.out
+            with patch("install_cli.setup_command._interactive_menu") as mock_menu:
+                main()
+    mock_menu.assert_called_once_with(["claude"], repair=False, force=False)
 
 
 def test_dry_run_calls_run_host_with_dry_run_true():

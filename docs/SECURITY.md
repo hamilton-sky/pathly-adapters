@@ -105,6 +105,52 @@ Production recommendation:
 
 ---
 
+## CLI Host Allowlist Bypass
+
+Risk:
+
+- The `--host` CLI argument was passed directly to `adapter_meta_path(host)` and
+  `adapter_install_yaml(host)` without validation. A caller could supply an arbitrary
+  string used as a filesystem path component, potentially reading from unintended locations.
+
+Mitigation applied (security-fixes):
+
+- `ALLOWED_HOSTS = {"claude", "codex", "copilot"}` is defined at module level in
+  `install_cli/setup_command.py`.
+- `main()` validates every host in the resolved host list against `ALLOWED_HOSTS` before
+  any filesystem access. Invalid hosts cause an immediate exit with a descriptive error.
+
+Production recommendation:
+
+- Keep `ALLOWED_HOSTS` as the single source of truth. Any new supported host must be
+  added there explicitly.
+
+---
+
+## Telemetry Server DoS via Content-Length
+
+Risk:
+
+- `_read_message()` in `pathly_telemetry/server.py` called `stdin.read(length)` with no
+  upper bound on `length`. A caller advertising `Content-Length: 2GB` could cause a 2 GB
+  allocation attempt, hanging or OOM-killing the process.
+- `Content-Length: -1` was accepted; `stdin.read(-1)` reads until EOF (unbounded).
+- `int(headers.get("content-length", 0))` raised `ValueError` on non-integer header
+  values, crashing the server loop.
+
+Mitigation applied (security-fixes):
+
+- Reads are capped at `_MAX_BODY = 1_048_576` (1 MiB). Messages with a larger or negative
+  `Content-Length` are dropped without reading.
+- The `int()` parse is wrapped in `try/except ValueError`; a malformed `Content-Length` header causes `_read_message()` to return `None`, which terminates the server process cleanly.
+
+Production recommendation:
+
+- Consider logging dropped oversized or malformed messages to a diagnostic sink so
+  operators can detect probing attempts.
+
+---
+
 ## File Write Safety
 
 Risk:
