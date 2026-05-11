@@ -32,7 +32,7 @@ These are the real files written during the run. They are not copies — they ar
 | [plans/security-fixes/CONVERSATION_PROMPTS.md](../security-fixes/CONVERSATION_PROMPTS.md) | Planning | Verbatim prompts given to each builder agent |
 | [plans/security-fixes/PROGRESS.md](../security-fixes/PROGRESS.md) | Pipeline | Running status — which conversations are DONE |
 | [plans/security-fixes/RETRO.md](../security-fixes/RETRO.md) | Retro | Human-readable retrospective for the next pipeline run |
-| [LESSONS.md](../../LESSONS.md) | Lessons | Promoted patterns — planner reads this before every new plan |
+| [lessons/LESSONS.md](../../lessons/LESSONS.md) | Lessons | Promoted patterns — planner reads this before every new plan |
 
 ---
 

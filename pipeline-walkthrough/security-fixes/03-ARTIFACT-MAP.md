@@ -82,7 +82,7 @@ Contains:
 
 ## Lessons and patterns
 
-### [LESSONS.md](../../LESSONS.md)
+### [lessons/LESSONS.md](../../lessons/LESSONS.md)
 **Written by:** /lessons skill  
 **Read by:** Planner (before every new plan)
 
@@ -146,7 +146,7 @@ PROGRESS.md              ←── which conversations are done (state)
 RETRO.md                 ←── what we learned (feedback loop to next feature)
        │
        ▼
-LESSONS.md (root)        ←── promoted patterns (feedback loop to planner)
+lessons/LESSONS.md       ←── promoted patterns (feedback loop to planner)
 ```
 
 Each file is written by a different agent and read by the next agent in the chain.
