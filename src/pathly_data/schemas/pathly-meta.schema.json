@@ -21,6 +21,7 @@
     "variables": { "type": "object" },
     "templates": { "type": "object" },
     "skills": { "type": "object" },
+    "status": { "type": "string" },
     "structure": { "type": "string" },
     "telemetry": { "type": "boolean" },
     "hooks": {
