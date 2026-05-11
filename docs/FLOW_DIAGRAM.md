@@ -57,11 +57,11 @@ flowchart TD
 │   │   └── SKILL.md
 │   ├── review/
 │   │   └── SKILL.md
-│   ├── team-flow/
+│   ├── pathly-team-flow/
 │   │   └── SKILL.md
-│   ├── test/
+│   ├── pathly-test/
 │   │   └── SKILL.md
-│   └── ... (one folder per skill)
+│   └── pathly-*/              (one folder per sub-skill, all prefixed)
 └── plugins/pathly/
     └── templates/pathly plan/
         └── *.template.md
@@ -95,31 +95,32 @@ Source: `src/pathly_data/adapters/copilot/_meta/*.yaml` + `src/pathly_data/core/
 
 ### Claude Code
 
-Each skill is installed individually. You can invoke via the `/pathly` dispatcher
-or call any skill directly by name:
+All Pathly commands go through the `/pathly` dispatcher. Sub-skills are installed
+with a `pathly-` prefix so they never collide with other tools' slash commands.
 
 ```text
-Via dispatcher            Direct invocation         Purpose
+Command                   Purpose
 ──────────────────────────────────────────────────────────────────────
-/pathly start             /start                    welcome screen + journey map
-/pathly go add login      /go add login             director routes intent
-/pathly build             /build                    implement next conversation
-/pathly storm             /storm                    brainstorm with architect
-/pathly po checkout-flow  /po checkout-flow         clarify requirements (PO)
-/pathly plan              /plan                     create/update feature plan
-/pathly review            /review                   code review
-/pathly debug <desc>      /debug <desc>             investigate a bug
-/pathly explore <q>       /explore <q>              explore codebase (explorer + scout-flow)
-                          /test <feature>           run acceptance tests (tester + scout-flow)
-/pathly meet              /meet                     consult a role mid-flow
-/pathly verify            /verify-state             check for stale feedback
-/pathly pause             /pause                    pause session
-/pathly end               /end                      retro + archive
-/pathly retro <feature>   /retro <feature>          write retrospective only
-                          /team-flow <feature>      run full team pipeline
-                          /archive <feature>        archive completed feature
-                          /lessons                  promote lessons from retros
-                          /prd-import               import a PRD file
+/pathly start             welcome screen + journey map
+/pathly go                director routes intent (describe what you want)
+/pathly build             implement next conversation (auto-detects feature)
+/pathly storm             brainstorm with architect
+/pathly plan              create/update feature plan (auto-detects feature)
+/pathly review            code review
+/pathly test              run acceptance tests (auto-detects feature)
+/pathly debug             investigate a bug
+/pathly explore           explore codebase (explorer + scout-flow)
+/pathly po                clarify requirements with PO
+/pathly meet              consult a role mid-flow
+/pathly verify            check for stale feedback
+/pathly pause             pause session
+/pathly end               retro + archive
+/pathly retro             write retrospective (auto-detects feature)
+/pathly team-flow         run full team pipeline (auto-detects feature)
+/pathly archive           archive completed feature (auto-detects feature)
+/pathly lessons           promote lessons from retros
+/pathly prd-import        import a PRD file
+/pathly help              state-aware menu
 ```
 
 ### Codex

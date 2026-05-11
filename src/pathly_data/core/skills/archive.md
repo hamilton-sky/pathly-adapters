@@ -8,15 +8,20 @@ Adapter skills should load and follow this prompt instead of duplicating workflo
 This core prompt uses host-neutral Pathly route names. Adapters are responsible
 for rendering those routes in their host-native form.
 
+## Feature detection
+
+If `$ARGUMENTS` contains a non-keyword word, use it as `FEATURE`.
+Otherwise auto-detect:
+1. Read `plans/*/STATE.json` files, sorted by modification time (newest first).
+   Use the most recent feature whose state is not `IDLE` or `DONE`.
+2. If none found, use the most recently modified `plans/*/` folder (excluding `.archive/`).
+3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
+4. If no `plans/` folder exists or is empty: stop →
+   `No active feature found. Start with /pathly go to describe what you want to build.`
+
 ## Step 1: Validate
 
-If `$ARGUMENTS` is empty: stop →
-```
-Route: `archive <feature-name>`
-Example route: `archive hotel-search`
-```
-
-Set `FEATURE = $ARGUMENTS`.
+Set `FEATURE` from the Feature detection above.
 
 Check `plans/$FEATURE/` exists. If not: stop →
 ```

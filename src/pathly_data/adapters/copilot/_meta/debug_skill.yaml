@@ -1,3 +1,2 @@
-skill: debug
-invocation: /debug
-natural_language: "debug, /debug, debug bug, investigate issue"
+skill: pathly-debug
+natural_language: "/pathly debug, debug bug, investigate issue, debug"

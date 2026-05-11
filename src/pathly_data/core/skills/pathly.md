@@ -19,18 +19,26 @@ Split `$ARGUMENTS` into:
 | `pause` | `stop` | → **pause** |
 | `end` | `done`, `finish`, `wrap` | → **end** |
 | `help` | `h`, `?` | → **help** |
-| `meet` | — | → **meet** |
-| `build` | `b` | → **go** with intent `"continue build"` |
-| `storm` | — | → **go** with intent `"storm <args>"` |
+| `meet` | — | → **pathly-meet** skill directly |
 
-### Specialized commands (skip director routing)
+### Specialized commands (direct to skill — no director routing)
 
-| subcommand | behavior |
-|---|---|
-| `po` | → **po** skill directly |
-| `debug` | → **debug** skill directly |
-| `explore` | → **explore** skill directly |
-| `verify` | → **verify-state** skill directly |
+| subcommand | aliases | behavior |
+|---|---|---|
+| `build` | `b` | → **pathly-build** skill directly |
+| `storm` | — | → **pathly-storm** skill directly |
+| `plan` | `p` | → **pathly-plan** skill directly |
+| `review` | `r` | → **pathly-review** skill directly |
+| `test` | `t` | → **pathly-test** skill directly |
+| `retro` | — | → **pathly-retro** skill directly |
+| `archive` | — | → **pathly-archive** skill directly |
+| `lessons` | — | → **pathly-lessons** skill directly |
+| `team-flow` | `flow`, `tf` | → **pathly-team-flow** skill directly |
+| `po` | — | → **pathly-po** skill directly |
+| `debug` | — | → **pathly-debug** skill directly |
+| `explore` | — | → **pathly-explore** skill directly |
+| `verify` | — | → **pathly-verify-state** skill directly |
+| `prd-import` | `import` | → **pathly-prd-import** skill directly |
 
 ### Catch-all
 
@@ -253,7 +261,7 @@ write a read-only consult note to `plans/<feature>/feedback/CONSULT_<role>.md`.
 
   [1] Start a new feature          /pathly go <what you want>
   [2] Brainstorm an unclear idea   /pathly go storm
-  [3] Import a PRD/BMAD file       prd-import / bmad-import
+  [3] Import a PRD/BMAD file       /pathly prd-import
   [4] See all commands
 
 Reply with 1–4:
@@ -269,8 +277,8 @@ Reply with 1–4:
 ═══════════════════════════════════════════
 
   [1] Continue building            /pathly go continue
-  [2] Run full pipeline            team-flow <feature> build
-  [3] Review current code          review
+  [2] Run full pipeline            /pathly team-flow build
+  [3] Review current code          /pathly review
   [4] See all commands
 
 Reply with 1–4:
@@ -303,8 +311,8 @@ Reply with 1–3:
 ═══════════════════════════════════════════
 
   [1] Close feature (tests + retro)  /pathly end
-  [2] Run tests only                  team-flow <feature> test
-  [3] Write retro only                retro <feature>
+  [2] Run tests only                  /pathly team-flow test
+  [3] Write retro only                /pathly retro
   [4] See all commands
 
 Reply with 1–4:
@@ -319,8 +327,8 @@ Reply with 1–4:
   Rigor: <lite|standard|strict>
 ═══════════════════════════════════════════
 
-  [1] Archive this feature         archive <feature>
-  [2] Promote lessons              lessons
+  [1] Archive this feature         /pathly archive
+  [2] Promote lessons              /pathly lessons
   [3] Start next feature           /pathly go <what you want>
   [4] Read the retro
 
@@ -335,12 +343,16 @@ Reply with 1–4:
   /pathly build   /pathly pause   /pathly meet
   /pathly end     /pathly help
 
+── Pipeline ──────────────────────────────
+  /pathly plan    /pathly review  /pathly test
+  /pathly retro   /pathly archive /pathly lessons
+  /pathly team-flow
+
 ── Specialized ───────────────────────────
   /pathly po      /pathly debug
   /pathly explore /pathly verify
+  /pathly prd-import
 
 ── Catch-all ─────────────────────────────
   /pathly <anything>   Director routes intent
-
-Run /pathly help for full descriptions and state-aware guidance.
 ```

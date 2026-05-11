@@ -1,3 +1,2 @@
-skill: go
-invocation: /go
-natural_language: "go, /go, continue, resume, next step, keep going"
+skill: pathly-go
+natural_language: "/pathly go, continue, resume, next step, keep going"

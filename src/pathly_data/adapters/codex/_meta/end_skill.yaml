@@ -1,3 +1,2 @@
-skill: end
-invocation: /end
-natural_language: "end, /end, done, finish, wrap up, close feature"
+skill: pathly-end
+natural_language: "/pathly end, done, finish, wrap up, close feature"

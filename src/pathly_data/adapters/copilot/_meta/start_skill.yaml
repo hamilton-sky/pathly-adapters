@@ -1,3 +1,2 @@
-skill: start
-invocation: /start
-natural_language: "start, /start, begin pathly, welcome, pathly start"
+skill: pathly-start
+natural_language: "/pathly start, begin pathly, welcome, pathly start"

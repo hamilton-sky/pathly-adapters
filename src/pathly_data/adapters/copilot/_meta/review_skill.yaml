@@ -1,3 +1,2 @@
-skill: review
-invocation: /review
-natural_language: "review, /review, review code, code review"
+skill: pathly-review
+natural_language: "/pathly review, review code, code review, review"

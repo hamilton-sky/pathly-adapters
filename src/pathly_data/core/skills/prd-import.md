@@ -26,7 +26,13 @@ Split `$ARGUMENTS` on the first space:
 - If the final token is `lite`, `standard`, or `strict`, remove it from `PRD_PATH` and set `rigor` accordingly.
 - Default: `rigor = standard`
 
-If either is missing, stop and tell the user:
+If `FEATURE` is missing, ask interactively:
+```
+Feature name? (e.g. hotel-search):
+```
+Wait for the user's reply and use it as `FEATURE`.
+
+If `PRD_PATH` is missing, stop and tell the user:
 ```
 Route: `prd-import <feature-name> <path/to/PRD.md>`
 Example route: `prd-import hotel-search docs/hotel-search-prd.md`

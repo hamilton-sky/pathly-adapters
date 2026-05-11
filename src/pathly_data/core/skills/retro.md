@@ -10,11 +10,22 @@ for rendering those routes in their host-native form.
 
 ## Skill Contract
 
-**Consumes:** `plans/$ARGUMENTS/PROGRESS.md` + `plans/$ARGUMENTS/CONVERSATION_PROMPTS.md`
-**Produces:** `plans/$ARGUMENTS/RETRO.md`
+**Consumes:** `plans/<FEATURE>/PROGRESS.md` + `plans/<FEATURE>/CONVERSATION_PROMPTS.md`
+**Produces:** `plans/<FEATURE>/RETRO.md`
 **Consumed by:** `storm` skill (user pastes RETRO.md as context for next storm session)
 
-Run a retrospective on the **$ARGUMENTS** feature plan.
+## Feature detection
+
+If `$ARGUMENTS` contains a non-keyword word, use it as `FEATURE`.
+Otherwise auto-detect:
+1. Read `plans/*/STATE.json` files, sorted by modification time (newest first).
+   Use the most recent feature whose state is not `IDLE` or `DONE`.
+2. If none found, use the most recently modified `plans/*/` folder (excluding `.archive/`).
+3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
+4. If no `plans/` folder exists or is empty: stop →
+   `No active feature found. Start with /pathly go to describe what you want to build.`
+
+Run a retrospective on the **FEATURE** plan.
 
 ## Step 1: Read the plan
 

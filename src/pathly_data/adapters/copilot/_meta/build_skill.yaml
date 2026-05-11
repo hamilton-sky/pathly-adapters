@@ -1,3 +1,2 @@
-skill: build
-invocation: /build
-natural_language: "build, /build, build feature, implement next conversation"
+skill: pathly-build
+natural_language: "/pathly build, build feature, implement next conversation, build"

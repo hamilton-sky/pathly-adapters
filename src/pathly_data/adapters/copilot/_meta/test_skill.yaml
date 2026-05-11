@@ -1,4 +1,3 @@
-skill: test
-invocation: /test
-natural_language: "test, /test, run tests, verify acceptance criteria, test feature"
+skill: pathly-test
+natural_language: "/pathly test, run tests, verify acceptance criteria, test feature"
 status: experimental

@@ -8,7 +8,18 @@ Adapter skills should load and follow this prompt instead of duplicating workflo
 This core prompt uses host-neutral Pathly route names. Adapters are responsible
 for rendering those routes in their host-native form.
 
-Parse `$ARGUMENTS`: the first word is the **plan folder name**, and if a second word "auto" is present, that signals non-interactive auto-flow mode. For example, `continue refactor-main auto` -> plan = `refactor-main`, auto mode = true.
+Parse `$ARGUMENTS`: the first word is the **plan folder name** (FEATURE), and if a second word "auto" is present, that signals non-interactive auto-flow mode. For example, `continue refactor-main auto` -> plan = `refactor-main`, auto mode = true.
+
+## Feature detection
+
+If the first word of `$ARGUMENTS` is a non-keyword word, use it as `FEATURE`.
+Otherwise auto-detect:
+1. Read `plans/*/STATE.json` files, sorted by modification time (newest first).
+   Use the most recent feature whose state is not `IDLE` or `DONE`.
+2. If none found, use the most recently modified `plans/*/` folder (excluding `.archive/`).
+3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
+4. If no `plans/` folder exists or is empty: stop →
+   `No active feature found. Start with /pathly go to describe what you want to build.`
 
 ## Step 0: Execution Mode Selection
 

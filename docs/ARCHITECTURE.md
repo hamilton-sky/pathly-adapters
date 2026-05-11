@@ -179,27 +179,27 @@ For Claude Code:
 │   architect, builder, director, explorer, orchestrator, planner, po,
 │   quick, reviewer, scout, tester, web-researcher
 ├── skills/                    ← skill directories (each folder has SKILL.md)
-│   ├── pathly/                ← main dispatcher (/pathly <subcommand>)
-│   ├── start/                 ← /start  — welcome screen + journey map
-│   ├── go/                    ← /go     — director routes intent
-│   ├── build/                 ← /build  — implement next conversation
-│   ├── plan/                  ← /plan   — create/update feature plan
-│   ├── team-flow/             ← /team-flow — run full team pipeline
-│   ├── storm/                 ← /storm  — brainstorm with architect
-│   ├── review/                ← /review — code review
-│   ├── debug/                 ← /debug  — investigate a bug
-│   ├── explore/               ← /explore — explore codebase
-│   ├── po/                    ← /po     — clarify requirements (PO)
-│   ├── meet/                  ← /meet   — consult a role mid-flow
-│   ├── verify-state/          ← /verify-state — check for stale feedback
-│   ├── pause/                 ← /pause  — pause session
-│   ├── end/                   ← /end    — retro + archive
-│   ├── retro/                 ← /retro  — write retrospective
-│   ├── test/                  ← /test   — run acceptance tests via scout-flow
-│   ├── archive/               ← /archive — archive completed feature
-│   ├── lessons/               ← /lessons — promote lessons from retros
-│   ├── prd-import/            ← /prd-import — import a PRD file
-│   └── help/                  ← /help   — state-aware command reference
+│   ├── pathly/                ← /pathly — main dispatcher (only user-facing slash command)
+│   ├── pathly-start/          ← internal: /pathly start
+│   ├── pathly-go/             ← internal: /pathly go
+│   ├── pathly-build/          ← internal: /pathly build
+│   ├── pathly-plan/           ← internal: /pathly plan
+│   ├── pathly-team-flow/      ← internal: /pathly team-flow
+│   ├── pathly-storm/          ← internal: /pathly storm
+│   ├── pathly-review/         ← internal: /pathly review
+│   ├── pathly-debug/          ← internal: /pathly debug
+│   ├── pathly-explore/        ← internal: /pathly explore
+│   ├── pathly-po/             ← internal: /pathly po
+│   ├── pathly-meet/           ← internal: /pathly meet
+│   ├── pathly-verify-state/   ← internal: /pathly verify
+│   ├── pathly-pause/          ← internal: /pathly pause
+│   ├── pathly-end/            ← internal: /pathly end
+│   ├── pathly-retro/          ← internal: /pathly retro
+│   ├── pathly-test/           ← internal: /pathly test
+│   ├── pathly-archive/        ← internal: /pathly archive
+│   ├── pathly-lessons/        ← internal: /pathly lessons
+│   ├── pathly-prd-import/     ← internal: /pathly prd-import
+│   └── pathly-help/           ← internal: /pathly help
 └── plugins/pathly/
     └── templates/pathly plan/
         └── *.template.md

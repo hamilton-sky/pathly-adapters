@@ -1,3 +1,2 @@
-skill: explore
-invocation: /explore
-natural_language: "explore, /explore, explore codebase, investigate code"
+skill: pathly-explore
+natural_language: "/pathly explore, explore codebase, investigate code, explore"

@@ -1,3 +1,2 @@
-skill: verify-state
-invocation: /verify-state
-natural_language: "verify-state, /verify-state, verify, check state"
+skill: pathly-verify-state
+natural_language: "/pathly verify, verify, check state, verify-state"

@@ -1,3 +1,2 @@
-skill: prd-import
-invocation: /prd-import
-natural_language: "prd-import, /prd-import, import prd, import requirements"
+skill: pathly-prd-import
+natural_language: "/pathly prd-import, import prd, import requirements, prd-import"

@@ -1,3 +1,2 @@
-skill: help
-invocation: /help
-natural_language: "help, /help, what can I do, show commands, pathly help"
+skill: pathly-help
+natural_language: "/pathly help, what can I do, show commands, pathly help"

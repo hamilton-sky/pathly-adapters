@@ -15,6 +15,16 @@ Parse `$ARGUMENTS` (order doesn't matter):
 - `plan` → `entryStage = plan` | `build` → `entryStage = build` | `test` → `entryStage = test`
 - Defaults: `entryStage = discovery`, `rigor = lite`
 
+## Feature detection
+
+If no `FEATURE` was found in `$ARGUMENTS`, auto-detect:
+1. Read `plans/*/STATE.json` files, sorted by modification time (newest first).
+   Use the most recent feature whose state is not `IDLE` or `DONE`.
+2. If none found, use the most recently modified `plans/*/` folder (excluding `.archive/`).
+3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
+4. If no `plans/` folder exists or is empty: stop →
+   `No active feature found. Start with /pathly go to describe what you want to build.`
+
 Conflict checks (stop and report):
 - `strict` + `fast` → `strict mode requires human approval gates; remove fast or choose standard fast.`
 - `nano` + `strict|standard|plan|build|test` → `nano mode has no plan stages; remove the conflicting flag or choose lite instead.`

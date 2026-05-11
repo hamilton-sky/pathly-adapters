@@ -17,10 +17,20 @@ Use `team-flow <feature> test` when running within the full pipeline (build → 
 
 ---
 
+## Feature detection
+
+If `$ARGUMENTS` contains a non-keyword word, use it as `FEATURE`.
+Otherwise auto-detect:
+1. Read `plans/*/STATE.json` files, sorted by modification time (newest first).
+   Use the most recent feature whose state is not `IDLE` or `DONE`.
+2. If none found, use the most recently modified `plans/*/` folder (excluding `.archive/`).
+3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
+4. If no `plans/` folder exists or is empty: stop →
+   `No active feature found. Start with /pathly go to describe what you want to build.`
+
 ## Step 0 — Locate the plan
 
-Parse `$ARGUMENTS` for a plan folder name. If blank, list all `plans/*/` folders
-and ask which one to test.
+Parse `$ARGUMENTS` for a plan folder name (FEATURE). If blank, use the auto-detected FEATURE above.
 
 Read `plans/<feature>/PROGRESS.md`. If Status is not COMPLETE (or all conversations
 not DONE), stop:

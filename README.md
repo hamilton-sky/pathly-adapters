@@ -31,13 +31,13 @@ That's it. Pathly detects Claude Code, Codex, and Copilot automatically.
 Then open Claude Code in your project directory and start:
 
 ```
-/start                   ← welcome screen + pick what to do
-/go add login flow       ← director routes your intent
-/build                   ← implement next conversation
-/end                     ← retro + archive
+/pathly start            ← welcome screen + pick what to do
+/pathly go               ← describe what you want; director routes it
+/pathly build            ← implement next conversation
+/pathly end              ← retro + archive
 ```
 
-Or use the `/pathly` dispatcher: `/pathly start`, `/pathly go add login`, etc.
+All commands go through `/pathly`. See `/pathly help` for the full command list.
 
 ## All commands
 

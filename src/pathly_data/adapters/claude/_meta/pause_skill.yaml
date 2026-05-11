@@ -1,3 +1,2 @@
-skill: pause
-invocation: /pause
-natural_language: "pause, /pause, stop session, save state, pause work"
+skill: pathly-pause
+natural_language: "/pathly pause, stop session, save state, pause work"
