@@ -13,6 +13,12 @@ After each conversation, **commit your changes** before starting the next.
 ```
 Implement [Feature] Conversation 1 (Phases X-Y) from plans/$ARGUMENTS/IMPLEMENTATION_PLAN.md.
 
+**Before editing anything:** glob/read the live repo to confirm every file path below exists. Correct any discrepancy between the plan's stated paths and reality before proceeding.
+
+**Codebase files this conversation touches:**
+- `[src/path/to/file.py]` — [what changes]
+- `[src/path/to/other.py]` — [what changes]
+
 Scope:
 - Phase X: [specific instructions with file paths and layer]
 - Phase Y: [specific instructions with file paths and layer]

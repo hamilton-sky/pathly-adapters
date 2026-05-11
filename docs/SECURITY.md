@@ -82,9 +82,9 @@ state.
 
 Files reviewed:
 
-- `install_cli/detect.py`
-- `install_cli/materialize.py`
-- `install_cli/setup_command.py`
+- `src/install_cli/detect.py`
+- `src/install_cli/materialize.py`
+- `src/install_cli/setup_command.py`
 
 Risk:
 
@@ -208,7 +208,7 @@ Production hardening still needed:
 
 Risk:
 
-- `adapters/claude/.claude-plugin/plugin.json`, `adapters/codex/.codex-plugin/plugin.json`,
+- `src/pathly_data/adapters/claude/.claude-plugin/plugin.json`, `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`,
   and `.agents/plugins/marketplace.json` are trusted by Claude Code and Codex.
 - A malformed or tampered manifest could cause the host tool to load the wrong
   files or fail silently.

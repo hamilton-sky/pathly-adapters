@@ -9,48 +9,53 @@ loading, and the `pathly-setup` CLI.
 ```text
 pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-setup)
 │
-├── core/                        ← SINGLE SOURCE OF TRUTH (tool-agnostic)
-│   ├── agents/                  ← Agent behavior contracts (.md — no spawning syntax)
-│   │   ├── architect.md
-│   │   ├── builder.md
-│   │   ├── director.md
-│   │   ├── orchestrator.md
-│   │   ├── planner.md
-│   │   ├── po.md
-│   │   ├── quick.md
-│   │   ├── reviewer.md
-│   │   ├── scout.md
-│   │   ├── tester.md
-│   │   └── web-researcher.md
-│   ├── skills/                  ← Skill logic in natural language (tool-agnostic .md)
-│   │   ├── team-flow.md
-│   │   ├── explore.md
-│   │   ├── build.md
-│   │   ├── review.md
-│   │   ├── storm.md
-│   │   └── ...
-│   └── templates/               ← Plan file templates (PROGRESS, USER_STORIES, etc.)
-│       └── plan/
+├── src/
+│   ├── install_cli/             ← Python CLI: detects host tools, stitches + deploys files
+│   │   ├── detect.py            ← Discovers installed AI tools
+│   │   ├── stitch.py            ← Combines core/ + adapter _meta/ into deployable files
+│   │   ├── materialize.py       ← Writes output files to ~/.claude/, ~/.codex/, etc.
+│   │   ├── setup_command.py     ← Entry point for pathly-setup command
+│   │   ├── mcp_config.py
+│   │   ├── resources.py
+│   │   └── __main__.py
+│   └── pathly_data/
+│       ├── core/                ← SINGLE SOURCE OF TRUTH (tool-agnostic)
+│       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax)
+│       │   │   ├── architect.md
+│       │   │   ├── builder.md
+│       │   │   ├── director.md
+│       │   │   ├── orchestrator.md
+│       │   │   ├── planner.md
+│       │   │   ├── po.md
+│       │   │   ├── quick.md
+│       │   │   ├── reviewer.md
+│       │   │   ├── scout.md
+│       │   │   ├── tester.md
+│       │   │   └── web-researcher.md
+│       │   ├── skills/          ← Skill logic in natural language (tool-agnostic .md)
+│       │   │   ├── team-flow.md
+│       │   │   ├── explore.md
+│       │   │   ├── build.md
+│       │   │   ├── review.md
+│       │   │   ├── storm.md
+│       │   │   └── ...
+│       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
+│       │       └── plan/
+│       └── adapters/            ← Thin tool-specific wrappers
+│           ├── claude/          ← .claude-plugin/ + _meta/*.yaml per agent/skill
+│           ├── codex/           ← .codex-plugin/ + _meta/*.yaml per agent/skill
+│           └── copilot/         ← _meta/*.yaml per agent/skill
 │
-├── adapters/                    ← Thin tool-specific wrappers
-│   ├── claude/                  ← .claude-plugin/ + _meta/*.yaml per agent/skill
-│   ├── codex/                   ← .codex-plugin/ + _meta/*.yaml per agent/skill
-│   └── copilot/                 ← _meta/*.yaml per agent/skill
-│
-└── install_cli/                 ← Python CLI: detects host tools, stitches + deploys files
-    ├── detect.py                ← Discovers installed AI tools
-    ├── stitch.py                ← Combines core/ + adapter _meta/ into deployable files
-    ├── materialize.py           ← Writes output files to ~/.claude/, ~/.codex/, etc.
-    └── setup_command.py         ← Entry point for pathly-setup command
+└── orchestrator/                ← Local FSM event-log module (internal)
 ```
 
 ## Adapter Surfaces Per Host
 
 | Host | User surface | Source files | Installed destination |
 |---|---|---|---|
-| Claude Code | `/pathly ...`, `/go ...` | `adapters/claude/_meta/` | `~/.claude/agents/`, `~/.claude/skills/` |
-| Codex | `Use Pathly ...` natural-language plugin skills | `adapters/codex/_meta/` | `~/.codex/agents/`, `~/.codex/skills/` |
-| Copilot | Copilot-native skill invocation | `adapters/copilot/_meta/` | VS Code agents folder |
+| Claude Code | `/pathly ...`, `/go ...` | `src/pathly_data/adapters/claude/_meta/` | `~/.claude/agents/`, `~/.claude/skills/` |
+| Codex | `Use Pathly ...` natural-language plugin skills | `src/pathly_data/adapters/codex/_meta/` | `~/.codex/agents/`, `~/.codex/skills/` |
+| Copilot | Copilot-native skill invocation | `src/pathly_data/adapters/copilot/_meta/` | VS Code agents folder |
 
 Current Codex builds do not expose Pathly as `/pathly`. Use natural-language
 skill prompts in Codex.
@@ -67,7 +72,7 @@ skill prompts in Codex.
 
 ## Stitch Pipeline
 
-`core/` is content, not runtime code. `install_cli/` stitches `core/` content
+`core/` is content, not runtime code. `src/install_cli/` stitches `core/` content
 with adapter `_meta/*.yaml` files at install time and deploys the result to the
 host tool's config directory.
 
@@ -80,9 +85,9 @@ pathly-setup
         │       into deployable agent and skill files
         │
         ├── materialize.py writes stitched files:
-        │   ├── adapters/claude/_meta/**  ──────► ~/.claude/agents/ + ~/.claude/skills/
-        │   ├── adapters/codex/_meta/**   ──────► ~/.codex/agents/ + ~/.codex/skills/
-        │   └── adapters/copilot/_meta/** ──────► Copilot workspace config
+        │   ├── src/pathly_data/adapters/claude/_meta/**  ──────► ~/.claude/agents/ + ~/.claude/skills/
+        │   ├── src/pathly_data/adapters/codex/_meta/**   ──────► ~/.codex/agents/ + ~/.codex/skills/
+        │   └── src/pathly_data/adapters/copilot/_meta/** ──────► Copilot workspace config
         │
         └── setup_command.py is the CLI entry point (registered as `pathly-setup`)
 ```
@@ -95,12 +100,13 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 
 | Module | Purpose |
 |---|---|
-| `install_cli/detect.py` | Discovers which AI tools (Claude Code, Codex, Copilot) are installed |
-| `install_cli/stitch.py` | Merges `core/` content with adapter `_meta/*.yaml` into deployable files |
-| `install_cli/materialize.py` | Writes stitched output to `~/.claude/`, `~/.codex/`, etc. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back. |
-| `install_cli/setup_command.py` | CLI entry point registered as `pathly-setup` |
-| `core/` | Source-of-truth agent contracts, skill logic, plan templates — never edited by install |
-| `adapters/` | Per-tool YAML metadata (`_meta/`) and plugin manifests |
+| `src/install_cli/detect.py` | Discovers which AI tools (Claude Code, Codex, Copilot) are installed |
+| `src/install_cli/stitch.py` | Merges `core/` content with adapter `_meta/*.yaml` into deployable files |
+| `src/install_cli/materialize.py` | Writes stitched output to `~/.claude/`, `~/.codex/`, etc. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back. |
+| `src/install_cli/setup_command.py` | CLI entry point registered as `pathly-setup` |
+| `src/pathly_data/core/` | Source-of-truth agent contracts, skill logic, plan templates — never edited by install |
+| `src/pathly_data/adapters/` | Per-tool YAML metadata (`_meta/`) and plugin manifests |
+| `orchestrator/` | Local Python module at the repo root. Implements an FSM event-log for tracking LLM conversation context. Not a user-facing CLI tool. |
 
 ## Host Detection
 
@@ -123,23 +129,23 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 
 **Key constraint:** Subagent spawning syntax is tool-specific. There is no universal standard.
 
-**Solution (thin adapters):** `core/skills/` contains the skill *logic* in natural language.
+**Solution (thin adapters):** `src/pathly_data/core/skills/` contains the skill *logic* in natural language.
 Each adapter's `_meta/*.yaml` adds only the tool-specific spawn call on top:
 
 ```
-# core/skills/team-flow.md
+# src/pathly_data/core/skills/team-flow.md
 Delegate implementation to the builder agent.
 Then delegate review to the reviewer agent.
 
-# adapters/claude/_meta/go_skill.yaml  (adds Agent() spawn calls for Claude Code)
+# src/pathly_data/adapters/claude/_meta/go_skill.yaml  (adds Agent() spawn calls for Claude Code)
 Spawn Agent(subagent_type="builder") for implementation.
 Spawn Agent(subagent_type="reviewer") for review.
 ```
 
 ## Installed Manifests
 
-- Claude plugin manifest: `adapters/claude/.claude-plugin/plugin.json`
-- Codex plugin manifest: `adapters/codex/.codex-plugin/plugin.json`
+- Claude plugin manifest: `src/pathly_data/adapters/claude/.claude-plugin/plugin.json`
+- Codex plugin manifest: `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`
 - Public Codex marketplace metadata: `.agents/plugins/marketplace.json`
 
 There is no root `.codex-plugin/` directory. Root `.agents/` is marketplace
@@ -184,11 +190,11 @@ For Claude Code:
 
 ## Source of Truth
 
-- Shared workflow behavior belongs in `core/skills/`.
-- Shared role behavior belongs in `core/agents/`.
-- Plan file structure belongs in `core/templates/plan/`.
-- Host metadata belongs under the matching adapter in `adapters/<tool>/_meta/`.
-- Python runtime code belongs in `install_cli/`, not in `core/`.
+- Shared workflow behavior belongs in `src/pathly_data/core/skills/`.
+- Shared role behavior belongs in `src/pathly_data/core/agents/`.
+- Plan file structure belongs in `src/pathly_data/core/templates/plan/`.
+- Host metadata belongs under the matching adapter in `src/pathly_data/adapters/<tool>/_meta/`.
+- Python runtime code belongs in `src/install_cli/`, not in `core/`.
 
 Adapters should stay thin. They load or wrap core content, add host-specific
 metadata, and expose the host-native invocation style.
@@ -200,7 +206,7 @@ planned work. Add them only when there is real demand, keeping the same rule:
 core owns reusable behavior, adapters own packaging.
 
 ```text
-adapters/
+src/pathly_data/adapters/
 |-- cursor/
 |-- windsurf/
 |-- bmad/

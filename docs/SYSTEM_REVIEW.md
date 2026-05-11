@@ -47,17 +47,17 @@ Internal review of pathly-adapters' current shape and release posture.
 ## Current Implementation Map
 
 ```text
-install_cli/detect.py        host discovery (Claude Code, Codex, Copilot)
-install_cli/stitch.py        core/ + _meta/*.yaml → deployable agent/skill files
-install_cli/materialize.py   atomic write to host config + manifest tracking
-install_cli/setup_command.py pathly-setup CLI (dry-run, apply, repair, force,
+src/install_cli/detect.py        host discovery (Claude Code, Codex, Copilot)
+src/install_cli/stitch.py        core/ + _meta/*.yaml → deployable agent/skill files
+src/install_cli/materialize.py   atomic write to host config + manifest tracking
+src/install_cli/setup_command.py pathly-setup CLI (dry-run, apply, repair, force,
                                uninstall, per-host subcommands)
-core/agents/                 11 host-neutral agent behavior contracts
-core/skills/                 skill logic in natural language
-core/templates/plan/         plan file templates
-adapters/claude/_meta/       per-agent/skill YAML for Claude Code
-adapters/codex/_meta/        per-agent/skill YAML for Codex
-adapters/copilot/_meta/      per-agent/skill YAML for Copilot
+src/pathly_data/core/agents/                 11 host-neutral agent behavior contracts
+src/pathly_data/core/skills/                 skill logic in natural language
+src/pathly_data/core/templates/plan/         plan file templates
+src/pathly_data/adapters/claude/_meta/       per-agent/skill YAML for Claude Code
+src/pathly_data/adapters/codex/_meta/        per-agent/skill YAML for Codex
+src/pathly_data/adapters/copilot/_meta/      per-agent/skill YAML for Copilot
 ```
 
 ## Recommended Next Hardening

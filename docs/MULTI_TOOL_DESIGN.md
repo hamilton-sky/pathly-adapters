@@ -7,37 +7,30 @@ packaged for Claude Code, Codex, the Python CLI, and future hosts.
 ## Current Structure
 
 ```text
-pathly/                              ← monorepo root
-|-- pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-setup)
-|   |-- core/                        ← single source of truth (tool-agnostic)
-|   |   |-- agents/                  ← 11 agent behavior contracts
-|   |   |-- skills/                  ← 19 skill definitions
-|   |   `-- templates/plan/          ← plan file templates
-|   |-- adapters/                    ← thin tool-specific wrappers
-|   |   |-- claude/                  ← .claude-plugin/ + _meta/*.yaml
-|   |   |-- codex/                   ← .codex-plugin/ + _meta/*.yaml
-|   |   `-- copilot/                 ← _meta/*.yaml
-|   |-- install_cli/                 ← Python installer CLI
-|   `-- pathly_telemetry/            ← cross-host activity telemetry
-|-- pathly-engine/                   ← pip package: pathly-engine (CLI: pathly)
-|   |-- orchestrator/                ← pure FSM library
-|   |-- runners/                     ← subprocess runners (claude, codex)
-|   |-- team_flow/                   ← Python driver
-|   `-- engine_cli/                  ← CLI entry point
-|-- .agents/                         ← Codex marketplace metadata only
-|   `-- plugins/marketplace.json
-|-- docs/                            ← architecture, readiness, and review notes
-|-- tests/                           ← integration tests
-`-- README.md
+pathly-adapters/                 ← repo root (single package)
+├── src/
+│   ├── install_cli/             ← Python CLI: detect, stitch, setup_command
+│   └── pathly_data/             ← installed package data
+│       ├── core/                ← single source of truth (tool-agnostic)
+│       │   ├── agents/
+│       │   ├── skills/
+│       │   └── templates/plan/
+│       └── adapters/            ← thin tool-specific wrappers
+│           ├── claude/
+│           ├── codex/
+│           └── copilot/
+├── orchestrator/                ← local FSM event-log module (internal)
+├── docs/
+└── pyproject.toml
 ```
 
 ## Source Of Truth
 
-- Shared workflow behavior belongs in `pathly-adapters/core/skills/`.
-- Shared role behavior belongs in `pathly-adapters/core/agents/`.
-- Plan file structure belongs in `pathly-adapters/core/templates/plan/`.
-- Host metadata belongs under the matching adapter in `pathly-adapters/adapters/<tool>/_meta/`.
-- Python runtime code belongs in `pathly-engine/` or `pathly-adapters/install_cli/`, not in `core/`.
+- Shared workflow behavior belongs in `src/pathly_data/core/skills/`.
+- Shared role behavior belongs in `src/pathly_data/core/agents/`.
+- Plan file structure belongs in `src/pathly_data/core/templates/plan/`.
+- Host metadata belongs under the matching adapter in `src/pathly_data/adapters/<tool>/_meta/`.
+- Python runtime code belongs in `src/install_cli/`, not in `core/`.
 
 Adapters should stay thin. They load or wrap core content, add host-specific
 metadata, and expose the host-native invocation style.
@@ -46,15 +39,14 @@ metadata, and expose the host-native invocation style.
 
 | Adapter | User invocation | Files |
 |---|---|---|
-| Claude Code | `/pathly <request>` or `/path <request>` (slash commands) | `pathly-adapters/adapters/claude/` |
-| Codex | `Use Pathly <request>` or `Pathly <request>` (natural language) | `pathly-adapters/adapters/codex/` |
-| Copilot | Version-dependent; agent files as custom instructions | `pathly-adapters/adapters/copilot/` |
-| CLI | `pathly <command>` terminal commands | `pathly-engine/engine_cli/` |
+| Claude Code | `/pathly <request>` or `/path <request>` (slash commands) | `src/pathly_data/adapters/claude/` |
+| Codex | `Use Pathly <request>` or `Pathly <request>` (natural language) | `src/pathly_data/adapters/codex/` |
+| Copilot | Version-dependent; agent files as custom instructions | `src/pathly_data/adapters/copilot/` |
 
 ## Installed Manifests
 
-- Claude plugin manifest: `pathly-adapters/adapters/claude/.claude-plugin/plugin.json`
-- Codex plugin manifest: `pathly-adapters/adapters/codex/.codex-plugin/plugin.json`
+- Claude plugin manifest: `src/pathly_data/adapters/claude/.claude-plugin/plugin.json`
+- Codex plugin manifest: `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`
 - Public Codex marketplace metadata: `.agents/plugins/marketplace.json`
 
 There is no root `.codex-plugin/` directory in the current repository. Root
@@ -69,7 +61,7 @@ core owns reusable behavior, adapters own packaging.
 Suggested future layout:
 
 ```text
-adapters/
+src/pathly_data/adapters/
 |-- cursor/
 |-- windsurf/
 |-- bmad/

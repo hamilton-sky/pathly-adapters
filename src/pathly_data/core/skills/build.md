@@ -114,6 +114,7 @@ In auto-flow mode, skip this and proceed immediately.
 
 Execute exactly what the conversation prompt specifies:
 
+0. **Verify before edit** — before touching any file, glob or read the live repo to confirm every path in the conversation prompt exists and matches reality. If any path is wrong, stale, or missing: correct it and note the discrepancy. Do not proceed with a path that cannot be found.
 1. Read each file that will be modified
 2. Make changes following the prompt's specifications exactly
 3. Follow all project conventions from the project's guidance and rule files.

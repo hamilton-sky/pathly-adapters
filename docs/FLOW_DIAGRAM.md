@@ -20,7 +20,7 @@ flowchart TD
 
     CC --> CA[claude adapter\n~/.claude/agents/ + ~/.claude/skills/]
     CX --> XA[codex adapter\n~/.codex/agents/ + ~/.codex/skills/]
-    CLI --> LA[pathly-engine CLI\npathly-engine/engine_cli/]
+    CLI --> LA[pathly-setup CLI\nsrc/install_cli/setup_command.py]
 ```
 
 ## Install Flow
@@ -62,8 +62,8 @@ flowchart TD
         └── *.template.md
 ```
 
-Source: `adapters/claude/_meta/*.yaml` + `core/` content
-Plugin manifest: `adapters/claude/.claude-plugin/plugin.json`
+Source: `src/pathly_data/adapters/claude/_meta/*.yaml` + `src/pathly_data/core/` content
+Plugin manifest: `src/pathly_data/adapters/claude/.claude-plugin/plugin.json`
 
 ### Codex
 
@@ -73,8 +73,8 @@ Plugin manifest: `adapters/claude/.claude-plugin/plugin.json`
 └── skills/                    ← stitched skill files (natural language, not slash commands)
 ```
 
-Source: `adapters/codex/_meta/*.yaml` + `core/` content
-Plugin manifest: `adapters/codex/.codex-plugin/plugin.json`
+Source: `src/pathly_data/adapters/codex/_meta/*.yaml` + `src/pathly_data/core/` content
+Plugin manifest: `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`
 Public marketplace metadata: `.agents/plugins/marketplace.json`
 
 ### Copilot
@@ -84,7 +84,7 @@ VS Code agents folder/
 └── stitched agent + skill files (Copilot-compatible format)
 ```
 
-Source: `adapters/copilot/_meta/*.yaml` + `core/` content
+Source: `src/pathly_data/adapters/copilot/_meta/*.yaml` + `src/pathly_data/core/` content
 
 ## Host-Specific Invocation
 
@@ -141,15 +141,15 @@ existing files that would be replaced, final start command per host.
 
 ## Stitch: Core + Adapter Metadata
 
-`core/skills/` contains skill *logic* in natural language. Each adapter's
+`src/pathly_data/core/skills/` contains skill *logic* in natural language. Each adapter's
 `_meta/*.yaml` adds only the tool-specific spawn call on top:
 
 ```
-# core/skills/team-flow.md
+# src/pathly_data/core/skills/team-flow.md
 Delegate implementation to the builder agent.
 Then delegate review to the reviewer agent.
 
-# adapters/claude/_meta/go_skill.yaml  (adds Agent() spawn calls for Claude Code)
+# src/pathly_data/adapters/claude/_meta/go_skill.yaml  (adds Agent() spawn calls for Claude Code)
 Spawn Agent(subagent_type="builder") for implementation.
 Spawn Agent(subagent_type="reviewer") for review.
 ```

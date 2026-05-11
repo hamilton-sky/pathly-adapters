@@ -38,6 +38,8 @@ Read the task description and output only a `## NEEDS_CONTEXT` block:
 
 ## Phase 2 — Implement (normal spawn, or `phase: implement`)
 
+**Verify before edit:** before touching any file, glob or read the live repo to confirm every path named in the prompt exists. If a path is wrong or missing, correct it and note the discrepancy — do not silently proceed with a path that cannot be found.
+
 Implement the task. If the skill ran Phase 1, scout findings will be injected into your prompt under `## Scout Findings` — treat them as authoritative context before touching any file.
 
 **After receiving scout findings:** compress them into a short internal summary before editing. Raw findings must not persist into the edit phase.

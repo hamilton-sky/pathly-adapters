@@ -11,8 +11,8 @@ for rendering those routes in their host-native form.
 ## Skill Contract
 
 **Consumes (optional):** `plans/STORM_SEED.md` - pre-filled answers for the interview
-**Produces:** `plans/$FEATURE/` - 4 files in lite, 8 files in standard/strict
-**Consumed by:** `build` skill reads `plans/$FEATURE/CONVERSATION_PROMPTS.md` and `PROGRESS.md`
+**Produces:** `plans/$FEATURE/` - FEATURE_INDEX.md + 4 files in lite, FEATURE_INDEX.md + 8 files in standard/strict
+**Consumed by:** `build` skill reads `plans/$FEATURE/FEATURE_INDEX.md` first, then `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
 
 ## Step 0: Parse Arguments
 
@@ -105,7 +105,10 @@ Create `plans/$FEATURE/` if it does not exist. If it exists, add or update only 
 
 ### Rigor File Sets
 
-Lite produces 4 required files:
+**All rigor levels produce `FEATURE_INDEX.md` as the first file.** Write it before any other plan file.
+
+Lite produces 5 required files:
+- `FEATURE_INDEX.md` ← always first
 - `USER_STORIES.md`
 - `IMPLEMENTATION_PLAN.md`
 - `PROGRESS.md`
@@ -113,7 +116,8 @@ Lite produces 4 required files:
 
 Lite merges happy path, edge cases, architecture notes, and flow notes into the relevant sections of those four files. Keep the plan small: target 1-2 conversations and only include detail the builder needs.
 
-Standard produces 8 files:
+Standard produces 9 files:
+- `FEATURE_INDEX.md` ← always first
 - `USER_STORIES.md`
 - `IMPLEMENTATION_PLAN.md`
 - `PROGRESS.md`
@@ -133,50 +137,72 @@ Strict produces the same 8 files plus stronger audit expectations:
 
 Conversation cap rule: max 4 conversations per folder. If more are needed, split into `plans/$FEATURE-part-1/` and `plans/$FEATURE-part-2/`.
 
-### 4a. USER_STORIES.md
+### 4a. FEATURE_INDEX.md ← write this first
+
+Read `core/templates/plan/FEATURE_INDEX.template.md` for the exact file structure.
+
+Fill in:
+- **Plan files table** — list every plan file this feature will produce, with written-by/read-by/purpose.
+- **Codebase touchpoints table** — list every source file this feature will create or modify, which conversation touches it, and what changes. One row per file. These are the paths the builder must verify before editing.
+- **Conversation map** — one row per conversation matching PROGRESS.md exactly.
+- **Optional plan files** — mark yes/no for each of the 4 optional files.
+
+Write this file before writing any other plan file. All codebase paths must be accurate — the builder will glob-verify each one.
+
+### 4b. USER_STORIES.md
 
 Read `core/templates/plan/USER_STORIES.template.md` for the exact file structure.
 
 In lite, include only the stories and acceptance criteria needed for the small change.
 
-### 4b. IMPLEMENTATION_PLAN.md
+### 4c. IMPLEMENTATION_PLAN.md
 
 Read `core/templates/plan/IMPLEMENTATION_PLAN.template.md` for the exact file structure.
+
+Each phase header must carry a `Conversation: N` tag matching the PROGRESS.md row it belongs to:
+```
+## Phase 2 — Fix path prefixes   ← Conversation: 1
+```
+This enforces 1:1 alignment between plan phases and PROGRESS.md rows. The builder navigates by conversation number; the tag is the bridge.
 
 In lite, add short sections for happy path, edge cases, and architecture notes directly in this file instead of creating separate files.
 
 In strict, add risk, rollback, approval, and verification mapping sections.
 
-### 4c. PROGRESS.md
+### 4d. PROGRESS.md
 
 Read `core/templates/plan/PROGRESS.template.md` for the exact file structure.
 
-### 4d. CONVERSATION_PROMPTS.md
+### 4e. CONVERSATION_PROMPTS.md
 
 This is the key file: verbatim prompts for each builder conversation. Max 4 conversations per folder.
 Read `core/templates/plan/CONVERSATION_PROMPTS.template.md` for the exact file structure.
 
-Each prompt must be self-contained and runnable without reading every plan file.
+Each prompt must be self-contained. Start every prompt with:
+```
+Read plans/$FEATURE/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+```
+Do not re-list all codebase files in the prompt — they live in FEATURE_INDEX.md.
 
-### 4e. HAPPY_FLOW.md
+### 4f. HAPPY_FLOW.md
 
 Skip in `lite`; merge the happy path into `USER_STORIES.md` or `IMPLEMENTATION_PLAN.md`.
 
 For standard and strict, read `core/templates/plan/HAPPY_FLOW.template.md` for the exact file structure.
 
-### 4f. EDGE_CASES.md
+### 4g. EDGE_CASES.md
 
 Skip in `lite`; merge only relevant edge cases into `USER_STORIES.md` and `CONVERSATION_PROMPTS.md`.
 
 For standard and strict, read `core/templates/plan/EDGE_CASES.template.md` for the exact file structure.
 
-### 4g. ARCHITECTURE_PROPOSAL.md
+### 4h. ARCHITECTURE_PROPOSAL.md
 
 Skip in `lite`; put short architecture notes directly in `IMPLEMENTATION_PLAN.md`.
 
 For standard and strict, read `core/templates/plan/ARCHITECTURE_PROPOSAL.template.md` for the exact file structure.
 
-### 4h. FLOW_DIAGRAM.md
+### 4i. FLOW_DIAGRAM.md
 
 Skip in `lite` unless the flow is unclear without a diagram.
 
@@ -220,8 +246,9 @@ Keep decomposition small enough for builder reliability:
 
 ## Step 5: Verify Structure
 
-- If `rigor = lite`, all 4 required files exist in `plans/$FEATURE/`.
-- If `rigor = standard` or `strict`, all 8 files exist in `plans/$FEATURE/`.
+- `FEATURE_INDEX.md` exists in `plans/$FEATURE/` for all rigor levels.
+- If `rigor = lite`, all 5 required files exist in `plans/$FEATURE/`.
+- If `rigor = standard` or `strict`, all 9 files exist in `plans/$FEATURE/`.
 - `CONVERSATION_PROMPTS.md` has no more than 4 conversations.
 - Conversation prompts reference correct phase numbers.
 - `PROGRESS.md` conversation table matches `CONVERSATION_PROMPTS.md`.
@@ -237,8 +264,9 @@ Keep decomposition small enough for builder reliability:
 Rigor: [lite / standard / strict]
 
 Files:
+- FEATURE_INDEX.md - entry point: all plan files + codebase touchpoints
 - USER_STORIES.md - N stories with acceptance criteria
-- IMPLEMENTATION_PLAN.md - N phases across N conversations
+- IMPLEMENTATION_PLAN.md - N phases across N conversations (each tagged Conversation: N)
 - PROGRESS.md - tracking table, all TODO
 - CONVERSATION_PROMPTS.md - N builder prompts ready to use
 - HAPPY_FLOW.md - ideal journey [standard/strict only]

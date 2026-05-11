@@ -10,7 +10,7 @@ pathly-adapters is currently:
 - Stable (1.0.0) for the core install path (`--dry-run`, `--apply`, `--uninstall`).
 - Verified with full rollback on failure.
 - Supported for Claude Code through the existing install scripts.
-- Ready for Codex plugin testing through `adapters/codex/.codex-plugin/plugin.json`.
+- Ready for Codex plugin testing through `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`.
 - Copilot destination paths follow the VS Code Copilot agent spec and may
   require `--repair` after a VS Code update.
 - Not yet fully adapter-based for Cursor, Windsurf, BMAD, or generic prompts.
@@ -20,7 +20,7 @@ pathly-adapters is currently:
 Required before calling the release production-ready:
 
 - Install scripts work on macOS, Linux, and Windows.
-- `adapters/claude/.claude-plugin/plugin.json` parses as valid JSON.
+- `src/pathly_data/adapters/claude/.claude-plugin/plugin.json` parses as valid JSON.
 - Plugin manifest validates against the Claude Code plugin schema.
 - Smoke tests confirm every documented skill exists under `~/.claude/skills/`
   after install.
@@ -33,7 +33,7 @@ Required before calling the release production-ready:
 
 Done:
 
-- `adapters/codex/.codex-plugin/plugin.json` committed.
+- `src/pathly_data/adapters/codex/.codex-plugin/plugin.json` committed.
 - Public Codex marketplace metadata at `.agents/plugins/marketplace.json`.
 - `pathly-setup codex --apply` creates the Codex local marketplace files.
 
@@ -85,8 +85,8 @@ Required before production-ready:
 
 Required before production-ready:
 
-- `adapters/claude/.claude-plugin/plugin.json` parses as valid JSON.
-- `adapters/codex/.codex-plugin/plugin.json` parses as valid JSON.
+- `src/pathly_data/adapters/claude/.claude-plugin/plugin.json` parses as valid JSON.
+- `src/pathly_data/adapters/codex/.codex-plugin/plugin.json` parses as valid JSON.
 - `.agents/plugins/marketplace.json` parses as valid JSON.
 - All three manifests are validated in CI.
 
