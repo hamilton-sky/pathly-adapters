@@ -129,3 +129,27 @@ Repeat until state is DONE or the user stops the pipeline.
 | RETRO | `team-flow/retro` |
 | BLOCKED_ON_HUMAN | Print `plans/<feature>/feedback/HUMAN_QUESTIONS.md`. Wait for user. On reply: delete file, append `{"type": "HUMAN_RESPONSE", "value": "<reply>"}` to EVENTS.jsonl, restore prior state in STATE.json, re-route. |
 | DONE | Print `[Complete] Feature '[feature]' is DONE.` Stop. |
+
+## Artifact archiving — dual-write rule
+
+**This rule applies to the orchestrator and all sub-skills.**
+
+Whenever any feedback file is written to `plans/<feature>/feedback/`, also write
+a copy to `pipeline-walkthrough/<feature>/artifacts/` at the same time.
+
+Naming: `<FILENAME>_conv<N>_attempt<M>.md`
+Examples: `REVIEW_FAILURES_conv1_attempt2.md`, `HUMAN_QUESTIONS_conv1_stall.md`
+
+Create `pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
+
+**Why:** feedback files are deleted when resolved — the archive is the only permanent
+record of what each agent said. The FSM only reads `plans/<feature>/feedback/`;
+it never scans `pipeline-walkthrough/`, so the archive never jams the state machine.
+
+**Applies to all feedback files:**
+- `REVIEW_FAILURES.md` — written by reviewer
+- `ARCH_FEEDBACK.md` — written by reviewer
+- `TEST_FAILURES.md` — written by tester
+- `IMPL_QUESTIONS.md` — written by builder
+- `DESIGN_QUESTIONS.md` — written by builder
+- `HUMAN_QUESTIONS.md` — written by orchestrator (escalation, stall, rigor offer)

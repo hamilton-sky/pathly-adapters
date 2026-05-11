@@ -88,9 +88,22 @@ spawn scout:
 - Sub-agents are terminal — they cannot spawn further agents.
 - Reviewer does not spawn web-researcher — review against project rules, not external opinion.
 
+## Artifact archiving — dual-write rule
+
+Whenever you write a feedback file to `plans/<feature>/feedback/`, also write a
+copy to `pipeline-walkthrough/<feature>/artifacts/` before the resolver deletes it.
+
+Name the archive copy: `<FILENAME>_conv<N>_attempt<M>.md`
+Example: `REVIEW_FAILURES_conv1_attempt2.md`
+
+Create `pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
+If you cannot determine the attempt number, use the current timestamp instead.
+
+This archive is never read by the FSM — it is a permanent record for humans.
+
 ## What NOT to do
 - Do not edit source files (the patch in [AUTO_FIX] is not an edit — it is a report)
 - Do not run Bash. Use Read/Glob/Grep and scout findings for evidence.
 - Do not suggest refactors beyond what the rule requires
-- Do not approve changes that violate documented contracts
+- Do not approve changes that violates documented contracts
 - Do not mark anything [AUTO_FIX] if you have any doubt about the correctness of the patch
