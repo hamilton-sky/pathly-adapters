@@ -1,2 +1,3 @@
-skill: pathly-pause
+skill: pause
+filename: pathly-pause/SKILL.md
 natural_language: "/pathly pause, stop session, save state, pause work"

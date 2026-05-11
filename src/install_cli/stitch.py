@@ -11,7 +11,7 @@ def stitch_skill(core_path: Path, meta_path: Path) -> str:
         except yaml.YAMLError as e:
             raise ValueError(f"Malformed YAML in {meta_path}: {e}") from e
 
-    required = ["skill", "invocation"]
+    required = ["skill"]
     missing = [k for k in required if k not in meta]
     if missing:
         raise ValueError(f"Missing required fields in {meta_path}: {missing}")
