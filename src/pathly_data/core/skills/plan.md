@@ -176,6 +176,8 @@ Skip in `lite` unless the flow is unclear without a diagram.
 For standard and strict, read `core/templates/plan/FLOW_DIAGRAM.template.md` for the exact file structure.
 Use ASCII only. Show only layers touched. Include happy path and fallback. Label arrows with action name or config key. Max about 70 chars wide.
 
+**Mermaid option:** If the feature introduces a new inter-agent calling convention, sub-skill, or orchestration pattern — at any rigor level — also offer `core/templates/plan/MERMAID_DIAGRAM.template.md` as the diagram format. Mermaid renders richer in tools that support it; ASCII is the fallback for plain-text hosts. Let the user choose, or default to Mermaid when the host is known to render it.
+
 ## Task Decomposition Rules
 
 When turning stories into implementation work, each phase and conversation must
