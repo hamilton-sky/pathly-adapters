@@ -5,3 +5,5 @@ files:
 skills:
   destination: ~/.vscode/extensions/pathly/skills/
   structure: flat
+templates:
+  destination: ~/.vscode/extensions/pathly/templates

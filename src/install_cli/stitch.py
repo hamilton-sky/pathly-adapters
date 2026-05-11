@@ -27,6 +27,9 @@ def stitch_skill(core_path: Path, meta_path: Path) -> str:
     if meta.get("strip_frontmatter"):
         body = re.sub(r"^---\n.*?\n---\n", "", body, count=1, flags=re.DOTALL)
 
+    for key, val in meta.get("variables", {}).items():
+        body = body.replace("{{" + key + "}}", str(val))
+
     return body
 
 

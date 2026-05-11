@@ -14,6 +14,10 @@ def core_skills_path() -> Path:
     return _root() / "core" / "skills"
 
 
+def core_templates_path() -> Path:
+    return _root() / "core" / "templates"
+
+
 def adapters_path() -> Path:
     return _root() / "adapters"
 

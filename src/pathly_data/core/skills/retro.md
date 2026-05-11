@@ -110,7 +110,7 @@ documents to `pipeline-walkthrough/$ARGUMENTS/`. Create the directory if it does
 - Run `git diff --name-only` against the main branch → `{{SOURCE_FILE_ROWS}}`.
 
 **Write `pipeline-walkthrough/$ARGUMENTS/01-PIPELINE-FLOW.md`:**
-Fill from the template at `src/pathly_data/core/templates/pipeline-walkthrough/01-PIPELINE-FLOW.md`.
+Fill from the template at `{{TEMPLATES_DIR}}/pipeline-walkthrough/01-PIPELINE-FLOW.md`.
 - `{{DISCOVERY_TRACE}}` — STATE_TRANSITION events for IDLE/EXPLORING/STORMING states, formatted as
   `│  Orchestrator → [STATE] (auto-advance)` per line.
 - `{{ARCHITECT_CONSULT_TRACE}}` — AGENT_DONE events where agent is architect/scout, or empty line.
@@ -121,7 +121,7 @@ Fill from the template at `src/pathly_data/core/templates/pipeline-walkthrough/0
 - `{{FSM_STATES}}` — all STATE_TRANSITION `to` values, one per line with `→` prefix.
 
 **Write `pipeline-walkthrough/$ARGUMENTS/02-TOKEN-USAGE.md`:**
-Fill from `src/pathly_data/core/templates/pipeline-walkthrough/02-TOKEN-USAGE.md`.
+Fill from `{{TEMPLATES_DIR}}/pipeline-walkthrough/02-TOKEN-USAGE.md`.
 - `{{AGENT_TOKEN_ROWS}}` — one row per AGENT_DONE event: `| N | agent | role | in | out | total | tools | wall | cost |`.
   If `cost_usd == 0.0` for all events, write "not captured" in cost/token columns.
 - `{{TOTAL_SPAWNS}}` — count of AGENT_DONE events.
@@ -132,7 +132,7 @@ Fill from `src/pathly_data/core/templates/pipeline-walkthrough/02-TOKEN-USAGE.md
   if all zeros; otherwise summarise which agent drove the most cost.
 
 **Write `pipeline-walkthrough/$ARGUMENTS/03-ARTIFACT-MAP.md`:**
-Fill from `src/pathly_data/core/templates/pipeline-walkthrough/03-ARTIFACT-MAP.md`.
+Fill from `{{TEMPLATES_DIR}}/pipeline-walkthrough/03-ARTIFACT-MAP.md`.
 - `{{FEEDBACK_FILE_ROWS}}` — one row per file in `pipeline-walkthrough/$ARGUMENTS/artifacts/`,
   with written-by and resolved-by inferred from filename. If folder is empty: `| — | — | — | — |`.
 - `{{SOURCE_FILE_ROWS}}` — one row per changed file from git diff: `| path | [story ref] | [what changed] |`.

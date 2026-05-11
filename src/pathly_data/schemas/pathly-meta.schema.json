@@ -18,6 +18,8 @@
     "host": { "type": "string" },
     "destination": { "type": "string" },
     "files": { "type": "array" },
+    "variables": { "type": "object" },
+    "templates": { "type": "object" },
     "skills": { "type": "object" },
     "structure": { "type": "string" },
     "telemetry": { "type": "boolean" },

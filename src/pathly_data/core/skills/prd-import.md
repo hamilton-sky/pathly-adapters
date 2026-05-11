@@ -141,35 +141,35 @@ If `rigor = standard` or `strict`, write all 8 files.
 If `rigor = strict`, add explicit risk, rollback, verification mapping, and approval notes.
 
 ### FILE 1: USER_STORIES.md
-Read `core/templates/plan/USER_STORIES.template.md` for structure.
+Read `{{TEMPLATES_DIR}}/plan/USER_STORIES.template.md` for structure.
 
 ### FILE 2: IMPLEMENTATION_PLAN.md
-Read `core/templates/plan/IMPLEMENTATION_PLAN.template.md` for structure.
+Read `{{TEMPLATES_DIR}}/plan/IMPLEMENTATION_PLAN.template.md` for structure.
 
 ### FILE 3: PROGRESS.md
-Read `core/templates/plan/PROGRESS.template.md` for structure.
+Read `{{TEMPLATES_DIR}}/plan/PROGRESS.template.md` for structure.
 
 ### FILE 4: CONVERSATION_PROMPTS.md
-Read `core/templates/plan/CONVERSATION_PROMPTS.template.md` for structure.
+Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for structure.
 
 Each conversation prompt must be self-contained, scoped to specific files and layers, include the relevant architectural boundary rules from project guidance, Do NOT list, verify command, and end with:
 `After done, update plans/$FEATURE/PROGRESS.md phase X to DONE.`
 
 ### FILE 5: HAPPY_FLOW.md
 Standard/strict only. Skip in lite.
-Read `core/templates/plan/HAPPY_FLOW.template.md` for structure.
+Read `{{TEMPLATES_DIR}}/plan/HAPPY_FLOW.template.md` for structure.
 
 ### FILE 6: EDGE_CASES.md
 Standard/strict only. Skip in lite.
-Read `core/templates/plan/EDGE_CASES.template.md` for structure.
+Read `{{TEMPLATES_DIR}}/plan/EDGE_CASES.template.md` for structure.
 
 ### FILE 7: ARCHITECTURE_PROPOSAL.md
 Standard/strict only. Skip in lite; merge short architecture notes into IMPLEMENTATION_PLAN.md.
-Read `core/templates/plan/ARCHITECTURE_PROPOSAL.template.md` for structure.
+Read `{{TEMPLATES_DIR}}/plan/ARCHITECTURE_PROPOSAL.template.md` for structure.
 
 ### FILE 8: FLOW_DIAGRAM.md
 Standard/strict only. Skip in lite unless the flow is unclear without a diagram.
-Read `core/templates/plan/FLOW_DIAGRAM.template.md` for structure.
+Read `{{TEMPLATES_DIR}}/plan/FLOW_DIAGRAM.template.md` for structure.
 ASCII only. Max ~70 chars wide.
 
 ---

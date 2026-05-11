@@ -1,3 +1,5 @@
 skill: retro
 filename: pathly-retro/SKILL.md
 natural_language: "/pathly retro, retrospective, write retro, retro"
+variables:
+  TEMPLATES_DIR: ~/.claude/plugins/pathly/templates

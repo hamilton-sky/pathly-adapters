@@ -5,6 +5,8 @@ files:
 skills:
   destination: ~/.codex/skills/
   structure: nested
+templates:
+  destination: ~/.codex/plugins/pathly/templates
 telemetry: true
 hooks:
   - event: post_tool_call

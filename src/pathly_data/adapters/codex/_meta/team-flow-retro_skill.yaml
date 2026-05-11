@@ -1,0 +1,5 @@
+skill: team-flow/retro
+filename: pathly-team-flow/retro/SKILL.md
+natural_language: "/pathly team-flow retro, team-flow retrospective phase"
+variables:
+  TEMPLATES_DIR: ~/.codex/plugins/pathly/templates

@@ -106,7 +106,7 @@ Conversation cap rule: max 4 conversations per folder. If more are needed, split
 
 ### 4a. FEATURE_INDEX.md ← write this first
 
-Read `core/templates/plan/FEATURE_INDEX.template.md` for the exact file structure.
+Read `{{TEMPLATES_DIR}}/plan/FEATURE_INDEX.template.md` for the exact file structure.
 
 Fill in:
 - **Plan files table** — list every plan file this feature will produce, with written-by/read-by/purpose.
@@ -118,13 +118,13 @@ Write this file before writing any other plan file. All codebase paths must be a
 
 ### 4b. USER_STORIES.md
 
-Read `core/templates/plan/USER_STORIES.template.md` for the exact file structure.
+Read `{{TEMPLATES_DIR}}/plan/USER_STORIES.template.md` for the exact file structure.
 
 In lite, include only the stories and acceptance criteria needed for the small change.
 
 ### 4c. IMPLEMENTATION_PLAN.md
 
-Read `core/templates/plan/IMPLEMENTATION_PLAN.template.md` for the exact file structure.
+Read `{{TEMPLATES_DIR}}/plan/IMPLEMENTATION_PLAN.template.md` for the exact file structure.
 
 Each phase header must carry a `Conversation: N` tag matching the PROGRESS.md row it belongs to:
 ```
@@ -138,12 +138,12 @@ In strict, add risk, rollback, approval, and verification mapping sections.
 
 ### 4d. PROGRESS.md
 
-Read `core/templates/plan/PROGRESS.template.md` for the exact file structure.
+Read `{{TEMPLATES_DIR}}/plan/PROGRESS.template.md` for the exact file structure.
 
 ### 4e. CONVERSATION_PROMPTS.md
 
 This is the key file: verbatim prompts for each builder conversation. Max 4 conversations per folder.
-Read `core/templates/plan/CONVERSATION_PROMPTS.template.md` for the exact file structure.
+Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for the exact file structure.
 
 Each prompt must be self-contained. Start every prompt with:
 ```
@@ -155,28 +155,28 @@ Do not re-list all codebase files in the prompt — they live in FEATURE_INDEX.m
 
 Skip in `lite`; merge the happy path into `USER_STORIES.md` or `IMPLEMENTATION_PLAN.md`.
 
-For standard and strict, read `core/templates/plan/HAPPY_FLOW.template.md` for the exact file structure.
+For standard and strict, read `{{TEMPLATES_DIR}}/plan/HAPPY_FLOW.template.md` for the exact file structure.
 
 ### 4g. EDGE_CASES.md
 
 Skip in `lite`; merge only relevant edge cases into `USER_STORIES.md` and `CONVERSATION_PROMPTS.md`.
 
-For standard and strict, read `core/templates/plan/EDGE_CASES.template.md` for the exact file structure.
+For standard and strict, read `{{TEMPLATES_DIR}}/plan/EDGE_CASES.template.md` for the exact file structure.
 
 ### 4h. ARCHITECTURE_PROPOSAL.md
 
 Skip in `lite`; put short architecture notes directly in `IMPLEMENTATION_PLAN.md`.
 
-For standard and strict, read `core/templates/plan/ARCHITECTURE_PROPOSAL.template.md` for the exact file structure.
+For standard and strict, read `{{TEMPLATES_DIR}}/plan/ARCHITECTURE_PROPOSAL.template.md` for the exact file structure.
 
 ### 4i. FLOW_DIAGRAM.md
 
 Skip in `lite` unless the flow is unclear without a diagram.
 
-For standard and strict, read `core/templates/plan/FLOW_DIAGRAM.template.md` for the exact file structure.
+For standard and strict, read `{{TEMPLATES_DIR}}/plan/FLOW_DIAGRAM.template.md` for the exact file structure.
 Use ASCII only. Show only layers touched. Include happy path and fallback. Label arrows with action name or config key. Max about 70 chars wide.
 
-**Mermaid option:** If the feature introduces a new inter-agent calling convention, sub-skill, or orchestration pattern — at any rigor level — also offer `core/templates/plan/MERMAID_DIAGRAM.template.md` as the diagram format. Mermaid renders richer in tools that support it; ASCII is the fallback for plain-text hosts. Let the user choose, or default to Mermaid when the host is known to render it.
+**Mermaid option:** If the feature introduces a new inter-agent calling convention, sub-skill, or orchestration pattern — at any rigor level — also offer `{{TEMPLATES_DIR}}/plan/MERMAID_DIAGRAM.template.md` as the diagram format. Mermaid renders richer in tools that support it; ASCII is the fallback for plain-text hosts. Let the user choose, or default to Mermaid when the host is known to render it.
 
 ## Task Decomposition Rules
 

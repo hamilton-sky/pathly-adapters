@@ -31,7 +31,7 @@ After quick completes:
 
 **Generate pipeline-walkthrough files:**
 Read `plans/[feature]/EVENTS.jsonl`. Fill and write the three templates from
-`src/pathly_data/core/templates/pipeline-walkthrough/` to `pipeline-walkthrough/[feature]/`:
+`{{TEMPLATES_DIR}}/pipeline-walkthrough/` to `pipeline-walkthrough/[feature]/`:
 
 - `01-PIPELINE-FLOW.md` — FSM state sequence, conversation traces, feedback loops.
   Replace `{{FSM_STATES}}` with ordered STATE_TRANSITION `to` values;

@@ -8,7 +8,7 @@ import yaml
 
 from .detect import detect_hosts
 from .mcp_config import install_mcp_config, uninstall_mcp_config
-from .resources import adapter_meta_path, adapter_install_yaml, core_agents_path, core_skills_path
+from .resources import adapter_meta_path, adapter_install_yaml, core_agents_path, core_skills_path, core_templates_path
 from .stitch import stitch_agent, stitch_skill
 from .materialize import materialize, uninstall
 
@@ -73,6 +73,16 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             except FileNotFoundError:
                 print(f"  [warn] No core skill for {skill_name!r}, skipping", file=sys.stderr)
 
+    templates_cfg = install_cfg.get("templates")
+    template_files: dict[str, str] = {}
+    templates_dest: Path | None = None
+    if templates_cfg:
+        templates_dest = Path(templates_cfg["destination"]).expanduser()
+        tmpl_root = core_templates_path()
+        for tmpl_file in sorted(tmpl_root.rglob("*.md")):
+            rel = tmpl_file.relative_to(tmpl_root).as_posix()
+            template_files[rel] = tmpl_file.read_text(encoding="utf-8")
+
     if dry_run:
         print(f"\n[{host}] Would write to {dest}:")
         for name in sorted(agent_files):
@@ -81,6 +91,10 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             print(f"\n[{host}] Would write skills to {skills_dest}:")
             for name in sorted(skill_files):
                 print(f"  {skills_dest / name}")
+        if templates_dest and template_files:
+            print(f"\n[{host}] Would write templates to {templates_dest}:")
+            for name in sorted(template_files):
+                print(f"  {templates_dest / name}")
         if telemetry_enabled:
             install_mcp_config(host, dry_run=True)
         return
@@ -100,6 +114,12 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             if written:
                 written_dests.append(skills_dest)
                 print(f"[{host}] Wrote {len(written)} skill(s) to {skills_dest}")
+
+        if templates_dest and template_files:
+            written = materialize(template_files, templates_dest, repair=repair, force=force, dry_run=False)
+            if written:
+                written_dests.append(templates_dest)
+                print(f"[{host}] Wrote {len(written)} template(s) to {templates_dest}")
 
         if telemetry_enabled:
             install_mcp_config(host, dry_run=False)
@@ -147,6 +167,17 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
                 print(f"  {skills_dest / name}")
         elif skill_removed:
             print(f"[{host}] Removed {len(skill_removed)} skill(s) from {skills_dest}")
+
+    templates_cfg = install_cfg.get("templates")
+    if templates_cfg:
+        templates_dest = Path(templates_cfg["destination"]).expanduser()
+        tmpl_removed = uninstall(templates_dest, dry_run=dry_run)
+        if dry_run:
+            print(f"\n[{host}] Would remove {len(tmpl_removed)} template(s) from {templates_dest}:")
+            for name in sorted(tmpl_removed):
+                print(f"  {templates_dest / name}")
+        elif tmpl_removed:
+            print(f"[{host}] Removed {len(tmpl_removed)} template(s) from {templates_dest}")
 
 
 def main() -> None:

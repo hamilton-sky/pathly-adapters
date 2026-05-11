@@ -1,3 +1,5 @@
 skill: prd-import
 filename: pathly-prd-import/SKILL.md
 natural_language: "/pathly prd-import, import prd, import requirements, prd-import"
+variables:
+  TEMPLATES_DIR: ~/.codex/plugins/pathly/templates
