@@ -99,6 +99,8 @@ Stable (1.0.0). Core install path (`--dry-run`, `--apply`, `--uninstall`) is ver
 
 ## Known Limitations
 
+- **Windows: broken stub if you previously ran `pip install pathly-adapters` directly** — a bare `pip install` (outside pipx) leaves a `pathly-setup.exe` stub in the global Python Scripts directory that shadows the pipx version and throws `ModuleNotFoundError: No module named 'install_cli'`. Fix: delete the stub at `%LOCALAPPDATA%\Programs\Python\Python3XX\Scripts\pathly-setup.exe` and its matching `~athly_adapters-*.dist-info` folder in `site-packages`, then open a fresh terminal. Always use `pipx install pathly-adapters` as documented.
+
 - **Codex install unverified on a clean machine** — the Codex adapter is committed and `pathly-setup codex --apply` runs without error, but a full clean-machine smoke test has not been completed. Use Codex support at your own risk until this is confirmed.
 
 - **Copilot paths may need `--repair` after a VS Code update** — Pathly installs agent files to the VS Code Copilot agent spec path, which may change between VS Code versions. Run `pathly-setup --repair` after a VS Code update if Copilot agents stop appearing.
