@@ -28,6 +28,17 @@ pathly-setup --apply      # install into all detected hosts
 
 That's it. Pathly detects Claude Code, Codex, and Copilot automatically.
 
+Then open Claude Code in your project directory and start:
+
+```
+/start                   ← welcome screen + pick what to do
+/go add login flow       ← director routes your intent
+/build                   ← implement next conversation
+/end                     ← retro + archive
+```
+
+Or use the `/pathly` dispatcher: `/pathly start`, `/pathly go add login`, etc.
+
 ## All commands
 
 ```bash
@@ -46,16 +57,16 @@ pathly-setup --uninstall            # remove all Pathly-owned files
 
 ## Supported Hosts
 
-| Host | Detected by | Default destination |
+| Host | Detected by | Installed locations |
 |------|-------------|---------------------|
-| `claude` | `~/.claude/` directory exists | `~/.claude/agents/` |
-| `codex` | Codex config directory exists | `~/.codex/agents/` |
+| `claude` | `~/.claude/` directory exists | `~/.claude/agents/` + `~/.claude/skills/` |
+| `codex` | Codex config directory exists | `~/.codex/agents/` + `~/.codex/skills/` |
 | `copilot` | VS Code + Copilot detected | VS Code agents folder |
 
 ## How It Works
 
 1. **Detect** — scans for installed hosts on the current machine.
-2. **Stitch** — combines `core/agents/<name>.md` with adapter-specific `_meta/<name>.yaml` to produce the final agent file (frontmatter + body + spawn section).
+2. **Stitch** — combines `core/agents/` and `core/skills/` content with adapter-specific `_meta/*.yaml` to produce deployable agent and skill files (frontmatter + body + spawn section).
 3. **Materialize** — writes stitched files to the host config location. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back.
 
 ## Development setup

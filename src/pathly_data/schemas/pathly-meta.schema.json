@@ -11,6 +11,7 @@
     "spawn_section": { "type": "string" },
     "skill": { "type": "string" },
     "invocation": { "type": "string" },
+    "natural_language": { "type": "string" },
     "wrapper": { "type": "string" },
     "strip_frontmatter": { "type": "boolean" },
     "filename": { "type": "string" },
@@ -18,7 +19,19 @@
     "destination": { "type": "string" },
     "files": { "type": "array" },
     "skills": { "type": "object" },
-    "structure": { "type": "string" }
+    "structure": { "type": "string" },
+    "telemetry": { "type": "boolean" },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event": { "type": "string" },
+          "script": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
   },
   "additionalProperties": false
 }

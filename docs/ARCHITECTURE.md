@@ -175,12 +175,29 @@ For Claude Code:
 ```
 ~/.claude/
 ├── agents/                    ← 11 behavioral contracts (.md files)
-├── skills/                    ← installed Claude Code lifecycle skills (nested)
-│   ├── pathly/SKILL.md
-│   ├── build/SKILL.md
-│   ├── review/SKILL.md
-│   ├── team-flow/SKILL.md
-│   └── ... (one folder per skill)
+│   architect, builder, director, orchestrator, planner, po,
+│   quick, reviewer, scout, tester, web-researcher
+├── skills/                    ← 20 skill directories (each folder has SKILL.md)
+│   ├── pathly/                ← main dispatcher (/pathly <subcommand>)
+│   ├── start/                 ← /start  — welcome screen + journey map
+│   ├── go/                    ← /go     — director routes intent
+│   ├── build/                 ← /build  — implement next conversation
+│   ├── plan/                  ← /plan   — create/update feature plan
+│   ├── team-flow/             ← /team-flow — run full team pipeline
+│   ├── storm/                 ← /storm  — brainstorm with architect
+│   ├── review/                ← /review — code review
+│   ├── debug/                 ← /debug  — investigate a bug
+│   ├── explore/               ← /explore — explore codebase
+│   ├── po/                    ← /po     — clarify requirements (PO)
+│   ├── meet/                  ← /meet   — consult a role mid-flow
+│   ├── verify-state/          ← /verify-state — check for stale feedback
+│   ├── pause/                 ← /pause  — pause session
+│   ├── end/                   ← /end    — retro + archive
+│   ├── retro/                 ← /retro  — write retrospective
+│   ├── archive/               ← /archive — archive completed feature
+│   ├── lessons/               ← /lessons — promote lessons from retros
+│   ├── prd-import/            ← /prd-import — import a PRD file
+│   └── help/                  ← /help   — state-aware command reference
 └── plugins/pathly/
     └── templates/pathly plan/
         └── *.template.md

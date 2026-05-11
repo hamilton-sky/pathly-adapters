@@ -5,22 +5,21 @@ where files land.
 
 ## Host Entry Points
 
-Pathly has three public front doors:
+Pathly has two runtime entry points:
 
-- Claude Code slash skills: `/pathly ...` and `/path ...`
-- Codex plugin skills: `Use Pathly ...`
-- CLI fallback: `pathly ...`
+- Claude Code: via the `/pathly` dispatcher (`/pathly go`, `/pathly build`, etc.) or direct skill invocations (`/go`, `/build`, `/start`, etc.)
+- Codex: `Use Pathly ...` (natural language)
+
+`pathly-setup` is the install-time CLI only — it deploys agents and skills; it is not a runtime workflow command.
 
 ```mermaid
 flowchart TD
     A[plain-English request] --> B{host}
-    B --> CC["Claude Code\n/pathly <request>"]
+    B --> CC["Claude Code\n/pathly <subcommand>\nor /skill-name directly"]
     B --> CX["Codex\nUse Pathly <request>"]
-    B --> CLI["CLI\npathly <command>"]
 
     CC --> CA[claude adapter\n~/.claude/agents/ + ~/.claude/skills/]
     CX --> XA[codex adapter\n~/.codex/agents/ + ~/.codex/skills/]
-    CLI --> LA[pathly-setup CLI\nsrc/install_cli/setup_command.py]
 ```
 
 ## Install Flow
@@ -94,17 +93,30 @@ Source: `src/pathly_data/adapters/copilot/_meta/*.yaml` + `src/pathly_data/core/
 
 ### Claude Code
 
+Each skill is installed individually. You can invoke via the `/pathly` dispatcher
+or call any skill directly by name:
+
 ```text
-/pathly start                           ← full journey map
-/pathly po checkout-flow                ← clarify requirements first
-/pathly storm                           ← brainstorm with architect
-/pathly go add password reset           ← director routes new feature
-/pathly build                           ← implement next conversation
-/pathly meet checkout-flow              ← context-aware role consultation
-/pathly debug checkout button does nothing
-/pathly explore how does checkout state flow through the app?
-/pathly verify                          ← check for stale feedback
-/pathly end                             ← wrap up + retro
+Via dispatcher            Direct invocation         Purpose
+──────────────────────────────────────────────────────────────────────
+/pathly start             /start                    welcome screen + journey map
+/pathly go add login      /go add login             director routes intent
+/pathly build             /build                    implement next conversation
+/pathly storm             /storm                    brainstorm with architect
+/pathly po checkout-flow  /po checkout-flow         clarify requirements (PO)
+/pathly plan              /plan                     create/update feature plan
+/pathly review            /review                   code review
+/pathly debug <desc>      /debug <desc>             investigate a bug
+/pathly explore <q>       /explore <q>              explore codebase
+/pathly meet              /meet                     consult a role mid-flow
+/pathly verify            /verify-state             check for stale feedback
+/pathly pause             /pause                    pause session
+/pathly end               /end                      retro + archive
+/pathly retro <feature>   /retro <feature>          write retrospective only
+                          /team-flow <feature>      run full team pipeline
+                          /archive <feature>        archive completed feature
+                          /lessons                  promote lessons from retros
+                          /prd-import               import a PRD file
 ```
 
 ### Codex

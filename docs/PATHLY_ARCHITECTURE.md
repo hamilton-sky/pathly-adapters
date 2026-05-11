@@ -53,12 +53,13 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── tester.md
 │       │   │   └── web-researcher.md
 │       │   ├── skills/          ← Skill logic in natural language (tool-agnostic .md)
-│       │   │   ├── team-flow.md
-│       │   │   ├── explore.md
-│       │   │   ├── build.md
-│       │   │   ├── review.md
-│       │   │   ├── storm.md
-│       │   │   └── ...
+│       │   │   ├── pathly.md    ← dispatcher (routes /pathly subcommands)
+│       │   │   ├── start.md, go.md, build.md, plan.md
+│       │   │   ├── team-flow.md, storm.md, review.md
+│       │   │   ├── debug.md, explore.md, po.md, meet.md
+│       │   │   ├── verify-state.md, pause.md, end.md, retro.md
+│       │   │   ├── archive.md, lessons.md, prd-import.md, help.md
+│       │   │   └── team-flow/   ← sub-skills for team pipeline phases
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
