@@ -155,8 +155,9 @@ Route back to `team-flow [FEATURE] [rigor] [autoFlow]`.
 
 Runs after planning completes, before routing back to the orchestrator.
 
-The pipeline **always starts with the 4 core lite files** — no exceptions:
+The pipeline **always starts with the 5 core lite files** — no exceptions:
 ```
+FEATURE_INDEX.md
 USER_STORIES.md
 IMPLEMENTATION_PLAN.md
 PROGRESS.md
@@ -188,7 +189,7 @@ If any signal fires, write `plans/<feature>/feedback/HUMAN_QUESTIONS.md`:
 ```
 [RIGOR ESCALATOR] — recommended additions for <feature>
 
-The 4 core plan files are ready. Based on what was found during planning,
+The 5 core plan files are ready. Based on what was found during planning,
 these additional files are recommended:
 
   ✦ ARCHITECTURE_PROPOSAL.md   → cross-layer dependencies detected
@@ -200,7 +201,7 @@ Add to plan:
   [1] All recommended
   [2] ARCHITECTURE_PROPOSAL.md only
   [3] EDGE_CASES.md only
-  [4] None — keep 4 core files only
+  [4] None — keep 5 core files only
 
 Reply with 1, 2, 3, or 4:
 ```
@@ -215,7 +216,7 @@ Print: `[RIGOR AUTO] Adding: <file1>, <file2> — signals detected during planni
 
 ### Rules
 
-- The 4 core files are never removed, never conditional, never skipped.
+- The 5 core files are never removed, never conditional, never skipped.
 - Extra files are additive only — never replace core files.
 - Do not add a file when its signal did not fire, even if the user asks for "standard".
   (If the user wants all 8 files explicitly, route to `flow <feature> standard`.)
