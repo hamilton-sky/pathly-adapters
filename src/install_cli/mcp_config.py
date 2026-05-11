@@ -116,15 +116,26 @@ def _uninstall_codex(*, dry_run: bool) -> None:
     if content is None:
         return
 
-    section_header = f"[mcp_servers.{_SERVER_NAME}]"
-    if section_header not in content:
-        return
-
-    # Remove the section: everything from the header to the next [section] or EOF
     import re
-    # Match from [mcp_servers.pathly-telemetry] to next top-level section or EOF
-    pattern = rf"\n?\[mcp_servers\.{re.escape(_SERVER_NAME)}\][^\[]*"
-    cleaned = re.sub(pattern, "", content)
+
+    cleaned = content
+
+    section_header = f"[mcp_servers.{_SERVER_NAME}]"
+    if section_header in cleaned:
+        # Remove from the section header to the next top-level section (a '['
+        # at line start) or EOF.  re.DOTALL lets '.' cross newlines in the block.
+        pattern = rf"\n?\[mcp_servers\.{re.escape(_SERVER_NAME)}\].*?(?=\n\[|\Z)"
+        cleaned = re.sub(pattern, "", cleaned, flags=re.DOTALL)
+
+    # Strip any stale bare args lines left by previous buggy uninstalls.
+    _STALE_ARGS_LINE = '["-m", "pathly_telemetry"]'
+    cleaned = "\n".join(
+        line for line in cleaned.split("\n")
+        if line.strip() != _STALE_ARGS_LINE
+    )
+
+    if cleaned == content:
+        return
 
     if dry_run:
         print(f"  [dry-run] Would remove MCP server '{_SERVER_NAME}' from {path}")

@@ -180,3 +180,47 @@ def test_missing_config_file_codex(monkeypatch, tmp_path):
 
     install_mcp_config("codex")
     uninstall_mcp_config("codex")
+
+
+def test_uninstall_removes_full_block_including_args_codex(monkeypatch, tmp_path):
+    """Uninstall must remove the args line whose value contains '[', not stop at it."""
+    config = tmp_path / "config.toml"
+    config.write_text("[memories]\nsome = true\n", encoding="utf-8")
+    _patch_codex(monkeypatch, config)
+
+    install_mcp_config("codex")
+    uninstall_mcp_config("codex")
+
+    content = config.read_text(encoding="utf-8")
+    assert f"[mcp_servers.{_SERVER_NAME}]" not in content
+    assert "pathly_telemetry" not in content
+
+
+def test_repeated_install_uninstall_no_accumulation_codex(monkeypatch, tmp_path):
+    """Three install+uninstall cycles must leave no trace."""
+    config = tmp_path / "config.toml"
+    config.write_text("[memories]\nsome = true\n", encoding="utf-8")
+    _patch_codex(monkeypatch, config)
+
+    for _ in range(3):
+        install_mcp_config("codex")
+        uninstall_mcp_config("codex")
+
+    content = config.read_text(encoding="utf-8")
+    assert "pathly_telemetry" not in content
+
+
+def test_uninstall_cleans_stale_bare_args_line_codex(monkeypatch, tmp_path):
+    """Uninstall strips bare '["-m", "pathly_telemetry"]' lines from prior buggy runs."""
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[memories]\nsome = true\n["-m", "pathly_telemetry"]\n',
+        encoding="utf-8",
+    )
+    _patch_codex(monkeypatch, config)
+
+    uninstall_mcp_config("codex")
+
+    content = config.read_text(encoding="utf-8")
+    assert '["-m", "pathly_telemetry"]' not in content
+    assert "[memories]" in content
