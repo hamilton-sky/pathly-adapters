@@ -24,6 +24,7 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   │   ├── architect.md
 │       │   │   ├── builder.md
 │       │   │   ├── director.md
+│       │   │   ├── explorer.md
 │       │   │   ├── orchestrator.md
 │       │   │   ├── planner.md
 │       │   │   ├── po.md
@@ -174,10 +175,10 @@ For Claude Code:
 
 ```
 ~/.claude/
-├── agents/                    ← 11 behavioral contracts (.md files)
-│   architect, builder, director, orchestrator, planner, po,
+├── agents/                    ← 12 behavioral contracts (.md files)
+│   architect, builder, director, explorer, orchestrator, planner, po,
 │   quick, reviewer, scout, tester, web-researcher
-├── skills/                    ← 20 skill directories (each folder has SKILL.md)
+├── skills/                    ← skill directories (each folder has SKILL.md)
 │   ├── pathly/                ← main dispatcher (/pathly <subcommand>)
 │   ├── start/                 ← /start  — welcome screen + journey map
 │   ├── go/                    ← /go     — director routes intent
@@ -194,6 +195,7 @@ For Claude Code:
 │   ├── pause/                 ← /pause  — pause session
 │   ├── end/                   ← /end    — retro + archive
 │   ├── retro/                 ← /retro  — write retrospective
+│   ├── test/                  ← /test   — run acceptance tests via scout-flow
 │   ├── archive/               ← /archive — archive completed feature
 │   ├── lessons/               ← /lessons — promote lessons from retros
 │   ├── prd-import/            ← /prd-import — import a PRD file

@@ -64,59 +64,69 @@ Ask the user to confirm or adjust the framing before running the scout.
 
 ---
 
-## Step 2 — Trace (scout)
+## Step 2 — Analyze (explorer phase: analyze)
 
-Spawn the **scout** agent:
+Spawn the **explorer** agent with `phase: analyze`:
 
 ```
+phase: analyze
 Read explorations/<topic>/EXPLORE.md.
-Explore the codebase to answer the question in EXPLORE.md.
-
-Rules:
-- Follow visible code paths. Do not invent interactions.
-- Return a TRACE.md-ready list of every file you read:
-  Format: [file:line] — [what you found there] — [relevance to the question]
-- Return findings for the skill to append under `## Findings` in EXPLORE.md
-- If you need a human decision to continue (ambiguity, missing context),
-  return the exact human question and stop; the skill writes `explorations/<topic>/feedback/HUMAN_QUESTIONS.md`.
-- Do NOT write to any production code file.
-- Do NOT build anything. Do NOT suggest fixes. Observe and report only.
-
-Stop when you can answer the question in EXPLORE.md, or when you've exhausted
-visible paths and must report what you found.
+Identify what research is needed to answer the question.
 ```
 
-If `HUMAN_QUESTIONS.md` is created: pause, show user the question, wait for answer (delete file), then resume the scout.
+Parse the `## NEEDS_CONTEXT` block it returns.
 
 ---
 
-## Step 3 — Draw conclusions
+## Step 3 — Scout (if NEEDS_CONTEXT has entries)
 
-After the scout finishes and the skill writes `TRACE.md`, spawn the **quick** agent:
+If the block is not `none`, call **scout-flow** with:
+- `NEEDS_CONTEXT`: the block from Step 2
+- `ROLE: explorer`
+- `FEATURE: <topic>`
 
-```
-Read explorations/<topic>/EXPLORE.md and explorations/<topic>/TRACE.md.
-Write explorations/<topic>/CONCLUSIONS.md:
+Use the returned compressed summary as `## Scout Findings`.
 
-## Answer
-[direct answer to the question in EXPLORE.md — yes/no/it depends + one paragraph]
-
-## Evidence
-[3–5 bullet points, each with file:line reference, supporting the answer]
-
-## Risks / open questions
-[anything that needs more investigation before acting on the conclusion]
-
-## Recommendation
-[ONE of these three:]
-  BUILD: This exploration justifies a feature. Suggested scope: [1-3 sentences]
-  SKIP: Not worth building. Reason: [one sentence]
-  INVESTIGATE MORE: [what specific question to explore next]
-```
+If the block is `none`, set Scout Findings to `none` and skip this step.
 
 ---
 
-## Step 4 — Present and offer graduation
+## Step 4 — Trace (explorer phase: explore)
+
+Spawn the **explorer** agent with `phase: explore`:
+
+```
+phase: explore
+explorations/<topic>/EXPLORE.md
+
+## Scout Findings
+[compressed summary from Step 3, or "none"]
+```
+
+The explorer writes `explorations/<topic>/TRACE.md`.
+
+If the explorer returns a human question (rather than "TRACE written"):
+- Write that question to `explorations/<topic>/feedback/HUMAN_QUESTIONS.md`
+- Pause, show the user the question, wait for answer
+- Delete `HUMAN_QUESTIONS.md`, then re-spawn the explorer with the answer appended
+
+---
+
+## Step 5 — Conclude (explorer phase: conclude)
+
+Spawn the **explorer** agent with `phase: conclude`:
+
+```
+phase: conclude
+explorations/<topic>/EXPLORE.md
+explorations/<topic>/TRACE.md
+```
+
+The explorer writes `explorations/<topic>/CONCLUSIONS.md`.
+
+---
+
+## Step 6 — Present and offer graduation
 
 Print the contents of `CONCLUSIONS.md` to the user.
 
@@ -153,7 +163,7 @@ Reply with 1, 2, 3, or 4:
 
 ## Rules
 
-- **Scout only** — no builder, no reviewer, no tester, no planner.
+- **Explorer + scout-flow only** — no builder, no reviewer, no tester, no planner.
 - **Read-only on production code.** The only files written are inside `explorations/<topic>/`.
 - **HUMAN_QUESTIONS.md is the only feedback file.** No REVIEW_FAILURES, no TEST_FAILURES.
 - **No PROGRESS.md, no EVENTS.jsonl, no STATE.json.** Explorations are not FSM-tracked.

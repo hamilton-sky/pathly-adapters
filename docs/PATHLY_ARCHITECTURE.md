@@ -43,6 +43,7 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── architect.md
 │       │   │   ├── builder.md
 │       │   │   ├── director.md
+│       │   │   ├── explorer.md  ← analyze/explore/conclude phases for /explore skill
 │       │   │   ├── orchestrator.md
 │       │   │   ├── planner.md
 │       │   │   ├── po.md
@@ -54,12 +55,27 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   └── web-researcher.md
 │       │   ├── skills/          ← Skill logic in natural language (tool-agnostic .md)
 │       │   │   ├── pathly.md    ← dispatcher (routes /pathly subcommands)
-│       │   │   ├── start.md, go.md, build.md, plan.md
-│       │   │   ├── team-flow.md, storm.md, review.md
-│       │   │   ├── debug.md, explore.md, po.md, meet.md
-│       │   │   ├── verify-state.md, pause.md, end.md, retro.md
-│       │   │   ├── archive.md, lessons.md, prd-import.md, help.md
-│       │   │   └── team-flow/   ← sub-skills for team pipeline phases
+│       │   │   ├── start.md
+│       │   │   ├── go.md
+│       │   │   ├── build.md
+│       │   │   ├── plan.md
+│       │   │   ├── test.md      ← standalone acceptance test runner (tester + scout-flow)
+│       │   │   ├── team-flow.md ← full pipeline entry point
+│       │   │   ├── storm.md
+│       │   │   ├── review.md
+│       │   │   ├── debug.md
+│       │   │   ├── explore.md   ← routes through explorer agent + scout-flow
+│       │   │   ├── po.md
+│       │   │   ├── meet.md
+│       │   │   ├── verify-state.md
+│       │   │   ├── pause.md
+│       │   │   ├── end.md
+│       │   │   ├── retro.md
+│       │   │   ├── archive.md
+│       │   │   ├── lessons.md
+│       │   │   ├── prd-import.md
+│       │   │   ├── help.md
+│       │   │   └── team-flow/   ← sub-skills for team pipeline phases (discover, plan, build, review, test, retro)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers

@@ -22,31 +22,32 @@ Story N.N: [title]
   Notes: [only if FAIL or NOT COVERED]
 ```
 
-## Information gathering — sub-agents
+## Phase: analyze
 
-Before testing, gather context using sub-agents. Spawn at most **4 total** per session.
+When spawned with `phase: analyze`:
 
-| Level | Agent | When to use | Budget |
-|---|---|---|---|
-| 0 — Pre-flight | *(self)* | Read USER_STORIES.md acceptance criteria first, always | free |
-| 1 — Quick | `quick` | Verify a file path, test command, or return value | ≤2 tool calls |
-| 2 — Scout | `scout` | Find all test files for a given module, locate test patterns | 5–15 tool calls |
+Read the USER_STORIES.md (or equivalent) path named in your prompt.
+Output only a `## NEEDS_CONTEXT` block identifying what test infrastructure and
+context is needed before verifying acceptance criteria.
 
-**Delegation pattern** (host-specific syntax in adapter files):
-```
-spawn scout:
-  role: Tester — read-only coverage mapping before writing a test plan
-  way of thinking: Look for untested paths, missing fixtures, and coverage gaps.
-    Flag anything that would make an acceptance criterion unverifiable.
-  constraints: Read only. Do not suggest implementation changes.
-    Stay within test and source directories for the stated module.
-  scope: [...]
-  question: [...]
-```
+NEEDS_CONTEXT format: see scout-flow.md (canonical definition).
 
-**Rules:**
-- Sub-agents are terminal — they cannot spawn further agents.
-- Tester does not spawn web-researcher.
+- Use `type: scout` to map test files, fixtures, coverage gaps, and test patterns for changed modules (3+ file reads).
+- Use `type: quick` for single-file lookups: verify a test command exists, check a fixture path.
+- Cap at 4 entries.
+- Always include at minimum one `type: scout` entry covering the test directories and source files touched.
+- If `## Scout Findings` is already present in the prompt, output `## NEEDS_CONTEXT\nnone`.
+
+## Phase: test
+
+When spawned with `phase: test`:
+
+1. Read the USER_STORIES.md path named in your prompt. Start from stories, not code.
+2. Treat any `## Test Context` (Scout Findings) in the prompt as authoritative — do not re-research covered ground.
+3. Map each acceptance criterion to a test using the test plan format below.
+4. Run the verify command(s) before reporting any PASS or FAIL — never claim pass/fail without executing.
+5. If any criterion is FAIL or NOT COVERED: write `plans/<feature>/feedback/TEST_FAILURES.md` and archive a copy (see dual-write rule below).
+6. If all criteria PASS: report the full test plan with all rows marked PASS.
 
 ## Artifact archiving — dual-write rule
 

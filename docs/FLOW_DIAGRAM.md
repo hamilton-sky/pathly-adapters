@@ -59,6 +59,8 @@ flowchart TD
 │   │   └── SKILL.md
 │   ├── team-flow/
 │   │   └── SKILL.md
+│   ├── test/
+│   │   └── SKILL.md
 │   └── ... (one folder per skill)
 └── plugins/pathly/
     └── templates/pathly plan/
@@ -107,7 +109,8 @@ Via dispatcher            Direct invocation         Purpose
 /pathly plan              /plan                     create/update feature plan
 /pathly review            /review                   code review
 /pathly debug <desc>      /debug <desc>             investigate a bug
-/pathly explore <q>       /explore <q>              explore codebase
+/pathly explore <q>       /explore <q>              explore codebase (explorer + scout-flow)
+                          /test <feature>           run acceptance tests (tester + scout-flow)
 /pathly meet              /meet                     consult a role mid-flow
 /pathly verify            /verify-state             check for stale feedback
 /pathly pause             /pause                    pause session

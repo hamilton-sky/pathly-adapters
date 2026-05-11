@@ -29,7 +29,7 @@ When all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl. Confirm 
 | Action | Spawn |
 |---|---|
 | Phase 1 — Analyze needs | `tester` (phase: analyze) |
-| Phase 2 — Scout context | `scout` or `quick` with `ROLE: tester` (parallel, max 4) |
+| Phase 2 — Scout context | `scout-flow` with `ROLE: tester` |
 | Phase 3 — Test | `tester` (phase: test) |
 | Fix failing criteria | `builder` |
 
@@ -60,13 +60,14 @@ Output `none` if the default test-context scout above is sufficient.
 ```
 Parse the `## NEEDS_CONTEXT` block. If it says `none`, use only the default test-context scout in Phase 2.
 
-## Phase 2 — Scout (parallel, max 4)
+## Phase 2 — Scout
 
-Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
-- `type: quick` → spawn `quick` with `ROLE: tester` + the question
-- `type: scout` → spawn `scout` with `ROLE: tester` + scope + question
+Call **scout-flow** with:
+- `NEEDS_CONTEXT`: the block from Phase 1
+- `ROLE: tester`
+- `FEATURE: <feature>`
 
-Compress all findings into a short summary for Phase 3.
+Use the returned compressed summary as `## Test Context` in Phase 3.
 
 ## Phase 3 — Test
 

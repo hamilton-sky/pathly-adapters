@@ -1,6 +1,6 @@
 # Pathly Skills Overview
 
-19 canonical skills. Each lives in `core/skills/`. Adapters translate them to
+20 canonical skills. Each lives in `core/skills/`. Adapters translate them to
 host-native surfaces. This document is the authoritative reference.
 
 ---
@@ -504,7 +504,8 @@ Sub-skill responsibilities:
                                         zero-diff stall → HUMAN_QUESTIONS
                       → writes STATE.json → BUILDING or TESTING, routes back
 
-  team-flow/test      Stage 4 — scout + tester, TEST_FAILURES → builder (max 2)
+  team-flow/test      Stage 4 — tester(analyze) → scout-flow → tester(test),
+                      TEST_FAILURES → builder (max 2)
                       → writes STATE.json → RETRO, routes back
 
   team-flow/retro     Stage 5 — quick → RETRO.md + LESSONS_CANDIDATE.md
@@ -568,6 +569,7 @@ debug <symptom>
 ## 14. explore — Codebase Investigation
 
 Answers a question about the codebase. No code changes. No plan files.
+Orchestrates the explorer agent through analyze → scout-flow → explore → conclude phases.
 
 ```
 explore <topic>
@@ -580,16 +582,25 @@ explore <topic>
   [User confirms framing]
       │
       ▼
-  Spawn scout (READ-ONLY)
+  Phase 1: explorer(analyze)
+  → NEEDS_CONTEXT block
+  → none? skip Phase 2
       │
       ▼
-  Write TRACE.md (file:line findings)
-  Append ## Findings to EXPLORE.md
+  Phase 2: scout-flow (if NEEDS_CONTEXT)
+  ROLE: explorer
+  → compressed Scout Findings
       │
       ▼
-  Spawn quick → Write CONCLUSIONS.md:
-  answer | evidence | recommendation
-  BUILD / SKIP / INVESTIGATE MORE
+  Phase 3: explorer(explore) + Scout Findings
+  → writes TRACE.md
+  (human question? → HUMAN_QUESTIONS.md, wait, retry)
+      │
+      ▼
+  Phase 4: explorer(conclude)
+  → writes CONCLUSIONS.md:
+    answer | evidence | recommendation
+    BUILD / SKIP / INVESTIGATE MORE
       │
       ▼
   Show conclusions. Offer:
@@ -735,7 +746,47 @@ archive <feature>
 
 ---
 
-## 19. verify-state — Pipeline Health Check
+## 19. test — Acceptance Test Runner
+
+Verifies acceptance criteria for a completed feature. Standalone alternative to
+`team-flow <feature> test` — usable without running the full pipeline.
+Orchestrates tester through analyze → scout-flow → test phases, then fix loop.
+
+```
+test <feature>
+      │
+      ▼
+  Pre-flight:
+  all PROGRESS conversations DONE?
+  USER_STORIES.md exists?
+  (no → stop, explain)
+      │
+      ▼
+  Phase 1: tester(analyze)
+  → NEEDS_CONTEXT block
+      │
+      ▼
+  Phase 2: scout-flow (if NEEDS_CONTEXT)
+  ROLE: tester
+  → Test Context
+      │
+      ▼
+  Phase 3: tester(test) + Test Context
+  → PASS / FAIL / NOT COVERED per criterion
+      │
+  ┌───┴──────────────────┐
+  ▼                      ▼
+TEST_FAILURES.md?     all pass
+  │                      │
+  ▼                      ▼
+builder fixes         Report +
+re-run tester         offer retro
+(max 2 cycles)
+```
+
+---
+
+## 20. verify-state — Pipeline Health Check
 
 Read-only. Detects stale files, drift, and FSM inconsistencies. Never auto-fixes.
 
@@ -795,6 +846,7 @@ verify-state [feature | all]
   LESSONS.md      ──►  plan      ──►  (injected silently)
   RETRO.md + done ──►  archive   ──►  plans/.archive/
   question        ──►  explore   ──►  CONCLUSIONS.md
+  plans/<feature> ──►  test      ──►  test report + TEST_FAILURES.md
   bug symptom     ──►  debug     ──►  fix + FIX.md
   any feature     ──►  verify-   ──►  health report
                        state
@@ -828,4 +880,4 @@ Priority order (highest to lowest):
 
 ---
 
-_Generated 2026-05-11 — update this file after any core/skills/ change._
+_Generated 2026-05-12 — update this file after any core/skills/ change._

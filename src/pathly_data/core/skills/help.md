@@ -129,15 +129,17 @@ Print the banner, then the numbered options for the detected state. Wait for use
   [1] Start a new feature                     -> /pathly start
   [2] Brainstorm/refine an unclear idea       -> storm
   [3] Start a new feature with a PRD/BMAD file
-  [4] See all commands
+  [4] Explore the codebase first              -> explore <topic>
+  [5] See all commands
 
-Reply with 1, 2, 3, or 4:
+Reply with 1, 2, 3, 4, or 5:
 ```
 
 On '1': route to director via `/pathly start` (director asks for intent)
 On '2': ask "What idea do you want to refine?" -> route to `storm <answer>`
 On '3': ask "Feature name?" then "PRD or BMAD file path?" -> route to `team-flow <name>` and user selects PRD/BMAD at the path selector
-On '4': print full command reference (Step 3)
+On '4': ask "What do you want to explore?" -> route to `explore <answer>`
+On '5': print full command reference (Step 3)
 
 ---
 
@@ -312,9 +314,11 @@ On '5': print full command reference
 ───────────────────────────────────────────
 
   storm                                     architect explores idea -> STORM_SEED.md
+  explore <topic>                           explorer maps codebase -> TRACE.md + CONCLUSIONS.md
   plan <feature> [rigor]                    planner creates 4 or 8 plan files
   continue <feature>                        builder implements next TODO conversation
   review                                    reviewer audits staged changes
+  test <feature>                            tester verifies acceptance criteria via scout-flow
   retro <feature>                           quick summarizes; retro skill writes RETRO.md + extracts lessons
   lessons                                   promote candidate lessons -> LESSONS.md
   archive <feature>                         move completed feature to plans/.archive/

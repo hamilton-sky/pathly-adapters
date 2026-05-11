@@ -15,10 +15,10 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 
 ## Subagents used in this stage
 
-| Action | Spawn |
+| Action | Route / Spawn |
 |---|---|
 | PO discussion | `po` |
-| Codebase exploration | `scout` |
+| Codebase exploration | `explore` skill (explorer + scout-flow internally) |
 | Technical storm | `architect` |
 | Planning (path 5 only) | `planner` |
 
@@ -120,28 +120,29 @@ Route to `team-flow/plan [FEATURE] [rigor] [autoFlow] storm`.
 
 ## Path 4 — Explore first
 
-Transition state → EXPLORING. **Spawn** `scout`:
-```
-Explore the codebase for the feature: [feature name]
-Map where this functionality would live — layers, existing files, dependencies, anything already present.
-Output a short summary: relevant files found, likely touch points, open questions.
-Do not plan or implement — explore only.
-```
+Transition state → EXPLORING.
 
-After scout completes, print:
+Route to `explore [FEATURE]`.
+
+The explore skill frames the question, runs the explorer + scout-flow pipeline, and
+writes `explorations/[FEATURE]/CONCLUSIONS.md`.
+
+After the explore skill returns control (user chose "Done" or "Graduate"), read
+`explorations/[FEATURE]/CONCLUSIONS.md` and print:
+
 ```
-[Explore complete] Scout mapped the codebase.
+[Explore complete] Findings in explorations/[FEATURE]/CONCLUSIONS.md.
 
 What next?
-  [A] Plan — go to planning (planner uses scout findings as context)
+  [A] Plan — go to planning (planner gets CONCLUSIONS.md as context)
   [B] Implement directly — nano mode, no plan (best if explore showed ≤ 2 files to touch)
   [C] Stop here — I'll review the explore output first
 
 Reply with A, B, or C:
 ```
 
-**A** → Store scout output as `exploreContext`. Transition state → PLANNING.
-Route to `team-flow/plan [FEATURE] [rigor] [autoFlow]` (pass explore context in args or STATE.json).
+**A** → Store `explorations/[FEATURE]/CONCLUSIONS.md` path as `exploreContext`. Transition state → PLANNING.
+Route to `team-flow/plan [FEATURE] [rigor] [autoFlow]` with explore context injected.
 
 **B** → Route back to `team-flow [FEATURE] nano`. (Orchestrator will run nano mode.)
 
