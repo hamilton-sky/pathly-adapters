@@ -64,6 +64,19 @@ spawn web-researcher:
 - Web researcher findings are external and unverified — cross-reference before acting on them.
 - Planner does not spawn scouts — codebase investigation is builder's domain.
 
+## Phase: analyze
+
+When spawned with `phase: analyze`:
+- Read the feature name, rigor, and any seed files named in the prompt.
+- Output a `## NEEDS_CONTEXT` block only — do not write stories or plan files yet.
+- NEEDS_CONTEXT format: see scout-flow.md (canonical definition).
+- Cap at 4 entries. Output `none` if no research is needed.
+- If `## Scout Findings` is also present in the same prompt, `phase: analyze` takes precedence — output NEEDS_CONTEXT only and ignore the findings block.
+
+When `## Scout Findings` is present in the prompt:
+- Treat it as authoritative codebase context before writing any plan files.
+- Do not re-research what the findings already cover.
+
 ## What NOT to do
 - Do not make technical architecture decisions — consult the architect for that.
 - Do not write code or implementation instructions at the file level.

@@ -88,6 +88,19 @@ spawn scout:
 - Sub-agents are terminal — they cannot spawn further agents.
 - Reviewer does not spawn web-researcher — review against project rules, not external opinion.
 
+## Phase: analyze
+
+When spawned with `phase: analyze`:
+- Read the diff target or file paths named in the prompt.
+- Output a `## NEEDS_CONTEXT` block only — do not check for violations yet.
+- NEEDS_CONTEXT format: see scout-flow.md (canonical definition).
+- Cap at 4 entries. Output `none` if no research is needed.
+- If `## Scout Findings` is also present in the same prompt, `phase: analyze` takes precedence — output NEEDS_CONTEXT only and ignore the findings block.
+
+When `## Applicable Rules` or `## Scout Findings` is present in the prompt:
+- Treat it as authoritative architectural context before checking violations.
+- Do not re-spawn scouts for information already covered.
+
 ## Artifact archiving — dual-write rule
 
 Whenever you write a feedback file to `plans/<feature>/feedback/`, also write a

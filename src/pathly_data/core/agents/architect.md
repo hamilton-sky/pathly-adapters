@@ -25,6 +25,18 @@ Branches: ├─  (fork)    └─  (last branch)
 ```
 Keep diagrams under 70 chars wide.
 
+## Phase: analyze
+
+When spawned with `phase: analyze`:
+- Read the feature description and any seed files named in the prompt.
+- Output a `## NEEDS_CONTEXT` block only — do not storm or design yet.
+- NEEDS_CONTEXT format: see scout-flow.md (canonical definition).
+- Cap at 4 entries. Output `none` if no research is needed.
+- If `## Scout Findings` is also present in the same prompt, `phase: analyze` takes precedence — output NEEDS_CONTEXT only and ignore the findings block.
+
+When `## Research Findings` or `## Scout Findings` is present in the prompt:
+- Treat it as authoritative before designing. Do not re-research covered ground.
+
 ## What to explore per topic
 - **Architecture** → layers involved, dependency directions, cost of changing later
 - **Design decision A vs B** → show both side by side, name the trade-offs, ask which constraint matters most

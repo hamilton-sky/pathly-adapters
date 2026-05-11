@@ -16,18 +16,21 @@ Review code at $ARGUMENTS against this project's architectural standards.
 
 ## Pre-review context gathering
 
-Before loading project rules, spawn a role-scoped scout to retrieve architectural rules applicable to the changed files:
+**Phase 1 — Analyze:**
+Spawn `reviewer` with `phase: analyze`. Pass the diff target (`$ARGUMENTS`).
+Parse the returned `## NEEDS_CONTEXT` block.
 
-Spawn `scout` with `ROLE: reviewer`:
-```
-ROLE: reviewer
-What architectural rules, layer contracts, coding conventions, and dependency direction rules apply to these changed files: [list from git diff]?
-Scope: ARCHITECTURE_PROPOSAL.md in the matching plans/ folder, project rule files, similar existing files in the same layer.
-Return only rules directly relevant to the specific files that changed. 3–8 bullet points max.
-```
+**Phase 2 — Scout:**
+If `NEEDS_CONTEXT` is not `none`: call `scout-flow` with the block, `ROLE: reviewer`, `FEATURE: [changed area]`. Use the returned summary as findings.
+If `NEEDS_CONTEXT` is `none`: findings = none.
 
-Inject findings as `## Applicable Rules` before Step 2.
-If no rule files exist and the scout finds nothing: proceed without injection.
+**Phase 3 — Review:**
+Spawn `reviewer` with the full review prompt. Inject:
+```
+## Applicable Rules
+[compressed summary from Phase 2, or "none" if skipped]
+```
+Keep Steps 1–3 and the report format inside the reviewer's spawn prompt.
 
 ## Step 1 — Get the diff
 

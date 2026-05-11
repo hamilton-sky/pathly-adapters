@@ -48,56 +48,23 @@ If it does not exist: interview the user. Ask what it does, which layers it touc
 
 If `rigor = strict`, do not skip risk questions. Explicitly ask about security, data loss, migrations, compliance, production impact, and rollback expectations unless the user already answered them.
 
-## Planner Consultation Policy
+## Step 3: Gather Codebase Context
 
-The planner owns the final plan files. It may consult other roles, but those
-consultations are optional inputs, not mandatory stages.
+**Phase 1 — Analyze:**
+Spawn `planner` with `phase: analyze`. Pass the feature name and rigor level.
+Parse the returned `## NEEDS_CONTEXT` block.
 
-Consult `po` before writing `USER_STORIES.md` only when product intent is
-unclear:
+**Phase 2 — Scout:**
+If `NEEDS_CONTEXT` is not `none`: call `scout-flow` with the block, `ROLE: planner`, `FEATURE: [feature name]`. Use the returned summary as Scout Findings.
+If `NEEDS_CONTEXT` is `none`: findings = none. Skip scout-flow.
 
-- The target user or buyer is ambiguous.
-- MVP scope is too broad or mixes multiple user problems.
-- Acceptance criteria describe implementation instead of observable outcomes.
-- Success criteria, out-of-scope items, or product edge cases are missing.
-- A PRD exists but has gaps or conflicting requirements.
-
-Before writing user stories, spawn `quick` with `ROLE: po`:
+**Phase 3 — Plan:**
+Spawn `planner` with `phase: plan`. Inject:
 ```
-ROLE: po
-Single factual lookup: who are the existing users of [feature area]? What similar features already exist in this codebase that set scope expectations?
-Read at most 2 files. Return 3–5 bullet facts relevant to product scope only.
+## Scout Findings
+[compressed summary from Phase 2, or "none" if skipped]
 ```
-Inject findings into PO consultation context.
-
-If PO consultation is needed, request or read `plans/$FEATURE/PO_NOTES.md`, then
-turn those notes into user stories and acceptance criteria. Do not keep PO in
-the default lite path when the user already gave enough product context.
-
-Consult `architect` only when technical risk is material:
-
-- Cross-layer dependency direction is unclear.
-- Data migrations, auth, payments, security, compliance, or rollback are in scope.
-- The feature changes shared abstractions or public contracts.
-- The planner cannot produce implementation phases without design decisions.
-
-When architect consultation is triggered, first spawn `scout` with `ROLE: architect`:
-```
-ROLE: architect
-What cross-layer dependencies, existing design decisions, and architectural constraints apply to [feature]?
-Scope: ARCHITECTURE_PROPOSAL.md files, layer boundary files, files the feature will touch.
-Return: existing constraints that must be respected, patterns to follow, open design questions.
-```
-Inject findings as `## Architecture Context` into the architect spawn prompt.
-
-Do not add a generic "consult everyone" stage. Use targeted consultation so
-Pathly stays low-latency and low-token by default.
-## Step 3: Research The Codebase
-
-1. Read project guidance and linked rule files for layer structure, dependency direction, naming conventions, and test commands.
-2. Find similar existing components and use them as reference patterns.
-3. Identify files to create or modify.
-4. Check test directory conventions if tests are in scope.
+Plus all existing context: rigor level, `STORM_SEED` contents if it existed, `PO_NOTES` contents if it exists.
 
 ## Step 4: Create The Plans Folder
 
@@ -216,15 +183,20 @@ show both its purpose and its dependency relationship to the larger feature.
 
 For each phase in `IMPLEMENTATION_PLAN.md`, include:
 
+- File: exact path of the file this phase creates or modifies (required at all rigor levels).
+- Done when: one observable sentence — what is true when this phase is complete (required at all rigor levels).
 - Purpose: why this phase exists in the user-facing feature.
 - Depends on: earlier phase/conversation, existing code path, or external setup.
 - Enables: what later phase or acceptance criterion this unlocks.
-- Verification: the smallest useful command or manual check for that phase.
+- Verify: a runnable command or manual check (standard/strict only; omit in lite).
+- Rollback: how to undo if this phase goes wrong (strict only).
+
+`File` and `Done when` are mandatory at every rigor level. They let the builder jump directly to the right file and know exactly when to stop — eliminating orientation tool calls on every run.
 
 Keep decomposition small enough for builder reliability:
 
-- Lite: 1-2 conversations, 1-3 phases per conversation.
-- Standard/strict: up to 4 conversations, 3-6 phases per conversation.
+- Lite: 1-2 conversations, 1 phase per file touched — one File + Done when per phase.
+- Standard/strict: up to 4 conversations, 3-6 phases per conversation, each with File + Done when + Verify.
 - If dependency chains exceed 4 conversations, split the feature into follow-up
   plan folders instead of creating a giant plan.
 ## Conversation Splitting Rules
@@ -253,7 +225,8 @@ Keep decomposition small enough for builder reliability:
 - Conversation prompts reference correct phase numbers.
 - `PROGRESS.md` conversation table matches `CONVERSATION_PROMPTS.md`.
 - Phase numbers are consistent across all created files.
-- Verify commands use correct project commands.
+- Every phase in `IMPLEMENTATION_PLAN.md` has a `File:` field and a `Done when:` field — all rigor levels.
+- Verify commands use correct project commands (standard/strict only).
 - If `rigor = strict`, every acceptance criterion has an explicit verification mapping and rollback note.
 
 ## Step 6: Report

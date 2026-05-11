@@ -52,3 +52,53 @@ MUST map each IMPLEMENTATION_PLAN phase to exactly one PROGRESS.md conversation 
 
 ### Source
 Feature: docs-sync | Stage: planning | Date: 2026-05-11
+
+---
+
+## [parallel-scout-standard] Multi-file conversations are too large for reliable builder execution
+
+### Pattern
+Conversations that touch 3–4 files of the same type (skills, agents) accumulate too much scope, making it harder to verify and easier to introduce inconsistencies across files.
+
+### Rule
+MUST scope each conversation to at most one file per category — one skill file or one agent file per conversation, not a batch. Each phase must carry an explicit file path and done-condition at all rigor levels (lite included).
+
+### Injection
+- Add to `CONVERSATION_PROMPTS.md` splitting rule: "If a conversation touches more than one file of the same type (skill, agent, config), split into separate conversations — one per file."
+- Add to each phase in `IMPLEMENTATION_PLAN.md`: `**File:** <exact path>` and `**Done when:** <observable condition>` — required at all rigor levels.
+
+### Source
+Feature: parallel-scout-standard | Stage: implementation | Date: 2026-05-11
+
+---
+
+## [parallel-scout-standard] Pre-loading file paths and done-conditions eliminates agent orientation overhead
+
+### Pattern
+Agents without explicit file paths and done-conditions in their task spend 4–6 tool calls on orientation (reading FEATURE_INDEX, globbing for files, re-reading the plan to understand "done") before any real work starts. This compounds across retries and continuation sessions.
+
+### Rule
+MUST include an explicit `File:` path and `Done when:` condition in every phase of every plan, at all rigor levels — not just standard/strict. The planning cost is paid once; the orientation savings are paid on every builder run.
+
+### Injection
+- Add to every phase in `IMPLEMENTATION_PLAN.md`: `**File:** <exact path to file being created/modified>` and `**Done when:** <one observable sentence — what is true when this phase is complete>`.
+- Depth scales by rigor: lite = path + done-condition; standard = + verify command; strict = + verify command + rollback note.
+
+### Source
+Feature: parallel-scout-standard | Stage: retro discussion | Date: 2026-05-11
+
+---
+
+## [parallel-scout-standard] Flow diagram template not offered for orchestration features
+
+### Pattern
+Features that introduce new calling conventions or orchestration patterns (like scout-flow) benefit from a visual flow diagram during planning, but the plan skill only offers ASCII diagrams and does not prompt for one when the feature is orchestration-heavy.
+
+### Rule
+MUST offer the flow diagram template when a feature introduces a new inter-agent calling convention, sub-skill, or orchestration pattern.
+
+### Injection
+- Add to `plan.md` Step 2 (Understand The Feature): "If the feature introduces a new calling convention, sub-skill, or orchestration pattern, include a `FLOW_DIAGRAM.md` regardless of rigor level."
+
+### Source
+Feature: parallel-scout-standard | Stage: planning | Date: 2026-05-11

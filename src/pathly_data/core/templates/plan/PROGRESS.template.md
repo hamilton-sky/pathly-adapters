@@ -21,9 +21,9 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 
 ## Phase Detail
 
-| # | Phase | Layer | Description | Conv | Status | Key Files |
-|---|-------|-------|-------------|------|--------|-----------|
-| 1 | [name] | [layer] | [description] | 1 | TODO | `[files]` |
+| Conv | Phase | File | Description | Done when | Status |
+|------|-------|------|-------------|-----------|--------|
+| 1 | [name] | `src/path/to/file.ext` | [description] | [done-condition] | TODO |
 ...
 
 ## Prerequisites

@@ -45,9 +45,9 @@ Run `git status` (without -uall flag).
   ```
   Wait for user decision before continuing. In auto-flow mode, stop immediately.
 
-## Context gathering — two-phase builder
+## Context gathering — three-phase builder
 
-For non-trivial conversations (touches multiple files or an unfamiliar area), run a two-phase build before Step 5:
+For non-trivial conversations (touches multiple files or an unfamiliar area), run a three-phase build before Step 5:
 
 **Phase 1 — Analyze:**
 Spawn `builder` with `phase: analyze` prepended to the conversation prompt:
@@ -58,11 +58,7 @@ phase: analyze
 Parse the `## NEEDS_CONTEXT` block it returns. If the block says `none`: skip Phase 2.
 
 **Phase 2 — Scout (if NEEDS_CONTEXT has entries):**
-Spawn all entries in parallel (max 4 total):
-- `type: quick` → spawn `quick` with `ROLE: builder` + the question
-- `type: scout` → spawn `scout` with `ROLE: builder` + scope + question
-
-After all return, compress findings into a short summary.
+Call `scout-flow` with the NEEDS_CONTEXT block, `ROLE: builder`, `FEATURE: [plan folder name]`. Use the returned summary as Scout Findings.
 
 **Phase 3 — Implement (Step 5):**
 Spawn `builder` with `phase: implement`, injecting findings:

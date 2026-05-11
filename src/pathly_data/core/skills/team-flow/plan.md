@@ -17,10 +17,10 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 | Action | Spawn |
 |---|---|
 | Storm Phase 1 — Analyze | `architect` (phase: analyze) |
-| Storm Phase 2 — Research | `scout`, `quick`, or `web-researcher` with `ROLE: architect` (parallel, max 4) |
+| Storm Phase 2 — Research | scout-flow (ROLE: architect) |
 | Storm Phase 3 — Storm | `architect` (phase: storm) |
 | Plan Phase 1 — Analyze | `planner` (phase: analyze) |
-| Plan Phase 2 — Scout | `scout` or `quick` with `ROLE: planner` (parallel, max 4) |
+| Plan Phase 2 — Scout | scout-flow (ROLE: planner) |
 | Plan Phase 3 — Plan | `planner` (phase: plan) |
 
 ---
@@ -47,14 +47,10 @@ Output `none` if no upfront research is needed.
 ```
 Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
-### Phase 2 — Research (parallel, max 4)
+### Phase 2 — Research
 
-Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
-- `type: quick` → spawn `quick` with `ROLE: architect` + the question
-- `type: scout` → spawn `scout` with `ROLE: architect` + scope + question
-- `type: web` → spawn `web-researcher` with `ROLE: architect` + the query
-
-Compress all findings into a short summary for Phase 3.
+Call scout-flow with: NEEDS_CONTEXT block from Phase 1, ROLE: architect, FEATURE: [feature name].
+Use the returned compressed summary as Research Findings for Phase 3.
 
 ### Phase 3 — Storm
 
@@ -107,13 +103,10 @@ Output `none` if no upfront research is needed.
 ```
 Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
-### Phase 2 — Scout (parallel, max 4)
+### Phase 2 — Scout
 
-Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
-- `type: quick` → spawn `quick` with `ROLE: planner` + the question
-- `type: scout` → spawn `scout` with `ROLE: planner` + scope + question
-
-Compress all findings into a short summary for Phase 3.
+Call scout-flow with: NEEDS_CONTEXT block from Phase 1, ROLE: planner, FEATURE: [feature name].
+Use the returned compressed summary as Scout Findings for Phase 3.
 
 ### Phase 3 — Plan
 

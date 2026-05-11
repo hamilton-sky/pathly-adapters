@@ -14,17 +14,15 @@ Plans (IMPLEMENTATION_PLAN.md)  →  Implementation modules  →  Interfaces / c
 
 ## Phases
 
-### Phase 1: [Phase Title] (estimated effort)
-**Layer:** [API / Service / CLI / Data / UI / Infra]
+### Phase 1: [Phase Title]   ← Conversation: N
+**File:** `src/path/to/file.ext` — [CREATE / MODIFY: what changes]
+**Done when:** [one observable sentence — what is true when this phase is complete]
 **Delivers stories:** S1.1, S1.2
-**Files:**
-- `<module>/<component>/<file>.py` — [what changes]
-- `<module>/<component>/<file>.py` — NEW: [what it does]
-
+**Depends on:** [prior phase, conversation, or "nothing"]
+**Enables:** [next phase or acceptance criterion this unlocks]
 **Details:**
-[Specific implementation instructions — cfg list keys, method signatures, action names]
-
-**Verify:** `<project verify command — e.g. pytest, make test, or the stated verify script>`
+[Specific implementation instructions — cfg list keys, method signatures, section names]
+**Verify:** `<project verify command — e.g. pytest, make test>` ← standard/strict only; omit in lite
 
 ### Phase 2: [Phase Title] (estimated effort)
 ...
