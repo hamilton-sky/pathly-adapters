@@ -22,8 +22,9 @@ State snapshots are written to `plans/<feature>/STATE.json`.
 
 | Action | Spawn |
 |---|---|
-| Gather applicable rules | `scout` with `ROLE: reviewer` |
-| Review changes | `reviewer` |
+| Phase 1 — Analyze changes | `reviewer` (phase: analyze) |
+| Phase 2 — Scout context | `scout` or `quick` with `ROLE: reviewer` (parallel, max 4) |
+| Phase 3 — Review | `reviewer` (phase: review) |
 | Fix architectural violations | `architect` |
 | Fix implementation violations | `builder` |
 
@@ -36,27 +37,45 @@ State snapshots are written to `plans/<feature>/STATE.json`.
 
 ---
 
-## Pre-review scout
+## Phase 1 — Analyze
 
-**Spawn** `scout` with `ROLE: reviewer`:
+**Spawn** `reviewer` with `phase: analyze`:
 ```
-ROLE: reviewer
-What architectural rules, layer contracts, and coding conventions apply to the files changed
-in conversation N of [feature]?
-Check: project guidance files (CLAUDE.md, .claude/rules/), plans/[feature]/ARCHITECTURE_PROPOSAL.md
-if it exists.
-Return only the rules relevant to the specific files touched — not a general summary.
-```
+phase: analyze
+Conv N of [feature] — scan the diff to identify what context you need before reviewing.
+Run: git diff HEAD~1 HEAD
+Read plans/[feature]/ARCHITECTURE_PROPOSAL.md if it exists.
+List what you need — output NEEDS_CONTEXT block only.
 
-## Reviewer spawn
+NEEDS_CONTEXT format (one entry per line):
+  - type: scout | scope: <files or directories> | question: <specific question>
+  - type: quick | question: <specific question>
 
-**Spawn** `reviewer` with scout findings injected:
+Always include at minimum:
+  - type: scout | scope: CLAUDE.md, .claude/rules/, plans/[feature]/ARCHITECTURE_PROPOSAL.md | question: what architectural rules and coding conventions apply to the changed files?
+
+Output `none` if the default rules scout above is sufficient.
 ```
+Parse the `## NEEDS_CONTEXT` block. If it says `none`, use only the default rules scout in Phase 2.
+
+## Phase 2 — Scout (parallel, max 4)
+
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: reviewer` + the question
+- `type: scout` → spawn `scout` with `ROLE: reviewer` + scope + question
+
+Compress all findings into a short summary for Phase 3.
+
+## Phase 3 — Review
+
+**Spawn** `reviewer` with `phase: review` and scout findings injected:
+```
+phase: review
 Review the changes from conversation N of [feature].
 Run: git diff HEAD~1 HEAD (or git diff --staged if not yet committed).
 
-## Applicable Rules (from pre-review scout)
-[scout findings]
+## Applicable Rules and Context (from pre-review scout)
+[compressed findings]
 
 Check against these rules and plans/[feature]/ARCHITECTURE_PROPOSAL.md.
 If architectural violations found: write plans/[feature]/feedback/ARCH_FEEDBACK.md
@@ -116,7 +135,7 @@ git diff HEAD -- . ":(exclude)plans/"
   ```
   Append `{"type": "NO_DIFF_DETECTED"}` to EVENTS.jsonl.
   Stop: "Zero-diff loop detected for Conv N. Escalated to HUMAN_QUESTIONS.md."
-- If output is **non-empty**: re-run reviewer spawn above (go back to pre-review scout).
+- If output is **non-empty**: re-run from Phase 1 — Analyze above.
 
 ### If no feedback files — PASS
 

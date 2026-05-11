@@ -176,15 +176,8 @@ If autoFlow: log human response "auto-advance".
 
 **Phase 2 — Architect Storm:**
 Transition state → STORMING.
-
-**Spawn** `architect`:
-```
-Route to storm for the feature: [feature name]
-Context from PO discussion is in plans/[feature]/PO_NOTES.md — read it first.
-Explore the idea technically — layers, dependencies, design decisions.
-When the user is satisfied, they will type /stop plan to write STORM_SEED.md.
-Remind them of this at the start.
-```
+Route to `team-flow/plan [FEATURE] [rigor] [autoFlow] storm`.
+(plan.md Stage 1 runs the full analyze → research → storm cycle, reading PO_NOTES.md automatically.)
 
 If not autoFlow — pause:
 ```

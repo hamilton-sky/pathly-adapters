@@ -28,8 +28,9 @@ When all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl. Confirm 
 
 | Action | Spawn |
 |---|---|
-| Gather test context | `scout` with `ROLE: tester` |
-| Verify acceptance criteria | `tester` |
+| Phase 1 — Analyze needs | `tester` (phase: analyze) |
+| Phase 2 — Scout context | `scout` or `quick` with `ROLE: tester` (parallel, max 4) |
+| Phase 3 — Test | `tester` (phase: test) |
 | Fix failing criteria | `builder` |
 
 ## Rigor depth
@@ -40,28 +41,45 @@ When all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl. Confirm 
 
 ---
 
-## Pre-tester scout
+## Phase 1 — Analyze
 
-**Spawn** `scout` with `ROLE: tester`:
+**Spawn** `tester` with `phase: analyze`:
 ```
-ROLE: tester
-What test patterns, existing test fixtures, and coverage gaps exist for the files changed in [feature]?
-Scope: test directories, source files touched, existing test helpers/fixtures.
-Return: existing test patterns to follow, missing coverage areas, and any test commands specific to this module.
-```
-Inject findings as `## Test Context` into the tester spawn prompt.
+phase: analyze
+Read plans/[feature]/USER_STORIES.md.
+List what test infrastructure and context you need before verifying — output NEEDS_CONTEXT block only.
 
-## Tester spawn
+NEEDS_CONTEXT format (one entry per line):
+  - type: scout | scope: <test directories or source files> | question: <specific question>
+  - type: quick | question: <specific question>
+
+Always include at minimum:
+  - type: scout | scope: test directories, source files touched | question: what test patterns, fixtures, and coverage gaps exist for the changed files?
+
+Output `none` if the default test-context scout above is sufficient.
+```
+Parse the `## NEEDS_CONTEXT` block. If it says `none`, use only the default test-context scout in Phase 2.
+
+## Phase 2 — Scout (parallel, max 4)
+
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: tester` + the question
+- `type: scout` → spawn `scout` with `ROLE: tester` + scope + question
+
+Compress all findings into a short summary for Phase 3.
+
+## Phase 3 — Test
 
 Track `testRetryCount = 0`.
 
-**Spawn** `tester`:
+**Spawn** `tester` with `phase: test` and scout findings injected:
 ```
+phase: test
 Read plans/[feature]/USER_STORIES.md.
 Run /test to verify each acceptance criterion.
 
 ## Test Context
-[scout findings]
+[compressed findings]
 
 For each criterion: PASS / FAIL / NOT COVERED.
 If any FAIL or NOT COVERED: write plans/[feature]/feedback/TEST_FAILURES.md

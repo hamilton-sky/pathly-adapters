@@ -16,18 +16,57 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 
 | Action | Spawn |
 |---|---|
-| Technical storm | `architect` |
-| Create plan files | `planner` |
+| Storm Phase 1 — Analyze | `architect` (phase: analyze) |
+| Storm Phase 2 — Research | `scout`, `quick`, or `web-researcher` with `ROLE: architect` (parallel, max 4) |
+| Storm Phase 3 — Storm | `architect` (phase: storm) |
+| Plan Phase 1 — Analyze | `planner` (phase: analyze) |
+| Plan Phase 2 — Scout | `scout` or `quick` with `ROLE: planner` (parallel, max 4) |
+| Plan Phase 3 — Plan | `planner` (phase: plan) |
 
 ---
 
 ## Stage 1 — Storm
 *(only runs if `storm` flag is present in args or FSM state is STORMING)*
 
-**Spawn** `architect`:
+### Phase 1 — Analyze
+
+**Spawn** `architect` with `phase: analyze`:
 ```
+phase: analyze
+Feature: [feature name]
+Read plans/[feature]/PO_NOTES.md if it exists.
+Read plans/[feature]/STORM_SEED.md if it exists.
+List what codebase research and external information you need before storming — output NEEDS_CONTEXT block only.
+
+NEEDS_CONTEXT format (one entry per line):
+  - type: scout | scope: <files or directories> | question: <specific question>
+  - type: quick | question: <specific question>
+  - type: web | query: <search query>
+
+Output `none` if no upfront research is needed.
+```
+Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
+
+### Phase 2 — Research (parallel, max 4)
+
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: architect` + the question
+- `type: scout` → spawn `scout` with `ROLE: architect` + scope + question
+- `type: web` → spawn `web-researcher` with `ROLE: architect` + the query
+
+Compress all findings into a short summary for Phase 3.
+
+### Phase 3 — Storm
+
+**Spawn** `architect` with `phase: storm` and research findings injected:
+```
+phase: storm
 Route to storm for the feature: [feature name]
 Explore the idea technically — layers, dependencies, design decisions.
+
+## Research Findings
+[compressed summary — or "none" if Phase 2 was skipped]
+
 When the user is satisfied, they will type /stop plan to write STORM_SEED.md.
 Remind them of this at the start.
 ```
@@ -50,11 +89,44 @@ Transition state → PLANNING. Fall through to Stage 2.
 
 ## Stage 2 — Plan
 
-**Spawn** `planner`:
+### Phase 1 — Analyze
+
+**Spawn** `planner` with `phase: analyze`:
 ```
+phase: analyze
+Feature: [feature name], rigor: [rigor]
+Read plans/[feature]/STORM_SEED.md if it exists.
+Read plans/[feature]/PO_NOTES.md if it exists.
+List what codebase context you need before writing the plan — output NEEDS_CONTEXT block only.
+
+NEEDS_CONTEXT format (one entry per line):
+  - type: scout | scope: <files or directories> | question: <specific question>
+  - type: quick | question: <specific question>
+
+Output `none` if no upfront research is needed.
+```
+Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
+
+### Phase 2 — Scout (parallel, max 4)
+
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: planner` + the question
+- `type: scout` → spawn `scout` with `ROLE: planner` + scope + question
+
+Compress all findings into a short summary for Phase 3.
+
+### Phase 3 — Plan
+
+**Spawn** `planner` with `phase: plan` and scout findings injected:
+```
+phase: plan
 Route to plan [feature name] [rigor].
 If plans/[feature]/STORM_SEED.md exists, consume it as pre-filled answers.
 If plans/[feature]/PO_NOTES.md exists, read it first for requirements context.
+
+## Scout Findings
+[compressed summary — or "none" if Phase 2 was skipped]
+
 Ensure every story references which phase/conversation delivers it.
 Ensure every phase references which stories it fulfills.
 After creating the selected rigor's plan files, list them as a summary.
