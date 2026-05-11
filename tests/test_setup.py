@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -5,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from install_cli.detect import detect_hosts, _HOST_MARKERS
-from install_cli.materialize import materialize
+from install_cli.materialize import materialize, uninstall, MANIFEST_NAME
 from install_cli.setup_command import main
 
 
@@ -140,3 +141,39 @@ def test_dry_run_real_claude(capsys):
         main()  # no mocks — uses real adapter files
     captured = capsys.readouterr()
     assert "[claude]" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# uninstall — manifest traversal guard
+# ---------------------------------------------------------------------------
+
+def _write_manifest(dest: Path, entries: dict) -> None:
+    manifest = {"files": entries}
+    (dest / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+
+def test_uninstall_rejects_traversal_in_manifest(tmp_path):
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    _write_manifest(dest, {"../../evil_file": "2024-01-01T00:00:00+00:00"})
+
+    evil_file = tmp_path / "evil_file"
+    evil_file.write_text("untouched", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="traversal"):
+        uninstall(dest)
+
+    assert evil_file.exists(), "File outside dest must not be deleted"
+
+
+def test_uninstall_clean_manifest(tmp_path):
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    tracked_file = dest / "agent.md"
+    tracked_file.write_text("# agent", encoding="utf-8")
+    _write_manifest(dest, {"agent.md": "2024-01-01T00:00:00+00:00"})
+
+    removed = uninstall(dest)
+
+    assert removed == ["agent.md"]
+    assert not tracked_file.exists()
