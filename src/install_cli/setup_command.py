@@ -11,7 +11,14 @@ from .detect import detect_hosts
 from .mcp_config import install_mcp_config, uninstall_mcp_config
 from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_skills_path, core_templates_path, hooks_path
 from .stitch import stitch_agent, stitch_skill
-from .materialize import materialize, uninstall
+from .materialize import (
+    materialize,
+    uninstall,
+    deploy_codex_hooks,
+    remove_codex_hooks,
+    deploy_copilot_hooks,
+    remove_copilot_hooks,
+)
 
 # Must stay in sync with detect_hosts() — any host returned by detect_hosts()
 # must appear here, or auto-detected installs will fail with a confusing error.
@@ -152,6 +159,16 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             install_mcp_config(host, dry_run=True)
         if host == "codex" and plugin_files:
             install_codex_plugin(plugin_files, dry_run=True)
+        if host == "codex":
+            hook_paths = deploy_codex_hooks(dry_run=True)
+            print(f"\n[{host}] Would write Codex hooks to:")
+            for p in hook_paths:
+                print(f"  {p}")
+        if host == "copilot":
+            hook_paths = deploy_copilot_hooks(dry_run=True)
+            print(f"\n[{host}] Would write Copilot hooks to:")
+            for p in hook_paths:
+                print(f"  {p}")
         return
 
     written_dests: list[Path] = []
@@ -197,6 +214,16 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             install_codex_plugin(plugin_files, dry_run=False)
             codex_plugin_registered = True
 
+        if host == "codex":
+            written_hooks = deploy_codex_hooks(dry_run=False)
+            if written_hooks:
+                print(f"[{host}] Wrote Codex hooks to {written_hooks[0]}")
+
+        if host == "copilot":
+            written_hooks = deploy_copilot_hooks(dry_run=False)
+            if written_hooks:
+                print(f"[{host}] Wrote Copilot hooks ({len(written_hooks)} file(s))")
+
     except Exception:
         print(f"[{host}] Install failed — rolling back.", file=sys.stderr)
         for d in written_dests:
@@ -225,6 +252,17 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
         uninstall_mcp_config(host, dry_run=dry_run)
     if host == "codex":
         uninstall_codex_plugin(dry_run=dry_run)
+        removed_hooks = remove_codex_hooks(dry_run=dry_run)
+        if dry_run and removed_hooks:
+            print(f"\n[{host}] Would remove Codex hooks from {removed_hooks[0]}")
+        elif removed_hooks:
+            print(f"[{host}] Removed Codex hooks from {removed_hooks[0]}")
+    if host == "copilot":
+        removed_hooks = remove_copilot_hooks(dry_run=dry_run)
+        if dry_run and removed_hooks:
+            print(f"\n[{host}] Would remove Copilot hooks: {', '.join(removed_hooks)}")
+        elif removed_hooks:
+            print(f"[{host}] Removed Copilot hooks ({len(removed_hooks)} file(s))")
 
     removed = uninstall(dest, dry_run=dry_run)
     if dry_run:

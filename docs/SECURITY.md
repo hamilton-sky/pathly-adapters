@@ -230,14 +230,12 @@ Production recommendation:
 
 Status of automatic hook integration per host:
 
-| Host | Status | Notes |
-|---|---|---|
-| **Claude Code** | Supported | Hooks fire automatically via the Claude Code hook event system (`post_tool_call`). |
-| **Codex** | Not yet deployed | Parity path: per-host `_meta/<name>_hook.yaml` overlay. |
-| **Copilot VS Code** | Not yet deployed | Parity path: same `_meta/<name>_hook.yaml` overlay mechanism. |
-| **Copilot CLI** | Not supported | No hook event system available in this host. |
-
-Until Codex and Copilot VS Code overlays are shipped, hooks must be installed manually on those hosts. See Known Limitations in README.md.
+| Host | Status | Deployed by installer | Notes |
+|---|---|---|---|
+| **Claude Code** | Supported | ✅ (auto via `post_tool_call` hook system) | Hooks fire automatically via the Claude Code hook event system (`post_tool_call`). |
+| **Codex** | Supported | ✅ (`pathly-setup codex --apply`) | Writes `~/.codex/hooks.json` with `PostToolUse` entries under the `pathly` namespace. |
+| **Copilot VS Code** | Supported | ✅ (`pathly-setup copilot --apply`) | Writes `.github/hooks/pathly-classify.json` and `.github/hooks/pathly-ttl.json`. |
+| **Copilot CLI** | Not supported | ❌ (no hook event system) | No hook event system available in this host. |
 
 ---
 

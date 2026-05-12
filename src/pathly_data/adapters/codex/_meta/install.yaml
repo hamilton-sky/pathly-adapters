@@ -13,7 +13,11 @@ plugin:
   include_stitched: true
 telemetry: true
 hooks:
-  - event: post_tool_call
+  - event: PostToolUse
+    matcher:
+      tool_name: apply_patch
     script: hooks/classify_feedback.py
-  - event: post_tool_call
+  - event: PostToolUse
+    matcher:
+      tool_name: apply_patch
     script: hooks/inject_feedback_ttl.py

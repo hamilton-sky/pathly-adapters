@@ -7,3 +7,8 @@ skills:
   structure: flat
 templates:
   destination: ~/.vscode/extensions/pathly/templates
+hooks:
+  - event: PostToolUse
+    script: classify_feedback.py
+  - event: PostToolUse
+    script: inject_feedback_ttl.py

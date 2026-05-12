@@ -1,9 +1,168 @@
+import importlib.resources
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 MANIFEST_NAME = ".pathly-manifest.json"
+
+
+def _hook_script_path(name: str) -> Path:
+    """Return the absolute path to a pathly_hooks script."""
+    return Path(str(importlib.resources.files("pathly_hooks"))) / name
+
+
+# ---------------------------------------------------------------------------
+# Codex hooks
+# ---------------------------------------------------------------------------
+
+def deploy_codex_hooks(*, dry_run: bool = False) -> list[str]:
+    """Write ~/.codex/hooks.json with Pathly PostToolUse entries.
+
+    Merges into any existing hooks.json — only the 'pathly' key is touched.
+    Returns list of paths that were (or would be) written.
+    """
+    hooks_file = Path.home() / ".codex" / "hooks.json"
+    pathly_entries = {
+        "classify_feedback": {
+            "event": "PostToolUse",
+            "matcher": {"tool_name": "apply_patch"},
+            "command": str(_hook_script_path("classify_feedback.py")),
+        },
+        "inject_feedback_ttl": {
+            "event": "PostToolUse",
+            "matcher": {"tool_name": "apply_patch"},
+            "command": str(_hook_script_path("inject_feedback_ttl.py")),
+        },
+    }
+
+    if dry_run:
+        return [str(hooks_file)]
+
+    existing: dict = {}
+    if hooks_file.exists():
+        try:
+            existing = json.loads(hooks_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+
+    existing["pathly"] = pathly_entries
+    hooks_file.parent.mkdir(parents=True, exist_ok=True)
+    hooks_file.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+
+    config_toml = Path.home() / ".codex" / "config.toml"
+    if config_toml.exists():
+        content = config_toml.read_text(encoding="utf-8")
+        if "codex_hooks = true" not in content:
+            print(
+                "  [note] ~/.codex/config.toml exists but lacks "
+                "[features]\\ncodex_hooks = true — hooks may not fire.",
+                file=sys.stderr,
+            )
+    else:
+        print(
+            "  [note] ~/.codex/config.toml not found — add "
+            "[features]\\ncodex_hooks = true to enable hooks.",
+            file=sys.stderr,
+        )
+
+    return [str(hooks_file)]
+
+
+def remove_codex_hooks(*, dry_run: bool = False) -> list[str]:
+    """Remove the 'pathly' key from ~/.codex/hooks.json.
+
+    Deletes the file if it becomes empty. Returns list of paths affected.
+    """
+    hooks_file = Path.home() / ".codex" / "hooks.json"
+    if not hooks_file.exists():
+        return []
+
+    if dry_run:
+        return [str(hooks_file)]
+
+    try:
+        existing = json.loads(hooks_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+    existing.pop("pathly", None)
+
+    if not existing:
+        hooks_file.unlink()
+    else:
+        hooks_file.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+
+    return [str(hooks_file)]
+
+
+# ---------------------------------------------------------------------------
+# Copilot VS Code hooks
+# ---------------------------------------------------------------------------
+
+def deploy_copilot_hooks(dest: Path = None, *, dry_run: bool = False) -> list[str]:
+    """Write .github/hooks/pathly-classify.json and pathly-ttl.json.
+
+    dest defaults to Path.cwd() / '.github' / 'hooks'.
+    Returns list of paths that were (or would be) written.
+    """
+    if dest is None:
+        dest = Path.cwd() / ".github" / "hooks"
+
+    classify_path = dest / "pathly-classify.json"
+    ttl_path = dest / "pathly-ttl.json"
+
+    classify_script = _hook_script_path("classify_feedback.py")
+    ttl_script = _hook_script_path("inject_feedback_ttl.py")
+
+    classify_content = {
+        "event": "PostToolUse",
+        "command": {
+            "windows": f"python {classify_script} ",
+            "linux": f"python3 {classify_script} ",
+            "osx": f"python3 {classify_script} ",
+        },
+    }
+    ttl_content = {
+        "event": "PostToolUse",
+        "command": {
+            "windows": f"python {ttl_script} ",
+            "linux": f"python3 {ttl_script} ",
+            "osx": f"python3 {ttl_script} ",
+        },
+    }
+
+    if dry_run:
+        return [str(classify_path), str(ttl_path)]
+
+    dest.mkdir(parents=True, exist_ok=True)
+    classify_path.write_text(json.dumps(classify_content, indent=2), encoding="utf-8")
+    ttl_path.write_text(json.dumps(ttl_content, indent=2), encoding="utf-8")
+
+    return [str(classify_path), str(ttl_path)]
+
+
+def remove_copilot_hooks(dest: Path = None, *, dry_run: bool = False) -> list[str]:
+    """Delete Pathly Copilot hook JSON files if they exist.
+
+    Returns list of paths that were (or would be) deleted.
+    """
+    if dest is None:
+        dest = Path.cwd() / ".github" / "hooks"
+
+    targets = [dest / "pathly-classify.json", dest / "pathly-ttl.json"]
+    affected = [str(p) for p in targets if p.exists()]
+
+    if dry_run or not affected:
+        return affected
+
+    for p in targets:
+        try:
+            p.unlink()
+        except FileNotFoundError:
+            pass
+
+    return affected
 
 
 def _load_manifest(dest: Path) -> dict:
