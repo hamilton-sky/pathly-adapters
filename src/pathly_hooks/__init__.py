@@ -4,4 +4,4 @@ Pathly hooks — Claude Code post-tool-call hooks for feedback classification an
 These hooks require the Claude Code hook event system and have no equivalent in Codex or Copilot.
 """
 
-from pathly_hooks import classify_feedback, inject_feedback_ttl  # noqa: F401
+from . import classify_feedback, inject_feedback_ttl  # noqa: F401
