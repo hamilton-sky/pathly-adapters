@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = ["pyyaml>=6.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "build", "twine"]
+dev = ["pytest>=8", "build", "twine", "jsonschema>=4"]
 
 [project.scripts]
 pathly-setup = "install_cli.__main__:main"

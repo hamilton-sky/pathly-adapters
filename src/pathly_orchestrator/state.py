@@ -38,6 +38,24 @@ STATES = {
     "DONE":               "All conversations complete, retro written",
 }
 
+VALID_STATES: frozenset[str] = frozenset(STATES.keys())
+
+TRANSITIONS: dict[str, frozenset[str]] = {
+    "IDLE":             frozenset(["DISCOVERING", "PLANNING", "BUILDING", "BLOCKED_ON_HUMAN"]),
+    "DISCOVERING":      frozenset(["PLANNING", "IDLE", "BLOCKED_ON_HUMAN"]),
+    "PLANNING":         frozenset(["PLAN_DONE", "BUILDING", "BLOCKED_ON_HUMAN"]),
+    "PLAN_DONE":        frozenset(["BUILDING", "CONSULT_OPEN", "BLOCKED_ON_HUMAN"]),
+    "CONSULT_OPEN":     frozenset(["PLANNING", "BUILDING", "PLAN_DONE", "BLOCKED_ON_HUMAN"]),
+    "BUILDING":         frozenset(["REVIEWING", "TESTING", "BLOCKED_ON_HUMAN", "DONE"]),
+    "REVIEWING":        frozenset(["BUILDING", "REVIEW_BLOCKED", "BLOCKED_ON_HUMAN", "DONE"]),
+    "REVIEW_BLOCKED":   frozenset(["BUILDING", "BLOCKED_ON_HUMAN"]),
+    "TESTING":          frozenset(["RETRO", "TEST_BLOCKED", "BLOCKED_ON_HUMAN", "DONE"]),
+    "TEST_BLOCKED":     frozenset(["BUILDING", "TESTING", "BLOCKED_ON_HUMAN"]),
+    "BLOCKED_ON_HUMAN": VALID_STATES,
+    "RETRO":            frozenset(["DONE", "BLOCKED_ON_HUMAN"]),
+    "DONE":             frozenset(),
+}
+
 # ── Example STATE.json ────────────────────────────────────────────────────────
 #
 # {
