@@ -3,3 +3,4 @@
 {"type": "STATE_TRANSITION", "to": "PLANNING", "ts": "2026-05-12T00:01:00Z"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-12T00:00:00Z"}
 {"type": "HUMAN_RESPONSE", "value": "go"}
+{"type": "STATE_TRANSITION", "to": "DONE", "ts": "2026-05-12T00:01:00Z"}
