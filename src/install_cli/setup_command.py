@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 
+from .codex_plugin_config import install_codex_plugin, uninstall_codex_plugin
 from .detect import detect_hosts
 from .mcp_config import install_mcp_config, uninstall_mcp_config
 from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_skills_path, core_templates_path
@@ -120,10 +121,13 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 print(f"  {plugin_dest / name}")
         if telemetry_enabled:
             install_mcp_config(host, dry_run=True)
+        if host == "codex" and plugin_files:
+            install_codex_plugin(plugin_files, dry_run=True)
         return
 
     written_dests: list[Path] = []
     mcp_registered = False
+    codex_plugin_registered = False
     try:
         written = materialize(agent_files, dest, repair=repair, force=force, dry_run=False)
         if written:
@@ -154,6 +158,10 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             install_mcp_config(host, dry_run=False)
             mcp_registered = True
 
+        if host == "codex" and plugin_files:
+            install_codex_plugin(plugin_files, dry_run=False)
+            codex_plugin_registered = True
+
     except Exception:
         print(f"[{host}] Install failed — rolling back.", file=sys.stderr)
         for d in written_dests:
@@ -166,6 +174,11 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 uninstall_mcp_config(host, dry_run=False)
             except Exception:
                 pass
+        if codex_plugin_registered:
+            try:
+                uninstall_codex_plugin(dry_run=False)
+            except Exception:
+                pass
         raise
 
 
@@ -175,6 +188,8 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
 
     if install_cfg.get("telemetry"):
         uninstall_mcp_config(host, dry_run=dry_run)
+    if host == "codex":
+        uninstall_codex_plugin(dry_run=dry_run)
 
     removed = uninstall(dest, dry_run=dry_run)
     if dry_run:
