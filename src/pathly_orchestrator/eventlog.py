@@ -16,8 +16,13 @@ CLI usage (called by LLM via Bash or by the retro skill):
 from __future__ import annotations
 import json
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
+
+from pathly_orchestrator.state import VALID_STATES, TRANSITIONS
+
+_APPEND_LOCK = threading.Lock()
 
 
 def _plans_dir() -> Path:
@@ -41,16 +46,54 @@ def _now() -> str:
 
 
 def append_event(feature: str, event: dict) -> None:
+    if event.get("type") == "STATE_TRANSITION":
+        to_state = event.get("to")
+        if to_state is not None and to_state not in VALID_STATES:
+            raise ValueError(
+                f"Invalid state in STATE_TRANSITION: {to_state!r}. "
+                f"Must be one of {sorted(VALID_STATES)}"
+            )
+
     path = _events_path(feature)
     path.parent.mkdir(parents=True, exist_ok=True)
     if "timestamp" not in event:
         event["timestamp"] = _now()
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event) + "\n")
+    line = json.dumps(event) + "\n"
+    with _APPEND_LOCK:
+        with open(path, "a", encoding="utf-8") as f:
+            try:
+                import fcntl
+                fcntl.flock(f, fcntl.LOCK_EX)
+                try:
+                    f.write(line)
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+            except ImportError:
+                f.write(line)
 
 
 def write_state(feature: str, state: dict) -> None:
+    new_current = state.get("current")
+    if new_current is not None and new_current not in VALID_STATES:
+        raise ValueError(
+            f"Invalid state: {new_current!r}. Must be one of {sorted(VALID_STATES)}"
+        )
+
     path = _state_path(feature)
+    if path.exists() and new_current is not None:
+        try:
+            old = json.loads(path.read_text(encoding="utf-8"))
+            old_current = old.get("current")
+            if old_current and old_current != new_current:
+                allowed = TRANSITIONS.get(old_current, frozenset())
+                if new_current not in allowed:
+                    raise ValueError(
+                        f"Invalid state transition: {old_current!r} → {new_current!r}. "
+                        f"Allowed from {old_current!r}: {sorted(allowed)}"
+                    )
+        except json.JSONDecodeError:
+            pass
+
     path.parent.mkdir(parents=True, exist_ok=True)
     if "updated_at" not in state:
         state["updated_at"] = _now()

@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pathly FSM STATE.json",
+  "description": "Schema for plans/<feature>/STATE.json written by the team-flow orchestrator.",
+  "type": "object",
+  "properties": {
+    "current": {
+      "type": "string",
+      "enum": [
+        "IDLE",
+        "DISCOVERING",
+        "PLANNING",
+        "PLAN_DONE",
+        "CONSULT_OPEN",
+        "BUILDING",
+        "REVIEWING",
+        "REVIEW_BLOCKED",
+        "TESTING",
+        "TEST_BLOCKED",
+        "BLOCKED_ON_HUMAN",
+        "RETRO",
+        "DONE"
+      ]
+    },
+    "feature": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rigor": {
+      "type": "string",
+      "enum": ["lite", "standard", "strict"]
+    },
+    "current_conversation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retry_count_by_key": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["current", "feature", "rigor", "updated_at"],
+  "additionalProperties": true,
+  "transitions": {
+    "IDLE":             ["DISCOVERING", "PLANNING", "BUILDING", "BLOCKED_ON_HUMAN"],
+    "DISCOVERING":      ["PLANNING", "IDLE", "BLOCKED_ON_HUMAN"],
+    "PLANNING":         ["PLAN_DONE", "BUILDING", "BLOCKED_ON_HUMAN"],
+    "PLAN_DONE":        ["BUILDING", "CONSULT_OPEN", "BLOCKED_ON_HUMAN"],
+    "CONSULT_OPEN":     ["PLANNING", "BUILDING", "PLAN_DONE", "BLOCKED_ON_HUMAN"],
+    "BUILDING":         ["REVIEWING", "TESTING", "BLOCKED_ON_HUMAN", "DONE"],
+    "REVIEWING":        ["BUILDING", "REVIEW_BLOCKED", "BLOCKED_ON_HUMAN", "DONE"],
+    "REVIEW_BLOCKED":   ["BUILDING", "BLOCKED_ON_HUMAN"],
+    "TESTING":          ["RETRO", "TEST_BLOCKED", "BLOCKED_ON_HUMAN", "DONE"],
+    "TEST_BLOCKED":     ["BUILDING", "TESTING", "BLOCKED_ON_HUMAN"],
+    "BLOCKED_ON_HUMAN": ["IDLE", "DISCOVERING", "PLANNING", "PLAN_DONE", "CONSULT_OPEN",
+                         "BUILDING", "REVIEWING", "REVIEW_BLOCKED", "TESTING",
+                         "TEST_BLOCKED", "BLOCKED_ON_HUMAN", "RETRO", "DONE"],
+    "RETRO":            ["DONE", "BLOCKED_ON_HUMAN"],
+    "DONE":             []
+  }
+}
