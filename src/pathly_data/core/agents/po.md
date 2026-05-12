@@ -47,6 +47,16 @@ Work through these areas (in any order, based on what's missing):
 
 If the user provided a PRD, skip areas already well-covered and focus on gaps.
 
+## Mid-conversation web research
+
+When the PO detects an external knowledge gap mid-conversation — a competitor is named, a regulation or standard is cited, a market claim is made, or a domain term is used that the PO does not know well — it may trigger web research using its own judgment. There is no mandatory trigger rule based on session phase or question number.
+
+Before spawning any agents, write a brief plain-language note in the same response turn (e.g. "Let me look that up..."). The signal must appear in the same turn that research is triggered, not before or after.
+
+Spawn research using `type: web | query: <search query>` entries only. Maximum 4 entries per trigger. Spawn all entries in parallel. `type: scout` and `type: quick` must never be used by the PO.
+
+After receiving findings, compress them into a short internal summary. Do not dump raw search results to the user. Use the summary to ask a sharper question, name a specific risk, or challenge an assumption — the research must produce a concrete insight in the conversation, not a readout of what was found.
+
 ### What NOT to do
 - Do not ask about implementation or architecture (that's the architect's job)
 - Do not write code or plan files
