@@ -26,5 +26,9 @@ def adapter_meta_path(host: str) -> Path:
     return adapters_path() / host / "_meta"
 
 
+def adapter_path(host: str) -> Path:
+    return adapters_path() / host
+
+
 def adapter_install_yaml(host: str) -> Path:
     return adapter_meta_path(host) / "install.yaml"

@@ -8,7 +8,7 @@ import yaml
 
 from .detect import detect_hosts
 from .mcp_config import install_mcp_config, uninstall_mcp_config
-from .resources import adapter_meta_path, adapter_install_yaml, core_agents_path, core_skills_path, core_templates_path
+from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_skills_path, core_templates_path
 from .stitch import stitch_agent, stitch_skill
 from .materialize import materialize, uninstall
 
@@ -83,6 +83,25 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             rel = tmpl_file.relative_to(tmpl_root).as_posix()
             template_files[rel] = tmpl_file.read_text(encoding="utf-8")
 
+    plugin_cfg = install_cfg.get("plugin")
+    plugin_files: dict[str, str] = {}
+    plugin_dest: Path | None = None
+    if plugin_cfg:
+        plugin_dest = Path(plugin_cfg["destination"]).expanduser()
+        source_name = plugin_cfg["source"].rstrip("/")
+        plugin_root = adapter_path(host) / source_name
+        if not plugin_root.exists():
+            raise FileNotFoundError(f"No plugin source for host {host!r}: {plugin_root}")
+        for plugin_file in sorted(plugin_root.rglob("*")):
+            if plugin_file.is_file():
+                rel = plugin_file.relative_to(plugin_root).as_posix()
+                plugin_files[f"{source_name}/{rel}"] = plugin_file.read_text(encoding="utf-8")
+        if plugin_cfg.get("include_stitched"):
+            for name, content in agent_files.items():
+                plugin_files[f"agents/{name}"] = content
+            for name, content in skill_files.items():
+                plugin_files[f"skills/{name}"] = content
+
     if dry_run:
         print(f"\n[{host}] Would write to {dest}:")
         for name in sorted(agent_files):
@@ -95,6 +114,10 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             print(f"\n[{host}] Would write templates to {templates_dest}:")
             for name in sorted(template_files):
                 print(f"  {templates_dest / name}")
+        if plugin_dest and plugin_files:
+            print(f"\n[{host}] Would write plugin files to {plugin_dest}:")
+            for name in sorted(plugin_files):
+                print(f"  {plugin_dest / name}")
         if telemetry_enabled:
             install_mcp_config(host, dry_run=True)
         return
@@ -120,6 +143,12 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             if written:
                 written_dests.append(templates_dest)
                 print(f"[{host}] Wrote {len(written)} template(s) to {templates_dest}")
+
+        if plugin_dest and plugin_files:
+            written = materialize(plugin_files, plugin_dest, repair=repair, force=force, dry_run=False)
+            if written:
+                written_dests.append(plugin_dest)
+                print(f"[{host}] Wrote {len(written)} plugin file(s) to {plugin_dest}")
 
         if telemetry_enabled:
             install_mcp_config(host, dry_run=False)
@@ -178,6 +207,17 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
                 print(f"  {templates_dest / name}")
         elif tmpl_removed:
             print(f"[{host}] Removed {len(tmpl_removed)} template(s) from {templates_dest}")
+
+    plugin_cfg = install_cfg.get("plugin")
+    if plugin_cfg:
+        plugin_dest = Path(plugin_cfg["destination"]).expanduser()
+        plugin_removed = uninstall(plugin_dest, dry_run=dry_run)
+        if dry_run:
+            print(f"\n[{host}] Would remove {len(plugin_removed)} plugin file(s) from {plugin_dest}:")
+            for name in sorted(plugin_removed):
+                print(f"  {plugin_dest / name}")
+        elif plugin_removed:
+            print(f"[{host}] Removed {len(plugin_removed)} plugin file(s) from {plugin_dest}")
 
 
 def main() -> None:

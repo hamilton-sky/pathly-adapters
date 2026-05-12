@@ -143,6 +143,18 @@ def test_dry_run_real_claude(capsys):
     assert "[claude]" in captured.out
 
 
+def test_dry_run_real_codex_includes_plugin_manifest(capsys):
+    """Codex dry-run reports the plugin bundle manifest, not only skills/templates."""
+    with patch.object(sys, "argv", ["pathly-setup", "codex", "--dry-run"]):
+        main()  # no mocks — uses real adapter files
+    captured = capsys.readouterr()
+    assert "[codex]" in captured.out
+    assert ".codex-plugin" in captured.out
+    assert "plugin.json" in captured.out
+    assert "skills" in captured.out
+    assert "agents" in captured.out
+
+
 # ---------------------------------------------------------------------------
 # uninstall — manifest traversal guard
 # ---------------------------------------------------------------------------

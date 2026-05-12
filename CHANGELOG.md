@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.2 — 2026-05-12
+
+- Add the PO phase to `team-flow/plan` so `PO_NOTES.md` is created before planner decomposition.
+- Separate PO requirements authorship from planner decomposition and add `ARCH_QUESTION` escalation rules for planner and tester.
+- Install a complete Codex plugin bundle under `~/.codex/plugins/pathly`, including plugin-local agents and skills, so Pathly can appear as a Codex plugin.
+- Accept Codex skill metadata that uses `natural_language` instead of slash-command `invocation`.
+
+---
+
 ## 2.0.0 — 2026-05-12
 
 ### Breaking changes

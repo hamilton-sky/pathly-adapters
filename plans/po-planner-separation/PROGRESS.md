@@ -4,21 +4,21 @@
 
 | Conversation | Title | Status |
 |---|---|---|
-| Conv 1 | PO agent + team-flow plan pipeline | NOT STARTED |
-| Conv 2 | Planner + tester escalation protocols | NOT STARTED |
+| Conv 1 | PO agent + team-flow plan pipeline | DONE |
+| Conv 2 | Planner + tester escalation protocols | DONE |
 
 ---
 
 ## Conversation 1 — PO agent + team-flow plan pipeline
 
-**Status:** NOT STARTED
+**Status:** DONE
 
 **Stories:** 1, 2
 
 **Phases:**
-- [ ] Phase 1 — Pre-flight read
-- [ ] Phase 2 — Update po.md
-- [ ] Phase 3 — Update plan.md Stage 2
+- [x] Phase 1 — Pre-flight read
+- [x] Phase 2 — Update po.md
+- [x] Phase 3 — Update plan.md Stage 2
 
 **Done when:**
 - `po.md` contains a subsection describing three activation cases and a
@@ -32,14 +32,14 @@
 
 ## Conversation 2 — Planner + tester escalation protocols
 
-**Status:** NOT STARTED
+**Status:** DONE
 
 **Stories:** 3, 4
 
 **Phases:**
-- [ ] Phase 1 — Pre-flight read
-- [ ] Phase 2 — Update planner.md
-- [ ] Phase 3 — Update tester.md
+- [x] Phase 1 — Pre-flight read
+- [x] Phase 2 — Update planner.md
+- [x] Phase 3 — Update tester.md
 
 **Done when:**
 - `planner.md` contains an "Escalation protocols during decomposition" section
@@ -52,7 +52,7 @@
 ## Completion gate
 
 Feature is complete when:
-- [ ] Both conversations are marked DONE above.
-- [ ] All four acceptance criteria tables in USER_STORIES.md are fully checked.
-- [ ] No existing section in any of the four target files has been removed or
+- [x] Both conversations are marked DONE above.
+- [x] All four acceptance criteria tables in USER_STORIES.md are fully checked.
+- [x] No existing section in any of the four target files has been removed or
   reworded outside the planned additions.

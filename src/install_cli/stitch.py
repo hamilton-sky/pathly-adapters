@@ -13,6 +13,8 @@ def stitch_skill(core_path: Path, meta_path: Path) -> str:
 
     required = ["skill"]
     missing = [k for k in required if k not in meta]
+    if not any(k in meta for k in ("invocation", "natural_language", "wrapper")):
+        missing.append("invocation or natural_language")
     if missing:
         raise ValueError(f"Missing required fields in {meta_path}: {missing}")
 

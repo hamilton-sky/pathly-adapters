@@ -19,6 +19,7 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 | Storm Phase 1 — Analyze | `architect` (phase: analyze) |
 | Storm Phase 2 — Research | scout-flow (ROLE: architect) |
 | Storm Phase 3 — Storm | `architect` (phase: storm) |
+| PO Phase — Requirements | `po` |
 | Plan Phase 1 — Analyze | `planner` (phase: analyze) |
 | Plan Phase 2 — Scout | scout-flow (ROLE: planner) |
 | Plan Phase 3 — Plan | `planner` (phase: plan) |
@@ -85,6 +86,24 @@ Transition state → PLANNING. Fall through to Stage 2.
 
 ## Stage 2 — Plan
 
+### PO Phase — Requirements
+
+Before planner analysis, check whether `plans/<feature>/PO_NOTES.md` exists.
+If it exists, skip this phase entirely and proceed to Phase 1 — Analyze.
+
+If `PO_NOTES.md` does not exist, check `plans/<feature>/STORM_SEED.md`
+richness:
+- Rich STORM_SEED.md: spawn `po` in confirmation-pass mode.
+- Thin or absent STORM_SEED.md: spawn `po` in full-interactive mode.
+
+Wait for `PO_NOTES.md` to be written before continuing. If PO exits via
+`stop` (discard) without writing `PO_NOTES.md`, halt and print an error to the
+user: `PO Phase discarded without PO_NOTES.md; planning cannot continue.`
+This is an unrecoverable state for the pipeline.
+
+If autoFlow is active, PO Phase runs non-interactively. PO writes its best-guess
+`PO_NOTES.md`, then the planner proceeds immediately.
+
 ### Phase 1 — Analyze
 
 **Spawn** `planner` with `phase: analyze`:
@@ -115,7 +134,8 @@ Use the returned compressed summary as Scout Findings for Phase 3.
 phase: plan
 Route to plan [feature name] [rigor].
 If plans/[feature]/STORM_SEED.md exists, consume it as pre-filled answers.
-If plans/[feature]/PO_NOTES.md exists, read it first for requirements context.
+Read plans/[feature]/PO_NOTES.md as the authoritative source of user stories.
+Decompose — do not re-author stories.
 
 ## Scout Findings
 [compressed summary — or "none" if Phase 2 was skipped]

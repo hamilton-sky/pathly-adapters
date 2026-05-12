@@ -25,18 +25,18 @@ not repeat myself between the storm and plan stages.
 
 ### Acceptance criteria
 
-- [ ] `po.md` contains an "Activation" section or equivalent that documents three
+- [x] `po.md` contains an "Activation" section or equivalent that documents three
   cases: rich STORM_SEED.md, thin/absent STORM_SEED.md, and autoFlow mode.
-- [ ] When the feature's `plans/<feature>/STORM_SEED.md` is present and rich
+- [x] When the feature's `plans/<feature>/STORM_SEED.md` is present and rich
   (contains problem statement, users, and scope), PO infers stories and writes a
   draft `PO_NOTES.md`, then pauses with exactly one confirmation prompt: "Here
   are the stories I derived — correct anything or say 'go'."
-- [ ] When STORM_SEED.md is absent or thin, PO enters the existing full
+- [x] When STORM_SEED.md is absent or thin, PO enters the existing full
   interactive mode (one question at a time until `stop notes`).
-- [ ] When `autoFlow` is active, PO writes its best-guess `PO_NOTES.md` without
+- [x] When `autoFlow` is active, PO writes its best-guess `PO_NOTES.md` without
   pausing. Unresolved items are written as `OPEN: <item>` entries in the
   `## Open Questions` section of `PO_NOTES.md`.
-- [ ] A fallback table in `po.md` summarises all three cases in a scannable
+- [x] A fallback table in `po.md` summarises all three cases in a scannable
   format (rich seed / thin or absent seed / autoFlow).
 
 ### Edge cases
@@ -61,18 +61,18 @@ decomposition.
 
 ### Acceptance criteria
 
-- [ ] `plan.md` Stage 2 contains a new "PO Phase" that executes before the
+- [x] `plan.md` Stage 2 contains a new "PO Phase" that executes before the
   current "Phase 1 — Analyze".
-- [ ] The PO Phase first checks whether `plans/<feature>/PO_NOTES.md` already
+- [x] The PO Phase first checks whether `plans/<feature>/PO_NOTES.md` already
   exists. If yes, the PO Phase is skipped entirely and planning proceeds.
-- [ ] If `PO_NOTES.md` does not exist, the PO Phase checks for STORM_SEED.md
+- [x] If `PO_NOTES.md` does not exist, the PO Phase checks for STORM_SEED.md
   richness and spawns `po` in the appropriate mode (confirmation pass if rich,
   full interactive if thin/absent).
-- [ ] The PO Phase waits for `PO_NOTES.md` to be written before continuing.
-- [ ] The planner Phase 3 prompt explicitly instructs the planner to read
+- [x] The PO Phase waits for `PO_NOTES.md` to be written before continuing.
+- [x] The planner Phase 3 prompt explicitly instructs the planner to read
   `PO_NOTES.md` as the authoritative source of user stories and to decompose
   rather than re-author.
-- [ ] Existing planner phases (Analyze, Scout, Plan) are otherwise unchanged in
+- [x] Existing planner phases (Analyze, Scout, Plan) are otherwise unchanged in
   content and order.
 
 ### Edge cases
@@ -99,21 +99,21 @@ cannot resolve alone.
 
 ### Acceptance criteria
 
-- [ ] `planner.md` contains a rule stating: if a story from `PO_NOTES.md` is
+- [x] `planner.md` contains a rule stating: if a story from `PO_NOTES.md` is
   ambiguous or missing acceptance criteria that cannot be inferred from context,
   the planner spawns PO in advisory mode (one bounded question, read-only, no
   state change) and uses the answer to continue.
-- [ ] `planner.md` states that if PO cannot answer from available context, the
+- [x] `planner.md` states that if PO cannot answer from available context, the
   planner writes the unresolved item as an `OPEN: <item>` block and halts for
   the user.
-- [ ] `planner.md` contains a rule stating: when the planner encounters something
+- [x] `planner.md` contains a rule stating: when the planner encounters something
   requiring architectural judgment, it writes `ARCH_QUESTION: <question>` in an
   `OPEN:` block and directs the user to `/meet architect`. It must NOT attempt
   to resolve the architectural question.
-- [ ] The existing "do not make technical architecture decisions" rule in
+- [x] The existing "do not make technical architecture decisions" rule in
   `planner.md` is preserved and the new ARCH_QUESTION rule is explicitly
   positioned as a strengthening of it.
-- [ ] The three escalation paths are distinct and readable as a unit
+- [x] The three escalation paths are distinct and readable as a unit
   (PO advisory spawn / OPEN halt / ARCH_QUESTION).
 
 ### Edge cases
@@ -140,14 +140,14 @@ the tester's role remains purely verification.
 
 ### Acceptance criteria
 
-- [ ] `tester.md` "What NOT to do" section contains a rule: do not attempt to
+- [x] `tester.md` "What NOT to do" section contains a rule: do not attempt to
   resolve architectural or design questions.
-- [ ] The rule specifies the exact format for escalation: report the issue as
+- [x] The rule specifies the exact format for escalation: report the issue as
   `ARCH_QUESTION: <description>` and direct the user to `/meet architect` or
   `/meet planner`.
-- [ ] The new rule is phrased as an escalation protocol, not just a prohibition —
+- [x] The new rule is phrased as an escalation protocol, not just a prohibition —
   it tells the tester what to do, not only what not to do.
-- [ ] Existing "What NOT to do" items are preserved verbatim.
+- [x] Existing "What NOT to do" items are preserved verbatim.
 
 ### Edge cases
 

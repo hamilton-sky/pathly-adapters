@@ -7,6 +7,10 @@ skills:
   structure: nested
 templates:
   destination: ~/.codex/plugins/pathly/templates
+plugin:
+  destination: ~/.codex/plugins/pathly
+  source: .codex-plugin
+  include_stitched: true
 telemetry: true
 hooks:
   - event: post_tool_call

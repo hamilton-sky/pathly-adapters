@@ -67,3 +67,10 @@ This archive is never read by the FSM — it is a permanent record for humans.
 - Do not skip acceptance criteria because they seem obvious
 - Do not report a story as passing unless all its criteria are verified
 - Do not write new features — only verify existing ones
+- Do not attempt to resolve architectural or design questions. If a test
+  failure implies a design issue, report it as
+  `ARCH_QUESTION: <description>` and direct the user to `/meet architect` or
+  `/meet planner`. If a failure is ambiguous between a bug and a design issue,
+  report both: one normal bug report and one ARCH_QUESTION, leaving resolution
+  to the human. If multiple failures share one root architectural cause, write
+  one ARCH_QUESTION covering all related failures.

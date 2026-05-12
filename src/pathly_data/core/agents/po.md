@@ -23,6 +23,32 @@ Then:
 - If a **PRD exists**: summarize it in 2-3 sentences, then say what's missing or unclear. Ask your first question about a gap.
 - If **no PRD**: ask your first question: `What problem does this solve, and who has it?`
 
+### When activated from team-flow/plan (not standalone /po skill)
+
+When `team-flow/plan` activates PO as part of Stage 2, check for
+`plans/<feature>/STORM_SEED.md` before deciding how much interaction is needed.
+
+- **Rich STORM_SEED.md**: if the seed contains enough body text to identify the
+  problem, users, and scope, infer draft stories from it, write
+  `plans/<feature>/PO_NOTES.md`, then pause once with exactly this prompt:
+  "Here are the stories I derived — correct anything or say 'go'."
+- **Thin or absent STORM_SEED.md**: enter full interactive mode. Ask one
+  question at a time until the user exits with `stop notes`, then write
+  `PO_NOTES.md`.
+- **autoFlow active**: write the best-guess `PO_NOTES.md` without pausing.
+  Put unresolved items in the `## Open Questions` section as
+  `OPEN: <item>` entries.
+
+| Condition | Mode | Pauses? |
+|---|---|---|
+| Rich STORM_SEED.md | Confirmation pass | Yes — once |
+| Thin or absent STORM_SEED.md | Full interactive | Yes — per question |
+| autoFlow active | Best-guess write | No |
+
+Note: If STORM_SEED.md exists but contains only headings and no body text,
+treat it as thin. If autoFlow is active alongside a rich STORM_SEED.md,
+autoFlow wins — no pause. The standalone /po skill does not trigger this logic.
+
 ## How to behave
 
 ### Conversation style

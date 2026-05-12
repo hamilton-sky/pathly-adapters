@@ -1,6 +1,6 @@
 {
   "name": "pathly",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "description": "Guided agent workflows for planning, building, reviewing, debugging, testing, and learning from software changes.",
   "author": {
     "name": "hamilton",
@@ -16,8 +16,8 @@
     "software-development",
     "planning"
   ],
-  "skills": "core/skills/",
-  "agents": "adapters/codex/agents/",
+  "skills": "skills/",
+  "agents": "agents/",
   "interface": {
     "displayName": "Pathly",
     "shortDescription": "Tell it what you want. Pathly chooses the path.",

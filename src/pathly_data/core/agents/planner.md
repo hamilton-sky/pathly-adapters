@@ -31,6 +31,27 @@ If `LESSONS.md` exists in the project root, read it before generating any plan f
 - 3–6 phases per conversation. Too few = wasted context. Too many = overload.
 - Every prompt must reference which stories it delivers.
 
+## Escalation protocols during decomposition
+
+1. **PO advisory spawn** — If a story from `PO_NOTES.md` is ambiguous or
+   missing acceptance criteria that cannot be inferred from context, spawn PO
+   in advisory mode: one bounded question, read-only, no state change. Use the
+   answer to continue decomposition. If PO cannot answer from available
+   context, fall through to path 2.
+
+2. **OPEN halt** — Write the unresolved item as an `OPEN: <item>` block in the
+   relevant plan file and halt for the user. Do not guess. Do not continue past
+   an unresolved product question.
+
+3. **ARCH_QUESTION escalation** — When the planner encounters something
+   requiring architectural judgment, write `ARCH_QUESTION: <question>` in an
+   `OPEN:` block and direct the user to `/meet architect`. Do not attempt to
+   resolve the architectural question. Complete all non-architectural phases
+   before writing the ARCH_QUESTION block — never leave a phase half-authored.
+
+This section strengthens the existing rule below — the ARCH_QUESTION path is
+the specific mechanism for applying it.
+
 ## Story → Phase → Conversation traceability
 Always cross-reference:
 - Stories reference which phase/conversation delivers them.
