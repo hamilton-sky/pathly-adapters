@@ -1,3 +1,5 @@
 {"type": "STATE_TRANSITION", "to": "PO_DISCUSSING", "ts": "2026-05-12T00:00:00Z"}
 {"type": "FILE_CREATED", "file": "plans/po-mid-conversation-web-research/PO_NOTES.md"}
 {"type": "STATE_TRANSITION", "to": "PLANNING", "ts": "2026-05-12T00:01:00Z"}
+{"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-12T00:00:00Z"}
+{"type": "HUMAN_RESPONSE", "value": "go"}
