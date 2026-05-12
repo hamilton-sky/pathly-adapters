@@ -185,3 +185,49 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 
 **Expected output:** SECURITY.md documents hook parity gap; README links to it; STATE.json schema accepts an optional `iteration_by_stage` map without breaking existing files; team-flow.md references the new field.
 **Files touched:** `docs/SECURITY.md`, `README.md`, `schemas/state.schema.json`, `src/pathly_orchestrator/state.py`, `src/pathly_data/core/skills/team-flow.md`, `tests/test_orchestrator.py`
+
+---
+
+## Conversation 5: Deploy hooks to Codex and Copilot VS Code (Phases 5.1 – 5.3)
+
+**Stories delivered:** S9, S7 (completion)
+
+**Prompt to paste:**
+```
+Read plans/orchestrator-hardening/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+
+Implement orchestrator-hardening Conversation 5 (Phases 5.1 – 5.3) from
+plans/orchestrator-hardening/IMPLEMENTATION_PLAN.md.
+
+**Before editing anything:** confirm Conv 4 has landed — `docs/SECURITY.md` must exist with a Hook surface coverage section. Also confirm `src/pathly_hooks/inject_feedback_ttl.py` and `src/pathly_hooks/classify_feedback.py` exist (Conv 1). If either is missing, stop and report.
+
+Codebase files this conversation touches:
+- `src/install_cli/materialize.py` — add hook file deployment for Codex and Copilot VS Code hosts
+- `src/pathly_data/adapters/codex/install.yaml` — update hook event name from `post_tool_call` → `PostToolUse`; add `matcher: {tool_name: apply_patch}`
+- `src/pathly_data/adapters/copilot/install.yaml` — update hook event name to `PostToolUse`; add platform-keyed command format
+- `tests/test_materialize_hooks.py` — CREATE: tests asserting hook files are written and removed correctly for each host
+- `docs/SECURITY.md` — Phase 5.3: update the hook coverage table to show "deployed by pathly-setup" for Codex and Copilot VS Code
+
+Scope:
+- Phase 5.1: Codex hook deployment. `pathly-setup codex --apply` writes `~/.codex/hooks.json` with two PostToolUse entries. If the file exists and contains other hooks, merge Pathly's entries under a `"pathly"` namespace key rather than overwriting. `--uninstall` removes Pathly's entries without touching user hooks. Print a one-line note if `[features] codex_hooks = true` is absent from `~/.codex/config.toml`.
+- Phase 5.2: Copilot VS Code hook deployment. `pathly-setup copilot --apply` writes `.github/hooks/pathly-classify.json` and `.github/hooks/pathly-ttl.json` in the project root (current working directory). Each file has `{"event": "PostToolUse", "command": {"windows": "...", "linux": "...", "osx": "..."}}`. Script path is the absolute installed package path from `importlib.resources`. `--uninstall` deletes both files.
+- Phase 5.3: Update `docs/SECURITY.md` hook coverage table — add a "Deployed by installer" column showing ✅ for Claude, Codex, Copilot VS Code and ❌ for Copilot CLI.
+
+Architectural rules to observe:
+- Do NOT overwrite user hooks. Codex merge must be safe under repeated `--apply` runs (idempotent).
+- Script paths in Copilot hook files must resolve correctly from an installed wheel, not just a source checkout — use `importlib.resources` or the absolute path of the installed `pathly_hooks` package.
+- Do not change hook script logic — `classify_feedback.py` and `inject_feedback_ttl.py` already read JSON from stdin and work cross-host.
+- Do not touch `src/pathly_data/adapters/claude/install.yaml` — Claude's hook event name stays `post_tool_call`.
+
+Do NOT touch `src/pathly_orchestrator/`, `schemas/`, `protocol_contract.yaml`, or any skill markdown.
+
+Verify: `pytest tests/test_materialize_hooks.py -v && pytest && pathly-setup codex --dry-run && pathly-setup copilot --dry-run`
+
+After done, update plans/orchestrator-hardening/PROGRESS.md phases 5.1 – 5.3 to DONE; flip top-level Status to COMPLETE.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+If fundamentally broken, rollback with git checkout on affected files and retry.
+```
+
+**Expected output:** `pathly-setup codex --apply` writes `~/.codex/hooks.json` with Pathly entries merged safely; `pathly-setup copilot --apply` writes two hook files under `.github/hooks/`; both `--uninstall` clean up; SECURITY.md table shows deployed status.
+**Files touched:** `src/install_cli/materialize.py`, `src/pathly_data/adapters/codex/install.yaml`, `src/pathly_data/adapters/copilot/install.yaml`, `tests/test_materialize_hooks.py`, `docs/SECURITY.md`

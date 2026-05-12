@@ -59,9 +59,13 @@ Files in the live repo that this feature reads or modifies.
 | `tests/test_feedback_protocol.py` | Conv 3 | Add version-mismatch test |
 | `tests/test_orchestrator.py` | Conv 2 | CREATE — state/event schema tests + concurrency test for append |
 | `README.md` | Conv 1, 4 | Mention `pathly-events`/`pathly-state` console scripts; note Claude-only hook surface |
-| `docs/SECURITY.md` | Conv 4 | Document hook parity gap across hosts |
+| `docs/SECURITY.md` | Conv 4, 5 | Document hook parity gap; update to show deployed status after Conv 5 |
 | `src/pathly_data/core/skills/team-flow.md` | Conv 4 | Update state model to per-stage iteration counter (if accepted) |
 | `src/pathly_data/core/agents/README_routing.md` | (read only) | Cross-check FSM state references |
+| `src/install_cli/materialize.py` | Conv 5 | Deploy hook files to Codex (`~/.codex/hooks.json`) and Copilot VS Code (`.github/hooks/`) |
+| `src/pathly_data/adapters/codex/install.yaml` | Conv 5 | Update hook event name to `PostToolUse`; add `apply_patch` matcher |
+| `src/pathly_data/adapters/copilot/install.yaml` | Conv 5 | Update hook event name to `PostToolUse`; add platform-keyed command format |
+| `tests/test_materialize_hooks.py` | Conv 5 | CREATE — assert hook files written and cleaned up for each host |
 
 > **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
 
@@ -71,10 +75,11 @@ Files in the live repo that this feature reads or modifies.
 
 | Conv | Title | Stories | Status | Key files touched |
 |---|---|---|---|---|
-| 1 | Ship orchestrator + hooks as real packages | S1, S4 | TODO | `orchestrator/*`, `hooks/*`, `pyproject.toml`, `tests/test_hooks.py` |
+| 1 | Ship orchestrator + hooks as real packages | S1, S4 | DONE | `src/pathly_orchestrator/*`, `src/pathly_hooks/*`, `pyproject.toml`, `tests/test_hooks.py` |
 | 2 | FSM hardening: STATE.json schema + EVENTS.jsonl concurrency | S2, S3 | TODO | `schemas/state.schema.json`, `src/pathly_orchestrator/state.py`, `eventlog.py`, `tests/test_orchestrator.py` |
 | 3 | Contract integrity: classify hook + protocol version | S5, S6 | TODO | `src/pathly_hooks/classify_feedback.py`, `protocol_contract.yaml`, `tests/test_feedback_protocol.py` |
-| 4 | Cross-host hook parity + per-stage iteration | S7, S8 | TODO | `docs/SECURITY.md`, `README.md`, `src/pathly_data/core/skills/team-flow.md` |
+| 4 | Cross-host hook parity docs + per-stage iteration | S7, S8 | TODO | `docs/SECURITY.md`, `README.md`, `src/pathly_data/core/skills/team-flow.md` |
+| 5 | Deploy hooks to Codex + Copilot VS Code | S9, S7 | TODO | `src/install_cli/materialize.py`, `codex/install.yaml`, `copilot/install.yaml`, `tests/test_materialize_hooks.py` |
 
 ---
 

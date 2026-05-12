@@ -12,8 +12,9 @@
 | S4 | Console scripts in README/CHANGELOG | Conv 1 | DONE |
 | S5 | Classify hook keyword fix | Conv 3 | TODO |
 | S6 | protocol_contract version field | Conv 3 | TODO |
-| S7 | Hook parity gap documented | Conv 4 | TODO |
+| S7 | Hook parity gap documented + deployment | Conv 4+5 | TODO |
 | S8 | Per-stage iteration counter | Conv 4 | TODO |
+| S9 | Hooks deployed to Codex + Copilot VS Code | Conv 5 | TODO |
 
 ## Conversation Breakdown
 
@@ -23,6 +24,7 @@
 | 2 | 2.1, 2.2, 2.3 | S2, S3 | TODO | `pytest tests/test_orchestrator.py` |
 | 3 | 3.1, 3.2 | S5, S6 | TODO | `pytest tests/test_hooks.py tests/test_feedback_protocol.py` |
 | 4 | 4.1, 4.2 | S7, S8 | TODO | `pytest && python -c "import yaml,json; yaml.safe_load(open('protocol_contract.yaml'))"` |
+| 5 | 5.1, 5.2, 5.3 | S9, S7 | TODO | `pytest tests/test_materialize_hooks.py && pathly-setup codex --dry-run && pathly-setup copilot --dry-run` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 
@@ -39,8 +41,11 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 2 | 2.3 | `eventlog.py`, `tests/test_orchestrator.py` | File lock on `append_event` | 10-thread stress test → 500 valid lines | TODO |
 | 3 | 3.1 | `classify_feedback.py`, `tests/test_hooks.py` | Drop `"how"` keyword; word-boundary match | "How long…" → [REQ]; design question → [ARCH] | TODO |
 | 3 | 3.2 | `protocol_contract.yaml`, `pathly_hooks/__init__.py`, `tests/test_feedback_protocol.py` | Version field + cross-check | Desync fails test loudly | TODO |
-| 4 | 4.1 | `docs/SECURITY.md`, `README.md` | Document hook parity gap | SECURITY.md has subsection; README links it | TODO |
+| 4 | 4.1 | `docs/SECURITY.md`, `README.md` | Document hook parity (Codex + Copilot VS Code supported; Copilot CLI gap) | SECURITY.md has subsection; README links it | TODO |
 | 4 | 4.2 | `schemas/state.schema.json`, `team-flow.md` | Optional `iteration_by_stage` field | Schema accepts both new and old shape | TODO |
+| 5 | 5.1 | `materialize.py`, `codex/install.yaml`, `tests/test_materialize_hooks.py` | Deploy hooks to Codex via `~/.codex/hooks.json` | `pathly-setup codex --apply` writes hook file | TODO |
+| 5 | 5.2 | `materialize.py`, `copilot/install.yaml`, `tests/test_materialize_hooks.py` | Deploy hooks to Copilot VS Code via `.github/hooks/` | `pathly-setup copilot --apply` writes two hook files | TODO |
+| 5 | 5.3 | `docs/SECURITY.md` | Update coverage table to show deployed status | Table reflects deployed state | TODO |
 
 ## Prerequisites
 - Editable install works: `pip install -e ".[dev]"`

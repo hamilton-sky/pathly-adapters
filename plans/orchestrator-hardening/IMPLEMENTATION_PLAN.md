@@ -2,20 +2,22 @@
 
 ## Overview
 
-Eight concrete fixes to the Pathly orchestrator and hook surfaces, grouped into
-four conversations. The plan converts repo-root reference code into shipped
+Nine concrete fixes to the Pathly orchestrator and hook surfaces, grouped into
+five conversations. The plan converts repo-root reference code into shipped
 packages, adds a STATE.json JSON Schema with a transition table, makes
 EVENTS.jsonl writes concurrency-safe, fixes a brittle classification heuristic,
-versions the cross-repo protocol contract, and documents the hook parity gap.
+versions the cross-repo protocol contract, documents the hook parity gap, and
+deploys working hooks to Codex and Copilot VS Code via the installer.
 
 ## Layer Architecture
 
 ```
 Plans (this file)                  →  Implementation modules                 →  Surfaces
         ↓                                            ↓                                 ↓
-[8 stories, 4 conversations]        [src/pathly_orchestrator/, src/pathly_hooks/]   [pipx console scripts,
+[9 stories, 5 conversations]        [src/pathly_orchestrator/, src/pathly_hooks/]   [pipx console scripts,
                                     [schemas/state.schema.json]                      JSON Schema for STATE.json,
-                                    [protocol_contract.yaml + version]               cross-repo version check]
+                                    [protocol_contract.yaml + version]               cross-repo version check,
+                                    [src/install_cli/materialize.py]                 Codex + Copilot VS Code hook files]
 ```
 
 ## Phases
@@ -120,12 +122,12 @@ Replace the substring scan at the current line ~54 with a narrower keyword set: 
 
 ### Phase 4.1: Document hook parity gap   ← Conversation: 4
 **File:** `docs/SECURITY.md`, `README.md` — MODIFY
-**Done when:** `docs/SECURITY.md` has a "Hook surface coverage" subsection listing claude=supported, codex=not-supported, copilot=not-supported with a one-line rationale; README "Known Limitations" links to it.
+**Done when:** `docs/SECURITY.md` has a "Hook surface coverage" subsection listing claude=supported, codex=supported (PostToolUse, v0.114+), copilot-vscode=supported (PostToolUse, Preview Feb 2026), copilot-cli=not-supported; README "Known Limitations" links to it.
 **Delivers stories:** S7
 **Depends on:** nothing
-**Enables:** nothing
+**Enables:** Phase 5.1 (implementation follows the documented spec)
 **Details:**
-Cite the actual hook scripts (`src/pathly_hooks/classify_feedback.py`, `src/pathly_hooks/inject_feedback_ttl.py`). State that they require the Claude Code hook event system and have no equivalent in Codex or Copilot today. Note the path Pathly would take if parity were added: a `_meta/<name>_hook.yaml` per-host overlay matching the existing skill overlay pattern.
+Cite `src/pathly_hooks/classify_feedback.py` and `src/pathly_hooks/inject_feedback_ttl.py`. For Codex: hooks live in `~/.codex/hooks.json`, require `[features] codex_hooks = true`, use `PostToolUse` with a `tool_name: apply_patch` matcher. For Copilot VS Code: hooks live in `.github/hooks/*.json`, use `PostToolUse` event, platform-keyed command. Copilot CLI is the only remaining gap (no `postToolUse` event). Note Phase 5 will implement deployment for Codex and Copilot VS Code.
 
 ### Phase 4.2: Add per-stage iteration to STATE.json schema + skill docs   ← Conversation: 4
 **File:** `schemas/state.schema.json`, `src/pathly_data/core/skills/team-flow.md`, `src/pathly_orchestrator/state.py` (docstring only) — MODIFY
@@ -137,6 +139,41 @@ Cite the actual hook scripts (`src/pathly_hooks/classify_feedback.py`, `src/path
 - Add `iteration_by_stage: {type: object, additionalProperties: {type: integer, minimum: 0}}` as optional.
 - Keep `current_conversation` for back-compat; document that new callers may use either.
 - In `team-flow.md`, mention the field once at the section that currently talks about retry counts.
+
+### Phase 5.1: Deploy hook files for Codex via materialize.py   ← Conversation: 5
+**File:** `src/install_cli/materialize.py`, `src/pathly_data/adapters/codex/install.yaml`, `tests/test_materialize_hooks.py` — MODIFY/CREATE
+**Done when:** `pathly-setup codex --apply` writes `~/.codex/hooks.json` with two `PostToolUse` entries (one per hook script); `pathly-setup codex --uninstall` removes those entries; test asserts file is written and has correct shape.
+**Delivers stories:** S9
+**Depends on:** Phase 1.2 (hooks in src/), Phase 4.1 (documented spec)
+**Enables:** Phase 5.2
+**Details:**
+- Read the `hooks:` list from `codex/install.yaml` (already declared there).
+- Write `~/.codex/hooks.json` as a JSON file with the array of hook objects. If the file already exists and was written by a different tool, merge Pathly's entries under a `pathly` key rather than overwriting — avoid clobbering user hooks.
+- Track the written file in the Pathly manifest so `--uninstall` can clean it up.
+- `codex/install.yaml` already has `hooks:` with `event: post_tool_call` — rename the event value to `PostToolUse` to match Codex's hook system. Add a `matcher: {tool_name: apply_patch}` so hooks only fire on file writes.
+- Requires `[features] codex_hooks = true` in `~/.codex/config.toml` — the installer should print a one-line note if that flag is absent, but not fail.
+
+### Phase 5.2: Deploy hook files for Copilot VS Code via materialize.py   ← Conversation: 5
+**File:** `src/install_cli/materialize.py`, `src/pathly_data/adapters/copilot/install.yaml`, `tests/test_materialize_hooks.py` — MODIFY
+**Done when:** `pathly-setup copilot --apply` writes `.github/hooks/pathly-classify.json` and `.github/hooks/pathly-ttl.json` in the project root; `--uninstall` removes them; test asserts both files are written with correct `PostToolUse` event shape.
+**Delivers stories:** S9
+**Depends on:** Phase 5.1
+**Enables:** nothing
+**Details:**
+- Copilot VS Code hooks live per-project in `.github/hooks/`. Write two separate JSON files, one per hook.
+- Each file: `{"event": "PostToolUse", "command": {"windows": "python ...", "linux": "python ...", "osx": "python ..."}}`.
+- The script path must be absolute or relative to the project root — use the installed package path via `importlib.resources`.
+- Track both files in the Pathly manifest.
+- `copilot/install.yaml` already has `hooks:` — update the event name to `PostToolUse` and add platform-keyed command format.
+
+### Phase 5.3: Update Story 7 acceptance criteria + SECURITY.md follow-up   ← Conversation: 5
+**File:** `docs/SECURITY.md` — MODIFY (add "Deployed via" column to the coverage table)
+**Done when:** SECURITY.md hook coverage table shows "deployed by pathly-setup" for Codex and Copilot VS Code; Copilot CLI row shows "not supported — no PostToolUse event".
+**Delivers stories:** S7 (completion), S9
+**Depends on:** Phase 5.1, Phase 5.2
+**Enables:** nothing
+**Details:**
+Single prose update — no code change. Update the table written in Phase 4.1 to reflect that Codex and Copilot VS Code hooks are now deployed automatically by the installer.
 
 ## Prerequisites
 - Editable install (`pip install -e ".[dev]"`) works against the current main.
@@ -150,3 +187,6 @@ Cite the actual hook scripts (`src/pathly_hooks/classify_feedback.py`, `src/path
 - **Heuristic stays as a fallback.** Phase 3.1 tightens but does not delete the keyword heuristic. The API path requires `ANTHROPIC_API_KEY` which a fresh install will not have, so a non-API fallback must still produce sane output.
 - **Version starts at 1, not 0.** `protocol_contract.yaml` has been used in production runs; bumping from "unversioned" to `version: 1` is more honest than starting at 0.
 - **Per-stage iteration is additive.** Phase 4.2 does not remove `current_conversation`. Removing it would touch every skill markdown file that references the FSM — out of scope.
+- **Hook deployment merges, not overwrites.** Phase 5.1 must not clobber existing `~/.codex/hooks.json` content. Pathly entries are namespaced or merged so user-defined hooks survive a reinstall.
+- **Copilot CLI excluded from scope.** Copilot CLI has no `postToolUse` event. Pathly documents this gap but does not attempt a workaround. If the Copilot CLI team adds the event, Phase 5 can be extended.
+- **PostToolUse event name normalisation.** The existing `install.yaml` files use `post_tool_call` (Claude Code's name). Phases 5.1–5.2 update the Codex and Copilot adapter yamls to use `PostToolUse` (their native name) while leaving Claude's yaml unchanged.

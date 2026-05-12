@@ -103,15 +103,16 @@ drift between feedback file sets cannot escape into a release.
 
 ### Story 7: Hook parity gap across hosts is documented
 
-**As a** Codex or Copilot user, **I want** the docs to tell me that the hook
-surface is Claude-only today, **so that** I do not assume `classify_feedback`
-runs in my environment.
+**As a** Codex or Copilot VS Code user, **I want** the docs to accurately describe
+which hosts support hooks, **so that** I know what runs in my environment and what
+doesn't.
 
 **Acceptance Criteria:**
-- [ ] `docs/SECURITY.md` includes a "Hook surface coverage" section listing per-host status.
-- [ ] README "Known Limitations" mentions the gap.
+- [ ] `docs/SECURITY.md` includes a "Hook surface coverage" section listing per-host status: Claude=supported, Codex=supported (PostToolUse v0.114+), Copilot VS Code=supported (PostToolUse Preview), Copilot CLI=not supported.
+- [ ] README "Known Limitations" links to the section.
+- [ ] Updated in Phase 5.3 once deployment is live to show "deployed by pathly-setup" for Codex and Copilot VS Code.
 
-**Delivered by:** Phase 4.1 → Conversation 4
+**Delivered by:** Phase 4.1 → Conversation 4 (docs); Phase 5.3 → Conversation 5 (completion)
 
 ### Story 8: Per-stage iteration counter replaces build-only `current_conversation`
 
@@ -125,3 +126,18 @@ clipped to build-stage iterations only.
 - [ ] `src/pathly_data/core/skills/team-flow.md` references the new field where iteration matters.
 
 **Delivered by:** Phase 4.2 → Conversation 4
+
+### Story 9: Hooks are deployed to Codex and Copilot VS Code by the installer
+
+**As a** Codex or Copilot VS Code user, **I want** `pathly-setup --apply` to write
+the hook configuration for my host, **so that** `classify_feedback` and
+`inject_feedback_ttl` fire automatically without me manually editing config files.
+
+**Acceptance Criteria:**
+- [ ] `pathly-setup codex --apply` writes `~/.codex/hooks.json` with two `PostToolUse` entries; existing user hooks are preserved (merge, not overwrite).
+- [ ] `pathly-setup copilot --apply` writes `.github/hooks/pathly-classify.json` and `.github/hooks/pathly-ttl.json` in the project root.
+- [ ] `pathly-setup codex --uninstall` and `pathly-setup copilot --uninstall` remove the Pathly-owned hook entries/files.
+- [ ] A test asserts both hook files are written with the correct `PostToolUse` event shape.
+- [ ] Copilot CLI is documented as the only remaining gap (no `postToolUse` event available).
+
+**Delivered by:** Phase 5.1, 5.2, 5.3 → Conversation 5
