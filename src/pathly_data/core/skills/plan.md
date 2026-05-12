@@ -66,6 +66,19 @@ Spawn `planner` with `phase: plan`. Inject:
 ```
 Plus all existing context: rigor level, `STORM_SEED` contents if it existed, `PO_NOTES` contents if it exists.
 
+## Template Path Resolution
+
+Before reading any template file, resolve `TEMPLATE_BASE` using this fallback chain — stop at the first path that successfully returns content:
+
+1. `{{TEMPLATES_DIR}}/plan/` — the adapter-installed path (Claude: `~/.claude/plugins/pathly/templates/plan/`, Codex: `~/.codex/plugins/pathly/templates/plan/`, Copilot: `~/.vscode/extensions/pathly/templates/plan/`)
+2. Replace `~` in path 1 with `$HOME` — Linux / macOS env var (Codex, Copilot, Claude in worktrees on Mac)
+3. Replace `~` in path 1 with `$USERPROFILE` — Windows env var (Copilot, Claude in worktrees on Windows)
+4. `.claude/templates/plan/` — project-local copy; works for any agent in any worktree if templates are committed to the repo
+
+If none of the four paths resolve, proceed without the template and use only the inline descriptions in this skill.
+
+All template reads below use `$TEMPLATE_BASE/<FILE>.template.md`.
+
 ## Step 4: Create The Plans Folder
 
 Create `plans/$FEATURE/` if it does not exist. If it exists, add or update only the files/sections needed for the selected rigor.
