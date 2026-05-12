@@ -51,6 +51,8 @@ pathly-setup copilot --apply        # install for Copilot / VS Code only
 pathly-setup --repair               # overwrite Pathly-owned files
 pathly-setup --force                # overwrite all files, even non-Pathly-owned
 pathly-setup --uninstall            # remove all Pathly-owned files
+pathly-events summary <feature>     # print token/cost table for a pipeline run
+pathly-state <feature>              # print current FSM state for a feature
 ```
 
 `--dry-run` never writes. `--apply` is required for any writes.

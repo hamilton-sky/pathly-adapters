@@ -9,8 +9,8 @@ This module provides:
   - summary(feature)                   — print token/cost table (Bash-callable)
 
 CLI usage (called by LLM via Bash or by the retro skill):
-  python -m orchestrator.eventlog summary security-fixes
-  python -m orchestrator.eventlog events security-fixes
+  python -m pathly_orchestrator.eventlog summary security-fixes
+  python -m pathly_orchestrator.eventlog events security-fixes
 """
 
 from __future__ import annotations
@@ -162,9 +162,9 @@ def _print_events(feature: str) -> None:
         print(json.dumps(e))
 
 
-if __name__ == "__main__":
+def _cli() -> None:
     if len(sys.argv) < 3:
-        print("Usage: python -m orchestrator.eventlog <summary|events> <feature>")
+        print("Usage: pathly-events <summary|events> <feature>")
         sys.exit(1)
     cmd, feat = sys.argv[1], sys.argv[2]
     if cmd == "summary":
@@ -174,3 +174,19 @@ if __name__ == "__main__":
     else:
         print(f"Unknown command: {cmd}. Use 'summary' or 'events'.")
         sys.exit(1)
+
+
+def _state_cli() -> None:
+    if len(sys.argv) < 2:
+        print("Usage: pathly-state <feature>")
+        sys.exit(1)
+    feat = sys.argv[1]
+    state = read_state(feat)
+    if state is None:
+        print(f"No STATE.json found in plans/{feat}/")
+        sys.exit(0)
+    print(json.dumps(state, indent=2))
+
+
+if __name__ == "__main__":
+    _cli()

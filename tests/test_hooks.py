@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).parent.parent
-CLASSIFY_HOOK = REPO_ROOT / "hooks" / "classify_feedback.py"
-INJECT_HOOK = REPO_ROOT / "hooks" / "inject_feedback_ttl.py"
+CLASSIFY_HOOK = REPO_ROOT / "src" / "pathly_hooks" / "classify_feedback.py"
+INJECT_HOOK = REPO_ROOT / "src" / "pathly_hooks" / "inject_feedback_ttl.py"
 
 HOOKS = [CLASSIFY_HOOK, INJECT_HOOK]
 

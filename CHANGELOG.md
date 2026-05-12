@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.0 — 2026-05-13
+
+### Orchestrator and hooks are now first-class shipped packages
+
+- Move `orchestrator/` → `src/pathly_orchestrator/` and `hooks/` → `src/pathly_hooks/`
+  so both ship in the installed wheel. The repo-root copies are removed.
+- Add `pathly-events summary <feature>` console script — prints a token/cost table
+  from `plans/<feature>/EVENTS.jsonl`.
+- Add `pathly-state <feature>` console script — prints current FSM state from
+  `plans/<feature>/STATE.json`.
+- This is non-breaking for end users: the repo-root `orchestrator/` and `hooks/`
+  directories were never exported by prior releases.
+
+---
+
 ## 2.0.3 - 2026-05-12
 
 - Fix Codex plugin installation by creating a real local marketplace copy and enabling `pathly@pathly-local` in Codex config.
