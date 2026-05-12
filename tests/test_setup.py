@@ -153,6 +153,8 @@ def test_dry_run_real_codex_includes_plugin_manifest(capsys):
     assert "plugin.json" in captured.out
     assert "skills" in captured.out
     assert "agents" in captured.out
+    assert "classify_feedback.py" in captured.out
+    assert "inject_feedback_ttl.py" in captured.out
 
 
 # ---------------------------------------------------------------------------
