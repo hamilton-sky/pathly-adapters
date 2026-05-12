@@ -1,6 +1,6 @@
-# team-flow/build
+# team/build
 
-Stage 3a — Implement. Invoked by the `team-flow` orchestrator when FSM state is BUILDING.
+Stage 3a — Implement. Invoked by the `team` orchestrator when FSM state is BUILDING.
 Executes one TODO conversation (analyze → scout → implement), then transitions to REVIEWING.
 
 Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
@@ -28,8 +28,6 @@ State snapshots are written to `plans/<feature>/STATE.json`.
 | Action | Spawn |
 |---|---|
 | Implement | `builder` |
-| Context lookup (shallow) | `quick` with `ROLE: builder` |
-| Context lookup (deep/cross-layer) | `scout` with `ROLE: builder` |
 | Clarify requirement | `planner` |
 | Clarify architecture | `architect` |
 
@@ -76,11 +74,12 @@ Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
 ### Phase 2 — Scout (if NEEDS_CONTEXT has entries)
 
-Spawn all entries in parallel (max 4 total):
-- `type: quick` → spawn `quick` with `ROLE: builder` + the question
-- `type: scout` → spawn `scout` with `ROLE: builder` + scope + question
+Call `scout-path` with:
+- `NEEDS_CONTEXT`: the block from Phase 1
+- `ROLE`: `builder`
+- `FEATURE`: [feature name]
 
-Compress all findings into a short summary for Phase 3.
+Use the returned compressed summary as Scout Findings.
 
 ### Phase 3 — Implement
 
@@ -88,7 +87,7 @@ Compress all findings into a short summary for Phase 3.
 ```
 phase: implement
 Route to continue [feature] in manual mode.
-Execute conversation N only. Verify, update PROGRESS.md.
+Execute conversation N only. Verify. Do NOT update PROGRESS.md — the orchestrator handles that after the reviewer passes.
 
 ## Scout Findings
 [compressed summary — or "none" if Phase 2 was skipped]
@@ -128,5 +127,5 @@ Both files can exist simultaneously. Route one at a time using the priority orde
 After Phase 3 completes with no blocking feedback files:
 Append `{"type": "AGENT_DONE", "agent": "builder"}` to EVENTS.jsonl.
 Transition state → REVIEWING.
-Route back to `team-flow [FEATURE] [rigor] [autoFlow]`.
-(Orchestrator will route to `team-flow/review`.)
+Route back to `team [FEATURE] [rigor] [autoFlow]`.
+(Orchestrator will route to `team/review`.)

@@ -21,24 +21,6 @@ Otherwise auto-detect:
 4. If no `plans/` folder exists or is empty: stop →
    `No active feature found. Start with /pathly go to describe what you want to build.`
 
-## Step 0: Execution Mode Selection
-
-Check if `$ARGUMENTS` contains the word "auto". If so, skip the menu and set `autoFlow = true` immediately. Also skip Step 1 dirty-check prompts and Step 4 "Proceed? (y/n)" confirmation — just execute.
-
-Otherwise, ask the user to choose:
-
-```
-Choose execution mode:
-
-1. Auto-flow — execute conversation, verify, commit, guide to next
-   (Best for sequential conversations. Auto-commits on success.)
-
-2. Manual — execute current conversation only, you handle commit + next steps
-   (Best for exploration or when you want to review before committing.)
-```
-
-Wait for user selection. Default to Manual if unclear.
-
 ## Step 1: Pre-flight check
 
 Run `git status` (without -uall flag).
@@ -69,7 +51,12 @@ phase: analyze
 Parse the `## NEEDS_CONTEXT` block it returns. If the block says `none`: skip Phase 2.
 
 **Phase 2 — Scout (if NEEDS_CONTEXT has entries):**
-Call `scout-flow` with the NEEDS_CONTEXT block, `ROLE: builder`, `FEATURE: [plan folder name]`. Use the returned summary as Scout Findings.
+Call `scout-path` with:
+- `NEEDS_CONTEXT`: the block from Phase 1
+- `ROLE`: `builder`
+- `FEATURE`: [plan folder name]
+
+Use the returned compressed summary as Scout Findings.
 
 **Phase 3 — Implement (Step 5):**
 Spawn `builder` with `phase: implement`, injecting findings:
@@ -108,14 +95,9 @@ Report to the user before starting:
 
 ```
 ## Next: Conversation N — [title]
-- Mode: [Auto-flow / Manual]
 - Scope: [files listed in CONVERSATION_PROMPTS.md]
 - Verify: [command]
-
-Proceed? (y/n)
 ```
-
-In auto-flow mode, skip this and proceed immediately.
 
 ## Step 5: Implement
 
@@ -138,56 +120,34 @@ Verification failed. The fix requires changes to [file] which is outside this co
 Options: (a) expand scope, (b) rollback with git checkout and retry
 ```
 
-In auto-flow mode, attempt up to 2 fixes. If still failing, switch to manual mode and stop.
+Attempt up to 2 fixes. If still failing, stop and report.
 
-## Step 7: Update PROGRESS.md
+## Step 7: Report completion
 
-After successful verification, update `plans/$PLAN/PROGRESS.md`:
-
-1. Change the target conversation's `| TODO |` → `| DONE |`
-2. Change all Phase Detail rows belonging to this conversation from `TODO` → `DONE`
-3. If all conversations are now DONE, change overall `Status: NOT STARTED` or `Status: IN PROGRESS` → `Status: COMPLETE`
-
-## Step 8: Commit + Next Steps
-
-### If Auto-flow mode (`autoFlow = true`):
-
-1. **Auto-commit** all changes:
-   ```bash
-   git add [all files modified] plans/$PLAN/PROGRESS.md
-   git commit -m "feat: $PLAN conv N done
-
-   Co-Authored-By: <adapter-specific assistant identity>"
-   ```
-
-2. **Check what's next** — read PROGRESS.md for the next TODO conversation.
-
-3. **If more conversations remain:**
-   ```
-   ✅ Conv N — DONE and committed.
-
-   📋 Next up: Conv N+1 — [scope summary]
-
-   Context is accumulating. To continue with a fresh session:
-   👉 Run: /clear
-   Then route to: `continue $PLAN`
-   ```
-
-4. **If all conversations are DONE:**
-   ```
-   ✅ All conversations COMPLETE for $PLAN!
-   ```
-
-### If Manual mode (`autoFlow = false`):
+After successful verification, report:
 
 ```
 ## Completed: Conv N — [title]
 - Files modified: [list]
 - Verification: passed
-- Next up: Conv N+1 — [title]
-
-Remember to commit before starting the next conversation.
 ```
+
+Do NOT update PROGRESS.md. Do NOT commit. The orchestrator (`/pathly team`) handles both after the reviewer passes.
+
+## Exit contract
+
+Write `plans/<feature>/STATE.json`:
+```json
+{"current": "REVIEWING", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
+```
+
+Append to `plans/<feature>/EVENTS.jsonl`:
+```
+{"type": "AGENT_DONE", "agent": "builder", "ts": "<iso-timestamp>"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "<iso-timestamp>"}
+```
+
+Do not invoke any other skill. The orchestrator reads STATE.json and decides what comes next.
 
 ## Edge Cases
 

@@ -1,6 +1,6 @@
-# team-flow/discover
+# team/discover
 
-Stage 0 — Discovery Path. Invoked by the `team-flow` orchestrator when FSM state is
+Stage 0 — Discovery Path. Invoked by the `team` orchestrator when FSM state is
 IDLE / PO_DISCUSSING / EXPLORING / STORMING.
 
 Parse `$ARGUMENTS`: first non-keyword word = `FEATURE`, `lite|standard|strict` = `rigor`,
@@ -64,7 +64,7 @@ Reply with 1, 2, 3, 4, or 5:
 ## Path 1 — Quick storm
 
 Transition state → STORMING.
-Route to `team-flow/plan [FEATURE] [rigor] [autoFlow] storm`.
+Route to `team/plan [FEATURE] [rigor] [autoFlow] storm`.
 
 ---
 
@@ -72,7 +72,7 @@ Route to `team-flow/plan [FEATURE] [rigor] [autoFlow] storm`.
 
 Print: `Skipping discovery. Starting planning...`
 Transition state → PLANNING.
-Route to `team-flow/plan [FEATURE] [rigor] [autoFlow]`.
+Route to `team/plan [FEATURE] [rigor] [autoFlow]`.
 
 ---
 
@@ -99,7 +99,7 @@ Wait for reply.
 
 **A** → Transition state → BUILDING.
 Print: `Skipping discovery. Starting implementation from PRD plan.`
-Route back to `team-flow [FEATURE] [rigor] [autoFlow]`.
+Route back to `team [FEATURE] [rigor] [autoFlow]`.
 
 **B** → Transition state → PO_DISCUSSING. **Spawn** `po`:
 ```
@@ -110,11 +110,11 @@ The user will type "stop notes" when satisfied to write plans/[feature]/PO_NOTES
 Remind them of this at the start.
 ```
 After PO completes: transition state → BUILDING.
-Route back to `team-flow [FEATURE] [rigor] [autoFlow]`.
+Route back to `team [FEATURE] [rigor] [autoFlow]`.
 
 **C** → Transition state → STORMING.
 Print: `Plan files ready. Starting architect storm for technical design.`
-Route to `team-flow/plan [FEATURE] [rigor] [autoFlow] storm`.
+Route to `team/plan [FEATURE] [rigor] [autoFlow] storm`.
 
 ---
 
@@ -142,11 +142,11 @@ Reply with A, B, or C:
 ```
 
 **A** → Store `explorations/[FEATURE]/CONCLUSIONS.md` path as `exploreContext`. Transition state → PLANNING.
-Route to `team-flow/plan [FEATURE] [rigor] [autoFlow]` with explore context injected.
+Route to `team/plan [FEATURE] [rigor] [autoFlow]` with explore context injected.
 
-**B** → Route back to `team-flow [FEATURE] nano`. (Orchestrator will run nano mode.)
+**B** → Route back to `team [FEATURE] nano`. (Orchestrator will run nano mode.)
 
-**C** → Print: `Pipeline paused after explore. Resume with team-flow [feature] build when ready.`
+**C** → Print: `Pipeline paused after explore. Resume with team [feature] build when ready.`
 Transition state → IDLE. Stop.
 
 ---
@@ -177,7 +177,7 @@ If autoFlow: log human response "auto-advance".
 
 **Phase 2 — Architect Storm:**
 Transition state → STORMING.
-Route to `team-flow/plan [FEATURE] [rigor] [autoFlow] storm`.
+Route to `team/plan [FEATURE] [rigor] [autoFlow] storm`.
 (plan.md Stage 1 runs the full analyze → research → storm cycle, reading PO_NOTES.md automatically.)
 
 If not autoFlow — pause:
@@ -189,4 +189,4 @@ On 'no': halt.
 
 **Phase 3 — Hand off to plan:**
 Transition state → PLANNING.
-Route to `team-flow/plan [FEATURE] [rigor] [autoFlow]`.
+Route to `team/plan [FEATURE] [rigor] [autoFlow]`.

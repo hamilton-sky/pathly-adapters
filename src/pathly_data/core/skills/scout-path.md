@@ -1,8 +1,8 @@
-# scout-flow
+# scout-path
 
 **This sub-skill is called by other skills, not by users directly.**
 
-scout-flow is an orchestrator-only utility. It receives a `NEEDS_CONTEXT` block from a parent skill (plan, build, review, or an agent contract), spawns the appropriate research agents in parallel, and returns a compressed summary of findings back to the calling skill.
+scout-path is an orchestrator-only utility. It receives a `NEEDS_CONTEXT` block from a parent skill (plan, build, review, or an agent contract), spawns the appropriate research agents in parallel, and returns a compressed summary of findings back to the calling skill.
 
 ---
 
@@ -30,7 +30,7 @@ This file is the single source of truth for the NEEDS_CONTEXT format.
 - `type: quick` — single-file lookup answerable in ≤ 2 tool calls
 - `type: web` — external search query (documentation, package info, etc.)
 
-When NEEDS_CONTEXT is `none`, scout-flow is not called.
+When NEEDS_CONTEXT is `none`, scout-path is not called.
 
 ---
 
@@ -79,5 +79,5 @@ Example: if there are 2 scout entries, 1 quick entry, and 2 web entries, drop th
 ## Rules
 
 - Max 4 parallel spawns.
-- scout-flow is orchestrator-only — not user-invokable and must not appear in any user-facing menu or help output.
-- Sub-agents spawned by scout-flow are terminal — they cannot spawn further agents.
+- scout-path is orchestrator-only — not user-invokable and must not appear in any user-facing menu or help output.
+- Sub-agents spawned by scout-path are terminal — they cannot spawn further agents.

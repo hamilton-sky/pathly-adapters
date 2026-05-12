@@ -1,6 +1,6 @@
-# team-flow/review
+# team/review
 
-Stage 3b — Review. Invoked by the `team-flow` orchestrator when FSM state is REVIEWING.
+Stage 3b — Review. Invoked by the `team` orchestrator when FSM state is REVIEWING.
 Runs reviewer for the current conversation, handles feedback loops, then advances.
 
 Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`. Conv N is the most recent BUILDING conversation
@@ -106,7 +106,7 @@ Report: what changed in the design.
 ```
 After architect resolves: log file deleted for ARCH_FEEDBACK.md.
 Transition state → BUILDING.
-Route back to `team-flow [FEATURE] [rigor] [autoFlow]`. (Orchestrator re-runs build for Conv N.)
+Route back to `team [FEATURE] [rigor] [autoFlow]`. (Orchestrator re-runs build for Conv N.)
 
 ### If `REVIEW_FAILURES.md` exists (no ARCH_FEEDBACK.md)
 
@@ -161,7 +161,7 @@ Mark Conv N as DONE in `plans/[feature]/PROGRESS.md`.
 
 **Check if all conversations are now DONE:**
 - If more TODO conversations remain: transition state → BUILDING.
-  Route back to `team-flow [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to build for next conv.)
+  Route back to `team [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to build for next conv.)
 - If all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl.
   Transition state → TESTING.
-  Route back to `team-flow [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to test.)
+  Route back to `team [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to test.)

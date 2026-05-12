@@ -1,7 +1,7 @@
-# team-flow/plan
+# team/plan
 
-Stages 1 + 2 — Storm and Plan. Invoked by the `team-flow` orchestrator when FSM state is
-PLANNING, or by `team-flow/discover` with arg `storm` to run Stage 1 first.
+Stages 1 + 2 — Storm and Plan. Invoked by the `team` orchestrator when FSM state is
+PLANNING, or by `team/discover` with arg `storm` to run Stage 1 first.
 
 Parse `$ARGUMENTS`: `FEATURE`, `rigor` (lite|standard|strict), `autoFlow`, optional `storm` flag.
 
@@ -17,11 +17,11 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 | Action | Spawn |
 |---|---|
 | Storm Phase 1 — Analyze | `architect` (phase: analyze) |
-| Storm Phase 2 — Research | scout-flow (ROLE: architect) |
+| Storm Phase 2 — Research | scout-path (ROLE: architect) |
 | Storm Phase 3 — Storm | `architect` (phase: storm) |
 | PO Phase — Requirements | `po` |
 | Plan Phase 1 — Analyze | `planner` (phase: analyze) |
-| Plan Phase 2 — Scout | scout-flow (ROLE: planner) |
+| Plan Phase 2 — Scout | scout-path (ROLE: planner) |
 | Plan Phase 3 — Plan | `planner` (phase: plan) |
 
 ---
@@ -50,7 +50,7 @@ Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
 ### Phase 2 — Research
 
-Call scout-flow with: NEEDS_CONTEXT block from Phase 1, ROLE: architect, FEATURE: [feature name].
+Call scout-path with: NEEDS_CONTEXT block from Phase 1, ROLE: architect, FEATURE: [feature name].
 Use the returned compressed summary as Research Findings for Phase 3.
 
 ### Phase 3 — Storm
@@ -124,7 +124,7 @@ Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
 ### Phase 2 — Scout
 
-Call scout-flow with: NEEDS_CONTEXT block from Phase 1, ROLE: planner, FEATURE: [feature name].
+Call scout-path with: NEEDS_CONTEXT block from Phase 1, ROLE: planner, FEATURE: [feature name].
 Use the returned compressed summary as Scout Findings for Phase 3.
 
 ### Phase 3 — Plan
@@ -160,7 +160,7 @@ Reply 'go' to start implementation, or 'stop' to pause here.
 If autoFlow: log human response "auto-advance".
 
 Transition state → BUILDING.
-Route back to `team-flow [FEATURE] [rigor] [autoFlow]`.
+Route back to `team [FEATURE] [rigor] [autoFlow]`.
 
 ---
 

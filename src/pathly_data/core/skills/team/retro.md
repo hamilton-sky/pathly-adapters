@@ -1,6 +1,6 @@
-# team-flow/retro
+# team/retro
 
-Stage 5 — Retrospective. Invoked by the `team-flow` orchestrator when FSM state is RETRO.
+Stage 5 — Retrospective. Invoked by the `team` orchestrator when FSM state is RETRO.
 
 Parse `$ARGUMENTS`: `FEATURE`.
 
@@ -63,4 +63,4 @@ Feature '[feature]' is DONE.
 To promote lessons to active memory: route to lessons
 ```
 
-Route back to `team-flow [FEATURE]`. (Orchestrator reads state DONE and stops.)
+Route back to `team [FEATURE]`. (Orchestrator reads state DONE and stops.)

@@ -1,4 +1,4 @@
-# team-flow
+# team
 
 Thin orchestrator for the full feature pipeline. Recovers FSM state and routes to the
 correct sub-skill. Adapters render route names in their host-native form.
@@ -28,6 +28,23 @@ If no `FEATURE` was found in `$ARGUMENTS`, auto-detect:
 Conflict checks (stop and report):
 - `strict` + `fast` → `strict mode requires human approval gates; remove fast or choose standard fast.`
 - `nano` + `strict|standard|plan|build|test` → `nano mode has no plan stages; remove the conflicting flag or choose lite instead.`
+
+## Mode selection
+
+If `fast` was parsed from `$ARGUMENTS`, set `autoFlow = true` and skip this step.
+
+Otherwise ask the user:
+
+```
+Choose execution mode:
+
+1. Auto-flow — implement, review, then commit and continue automatically
+   (Commits only after the reviewer passes — not after every build.)
+
+2. Manual — run one stage at a time; you decide when to commit
+```
+
+Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
 ## Nano mode
 
@@ -131,14 +148,48 @@ Repeat until state is DONE or the user stops the pipeline.
 
 | FSM state | Sub-skill |
 |---|---|
-| IDLE / PO_DISCUSSING / EXPLORING / STORMING | `team-flow/discover` |
-| PLANNING | `team-flow/plan` |
-| BUILDING | `team-flow/build` |
-| REVIEWING | `team-flow/review` |
-| TESTING | `team-flow/test` |
-| RETRO | `team-flow/retro` |
+| IDLE / PO_DISCUSSING / EXPLORING / STORMING | `team/discover` |
+| PLANNING | `team/plan` |
+| BUILDING | `team/build` |
+| REVIEWING | `team/review` |
+| TESTING | `team/test` |
+| RETRO | `team/retro` |
 | BLOCKED_ON_HUMAN | Print `plans/<feature>/feedback/HUMAN_QUESTIONS.md`. Wait for user. On reply: delete file, append `{"type": "HUMAN_RESPONSE", "value": "<reply>"}` to EVENTS.jsonl, restore prior state in STATE.json, re-route. |
 | DONE | Print `[Complete] Feature '[feature]' is DONE.` Stop. |
+
+## Orchestrator responsibilities between stages
+
+These actions are the orchestrator's job — sub-skills (build, review, test) do NOT do them.
+
+### After BUILDING → REVIEWING transition
+
+If `autoFlow = true`:
+- Commit all changed files:
+  ```bash
+  git add -A
+  git commit -m "feat(<feature>): conv N implement
+
+  Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+  ```
+- Print: `✅ Conv N implemented and committed — handing to reviewer.`
+
+### After REVIEWING → TESTING transition (reviewer passed)
+
+This is the moment PROGRESS.md gets updated — not earlier.
+
+1. Read `plans/<feature>/PROGRESS.md`. Find the conversation row that was just built (the one that moved from BUILDING to REVIEWING to TESTING).
+2. Mark that conv row `| TODO |` → `| DONE |`.
+3. Mark all Phase Detail rows for that conv `TODO` → `DONE`.
+4. If all convs are now DONE, set overall Status → `COMPLETE`.
+5. If `autoFlow = true`, commit:
+   ```bash
+   git add plans/<feature>/PROGRESS.md
+   git commit -m "chore(<feature>): mark conv N done after review pass"
+   ```
+
+### After REVIEW_BLOCKED → BUILDING (reviewer failed, fix needed)
+
+The orchestrator routes back to the build sub-skill. No commit, no PROGRESS.md update.
 
 ## Artifact archiving — dual-write rule
 

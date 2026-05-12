@@ -1,6 +1,6 @@
-# team-flow/test
+# team/test
 
-Stage 4 — Test + Fix Loop. Invoked by the `team-flow` orchestrator when FSM state is TESTING.
+Stage 4 — Test + Fix Loop. Invoked by the `team` orchestrator when FSM state is TESTING.
 
 Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 
@@ -19,7 +19,7 @@ State snapshots are written to `plans/<feature>/STATE.json`.
 Read `plans/<feature>/PROGRESS.md`. Check every conversation row in the Conversation Breakdown table.
 If any row status is not DONE: stop and report:
 ```
-Not all conversations are complete. Route to team-flow <feature> build first. Incomplete: Conv N
+Not all conversations are complete. Route to team <feature> build first. Incomplete: Conv N
 ```
 
 When all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl. Confirm state is TESTING in STATE.json.
@@ -29,7 +29,7 @@ When all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl. Confirm 
 | Action | Spawn |
 |---|---|
 | Phase 1 — Analyze needs | `tester` (phase: analyze) |
-| Phase 2 — Scout context | `scout-flow` with `ROLE: tester` |
+| Phase 2 — Scout context | `scout-path` with `ROLE: tester` |
 | Phase 3 — Test | `tester` (phase: test) |
 | Fix failing criteria | `builder` |
 
@@ -62,7 +62,7 @@ Parse the `## NEEDS_CONTEXT` block. If it says `none`, use only the default test
 
 ## Phase 2 — Scout
 
-Call **scout-flow** with:
+Call **scout-path** with:
 - `NEEDS_CONTEXT`: the block from Phase 1
 - `ROLE: tester`
 - `FEATURE: <feature>`
@@ -124,4 +124,4 @@ Reply 'done' to proceed to retro.
 If autoFlow: log human response "auto-advance".
 
 Transition state → RETRO.
-Route back to `team-flow [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to retro.)
+Route back to `team [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to retro.)
