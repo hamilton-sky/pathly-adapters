@@ -8,6 +8,8 @@
 #   2. Copy the identical change to pathly-engine/protocol_contract.yaml.
 #   3. Both repos' tests will fail until both files are in sync — that is intentional.
 
+version: "1.0"
+
 feedback_files:
   - ARCH_FEEDBACK.md
   - DESIGN_QUESTIONS.md

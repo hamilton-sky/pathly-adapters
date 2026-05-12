@@ -8,8 +8,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
+
+_ARCH_QUESTION = re.compile(
+    r"\b(architect|architecture|architectural|design|approach|structure)\b",
+    re.IGNORECASE,
+)
 
 
 def main() -> None:
@@ -52,8 +58,8 @@ def main() -> None:
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("- ") and not stripped.startswith("- [REQ]") and not stripped.startswith("- [ARCH]"):
-            question_text = stripped[2:].lower()
-            if any(kw in question_text for kw in ("architect", "design", "how", "approach", "structure")):
+            question_text = stripped[2:]
+            if _ARCH_QUESTION.search(question_text):
                 tagged.append(f"- [ARCH] {stripped[2:]}")
             else:
                 tagged.append(f"- [REQ] {stripped[2:]}")

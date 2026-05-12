@@ -62,7 +62,7 @@ pathly-state <feature>              # print current FSM state for a feature
 | Host | Detected by | Installed locations |
 |------|-------------|---------------------|
 | `claude` | `~/.claude/` directory exists | `~/.claude/agents/` + `~/.claude/skills/` |
-| `codex` | Codex config directory exists | `~/.codex/agents/` + `~/.codex/skills/` |
+| `codex` | Codex config directory exists | `~/.codex/agents/` + `~/.codex/skills/` + local plugin marketplace |
 | `copilot` | VS Code + Copilot detected | VS Code agents folder |
 
 ## How It Works
@@ -70,6 +70,7 @@ pathly-state <feature>              # print current FSM state for a feature
 1. **Detect** — scans for installed hosts on the current machine.
 2. **Stitch** — combines `core/agents/` and `core/skills/` content with adapter-specific `_meta/*.yaml` to produce deployable agent and skill files (frontmatter + body + spawn section).
 3. **Materialize** — writes stitched files to the host config location. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back.
+4. **Register Codex plugin** - for Codex installs, writes `~/.codex/pathly-marketplace`, enables `pathly@pathly-local`, and refreshes the marketplace through the Codex CLI when available.
 
 ## Development setup
 

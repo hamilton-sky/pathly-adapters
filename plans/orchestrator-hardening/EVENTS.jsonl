@@ -2,3 +2,4 @@
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-13T00:01:00Z"}
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T00:09:30Z"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-13T00:15:00Z"}
+{"type": "AGENT_DONE", "agent": "builder", "conversation": 3, "result": "passed", "timestamp": "2026-05-12T22:27:36Z", "verify": "pytest tests/test_hooks.py tests/test_feedback_protocol.py"}

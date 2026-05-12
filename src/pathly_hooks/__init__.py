@@ -1,7 +1,5 @@
-"""
-Pathly hooks — Claude Code post-tool-call hooks for feedback classification and TTL injection.
+"""Pathly hooks for feedback classification and TTL injection."""
 
-These hooks require the Claude Code hook event system and have no equivalent in Codex or Copilot.
-"""
+FEEDBACK_PROTOCOL_VERSION = "1.0"
 
 from . import classify_feedback, inject_feedback_ttl  # noqa: F401

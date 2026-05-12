@@ -140,6 +140,38 @@ def test_hook_missing_api_key(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# test_classify_feedback_uses_word_boundary_arch_keywords
+# ---------------------------------------------------------------------------
+
+def test_classify_feedback_uses_word_boundary_arch_keywords(tmp_path):
+    plans_dir = tmp_path / "plans"
+    plans_dir.mkdir()
+    feedback_file = plans_dir / "IMPL_QUESTIONS.md"
+    feedback_file.write_text(
+        "- How long should the TTL be?\n"
+        "- Which design should we use?\n"
+        "- Is this a showstopper?\n",
+        encoding="utf-8",
+    )
+
+    result = _run_hook(
+        CLASSIFY_HOOK,
+        {"file": str(feedback_file)},
+        env={
+            "PATHLY_PROJECT_ROOT": str(tmp_path),
+            "ANTHROPIC_API_KEY": "test-key",
+        },
+    )
+
+    assert result.returncode == 0
+    assert feedback_file.read_text(encoding="utf-8") == (
+        "- [REQ] How long should the TTL be?\n"
+        "- [ARCH] Which design should we use?\n"
+        "- [REQ] Is this a showstopper?\n"
+    )
+
+
+# ---------------------------------------------------------------------------
 # test_hook_missing_project_root
 # ---------------------------------------------------------------------------
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -20,6 +21,7 @@ def install_codex_plugin(
     dry_run: bool = False,
     config_path: Path | None = None,
     marketplace_root: Path | None = None,
+    codex_command: str | None = None,
 ) -> None:
     """Create a real local marketplace and enable the Pathly plugin."""
     config_path = config_path or _CODEX_CONFIG
@@ -28,8 +30,10 @@ def install_codex_plugin(
     if dry_run:
         print(f"  [dry-run] Would write Codex marketplace to {marketplace_root}")
         print(f"  [dry-run] Would enable plugin '{PLUGIN_NAME}@{MARKETPLACE_NAME}' in {config_path}")
+        print("  [dry-run] Would refresh Codex local marketplace registration if the codex CLI is available")
         return
 
+    using_default_paths = config_path == _CODEX_CONFIG and marketplace_root == _MARKETPLACE_ROOT
     plugin_root = marketplace_root / "plugins" / PLUGIN_NAME
     if plugin_root.exists():
         shutil.rmtree(plugin_root)
@@ -43,8 +47,15 @@ def install_codex_plugin(
         target.write_text(content, encoding="utf-8")
 
     _write_marketplace_json(marketplace_root)
-    _enable_in_codex_config(config_path, marketplace_root)
+    refreshed = _refresh_codex_marketplace(
+        marketplace_root,
+        codex_command=codex_command,
+        discover_cli=using_default_paths,
+    )
+    if not refreshed:
+        _enable_in_codex_config(config_path, marketplace_root)
     print(f"[codex] Registered local plugin marketplace at {marketplace_root}")
+    print('[codex] Restart Codex and start a new thread. Try: "Use Pathly help"')
 
 
 def uninstall_codex_plugin(
@@ -83,6 +94,43 @@ def _write_marketplace_json(root: Path) -> None:
         ],
     }
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _refresh_codex_marketplace(
+    marketplace_root: Path,
+    *,
+    codex_command: str | None = None,
+    discover_cli: bool = True,
+) -> bool:
+    command = codex_command
+    if command is None and discover_cli:
+        command = shutil.which("codex")
+    if command is None:
+        print("[codex] Codex CLI not found; config.toml was updated directly.")
+        return False
+
+    remove = subprocess.run(
+        [command, "plugin", "marketplace", "remove", MARKETPLACE_NAME],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if remove.returncode != 0:
+        print(f"[codex] Marketplace remove skipped: {remove.stderr.strip() or remove.stdout.strip()}")
+
+    add = subprocess.run(
+        [command, "plugin", "marketplace", "add", str(marketplace_root)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if add.returncode != 0:
+        print(f"[codex] Codex CLI marketplace refresh failed: {add.stderr.strip() or add.stdout.strip()}", file=sys.stderr)
+        print("[codex] Falling back to direct config.toml registration.", file=sys.stderr)
+        return False
+
+    print("[codex] Refreshed Codex local marketplace registration via codex CLI.")
+    return True
 
 
 def _enable_in_codex_config(path: Path, marketplace_root: Path) -> None:

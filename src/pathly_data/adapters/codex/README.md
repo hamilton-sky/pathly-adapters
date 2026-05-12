@@ -46,12 +46,18 @@ git clone https://github.com/hamilton-sky/pathly
 cd pathly
 pip install -e pathly-adapters/
 pathly-setup codex --apply
-codex plugin marketplace add C:\tmp\pathly-marketplace
 ```
 
-Restart Codex after adding or changing the local marketplace. If the plugin was
-enabled but not selected in an existing thread, start a fresh thread after the
-restart.
+`pathly-setup codex --apply` writes the local marketplace under
+`~/.codex/pathly-marketplace`, enables `pathly@pathly-local` in
+`~/.codex/config.toml`, and refreshes the marketplace with
+`codex plugin marketplace remove/add` when the Codex CLI is available. If the
+CLI is not available or the refresh fails, the config file registration remains
+as a fallback.
+
+Restart Codex after installing or changing the local marketplace. If the plugin
+was enabled but not selected in an existing thread, start a fresh thread after
+the restart.
 
 Manual PowerShell equivalent:
 
@@ -65,6 +71,7 @@ New-Item -ItemType Junction -Path "$plugin\skills" -Target ".\adapters\codex\ski
 New-Item -ItemType Junction -Path "$plugin\core" -Target ".\core"
 
 # Write marketplace.json as shown in the root README, then:
+codex plugin marketplace remove pathly-local
 codex plugin marketplace add $market
 ```
 

@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 
 import yaml
+from pathly_hooks import FEEDBACK_PROTOCOL_VERSION
 
 _REPO_ROOT = Path(__file__).parent.parent
 _CONTRACT_PATH = _REPO_ROOT / "protocol_contract.yaml"
@@ -80,4 +81,12 @@ class TestFeedbackProtocolAdapters:
         """protocol_contract.yaml must parse and contain a feedback_files list."""
         assert isinstance(CONTRACT_FILES, set) and len(CONTRACT_FILES) > 0, (
             "protocol_contract.yaml parsed but 'feedback_files' is empty or missing"
+        )
+
+    def test_contract_version_matches_hooks_package(self):
+        """The hook package and protocol_contract.yaml must advertise the same protocol version."""
+        assert CONTRACT.get("version") == FEEDBACK_PROTOCOL_VERSION, (
+            "Feedback protocol version mismatch.\n"
+            f"protocol_contract.yaml version: {CONTRACT.get('version')!r}\n"
+            f"pathly_hooks version: {FEEDBACK_PROTOCOL_VERSION!r}"
         )

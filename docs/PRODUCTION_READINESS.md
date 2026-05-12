@@ -35,7 +35,7 @@ Done:
 
 - `src/pathly_data/adapters/codex/.codex-plugin/plugin.json` committed.
 - Public Codex marketplace metadata at `.agents/plugins/marketplace.json`.
-- `pathly-setup codex --apply` creates the Codex local marketplace files.
+- `pathly-setup codex --apply` creates the Codex local marketplace files and refreshes the local marketplace through the Codex CLI when available.
 
 Still needed:
 
