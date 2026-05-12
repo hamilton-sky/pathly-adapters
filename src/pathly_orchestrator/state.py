@@ -16,6 +16,9 @@ STATE.json lives at plans/<feature>/STATE.json and is rewritten after every even
   "retry_count_by_key": {           // key = "conv-N:FILENAME.md"
     "conv-2:REVIEW_FAILURES.md": 1
   },
+  "iteration_by_stage": {           // key = FSM stage name, value = attempt count
+    "BUILDING": 2
+  },
   "updated_at": "2026-05-11T10:30:00Z"
 }
 
@@ -66,5 +69,13 @@ TRANSITIONS: dict[str, frozenset[str]] = {
 #   "retry_count_by_key": {
 #     "conv-2:REVIEW_FAILURES.md": 1
 #   },
+#   "iteration_by_stage": {
+#     "BUILDING": 2
+#   },
 #   "updated_at": "2026-05-11T10:45:00Z"
 # }
+#
+# iteration_by_stage is optional. When present, each key is an FSM stage name
+# and each value is the number of times that stage has been entered. This
+# supplements retry_count_by_key (which tracks per-file retry counts) with a
+# coarser per-stage view.

@@ -226,6 +226,21 @@ Production recommendation:
 
 ---
 
+## Hook surface coverage
+
+Status of automatic hook integration per host:
+
+| Host | Status | Notes |
+|---|---|---|
+| **Claude Code** | Supported | Hooks fire automatically via the Claude Code hook event system (`post_tool_call`). |
+| **Codex** | Not yet deployed | Parity path: per-host `_meta/<name>_hook.yaml` overlay. |
+| **Copilot VS Code** | Not yet deployed | Parity path: same `_meta/<name>_hook.yaml` overlay mechanism. |
+| **Copilot CLI** | Not supported | No hook event system available in this host. |
+
+Until Codex and Copilot VS Code overlays are shipped, hooks must be installed manually on those hosts. See Known Limitations in README.md.
+
+---
+
 ## Production Readiness Checklist
 
 Required before production-ready:

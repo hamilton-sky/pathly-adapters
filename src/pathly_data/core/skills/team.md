@@ -106,6 +106,8 @@ Append `{"type": "STATE_TRANSITION", "to": "NEW_STATE", "ts": "<iso-timestamp>"}
 **Log an event:** Append a JSON line to EVENTS.jsonl. Common types:
 `FILE_CREATED`, `FILE_DELETED`, `HUMAN_RESPONSE`, `RETRY`, `AGENT_DONE`, `NO_DIFF_DETECTED`, `IMPLEMENT_COMPLETE`
 
+When emitting a `RETRY` event, increment the relevant entry in `iteration_by_stage` in STATE.json (key = current FSM stage name). This optional map tracks per-stage attempt counts across the pipeline run.
+
 ---
 
 ## State recovery

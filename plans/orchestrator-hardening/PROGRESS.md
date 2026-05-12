@@ -23,7 +23,7 @@
 | 1 | 1.1, 1.2, 1.3, 1.4 | S1, S4 | DONE | `pytest tests/test_hooks.py && pip install -e . && pathly-events summary nonexistent` |
 | 2 | 2.1, 2.2, 2.3 | S2, S3 | DONE | `pytest tests/test_orchestrator.py` |
 | 3 | 3.1, 3.2 | S5, S6 | DONE | `pytest tests/test_hooks.py tests/test_feedback_protocol.py` |
-| 4 | 4.1, 4.2 | S7, S8 | TODO | `pytest && python -c "import yaml,json; yaml.safe_load(open('protocol_contract.yaml'))"` |
+| 4 | 4.1, 4.2 | S7, S8 | DONE | `pytest && python -c "import yaml,json; yaml.safe_load(open('protocol_contract.yaml'))"` |
 | 5 | 5.1, 5.2, 5.3 | S9, S7 | TODO | `pytest tests/test_materialize_hooks.py && pathly-setup codex --dry-run && pathly-setup copilot --dry-run` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
@@ -41,8 +41,8 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 2 | 2.3 | `eventlog.py`, `tests/test_orchestrator.py` | File lock on `append_event` | 10-thread stress test → 500 valid lines | DONE |
 | 3 | 3.1 | `classify_feedback.py`, `tests/test_hooks.py` | Drop `"how"` keyword; word-boundary match | "How long…" → [REQ]; design question → [ARCH] | DONE |
 | 3 | 3.2 | `protocol_contract.yaml`, `pathly_hooks/__init__.py`, `tests/test_feedback_protocol.py` | Version field + cross-check | Desync fails test loudly | DONE |
-| 4 | 4.1 | `docs/SECURITY.md`, `README.md` | Document hook parity (Codex + Copilot VS Code supported; Copilot CLI gap) | SECURITY.md has subsection; README links it | TODO |
-| 4 | 4.2 | `schemas/state.schema.json`, `team-flow.md` | Optional `iteration_by_stage` field | Schema accepts both new and old shape | TODO |
+| 4 | 4.1 | `docs/SECURITY.md`, `README.md` | Document hook parity (Codex + Copilot VS Code supported; Copilot CLI gap) | SECURITY.md has subsection; README links it | DONE |
+| 4 | 4.2 | `schemas/state.schema.json`, `team-flow.md` | Optional `iteration_by_stage` field | Schema accepts both new and old shape | DONE |
 | 5 | 5.1 | `materialize.py`, `codex/install.yaml`, `tests/test_materialize_hooks.py` | Deploy hooks to Codex via `~/.codex/hooks.json` | `pathly-setup codex --apply` writes hook file | TODO |
 | 5 | 5.2 | `materialize.py`, `copilot/install.yaml`, `tests/test_materialize_hooks.py` | Deploy hooks to Copilot VS Code via `.github/hooks/` | `pathly-setup copilot --apply` writes two hook files | TODO |
 | 5 | 5.3 | `docs/SECURITY.md` | Update coverage table to show deployed status | Table reflects deployed state | TODO |

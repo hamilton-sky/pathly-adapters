@@ -122,3 +122,5 @@ Stable (1.0.0). Core install path (`--dry-run`, `--apply`, `--uninstall`) is ver
 - **Hook path validation requires Python 3.9+** — hook scripts use `Path.is_relative_to()`, introduced in Python 3.9. The project already requires Python 3.11+, so this is always satisfied.
 
 - **Hooks require `PATHLY_PROJECT_ROOT`** — hook scripts (`classify_feedback.py`, `inject_feedback_ttl.py`) read the `PATHLY_PROJECT_ROOT` environment variable to locate the active project's `plans/` directory. If this variable is not set, hooks exit immediately without performing any action.
+
+- **Hook parity gap** — Pathly hooks run automatically only under Claude Code. Codex and Copilot VS Code require manual install; see [Hook surface coverage](docs/SECURITY.md#hook-surface-coverage).

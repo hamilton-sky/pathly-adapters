@@ -60,6 +60,13 @@ def test_schema_transitions_covers_all_states():
     assert set(transitions.keys()) == set(STATES.keys())
 
 
+def test_iteration_by_stage_is_optional():
+    # Existing STATE.json files that omit iteration_by_stage must still validate.
+    jsonschema.validate(_valid_state_doc(), SCHEMA)
+    # Documents that include iteration_by_stage must also validate.
+    jsonschema.validate(_valid_state_doc(iteration_by_stage={"BUILDING": 2}), SCHEMA)
+
+
 # ── write_state validation ────────────────────────────────────────────────────
 
 def test_write_state_rejects_invalid_state_name(tmp_path):
