@@ -9,7 +9,7 @@ STATE.json lives at plans/<feature>/STATE.json and is rewritten after every even
 ── Schema ────────────────────────────────────────────────────────────────────
 
 {
-  "name": "<FSM state name>",      // see STATES below
+  "current": "<FSM state name>",    // see STATES below
   "feature": "<feature-name>",
   "rigor": "lite|standard|strict",
   "current_conversation": 0,        // 0 = not in build stage yet; 1+ = active conv
@@ -62,7 +62,7 @@ TRANSITIONS: dict[str, frozenset[str]] = {
 # ── Example STATE.json ────────────────────────────────────────────────────────
 #
 # {
-#   "name": "REVIEWING",
+#   "current": "REVIEWING",
 #   "feature": "security-fixes",
 #   "rigor": "lite",
 #   "current_conversation": 2,

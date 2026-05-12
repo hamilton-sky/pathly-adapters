@@ -1,15 +1,16 @@
-import importlib.resources
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .resources import hooks_path
 
 MANIFEST_NAME = ".pathly-manifest.json"
 
 
 def _hook_script_path(name: str) -> Path:
     """Return the absolute path to a pathly_hooks script."""
-    return Path(str(importlib.resources.files("pathly_hooks"))) / name
+    return hooks_path() / name
 
 
 # ---------------------------------------------------------------------------

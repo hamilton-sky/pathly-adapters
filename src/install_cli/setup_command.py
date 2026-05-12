@@ -241,6 +241,16 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 uninstall_codex_plugin(dry_run=False)
             except Exception:
                 pass
+        if host == "codex":
+            try:
+                remove_codex_hooks(dry_run=False)
+            except Exception:
+                pass
+        if host == "copilot":
+            try:
+                remove_copilot_hooks(dry_run=False)
+            except Exception:
+                pass
         raise
 
 
