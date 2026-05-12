@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.3 - 2026-05-12
+
+- Fix Codex plugin installation by creating a real local marketplace copy and enabling `pathly@pathly-local` in Codex config.
+- Use relative `./skills/` and `./agents/` paths in the Codex plugin manifest.
+- Add regression coverage for Codex marketplace install, idempotency, and uninstall.
+
+---
+
 ## 2.0.2 — 2026-05-12
 
 - Add the PO phase to `team-flow/plan` so `PO_NOTES.md` is created before planner decomposition.
