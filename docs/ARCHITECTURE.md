@@ -181,7 +181,7 @@ For Claude Code:
     └── templates/pathly plan/
 ```
 
-See [FLOW_DIAGRAM.md](docs/FLOW_DIAGRAM.md) for the full command reference and deployed file details.
+See [FLOW_DIAGRAM.md](FLOW_DIAGRAM.md) for the full command reference and deployed file details.
 
 ## User-Level Data Locations
 
