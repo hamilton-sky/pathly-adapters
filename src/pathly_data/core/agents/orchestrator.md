@@ -186,8 +186,8 @@ Examples: `REVIEW_FAILURES_conv1_attempt2.md`, `HUMAN_QUESTIONS_conv1_stall.md`
 Create `pathly/pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
 
 **Why:** feedback files are deleted when resolved — the archive is the only permanent
-record of what each agent said. The FSM only reads `plans/<feature>/feedback/`;
-it never scans `pipeline-walkthrough/`, so the archive never jams the state machine.
+record of what each agent said. The FSM only reads `pathly/plans/<feature>/feedback/`;
+it never scans `pathly/pipeline-walkthrough/`, so the archive never jams the state machine.
 
 **Applies to all feedback files:**
 - `REVIEW_FAILURES.md` — written by reviewer
