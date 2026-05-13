@@ -2,7 +2,7 @@
 
 ## Context
 
-The pathly orchestrator is hardcoded to the team pipeline: fixed state names (BUILDING, REVIEWING, TESTING, RETRO), fixed agent_map, fixed feedback routing, and hardcoded storage at `plans/<feature>/`. Other flows (debug, explore) either run inline with no state tracking or duplicate similar patterns. Runtime output directories (`plans/`, `debugs/`, `explorations/`, `pipeline-walkthrough/`) are scattered at the project root.
+The pathly orchestrator is hardcoded to the team pipeline: fixed state names (BUILDING, REVIEWING, TESTING, RETRO), fixed agent_map, fixed feedback routing, and hardcoded storage at `plans/<feature>/`. Other flows (debug, explore) either run inline with no state tracking or duplicate similar patterns. Runtime output directories (`plans/`, `debugs/`, `explorations/`, `pipeline-walkthrough/`, `lessons/`) are scattered at the project root.
 
 This feature consolidates all runtime output under a `pathly/` root, extracts all flow-specific configuration into `core/flows/*.flow.yaml` files, and rewrites the orchestrator to be a generic FSM engine driven by whichever flow config it receives at spawn time.
 
@@ -11,12 +11,14 @@ This feature consolidates all runtime output under a `pathly/` root, extracts al
 ## Stories
 
 ### Story 0.1: pathly/ root directory consolidates all runtime output
-**As a** user running any pathly flow, **I want** all runtime output (plans, debug sessions, explorations, pipeline walkthroughs) to live under a single `pathly/` directory, **so that** my project root stays clean and all pathly artifacts are in one predictable place.
+**As a** user running any pathly flow, **I want** all runtime output (plans, debug sessions, explorations, pipeline walkthroughs, and lessons) to live under a single `pathly/` directory, **so that** my project root stays clean and all pathly artifacts are in one predictable place.
 
 **Acceptance Criteria:**
 - [ ] `team.md` feature detection scans `pathly/plans/*/STATE.json` (not `plans/*/STATE.json`)
 - [ ] `orchestrator.md` artifact archiving writes pipeline walkthroughs to `pathly/pipeline-walkthrough/<feature>/artifacts/`
 - [ ] All flow config `storage_path` fields use `pathly/` prefix (`pathly/plans/{topic}/`, `pathly/debugs/{topic}/`, `pathly/explorations/{topic}/`)
+- [ ] `lessons.md` skill writes and reads from `pathly/lessons/LESSONS_CANDIDATE.md` and `pathly/lessons/LESSONS.md`
+- [ ] `retro.md` skill appends lessons to `pathly/lessons/LESSONS_CANDIDATE.md` (not `lessons/LESSONS_CANDIDATE.md`)
 
 **Delivered by:** Phase 0a–0b → Conversation 1
 
