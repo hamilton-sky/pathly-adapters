@@ -16,7 +16,7 @@ Use route `explore <topic>` when you have a question, not a task:
 - "What is the data flow for feature A?"
 - "Should we migrate from B to C?"
 
-Do NOT use when you already have acceptance criteria — use `team-flow` instead.
+Do NOT use when you already have acceptance criteria — use `team` instead.
 Do NOT use to debug a known bug — use `debug` instead.
 
 ---
@@ -29,7 +29,7 @@ explorations/<topic>/
   TRACE.md            ← scout output: code path traced, files visited
   CONCLUSIONS.md      ← what was learned; recommendation (build/don't build/investigate more)
   feedback/
-    HUMAN_QUESTIONS.md  ← same protocol as team-flow; blocks when scout needs a decision
+    HUMAN_QUESTIONS.md  ← same protocol as team; blocks when scout needs a decision
 ```
 
 No `plans/`, no `PROGRESS.md`, no `STORM_SEED.md`, no `EVENTS.jsonl`.
@@ -80,7 +80,7 @@ Parse the `## NEEDS_CONTEXT` block it returns.
 
 ## Step 3 — Scout (if NEEDS_CONTEXT has entries)
 
-If the block is not `none`, call **scout-flow** with:
+If the block is not `none`, call **scout-path** with:
 - `NEEDS_CONTEXT`: the block from Step 2
 - `ROLE: explorer`
 - `FEATURE: <topic>`
@@ -135,7 +135,7 @@ Then ask:
 ```
 Exploration complete. What next?
 
-[1] Graduate to feature pipeline   -> team-flow <topic> --from-exploration <topic>
+[1] Graduate to feature pipeline   -> team <topic> --from-exploration <topic>
 [2] Explore a follow-up question   -> explore <follow-up>
 [3] Done — keep as reference only
 [4] Archive this exploration
@@ -144,7 +144,7 @@ Reply with 1, 2, 3, or 4:
 ```
 
 **On '1' — Graduate:**
-- Run `team-flow <name>` with `CONCLUSIONS.md` injected as context for the storm stage.
+- Run `team <name>` with `CONCLUSIONS.md` injected as context for the storm stage.
   Tell the orchestrator: "Context from exploration: [paste CONCLUSIONS.md summary]."
 - The storm agent starts with the exploration's answer as input, not from scratch.
 
@@ -163,9 +163,9 @@ Reply with 1, 2, 3, or 4:
 
 ## Rules
 
-- **Explorer + scout-flow only** — no builder, no reviewer, no tester, no planner.
+- **Explorer + scout-path only** — no builder, no reviewer, no tester, no planner.
 - **Read-only on production code.** The only files written are inside `explorations/<topic>/`.
 - **HUMAN_QUESTIONS.md is the only feedback file.** No REVIEW_FAILURES, no TEST_FAILURES.
 - **No PROGRESS.md, no EVENTS.jsonl, no STATE.json.** Explorations are not FSM-tracked.
-- **Graduation is opt-in.** The exploration never automatically starts `team-flow`.
+- **Graduation is opt-in.** The exploration never automatically starts `team`.
 - **An exploration can end with "don't build."** That is a valid and valuable outcome.

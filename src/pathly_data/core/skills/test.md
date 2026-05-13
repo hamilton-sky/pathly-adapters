@@ -11,9 +11,9 @@ for rendering those routes in their host-native form.
 ## When to use
 
 Use `/test` to verify acceptance criteria for a completed feature, or to run a targeted
-test pass against a specific plan folder outside the full team-flow pipeline.
+test pass against a specific plan folder outside the full team pipeline.
 
-Use `team-flow <feature> test` when running within the full pipeline (build → test → retro).
+Use `team <feature> test` when running within the full pipeline (build → test → retro).
 
 ---
 
@@ -63,7 +63,7 @@ Parse the `## NEEDS_CONTEXT` block it returns.
 
 ## Step 2 — Scout (if NEEDS_CONTEXT has entries)
 
-If the block is not `none`, call **scout-flow** with:
+If the block is not `none`, call **scout-path** with:
 - `NEEDS_CONTEXT`: the block from Step 1
 - `ROLE: tester`
 - `FEATURE: <feature>`

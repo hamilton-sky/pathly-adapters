@@ -55,8 +55,8 @@ Spawn `planner` with `phase: analyze`. Pass the feature name and rigor level.
 Parse the returned `## NEEDS_CONTEXT` block.
 
 **Phase 2 — Scout:**
-If `NEEDS_CONTEXT` is not `none`: call `scout-flow` with the block, `ROLE: planner`, `FEATURE: [feature name]`. Use the returned summary as Scout Findings.
-If `NEEDS_CONTEXT` is `none`: findings = none. Skip scout-flow.
+If `NEEDS_CONTEXT` is not `none`: call `scout-path` with the block, `ROLE: planner`, `FEATURE: [feature name]`. Use the returned summary as Scout Findings.
+If `NEEDS_CONTEXT` is `none`: findings = none. Skip scout-path.
 
 **Phase 3 — Plan:**
 Spawn `planner` with `phase: plan`. Inject:

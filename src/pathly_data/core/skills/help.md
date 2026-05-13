@@ -59,7 +59,7 @@ Issue 1: REVIEW_FAILURES.md is a leftover from a previous run
 
 Issue 2: STATE.json says BUILDING but no conversation is active
   Why: PROGRESS.md shows all conversations as either DONE or TODO — none are in_progress.
-  Suggestion: route to `team-flow <feature> build` to return the pipeline to a stable state.
+  Suggestion: route to `team <feature> build` to return the pipeline to a stable state.
 
 ────────────────────────────────────────────
 Run suggestion 1? [yes / no / show all suggestions]
@@ -137,7 +137,7 @@ Reply with 1, 2, 3, 4, or 5:
 
 On '1': route to director via `/pathly start` (director asks for intent)
 On '2': ask "What idea do you want to refine?" -> route to `storm <answer>`
-On '3': ask "Feature name?" then "PRD or BMAD file path?" -> route to `team-flow <name>` and user selects PRD/BMAD at the path selector
+On '3': ask "Feature name?" then "PRD or BMAD file path?" -> route to `team <name>` and user selects PRD/BMAD at the path selector
 On '4': ask "What do you want to explore?" -> route to `explore <answer>`
 On '5': print full command reference (Step 3)
 
@@ -153,14 +153,14 @@ On '5': print full command reference (Step 3)
   What do you want to do?
 
   [1] Plan the feature now      -> plan <feature>
-  [2] Run full pipeline         -> team-flow <feature>
+  [2] Run full pipeline         -> team <feature>
   [3] See all commands
 
 Reply with 1, 2, or 3:
 ```
 
 On '1': route to `plan <feature>`
-On '2': route to `team-flow <feature>`
+On '2': route to `team <feature>`
 On '3': print full command reference
 
 ---
@@ -189,8 +189,8 @@ Reply with 1–7:
 ```
 
 On '1': route to orchestrator via `/pathly continue` (reads STATE.json for active feature)
-On '2': route to `team-flow <feature> build`  (with pauses)
-On '3': route to `team-flow <feature> build fast`
+On '2': route to `team <feature> build`  (with pauses)
+On '3': route to `team <feature> build fast`
 On '4': route to `review`
 On '5': route to meet skill via `/pathly meet` (reads STATE.json for active feature)
 On '6': print the "CHANGING RIGOR" section from Step 3
@@ -248,7 +248,7 @@ Reply with 1–5:
 
 On '1': route to orchestrator via `/pathly end` (confirms, runs tests if needed, then retro)
 On '2': route to orchestrator via `/pathly continue` (reads STATE.json for active feature)
-On '3': route to `team-flow <feature> test`
+On '3': route to `team <feature> test`
 On '4': route to `retro <feature>`
 On '5': print full command reference
 
@@ -318,7 +318,7 @@ On '5': print full command reference
   plan <feature> [rigor]                    planner creates 4 or 8 plan files
   continue <feature>                        builder implements next TODO conversation
   review                                    reviewer audits staged changes
-  test <feature>                            tester verifies acceptance criteria via scout-flow
+  test <feature>                            tester verifies acceptance criteria via scout-path
   retro <feature>                           quick summarizes; retro skill writes RETRO.md + extracts lessons
   lessons                                   promote candidate lessons -> LESSONS.md
   archive <feature>                         move completed feature to plans/.archive/

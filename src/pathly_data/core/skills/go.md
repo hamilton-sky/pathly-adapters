@@ -16,7 +16,7 @@ project state, understand the user's intent, choose the lightest safe workflow,
 and invoke the right skill.
 
 Never execute implementation work yourself. Route to the right skill and let it
-run. The orchestrator owns FSM state and feedback loops after `team-flow`
+run. The orchestrator owns FSM state and feedback loops after `team`
 starts.
 
 ---
@@ -60,12 +60,12 @@ Classify the free text into one intent:
 
 | Intent | Signals | Route family |
 |---|---|---|
-| `tiny_change` | copy tweak, config tweak, one obvious bug, "quick fix" | `team-flow <feature> nano` |
-| `new_feature` | build, add, create, implement, make, I want | `team-flow <feature> <rigor>` |
+| `tiny_change` | copy tweak, config tweak, one obvious bug, "quick fix" | `team <feature> nano` |
+| `new_feature` | build, add, create, implement, make, I want | `team <feature> <rigor>` |
 | `brainstorm` | brainstorm, storm, refine, unclear idea, help me shape, not defined yet | `storm <topic>` |
-| `resume` | continue, resume, finish, next step, keep going | `team-flow <feature> build` |
-| `test` | test, verify, acceptance criteria, QA | `team-flow <feature> test` |
-| `fix_or_review` | fix, broken, bug, check current diff, review | `review` or `team-flow <feature> nano` |
+| `resume` | continue, resume, finish, next step, keep going | `team <feature> build` |
+| `test` | test, verify, acceptance criteria, QA | `team <feature> test` |
+| `fix_or_review` | fix, broken, bug, check current diff, review | `review` or `team <feature> nano` |
 | `retro` | retro, wrap up, lessons, done building | `retro <feature>` |
 | `unclear` | anything else | ask one clarifying question |
 
@@ -108,7 +108,7 @@ Use `strict` when any are true:
 Discovery choice:
 - Run `storm <topic>` when the user explicitly wants to brainstorm, refine an
   unclear idea, or talk with the architect before a feature is defined.
-- Run normal `team-flow <feature>` discovery when the request is vague enough
+- Run normal `team <feature>` discovery when the request is vague enough
   to need discovery, but defined enough to name a feature and start the
   pipeline.
 - Prefer direct `plan` or `build` entry only when prior plan state makes that
@@ -155,25 +155,25 @@ Use these route forms:
 
 ```text
 storm <topic>
-team-flow <feature> nano
-team-flow <feature> lite
-team-flow <feature> standard
-team-flow <feature> strict
-team-flow <feature> build
-team-flow <feature> test
+team <feature> nano
+team <feature> lite
+team <feature> standard
+team <feature> strict
+team <feature> build
+team <feature> test
 review
 retro <feature>
 ```
 
-For new features, default to `team-flow <feature> lite` unless the decision
+For new features, default to `team <feature> lite` unless the decision
 rules choose `nano`, `standard`, or `strict`.
 
 For current-diff review, route to `review`.
 
 For bug fixes:
 - If there is no existing feature plan and the change is tiny, route to
-  `team-flow <feature> nano`.
-- If the bug belongs to an active plan, route to `team-flow <feature> build`.
+  `team <feature> nano`.
+- If the bug belongs to an active plan, route to `team <feature> build`.
 - If the user only asks to inspect, route to `review`.
 
 Run the selected workflow exactly as if the user had invoked that Pathly route
