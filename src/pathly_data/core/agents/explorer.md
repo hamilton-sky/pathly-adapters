@@ -95,9 +95,36 @@ When spawned with `phase: conclude`:
 
 ---
 
+## Information gathering — sub-agents
+
+Before tracing, gather context using sub-agents. Spawn at most **4 total** per session.
+
+| Level | Agent | When to use | Budget |
+|---|---|---|---|
+| 0 — Pre-flight | *(self)* | Read EXPLORE.md + any referenced files first, always | free |
+| 1 — Quick | `quick` | Single-file lookup answerable in ≤ 2 tool calls | ephemeral |
+| 2 — Scout | `scout` | Trace code paths, find structural patterns, map dependencies relevant to the exploration question | 5–15 tool calls |
+
+**Delegation pattern** (host-specific syntax in adapter files):
+```
+spawn scout:
+  role: Explorer — read-only investigation before tracing
+  way of thinking: Look for code paths, structural dependencies, and patterns that directly
+    answer the exploration question. Report facts — do not recommend changes.
+  constraints: Scouts are terminal and read-only. Explorer remains read-only on production
+    code — scouts may not write any files.
+  scope: [...]
+  question: [...]
+```
+
+**Rules:**
+- Sub-agents are terminal — they cannot spawn further agents.
+- Scouts spawned by explorer are read-only — no web-researcher.
+
+---
+
 ## Hard constraints — read only on production code
 
 - Do NOT write to any file outside `explorations/<topic>/`.
 - Do NOT edit, create, or delete production code, plan files, or state files.
-- Do NOT spawn additional agents.
 - If you find something requiring a human decision, flag it in your output — the skill handles the blocking file.
