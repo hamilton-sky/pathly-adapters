@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pathly FSM STATE.json",
+  "description": "Schema for plans/<feature>/STATE.json written by the team-flow orchestrator.",
+  "type": "object",
+  "properties": {
+    "current": {
+      "type": "string",
+      "minLength": 1
+    },
+    "feature": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rigor": {
+      "type": "string",
+      "enum": ["lite", "standard", "strict"]
+    },
+    "current_conversation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retry_count_by_key": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "iteration_by_stage": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["current", "feature", "rigor", "updated_at"],
+  "additionalProperties": true
+}
