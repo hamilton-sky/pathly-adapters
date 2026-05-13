@@ -144,9 +144,9 @@ Reply with 1, 2, 3, or 4:
 ```
 
 **On '1' — Graduate:**
-- Run `team <name>` with `CONCLUSIONS.md` injected as context for the storm stage.
-  Tell the orchestrator: "Context from exploration: [paste CONCLUSIONS.md summary]."
-- The storm agent starts with the exploration's answer as input, not from scratch.
+- Run `team <name>`.
+- `team/plan` reads `explorations/<name>/CONCLUSIONS.md` automatically when the planner runs.
+- If the user wants to storm first: run `team <name> storm`. The architect storm reads STORM_SEED.md; tell the architect the exploration answer is in `explorations/<name>/CONCLUSIONS.md` as prior context.
 
 **On '2' — Follow-up:**
 - Ask "New question?" -> route to `explore <new-topic>`

@@ -141,8 +141,9 @@ What next?
 Reply with A, B, or C:
 ```
 
-**A** → Store `explorations/[FEATURE]/CONCLUSIONS.md` path as `exploreContext`. Transition state → PLANNING.
-Route to `team/plan [FEATURE] [rigor] [autoFlow]` with explore context injected.
+**A** → Transition state → PLANNING.
+Route to `team/plan [FEATURE] [rigor] [autoFlow]`.
+(`team/plan` reads `explorations/[FEATURE]/CONCLUSIONS.md` automatically — no extra injection needed.)
 
 **B** → Route back to `team [FEATURE] nano`. (Orchestrator will run nano mode.)
 

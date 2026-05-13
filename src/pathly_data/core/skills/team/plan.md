@@ -112,6 +112,7 @@ phase: analyze
 Feature: [feature name], rigor: [rigor]
 Read plans/[feature]/STORM_SEED.md if it exists.
 Read plans/[feature]/PO_NOTES.md if it exists.
+If explorations/[feature]/CONCLUSIONS.md exists, read it as prior exploration context — treat its findings as established facts and do not re-investigate what it already covers.
 List what codebase context you need before writing the plan — output NEEDS_CONTEXT block only.
 
 NEEDS_CONTEXT format (one entry per line):
@@ -135,6 +136,7 @@ phase: plan
 Route to plan [feature name] [rigor].
 If plans/[feature]/STORM_SEED.md exists, consume it as pre-filled answers.
 Read plans/[feature]/PO_NOTES.md as the authoritative source of user stories.
+If explorations/[feature]/CONCLUSIONS.md exists, treat it as prior exploration: do not re-investigate what it covers; use its Recommendation and Evidence sections to anchor scope and risk decisions.
 Decompose — do not re-author stories.
 
 ## Scout Findings
