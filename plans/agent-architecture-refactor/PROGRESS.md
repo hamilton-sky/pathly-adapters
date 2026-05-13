@@ -6,7 +6,7 @@
 |---|---|---|---|
 | Conv 1 | Scout-pattern migration | S1.1, S1.2 | DONE |
 | Conv 2 | Worker agent contracts + YAML | S2.1, S2.2, S2.3, S2.4, S2.5 | DONE |
-| Conv 3 | Explorer agent parity | S3.1, S3.2 | TODO |
+| Conv 3 | Explorer agent parity | S3.1, S3.2 | DONE |
 | Conv 4 | Orchestrator conversion | S4.1, S4.2 | TODO |
 
 ---
@@ -38,9 +38,9 @@
 
 | Phase | File | Status |
 |---|---|---|
-| Phase 14 | explorer.md — add scout spawn section, remove no-spawn rule | TODO |
-| Phase 15 | claude/explorer.yaml — add can_spawn | TODO |
-| Phase 16 | codex/explorer.yaml — add can_spawn | TODO |
+| Phase 14 | explorer.md — add scout spawn section, remove no-spawn rule | DONE |
+| Phase 15 | claude/explorer.yaml — add can_spawn | DONE |
+| Phase 16 | codex/explorer.yaml — add can_spawn | DONE |
 
 ## Conv 4 Phase Detail
 
