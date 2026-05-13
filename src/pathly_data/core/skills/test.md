@@ -63,10 +63,9 @@ Parse the `## NEEDS_CONTEXT` block it returns.
 
 ## Step 2 — Scout (if NEEDS_CONTEXT has entries)
 
-If the block is not `none`, call **scout-path** with:
-- `NEEDS_CONTEXT`: the block from Step 1
-- `ROLE: tester`
-- `FEATURE: <feature>`
+If the block is not `none`, spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: tester` + the question
+- `type: scout` → spawn `scout` with `ROLE: tester` + scope + question
 
 Use the returned compressed summary as `## Test Context`.
 

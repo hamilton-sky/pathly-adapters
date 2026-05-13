@@ -21,7 +21,10 @@ Spawn `reviewer` with `phase: analyze`. Pass the diff target (`$ARGUMENTS`).
 Parse the returned `## NEEDS_CONTEXT` block.
 
 **Phase 2 — Scout:**
-If `NEEDS_CONTEXT` is not `none`: call `scout-path` with the block, `ROLE: reviewer`, `FEATURE: [changed area]`. Use the returned summary as findings.
+If `NEEDS_CONTEXT` is not `none`: spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: reviewer` + the question
+- `type: scout` → spawn `scout` with `ROLE: reviewer` + scope + question
+Use the returned summary as findings.
 If `NEEDS_CONTEXT` is `none`: findings = none.
 
 **Phase 3 — Review:**

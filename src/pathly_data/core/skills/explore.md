@@ -80,10 +80,9 @@ Parse the `## NEEDS_CONTEXT` block it returns.
 
 ## Step 3 — Scout (if NEEDS_CONTEXT has entries)
 
-If the block is not `none`, call **scout-path** with:
-- `NEEDS_CONTEXT`: the block from Step 2
-- `ROLE: explorer`
-- `FEATURE: <topic>`
+If the block is not `none`, spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: explorer` + the question
+- `type: scout` → spawn `scout` with `ROLE: explorer` + scope + question
 
 Use the returned compressed summary as `## Scout Findings`.
 
@@ -163,7 +162,7 @@ Reply with 1, 2, 3, or 4:
 
 ## Rules
 
-- **Explorer + scout-path only** — no builder, no reviewer, no tester, no planner.
+- **Explorer + scout agent only** — no builder, no reviewer, no tester, no planner.
 - **Read-only on production code.** The only files written are inside `explorations/<topic>/`.
 - **HUMAN_QUESTIONS.md is the only feedback file.** No REVIEW_FAILURES, no TEST_FAILURES.
 - **No PROGRESS.md, no EVENTS.jsonl, no STATE.json.** Explorations are not FSM-tracked.

@@ -29,7 +29,7 @@ When all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl. Confirm 
 | Action | Spawn |
 |---|---|
 | Phase 1 — Analyze needs | `tester` (phase: analyze) |
-| Phase 2 — Scout context | `scout-path` with `ROLE: tester` |
+| Phase 2 — Scout context | `scout` or `quick` with `ROLE: tester` (parallel, max 4) |
 | Phase 3 — Test | `tester` (phase: test) |
 | Fix failing criteria | `builder` |
 
@@ -62,10 +62,9 @@ Parse the `## NEEDS_CONTEXT` block. If it says `none`, use only the default test
 
 ## Phase 2 — Scout
 
-Call **scout-path** with:
-- `NEEDS_CONTEXT`: the block from Phase 1
-- `ROLE: tester`
-- `FEATURE: <feature>`
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: tester` + the question
+- `type: scout` → spawn `scout` with `ROLE: tester` + scope + question
 
 Use the returned compressed summary as `## Test Context` in Phase 3.
 

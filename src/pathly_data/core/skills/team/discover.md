@@ -18,7 +18,7 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 | Action | Route / Spawn |
 |---|---|
 | PO discussion | `po` |
-| Codebase exploration | `explore` skill (explorer + scout-path internally) |
+| Codebase exploration | `explore` skill (explorer + scout agent internally) |
 | Technical storm | `architect` |
 | Planning (path 5 only) | `planner` |
 

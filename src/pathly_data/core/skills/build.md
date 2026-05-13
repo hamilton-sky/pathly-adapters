@@ -51,10 +51,9 @@ phase: analyze
 Parse the `## NEEDS_CONTEXT` block it returns. If the block says `none`: skip Phase 2.
 
 **Phase 2 — Scout (if NEEDS_CONTEXT has entries):**
-Call `scout-path` with:
-- `NEEDS_CONTEXT`: the block from Phase 1
-- `ROLE`: `builder`
-- `FEATURE`: [plan folder name]
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: builder` + the question
+- `type: scout` → spawn `scout` with `ROLE: builder` + scope + question
 
 Use the returned compressed summary as Scout Findings.
 

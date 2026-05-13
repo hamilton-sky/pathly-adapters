@@ -2,6 +2,8 @@
 
 **This sub-skill is called by other skills, not by users directly.**
 
+> Note: scout-path is for standalone invocation only. Pipeline stages spawn the scout agent directly — they do not call scout-path.
+
 scout-path is an orchestrator-only utility. It receives a `NEEDS_CONTEXT` block from a parent skill (plan, build, review, or an agent contract), spawns the appropriate research agents in parallel, and returns a compressed summary of findings back to the calling skill.
 
 ---
