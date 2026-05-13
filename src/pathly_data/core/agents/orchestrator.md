@@ -177,13 +177,13 @@ The orchestrator routes back to the build sub-skill. No commit, no PROGRESS.md u
 
 **This rule applies to the orchestrator and all sub-skills.**
 
-Whenever any feedback file is written to `plans/<feature>/feedback/`, also write
-a copy to `pipeline-walkthrough/<feature>/artifacts/` at the same time.
+Whenever any feedback file is written to `pathly/plans/<feature>/feedback/`, also write
+a copy to `pathly/pipeline-walkthrough/<feature>/artifacts/` at the same time.
 
 Naming: `<FILENAME>_conv<N>_attempt<M>.md`
 Examples: `REVIEW_FAILURES_conv1_attempt2.md`, `HUMAN_QUESTIONS_conv1_stall.md`
 
-Create `pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
+Create `pathly/pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
 
 **Why:** feedback files are deleted when resolved — the archive is the only permanent
 record of what each agent said. The FSM only reads `plans/<feature>/feedback/`;

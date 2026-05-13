@@ -18,11 +18,11 @@ Parse `$ARGUMENTS` (order doesn't matter):
 ## Feature detection
 
 If no `FEATURE` was found in `$ARGUMENTS`, auto-detect:
-1. Read `plans/*/STATE.json` files, sorted by modification time (newest first).
+1. Read `pathly/plans/*/STATE.json` files, sorted by modification time (newest first).
    Use the most recent feature whose state is not `IDLE` or `DONE`.
-2. If none found, use the most recently modified `plans/*/` folder (excluding `.archive/`).
+2. If none found, use the most recently modified `pathly/plans/*/` folder (excluding `.archive/`).
 3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
-4. If no `plans/` folder exists or is empty: stop →
+4. If no `pathly/plans/` folder exists or is empty: stop →
    `No active feature found. Start with /pathly go to describe what you want to build.`
 
 Conflict checks (stop and report):
