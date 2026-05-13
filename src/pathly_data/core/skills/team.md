@@ -49,7 +49,8 @@ Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 ## Spawn orchestrator
 
 After mode selection is complete (autoFlow is set), spawn the **orchestrator** agent with:
-- FEATURE: [parsed feature name]
+- flow_config: src/pathly_data/core/flows/team.flow.yaml
+- topic: [parsed feature name]
 - rigor: [parsed rigor]
 - autoFlow: [true/false]
 - entryStage: [parsed entryStage, default: discovery]
