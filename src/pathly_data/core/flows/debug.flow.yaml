@@ -1,0 +1,37 @@
+version: 1
+flow: debug
+storage_path: "pathly/debugs/{topic}/"
+
+states:
+  - INVESTIGATING
+  - REPRODUCING
+  - ROOT_CAUSE_FOUND
+  - FIXING
+  - VERIFYING
+  - DONE
+
+transitions:
+  INVESTIGATING:
+    - REPRODUCING
+  REPRODUCING:
+    - ROOT_CAUSE_FOUND
+  ROOT_CAUSE_FOUND:
+    - FIXING
+  FIXING:
+    - VERIFYING
+    - ROOT_CAUSE_FOUND
+  VERIFYING:
+    - DONE
+    - FIXING
+  DONE: []
+
+agent_map:
+  INVESTIGATING: scout
+  REPRODUCING: tester
+  ROOT_CAUSE_FOUND: builder
+  FIXING: tester
+  VERIFYING: reviewer
+
+feedback_routing:
+  TEST_FAILURES: builder
+  HUMAN_QUESTIONS: human

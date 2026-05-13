@@ -1,0 +1,57 @@
+version: 1
+flow: team
+storage_path: "pathly/plans/{topic}/"
+
+states:
+  - IDLE
+  - STORMING
+  - PLANNING
+  - BUILDING
+  - REVIEWING
+  - TESTING
+  - RETRO
+  - BLOCKED_ON_HUMAN
+  - DONE
+
+transitions:
+  IDLE:
+    - STORMING
+    - PLANNING
+    - BUILDING
+  STORMING:
+    - PLANNING
+  PLANNING:
+    - BUILDING
+  BUILDING:
+    - REVIEWING
+    - BLOCKED_ON_HUMAN
+  REVIEWING:
+    - BUILDING
+    - TESTING
+  TESTING:
+    - BUILDING
+    - RETRO
+  RETRO:
+    - DONE
+  BLOCKED_ON_HUMAN:
+    - BUILDING
+    - REVIEWING
+    - TESTING
+  DONE: []
+
+agent_map:
+  STORMING: team/discover
+  PLANNING: team/plan
+  BUILDING: team/build
+  REVIEWING: team/review
+  TESTING: team/test
+  RETRO: team/retro
+  BLOCKED_ON_HUMAN: wait
+
+feedback_routing:
+  ARCH_FEEDBACK: architect
+  REVIEW_FAILURES: builder
+  TEST_FAILURES: builder
+  IMPL_QUESTIONS: planner
+  DESIGN_QUESTIONS: architect
+  HUMAN_QUESTIONS: human
