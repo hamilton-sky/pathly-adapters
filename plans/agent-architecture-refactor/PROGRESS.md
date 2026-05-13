@@ -4,7 +4,7 @@
 
 | Conv | Scope | Stories | Status |
 |---|---|---|---|
-| Conv 1 | Scout-pattern migration | S1.1, S1.2 | TODO |
+| Conv 1 | Scout-pattern migration | S1.1, S1.2 | DONE |
 | Conv 2 | Worker agent contracts + YAML | S2.1, S2.2, S2.3, S2.4, S2.5 | TODO |
 | Conv 3 | Explorer agent parity | S3.1, S3.2 | TODO |
 | Conv 4 | Orchestrator conversion | S4.1, S4.2 | TODO |
@@ -15,12 +15,12 @@
 
 | Phase | File | Status |
 |---|---|---|
-| Phase 1 | build.md, review.md — replace scout-path calls | TODO |
-| Phase 2 | test.md — replace scout-path call | TODO |
-| Phase 3 | team/build.md, team/test.md — replace scout-path calls | TODO |
-| Phase 4 | explore.md — two-line update | TODO |
-| Phase 5 | scout-path.md — add standalone-only note | TODO |
-| Phase 6 | team/discover.md — subagents table update | TODO |
+| Phase 1 | build.md, review.md — replace scout-path calls | DONE |
+| Phase 2 | test.md — replace scout-path call | DONE |
+| Phase 3 | team/build.md, team/test.md — replace scout-path calls | DONE |
+| Phase 4 | explore.md — two-line update | DONE |
+| Phase 5 | scout-path.md — add standalone-only note | DONE |
+| Phase 6 | team/discover.md — subagents table update | DONE |
 
 ## Conv 2 Phase Detail
 
