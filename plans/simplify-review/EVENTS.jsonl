@@ -6,3 +6,8 @@
 {"type": "FILE_CREATED", "file": "plans/simplify-review/PROGRESS.md", "ts": "2026-05-12T00:10:03Z"}
 {"type": "FILE_CREATED", "file": "plans/simplify-review/CONVERSATION_PROMPTS.md", "ts": "2026-05-12T00:10:04Z"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-12T00:10:05Z"}
+{"type": "AGENT_DONE", "agent": "builder", "ts": "2026-05-13T04:00:00Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T04:00:00Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "ts": "2026-05-13T04:05:00Z"}
+{"type": "FILE_CREATED", "file": "plans/simplify-review/feedback/REVIEW_FAILURES.md", "ts": "2026-05-13T04:05:00Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEW_BLOCKED", "ts": "2026-05-13T04:05:00Z"}
