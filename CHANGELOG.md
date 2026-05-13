@@ -1,5 +1,57 @@
 # Changelog
 
+## 2.4.0 — 2026-05-13
+
+### Mandatory scout spawning rules enforced across all agents
+
+- Add `## Scout spawning rules — MANDATORY` block to all 6 scout-spawning agents
+  (`explorer`, `planner`, `builder`, `architect`, `reviewer`, `tester`) and to the
+  `explore` skill. Rules enforce: orientation scout required when spawning ≥2 scouts,
+  clustering rule for all remaining scouts (2–3 related files per concern), minimum 2
+  scouts when scouts are used, maximum 4 (5 only with written justification), parallel
+  launch required (all scouts in one message), and no direct file reads by the
+  orchestrating agent while scouts are active.
+- Add `docs/RISK_ASSESSMENT.md` — architecture risk assessment for 5 identified risks
+  (hook contract mismatch, Codex clean-machine gap, unversioned event schema,
+  version drift, mcp_config opacity) with proposed solutions for each.
+- Add `pathly/explorations/architecture-risk-assessment/` — full exploration artifacts
+  (EXPLORE.md, TRACE.md, CONCLUSIONS.md) from the risk assessment conducted 2026-05-13.
+
+---
+
+## 2.3.0 — 2026-05-13
+
+### FSM configurable via flow_config YAML (breaking for skill authors)
+
+- Orchestrator is now a generic FSM engine driven by a `flow_config` YAML file at
+  spawn time. Skills pass `flow_config`, `topic`, `rigor`, and `autoFlow` — the
+  orchestrator reads the state machine, agent_map, storage_path, and feedback_routing
+  from the YAML rather than having them hard-coded.
+- `src/pathly_data/core/flows/` — new directory shipping `*.flow.yaml` files for
+  `team`, `explore`, `debug`, and `test` pipelines. Installed alongside agents by
+  `pathly-setup`.
+- `materialize_flows()` added to `install_cli/materialize.py` — copies all
+  `*.flow.yaml` files from the installed package to the host destination.
+- Sub-skills now write artifacts only; orchestrator exclusively owns `STATE.json`
+  writes and event appends. Commit template updated to use neutral
+  "Pathly Orchestrator" identity.
+- `pathly/` root consolidation — all pipeline workspace artifacts (`plans/`,
+  `pipeline-walkthrough/`, `lessons/`, `explorations/`) live under `pathly/`.
+  Repo-root `plans/` and `pipeline-walkthrough/` directories removed.
+
+---
+
+## 2.2.0 — 2026-05-13
+
+### Agent architecture refactor and archive consolidation
+
+- Archive consolidation: `_archive/` → `.archive/` across all pipeline plan directories.
+- Fix tester: remove `builder` from `can_spawn` — orchestrator spawns builder,
+  tester does not.
+- Archive `agent-architecture-refactor` pipeline (DONE).
+
+---
+
 ## 2.1.0 — 2026-05-13
 
 ### Orchestrator and hooks are now first-class shipped packages
