@@ -17,11 +17,11 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 | Action | Spawn |
 |---|---|
 | Storm Phase 1 — Analyze | `architect` (phase: analyze) |
-| Storm Phase 2 — Research | scout-path (ROLE: architect) |
+| Storm Phase 2 — Research | scout agent — parallel per entry (architect lens) |
 | Storm Phase 3 — Storm | `architect` (phase: storm) |
 | PO Phase — Requirements | `po` |
 | Plan Phase 1 — Analyze | `planner` (phase: analyze) |
-| Plan Phase 2 — Scout | scout-path (ROLE: planner) |
+| Plan Phase 2 — Scout | scout agent — parallel per entry (planner lens) |
 | Plan Phase 3 — Plan | `planner` (phase: plan) |
 
 ---
@@ -50,8 +50,15 @@ Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
 ### Phase 2 — Research
 
-Call scout-path with: NEEDS_CONTEXT block from Phase 1, ROLE: architect, FEATURE: [feature name].
-Use the returned compressed summary as Research Findings for Phase 3.
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total) with `ROLE: architect`:
+- `type: quick` → spawn `quick` with `ROLE: architect` + the question
+- `type: scout` → spawn `scout` with `ROLE: architect` + scope + question
+- `type: web` → spawn `web-researcher` with `ROLE: architect` + the query
+
+Default: always parallel — scouts are read-only, scope overlap is not a problem.
+Sequential only when entry B's question explicitly references entry A's answer
+(e.g. "that class", "the above", "what you found").
+Collect all findings. Synthesize into a single Research Findings block before Phase 3.
 
 ### Phase 3 — Storm
 
@@ -125,8 +132,13 @@ Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
 ### Phase 2 — Scout
 
-Call scout-path with: NEEDS_CONTEXT block from Phase 1, ROLE: planner, FEATURE: [feature name].
-Use the returned compressed summary as Scout Findings for Phase 3.
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total) with `ROLE: planner`:
+- `type: quick` → spawn `quick` with `ROLE: planner` + the question
+- `type: scout` → spawn `scout` with `ROLE: planner` + scope + question
+
+Default: always parallel — scouts are read-only, scope overlap is not a problem.
+Sequential only when entry B's question explicitly references entry A's answer.
+Collect all findings. Synthesize into a single Scout Findings block before Phase 3.
 
 ### Phase 3 — Plan
 

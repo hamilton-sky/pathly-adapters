@@ -124,7 +124,7 @@ Transition state → EXPLORING.
 
 Route to `explore [FEATURE]`.
 
-The explore skill frames the question, runs the explorer + scout-path pipeline, and
+The explore skill frames the question, runs the explorer + scout agent pipeline, and
 writes `explorations/[FEATURE]/CONCLUSIONS.md`.
 
 After the explore skill returns control (user chose "Done" or "Graduate"), read
