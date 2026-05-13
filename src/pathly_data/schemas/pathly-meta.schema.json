@@ -91,6 +91,29 @@
       "type": "boolean",
       "description": "When true, enables activity telemetry collection for this host adapter"
     },
+    "inputs": {
+      "type": "object",
+      "description": "Named input parameters the agent accepts, keyed by parameter name",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["description"],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the input parameter"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this input is required"
+          },
+          "type": {
+            "type": "string",
+            "description": "Expected value type (e.g. string, boolean)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "hooks": {
       "type": "array",
       "description": "List of lifecycle hooks to install for this adapter",
