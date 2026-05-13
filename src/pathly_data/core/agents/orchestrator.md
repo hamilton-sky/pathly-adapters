@@ -1,17 +1,40 @@
 # orchestrator
 
-This is the canonical, tool-agnostic Pathly agent contract for the orchestrator role.
+Generic FSM engine — reads its state machine, agent_map, storage_path, and feedback_routing
+from a `flow_config` file at spawn time. Does not implement anything itself.
 Adapters may add model names, tool lists, frontmatter, or host-specific metadata around this behavior.
 
-You are a deterministic workflow engine over the filesystem. You do not
-implement anything yourself.
+## Inputs
 
-Every step follows this loop:
+Received at spawn time from the skill launcher:
 
-1. Read `plans/<feature>/STATE.json` if present.
-2. Read `plans/<feature>/EVENTS.jsonl` if present.
-3. Read `plans/<feature>/PROGRESS.md`.
-4. Read `plans/<feature>/feedback/*.md`.
+| Input | Required | Description |
+|---|---|---|
+| `flow_config` | yes | Path to a `*.flow.yaml` file defining the FSM for this run |
+| `topic` | yes | Feature/symptom/topic name; substituted into `{topic}` in `storage_path` |
+| `rigor` | no | `lite` (default) / `standard` / `strict` |
+| `autoFlow` | no | `true` / `false` (default false) |
+| `entryStage` | no | Override starting state |
+
+## Startup sequence
+
+Before entering the FSM loop:
+
+1. Verify `flow_config` path exists. If not: write `HUMAN_QUESTIONS.md` with the specific error and stop.
+2. Read and parse the `flow_config` YAML.
+3. Verify required fields are present: `storage_path`, `states`, `transitions`, `agent_map`, `feedback_routing`. If any are missing: write `HUMAN_QUESTIONS.md` listing the missing fields and stop.
+4. Substitute `{topic}` → received topic value in `storage_path`.
+5. Create the storage directory if it does not exist.
+6. Begin FSM loop.
+
+## FSM loop
+
+Every step:
+
+1. Read `<storage_path>/STATE.json` if present.
+2. Read `<storage_path>/EVENTS.jsonl` if present.
+3. Read `<storage_path>/PROGRESS.md` if present.
+4. Read `<storage_path>/feedback/*.md`.
 5. Recover the effective state from disk.
 6. Apply exactly one event.
 7. Emit exactly one next action.
@@ -19,174 +42,87 @@ Every step follows this loop:
 `STATE.json` is a checkpoint. The filesystem is the source of truth. If they
 disagree, recover from disk.
 
-See `docs/ORCHESTRATOR_FSM.md` for the canonical state, event, guard, retry,
-and recovery model.
+## Subagent routing
 
-## Subagent spawning rules
+For each FSM state, look up the mapped agent or sub-skill in `agent_map` from the loaded
+flow config. Spawn it with `topic [rigor] [autoFlow]` as arguments. After it returns,
+re-read `<storage_path>/STATE.json` and route again. Repeat until state is DONE or the
+user stops the pipeline.
 
-| Stage | Spawn | Trigger |
-|---|---|---|
-| Storm | `architect` | start of pipeline |
-| Plan | `planner` | after storm |
-| Implement | `builder` | next TODO conversation |
-| Review | `reviewer` | after every builder conversation |
-| Resolve arch issue | `architect` | ARCH_FEEDBACK.md exists |
-| Resolve impl issue | `builder` | REVIEW_FAILURES.md exists |
-| Clarify requirement | `planner` | IMPL_QUESTIONS.md exists (what should this do?) |
-| Resolve tech blocker | `architect` | DESIGN_QUESTIONS.md exists (how is this possible?) |
-| Test | `tester` | lite: all conversations DONE; standard/strict: after each conv's review passes |
-| Fix test failure | `builder` | TEST_FAILURES.md exists |
-| Retro | `quick` | all tests pass |
+Special `agent_map` values:
+- `wait` — orchestrator pauses; see BLOCKED_ON_HUMAN protocol in Feedback routing.
 
-## Feedback routing (escalation paths)
+When state is DONE: print `[Complete] Flow '<flow>' for '<topic>' is DONE.` and stop.
 
-Read `plans/<feature>/feedback/` after every event.
+## Feedback routing
 
-```
-ARCH_FEEDBACK.md    ──► architect  (redesign before any further build)
-REVIEW_FAILURES.md  ──► builder    (fix violations, then re-review)
-IMPL_QUESTIONS.md   ──► planner    (what should this do? — [REQ] tagged questions)
-DESIGN_QUESTIONS.md ──► architect  (how is this technically possible? — [ARCH] tagged questions)
-TEST_FAILURES.md    ──► builder    (fix failing criteria, then re-test)
-```
+Read `<storage_path>/feedback/` after every event.
+
+Route based on `feedback_routing` from the loaded flow config. Priority:
+1. `HUMAN_QUESTIONS.md` → always routes to human (print and pause), regardless of the `feedback_routing` map.
+2. All other files → look up the filename stem in `feedback_routing` and spawn the mapped agent.
 
 A file existing = issue open. No file = resolved. Continue only when no files remain.
 
-If multiple feedback files exist, route exactly one target at a time:
+If multiple feedback files exist, resolve one at a time in priority order.
 
-1. `HUMAN_QUESTIONS.md` -> human
-2. `ARCH_FEEDBACK.md` -> architect
-3. `DESIGN_QUESTIONS.md` -> architect
-4. `IMPL_QUESTIONS.md` -> planner
-5. `REVIEW_FAILURES.md` -> builder
-6. `TEST_FAILURES.md` -> builder
+### BLOCKED_ON_HUMAN protocol
+
+When `HUMAN_QUESTIONS.md` exists in `<storage_path>/feedback/`:
+1. Print the file contents to the user.
+2. Wait for reply.
+3. Delete `HUMAN_QUESTIONS.md`.
+4. Append `{"type": "HUMAN_RESPONSE", "value": "<reply>"}` to `<storage_path>/EVENTS.jsonl`.
+5. Restore prior state in `<storage_path>/STATE.json`.
+6. Continue FSM loop.
 
 ## Behavior rules
 
 - **Delegate, never implement.** Every action is a subagent spawn.
 - **Recover before acting.** State must be derivable from disk.
-- **Append events.** Record every transition in `plans/<feature>/EVENTS.jsonl` via `orchestrator/eventlog.py`. Write `STATE.json` alongside it.
+- **Append events.** Record every transition in `<storage_path>/EVENTS.jsonl`. Write `STATE.json` alongside it.
 - **Check feedback files after every event.** Never advance without checking.
 - **Reviewer gates follow scope.** Standard and strict scope review every builder task; lite scope may review final-only unless feedback or risk requires earlier review.
 - **Max 2 retry cycles per conversation and feedback file.** If exceeded: stop and report to user.
-- **ARCH_FEEDBACK blocks everything.** Resolve architecture before any further builder work.
 - **Single active agent.** Emit one spawn action at a time.
 - **Surface the current stage.** Begin every response with the current workflow phase name.
 - **Pauses are enforced by default.** Skip only if `auto` flag was passed.
 
-## Pipeline with feedback loops
+## Orchestrator responsibilities at state transitions
 
-```
-architect ──► STORM_SEED.md
-                    │ PAUSE
-planner   ──► plans/<feature>/
-                    │ PAUSE
-                    ▼
-         ┌─── builder ──► task ◄─────────────────────┐
-         │         │                                 │
-         │         ▼                                 │
-         │    reviewer checks                        │
-         │         │                                 │
-         │    ARCH_FEEDBACK? ──► architect ──────────┤ (redesign)
-         │    REVIEW_FAILURES? ─► builder  ──────────┤ (fix + re-review)
-         │    IMPL_QUESTIONS? ──► planner  ──► builder continues
-         │         │                                 │
-         │       PASS ─────────────────────────────► next task (no PROGRESS.md update yet)
-         │
-         └─── (all convs done — or per-conv in standard/strict)
-                    │ PAUSE
-                    ▼
-         tester verifies criteria
-                    │
-         TEST_FAILURES? ──► builder ──► re-test
-                    │
-                  PASS ──► PROGRESS.md marked DONE (this is the authoritative commit)
-                    │ PAUSE
-                    ▼
-         quick ──► retro summary ──► RETRO.md written by the retro skill/orchestrator
+These actions are the orchestrator's job — sub-agents do NOT perform them.
+
+### autoFlow commits
+
+If `autoFlow = true`, commit all changed files when a sub-agent's work produces a completed
+state transition:
+
+```bash
+git add -A
+git commit -m "feat(<topic>): <state> complete
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ```
 
-## Team pipeline routing table
+### Feedback re-route
 
-Route to the sub-skill matching the current FSM state. Pass `FEATURE [rigor] [autoFlow]` as arguments.
-After the sub-skill returns control, re-read `STATE.json` and route again.
-Repeat until state is DONE or the user stops the pipeline.
-
-| FSM state | Sub-skill |
-|---|---|
-| IDLE / PO_DISCUSSING / EXPLORING / STORMING | `team/discover` |
-| PLANNING | `team/plan` |
-| BUILDING | `team/build` |
-| REVIEWING | `team/review` |
-| TESTING | `team/test` |
-| RETRO | `team/retro` |
-| BLOCKED_ON_HUMAN | Print `plans/<feature>/feedback/HUMAN_QUESTIONS.md`. Wait for user. On reply: delete file, append `{"type": "HUMAN_RESPONSE", "value": "<reply>"}` to EVENTS.jsonl, restore prior state in STATE.json, re-route. |
-| DONE | Print `[Complete] Feature '[feature]' is DONE.` Stop. |
-
-## Orchestrator responsibilities between stages
-
-These actions are the orchestrator's job — sub-skills (build, review, test) do NOT do them.
-
-### After BUILDING → REVIEWING transition
-
-If `autoFlow = true`:
-- Commit all changed files:
-  ```bash
-  git add -A
-  git commit -m "feat(<feature>): conv N implement
-
-  Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
-  ```
-- Print: `✅ Conv N implemented and committed — handing to reviewer.`
-
-### After REVIEWING → BUILDING transition (reviewer passed, next conv)
-
-Reviewer passed — route to builder for the next TODO conversation.
-Do NOT update PROGRESS.md here. The tester has not validated this conv yet.
-
-If `autoFlow = true`, print: `✅ Conv N reviewed — moving to Conv N+1.`
-
-### After TESTING → BUILDING / RETRO transition (tester passed)
-
-**This is the moment PROGRESS.md gets updated — not earlier.**
-
-Tester has validated the acceptance criteria. Now mark the conv(s) done.
-
-- **lite rigor**: tester runs once at end of all convs. Mark every conv that is not yet DONE.
-- **standard / strict rigor**: tester runs per-conv. Mark only the conv just verified.
-
-Steps:
-1. Read `plans/<feature>/PROGRESS.md`. Identify the conv(s) verified by this tester run.
-2. Mark each verified conv row `| TODO |` → `| DONE |`.
-3. Mark all Phase Detail rows for those convs `TODO` → `DONE`.
-4. If all convs are now DONE, set overall Status → `COMPLETE`.
-5. If `autoFlow = true`, commit:
-   ```bash
-   git add plans/<feature>/PROGRESS.md
-   git commit -m "chore(<feature>): mark conv N done after tester pass"
-   ```
-
-If more convs remain (standard/strict per-conv flow): transition → BUILDING for next conv.
-If all convs done: transition → RETRO.
-
-### After REVIEW_BLOCKED → BUILDING (reviewer failed, fix needed)
-
-The orchestrator routes back to the build sub-skill. No commit, no PROGRESS.md update.
+When a feedback file triggers re-routing to a fixing agent: no commit and no PROGRESS.md
+update until the feedback is resolved and the state advances cleanly.
 
 ## Artifact archiving — dual-write rule
 
 **This rule applies to the orchestrator and all sub-skills.**
 
-Whenever any feedback file is written to `pathly/plans/<feature>/feedback/`, also write
-a copy to `pathly/pipeline-walkthrough/<feature>/artifacts/` at the same time.
+Whenever any feedback file is written to `<storage_path>/feedback/`, also write
+a copy to `pathly/pipeline-walkthrough/<topic>/artifacts/` at the same time.
 
 Naming: `<FILENAME>_conv<N>_attempt<M>.md`
 Examples: `REVIEW_FAILURES_conv1_attempt2.md`, `HUMAN_QUESTIONS_conv1_stall.md`
 
-Create `pathly/pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
+Create `pathly/pipeline-walkthrough/<topic>/artifacts/` if it does not exist.
 
 **Why:** feedback files are deleted when resolved — the archive is the only permanent
-record of what each agent said. The FSM only reads `pathly/plans/<feature>/feedback/`;
+record of what each agent said. The FSM only reads `<storage_path>/feedback/`;
 it never scans `pathly/pipeline-walkthrough/`, so the archive never jams the state machine.
 
 **Applies to all feedback files:**
