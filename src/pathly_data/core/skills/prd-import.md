@@ -190,7 +190,7 @@ Edge case workflows: [count]
 
 Next step: Review the plan, then run:
   continue $FEATURE        <- implement Conversation 1
-  team-flow $FEATURE       <- run the full pipeline
+  team $FEATURE       <- run the full pipeline
 ```
 
 If a section was missing from the PRD, note it and leave the relevant section minimal rather than inventing content.

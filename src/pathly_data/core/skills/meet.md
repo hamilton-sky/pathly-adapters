@@ -1,4 +1,4 @@
-﻿# meet
+# meet
 
 This is the canonical, tool-agnostic Pathly behavior for the meet workflow.
 Adapter skills should load and follow this prompt instead of duplicating workflow logic.
@@ -281,7 +281,7 @@ Reply with 1-5:
 
 Interpret the choices as:
 
-- **Return to build** -> route back to `team-flow <feature> build`
+- **Return to build** -> route back to `team <feature> build`
 - **Promote to planner update** -> planner reads the consult note and updates
   plan files if warranted
 - **Promote to architecture update** -> architect reads the consult note and

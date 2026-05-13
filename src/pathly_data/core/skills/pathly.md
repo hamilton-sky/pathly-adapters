@@ -33,7 +33,7 @@ Split `$ARGUMENTS` into:
 | `retro` | — | → **pathly-retro** skill directly |
 | `archive` | — | → **pathly-archive** skill directly |
 | `lessons` | — | → **pathly-lessons** skill directly |
-| `team-flow` | `flow`, `tf` | → **pathly-team-flow** skill directly |
+| `team` | `flow`, `tf` | → **pathly-team** skill directly |
 | `po` | — | → **pathly-po** skill directly |
 | `debug` | — | → **pathly-debug** skill directly |
 | `explore` | — | → **pathly-explore** skill directly |
@@ -120,12 +120,12 @@ Wait for reply.
 
 | Intent | Signals | Route |
 |---|---|---|
-| `tiny_change` | copy tweak, config, one obvious bug, "quick fix" | `team-flow <feature> nano` |
-| `new_feature` | build, add, create, implement, make, I want | `team-flow <feature> <rigor>` |
+| `tiny_change` | copy tweak, config, one obvious bug, "quick fix" | `team <feature> nano` |
+| `new_feature` | build, add, create, implement, make, I want | `team <feature> <rigor>` |
 | `brainstorm` | brainstorm, storm, refine, unclear idea | `storm <topic>` |
-| `resume` | continue, resume, finish, next step, keep going | `team-flow <feature> build` |
-| `test` | test, verify, acceptance criteria, QA | `team-flow <feature> test` |
-| `fix_or_review` | fix, broken, bug, check diff, review | `review` or `team-flow <feature> nano` |
+| `resume` | continue, resume, finish, next step, keep going | `team <feature> build` |
+| `test` | test, verify, acceptance criteria, QA | `team <feature> test` |
+| `fix_or_review` | fix, broken, bug, check diff, review | `review` or `team <feature> nano` |
 | `retro` | retro, wrap up, lessons, done building | `retro <feature>` |
 | `unclear` | anything else | ask one clarifying question |
 
@@ -162,17 +162,17 @@ Starting: <plain-language next action>
 
 ```
 storm <topic>
-team-flow <feature> nano
-team-flow <feature> lite
-team-flow <feature> standard
-team-flow <feature> strict
-team-flow <feature> build
-team-flow <feature> test
+team <feature> nano
+team <feature> lite
+team <feature> standard
+team <feature> strict
+team <feature> build
+team <feature> test
 review
 retro <feature>
 ```
 
-Default for new features: `team-flow <feature> lite`.
+Default for new features: `team <feature> lite`.
 
 ---
 
@@ -277,7 +277,7 @@ Reply with 1–4:
 ═══════════════════════════════════════════
 
   [1] Continue building            /pathly go continue
-  [2] Run full pipeline            /pathly team-flow build
+  [2] Run full pipeline            /pathly team build
   [3] Review current code          /pathly review
   [4] See all commands
 
@@ -311,7 +311,7 @@ Reply with 1–3:
 ═══════════════════════════════════════════
 
   [1] Close feature (tests + retro)  /pathly end
-  [2] Run tests only                  /pathly team-flow test
+  [2] Run tests only                  /pathly team test
   [3] Write retro only                /pathly retro
   [4] See all commands
 
@@ -346,7 +346,7 @@ Reply with 1–4:
 ── Pipeline ──────────────────────────────
   /pathly plan    /pathly review  /pathly test
   /pathly retro   /pathly archive /pathly lessons
-  /pathly team-flow
+  /pathly team
 
 ── Specialized ───────────────────────────
   /pathly po      /pathly debug

@@ -29,8 +29,8 @@ debugs/<symptom-name>/
   ROOT_CAUSE.md    ← what the root cause is (written from scout findings or by builder)
   FIX.md           ← what changed and why
   feedback/
-    HUMAN_QUESTIONS.md   ← blocks on user decision (same as team-flow)
-    TEST_FAILURES.md     ← tester → builder (same protocol as team-flow)
+    HUMAN_QUESTIONS.md   ← blocks on user decision (same as team)
+    TEST_FAILURES.md     ← tester → builder (same protocol as team)
 ```
 
 ---
@@ -175,7 +175,7 @@ Write your finding as "## Post-Fix Status" in REPRO.md.
 **If `[FIXED]`:** advance to DONE.
 
 **If `[NOT FIXED]`:**
-- Write `debugs/<symptom-name>/feedback/TEST_FAILURES.md` (same format as team-flow):
+- Write `debugs/<symptom-name>/feedback/TEST_FAILURES.md` (same format as team):
   ```markdown
   # Test Failures — <symptom-name>
   ## Failing
@@ -233,6 +233,6 @@ Next steps:
 - **Tester runs twice**: before the fix (to confirm repro) and after (to confirm fix).
 - **Builder touches only what ROOT_CAUSE.md says.** No opportunistic cleanup.
 - **Reviewer scope is narrow**: security + contracts only. No style.
-- **Feedback protocol is identical to team-flow.** `TEST_FAILURES.md` and `HUMAN_QUESTIONS.md` work the same way.
+- **Feedback protocol is identical to team.** `TEST_FAILURES.md` and `HUMAN_QUESTIONS.md` work the same way.
 - **Never advance past a [NOT REPRODUCED] status.** A bug that doesn't reproduce cannot be reliably fixed.
 - **Max 2 fix retries.** If the fix doesn't work after 2 attempts, escalate to human.

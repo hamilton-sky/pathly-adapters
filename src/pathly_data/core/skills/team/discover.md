@@ -18,7 +18,7 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 | Action | Route / Spawn |
 |---|---|
 | PO discussion | `po` |
-| Codebase exploration | `explore` skill (explorer + scout-flow internally) |
+| Codebase exploration | `explore` skill (explorer + scout-path internally) |
 | Technical storm | `architect` |
 | Planning (path 5 only) | `planner` |
 
@@ -124,7 +124,7 @@ Transition state → EXPLORING.
 
 Route to `explore [FEATURE]`.
 
-The explore skill frames the question, runs the explorer + scout-flow pipeline, and
+The explore skill frames the question, runs the explorer + scout-path pipeline, and
 writes `explorations/[FEATURE]/CONCLUSIONS.md`.
 
 After the explore skill returns control (user chose "Done" or "Graduate"), read

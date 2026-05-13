@@ -79,5 +79,5 @@ plans/ is now clean.
 If `plans/` now has no remaining active features, add:
 ```
 No active features remaining. Start the next one with:
-  team-flow <new-feature>
+  team <new-feature>
 ```
