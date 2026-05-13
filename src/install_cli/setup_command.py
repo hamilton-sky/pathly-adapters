@@ -9,10 +9,11 @@ import yaml
 from .codex_plugin_config import install_codex_plugin, uninstall_codex_plugin
 from .detect import detect_hosts
 from .mcp_config import install_mcp_config, uninstall_mcp_config
-from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_skills_path, core_templates_path, hooks_path
+from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_flows_path, core_skills_path, core_templates_path, hooks_path
 from .stitch import stitch_agent, stitch_skill
 from .materialize import (
     materialize,
+    materialize_flows,
     uninstall,
     deploy_codex_hooks,
     remove_codex_hooks,
@@ -77,7 +78,7 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             core_file = core_skills_dir / f"{skill_meta['skill']}.md"
             default_filename = f"{skill_name}/SKILL.md" if nested else f"{skill_name}.md"
             try:
-                skill_files[skill_meta.get("filename", default_filename)] = stitch_skill(core_file, meta_file)
+                skill_files[skill_meta.get("filename", default_filename)] = stitch_skill(core_file, meta_file, flows_dest=dest)
             except FileNotFoundError:
                 print(f"  [warn] No core skill for {skill_name!r}, skipping", file=sys.stderr)
 
@@ -139,6 +140,8 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         print(f"\n[{host}] Would write to {dest}:")
         for name in sorted(agent_files):
             print(f"  {dest / name}")
+        for name in sorted(f.name for f in core_flows_path().glob("*.flow.yaml")):
+            print(f"  {dest / name}")
         if skills_dest and skill_files:
             print(f"\n[{host}] Would write skills to {skills_dest}:")
             for name in sorted(skill_files):
@@ -181,6 +184,12 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             print(f"[{host}] Wrote {len(written)} file(s) to {dest}")
         else:
             print(f"[{host}] Nothing to write (files already current or not Pathly-owned)")
+
+        flow_written = materialize_flows(dest, repair=repair, force=force, dry_run=False)
+        if flow_written:
+            if dest not in written_dests:
+                written_dests.append(dest)
+            print(f"[{host}] Wrote {len(flow_written)} flow(s) to {dest}")
 
         if skills_dest and skill_files:
             written = materialize(skill_files, skills_dest, repair=repair, force=force, dry_run=False)

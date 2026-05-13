@@ -221,6 +221,24 @@ def materialize(
     return written
 
 
+def materialize_flows(
+    dest: Path,
+    *,
+    repair: bool = False,
+    force: bool = False,
+    dry_run: bool = False,
+) -> list[str]:
+    """Copy *.flow.yaml files from the installed package to dest. Returns list of filenames written."""
+    from .resources import core_flows_path
+
+    flows_src = core_flows_path()
+    files: dict[str, str] = {
+        f.name: f.read_text(encoding="utf-8")
+        for f in sorted(flows_src.glob("*.flow.yaml"))
+    }
+    return materialize(files, dest, repair=repair, force=force, dry_run=dry_run)
+
+
 def uninstall(dest: Path, *, dry_run: bool = False) -> list[str]:
     """Remove all Pathly-owned files from dest using the manifest.
 

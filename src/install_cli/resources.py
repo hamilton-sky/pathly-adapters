@@ -18,6 +18,10 @@ def core_templates_path() -> Path:
     return _root() / "core" / "templates"
 
 
+def core_flows_path() -> Path:
+    return _root() / "core" / "flows"
+
+
 def hooks_path() -> Path:
     return Path(str(files("pathly_hooks")))
 

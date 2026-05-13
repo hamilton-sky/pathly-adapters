@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 
 
-def stitch_skill(core_path: Path, meta_path: Path) -> str:
+def stitch_skill(core_path: Path, meta_path: Path, *, flows_dest: Path | None = None) -> str:
     with open(meta_path, encoding="utf-8") as f:
         try:
             meta = yaml.safe_load(f)
@@ -31,6 +31,9 @@ def stitch_skill(core_path: Path, meta_path: Path) -> str:
 
     for key, val in meta.get("variables", {}).items():
         body = body.replace("{{" + key + "}}", str(val))
+
+    if flows_dest is not None:
+        body = body.replace("src/pathly_data/core/flows/", flows_dest.as_posix() + "/")
 
     return body
 
