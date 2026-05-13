@@ -19,6 +19,8 @@ from .materialize import (
     remove_codex_hooks,
     deploy_copilot_hooks,
     remove_copilot_hooks,
+    deploy_claude_hooks,
+    remove_claude_hooks,
 )
 
 # Must stay in sync with detect_hosts() — any host returned by detect_hosts()
@@ -172,6 +174,11 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             print(f"\n[{host}] Would write Copilot hooks to:")
             for p in hook_paths:
                 print(f"  {p}")
+        if host == "claude":
+            hook_paths = deploy_claude_hooks(dry_run=True)
+            print(f"\n[{host}] Would write Claude hooks to:")
+            for p in hook_paths:
+                print(f"  {p}")
         return
 
     written_dests: list[Path] = []
@@ -233,6 +240,11 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             if written_hooks:
                 print(f"[{host}] Wrote Copilot hooks ({len(written_hooks)} file(s))")
 
+        if host == "claude":
+            written_hooks = deploy_claude_hooks(dry_run=False)
+            if written_hooks:
+                print(f"[{host}] Wrote Claude hooks to {written_hooks[0]}")
+
     except Exception:
         print(f"[{host}] Install failed — rolling back.", file=sys.stderr)
         for d in written_dests:
@@ -260,6 +272,11 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 remove_copilot_hooks(dry_run=False)
             except Exception:
                 pass
+        if host == "claude":
+            try:
+                remove_claude_hooks(dry_run=False)
+            except Exception:
+                pass
         raise
 
 
@@ -282,6 +299,12 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
             print(f"\n[{host}] Would remove Copilot hooks: {', '.join(removed_hooks)}")
         elif removed_hooks:
             print(f"[{host}] Removed Copilot hooks ({len(removed_hooks)} file(s))")
+    if host == "claude":
+        removed_hooks = remove_claude_hooks(dry_run=dry_run)
+        if dry_run and removed_hooks:
+            print(f"\n[{host}] Would remove Claude hooks from {removed_hooks[0]}")
+        elif removed_hooks:
+            print(f"[{host}] Removed Claude hooks from {removed_hooks[0]}")
 
     removed = uninstall(dest, dry_run=dry_run)
     if dry_run:

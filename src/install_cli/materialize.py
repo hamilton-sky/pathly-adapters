@@ -166,6 +166,84 @@ def remove_copilot_hooks(dest: Path = None, *, dry_run: bool = False) -> list[st
     return affected
 
 
+# ---------------------------------------------------------------------------
+# Claude hooks
+# ---------------------------------------------------------------------------
+
+def deploy_claude_hooks(*, dry_run: bool = False) -> list[str]:
+    """Write ~/.claude/settings.json with Pathly post_tool_call hook entries.
+
+    Merges into any existing settings.json — only the 'hooks' key is touched.
+    Returns list of paths that were (or would be) written.
+    """
+    settings_file = Path.home() / ".claude" / "settings.json"
+    pathly_hooks = {
+        "classify_feedback": {
+            "event": "post_tool_call",
+            "script": str(_hook_script_path("classify_feedback.py")),
+        },
+        "inject_feedback_ttl": {
+            "event": "post_tool_call",
+            "script": str(_hook_script_path("inject_feedback_ttl.py")),
+        },
+    }
+
+    if dry_run:
+        return [str(settings_file)]
+
+    existing: dict = {}
+    if settings_file.exists():
+        try:
+            existing = json.loads(settings_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+
+    # Initialize hooks dict if not present
+    if "hooks" not in existing:
+        existing["hooks"] = {}
+
+    # Merge pathly hooks into the hooks section
+    existing["hooks"].update(pathly_hooks)
+
+    settings_file.parent.mkdir(parents=True, exist_ok=True)
+    settings_file.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+
+    return [str(settings_file)]
+
+
+def remove_claude_hooks(*, dry_run: bool = False) -> list[str]:
+    """Remove the 'classify_feedback' and 'inject_feedback_ttl' keys from ~/.claude/settings.json.
+
+    Returns list of paths affected.
+    """
+    settings_file = Path.home() / ".claude" / "settings.json"
+    if not settings_file.exists():
+        return []
+
+    if dry_run:
+        return [str(settings_file)]
+
+    try:
+        existing = json.loads(settings_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+    if "hooks" not in existing:
+        return []
+
+    # Remove pathly hooks
+    existing["hooks"].pop("classify_feedback", None)
+    existing["hooks"].pop("inject_feedback_ttl", None)
+
+    # If hooks dict is now empty, remove it entirely
+    if not existing["hooks"]:
+        existing.pop("hooks", None)
+
+    settings_file.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+
+    return [str(settings_file)]
+
+
 def _load_manifest(dest: Path) -> dict:
     manifest_path = dest / MANIFEST_NAME
     if manifest_path.exists():
