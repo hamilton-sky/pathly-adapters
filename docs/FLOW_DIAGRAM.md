@@ -17,9 +17,11 @@ flowchart TD
     A[plain-English request] --> B{host}
     B --> CC["Claude Code\n/pathly <subcommand>\nor /skill-name directly"]
     B --> CX["Codex\nUse Pathly <request>"]
+    B --> CP["Copilot\nCopilot-native skill invocation"]
 
     CC --> CA[claude adapter\n~/.claude/agents/ + ~/.claude/skills/]
     CX --> XA[codex adapter\n~/.codex/agents/ + ~/.codex/skills/]
+    CP --> PA[copilot adapter\n~/.vscode/extensions/pathly/agents/ + skills/]
 ```
 
 ## Install Flow
@@ -112,7 +114,7 @@ Command                   Purpose
 /pathly explore           explore codebase (explorer + scout-flow)
 /pathly po                clarify requirements with PO
 /pathly meet              consult a role mid-flow
-/pathly verify            check for stale feedback
+/pathly verify*           check for stale feedback
 /pathly pause             pause session
 /pathly end               retro + archive
 /pathly retro             write retrospective (auto-detects feature)
@@ -122,6 +124,8 @@ Command                   Purpose
 /pathly prd-import        import a PRD file
 /pathly help              state-aware menu
 ```
+
+*`/pathly verify` dispatches to `verify-state` (different stem from all other `/pathly <x>` → `<x>` pairs).
 
 ### Codex
 
@@ -139,8 +143,17 @@ instead of using Pathly, the plugin was not selected — retry with `Use Pathly 
 
 ### Copilot
 
-Invocation syntax varies by VS Code / Copilot version — check Copilot chat
-settings after install.
+```text
+@pathly start
+@pathly go
+@pathly build
+@pathly end
+@pathly help
+```
+
+Invocation syntax varies by VS Code / Copilot version. If `@pathly` is not available in your
+Copilot chat, try referencing the agent by name (e.g. `#pathly`) or check Copilot chat settings
+after install.
 
 ## pathly-setup Commands
 

@@ -1,5 +1,9 @@
 # Pathly Adapters Architecture
 
+> **Scope:** Install and package layout — the `pathly-adapters` pip package, its stitch
+> pipeline, and the `pathly_data` resource layout. For runtime adapter surfaces (how skills
+> and agents are exposed per host), see [ARCHITECTURE.md](ARCHITECTURE.md).
+>
 > Canonical reference for the pathly-adapters package.
 > Reflects decisions made after the May 2026 architecture review.
 
@@ -24,7 +28,7 @@ tool normally — the tool reads Pathly's agents and skills transparently.
 
 ```
 pathly-adapters/                 ← pip package: pathly-adapters
-│                                   installs via: pip install -e pathly-adapters/
+│                                   installs via: pip install -e ".[dev]"
 │                                   CLI entries: pathly-setup, pathly-tokens
 │
 ├── src/

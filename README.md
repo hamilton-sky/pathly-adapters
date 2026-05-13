@@ -37,7 +37,9 @@ Then open Claude Code in your project directory and start:
 /pathly end              ← retro + archive
 ```
 
-All commands go through `/pathly`. See `/pathly help` for the full command list.
+All commands go through `/pathly`. See [docs/FLOW_DIAGRAM.md](docs/FLOW_DIAGRAM.md) for the full command reference.
+
+> **Tip:** `/start` and `/pathly start` are equivalent. `/pathly` dispatches to the same skill; direct invocation skips the dispatcher.
 
 ## All commands
 
@@ -61,14 +63,14 @@ pathly-state <feature>              # print current FSM state for a feature
 
 | Host | Detected by | Installed locations |
 |------|-------------|---------------------|
-| `claude` | `~/.claude/` directory exists | `~/.claude/agents/` + `~/.claude/skills/` |
+| `claude` | `~/.claude/` directory exists | `~/.claude/agents/` (behavioral contracts)<br>`~/.claude/skills/` (skill folders) |
 | `codex` | Codex config directory exists | `~/.codex/agents/` + `~/.codex/skills/` + local plugin marketplace |
-| `copilot` | VS Code + Copilot detected | VS Code agents folder |
+| `copilot` | VS Code + Copilot detected | `~/.vscode/extensions/pathly/agents/`<br>`~/.vscode/extensions/pathly/skills/` |
 
 ## How It Works
 
 1. **Detect** — scans for installed hosts on the current machine.
-2. **Stitch** — combines `core/agents/` and `core/skills/` content with adapter-specific `_meta/*.yaml` to produce deployable agent and skill files (frontmatter + body + spawn section).
+2. **Stitch** — combines `core/agents/` and `core/skills/` content with adapter-specific `_meta/<name>.yaml` to produce deployable agent and skill files (frontmatter + body + spawn section).
 3. **Materialize** — writes stitched files to the host config location. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back.
 4. **Register Codex plugin** - for Codex installs, writes `~/.codex/pathly-marketplace`, enables `pathly@pathly-local`, and refreshes the marketplace through the Codex CLI when available.
 

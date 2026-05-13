@@ -175,35 +175,13 @@ For Claude Code:
 
 ```
 ~/.claude/
-├── agents/                    ← 12 behavioral contracts (.md files)
-│   architect, builder, director, explorer, orchestrator, planner, po,
-│   quick, reviewer, scout, tester, web-researcher
-├── skills/                    ← skill directories (each folder has SKILL.md)
-│   ├── pathly/                ← /pathly — main dispatcher (only user-facing slash command)
-│   ├── pathly-start/          ← internal: /pathly start
-│   ├── pathly-go/             ← internal: /pathly go
-│   ├── pathly-build/          ← internal: /pathly build
-│   ├── pathly-plan/           ← internal: /pathly plan
-│   ├── pathly-team-flow/      ← internal: /pathly team-flow
-│   ├── pathly-storm/          ← internal: /pathly storm
-│   ├── pathly-review/         ← internal: /pathly review
-│   ├── pathly-debug/          ← internal: /pathly debug
-│   ├── pathly-explore/        ← internal: /pathly explore
-│   ├── pathly-po/             ← internal: /pathly po
-│   ├── pathly-meet/           ← internal: /pathly meet
-│   ├── pathly-verify-state/   ← internal: /pathly verify
-│   ├── pathly-pause/          ← internal: /pathly pause
-│   ├── pathly-end/            ← internal: /pathly end
-│   ├── pathly-retro/          ← internal: /pathly retro
-│   ├── pathly-test/           ← internal: /pathly test
-│   ├── pathly-archive/        ← internal: /pathly archive
-│   ├── pathly-lessons/        ← internal: /pathly lessons
-│   ├── pathly-prd-import/     ← internal: /pathly prd-import
-│   └── pathly-help/           ← internal: /pathly help
+├── agents/          ← behavioral contracts (.md files)
+├── skills/          ← skill directories (one folder per sub-skill, each with SKILL.md)
 └── plugins/pathly/
     └── templates/pathly plan/
-        └── *.template.md
 ```
+
+See [FLOW_DIAGRAM.md](docs/FLOW_DIAGRAM.md) for the full command reference and deployed file details.
 
 ## User-Level Data Locations
 
