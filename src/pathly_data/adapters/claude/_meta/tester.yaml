@@ -2,4 +2,4 @@
 description: Test planning, test execution, and coverage analysis. Use after implementation to verify stories are delivered — writes test plans from acceptance criteria, runs tests, reports gaps. Does not fix bugs.
 model: sonnet
 tools: [Read, Glob, Grep, Bash, Write]
-can_spawn: [quick, scout, builder]
+can_spawn: [quick, scout]
