@@ -101,7 +101,7 @@ state transition:
 git add -A
 git commit -m "feat(<topic>): <state> complete
 
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+Co-Authored-By: Pathly Orchestrator <noreply@anthropic.com>"
 ```
 
 ### Feedback re-route
