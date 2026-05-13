@@ -226,6 +226,29 @@ inputs:
 
 **Delivers stories:** S2.2
 **Depends on:** Phase 4 complete
+**Enables:** Phase 5b
+
+---
+
+### Phase 5b — Update state.schema.json to allow any state string   ← Conversation: 3
+
+**File:** `schemas/state.schema.json` — MODIFY
+
+The schema currently validates `STATE.json` with a hardcoded `enum` of team pipeline states and a hardcoded `transitions` block at the bottom. Both must go now that the FSM is generic.
+
+Two changes:
+1. Replace the `current` field's `enum` array with `"type": "string", "minLength": 1`.
+2. Remove the `transitions` block at the bottom of the file — it is team-pipeline-specific and has no place in a generic schema.
+
+All other fields (`feature`, `rigor`, `current_conversation`, `updated_at`, etc.) stay unchanged.
+
+**Done when:**
+- `grep "BUILDING\|REVIEWING\|RETRO" schemas/state.schema.json` returns no output.
+- `grep "\"type\": \"string\"" schemas/state.schema.json` matches the `current` property line.
+- `grep "\"transitions\"" schemas/state.schema.json` returns no output.
+
+**Delivers stories:** S2.1 (complete — STATE.json schema now matches generic FSM output)
+**Depends on:** Phase 5 complete (same conversation, natural final step)
 **Enables:** Conv 4
 
 ---

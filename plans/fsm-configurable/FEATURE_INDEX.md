@@ -40,6 +40,7 @@ Files in the live repo that this feature reads or modifies.
 | `src/pathly_data/core/flows/explore.flow.yaml` | Conv 2 | CREATE: FSM config for explore flow (storage_path: pathly/explorations/{topic}/) |
 | `src/pathly_data/adapters/claude/_meta/orchestrator.yaml` | Conv 3 | MODIFY: add flow_config + topic input fields |
 | `src/pathly_data/adapters/codex/_meta/orchestrator.yaml` | Conv 3 | MODIFY: add flow_config + topic input fields (if exists) |
+| `schemas/state.schema.json` | Conv 3 | MODIFY: replace hardcoded team state enum with `type: string`; remove hardcoded transitions block |
 | `src/pathly_data/core/skills/team.md` | Conv 4 | MODIFY: pass flow_config path to orchestrator spawn |
 | `src/pathly_data/core/skills/debug.md` | Conv 4 | MODIFY: stop running inline; spawn orchestrator with debug flow config |
 | `src/pathly_data/core/skills/explore.md` | Conv 4 | MODIFY: stop running inline; spawn orchestrator with explore flow config |

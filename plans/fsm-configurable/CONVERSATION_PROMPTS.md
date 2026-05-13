@@ -118,10 +118,12 @@ Implement fsm-configurable Conversation 3 (Phases 4–5) from plans/fsm-configur
 - `src/pathly_data/core/agents/orchestrator.md` — replace hardcoded team FSM with flow_config-driven generic engine
 - `src/pathly_data/adapters/claude/_meta/orchestrator.yaml` — add flow_config input declaration
 - `src/pathly_data/adapters/codex/_meta/orchestrator.yaml` — add flow_config input declaration (skip with a PROGRESS note if file does not exist)
+- `schemas/state.schema.json` — remove hardcoded team state enum and transitions block
 
 Scope:
 - Phase 4: Generalize orchestrator.md — inputs, startup read, storage_path, state list, agent_map, feedback_routing (story S2.1) — see IMPLEMENTATION_PLAN.md Phase 4
 - Phase 5: Update orchestrator.yaml for both adapters — add flow_config and topic input fields (story S2.2) — see IMPLEMENTATION_PLAN.md Phase 5
+- Phase 5b: Update schemas/state.schema.json — replace `current` enum with `"type": "string"`, remove `transitions` block — see IMPLEMENTATION_PLAN.md Phase 5b
 
 Rules:
 - The three flow YAML files in `core/flows/` are your reference for what the generic orchestrator must support — read them before editing orchestrator.md.
@@ -133,7 +135,9 @@ Verify:
 - `grep -i "BUILDING\|REVIEWING\|TESTING\|RETRO" src/pathly_data/core/agents/orchestrator.md` — output must be comment lines only (lines starting with `#` or `>`).
 - `grep "flow_config" src/pathly_data/core/agents/orchestrator.md` — must return at least 2 matches (inputs block + startup read).
 - `grep "flow_config" src/pathly_data/adapters/claude/_meta/orchestrator.yaml` — must return the new field.
-- `git diff --stat` — must show only orchestrator.md and the YAML adapter file(s).
+- `grep "BUILDING\|REVIEWING\|RETRO" schemas/state.schema.json` — must return no output.
+- `grep "transitions" schemas/state.schema.json` — must return no output.
+- `git diff --stat` — must show only orchestrator.md, the YAML adapter file(s), and state.schema.json.
 
 After done, update plans/fsm-configurable/PROGRESS.md Phases 4–5 and Conv 3 to DONE.
 

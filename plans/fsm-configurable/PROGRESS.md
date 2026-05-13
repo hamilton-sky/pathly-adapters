@@ -38,6 +38,7 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 2 | 3 | `src/pathly_data/core/flows/explore.flow.yaml` | CREATE explore FSM config | File exists with storage_path `pathly/explorations/{topic}/`, states, transitions, agent_map, feedback_routing | TODO |
 | 3 | 4 | `src/pathly_data/core/agents/orchestrator.md` | Replace hardcoded FSM with flow_config-driven generic engine | No team state literals in logic lines; flow_config read at startup; storage_path from config | TODO |
 | 3 | 5 | `src/pathly_data/adapters/claude/_meta/orchestrator.yaml` | Add flow_config + topic input declarations | grep flow_config returns the new field | TODO |
+| 3 | 5b | `schemas/state.schema.json` | Remove hardcoded team state enum and transitions block | grep "BUILDING\|RETRO" returns no output; current field uses type:string | TODO |
 | 4 | 6 | `src/pathly_data/core/skills/team.md` | Add flow_config to orchestrator spawn block | grep flow_config returns core/flows/team.flow.yaml | TODO |
 | 4 | 7 | `src/pathly_data/core/skills/debug.md` | Replace inline FSM steps with orchestrator spawn | grep orchestrator returns spawn instruction; grep flow_config returns core/flows/debug.flow.yaml | TODO |
 | 4 | 8 | `src/pathly_data/core/skills/explore.md` | Replace inline spawning with orchestrator spawn | grep orchestrator returns spawn instruction; grep flow_config returns core/flows/explore.flow.yaml | TODO |
