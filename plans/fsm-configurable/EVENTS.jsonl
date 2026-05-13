@@ -4,3 +4,4 @@
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-13T00:03:00Z"}
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T00:04:00Z"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-13T00:05:00Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T00:06:00Z"}
