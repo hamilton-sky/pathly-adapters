@@ -44,6 +44,13 @@ spawn scout:
 - Sub-agents are terminal — they cannot spawn further agents.
 - Compress all sub-agent findings into a short summary before beginning edits.
 
+**Scout spawning rules — MANDATORY when scouts are used:**
+- **Wide scout required (when spawning ≥ 2 scouts):** Designate one scout as the orientation scout. Its job: broad structural context — what files exist in the layer, how they connect, which are most relevant. It produces a map, not conclusions. Counts toward your total.
+- **Clustering rule:** All other scouts cover 2–3 related files in the same layer or concern. One file only = too narrow. Everything = too broad. Each produces cited file:line findings for its concern only.
+- **Minimum 2 when using scouts.** Single scout is only acceptable if NEEDS_CONTEXT explicitly justifies it. Max 4. Five requires written justification before spawning.
+- **Parallel launch:** All scouts for a phase MUST be launched in a single message. Sequential launches are wrong.
+- **No direct reads while scouts are active.** Implementation begins only after all scout findings are returned and compressed.
+
 ## Phase: analyze
 
 When the skill spawns you with `phase: analyze`, do **not** write any code.
