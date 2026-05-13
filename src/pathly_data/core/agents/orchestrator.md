@@ -34,7 +34,7 @@ and recovery model.
 | Resolve impl issue | `builder` | REVIEW_FAILURES.md exists |
 | Clarify requirement | `planner` | IMPL_QUESTIONS.md exists (what should this do?) |
 | Resolve tech blocker | `architect` | DESIGN_QUESTIONS.md exists (how is this possible?) |
-| Test | `tester` | all conversations DONE |
+| Test | `tester` | lite: all conversations DONE; standard/strict: after each conv's review passes |
 | Fix test failure | `builder` | TEST_FAILURES.md exists |
 | Retro | `quick` | all tests pass |
 
@@ -91,16 +91,16 @@ planner   ──► plans/<feature>/
          │    REVIEW_FAILURES? ─► builder  ──────────┤ (fix + re-review)
          │    IMPL_QUESTIONS? ──► planner  ──► builder continues
          │         │                                 │
-         │       PASS ─────────────────────────────► next task
+         │       PASS ─────────────────────────────► next task (no PROGRESS.md update yet)
          │
-         └─── (all convs done)
+         └─── (all convs done — or per-conv in standard/strict)
                     │ PAUSE
                     ▼
          tester verifies criteria
                     │
          TEST_FAILURES? ──► builder ──► re-test
                     │
-                  PASS
+                  PASS ──► PROGRESS.md marked DONE (this is the authoritative commit)
                     │ PAUSE
                     ▼
          quick ──► retro summary ──► RETRO.md written by the retro skill/orchestrator
@@ -139,19 +139,35 @@ If `autoFlow = true`:
   ```
 - Print: `✅ Conv N implemented and committed — handing to reviewer.`
 
-### After REVIEWING → TESTING transition (reviewer passed)
+### After REVIEWING → BUILDING transition (reviewer passed, next conv)
 
-This is the moment PROGRESS.md gets updated — not earlier.
+Reviewer passed — route to builder for the next TODO conversation.
+Do NOT update PROGRESS.md here. The tester has not validated this conv yet.
 
-1. Read `plans/<feature>/PROGRESS.md`. Find the conversation row that was just built (the one that moved from BUILDING to REVIEWING to TESTING).
-2. Mark that conv row `| TODO |` → `| DONE |`.
-3. Mark all Phase Detail rows for that conv `TODO` → `DONE`.
+If `autoFlow = true`, print: `✅ Conv N reviewed — moving to Conv N+1.`
+
+### After TESTING → BUILDING / RETRO transition (tester passed)
+
+**This is the moment PROGRESS.md gets updated — not earlier.**
+
+Tester has validated the acceptance criteria. Now mark the conv(s) done.
+
+- **lite rigor**: tester runs once at end of all convs. Mark every conv that is not yet DONE.
+- **standard / strict rigor**: tester runs per-conv. Mark only the conv just verified.
+
+Steps:
+1. Read `plans/<feature>/PROGRESS.md`. Identify the conv(s) verified by this tester run.
+2. Mark each verified conv row `| TODO |` → `| DONE |`.
+3. Mark all Phase Detail rows for those convs `TODO` → `DONE`.
 4. If all convs are now DONE, set overall Status → `COMPLETE`.
 5. If `autoFlow = true`, commit:
    ```bash
    git add plans/<feature>/PROGRESS.md
-   git commit -m "chore(<feature>): mark conv N done after review pass"
+   git commit -m "chore(<feature>): mark conv N done after tester pass"
    ```
+
+If more convs remain (standard/strict per-conv flow): transition → BUILDING for next conv.
+If all convs done: transition → RETRO.
 
 ### After REVIEW_BLOCKED → BUILDING (reviewer failed, fix needed)
 

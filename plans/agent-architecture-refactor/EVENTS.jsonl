@@ -20,3 +20,4 @@
 {"type": "FILE_DELETED", "file": "TEST_FAILURES.md", "ts": "2026-05-13T00:09:00Z"}
 {"type": "AGENT_DONE", "agent": "tester", "ts": "2026-05-13T00:09:00Z"}
 {"type": "STATE_TRANSITION", "to": "RETRO", "ts": "2026-05-13T00:09:00Z"}
+{"type": "STATE_TRANSITION", "to": "DONE", "ts": "2026-05-13T00:10:00Z"}

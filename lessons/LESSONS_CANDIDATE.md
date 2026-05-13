@@ -102,3 +102,36 @@ MUST offer the flow diagram template when a feature introduces a new inter-agent
 
 ### Source
 Feature: parallel-scout-standard | Stage: planning | Date: 2026-05-11
+
+---
+
+## [agent-architecture-refactor] Narrow verify scope misses files not named in the conversation prompt
+
+### Pattern
+Conv 1 listed 8 explicit skill files and scoped its verify command to only those files. team/plan.md also had scout-path references but was not in the prompt's file list — the verify command passed, but the tester caught 4 residual references at test time, requiring an extra fix cycle.
+
+### Rule
+MUST write the done-condition verify command to cover the entire affected directory, not just the files the conversation explicitly lists. For "replace X across all skills" features, grep the full `src/pathly_data/core/skills/` tree — a miss in the file list is still caught.
+
+### Injection
+- Add to Conv 1 verify in `CONVERSATION_PROMPTS.md`: "grep -rn 'scout-path' src/pathly_data/core/skills/ — expected: no output" (full tree, not per-file)
+- Add to plan phase template: "Verify scope: if the feature eliminates a pattern globally, the done-condition must grep the entire affected tree, not the explicit file list."
+
+### Source
+Feature: agent-architecture-refactor | Stage: test | Date: 2026-05-13
+
+---
+
+## [agent-architecture-refactor] YAML capability expansions need a cross-file audit verify step
+
+### Pattern
+After adding `can_spawn` to multiple YAML files across claude/ and codex/ adapters, there is no verify command that confirms all YAML files are consistent. A missed file would compile silently but cause a runtime capability mismatch between adapters.
+
+### Rule
+MUST include a single grep that covers all adapter YAML files for the changed field whenever a capability field (can_spawn, can_read, can_write) is added or modified across multiple adapter targets.
+
+### Injection
+- Add to any YAML-touching conversation: "Verify: grep -rn 'can_spawn' src/pathly_data/adapters/ — confirm all adapter variants are consistent, not just the ones the conversation touched."
+
+### Source
+Feature: agent-architecture-refactor | Stage: implementation | Date: 2026-05-13
