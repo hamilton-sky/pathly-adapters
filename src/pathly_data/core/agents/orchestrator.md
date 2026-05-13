@@ -106,6 +106,81 @@ planner   ──► plans/<feature>/
          quick ──► retro summary ──► RETRO.md written by the retro skill/orchestrator
 ```
 
+## Team pipeline routing table
+
+Route to the sub-skill matching the current FSM state. Pass `FEATURE [rigor] [autoFlow]` as arguments.
+After the sub-skill returns control, re-read `STATE.json` and route again.
+Repeat until state is DONE or the user stops the pipeline.
+
+| FSM state | Sub-skill |
+|---|---|
+| IDLE / PO_DISCUSSING / EXPLORING / STORMING | `team/discover` |
+| PLANNING | `team/plan` |
+| BUILDING | `team/build` |
+| REVIEWING | `team/review` |
+| TESTING | `team/test` |
+| RETRO | `team/retro` |
+| BLOCKED_ON_HUMAN | Print `plans/<feature>/feedback/HUMAN_QUESTIONS.md`. Wait for user. On reply: delete file, append `{"type": "HUMAN_RESPONSE", "value": "<reply>"}` to EVENTS.jsonl, restore prior state in STATE.json, re-route. |
+| DONE | Print `[Complete] Feature '[feature]' is DONE.` Stop. |
+
+## Orchestrator responsibilities between stages
+
+These actions are the orchestrator's job — sub-skills (build, review, test) do NOT do them.
+
+### After BUILDING → REVIEWING transition
+
+If `autoFlow = true`:
+- Commit all changed files:
+  ```bash
+  git add -A
+  git commit -m "feat(<feature>): conv N implement
+
+  Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+  ```
+- Print: `✅ Conv N implemented and committed — handing to reviewer.`
+
+### After REVIEWING → TESTING transition (reviewer passed)
+
+This is the moment PROGRESS.md gets updated — not earlier.
+
+1. Read `plans/<feature>/PROGRESS.md`. Find the conversation row that was just built (the one that moved from BUILDING to REVIEWING to TESTING).
+2. Mark that conv row `| TODO |` → `| DONE |`.
+3. Mark all Phase Detail rows for that conv `TODO` → `DONE`.
+4. If all convs are now DONE, set overall Status → `COMPLETE`.
+5. If `autoFlow = true`, commit:
+   ```bash
+   git add plans/<feature>/PROGRESS.md
+   git commit -m "chore(<feature>): mark conv N done after review pass"
+   ```
+
+### After REVIEW_BLOCKED → BUILDING (reviewer failed, fix needed)
+
+The orchestrator routes back to the build sub-skill. No commit, no PROGRESS.md update.
+
+## Artifact archiving — dual-write rule
+
+**This rule applies to the orchestrator and all sub-skills.**
+
+Whenever any feedback file is written to `plans/<feature>/feedback/`, also write
+a copy to `pipeline-walkthrough/<feature>/artifacts/` at the same time.
+
+Naming: `<FILENAME>_conv<N>_attempt<M>.md`
+Examples: `REVIEW_FAILURES_conv1_attempt2.md`, `HUMAN_QUESTIONS_conv1_stall.md`
+
+Create `pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
+
+**Why:** feedback files are deleted when resolved — the archive is the only permanent
+record of what each agent said. The FSM only reads `plans/<feature>/feedback/`;
+it never scans `pipeline-walkthrough/`, so the archive never jams the state machine.
+
+**Applies to all feedback files:**
+- `REVIEW_FAILURES.md` — written by reviewer
+- `ARCH_FEEDBACK.md` — written by reviewer
+- `TEST_FAILURES.md` — written by tester
+- `IMPL_QUESTIONS.md` — written by builder
+- `DESIGN_QUESTIONS.md` — written by builder
+- `HUMAN_QUESTIONS.md` — written by orchestrator (escalation, stall, rigor offer)
+
 ## What you must NOT do
 
 - Do not write code or edit files

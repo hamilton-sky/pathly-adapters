@@ -46,6 +46,17 @@ Choose execution mode:
 
 Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
+## Spawn orchestrator
+
+After mode selection is complete (autoFlow is set), spawn the **orchestrator** agent with:
+- FEATURE: [parsed feature name]
+- rigor: [parsed rigor]
+- autoFlow: [true/false]
+- entryStage: [parsed entryStage, default: discovery]
+
+The orchestrator handles all FSM state recovery, routing, git commits, PROGRESS.md updates,
+and artifact archiving. Do not perform these actions in team.md.
+
 ## Nano mode
 
 If `mode = nano`, run inline — do not route to sub-skills.
@@ -90,129 +101,3 @@ Do not write feedback files — report violations inline.
 **Step 5 — Fix cycle (max 1):** If violations found, spawn builder with the list. One pass only.
 If violations remain after 1 pass: stop, recommend upgrading to lite.
 If PASS: print `[Nano complete] [feature] done. Files changed: [list from git diff]`. Exit.
-
----
-
-## FSM operations (filesystem-native)
-
-All state is stored in two files under `plans/<feature>/`:
-
-- **STATE.json** — snapshot: `{"current": "STATE_NAME", "feature": "...", "rigor": "..."}`
-- **EVENTS.jsonl** — append-only log: one JSON object per line
-
-**Transition state:** Write STATE.json with the new `current` value.
-Append `{"type": "STATE_TRANSITION", "to": "NEW_STATE", "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
-
-**Log an event:** Append a JSON line to EVENTS.jsonl. Common types:
-`FILE_CREATED`, `FILE_DELETED`, `HUMAN_RESPONSE`, `RETRY`, `AGENT_DONE`, `NO_DIFF_DETECTED`, `IMPLEMENT_COMPLETE`
-
-When emitting a `RETRY` event, increment the relevant entry in `iteration_by_stage` in STATE.json (key = current FSM stage name). This optional map tracks per-stage attempt counts across the pipeline run.
-
----
-
-## State recovery
-
-Recover in this order. Print one log line showing the result.
-
-1. Read `plans/<feature>/STATE.json`. If it parses cleanly → use `current` field as state.
-2. If absent/unreadable → replay `plans/<feature>/EVENTS.jsonl` line by line; the last
-   `STATE_TRANSITION` event gives the current state.
-3. If neither file exists → start from IDLE.
-   In `strict` rigor: stop — "STATE.json and EVENTS.jsonl not found — cannot recover state in strict mode."
-
-Log lines:
-- `[FSM] State recovered from STATE.json: <state>`
-- `[FSM] State reconstructed from EVENTS.jsonl: <state> (N events)`
-- `[FSM] No prior state found — starting from IDLE`
-
-**Disk feedback wins:** Scan `plans/<feature>/feedback/`. If any files exist and state is not
-already BLOCKED, transition state → BLOCKED_ON_FEEDBACK.
-Append `{"type": "FILE_CREATED", "file": "<highest-priority-file>"}` to EVENTS.jsonl.
-Print: `[FSM] State corrected by disk feedback: <old> → BLOCKED_ON_FEEDBACK`
-
-## Entry stage override
-
-If `entryStage` was set, apply health checks then override the FSM state before routing:
-
-| entryStage | Health check | Override state |
-|---|---|---|
-| `plan` | none | PLANNING |
-| `build` | plan files exist for rigor; print `[SKIPPED] Discovery + plan → entering at build` | BUILDING |
-| `test` | plan files exist + all PROGRESS.md convs DONE; print `[SKIPPED] ... → entering at test` | TESTING |
-
-Health check failures: stop and report the specific missing requirement.
-
-## Routing
-
-Route to the sub-skill matching the current FSM state. Pass `FEATURE [rigor] [autoFlow]` as arguments.
-After the sub-skill returns control, re-read `STATE.json` and route again.
-Repeat until state is DONE or the user stops the pipeline.
-
-| FSM state | Sub-skill |
-|---|---|
-| IDLE / PO_DISCUSSING / EXPLORING / STORMING | `team/discover` |
-| PLANNING | `team/plan` |
-| BUILDING | `team/build` |
-| REVIEWING | `team/review` |
-| TESTING | `team/test` |
-| RETRO | `team/retro` |
-| BLOCKED_ON_HUMAN | Print `plans/<feature>/feedback/HUMAN_QUESTIONS.md`. Wait for user. On reply: delete file, append `{"type": "HUMAN_RESPONSE", "value": "<reply>"}` to EVENTS.jsonl, restore prior state in STATE.json, re-route. |
-| DONE | Print `[Complete] Feature '[feature]' is DONE.` Stop. |
-
-## Orchestrator responsibilities between stages
-
-These actions are the orchestrator's job — sub-skills (build, review, test) do NOT do them.
-
-### After BUILDING → REVIEWING transition
-
-If `autoFlow = true`:
-- Commit all changed files:
-  ```bash
-  git add -A
-  git commit -m "feat(<feature>): conv N implement
-
-  Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
-  ```
-- Print: `✅ Conv N implemented and committed — handing to reviewer.`
-
-### After REVIEWING → TESTING transition (reviewer passed)
-
-This is the moment PROGRESS.md gets updated — not earlier.
-
-1. Read `plans/<feature>/PROGRESS.md`. Find the conversation row that was just built (the one that moved from BUILDING to REVIEWING to TESTING).
-2. Mark that conv row `| TODO |` → `| DONE |`.
-3. Mark all Phase Detail rows for that conv `TODO` → `DONE`.
-4. If all convs are now DONE, set overall Status → `COMPLETE`.
-5. If `autoFlow = true`, commit:
-   ```bash
-   git add plans/<feature>/PROGRESS.md
-   git commit -m "chore(<feature>): mark conv N done after review pass"
-   ```
-
-### After REVIEW_BLOCKED → BUILDING (reviewer failed, fix needed)
-
-The orchestrator routes back to the build sub-skill. No commit, no PROGRESS.md update.
-
-## Artifact archiving — dual-write rule
-
-**This rule applies to the orchestrator and all sub-skills.**
-
-Whenever any feedback file is written to `plans/<feature>/feedback/`, also write
-a copy to `pipeline-walkthrough/<feature>/artifacts/` at the same time.
-
-Naming: `<FILENAME>_conv<N>_attempt<M>.md`
-Examples: `REVIEW_FAILURES_conv1_attempt2.md`, `HUMAN_QUESTIONS_conv1_stall.md`
-
-Create `pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
-
-**Why:** feedback files are deleted when resolved — the archive is the only permanent
-record of what each agent said. The FSM only reads `plans/<feature>/feedback/`;
-it never scans `pipeline-walkthrough/`, so the archive never jams the state machine.
-
-**Applies to all feedback files:**
-- `REVIEW_FAILURES.md` — written by reviewer
-- `ARCH_FEEDBACK.md` — written by reviewer
-- `TEST_FAILURES.md` — written by tester
-- `IMPL_QUESTIONS.md` — written by builder
-- `DESIGN_QUESTIONS.md` — written by builder
-- `HUMAN_QUESTIONS.md` — written by orchestrator (escalation, stall, rigor offer)
