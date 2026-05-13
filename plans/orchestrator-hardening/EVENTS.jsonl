@@ -3,3 +3,7 @@
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T00:09:30Z"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-13T00:15:00Z"}
 {"type": "AGENT_DONE", "agent": "builder", "conversation": 3, "result": "passed", "timestamp": "2026-05-12T22:27:36Z", "verify": "pytest tests/test_hooks.py tests/test_feedback_protocol.py"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T02:17:46Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEW_BLOCKED", "ts": "2026-05-13T02:17:46Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T02:30:00Z"}
+{"type": "STATE_TRANSITION", "to": "TESTING", "ts": "2026-05-13T02:35:00Z"}
