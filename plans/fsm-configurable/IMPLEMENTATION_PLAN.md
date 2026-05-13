@@ -274,6 +274,10 @@ All other fields (`feature`, `rigor`, `current_conversation`, `updated_at`, etc.
 5. Update `_state_path` and `_events_path` to call `_resolve_path(storage_path)`.
 6. Update `_state_cli()` so `pathly-state` accepts a full storage path (e.g. `pathly/plans/auth-rewrite`) rather than a bare feature name. Update `_cli()` the same way for `pathly-events summary`.
 
+**CLI backward compatibility decision (required before implementing point 6):** The signature change from `pathly-state <feature>` → `pathly-state pathly/plans/<feature>` is a breaking change for any user tooling that calls these CLIs. Decide before implementing: keep a deprecated alias that auto-prepends `pathly/plans/` when no `/` is present in the argument (recommended — backward-compatible, zero user action required), OR document the migration and remove the old form. Record the decision as a comment in `eventlog.py` above `_state_cli`.
+
+**Add `pathly-validate-flow` CLI (new deliverable, same conversation):** After implementing points 1–6, add a `pathly-validate-flow <path>` entry point in `pyproject.toml` backed by a `validate_flow_cli()` function in `state.py`. The function: loads the YAML at the given path, checks all five required fields are present, prints each missing field with a clear error message, exits 0 on success and 1 on failure. This lets users verify a flow YAML before running it. Implementation is ~15 lines. Register the entry point as `pathly-validate-flow = pathly_orchestrator.state:validate_flow_cli`.
+
 **Done when:**
 - `grep "VALID_STATES\|TRANSITIONS" src/pathly_orchestrator/state.py` returns no output.
 - `grep "load_flow\|valid_states\|flow_transitions" src/pathly_orchestrator/state.py` returns all three function definitions.
@@ -290,10 +294,10 @@ All other fields (`feature`, `rigor`, `current_conversation`, `updated_at`, etc.
 
 **File:** `src/pathly_data/core/skills/team.md` — MODIFY
 
-In the `## Spawn orchestrator` section (added by agent-architecture-refactor Conv 4), add `flow_config: core/flows/team.flow.yaml` to the spawn parameters. Remove any hardcoded team state names from the spawn block if present.
+In the `## Spawn orchestrator` section (added by agent-architecture-refactor Conv 4), add `flow_config: src/pathly_data/core/flows/team.flow.yaml` to the spawn parameters. Remove any hardcoded team state names from the spawn block if present.
 
 **Done when:**
-- `grep "flow_config" src/pathly_data/core/skills/team.md` returns a line with `core/flows/team.flow.yaml`.
+- `grep "flow_config" src/pathly_data/core/skills/team.md` returns a line with `src/pathly_data/core/flows/team.flow.yaml`.
 - `grep -i "BUILDING\|REVIEWING\|TESTING\|RETRO" src/pathly_data/core/skills/team.md` returns no results in the orchestrator spawn block.
 
 **Delivers stories:** S3.1
@@ -313,7 +317,7 @@ Replace the inline FSM logic (the six explicit steps mapping to INVESTIGATING �
 **Add:**
 ```
 Spawn **orchestrator** agent:
-  flow_config: core/flows/debug.flow.yaml
+  flow_config: src/pathly_data/core/flows/debug.flow.yaml
   topic: <symptom-name>
   rigor: <rigor>
   autoFlow: <autoFlow>
@@ -321,7 +325,7 @@ Spawn **orchestrator** agent:
 
 **Done when:**
 - `grep "orchestrator" src/pathly_data/core/skills/debug.md` returns the spawn instruction.
-- `grep "flow_config" src/pathly_data/core/skills/debug.md` returns `core/flows/debug.flow.yaml`.
+- `grep "flow_config" src/pathly_data/core/skills/debug.md` returns `src/pathly_data/core/flows/debug.flow.yaml`.
 - `grep -i "INVESTIGATING\|ROOT_CAUSE_FOUND\|FIXING\|VERIFYING" src/pathly_data/core/skills/debug.md` returns no inline step logic.
 
 **Delivers stories:** S3.2
@@ -341,7 +345,7 @@ Replace the inline three-phase explorer spawning logic with a `## Spawn orchestr
 **Add:**
 ```
 Spawn **orchestrator** agent:
-  flow_config: core/flows/explore.flow.yaml
+  flow_config: src/pathly_data/core/flows/explore.flow.yaml
   topic: <topic>
   rigor: <rigor>
   autoFlow: <autoFlow>
@@ -349,12 +353,76 @@ Spawn **orchestrator** agent:
 
 **Done when:**
 - `grep "orchestrator" src/pathly_data/core/skills/explore.md` returns the spawn instruction.
-- `grep "flow_config" src/pathly_data/core/skills/explore.md` returns `core/flows/explore.flow.yaml`.
+- `grep "flow_config" src/pathly_data/core/skills/explore.md` returns `src/pathly_data/core/flows/explore.flow.yaml`.
 - `grep -i "FRAMING\|ANALYZING\|TRACING\|CONCLUDING" src/pathly_data/core/skills/explore.md` returns no inline step logic.
 
 **Delivers stories:** S3.3
 **Depends on:** Phase 3 (explore.flow.yaml exists); Phase 4 (orchestrator is generic)
 **Enables:** nothing (final phase)
+
+---
+
+### Phase 9 — Materialize flow YAMLs during pathly-setup   ← Conversation: 5
+
+**Files:**
+- `src/install_cli/resources.py` — MODIFY: add `core_flows_path()` helper
+- `src/install_cli/stitch.py` — MODIFY: add `flows_dest` parameter to `stitch_skill()`
+- `src/install_cli/materialize.py` — MODIFY: add `materialize_flows()` function
+- `src/install_cli/setup_command.py` — MODIFY: call `materialize_flows`; pass `flows_dest=dest` to `stitch_skill`
+
+**Why:** Flow YAML files live in the package at `src/pathly_data/core/flows/`. After install, the user's project has no `src/pathly_data/` directory — the orchestrator agent cannot Read `src/pathly_data/core/flows/team.flow.yaml`. Fix: copy flow YAMLs to the host's agents destination (e.g., `~/.claude/agents/`) during `pathly-setup`, and replace the `src/pathly_data/core/flows/` prefix in stitched skill content with the absolute installed path.
+
+**Changes to `resources.py`:**
+Add `core_flows_path()` after the existing `core_templates_path()` function:
+```python
+def core_flows_path() -> Path:
+    return _root() / "core" / "flows"
+```
+
+**Changes to `stitch.py`:**
+Add a `flows_dest: Path | None = None` keyword parameter to `stitch_skill()`. After the existing `variables` substitution loop, add:
+```python
+if flows_dest is not None:
+    body = body.replace("src/pathly_data/core/flows/", flows_dest.as_posix() + "/")
+```
+This converts `flow_config: src/pathly_data/core/flows/team.flow.yaml` → `flow_config: /home/user/.claude/agents/team.flow.yaml` in the stitched skill output. Use `.as_posix()` so forward slashes are used in the skill text regardless of OS.
+
+**Changes to `materialize.py`:**
+Add after the existing `materialize()` function:
+```python
+def materialize_flows(
+    src_flows: Path,
+    dest: Path,
+    *,
+    repair: bool = False,
+    force: bool = False,
+    dry_run: bool = False,
+) -> list[str]:
+    """Copy *.flow.yaml files from src_flows to dest. Returns list of filenames written."""
+    files = {f.name: f.read_text(encoding="utf-8") for f in src_flows.glob("*.flow.yaml")}
+    return materialize(files, dest, repair=repair, force=force, dry_run=dry_run)
+```
+Flow files are tracked in the same manifest as agents, so `uninstall()` removes them automatically — no extra uninstall logic needed.
+
+**Changes to `setup_command.py`:**
+1. Add `core_flows_path` to the import from `.resources`.
+2. Add `materialize_flows` to the import from `.materialize`.
+3. In `_run_host()`, after computing `dest` and before agent stitching, call:
+   ```python
+   materialize_flows(core_flows_path(), dest, repair=repair, force=force, dry_run=dry_run)
+   ```
+4. In the skill stitching loop, change `stitch_skill(core_file, meta_file)` to `stitch_skill(core_file, meta_file, flows_dest=dest)`.
+
+**Done when:**
+- `grep "core_flows_path" src/install_cli/resources.py` returns the function definition.
+- `grep "flows_dest" src/install_cli/stitch.py` returns the parameter in `stitch_skill`.
+- `grep "materialize_flows" src/install_cli/materialize.py` returns the function definition.
+- `grep "materialize_flows" src/install_cli/setup_command.py` returns both the import line and the call line.
+- `grep "flows_dest=dest" src/install_cli/setup_command.py` returns the updated `stitch_skill` call.
+
+**Delivers stories:** S4.1
+**Depends on:** Conv 4 DONE (flow YAMLs exist at `src/pathly_data/core/flows/`); Phase 5c DONE (flow-agnostic Python layer)
+**Enables:** end users can run pathly after `pathly-setup --apply`
 
 ---
 
@@ -366,3 +434,5 @@ Spawn **orchestrator** agent:
 - Conv 1 (pathly/ path fixes) and Conv 2 (YAML creation) are safe to run before agent-architecture-refactor Conv 4. Conv 3 and Conv 4 are blocked on that dependency.
 - Criteria specify WHAT content the files must contain, not HOW they are formatted (per CANDIDATE-001).
 - Each criterion is independently falsifiable with a single grep (per CANDIDATE-002).
+- **Flow config paths use `src/pathly_data/core/flows/` prefix** — all `flow_config:` values in skill files reference the repo-relative path so agents running from the repo root can Read them. This works in the development/repo context only.
+- **Install gap — handled by Phase 9 / Conv 5:** Flow YAML files at `src/pathly_data/core/flows/` are not accessible from a user's project. Phase 9 closes this by materializing flow YAMLs to the host's agents destination (e.g., `~/.claude/agents/`) and rewriting the `src/pathly_data/core/flows/` prefix in stitched skill files to the absolute installed path. Conv 5 must run after Conv 4 so the flow YAMLs exist before they are materialized.

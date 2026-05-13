@@ -276,6 +276,9 @@ Verify:
   grep -n "dual-write\|routing table\|PROGRESS.md" src/pathly_data/core/agents/orchestrator.md
   → lines present
 
+  grep -n "nano mode\|Nano mode" src/pathly_data/core/skills/team.md
+  → must return matches (confirms nano mode survived section removal)
+
   git diff --stat — confirm only the 2 listed files are modified.
 
 After verification: update plans/agent-architecture-refactor/PROGRESS.md Phases 17–18, Conv 4 to DONE, and overall Status to COMPLETE.

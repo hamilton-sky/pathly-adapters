@@ -113,7 +113,7 @@ This feature consolidates all runtime output under a `pathly/` root, extracts al
 **As a** user running the team pipeline, **I want** team.md to pass the team flow config path to the orchestrator, **so that** the orchestrator uses the correct FSM without any team-specific logic embedded in it.
 
 **Acceptance Criteria:**
-- [ ] `team.md` spawn instruction for orchestrator includes `flow_config: core/flows/team.flow.yaml`
+- [ ] `team.md` spawn instruction for orchestrator includes `flow_config: src/pathly_data/core/flows/team.flow.yaml`
 - [ ] `team.md` does not contain hardcoded team state names (BUILDING, REVIEWING, etc.) in the orchestrator spawn block
 
 **Delivered by:** Phase 6 → Conversation 4
@@ -125,7 +125,7 @@ This feature consolidates all runtime output under a `pathly/` root, extracts al
 
 **Acceptance Criteria:**
 - [ ] `debug.md` contains a `Spawn **orchestrator** agent` instruction
-- [ ] The spawn instruction passes `flow_config: core/flows/debug.flow.yaml` and `topic: <symptom-name>`
+- [ ] The spawn instruction passes `flow_config: src/pathly_data/core/flows/debug.flow.yaml` and `topic: <symptom-name>`
 - [ ] `debug.md` does not contain inline FSM state-transition logic (the six explicit step-to-state mapping)
 - [ ] A debug run produces STATE.json and EVENTS.jsonl under `pathly/debugs/<symptom-name>/`
 
@@ -138,8 +138,21 @@ This feature consolidates all runtime output under a `pathly/` root, extracts al
 
 **Acceptance Criteria:**
 - [ ] `explore.md` contains a `Spawn **orchestrator** agent` instruction
-- [ ] The spawn instruction passes `flow_config: core/flows/explore.flow.yaml` and `topic: <topic>`
+- [ ] The spawn instruction passes `flow_config: src/pathly_data/core/flows/explore.flow.yaml` and `topic: <topic>`
 - [ ] `explore.md` does not contain inline FSM state-transition logic
 - [ ] An explore run produces STATE.json and EVENTS.jsonl under `pathly/explorations/<topic>/`
 
 **Delivered by:** Phase 8 → Conversation 4
+
+---
+
+### Story 4.1: pathly-setup materializes flow YAMLs and skill files reference the installed path
+**As a** user who installed pathly via `pathly-setup --apply`, **I want** the orchestrator to find flow YAML files when I run `/team` from my own project, **so that** pipelines work after install and not just inside the pathly-adapters repo.
+
+**Acceptance Criteria:**
+- [ ] After `pathly-setup --apply`, `*.flow.yaml` files exist at the host's agents destination (e.g., `~/.claude/agents/team.flow.yaml`)
+- [ ] The installed `team.md`, `debug.md`, and `explore.md` skill files reference the absolute installed path (e.g., `/home/user/.claude/agents/team.flow.yaml`), not `src/pathly_data/core/flows/team.flow.yaml`
+- [ ] `pathly-setup --uninstall` removes the materialized flow YAML files
+- [ ] `pathly-setup --repair` re-materializes flow YAML files if they are missing
+
+**Delivered by:** Phase 9 → Conversation 5

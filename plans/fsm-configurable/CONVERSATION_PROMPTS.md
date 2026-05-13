@@ -79,6 +79,7 @@ Rules:
 - Do NOT modify any existing files. This conversation creates new files only.
 - agent_map values must reference real agent names that exist under `src/pathly_data/core/agents/` or real skill paths under `src/pathly_data/core/skills/`.
 - All three storage_path values must use the `pathly/` prefix.
+- Each flow YAML must include a top-level `version: 1` field.
 
 Verify:
 - `git diff --stat` — confirm exactly 3 new files are listed.
@@ -126,10 +127,11 @@ Scope:
 - Phase 5b: Update schemas/state.schema.json — replace `current` enum with `"type": "string"`, remove `transitions` block — see IMPLEMENTATION_PLAN.md Phase 5b
 
 Rules:
-- The three flow YAML files in `core/flows/` are your reference for what the generic orchestrator must support — read them before editing orchestrator.md.
+- The three flow YAML files in `src/pathly_data/core/flows/` are your reference for what the generic orchestrator must support — read them before editing orchestrator.md.
 - Do NOT change `model`, `tools`, or `can_spawn` in the YAML files.
 - Do NOT touch team.md, debug.md, explore.md, or any flow YAML file in this conversation.
 - After editing, verify no hardcoded team state names remain as logic (not comment) lines in orchestrator.md.
+- If `flow_config` path does not exist, YAML parse fails, or any required field (`states`, `transitions`, `agent_map`, `storage_path`, `feedback_routing`) is missing — write `HUMAN_QUESTIONS.md` with the specific error and stop. Do NOT proceed with FSM execution.
 
 Verify:
 - `grep -i "BUILDING\|REVIEWING\|TESTING\|RETRO" src/pathly_data/core/agents/orchestrator.md` — output must be comment lines only (lines starting with `#` or `>`).
@@ -183,7 +185,7 @@ Also read all three flow YAML files to confirm the flow_config paths you will in
 - `src/pathly_data/core/skills/explore.md` — replace inline three-phase spawning with orchestrator spawn
 
 Scope:
-- Phase 6: team.md — add `flow_config: core/flows/team.flow.yaml` to the orchestrator spawn block (story S3.1) — see IMPLEMENTATION_PLAN.md Phase 6
+- Phase 6: team.md — add `flow_config: src/pathly_data/core/flows/team.flow.yaml` to the orchestrator spawn block (story S3.1) — see IMPLEMENTATION_PLAN.md Phase 6
 - Phase 7: debug.md — replace inline FSM with orchestrator spawn passing debug flow config (story S3.2) — see IMPLEMENTATION_PLAN.md Phase 7
 - Phase 8: explore.md — replace inline spawning with orchestrator spawn passing explore flow config (story S3.3) — see IMPLEMENTATION_PLAN.md Phase 8
 
@@ -194,9 +196,9 @@ Rules:
 - Do NOT touch orchestrator.md, flow YAML files, or any other file.
 
 Verify:
-- `grep "flow_config" src/pathly_data/core/skills/team.md` — returns `core/flows/team.flow.yaml`.
-- `grep "flow_config" src/pathly_data/core/skills/debug.md` — returns `core/flows/debug.flow.yaml`.
-- `grep "flow_config" src/pathly_data/core/skills/explore.md` — returns `core/flows/explore.flow.yaml`.
+- `grep "flow_config" src/pathly_data/core/skills/team.md` — returns `src/pathly_data/core/flows/team.flow.yaml`.
+- `grep "flow_config" src/pathly_data/core/skills/debug.md` — returns `src/pathly_data/core/flows/debug.flow.yaml`.
+- `grep "flow_config" src/pathly_data/core/skills/explore.md` — returns `src/pathly_data/core/flows/explore.flow.yaml`.
 - `grep "orchestrator" src/pathly_data/core/skills/debug.md` — returns the spawn instruction.
 - `grep "orchestrator" src/pathly_data/core/skills/explore.md` — returns the spawn instruction.
 - `git diff --stat` — shows only team.md, debug.md, explore.md.
@@ -209,3 +211,60 @@ If fundamentally broken, rollback with `git checkout` on affected files and retr
 
 **Expected output:** All three skill files delegate to orchestrator with their respective flow configs; `git diff --stat` shows exactly those three files.
 **Files touched:** `src/pathly_data/core/skills/team.md`, `src/pathly_data/core/skills/debug.md`, `src/pathly_data/core/skills/explore.md`
+
+---
+
+## Conversation 5: Materialize flow YAMLs during pathly-setup (Phase 9)
+
+**Stories delivered:** S4.1
+
+**Pre-condition:** Conv 4 of this feature must be DONE (flow YAML files must exist at `src/pathly_data/core/flows/`).
+
+**Prompt to paste:**
+```
+Read plans/fsm-configurable/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+
+Implement fsm-configurable Conversation 5 (Phase 9) from plans/fsm-configurable/IMPLEMENTATION_PLAN.md.
+
+**Pre-flight:**
+1. Run `git status` to confirm a clean working tree.
+2. Read `plans/fsm-configurable/PROGRESS.md` — confirm Conv 4 is DONE. If not, stop and report.
+3. Glob `src/pathly_data/core/flows/*.flow.yaml` — confirm all three flow files exist.
+
+**Before editing anything:** Read the following files in full:
+- `src/install_cli/resources.py`
+- `src/install_cli/stitch.py`
+- `src/install_cli/materialize.py`
+- `src/install_cli/setup_command.py`
+
+**Codebase files this conversation modifies:**
+- `src/install_cli/resources.py` — add `core_flows_path()` helper
+- `src/install_cli/stitch.py` — add `flows_dest` parameter to `stitch_skill()`
+- `src/install_cli/materialize.py` — add `materialize_flows()` function
+- `src/install_cli/setup_command.py` — call `materialize_flows`; pass `flows_dest=dest` to `stitch_skill`
+
+Scope: Phase 9 from IMPLEMENTATION_PLAN.md — four changes across four files.
+
+Rules:
+- `stitch_skill()` signature change must be backward-compatible: `flows_dest` is a keyword-only parameter with default `None`. When `None`, behaviour is identical to today.
+- The replacement in `stitch_skill` uses `.as_posix()` on `flows_dest` so the path in skill text always uses forward slashes, regardless of OS.
+- `materialize_flows()` must use the existing `materialize()` function — do not duplicate manifest logic.
+- Do NOT change `stitch_agent()`, `uninstall()`, or any other function.
+- Do NOT touch any `pathly_data` files or plan files.
+
+Verify:
+- `grep "core_flows_path" src/install_cli/resources.py` — returns the function definition.
+- `grep "flows_dest" src/install_cli/stitch.py` — returns the parameter in `stitch_skill`.
+- `grep "materialize_flows" src/install_cli/materialize.py` — returns the function definition.
+- `grep "materialize_flows" src/install_cli/setup_command.py` — returns at least 2 lines (import + call).
+- `grep "flows_dest=dest" src/install_cli/setup_command.py` — returns the updated `stitch_skill` call.
+- `git diff --stat` — shows only the 4 listed files.
+
+After done, update plans/fsm-configurable/PROGRESS.md Phase 9 and Conv 5 to DONE, and overall Status to DONE.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+If fundamentally broken, rollback with `git checkout -- <file>` and retry.
+```
+
+**Expected output:** `pathly-setup --apply` materializes `*.flow.yaml` files alongside agent files; stitched skill files contain the absolute installed path instead of `src/pathly_data/core/flows/`.
+**Files touched:** `src/install_cli/resources.py`, `src/install_cli/stitch.py`, `src/install_cli/materialize.py`, `src/install_cli/setup_command.py`

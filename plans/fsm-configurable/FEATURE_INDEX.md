@@ -44,6 +44,10 @@ Files in the live repo that this feature reads or modifies.
 | `src/pathly_data/core/skills/team.md` | Conv 4 | MODIFY: pass flow_config path to orchestrator spawn |
 | `src/pathly_data/core/skills/debug.md` | Conv 4 | MODIFY: stop running inline; spawn orchestrator with debug flow config |
 | `src/pathly_data/core/skills/explore.md` | Conv 4 | MODIFY: stop running inline; spawn orchestrator with explore flow config |
+| `src/install_cli/resources.py` | Conv 5 | MODIFY: add `core_flows_path()` helper |
+| `src/install_cli/stitch.py` | Conv 5 | MODIFY: add `flows_dest` parameter to `stitch_skill()` |
+| `src/install_cli/materialize.py` | Conv 5 | MODIFY: add `materialize_flows()` function |
+| `src/install_cli/setup_command.py` | Conv 5 | MODIFY: call `materialize_flows`; pass `flows_dest=dest` to `stitch_skill` |
 
 > **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
 
@@ -57,6 +61,7 @@ Files in the live repo that this feature reads or modifies.
 | 2 | Create core/flows/ YAML configs | S1.1, S1.2, S1.3 | TODO | `core/flows/team.flow.yaml`, `debug.flow.yaml`, `explore.flow.yaml` |
 | 3 | Generalize orchestrator.md | S2.1, S2.2 | TODO | `orchestrator.md`, `orchestrator.yaml` (both adapters) |
 | 4 | Update skill launchers | S3.1, S3.2, S3.3 | TODO | `team.md`, `debug.md`, `explore.md` |
+| 5 | Materialize flow YAMLs on install | S4.1 | TODO | `resources.py`, `stitch.py`, `materialize.py`, `setup_command.py` |
 
 ---
 

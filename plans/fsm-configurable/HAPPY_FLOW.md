@@ -9,10 +9,10 @@ This narrative describes the golden path once all three conversations are comple
 1. User invokes `/debug symptom:login-timeout rigor:standard`.
 2. `debug.md` parses the symptom name (`login-timeout`), confirms rigor, then reaches the `## Spawn orchestrator` block.
 3. debug.md spawns the orchestrator agent with:
-   - `flow_config: core/flows/debug.flow.yaml`
+   - `flow_config: src/pathly_data/core/flows/debug.flow.yaml`
    - `topic: login-timeout`
    - `rigor: standard`
-4. Orchestrator reads `core/flows/debug.flow.yaml`. It learns:
+4. Orchestrator reads `src/pathly_data/core/flows/debug.flow.yaml`. It learns:
    - `storage_path: debugs/login-timeout/`
    - states: INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE
    - agent_map: INVESTIGATING → scout, FIXING → builder, VERIFYING → tester
@@ -29,9 +29,9 @@ The user sees the same structured tracking they get from a team pipeline run —
 
 1. User invokes `/team feature:auth-refresh rigor:standard`.
 2. `team.md` parses inputs, reaches `## Spawn orchestrator`, passes:
-   - `flow_config: core/flows/team.flow.yaml`
+   - `flow_config: src/pathly_data/core/flows/team.flow.yaml`
    - `topic: auth-refresh`
-3. Orchestrator reads `core/flows/team.flow.yaml`:
+3. Orchestrator reads `src/pathly_data/core/flows/team.flow.yaml`:
    - `storage_path: plans/auth-refresh/`
    - states: IDLE → STORMING → PLANNING → BUILDING → REVIEWING → TESTING → RETRO → DONE
    - agent_map: PLANNING → team/plan, BUILDING → team/build, etc.
@@ -42,7 +42,7 @@ The user sees the same structured tracking they get from a team pipeline run —
 ## Scenario: contributor adds a new flow (e.g., `audit`)
 
 1. Contributor creates `src/pathly_data/core/flows/audit.flow.yaml` with states, transitions, agent_map, storage_path, feedback_routing.
-2. Contributor creates or updates `src/pathly_data/core/skills/audit.md` with a spawn block passing `flow_config: core/flows/audit.flow.yaml`.
+2. Contributor creates or updates `src/pathly_data/core/skills/audit.md` with a spawn block passing `flow_config: src/pathly_data/core/flows/audit.flow.yaml`.
 3. No changes to orchestrator.md — it handles the new flow generically.
 
 ---
