@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pathly adapter meta",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique identifier for this adapter meta entry"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the agent or skill"
+    },
+    "model": {
+      "type": "string",
+      "description": "Model identifier to use for this agent or skill"
+    },
+    "tools": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of tool names available to this agent or skill"
+    },
+    "can_spawn": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Agent types this entry is permitted to spawn"
+    },
+    "spawn_section": {
+      "type": "string",
+      "description": "Host-specific spawn call appended after the core skill body"
+    },
+    "skill": {
+      "type": "string",
+      "description": "Name of the core skill file this entry wraps"
+    },
+    "invocation": {
+      "type": "string",
+      "description": "How the skill is invoked on the target host (e.g. slash command or natural language prefix)"
+    },
+    "natural_language": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Natural-language invocation string used on hosts that do not support slash commands (e.g. Codex)"
+    },
+    "wrapper": {
+      "type": "string",
+      "description": "Optional wrapper template applied around the core skill body during stitching"
+    },
+    "strip_frontmatter": {
+      "type": "boolean",
+      "description": "When true, the core file's YAML frontmatter is stripped before stitching"
+    },
+    "filename": {
+      "type": "string",
+      "description": "Output filename override for the stitched file"
+    },
+    "host": {
+      "type": "string",
+      "enum": ["claude", "codex", "copilot"],
+      "description": "Target host tool for this adapter entry"
+    },
+    "destination": {
+      "type": "string",
+      "description": "Destination path (relative to the host config root) where the stitched file is written"
+    },
+    "files": {
+      "type": "array",
+      "description": "List of additional files to deploy alongside the stitched output"
+    },
+    "variables": {
+      "type": "object",
+      "description": "Key-value pairs substituted into the stitched file during materialization"
+    },
+    "templates": {
+      "type": "object",
+      "description": "Template file mappings to deploy to the host's templates directory"
+    },
+    "skills": {
+      "type": "object",
+      "description": "Sub-skill configuration block (destination, structure) for skill deployment"
+    },
+    "status": {
+      "type": "string",
+      "description": "Deployment status marker used internally by the install CLI"
+    },
+    "structure": {
+      "type": "string",
+      "description": "Deployment structure for skills: 'nested' (each skill in its own folder) or 'flat'"
+    },
+    "telemetry": {
+      "type": "boolean",
+      "description": "When true, enables activity telemetry collection for this host adapter"
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Named input parameters the agent accepts, keyed by parameter name",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["description"],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the input parameter"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this input is required"
+          },
+          "type": {
+            "type": "string",
+            "description": "Expected value type (e.g. string, boolean)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "hooks": {
+      "type": "array",
+      "description": "List of lifecycle hooks to install for this adapter",
+      "items": {
+        "type": "object",
+        "required": ["event", "script"],
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": ["post_tool_call", "PostToolUse"],
+            "description": "Hook event name that triggers the script"
+          },
+          "script": {
+            "type": "string",
+            "description": "Shell command string to execute when the event fires"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

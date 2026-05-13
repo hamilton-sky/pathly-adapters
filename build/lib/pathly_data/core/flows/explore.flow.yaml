@@ -1,0 +1,30 @@
+version: 1
+flow: explore
+storage_path: "pathly/explorations/{topic}/"
+
+states:
+  - FRAMING
+  - ANALYZING
+  - TRACING
+  - CONCLUDING
+  - DONE
+
+transitions:
+  FRAMING:
+    - ANALYZING
+  ANALYZING:
+    - TRACING
+  TRACING:
+    - CONCLUDING
+  CONCLUDING:
+    - DONE
+  DONE: []
+
+agent_map:
+  FRAMING: explorer
+  ANALYZING: explorer
+  TRACING: explorer
+  CONCLUDING: explorer
+
+feedback_routing:
+  HUMAN_QUESTIONS: human

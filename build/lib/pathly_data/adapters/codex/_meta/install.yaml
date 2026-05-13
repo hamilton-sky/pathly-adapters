@@ -1,0 +1,23 @@
+﻿host: codex
+destination: ~/.codex/agents/
+files:
+  - source: agents/
+skills:
+  destination: ~/.codex/skills/
+  structure: nested
+templates:
+  destination: ~/.codex/plugins/pathly/templates
+plugin:
+  destination: ~/.codex/plugins/pathly
+  source: .codex-plugin
+  include_stitched: true
+telemetry: true
+hooks:
+  - event: PostToolUse
+    matcher:
+      tool_name: apply_patch
+    script: hooks/classify_feedback.py
+  - event: PostToolUse
+    matcher:
+      tool_name: apply_patch
+    script: hooks/inject_feedback_ttl.py

@@ -1,0 +1,5 @@
+skill: plan
+filename: pathly-plan/SKILL.md
+natural_language: "/pathly plan, plan feature, create plan, plan"
+variables:
+  TEMPLATES_DIR: ~/.codex/plugins/pathly/templates
