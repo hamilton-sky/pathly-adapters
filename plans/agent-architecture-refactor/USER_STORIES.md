@@ -15,12 +15,12 @@ so that context research does not require an extra indirection layer that bloats
 **Acceptance criteria:**
 - AC1: The string `scout-path` does not appear in `build.md`, `review.md`, `test.md`, `explore.md`, `team/build.md`, `team/test.md`, or `team/plan.md` as an instruction to call or invoke anything.
 - AC2: Each of those seven files contains a `Spawn **scout** agent` instruction in place of the former scout-path call.
-- AC3: `team/plan.md` Storm Phase 2 and Plan Phase 2 use the parallel spawn pattern: one scout per independent NEEDS_CONTEXT entry when entries have non-overlapping scopes and no cross-references; one scout for the full block when entries are dependent.
+- AC3: `team/plan.md` Storm Phase 2 and Plan Phase 2 spawn one scout per NEEDS_CONTEXT entry in parallel by default; sequential only when entry B's question explicitly references entry A's answer (e.g. "that class", "the above").
 - AC4: `team/review.md` is not modified (it is already correct and serves as the reference pattern).
 
 **Edge cases:**
 - A file may reference `scout-path` in a comment or docstring explaining history; this is acceptable as long as the invocation instruction itself is replaced.
-- A NEEDS_CONTEXT entry is dependent if its question references the result of a prior entry (e.g. "that class", "the above"). Dependent entries run sequentially, not in parallel.
+- Scope overlap between entries is not a dependency — scouts are read-only, two scouts can read the same files with different questions simultaneously.
 
 ---
 
