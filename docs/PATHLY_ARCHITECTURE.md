@@ -30,7 +30,7 @@ tool normally — the tool reads Pathly's agents and skills transparently.
 ```
 pathly-adapters/                 ← pip package: pathly-adapters
 │                                   installs via: pip install -e ".[dev]"
-│                                   CLI entries: pathly-setup, pathly-tokens
+│                                   CLI entries: pathly-setup, pathly-tokens, pathly-events, pathly-state
 │
 ├── src/
 │   ├── install_cli/             ← Python CLI: detects host tools, stitches + deploys files
@@ -38,10 +38,13 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │   │   ├── stitch.py            ← Combines core/ + adapter _meta/ into deployable files
 │   │   ├── materialize.py       ← Writes output files to ~/.claude/, ~/.codex/, etc.
 │   │   ├── setup_command.py     ← Entry point for pathly-setup command
+│   │   ├── codex_plugin_config.py ← Codex local marketplace registration and plugin config
 │   │   ├── mcp_config.py
 │   │   ├── resources.py
 │   │   └── __main__.py
-│   ├── pathly_telemetry/        ← Cross-host activity telemetry (src-layout package)
+│   ├── pathly_telemetry/        ← Cross-host activity telemetry (pathly-tokens CLI)
+│   ├── pathly_orchestrator/     ← FSM event-log package (pathly-events, pathly-state CLIs)
+│   ├── pathly_hooks/            ← Hook scripts deployed into host tool settings by installer
 │   └── pathly_data/             ← Package resource layout for installed data files
 │       ├── core/                ← SINGLE SOURCE OF TRUTH (tool-agnostic)
 │       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax)
@@ -65,11 +68,12 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── build.md
 │       │   │   ├── plan.md
 │       │   │   ├── test.md      ← standalone acceptance test runner (tester + scout-flow)
-│       │   │   ├── team-flow.md ← full pipeline entry point
+│       │   │   ├── team.md      ← full pipeline entry point (/pathly team)
 │       │   │   ├── storm.md
 │       │   │   ├── review.md
 │       │   │   ├── debug.md
 │       │   │   ├── explore.md   ← routes through explorer agent + scout-flow
+│       │   │   ├── scout-path.md
 │       │   │   ├── po.md
 │       │   │   ├── meet.md
 │       │   │   ├── verify-state.md
@@ -80,7 +84,7 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── lessons.md
 │       │   │   ├── prd-import.md
 │       │   │   ├── help.md
-│       │   │   └── team-flow/   ← sub-skills for team pipeline phases (discover, plan, build, review, test, retro)
+│       │   │   └── team/        ← sub-skills for team pipeline phases (discover, plan, build, review, test, retro)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
@@ -88,7 +92,7 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │           ├── codex/           ← .codex-plugin/ + _meta/*.yaml per agent/skill
 │           └── copilot/         ← _meta/*.yaml per agent/skill
 │
-└── pyproject.toml               ← entry_points: pathly-setup, pathly-tokens
+└── pyproject.toml               ← entry_points: pathly-setup, pathly-tokens, pathly-events, pathly-state
 ```
 
 ---
@@ -102,6 +106,8 @@ The repository uses a `src/` layout. The source packages are:
 | `install_cli` | `src/install_cli/` | Install CLI — `pathly-setup` entry point and stitch pipeline |
 | `pathly_telemetry` | `src/pathly_telemetry/` | Telemetry — `pathly-tokens` entry point |
 | `pathly_data` | `src/pathly_data/` | Installed package data — agent contracts, skill logic, adapter metadata |
+| `pathly_orchestrator` | `src/pathly_orchestrator/` | FSM event-log — `pathly-events` and `pathly-state` entry points |
+| `pathly_hooks` | `src/pathly_hooks/` | Hook scripts deployed into host tool settings by installer |
 
 Entry points are declared in `pyproject.toml`. `src/install_cli/` contains the
 CLI implementation modules (`detect.py`, `stitch.py`, `materialize.py`, `setup_command.py`, `mcp_config.py`, `resources.py`, `__main__.py`).
@@ -117,6 +123,7 @@ CLI implementation modules (`detect.py`, `stitch.py`, `materialize.py`, `setup_c
 | `src/install_cli/materialize.py` | Writes stitched output to `~/.claude/`, `~/.codex/`, etc. Maintains a manifest of Pathly-owned files. Install is atomic — already-written files are rolled back if anything fails. |
 | `src/install_cli/setup_command.py` | CLI entry point logic. Handles `--dry-run`, `--apply`, `--repair`, `--force`, `--uninstall`, and per-host subcommands. |
 | `src/install_cli/mcp_config.py` | MCP configuration support |
+| `src/install_cli/codex_plugin_config.py` | Codex local marketplace registration and plugin config |
 | `src/install_cli/resources.py` | Package resource loading helpers |
 | `src/install_cli/__main__.py` | Entry point registered as `pathly-setup` |
 
@@ -229,6 +236,8 @@ metadata only.
 [project.scripts]
 pathly-setup = "install_cli.__main__:main"
 pathly-tokens = "pathly_telemetry.report:main"
+pathly-events = "pathly_orchestrator.eventlog:_cli"
+pathly-state = "pathly_orchestrator.eventlog:_state_cli"
 ```
 
 ---

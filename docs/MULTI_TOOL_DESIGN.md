@@ -10,6 +10,8 @@ packaged for Claude Code, Codex, the Python CLI, and future hosts.
 pathly-adapters/                 ← repo root (single package)
 ├── src/
 │   ├── install_cli/             ← Python CLI: detect, stitch, setup_command
+│   ├── pathly_orchestrator/     ← FSM event-log module (internal, src-layout package)
+│   ├── pathly_hooks/            ← Hook scripts deployed by installer into host tool settings
 │   └── pathly_data/             ← installed package data
 │       ├── core/                ← single source of truth (tool-agnostic)
 │       │   ├── agents/
@@ -19,7 +21,6 @@ pathly-adapters/                 ← repo root (single package)
 │           ├── claude/
 │           ├── codex/
 │           └── copilot/
-├── orchestrator/                ← local FSM event-log module (internal)
 ├── docs/
 └── pyproject.toml
 ```

@@ -47,7 +47,7 @@ flowchart TD
 
 ```text
 ~/.claude/
-├── agents/                    ← 11 stitched behavioral contracts
+├── agents/                    ← 12 stitched behavioral contracts
 │   ├── builder.md
 │   ├── reviewer.md
 │   ├── architect.md
@@ -59,7 +59,7 @@ flowchart TD
 │   │   └── SKILL.md
 │   ├── review/
 │   │   └── SKILL.md
-│   ├── pathly-team-flow/
+│   ├── pathly-team/
 │   │   └── SKILL.md
 │   ├── pathly-test/
 │   │   └── SKILL.md
@@ -118,7 +118,8 @@ Command                   Purpose
 /pathly pause             pause session
 /pathly end               retro + archive
 /pathly retro             write retrospective (auto-detects feature)
-/pathly team-flow         run full team pipeline (auto-detects feature)
+/pathly team              run full team pipeline (auto-detects feature)
+/pathly scout-path        targeted code-path scout (read-only lookup)
 /pathly archive           archive completed feature (auto-detects feature)
 /pathly lessons           promote lessons from retros
 /pathly prd-import        import a PRD file
@@ -178,7 +179,7 @@ existing files that would be replaced, final start command per host.
 `_meta/*.yaml` adds only the tool-specific spawn call on top:
 
 ```
-# src/pathly_data/core/skills/team-flow.md
+# src/pathly_data/core/skills/team.md
 Delegate implementation to the builder agent.
 Then delegate review to the reviewer agent.
 

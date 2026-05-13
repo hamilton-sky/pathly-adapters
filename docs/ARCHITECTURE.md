@@ -35,11 +35,12 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   │   ├── tester.md
 │       │   │   └── web-researcher.md
 │       │   ├── skills/          ← Skill logic in natural language (tool-agnostic .md)
-│       │   │   ├── team-flow.md
+│       │   │   ├── team.md
 │       │   │   ├── explore.md
 │       │   │   ├── build.md
 │       │   │   ├── review.md
 │       │   │   ├── storm.md
+│       │   │   ├── scout-path.md
 │       │   │   └── ...
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
@@ -48,7 +49,7 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │           ├── codex/           ← .codex-plugin/ + _meta/*.yaml per agent/skill
 │           └── copilot/         ← _meta/*.yaml per agent/skill
 │
-└── orchestrator/                ← Local FSM event-log module (internal)
+└── src/pathly_orchestrator/     ← FSM event-log module (internal, src-layout package)
 ```
 
 ## Adapter Surfaces Per Host
@@ -70,7 +71,7 @@ skill prompts in Codex.
 | **Who triggers it** | Orchestrator or other agents | User directly (`/skill-name`) |
 | **Lives in** | `core/agents/` | `core/skills/` |
 | **Format** | Markdown behavior contract | SKILL.md (YAML frontmatter + instructions) |
-| **Example** | builder, reviewer, scout | /team-flow, /explore, /review |
+| **Example** | builder, reviewer, scout | /team, /explore, /review |
 
 ## Stitch Pipeline
 
@@ -106,9 +107,11 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 | `src/install_cli/stitch.py` | Merges `core/` content with adapter `_meta/*.yaml` into deployable files |
 | `src/install_cli/materialize.py` | Writes stitched output to `~/.claude/`, `~/.codex/`, etc. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back. |
 | `src/install_cli/setup_command.py` | CLI entry point registered as `pathly-setup` |
+| `src/install_cli/codex_plugin_config.py` | Codex local marketplace registration and plugin config |
 | `src/pathly_data/core/` | Source-of-truth agent contracts, skill logic, plan templates — never edited by install |
 | `src/pathly_data/adapters/` | Per-tool YAML metadata (`_meta/`) and plugin manifests |
-| `orchestrator/` | Local Python module at the repo root. Implements an FSM event-log for tracking LLM conversation context. Not a user-facing CLI tool. |
+| `src/pathly_orchestrator/` | FSM event-log package. Implements `pathly-events` and `pathly-state` CLI entry points. |
+| `src/pathly_hooks/` | Hook scripts (`classify_feedback.py`, `inject_feedback_ttl.py`) deployed by install into host tool settings. |
 
 ## Host Detection
 
@@ -135,7 +138,7 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 Each adapter's `_meta/*.yaml` adds only the tool-specific spawn call on top:
 
 ```
-# src/pathly_data/core/skills/team-flow.md
+# src/pathly_data/core/skills/team.md
 Delegate implementation to the builder agent.
 Then delegate review to the reviewer agent.
 
