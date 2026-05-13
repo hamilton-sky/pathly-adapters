@@ -9,7 +9,6 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 All events are appended to `plans/<feature>/EVENTS.jsonl` as JSON lines.
 State snapshots are written to `plans/<feature>/STATE.json`.
 
-- **Transition state to X:** Write STATE.json `{"current": "X"}`. Append `{"type": "STATE_TRANSITION", "to": "X"}`.
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>"}`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>"}`.
 - **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>"}`.
@@ -117,10 +116,13 @@ All acceptance criteria: PASS.
 Reply 'done' to proceed to retro.
 ```
 - Proceed signal: log human response with reply value. Advance.
-- Stop signal: log human response "stop". Write STATE.json with current state. Halt.
+- Stop signal: log human response "stop". Halt.
 - Unrecognised: re-prompt without logging.
 
 If autoFlow: log human response "auto-advance".
 
-Transition state → RETRO.
-Route back to `team [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to retro.)
+**Write-or-delete transition artifact:**
+- If tests still failing after fix loop: TEST_FAILURES.md already exists — keep it.
+- If all tests pass: delete `<storage_path>/feedback/TEST_FAILURES.md` if it exists.
+
+Return. Orchestrator determines next state from transition_rules.

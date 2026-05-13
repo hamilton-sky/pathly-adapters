@@ -11,7 +11,6 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`. Conv N is the most recent BU
 All events are appended to `plans/<feature>/EVENTS.jsonl` as JSON lines.
 State snapshots are written to `plans/<feature>/STATE.json`.
 
-- **Transition state to X:** Write STATE.json `{"current": "X"}`. Append `{"type": "STATE_TRANSITION", "to": "X"}`.
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>"}`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>"}`.
 - **Log retry:** Append `{"type": "RETRY", "key": "conv-N:FILE.md"}`.
@@ -105,8 +104,7 @@ Delete plans/[feature]/feedback/ARCH_FEEDBACK.md when resolved.
 Report: what changed in the design.
 ```
 After architect resolves: log file deleted for ARCH_FEEDBACK.md.
-Transition state → BUILDING.
-Route back to `team [FEATURE] [rigor] [autoFlow]`. (Orchestrator re-runs build for Conv N.)
+Return. Orchestrator determines next state from transition_rules.
 
 ### If `REVIEW_FAILURES.md` exists (no ARCH_FEEDBACK.md)
 
@@ -152,16 +150,17 @@ Reviewer: PASS. Commit your changes now.
 Reply 'continue' for the next conversation, or 'stop' to pause here.
 ```
 - Proceed signal: log human response with reply value. Advance.
-- Stop signal: log human response "stop". Write STATE.json with current state. Halt.
+- Stop signal: log human response "stop". Halt.
 - Unrecognised: re-prompt without logging.
 
 If autoFlow: log human response "auto-advance".
 
 Mark Conv N as DONE in `plans/[feature]/PROGRESS.md`.
 
-**Check if all conversations are now DONE:**
-- If more TODO conversations remain: transition state → BUILDING.
-  Route back to `team [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to build for next conv.)
-- If all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl.
-  Transition state → TESTING.
-  Route back to `team [FEATURE] [rigor] [autoFlow]`. (Orchestrator routes to test.)
+**Write-or-delete transition artifacts:**
+- If more TODO conversations remain: write `<storage_path>/MORE_CONVS_NEEDED.md` (one-line note).
+  Else: delete `<storage_path>/MORE_CONVS_NEEDED.md` if it exists.
+- If REVIEW_FAILURES.md was written this run: it already exists — keep it.
+  If reviewer passed cleanly (no REVIEW_FAILURES.md written): delete `<storage_path>/feedback/REVIEW_FAILURES.md` if it exists.
+
+Return. Orchestrator determines next state from transition_rules.

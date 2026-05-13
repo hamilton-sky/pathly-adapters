@@ -44,15 +44,31 @@ disagree, recover from disk.
 
 ## Subagent routing
 
+Orchestrator is the only entity that writes `current` to STATE.json. Sub-skills write artifacts only.
+
 For each FSM state, look up the mapped agent or sub-skill in `agent_map` from the loaded
 flow config. Spawn it with `topic [rigor] [autoFlow]` as arguments. After it returns,
-re-read `<storage_path>/STATE.json` and route again. Repeat until state is DONE or the
-user stops the pipeline.
+evaluate `transition_rules` to determine the next state (see below), write STATE.json,
+and route again. Repeat until state is DONE or the user stops the pipeline.
 
 Special `agent_map` values:
 - `wait` — orchestrator pauses; see BLOCKED_ON_HUMAN protocol in Feedback routing.
 
 When state is DONE: print `[Complete] Flow '<flow>' for '<topic>' is DONE.` and stop.
+
+## Transition rules evaluation
+
+After each sub-agent or sub-skill returns control, determine the next state:
+
+1. Read `transition_rules[current_state]` from the loaded flow config.
+   If no `transition_rules` entry exists for the current state: use `transitions[current_state][0]` as the default next state (graceful — flows without transition_rules still work).
+2. For each entry in `on_artifact` (in order listed in the YAML):
+   - Check whether that file exists under `<storage_path>/`.
+   - First match → set `next_state` to the mapped state value. Stop checking.
+3. If no artifact matched → set `next_state` to `default`.
+4. Write `<storage_path>/STATE.json` with `{"current": next_state}`.
+5. Append `{"type": "STATE_TRANSITION", "to": next_state}` to `<storage_path>/EVENTS.jsonl`.
+6. Continue FSM loop with `next_state`.
 
 ## Feedback routing
 

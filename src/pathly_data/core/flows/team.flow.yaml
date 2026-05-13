@@ -55,3 +55,19 @@ feedback_routing:
   IMPL_QUESTIONS: planner
   DESIGN_QUESTIONS: architect
   HUMAN_QUESTIONS: human
+
+transition_rules:
+  BUILDING:
+    on_artifact:
+      BLOCKED_ON_HUMAN.md: BLOCKED_ON_HUMAN
+    default: REVIEWING
+  REVIEWING:
+    on_artifact:
+      REVIEW_FAILURES.md: BUILDING
+      MORE_CONVS_NEEDED.md: BUILDING
+    default: TESTING
+  TESTING:
+    on_artifact:
+      TEST_FAILURES.md: TESTING
+      BLOCKED_ON_HUMAN.md: BLOCKED_ON_HUMAN
+    default: RETRO

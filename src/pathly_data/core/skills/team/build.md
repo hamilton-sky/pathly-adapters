@@ -10,7 +10,6 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 All events are appended to `plans/<feature>/EVENTS.jsonl` as JSON lines.
 State snapshots are written to `plans/<feature>/STATE.json`.
 
-- **Transition state to X:** Write STATE.json `{"current": "X"}`. Append `{"type": "STATE_TRANSITION", "to": "X"}`.
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>"}`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>"}`.
 - **Log retry:** Append `{"type": "RETRY", "key": "conv-N:FILE.md"}`.
@@ -125,6 +124,5 @@ Both files can exist simultaneously. Route one at a time using the priority orde
 
 After Phase 3 completes with no blocking feedback files:
 Append `{"type": "AGENT_DONE", "agent": "builder"}` to EVENTS.jsonl.
-Transition state → REVIEWING.
-Route back to `team [FEATURE] [rigor] [autoFlow]`.
-(Orchestrator will route to `team/review`.)
+
+Return. Orchestrator determines next state from transition_rules.
