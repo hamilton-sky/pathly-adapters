@@ -1,0 +1,4 @@
+{"type": "STATE_TRANSITION", "to": "REPRODUCING"}
+{"type": "STATE_TRANSITION", "to": "FIXING"}
+{"type": "STATE_TRANSITION", "to": "VERIFYING"}
+{"type": "STATE_TRANSITION", "to": "DONE"}
