@@ -44,6 +44,11 @@ Files in the live repo that this feature reads or modifies.
 | `src/pathly_data/core/skills/team.md` | Conv 4 | MODIFY: pass flow_config path to orchestrator spawn |
 | `src/pathly_data/core/skills/debug.md` | Conv 4 | MODIFY: stop running inline; spawn orchestrator with debug flow config |
 | `src/pathly_data/core/skills/explore.md` | Conv 4 | MODIFY: stop running inline; spawn orchestrator with explore flow config |
+| `src/pathly_data/core/flows/team.flow.yaml` | Conv 4b | MODIFY: add transition_rules section (artifact-based routing for BUILDING, REVIEWING, TESTING) |
+| `src/pathly_data/core/skills/team/build.md` | Conv 4b | MODIFY: remove STATE.json transition write; add return instruction |
+| `src/pathly_data/core/skills/team/review.md` | Conv 4b | MODIFY: remove routing logic; write MORE_CONVS_NEEDED.md instead; keep PROGRESS.md update |
+| `src/pathly_data/core/skills/team/test.md` | Conv 4b | MODIFY: remove STATE.json transition write; keep internal fix loop |
+| `src/pathly_data/core/agents/orchestrator.md` | Conv 4b | MODIFY: add transition_rules evaluation loop; add ownership comment |
 | `src/install_cli/resources.py` | Conv 5 | MODIFY: add `core_flows_path()` helper |
 | `src/install_cli/stitch.py` | Conv 5 | MODIFY: add `flows_dest` parameter to `stitch_skill()` |
 | `src/install_cli/materialize.py` | Conv 5 | MODIFY: add `materialize_flows()` function |
@@ -61,6 +66,7 @@ Files in the live repo that this feature reads or modifies.
 | 2 | Create core/flows/ YAML configs | S1.1, S1.2, S1.3 | TODO | `core/flows/team.flow.yaml`, `debug.flow.yaml`, `explore.flow.yaml` |
 | 3 | Generalize orchestrator.md | S2.1, S2.2 | TODO | `orchestrator.md`, `orchestrator.yaml` (both adapters) |
 | 4 | Update skill launchers | S3.1, S3.2, S3.3 | TODO | `team.md`, `debug.md`, `explore.md` |
+| 4b | Sub-skill cleanup + transition_rules | S3.4 | TODO | `team.flow.yaml`, `team/build.md`, `team/review.md`, `team/test.md`, `orchestrator.md` |
 | 5 | Materialize flow YAMLs on install | S4.1 | TODO | `resources.py`, `stitch.py`, `materialize.py`, `setup_command.py` |
 
 ---

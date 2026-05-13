@@ -362,6 +362,109 @@ Spawn **orchestrator** agent:
 
 ---
 
+### Phase 8a — Extend team.flow.yaml with transition_rules   ← Conversation: 4b
+
+**File:** `src/pathly_data/core/flows/team.flow.yaml` — MODIFY
+
+Add a `transition_rules` top-level key. Each entry maps a state name to an ordered list of artifact checks and a default next state. Orchestrator evaluates checks top-to-bottom; first match wins; `default` fires when no artifact is present.
+
+```yaml
+transition_rules:
+  BUILDING:
+    on_artifact:
+      BLOCKED_ON_HUMAN.md: BLOCKED_ON_HUMAN
+    default: REVIEWING
+  REVIEWING:
+    on_artifact:
+      REVIEW_FAILURES.md: BUILDING
+      MORE_CONVS_NEEDED.md: BUILDING
+    default: TESTING
+  TESTING:
+    on_artifact:
+      TEST_FAILURES.md: TESTING
+      BLOCKED_ON_HUMAN.md: BLOCKED_ON_HUMAN
+    default: RETRO
+```
+
+Artifact paths are resolved relative to the run's `storage_path` (e.g. `pathly/plans/auth-rewrite/REVIEW_FAILURES.md`).
+
+**Done when:**
+- `grep "transition_rules" src/pathly_data/core/flows/team.flow.yaml` returns the new section.
+- `grep "MORE_CONVS_NEEDED" src/pathly_data/core/flows/team.flow.yaml` returns a match.
+
+**Delivers stories:** S3.4 (partial)
+**Depends on:** Phase 1 complete (team.flow.yaml exists); Conv 4 DONE (base structure confirmed)
+**Enables:** Phase 8b
+
+---
+
+### Phase 8b — Strip STATE.json transition writes from team sub-skills   ← Conversation: 4b
+
+**Files:**
+- `src/pathly_data/core/skills/team/build.md` — MODIFY
+- `src/pathly_data/core/skills/team/review.md` — MODIFY
+- `src/pathly_data/core/skills/team/test.md` — MODIFY
+
+**Changes to `team/build.md`:**
+1. Remove the "Transition state → REVIEWING" line at the end.
+2. Remove the "Transition state to X: Write STATE.json" instruction from the preamble — build.md no longer transitions state.
+3. Add a closing line: "Return. Orchestrator determines next state from transition_rules."
+
+**Changes to `team/review.md`:**
+1. Remove the routing block:
+   ```
+   If more TODO conversations remain: transition state → BUILDING.
+   Else: transition state → TESTING.
+   ```
+2. Replace with: if more TODO conversations remain, write `MORE_CONVS_NEEDED.md` under the run's storage path. Write no file if all conversations are done.
+3. Remove the "Transition state to X: Write STATE.json" preamble instruction.
+4. **Keep:** the PROGRESS.md update (marking Conv N as DONE) — this is reporting, not routing.
+5. Add a closing line: "Return. Orchestrator determines next state from transition_rules."
+
+**Changes to `team/test.md`:**
+1. Remove the "Transition state → RETRO" line at the end.
+2. Remove the "Transition state to X: Write STATE.json" preamble instruction.
+3. Keep the internal fix loop intact — tester writes TEST_FAILURES.md and loops with builder internally. Only the final transition out of TESTING is removed.
+4. Add a closing line: "Return. Orchestrator determines next state from transition_rules."
+
+**Done when:**
+- `grep "Transition state" src/pathly_data/core/skills/team/build.md` returns no output.
+- `grep "Transition state" src/pathly_data/core/skills/team/review.md` returns no output.
+- `grep "Transition state" src/pathly_data/core/skills/team/test.md` returns no output.
+- `grep "→ REVIEWING\|→ TESTING\|→ RETRO\|→ BUILDING" src/pathly_data/core/skills/team/build.md src/pathly_data/core/skills/team/review.md src/pathly_data/core/skills/team/test.md` returns no output (state names removed from routing context; may appear in prose description only).
+- `grep "MORE_CONVS_NEEDED" src/pathly_data/core/skills/team/review.md` returns the new write instruction.
+
+**Delivers stories:** S3.4 (partial)
+**Depends on:** Phase 8a complete (transition_rules exist in team.flow.yaml before sub-skills reference them)
+**Enables:** Phase 8c
+
+---
+
+### Phase 8c — Update orchestrator.md FSM loop to apply transition_rules   ← Conversation: 4b
+
+**File:** `src/pathly_data/core/agents/orchestrator.md` — MODIFY
+
+After each sub-agent or sub-skill returns, the orchestrator currently relies on the sub-skill having written the next state into STATE.json. Replace this with a generic transition_rules evaluation loop.
+
+**Changes:**
+1. After spawning a sub-agent/skill and receiving control back, read `transition_rules[current_state]` from the loaded flow config.
+2. For each entry in `on_artifact` (in order): check whether that file exists under the run's storage_path. First match → set next_state to the mapped state value.
+3. If no artifact matched → set next_state to `default`.
+4. Write STATE.json with `{"current": next_state}`. Append STATE_TRANSITION event to EVENTS.jsonl.
+5. Continue FSM loop with next_state.
+6. If current_state has no `transition_rules` entry in the flow config, proceed to `default` state from the `transitions` map (graceful — flows without transition_rules still work).
+
+**Done when:**
+- `grep "transition_rules" src/pathly_data/core/agents/orchestrator.md` returns the evaluation logic.
+- `grep "on_artifact" src/pathly_data/core/agents/orchestrator.md` returns the artifact check loop.
+- Orchestrator.md contains a note: "Orchestrator is the only entity that writes `current` to STATE.json. Sub-skills write artifacts only."
+
+**Delivers stories:** S3.4 (complete)
+**Depends on:** Phase 8b complete; Phase 4 complete (orchestrator is already generic, reads flow_config)
+**Enables:** Conv 5 (materialize)
+
+---
+
 ### Phase 9 — Materialize flow YAMLs during pathly-setup   ← Conversation: 5
 
 **Files:**

@@ -214,6 +214,69 @@ If fundamentally broken, rollback with `git checkout` on affected files and retr
 
 ---
 
+## Conversation 4b: Sub-skill cleanup + transition_rules (Phases 8a–8c)
+
+**Stories delivered:** S3.4
+
+**Pre-condition:** Conv 4 of this feature must be DONE. Conv 3 must be DONE.
+
+**Prompt to paste:**
+```
+Read plans/fsm-configurable/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+
+Implement fsm-configurable Conversation 4b (Phases 8a–8c) from plans/fsm-configurable/IMPLEMENTATION_PLAN.md.
+
+**Pre-flight:**
+1. Run `git status` to confirm a clean working tree.
+2. Read `plans/fsm-configurable/PROGRESS.md` — confirm Conv 3 and Conv 4 are DONE. If not, stop and report.
+
+**Before editing anything:** Read all five files in full:
+- `src/pathly_data/core/flows/team.flow.yaml`
+- `src/pathly_data/core/skills/team/build.md`
+- `src/pathly_data/core/skills/team/review.md`
+- `src/pathly_data/core/skills/team/test.md`
+- `src/pathly_data/core/agents/orchestrator.md`
+
+**Codebase files this conversation modifies:**
+- `src/pathly_data/core/flows/team.flow.yaml` — add transition_rules section
+- `src/pathly_data/core/skills/team/build.md` — remove STATE.json transition write
+- `src/pathly_data/core/skills/team/review.md` — remove routing logic; replace with MORE_CONVS_NEEDED.md artifact write
+- `src/pathly_data/core/skills/team/test.md` — remove STATE.json transition write; preserve internal fix loop
+- `src/pathly_data/core/agents/orchestrator.md` — add transition_rules evaluation after each sub-agent returns
+
+Scope:
+- Phase 8a: team.flow.yaml — add transition_rules covering BUILDING, REVIEWING, TESTING (story S3.4 partial) — see IMPLEMENTATION_PLAN.md Phase 8a
+- Phase 8b: strip STATE.json transition writes from build.md, review.md, test.md — see IMPLEMENTATION_PLAN.md Phase 8b
+- Phase 8c: orchestrator.md — add artifact-based transition_rules evaluation loop; add ownership comment — see IMPLEMENTATION_PLAN.md Phase 8c
+
+Rules:
+- Do NOT remove the PROGRESS.md update from review.md — marking Conv N as DONE is reporting, not routing.
+- Do NOT touch the internal fix loop inside test.md — only the final "Transition state → RETRO" line is removed.
+- Do NOT touch debug.flow.yaml or explore.flow.yaml — transition_rules are only needed for team flow now.
+- Orchestrator.md already reads flow_config generically after Conv 3 — add transition_rules support as an extension to the existing FSM loop, not a rewrite.
+- Sub-skills must each end with: "Return. Orchestrator determines next state from transition_rules."
+
+Verify:
+- `grep "transition_rules" src/pathly_data/core/flows/team.flow.yaml` — returns the new section.
+- `grep "Transition state" src/pathly_data/core/skills/team/build.md` — no output.
+- `grep "Transition state" src/pathly_data/core/skills/team/review.md` — no output.
+- `grep "Transition state" src/pathly_data/core/skills/team/test.md` — no output.
+- `grep "MORE_CONVS_NEEDED" src/pathly_data/core/skills/team/review.md` — returns the write instruction.
+- `grep "transition_rules" src/pathly_data/core/agents/orchestrator.md` — returns the evaluation logic.
+- `grep "only entity" src/pathly_data/core/agents/orchestrator.md` — returns the ownership comment.
+- `git diff --stat` — shows only team.flow.yaml, build.md, review.md, test.md, orchestrator.md.
+
+After done, update plans/fsm-configurable/PROGRESS.md Phases 8a–8c and Conv 4b to DONE.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+If fundamentally broken, rollback with `git checkout -- <file>` and retry the affected phase only.
+```
+
+**Expected output:** Sub-skills write artifacts only; orchestrator evaluates transition_rules to route FSM; `git diff --stat` shows exactly those 5 files.
+**Files touched:** `src/pathly_data/core/flows/team.flow.yaml`, `src/pathly_data/core/skills/team/build.md`, `src/pathly_data/core/skills/team/review.md`, `src/pathly_data/core/skills/team/test.md`, `src/pathly_data/core/agents/orchestrator.md`
+
+---
+
 ## Conversation 5: Materialize flow YAMLs during pathly-setup (Phase 9)
 
 **Stories delivered:** S4.1

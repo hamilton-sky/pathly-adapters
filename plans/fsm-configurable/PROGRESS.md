@@ -15,6 +15,7 @@
 | S3.1 | team.md passes flow_config when spawning orchestrator | Conv 4 | TODO |
 | S3.2 | debug.md spawns the orchestrator instead of running inline | Conv 4 | TODO |
 | S3.3 | explore.md spawns the orchestrator instead of running inline | Conv 4 | TODO |
+| S3.4 | sub-skills report outcome only; orchestrator owns all state transitions | Conv 4b | TODO |
 | S4.1 | pathly-setup materializes flow YAMLs and skill files reference the installed path | Conv 5 | TODO |
 
 ## Conversation Breakdown
@@ -25,6 +26,7 @@
 | 2 | 1–3 | S1.1, S1.2, S1.3 | TODO | `git diff --stat` (3 new flow YAML files only) |
 | 3 | 4–5 | S2.1, S2.2 | TODO | `git diff --stat` (orchestrator.md + orchestrator YAML) |
 | 4 | 6–8 | S3.1, S3.2, S3.3 | TODO | `git diff --stat` (team.md, debug.md, explore.md) |
+| 4b | 8a–8c | S3.4 | TODO | `grep "Transition state" team/build.md team/review.md team/test.md` returns no output |
 | 5 | 9 | S4.1 | TODO | `grep "materialize_flows" src/install_cli/setup_command.py` returns import + call |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
@@ -44,6 +46,9 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 4 | 6 | `src/pathly_data/core/skills/team.md` | Add flow_config to orchestrator spawn block | grep flow_config returns src/pathly_data/core/flows/team.flow.yaml | TODO |
 | 4 | 7 | `src/pathly_data/core/skills/debug.md` | Replace inline FSM steps with orchestrator spawn | grep orchestrator returns spawn instruction; grep flow_config returns src/pathly_data/core/flows/debug.flow.yaml | TODO |
 | 4 | 8 | `src/pathly_data/core/skills/explore.md` | Replace inline spawning with orchestrator spawn | grep orchestrator returns spawn instruction; grep flow_config returns src/pathly_data/core/flows/explore.flow.yaml | TODO |
+| 4b | 8a | `src/pathly_data/core/flows/team.flow.yaml` | Add transition_rules section covering BUILDING, REVIEWING, TESTING | grep transition_rules returns new section; grep MORE_CONVS_NEEDED returns match | TODO |
+| 4b | 8b | `team/build.md`, `team/review.md`, `team/test.md` | Strip STATE.json transition writes; review.md writes MORE_CONVS_NEEDED.md instead of routing | grep "Transition state" all three files returns no output | TODO |
+| 4b | 8c | `src/pathly_data/core/agents/orchestrator.md` | Add transition_rules evaluation loop after each sub-agent returns | grep transition_rules and on_artifact returns logic; ownership comment present | TODO |
 | 5 | 9 | `src/install_cli/resources.py`, `stitch.py`, `materialize.py`, `setup_command.py` | Materialize flow YAMLs on install; rewrite flow_config paths in stitched skills | grep materialize_flows setup_command.py returns import + call; grep flows_dest stitch.py returns parameter | TODO |
 
 ## Prerequisites

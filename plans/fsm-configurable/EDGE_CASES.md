@@ -60,6 +60,30 @@
 
 ---
 
+## EC-9: sub-skill partial cleanup — some still write STATE.json after Conv 4b
+
+**Scenario:** Builder removes `Transition state` from build.md but misses the equivalent preamble instruction ("Transition state to X: Write STATE.json `{"current": "X"}`") which also appears in review.md and test.md. Or builder removes the routing logic from review.md but forgets to add the `MORE_CONVS_NEEDED.md` write, leaving no signal for orchestrator.
+
+**Risk:** Orchestrator evaluates transition_rules and finds no artifact → falls to `default` → transitions to TESTING even when there are more convos to build. Silent correctness failure.
+
+**Mitigation:** Phase 8b done-when checks verify all three grep patterns return no output AND the `MORE_CONVS_NEEDED.md` write instruction is present in review.md. Builder must run all four verify commands before marking Phase 8b done.
+
+**Acceptance check:** Phase 8b done-when greps in IMPLEMENTATION_PLAN.md cover all three files for `Transition state` AND verify `MORE_CONVS_NEEDED` appears in review.md.
+
+---
+
+## EC-10: orchestrator.md already writes current — Phase 8c creates duplicate logic
+
+**Scenario:** After Conv 3 (Phase 4), orchestrator.md already writes STATE.json as part of the generic FSM loop. Phase 8c adds transition_rules evaluation which also writes STATE.json. Builder appends a second write block rather than merging, resulting in STATE.json being written twice per transition.
+
+**Risk:** Second write overwrites first; or conflicting logic paths for different flows (team uses transition_rules, debug does not — orchestrator needs to handle both gracefully).
+
+**Mitigation:** Builder reads orchestrator.md in full before Phase 8c. The transition_rules evaluation REPLACES the existing next-state determination logic — it does not append. For states with no `transition_rules` entry in the flow config, the orchestrator falls back to the simple `transitions` map from the flow YAML (already present from Conv 3). This graceful fallback means debug.flow.yaml and explore.flow.yaml do not need transition_rules and still work.
+
+**Acceptance check:** After Phase 8c, `grep "current" src/pathly_data/core/agents/orchestrator.md` returns exactly one write instruction in the FSM loop (not two).
+
+---
+
 ## EC-7: malformed flow YAML is written to disk without validation
 
 **Scenario:** `materialize_flows()` copies a flow YAML that is missing a required field (e.g., `agent_map`) to `~/.claude/agents/`. The file is installed successfully. When the user runs `/pathly team`, orchestrator reads the YAML, finds no `agent_map`, and silently routes nothing or crashes mid-run.

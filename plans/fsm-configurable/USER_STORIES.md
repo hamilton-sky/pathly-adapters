@@ -146,6 +146,21 @@ This feature consolidates all runtime output under a `pathly/` root, extracts al
 
 ---
 
+### Story 3.4: sub-skills report outcome only — orchestrator owns all state transitions
+**As a** flow author, **I want** team sub-skills (build, review, test) to write artifacts only and never write STATE.json transitions, **so that** the orchestrator is the single entity that controls the FSM state and routing decisions are not duplicated between skills and the engine.
+
+**Acceptance Criteria:**
+- [ ] `team/build.md` does not contain `Transition state` or `STATE.json` write instructions for `current`
+- [ ] `team/review.md` does not contain routing logic (`if more TODO → BUILDING, else → TESTING`); instead writes `MORE_CONVS_NEEDED.md` if more conversations remain
+- [ ] `team/review.md` does not write `current` to STATE.json
+- [ ] `team/test.md` does not contain `Transition state → RETRO`; does not write `current` to STATE.json
+- [ ] `team.flow.yaml` declares `transition_rules` covering BUILDING, REVIEWING, and TESTING states with artifact-based routing
+- [ ] `orchestrator.md` FSM loop applies `transition_rules` from the flow config after each sub-agent returns, and is the only entity writing `current` to STATE.json
+
+**Delivered by:** Phases 8a–8c → Conversation 4b
+
+---
+
 ### Story 4.1: pathly-setup materializes flow YAMLs and skill files reference the installed path
 **As a** user who installed pathly via `pathly-setup --apply`, **I want** the orchestrator to find flow YAML files when I run `/team` from my own project, **so that** pipelines work after install and not just inside the pathly-adapters repo.
 
