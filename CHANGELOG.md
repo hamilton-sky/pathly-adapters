@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.4.1 — 2026-05-13
+
+### Schema fixes
+
+- Add missing `inputs` property to `pathly-meta.schema.json` — VS Code was
+  reporting "Property inputs is not allowed" on `orchestrator.yaml` because the
+  schema predated the `inputs` field added for agent input definitions.
+- Move `state.schema.json` into `src/pathly_data/schemas/` — it previously only
+  existed as a root-level copy that was deleted when redundant root copies were
+  removed. Now lives alongside `pathly-meta.schema.json` as the canonical location.
+- Remove redundant root-level `schemas/` directory — `.vscode/settings.json`
+  already pointed to `src/pathly_data/schemas/` directly; the root copies caused
+  drift and false validation errors.
+
+---
+
 ## 2.4.0 — 2026-05-13
 
 ### Mandatory scout spawning rules enforced across all agents
