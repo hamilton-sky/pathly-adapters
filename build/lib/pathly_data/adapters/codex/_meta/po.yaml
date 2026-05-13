@@ -1,4 +1,0 @@
-﻿name: po
-description: Product Owner advisor — interactive requirements discussion. Probes what to build, who needs it, MVP scope, and edge cases through back-and-forth conversation. Challenges assumptions and surfaces gaps before architecture begins.
-model: gpt-5.4
-can_spawn: [web-researcher]

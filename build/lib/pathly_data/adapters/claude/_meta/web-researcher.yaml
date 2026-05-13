@@ -1,4 +1,0 @@
-﻿name: web-researcher
-description: External knowledge gatherer — searches the web for design patterns, library docs, best practices, and domain knowledge. Use when architect or planner needs external context before making design decisions. Returns cited findings, never writes.
-model: sonnet
-tools: [WebSearch, WebFetch]

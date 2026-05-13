@@ -1,4 +1,0 @@
-﻿name: tester
-description: Test planning, test execution, and coverage analysis. Use after implementation to verify stories are delivered — writes test plans from acceptance criteria, runs tests, reports gaps. Does not fix bugs.
-model: gpt-5.4
-can_spawn: [quick, scout]

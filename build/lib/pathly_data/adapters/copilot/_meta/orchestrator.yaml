@@ -1,4 +1,0 @@
-﻿name: orchestrator
-description: Pipeline orchestrator — deterministic filesystem FSM for the feature pipeline. Recovers state from disk, processes one event, emits one next action, and never implements anything itself.
-model: claude-opus-4-7
-status: experimental

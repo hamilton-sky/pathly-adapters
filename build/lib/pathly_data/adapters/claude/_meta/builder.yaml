@@ -1,5 +1,0 @@
-﻿name: builder
-description: Write code, fix bugs, implement features, refactor existing code, and run tests. Use for all coding execution tasks after the plan is clear.
-model: sonnet
-tools: [Read, Glob, Grep, Edit, Write, Bash, TodoWrite]
-can_spawn: [quick, scout]

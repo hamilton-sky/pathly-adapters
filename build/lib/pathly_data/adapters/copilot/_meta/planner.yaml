@@ -1,4 +1,0 @@
-﻿name: planner
-description: Requirements, user stories, acceptance criteria, and feature planning. Use when you need to define WHAT to build — stories, scope decisions, conversation decomposition, and the full plans/ folder.
-model: claude-sonnet-4-6
-status: experimental
