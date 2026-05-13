@@ -15,6 +15,16 @@ Parse `$ARGUMENTS` (order doesn't matter):
 - `plan` → `entryStage = plan` | `build` → `entryStage = build` | `test` → `entryStage = test`
 - Defaults: `entryStage = discovery`, `rigor = lite`
 
+### Guard 1 — Feature name validation
+
+After parsing, validate `FEATURE` before continuing:
+- If `FEATURE` contains spaces, newlines, tabs, or is longer than 50 characters: stop →
+  ```
+  Invalid feature name. Use a short slug, e.g. "fix-hooks" or "auth-refactor".
+  Re-run: /pathly-team <feature-name> [fast|lite|standard|strict]
+  ```
+- If `FEATURE` was derived from auto-detection (not from `$ARGUMENTS`), confirm with the user before proceeding.
+
 ## Feature detection
 
 If no `FEATURE` was found in `$ARGUMENTS`, auto-detect:
@@ -48,12 +58,26 @@ Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
 ## Spawn orchestrator
 
-After mode selection is complete (autoFlow is set), spawn the **orchestrator** agent with:
+After mode selection is complete (autoFlow is set), spawn the **orchestrator** agent with
+**exactly these 5 parameters and nothing else**:
 - flow_config: src/pathly_data/core/flows/team.flow.yaml
 - topic: [parsed feature name]
 - rigor: [parsed rigor]
 - autoFlow: [true/false]
 - entryStage: [parsed entryStage, default: discovery]
+
+### Guard 2 — Spawn isolation
+
+**CRITICAL:** Pass ONLY the 5 parameters above. Do NOT include any of the following in
+the orchestrator prompt:
+- Feature descriptions or problem summaries
+- File paths, line numbers, or code snippets
+- Implementation details or bug analysis
+- Conversation history or prior research
+
+The FSM discovers all context through its own agents (discover → plan → build).
+Passing extra context into the orchestrator prompt bypasses the flow and causes the
+orchestrator to implement instead of route — breaking the entire pipeline.
 
 The orchestrator handles all FSM state recovery, routing, git commits, PROGRESS.md updates,
 and artifact archiving. Do not perform these actions in team.md.

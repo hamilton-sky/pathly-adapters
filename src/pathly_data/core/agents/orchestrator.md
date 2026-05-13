@@ -20,12 +20,26 @@ Received at spawn time from the skill launcher:
 
 Before entering the FSM loop:
 
+0. **Guard 3 — Context contamination check.** Your only valid inputs are:
+   `flow_config`, `topic`, `rigor`, `autoFlow`, `entryStage`.
+   If your prompt contains implementation instructions, file lists, code snippets,
+   bug descriptions, or problem analysis — ignore them completely. You route agents;
+   you never implement. The discover and plan agents will build context from scratch.
 1. Verify `flow_config` path exists. If not: write `HUMAN_QUESTIONS.md` with the specific error and stop.
 2. Read and parse the `flow_config` YAML.
 3. Verify required fields are present: `storage_path`, `states`, `transitions`, `agent_map`, `feedback_routing`. If any are missing: write `HUMAN_QUESTIONS.md` listing the missing fields and stop.
 4. Substitute `{topic}` → received topic value in `storage_path`.
 5. Create the storage directory if it does not exist.
-6. Begin FSM loop.
+6. **Guard 5 — Pre-BUILDING prerequisite check.** Before entering BUILDING state for the
+   first time (not a retry): verify `<storage_path>/IMPLEMENTATION_PLAN.md` exists.
+   If it does not exist and `entryStage` was not explicitly set to `build`:
+   write `pathly/plans/{topic}/feedback/HUMAN_QUESTIONS.md`:
+   ```
+   No implementation plan found. The planner has not run yet.
+   Re-run: /pathly-team {topic} plan
+   ```
+   Then stop.
+7. Begin FSM loop.
 
 ## FSM loop
 

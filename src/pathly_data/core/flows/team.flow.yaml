@@ -57,6 +57,11 @@ feedback_routing:
   HUMAN_QUESTIONS: human
 
 transition_rules:
+  PLANNING:
+    # Guard 4 — artifact gate: planner must produce IMPLEMENTATION_PLAN.md before BUILDING
+    on_artifact:
+      IMPLEMENTATION_PLAN.md: BUILDING
+    default: PLANNING
   BUILDING:
     on_artifact:
       BLOCKED_ON_HUMAN.md: BLOCKED_ON_HUMAN
