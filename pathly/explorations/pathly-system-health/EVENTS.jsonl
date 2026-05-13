@@ -1,0 +1,5 @@
+{"type": "FSM_INIT", "state": "FRAMING"}
+{"type": "STATE_TRANSITION", "from": "FRAMING", "to": "ANALYZING"}
+{"type": "STATE_TRANSITION", "from": "ANALYZING", "to": "TRACING"}
+{"type": "STATE_TRANSITION", "from": "TRACING", "to": "CONCLUDING"}
+{"type": "STATE_TRANSITION", "from": "CONCLUDING", "to": "DONE"}
