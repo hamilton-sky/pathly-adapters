@@ -68,7 +68,7 @@ This file was missing from the original Conv 1 scope. It contains two scout-path
 1. **Subagents table** (top of file): replace `scout-path (ROLE: architect)` and `scout-path (ROLE: planner)` with `scout agent — parallel per entry (architect lens)` and `scout agent — parallel per entry (planner lens)`.
 
 2. **Storm Phase 2 — Research**: replace `Call scout-path with: NEEDS_CONTEXT block from Phase 1, ROLE: architect` with a parallel scout spawn block:
-   - **Default: always parallel.** Spawn one scout agent per NEEDS_CONTEXT entry simultaneously. Scope overlap is not a problem — scouts are read-only and each has its own question.
+   - **Default: always parallel.** Spawn one scout agent per NEEDS_CONTEXT entry simultaneously — up to 4 scouts at once (matching the NEEDS_CONTEXT cap of 4 entries). Scope overlap is not a problem — scouts are read-only and each has its own question.
    - **Sequential only** when entry B's question references entry A's answer (e.g. "that class", "the above", "what you found"). In that case, wait for A to complete before spawning B.
    - Collect all findings. Synthesize into a single Research Findings block before Phase 3.
 

@@ -15,7 +15,7 @@ so that context research does not require an extra indirection layer that bloats
 **Acceptance criteria:**
 - AC1: The string `scout-path` does not appear in `build.md`, `review.md`, `test.md`, `explore.md`, `team/build.md`, `team/test.md`, or `team/plan.md` as an instruction to call or invoke anything.
 - AC2: Each of those seven files contains a `Spawn **scout** agent` instruction in place of the former scout-path call.
-- AC3: `team/plan.md` Storm Phase 2 and Plan Phase 2 spawn one scout per NEEDS_CONTEXT entry in parallel by default; sequential only when entry B's question explicitly references entry A's answer (e.g. "that class", "the above").
+- AC3: `team/plan.md` Storm Phase 2 and Plan Phase 2 spawn one scout per NEEDS_CONTEXT entry in parallel by default — up to 4 simultaneous scouts (matching the NEEDS_CONTEXT cap of 4); sequential only when entry B's question explicitly references entry A's answer (e.g. "that class", "the above").
 - AC4: `team/review.md` is not modified (it is already correct and serves as the reference pattern).
 
 **Edge cases:**
