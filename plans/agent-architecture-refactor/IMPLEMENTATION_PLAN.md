@@ -57,6 +57,29 @@ Update the subagents table entry that references scout-path to describe the dire
 
 ---
 
+### Phase 6.5 — Replace scout-path calls in team/plan.md with parallel scout spawns
+
+**File:** `src/pathly_data/core/skills/team/plan.md`
+
+This file was missing from the original Conv 1 scope. It contains two scout-path call sites (Storm Phase 2 and Plan Phase 2) and references them in the subagents table.
+
+**Changes:**
+
+1. **Subagents table** (top of file): replace `scout-path (ROLE: architect)` and `scout-path (ROLE: planner)` with `scout agent — parallel per entry (architect lens)` and `scout agent — parallel per entry (planner lens)`.
+
+2. **Storm Phase 2 — Research**: replace `Call scout-path with: NEEDS_CONTEXT block from Phase 1, ROLE: architect` with a parallel scout spawn block:
+   - If NEEDS_CONTEXT has one entry: spawn one scout agent with that entry and the architect lens.
+   - If NEEDS_CONTEXT has two or more independent entries (non-overlapping scopes, no cross-references): spawn one scout agent per entry in parallel. Collect all findings. Synthesize into a single Research Findings block before Phase 3.
+   - An entry is dependent if its question references the answer of a prior entry (e.g. uses "that class", "that file", "the above"). Dependent entries must be run sequentially.
+
+3. **Plan Phase 2 — Scout**: same replacement with planner lens instead of architect lens.
+
+**Done when:**
+- `grep "scout-path" src/pathly_data/core/skills/team/plan.md` returns no invocation lines.
+- `grep "parallel" src/pathly_data/core/skills/team/plan.md` returns the parallel spawn instruction in both Phase 2 blocks.
+
+---
+
 ## Conversation 2: Worker agent contracts + YAML   ← Conversation: 2
 
 **Stories:** S2.1, S2.2, S2.3, S2.4, S2.5
