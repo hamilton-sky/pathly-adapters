@@ -13,6 +13,47 @@
 - This is non-breaking for end users: the repo-root `orchestrator/` and `hooks/`
   directories were never exported by prior releases.
 
+### FSM hardening
+
+- `schemas/state.schema.json` — JSON Schema with all 13 state names and allowed-transitions
+  table. `write_state` and `append_event` validate against it at write time; invalid state or
+  illegal transition raises `ValueError`.
+- `eventlog.append_event` is now concurrency-safe via `fcntl.flock` / `msvcrt.locking`.
+- `state.schema.json` gains an optional `iteration_by_stage` map (key = FSM stage name,
+  value = attempt count) alongside the existing `retry_count_by_key`.
+
+### Hook contract integrity
+
+- `classify_feedback.py` — drop `"how"` keyword trigger; use word-boundary regex for all
+  keywords; keyword set extended with `layer`, `boundary`.
+- `protocol_contract.yaml` gains `version: 1`; `pathly_hooks.PROTOCOL_VERSION` constant
+  cross-checked at import. Desync raises loudly.
+
+### Hook deployment to Codex and Copilot VS Code
+
+- `pathly-setup codex --apply` writes `~/.codex/hooks.json` with two `PostToolUse` entries
+  under a `"pathly"` namespace key. Merge-safe: user hooks outside the `"pathly"` key are
+  never touched. `--uninstall` removes only the `"pathly"` key.
+- `pathly-setup copilot --apply` writes `.github/hooks/pathly-classify.json` and
+  `.github/hooks/pathly-ttl.json` with platform-keyed commands (windows/linux/osx).
+  `--uninstall` deletes both files.
+- Codex `install.yaml` hook event updated from `post_tool_call` → `PostToolUse`; matcher
+  added (`tool_name: apply_patch`).
+- `docs/SECURITY.md` — new "Hook surface coverage" table documenting per-host deployment
+  status; README links to it under Known Limitations.
+
+### Skill system refactor (breaking rename)
+
+- `scout-flow` renamed to **`scout-path`** across all adapters (claude, codex, copilot).
+  `scout-path` is now properly installed via `scout-path_skill.yaml` — it was previously
+  missing from all adapter manifests.
+- `team-flow` renamed to **`team`** across all adapters and all skill content files.
+  `/pathly team-flow` → `/pathly team`. Sub-skills follow: `team/build`, `team/discover`, etc.
+- Build skill (`/pathly build`) no longer owns mode selection, commits, or PROGRESS.md
+  updates. Those are the orchestrator's (`/pathly team`) responsibility.
+- `/pathly team` now asks auto/manual mode once at entry, commits after BUILDING→REVIEWING,
+  and marks PROGRESS.md DONE only after REVIEWING→TESTING (reviewer passed).
+
 ---
 
 ## 2.0.3 - 2026-05-12
