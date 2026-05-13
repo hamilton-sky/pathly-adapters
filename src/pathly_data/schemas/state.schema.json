@@ -6,7 +6,21 @@
   "properties": {
     "current": {
       "type": "string",
-      "minLength": 1
+      "enum": [
+        "IDLE",
+        "DISCOVERING",
+        "PLANNING",
+        "PLAN_DONE",
+        "CONSULT_OPEN",
+        "BUILDING",
+        "REVIEWING",
+        "REVIEW_BLOCKED",
+        "TESTING",
+        "TEST_BLOCKED",
+        "BLOCKED_ON_HUMAN",
+        "RETRO",
+        "DONE"
+      ]
     },
     "feature": {
       "type": "string",
@@ -34,5 +48,34 @@
     }
   },
   "required": ["current", "feature", "rigor", "updated_at"],
-  "additionalProperties": true
+  "additionalProperties": true,
+  "transitions": {
+    "IDLE": ["DISCOVERING", "PLANNING", "BUILDING", "BLOCKED_ON_HUMAN"],
+    "DISCOVERING": ["PLANNING", "IDLE", "BLOCKED_ON_HUMAN"],
+    "PLANNING": ["PLAN_DONE", "BUILDING", "BLOCKED_ON_HUMAN"],
+    "PLAN_DONE": ["BUILDING", "CONSULT_OPEN", "BLOCKED_ON_HUMAN"],
+    "CONSULT_OPEN": ["PLANNING", "BUILDING", "PLAN_DONE", "BLOCKED_ON_HUMAN"],
+    "BUILDING": ["REVIEWING", "TESTING", "BLOCKED_ON_HUMAN", "DONE"],
+    "REVIEWING": ["BUILDING", "REVIEW_BLOCKED", "BLOCKED_ON_HUMAN", "DONE"],
+    "REVIEW_BLOCKED": ["BUILDING", "BLOCKED_ON_HUMAN"],
+    "TESTING": ["RETRO", "TEST_BLOCKED", "BLOCKED_ON_HUMAN", "DONE"],
+    "TEST_BLOCKED": ["BUILDING", "TESTING", "BLOCKED_ON_HUMAN"],
+    "BLOCKED_ON_HUMAN": [
+      "IDLE",
+      "DISCOVERING",
+      "PLANNING",
+      "PLAN_DONE",
+      "CONSULT_OPEN",
+      "BUILDING",
+      "REVIEWING",
+      "REVIEW_BLOCKED",
+      "TESTING",
+      "TEST_BLOCKED",
+      "BLOCKED_ON_HUMAN",
+      "RETRO",
+      "DONE"
+    ],
+    "RETRO": ["DONE", "BLOCKED_ON_HUMAN"],
+    "DONE": []
+  }
 }

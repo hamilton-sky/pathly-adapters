@@ -3,7 +3,7 @@ destination: ~/.codex/agents/
 files:
   - source: agents/
 skills:
-  destination: ~/.codex/skills/
+  destination: ~/.agents/skills/
   structure: nested
 templates:
   destination: ~/.codex/plugins/pathly/templates

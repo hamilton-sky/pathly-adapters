@@ -1,5 +1,6 @@
 import argparse
 import importlib.metadata
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -36,6 +37,42 @@ Pass `input_tokens` and `output_tokens` if you have estimates (or leave them as 
 """.strip()
 
 
+def _codex_skill_openai_yaml(skill_meta: dict) -> str:
+    display_name = skill_meta.get("display_name") or f"Pathly {skill_meta['skill']}"
+    short_description = (
+        skill_meta.get("short_description")
+        or skill_meta.get("natural_language")
+        or f"Run the Pathly {skill_meta['skill']} workflow."
+    )
+    default_prompt = skill_meta.get("default_prompt") or f"Use Pathly {skill_meta['skill']}"
+    return yaml.safe_dump(
+        {
+            "interface": {
+                "display_name": display_name,
+                "short_description": short_description,
+                "default_prompt": default_prompt,
+            }
+        },
+        sort_keys=False,
+        allow_unicode=True,
+    )
+
+
+def _toml_string(value: object) -> str:
+    return json.dumps("" if value is None else str(value), ensure_ascii=False)
+
+
+def _codex_agent_toml(agent_meta: dict, instructions: str) -> str:
+    lines = [
+        f"name = {_toml_string(agent_meta.get('name'))}",
+        f"description = {_toml_string(agent_meta.get('description'))}",
+    ]
+    if agent_meta.get("model"):
+        lines.append(f"model = {_toml_string(agent_meta.get('model'))}")
+    lines.append(f"developer_instructions = {_toml_string(instructions)}")
+    return "\n".join(lines) + "\n"
+
+
 def _load_install_yaml(host: str) -> dict:
     install_path = adapter_install_yaml(host)
     if not install_path.exists():
@@ -65,7 +102,12 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         if not core_file.exists():
             print(f"  [warn] No core file for {agent_name!r}, skipping", file=sys.stderr)
             continue
-        agent_files[f"{agent_name}.md"] = stitch_agent(core_file, meta_file, footer=footer)
+        stitched = stitch_agent(core_file, meta_file, footer=footer)
+        if host == "codex":
+            agent_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
+            agent_files[f"{agent_name}.toml"] = _codex_agent_toml(agent_meta, stitched)
+        else:
+            agent_files[f"{agent_name}.md"] = stitched
 
     skills_cfg = install_cfg.get("skills")
     skill_files: dict[str, str] = {}
@@ -80,7 +122,11 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             core_file = core_skills_dir / f"{skill_meta['skill']}.md"
             default_filename = f"{skill_name}/SKILL.md" if nested else f"{skill_name}.md"
             try:
-                skill_files[skill_meta.get("filename", default_filename)] = stitch_skill(core_file, meta_file, flows_dest=dest)
+                filename = skill_meta.get("filename", default_filename)
+                skill_files[filename] = stitch_skill(core_file, meta_file, flows_dest=dest)
+                if host == "codex" and filename.endswith("/SKILL.md"):
+                    skill_dir = filename.removesuffix("/SKILL.md")
+                    skill_files[f"{skill_dir}/agents/openai.yaml"] = _codex_skill_openai_yaml(skill_meta)
             except FileNotFoundError:
                 print(f"  [warn] No core skill for {skill_name!r}, skipping", file=sys.stderr)
 
@@ -133,8 +179,12 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         if plugin_cfg.get("include_stitched"):
             for name, content in agent_files.items():
                 plugin_files[f"agents/{name}"] = content
+            for flow_file in sorted(core_flows_path().glob("*.flow.yaml")):
+                plugin_files[f"flows/{flow_file.name}"] = flow_file.read_text(encoding="utf-8")
             for name, content in skill_files.items():
                 plugin_files[f"skills/{name}"] = content
+            for name, content in template_files.items():
+                plugin_files[f"templates/{name}"] = content
             for name, content in hook_files.items():
                 plugin_files[name] = content
 

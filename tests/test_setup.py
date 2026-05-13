@@ -152,7 +152,11 @@ def test_dry_run_real_codex_includes_plugin_manifest(capsys):
     assert ".codex-plugin" in captured.out
     assert "plugin.json" in captured.out
     assert "skills" in captured.out
+    assert "agents\\openai.yaml" in captured.out or "agents/openai.yaml" in captured.out
     assert "agents" in captured.out
+    assert "templates" in captured.out
+    assert "flows" in captured.out
+    assert "team.flow.yaml" in captured.out
     assert "classify_feedback.py" in captured.out
     assert "inject_feedback_ttl.py" in captured.out
 

@@ -12,7 +12,7 @@ import pytest
 from pathly_orchestrator.state import VALID_STATES, TRANSITIONS, STATES
 from pathly_orchestrator import eventlog as el
 
-SCHEMA_PATH = Path(__file__).parent.parent / "schemas" / "state.schema.json"
+SCHEMA_PATH = Path(__file__).parent.parent / "src" / "pathly_data" / "schemas" / "state.schema.json"
 SCHEMA = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 

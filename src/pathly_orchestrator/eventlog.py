@@ -23,6 +23,7 @@ from pathlib import Path
 from pathly_orchestrator.state import VALID_STATES, TRANSITIONS
 
 _APPEND_LOCK = threading.Lock()
+CURRENT_SCHEMA_VERSION = 1
 
 
 def _plans_dir() -> Path:
@@ -56,6 +57,7 @@ def append_event(feature: str, event: dict) -> None:
 
     path = _events_path(feature)
     path.parent.mkdir(parents=True, exist_ok=True)
+    event.setdefault("schema_version", CURRENT_SCHEMA_VERSION)
     if "timestamp" not in event:
         event["timestamp"] = _now()
     line = json.dumps(event) + "\n"
@@ -115,6 +117,19 @@ def read_events(feature: str) -> list[dict]:
                     events.append(json.loads(line))
                 except json.JSONDecodeError:
                     pass
+    for event in events:
+        schema_version = event.get("schema_version")
+        if schema_version is None:
+            print(
+                f"[warn] Event missing schema_version; assuming version {CURRENT_SCHEMA_VERSION}: {event}",
+                file=sys.stderr,
+            )
+        elif schema_version > CURRENT_SCHEMA_VERSION:
+            print(
+                f"[warn] Event schema_version {schema_version} is newer than supported "
+                f"{CURRENT_SCHEMA_VERSION}; some fields may not be recognized: {event}",
+                file=sys.stderr,
+            )
     return events
 
 

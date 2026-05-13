@@ -182,6 +182,8 @@ def test_hook_missing_project_root(hook, tmp_path):
     base_env = {k: v for k, v in os.environ.items()}
     base_env.pop("PATHLY_PROJECT_ROOT", None)
     base_env.pop("ANTHROPIC_API_KEY", None)
+    base_env["HOME"] = str(tmp_path)
+    base_env["USERPROFILE"] = str(tmp_path)
 
     result = subprocess.run(
         [sys.executable, str(hook)],
@@ -190,5 +192,6 @@ def test_hook_missing_project_root(hook, tmp_path):
         text=True,
         env=base_env,
     )
-    assert result.returncode != 0
-    assert "pathly-hook: PATHLY_PROJECT_ROOT not set" in result.stderr
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "PATHLY_PROJECT_ROOT not set" in (tmp_path / ".pathly" / "hook.log").read_text(encoding="utf-8")

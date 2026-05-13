@@ -109,6 +109,78 @@ def test_install_codex_plugin_falls_back_when_codex_cli_refresh_fails(tmp_path, 
     assert (market / "plugins" / PLUGIN_NAME / "skills" / "pathly" / "SKILL.md").exists()
 
 
+def test_install_codex_plugin_falls_back_when_codex_cli_cannot_launch(tmp_path, monkeypatch):
+    config = tmp_path / "config.toml"
+    market = tmp_path / "marketplace"
+    cache = tmp_path / "plugin-cache"
+
+    def fake_run(cmd, **kwargs):
+        raise PermissionError("access denied")
+
+    monkeypatch.setattr("install_cli.codex_plugin_config.subprocess.run", fake_run)
+    monkeypatch.setattr("install_cli.codex_plugin_config._PLUGIN_CACHE_ROOT", cache)
+
+    install_codex_plugin(
+        {
+            ".codex-plugin/plugin.json": '{"name":"pathly","version":"1.2.3"}',
+            "skills/pathly/SKILL.md": "# pathly",
+        },
+        config_path=config,
+        marketplace_root=market,
+        codex_command="codex",
+    )
+
+    assert f"[marketplaces.{MARKETPLACE_NAME}]" in config.read_text(encoding="utf-8")
+    assert (cache / "local" / "skills" / "pathly" / "SKILL.md").exists()
+
+
+def test_install_codex_plugin_no_codex_cli_in_path(tmp_path, monkeypatch):
+    config = tmp_path / "config.toml"
+    market = tmp_path / "marketplace"
+    cache = tmp_path / "plugin-cache"
+
+    monkeypatch.setattr("install_cli.codex_plugin_config._CODEX_CONFIG", config)
+    monkeypatch.setattr("install_cli.codex_plugin_config._MARKETPLACE_ROOT", market)
+    monkeypatch.setattr("install_cli.codex_plugin_config._PLUGIN_CACHE_ROOT", cache)
+    monkeypatch.setattr("install_cli.codex_plugin_config.shutil.which", lambda _: None)
+
+    install_codex_plugin(
+        {
+            ".codex-plugin/plugin.json": '{"name":"pathly","version":"9.9.9"}',
+            "skills/pathly/SKILL.md": "# pathly",
+            "skills/pathly/agents/openai.yaml": "interface:\n  display_name: Pathly\n",
+        }
+    )
+
+    content = config.read_text(encoding="utf-8")
+    assert f"[marketplaces.{MARKETPLACE_NAME}]" in content
+    assert (market / "plugins" / PLUGIN_NAME / "skills" / "pathly" / "SKILL.md").exists()
+    assert (cache / "local" / "skills" / "pathly" / "SKILL.md").exists()
+    assert (cache / "local" / "skills" / "pathly" / "agents" / "openai.yaml").exists()
+
+
+def test_install_codex_plugin_permission_denied_has_readable_error(tmp_path, monkeypatch):
+    config = tmp_path / "config.toml"
+    market = tmp_path / "marketplace"
+
+    def denied(*args, **kwargs):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr("install_cli.codex_plugin_config.Path.mkdir", denied)
+
+    try:
+        install_codex_plugin(
+            {"skills/pathly/SKILL.md": "# pathly"},
+            config_path=config,
+            marketplace_root=market,
+        )
+    except RuntimeError as exc:
+        assert "Cannot create Codex plugin directory" in str(exc)
+        assert "writable" in str(exc)
+    else:
+        raise AssertionError("Expected RuntimeError")
+
+
 def test_uninstall_codex_plugin_removes_marketplace_and_config_blocks(tmp_path):
     config = tmp_path / "config.toml"
     market = tmp_path / "marketplace"

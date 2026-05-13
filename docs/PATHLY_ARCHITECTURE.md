@@ -122,7 +122,7 @@ CLI implementation modules (`detect.py`, `stitch.py`, `materialize.py`, `setup_c
 | `src/install_cli/stitch.py` | Merges `core/` content with adapter `_meta/*.yaml` into deployable agent and skill files |
 | `src/install_cli/materialize.py` | Writes stitched output to `~/.claude/`, `~/.codex/`, etc. Maintains a manifest of Pathly-owned files. Install is atomic — already-written files are rolled back if anything fails. |
 | `src/install_cli/setup_command.py` | CLI entry point logic. Handles `--dry-run`, `--apply`, `--repair`, `--force`, `--uninstall`, and per-host subcommands. |
-| `src/install_cli/mcp_config.py` | MCP configuration support |
+| `src/install_cli/mcp_config.py` | Registers the `pathly-telemetry` MCP server (`record_activity` tool) in `~/.claude/settings.json` (`mcpServers`) and `~/.codex/config.toml` (`[mcp_servers]`). Silent no-op for Copilot. |
 | `src/install_cli/codex_plugin_config.py` | Codex local marketplace registration and plugin config |
 | `src/install_cli/resources.py` | Package resource loading helpers |
 | `src/install_cli/__main__.py` | Entry point registered as `pathly-setup` |

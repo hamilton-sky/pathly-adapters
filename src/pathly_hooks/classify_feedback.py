@@ -18,6 +18,16 @@ _ARCH_QUESTION = re.compile(
 )
 
 
+def _log_skip(message: str) -> None:
+    log_path = Path.home() / ".pathly" / "hook.log"
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(f"classify_feedback: {message}\n")
+    except OSError:
+        pass
+
+
 def main() -> None:
     raw = sys.stdin.read()
     try:
@@ -33,8 +43,8 @@ def main() -> None:
 
     project_root_env = os.environ.get("PATHLY_PROJECT_ROOT")
     if not project_root_env:
-        print("pathly-hook: PATHLY_PROJECT_ROOT not set", file=sys.stderr)
-        sys.exit(1)
+        _log_skip("PATHLY_PROJECT_ROOT not set")
+        sys.exit(0)
 
     plans_dir = (Path(project_root_env) / "plans").resolve()
     resolved = Path(raw_path).resolve()

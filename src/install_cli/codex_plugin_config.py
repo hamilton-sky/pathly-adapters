@@ -13,6 +13,11 @@ PLUGIN_NAME = "pathly"
 
 _CODEX_CONFIG = Path.home() / ".codex" / "config.toml"
 _MARKETPLACE_ROOT = Path.home() / ".codex" / "pathly-marketplace"
+_PLUGIN_CACHE_ROOT = Path.home() / ".codex" / "plugins" / "cache" / MARKETPLACE_NAME / PLUGIN_NAME
+
+
+def _write_error(action: str, path: Path, exc: OSError) -> RuntimeError:
+    return RuntimeError(f"Cannot {action} {path}: {exc}. Check that the Codex config directory is writable.")
 
 
 def install_codex_plugin(
@@ -37,16 +42,23 @@ def install_codex_plugin(
     plugin_root = marketplace_root / "plugins" / PLUGIN_NAME
     if plugin_root.exists():
         shutil.rmtree(plugin_root)
-    plugin_root.mkdir(parents=True, exist_ok=True)
+    try:
+        plugin_root.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise _write_error("create Codex plugin directory", plugin_root, exc) from exc
 
     for name, content in sorted(plugin_files.items()):
         target = plugin_root / name
         if not target.resolve().is_relative_to(plugin_root.resolve()):
             raise ValueError(f"Path traversal detected in plugin file: {name!r}")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+        except OSError as exc:
+            raise _write_error("write Codex plugin file", target, exc) from exc
 
     _write_marketplace_json(marketplace_root)
+    _write_plugin_cache(plugin_files)
     refreshed = _refresh_codex_marketplace(
         marketplace_root,
         codex_command=codex_command,
@@ -75,12 +87,17 @@ def uninstall_codex_plugin(
     _disable_in_codex_config(config_path)
     if marketplace_root.exists():
         shutil.rmtree(marketplace_root)
+    if _PLUGIN_CACHE_ROOT.exists():
+        shutil.rmtree(_PLUGIN_CACHE_ROOT)
     print(f"[codex] Removed local plugin marketplace at {marketplace_root}")
 
 
 def _write_marketplace_json(root: Path) -> None:
     path = root / ".agents" / "plugins" / "marketplace.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise _write_error("create Codex marketplace metadata directory", path.parent, exc) from exc
     data = {
         "name": MARKETPLACE_NAME,
         "interface": {"displayName": "Pathly Local"},
@@ -93,7 +110,33 @@ def _write_marketplace_json(root: Path) -> None:
             }
         ],
     }
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    try:
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except OSError as exc:
+        raise _write_error("write Codex marketplace metadata", path, exc) from exc
+
+
+def _plugin_version(plugin_files: dict[str, str]) -> str:
+    return "local"
+
+
+def _write_plugin_cache(plugin_files: dict[str, str]) -> None:
+    cache_root = _PLUGIN_CACHE_ROOT / _plugin_version(plugin_files)
+    if cache_root.exists():
+        try:
+            shutil.rmtree(cache_root)
+        except OSError as exc:
+            raise _write_error("replace Codex plugin cache", cache_root, exc) from exc
+
+    for name, content in sorted(plugin_files.items()):
+        target = cache_root / name
+        if not target.resolve().is_relative_to(cache_root.resolve()):
+            raise ValueError(f"Path traversal detected in plugin cache file: {name!r}")
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+        except OSError as exc:
+            raise _write_error("write Codex plugin cache file", target, exc) from exc
 
 
 def _refresh_codex_marketplace(
@@ -109,21 +152,31 @@ def _refresh_codex_marketplace(
         print("[codex] Codex CLI not found; config.toml was updated directly.")
         return False
 
-    remove = subprocess.run(
-        [command, "plugin", "marketplace", "remove", MARKETPLACE_NAME],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    try:
+        remove = subprocess.run(
+            [command, "plugin", "marketplace", "remove", MARKETPLACE_NAME],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except OSError as exc:
+        print(f"[codex] Codex CLI could not be launched: {exc}", file=sys.stderr)
+        print("[codex] Falling back to direct config.toml registration.", file=sys.stderr)
+        return False
     if remove.returncode != 0:
         print(f"[codex] Marketplace remove skipped: {remove.stderr.strip() or remove.stdout.strip()}")
 
-    add = subprocess.run(
-        [command, "plugin", "marketplace", "add", str(marketplace_root)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    try:
+        add = subprocess.run(
+            [command, "plugin", "marketplace", "add", str(marketplace_root)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except OSError as exc:
+        print(f"[codex] Codex CLI could not be launched: {exc}", file=sys.stderr)
+        print("[codex] Falling back to direct config.toml registration.", file=sys.stderr)
+        return False
     if add.returncode != 0:
         print(f"[codex] Codex CLI marketplace refresh failed: {add.stderr.strip() or add.stdout.strip()}", file=sys.stderr)
         print("[codex] Falling back to direct config.toml registration.", file=sys.stderr)
@@ -144,8 +197,11 @@ def _enable_in_codex_config(path: Path, marketplace_root: Path) -> None:
         f'[plugins."{PLUGIN_NAME}@{MARKETPLACE_NAME}"]\n'
         "enabled = true\n"
     )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content.rstrip() + "\n" + block, encoding="utf-8")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content.rstrip() + "\n" + block, encoding="utf-8")
+    except OSError as exc:
+        raise _write_error("write Codex config", path, exc) from exc
 
 
 def _disable_in_codex_config(path: Path) -> None:
