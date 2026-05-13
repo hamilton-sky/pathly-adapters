@@ -60,6 +60,18 @@
 
 ---
 
+## EC-7: malformed flow YAML is written to disk without validation
+
+**Scenario:** `materialize_flows()` copies a flow YAML that is missing a required field (e.g., `agent_map`) to `~/.claude/agents/`. The file is installed successfully. When the user runs `/pathly team`, orchestrator reads the YAML, finds no `agent_map`, and silently routes nothing or crashes mid-run.
+
+**Risk:** Broken installed state with no install-time error. User sees a runtime failure with no obvious cause.
+
+**Mitigation:** `_validate_flows()` in `materialize.py` runs before any file is written. It checks all five required keys (`storage_path`, `states`, `transitions`, `agent_map`, `feedback_routing`) and raises `ValueError` listing every missing key across every flow file. `pathly-setup` fails before touching disk if any YAML is malformed.
+
+**Acceptance check:** Phase 9 implementation includes `_validate_flows` call inside `materialize_flows`, before the `materialize()` call. Builder must also add a unit test: `test_materialize_flows_rejects_malformed_yaml` in `test_setup.py` or a new `test_materialize_flows.py`.
+
+---
+
 ## EC-6: codex adapter orchestrator.yaml does not exist
 
 **Scenario:** `src/pathly_data/adapters/codex/_meta/orchestrator.yaml` does not exist (the codex adapter may not have this file yet).
@@ -69,3 +81,15 @@
 **Mitigation:** Phase 5 instructions say to skip with a note if the file does not exist. The PROGRESS.md Phase 5 row must record the outcome (updated or skipped with reason).
 
 **Acceptance check:** CONVERSATION_PROMPTS.md Conv 2 prompt includes "skip with a PROGRESS note if file does not exist".
+
+---
+
+## EC-8: orchestrator.md exceeds maintainable size after Conv 3
+
+**Scenario:** After agent-architecture-refactor Conv 4 enriches orchestrator.md with FSM sections AND fsm-configurable Conv 3 replaces hardcoded states with config-driven logic, orchestrator.md may grow past ~400 lines. Natural language "code" at that size becomes hard to reason about — sections contradict each other, builders skip content, and LLMs hallucinate from middle sections.
+
+**Risk:** Silent correctness regressions in orchestrator behavior as the file grows; builders miss contradictions between old and new sections.
+
+**Mitigation:** At the end of Phase 4 (orchestrator generalization), builder must count approximate line length and record it in the PROGRESS.md Phase 4 row. If orchestrator.md exceeds 400 lines, flag it as a warning — do not block Conv 4, but do not ignore it. The planned resolution is `plans/fsm-transition-actions`, which moves hardcoded side-effect logic (git commits, PROGRESS.md updates, artifact archiving) into the flow YAMLs under a `transition_actions` key, reducing orchestrator.md to ~150 lines. That plan must run after this one completes.
+
+**Acceptance check:** PROGRESS.md Phase 4 row includes the line count after editing. If count > 400, a note referencing `plans/fsm-transition-actions` is added.

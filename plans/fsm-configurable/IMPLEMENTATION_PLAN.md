@@ -274,7 +274,7 @@ All other fields (`feature`, `rigor`, `current_conversation`, `updated_at`, etc.
 5. Update `_state_path` and `_events_path` to call `_resolve_path(storage_path)`.
 6. Update `_state_cli()` so `pathly-state` accepts a full storage path (e.g. `pathly/plans/auth-rewrite`) rather than a bare feature name. Update `_cli()` the same way for `pathly-events summary`.
 
-**CLI backward compatibility decision (required before implementing point 6):** The signature change from `pathly-state <feature>` → `pathly-state pathly/plans/<feature>` is a breaking change for any user tooling that calls these CLIs. Decide before implementing: keep a deprecated alias that auto-prepends `pathly/plans/` when no `/` is present in the argument (recommended — backward-compatible, zero user action required), OR document the migration and remove the old form. Record the decision as a comment in `eventlog.py` above `_state_cli`.
+**CLI backward compatibility decision (closed — do not re-open):** Use the backward-compatible alias approach. `pathly-state <feature>` (bare name, no `/`) auto-prepends `pathly/plans/` before resolving. `pathly-state pathly/plans/<feature>` (full path, contains `/`) is used as-is. This gives zero user action required and zero breakage. Record the decision as a comment in `eventlog.py` above `_state_cli`: `# bare feature names auto-resolved to pathly/plans/<name>/ for backward compat`.
 
 **Add `pathly-validate-flow` CLI (new deliverable, same conversation):** After implementing points 1–6, add a `pathly-validate-flow <path>` entry point in `pyproject.toml` backed by a `validate_flow_cli()` function in `state.py`. The function: loads the YAML at the given path, checks all five required fields are present, prints each missing field with a clear error message, exits 0 on success and 1 on failure. This lets users verify a flow YAML before running it. Implementation is ~15 lines. Register the entry point as `pathly-validate-flow = pathly_orchestrator.state:validate_flow_cli`.
 
@@ -400,9 +400,26 @@ def materialize_flows(
 ) -> list[str]:
     """Copy *.flow.yaml files from src_flows to dest. Returns list of filenames written."""
     files = {f.name: f.read_text(encoding="utf-8") for f in src_flows.glob("*.flow.yaml")}
+    _validate_flows(files)
     return materialize(files, dest, repair=repair, force=force, dry_run=dry_run)
+
+_REQUIRED_FLOW_KEYS = {"storage_path", "states", "transitions", "agent_map", "feedback_routing"}
+
+def _validate_flows(files: dict[str, str]) -> None:
+    """Raise ValueError listing all missing keys for any malformed flow YAML."""
+    import yaml
+    errors: list[str] = []
+    for name, text in files.items():
+        parsed = yaml.safe_load(text) or {}
+        missing = _REQUIRED_FLOW_KEYS - parsed.keys()
+        if missing:
+            errors.append(f"{name}: missing required keys: {sorted(missing)}")
+    if errors:
+        raise ValueError("Flow YAML validation failed:\n" + "\n".join(errors))
 ```
 Flow files are tracked in the same manifest as agents, so `uninstall()` removes them automatically — no extra uninstall logic needed.
+
+> **CRITICAL:** Phase 9 is the last phase and the easiest to skip. Without it, the installed system is completely broken — orchestrator.md cannot Read `src/pathly_data/core/flows/` paths from a user's project. Conv 5 must run; it is not optional cleanup.
 
 **Changes to `setup_command.py`:**
 1. Add `core_flows_path` to the import from `.resources`.

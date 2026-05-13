@@ -205,6 +205,8 @@ Implement agent-architecture-refactor Conversation 4 (Phases 17–18) from plans
 
 Before editing anything: read both orchestrator.md and team.md in full.
 
+**Merge rule for Phase 17:** orchestrator.md may already contain partial versions of the sections you are adding (git commit logic, PROGRESS.md updates, a routing table). If a section already exists, update or merge it — do NOT append a duplicate section. The done-when criteria check for content presence, not for new additions, so a merge is always acceptable. If you are unsure whether two sections describe the same concept, flag the ambiguity in PROGRESS.md before editing.
+
 Codebase files this conversation touches:
 - src/pathly_data/core/agents/orchestrator.md — add four FSM sections from team.md
 - src/pathly_data/core/skills/team.md — convert to thin launcher
