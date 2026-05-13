@@ -416,23 +416,34 @@ Artifact paths are resolved relative to the run's `storage_path` (e.g. `pathly/p
    If more TODO conversations remain: transition state → BUILDING.
    Else: transition state → TESTING.
    ```
-2. Replace with: if more TODO conversations remain, write `MORE_CONVS_NEEDED.md` under the run's storage path. Write no file if all conversations are done.
+2. Replace with the **write-or-delete** rule for each transition artifact:
+   - If more TODO conversations remain: write `MORE_CONVS_NEEDED.md` under the run's storage path.
+   - If no more TODO conversations remain: delete `MORE_CONVS_NEEDED.md` if it exists.
+   - If reviewer found failures: write `REVIEW_FAILURES.md` (already exists — keep this).
+   - If reviewer passed cleanly: **delete `REVIEW_FAILURES.md`** if it exists.
 3. Remove the "Transition state to X: Write STATE.json" preamble instruction.
 4. **Keep:** the PROGRESS.md update (marking Conv N as DONE) — this is reporting, not routing.
 5. Add a closing line: "Return. Orchestrator determines next state from transition_rules."
+
+**Why write-or-delete matters:** Orchestrator evaluates transition_rules AFTER the sub-skill returns, based on whether artifact files are present. If a stale artifact from a previous run still exists (e.g. `MORE_CONVS_NEEDED.md` written two convs ago), orchestrator routes incorrectly. Each sub-skill must leave artifact files in a state that accurately reflects the current run — write when true, delete when false.
 
 **Changes to `team/test.md`:**
 1. Remove the "Transition state → RETRO" line at the end.
 2. Remove the "Transition state to X: Write STATE.json" preamble instruction.
 3. Keep the internal fix loop intact — tester writes TEST_FAILURES.md and loops with builder internally. Only the final transition out of TESTING is removed.
-4. Add a closing line: "Return. Orchestrator determines next state from transition_rules."
+4. Apply the **write-or-delete** rule for `TEST_FAILURES.md` at the end of the loop:
+   - If tests still failing after fix loop: write `TEST_FAILURES.md` (already exists — keep this).
+   - If all tests pass: **delete `TEST_FAILURES.md`** if it exists.
+5. Add a closing line: "Return. Orchestrator determines next state from transition_rules."
 
 **Done when:**
 - `grep "Transition state" src/pathly_data/core/skills/team/build.md` returns no output.
 - `grep "Transition state" src/pathly_data/core/skills/team/review.md` returns no output.
 - `grep "Transition state" src/pathly_data/core/skills/team/test.md` returns no output.
 - `grep "→ REVIEWING\|→ TESTING\|→ RETRO\|→ BUILDING" src/pathly_data/core/skills/team/build.md src/pathly_data/core/skills/team/review.md src/pathly_data/core/skills/team/test.md` returns no output (state names removed from routing context; may appear in prose description only).
-- `grep "MORE_CONVS_NEEDED" src/pathly_data/core/skills/team/review.md` returns the new write instruction.
+- `grep "MORE_CONVS_NEEDED" src/pathly_data/core/skills/team/review.md` returns both the write instruction and the delete instruction.
+- `grep "delete.*REVIEW_FAILURES\|REVIEW_FAILURES.*delete" src/pathly_data/core/skills/team/review.md` returns a match.
+- `grep "delete.*TEST_FAILURES\|TEST_FAILURES.*delete" src/pathly_data/core/skills/team/test.md` returns a match.
 
 **Delivers stories:** S3.4 (partial)
 **Depends on:** Phase 8a complete (transition_rules exist in team.flow.yaml before sub-skills reference them)

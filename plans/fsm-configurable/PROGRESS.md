@@ -47,7 +47,7 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 4 | 7 | `src/pathly_data/core/skills/debug.md` | Replace inline FSM steps with orchestrator spawn | grep orchestrator returns spawn instruction; grep flow_config returns src/pathly_data/core/flows/debug.flow.yaml | TODO |
 | 4 | 8 | `src/pathly_data/core/skills/explore.md` | Replace inline spawning with orchestrator spawn | grep orchestrator returns spawn instruction; grep flow_config returns src/pathly_data/core/flows/explore.flow.yaml | TODO |
 | 4b | 8a | `src/pathly_data/core/flows/team.flow.yaml` | Add transition_rules section covering BUILDING, REVIEWING, TESTING | grep transition_rules returns new section; grep MORE_CONVS_NEEDED returns match | TODO |
-| 4b | 8b | `team/build.md`, `team/review.md`, `team/test.md` | Strip STATE.json transition writes; review.md writes MORE_CONVS_NEEDED.md instead of routing | grep "Transition state" all three files returns no output | TODO |
+| 4b | 8b | `team/build.md`, `team/review.md`, `team/test.md` | Strip STATE.json transition writes; write-or-delete rule for all transition artifacts | grep "Transition state" all three files returns no output; delete instructions present in review.md and test.md | TODO |
 | 4b | 8c | `src/pathly_data/core/agents/orchestrator.md` | Add transition_rules evaluation loop after each sub-agent returns | grep transition_rules and on_artifact returns logic; ownership comment present | TODO |
 | 5 | 9 | `src/install_cli/resources.py`, `stitch.py`, `materialize.py`, `setup_command.py` | Materialize flow YAMLs on install; rewrite flow_config paths in stitched skills | grep materialize_flows setup_command.py returns import + call; grep flows_dest stitch.py returns parameter | TODO |
 

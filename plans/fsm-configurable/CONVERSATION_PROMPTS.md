@@ -255,13 +255,19 @@ Rules:
 - Do NOT touch debug.flow.yaml or explore.flow.yaml — transition_rules are only needed for team flow now.
 - Orchestrator.md already reads flow_config generically after Conv 3 — add transition_rules support as an extension to the existing FSM loop, not a rewrite.
 - Sub-skills must each end with: "Return. Orchestrator determines next state from transition_rules."
+- **Write-or-delete rule (critical):** Every transition artifact must be explicitly managed each run. If the condition is true: write the file. If the condition is false: delete the file if it exists. Never leave a stale artifact from a previous run. Specifically:
+  - review.md: write MORE_CONVS_NEEDED.md if more TODO convs, else delete it; write REVIEW_FAILURES.md if failures found, else delete it.
+  - test.md: write TEST_FAILURES.md if tests still failing after fix loop, else delete it.
+  Reason: orchestrator reads artifact presence AFTER the sub-skill returns. A stale file from the previous run causes wrong routing with no error.
 
 Verify:
 - `grep "transition_rules" src/pathly_data/core/flows/team.flow.yaml` — returns the new section.
 - `grep "Transition state" src/pathly_data/core/skills/team/build.md` — no output.
 - `grep "Transition state" src/pathly_data/core/skills/team/review.md` — no output.
 - `grep "Transition state" src/pathly_data/core/skills/team/test.md` — no output.
-- `grep "MORE_CONVS_NEEDED" src/pathly_data/core/skills/team/review.md` — returns the write instruction.
+- `grep "MORE_CONVS_NEEDED" src/pathly_data/core/skills/team/review.md` — returns both write and delete instructions.
+- `grep "delete.*REVIEW_FAILURES\|REVIEW_FAILURES.*delete" src/pathly_data/core/skills/team/review.md` — returns a match.
+- `grep "delete.*TEST_FAILURES\|TEST_FAILURES.*delete" src/pathly_data/core/skills/team/test.md` — returns a match.
 - `grep "transition_rules" src/pathly_data/core/agents/orchestrator.md` — returns the evaluation logic.
 - `grep "only entity" src/pathly_data/core/agents/orchestrator.md` — returns the ownership comment.
 - `git diff --stat` — shows only team.flow.yaml, build.md, review.md, test.md, orchestrator.md.
