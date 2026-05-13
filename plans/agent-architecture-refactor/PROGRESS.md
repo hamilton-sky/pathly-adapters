@@ -1,13 +1,13 @@
 # agent-architecture-refactor — Progress
 
-**Status:** TODO
+**Status:** COMPLETE
 
 | Conv | Scope | Stories | Status |
 |---|---|---|---|
 | Conv 1 | Scout-pattern migration | S1.1, S1.2 | DONE |
 | Conv 2 | Worker agent contracts + YAML | S2.1, S2.2, S2.3, S2.4, S2.5 | DONE |
 | Conv 3 | Explorer agent parity | S3.1, S3.2 | DONE |
-| Conv 4 | Orchestrator conversion | S4.1, S4.2 | TODO |
+| Conv 4 | Orchestrator conversion | S4.1, S4.2 | DONE |
 
 ---
 
@@ -46,5 +46,5 @@
 
 | Phase | File | Status |
 |---|---|---|
-| Phase 17 | orchestrator.md — add FSM sections from team.md | TODO |
-| Phase 18 | team.md — convert to thin launcher | TODO |
+| Phase 17 | orchestrator.md — add FSM sections from team.md | DONE |
+| Phase 18 | team.md — convert to thin launcher | DONE |

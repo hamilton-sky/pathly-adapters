@@ -13,3 +13,6 @@
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-13T00:06:00Z"}
 {"type": "AGENT_DONE", "agent": "builder", "ts": "2026-05-13T00:07:00Z"}
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T00:07:00Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "ts": "2026-05-13T00:08:00Z"}
+{"type": "IMPLEMENT_COMPLETE", "ts": "2026-05-13T00:08:00Z"}
+{"type": "STATE_TRANSITION", "to": "TESTING", "ts": "2026-05-13T00:08:00Z"}
