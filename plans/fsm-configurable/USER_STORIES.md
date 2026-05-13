@@ -94,6 +94,21 @@ This feature consolidates all runtime output under a `pathly/` root, extracts al
 
 ---
 
+### Story 2.3: state.py and eventlog.py validate against flow config at runtime
+**As a** contributor adding a new flow, **I want** the Python validation layer to load valid states and transitions from the flow YAML at runtime, **so that** debug and explore flows are validated correctly and the hardcoded team-pipeline state list no longer blocks new flows.
+
+**Acceptance Criteria:**
+- [ ] `state.py` exposes `load_flow(yaml_path)`, `valid_states(flow)`, and `flow_transitions(flow)` functions
+- [ ] `state.py` does not define `VALID_STATES`, `STATES`, or `TRANSITIONS`
+- [ ] `write_state()` in `eventlog.py` accepts an optional `flow` parameter; when provided, validates `current` against `valid_states(flow)` and validates the transition against `flow_transitions(flow)`; when `None`, skips validation
+- [ ] `append_event()` in `eventlog.py` accepts the same optional `flow` parameter with the same guard behavior
+- [ ] `eventlog.py` accepts a full storage path (e.g. `pathly/plans/auth-rewrite`) instead of a bare feature name, removing the hardcoded `Path("plans")` prefix
+- [ ] CLI command `pathly-state pathly/plans/<feature>` resolves correctly after the `pathly/` migration
+
+**Delivered by:** Phase 5c → Conversation 3
+
+---
+
 ### Story 3.1: team.md passes flow_config when spawning orchestrator
 **As a** user running the team pipeline, **I want** team.md to pass the team flow config path to the orchestrator, **so that** the orchestrator uses the correct FSM without any team-specific logic embedded in it.
 

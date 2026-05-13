@@ -249,6 +249,39 @@ All other fields (`feature`, `rigor`, `current_conversation`, `updated_at`, etc.
 
 **Delivers stories:** S2.1 (complete — STATE.json schema now matches generic FSM output)
 **Depends on:** Phase 5 complete (same conversation, natural final step)
+**Enables:** Phase 5c
+
+---
+
+### Phase 5c — Generalize state.py and eventlog.py   ← Conversation: 3
+
+**File:** `src/pathly_orchestrator/state.py` — MODIFY
+**File:** `src/pathly_orchestrator/eventlog.py` — MODIFY
+
+**Why:** `state.py` hardcodes `VALID_STATES` and `TRANSITIONS` for the team pipeline. `eventlog.py` imports and validates against those. After Phase 5b removes the enum from `state.schema.json`, the Python layer would still reject any non-team state name written by a debug or explore flow. Additionally, `_plans_dir()` hardcodes `Path("plans")` — after the `pathly/` consolidation, the CLI command `pathly-state <feature>` will look in the wrong directory.
+
+**Changes to `state.py`:**
+1. Remove `STATES`, `VALID_STATES`, and `TRANSITIONS`.
+2. Add `load_flow(yaml_path: str) -> dict` — reads and returns a parsed `*.flow.yaml` file.
+3. Add `valid_states(flow: dict) -> frozenset[str]` — returns `frozenset(flow.get("states", []))`.
+4. Add `flow_transitions(flow: dict) -> dict[str, frozenset[str]]` — returns `{k: frozenset(v) for k, v in flow.get("transitions", {}).items()}`.
+
+**Changes to `eventlog.py`:**
+1. Remove the import of `VALID_STATES, TRANSITIONS` from `pathly_orchestrator.state`. Import `valid_states, flow_transitions` instead.
+2. Change `write_state(feature: str, state: dict)` → `write_state(storage_path: str, state: dict, flow: dict | None = None)`. When `flow` is provided, validate `current` against `valid_states(flow)` and validate the transition against `flow_transitions(flow)`. When `flow` is `None`, skip validation entirely (graceful degradation for direct LLM writes).
+3. Change `append_event(feature: str, event: dict)` → `append_event(storage_path: str, event: dict, flow: dict | None = None)`. Same optional guard: only validate `STATE_TRANSITION.to` when `flow` is provided.
+4. Replace the hardcoded `_plans_dir() → Path("plans")` and `_feature_dir(feature)` helpers with a single `_resolve_path(storage_path: str) -> Path` that treats the argument as a full directory path.
+5. Update `_state_path` and `_events_path` to call `_resolve_path(storage_path)`.
+6. Update `_state_cli()` so `pathly-state` accepts a full storage path (e.g. `pathly/plans/auth-rewrite`) rather than a bare feature name. Update `_cli()` the same way for `pathly-events summary`.
+
+**Done when:**
+- `grep "VALID_STATES\|TRANSITIONS" src/pathly_orchestrator/state.py` returns no output.
+- `grep "load_flow\|valid_states\|flow_transitions" src/pathly_orchestrator/state.py` returns all three function definitions.
+- `grep "Path(\"plans\")" src/pathly_orchestrator/eventlog.py` returns no output.
+- `grep "flow: dict" src/pathly_orchestrator/eventlog.py` returns both `write_state` and `append_event` signatures.
+
+**Delivers stories:** S2.3
+**Depends on:** Phase 5b complete (same conversation, final step)
 **Enables:** Conv 4
 
 ---
