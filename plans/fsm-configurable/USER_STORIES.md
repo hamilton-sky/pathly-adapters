@@ -2,13 +2,25 @@
 
 ## Context
 
-The pathly orchestrator is hardcoded to the team pipeline: fixed state names (BUILDING, REVIEWING, TESTING, RETRO), fixed agent_map, fixed feedback routing, and hardcoded storage at `plans/<feature>/`. Other flows (debug, explore) either run inline with no state tracking or duplicate similar patterns.
+The pathly orchestrator is hardcoded to the team pipeline: fixed state names (BUILDING, REVIEWING, TESTING, RETRO), fixed agent_map, fixed feedback routing, and hardcoded storage at `plans/<feature>/`. Other flows (debug, explore) either run inline with no state tracking or duplicate similar patterns. Runtime output directories (`plans/`, `debugs/`, `explorations/`, `pipeline-walkthrough/`) are scattered at the project root.
 
-This feature extracts all flow-specific configuration into `core/flows/*.flow.yaml` files and rewrites the orchestrator to be a generic FSM engine driven by whichever flow config it receives at spawn time.
+This feature consolidates all runtime output under a `pathly/` root, extracts all flow-specific configuration into `core/flows/*.flow.yaml` files, and rewrites the orchestrator to be a generic FSM engine driven by whichever flow config it receives at spawn time.
 
 ---
 
 ## Stories
+
+### Story 0.1: pathly/ root directory consolidates all runtime output
+**As a** user running any pathly flow, **I want** all runtime output (plans, debug sessions, explorations, pipeline walkthroughs) to live under a single `pathly/` directory, **so that** my project root stays clean and all pathly artifacts are in one predictable place.
+
+**Acceptance Criteria:**
+- [ ] `team.md` feature detection scans `pathly/plans/*/STATE.json` (not `plans/*/STATE.json`)
+- [ ] `orchestrator.md` artifact archiving writes pipeline walkthroughs to `pathly/pipeline-walkthrough/<feature>/artifacts/`
+- [ ] All flow config `storage_path` fields use `pathly/` prefix (`pathly/plans/{topic}/`, `pathly/debugs/{topic}/`, `pathly/explorations/{topic}/`)
+
+**Delivered by:** Phase 0a–0b → Conversation 1
+
+---
 
 ### Story 1.1: team.flow.yaml captures the team pipeline FSM
 **As a** contributor adding a new pipeline stage, **I want** the team FSM to be defined in a YAML file, **so that** I can read one file to understand the full state machine without reading orchestrator.md.
@@ -18,10 +30,10 @@ This feature extracts all flow-specific configuration into `core/flows/*.flow.ya
 - [ ] The file declares all team pipeline states: IDLE, STORMING, PLANNING, BUILDING, REVIEWING, TESTING, RETRO, BLOCKED_ON_HUMAN, DONE
 - [ ] The file declares all valid transitions between those states
 - [ ] The file declares an `agent_map` mapping each state to the agent or skill to invoke
-- [ ] The file declares `storage_path: plans/{topic}/`
+- [ ] The file declares `storage_path: pathly/plans/{topic}/`
 - [ ] The file declares `feedback_routing` covering ARCH_FEEDBACK, REVIEW_FAILURES, TEST_FAILURES, IMPL_QUESTIONS, DESIGN_QUESTIONS, HUMAN_QUESTIONS
 
-**Delivered by:** Phase 1 → Conversation 1
+**Delivered by:** Phase 1 → Conversation 2
 
 ---
 
@@ -33,10 +45,10 @@ This feature extracts all flow-specific configuration into `core/flows/*.flow.ya
 - [ ] The file declares states: INVESTIGATING, REPRODUCING, ROOT_CAUSE_FOUND, FIXING, VERIFYING, DONE
 - [ ] The file declares valid transitions between those states
 - [ ] The file declares an `agent_map` mapping each state to the appropriate agent to invoke
-- [ ] The file declares `storage_path: debugs/{topic}/`
+- [ ] The file declares `storage_path: pathly/debugs/{topic}/`
 - [ ] The file declares `feedback_routing` covering TEST_FAILURES and HUMAN_QUESTIONS at minimum
 
-**Delivered by:** Phase 2 → Conversation 1
+**Delivered by:** Phase 2 → Conversation 2
 
 ---
 
@@ -48,10 +60,10 @@ This feature extracts all flow-specific configuration into `core/flows/*.flow.ya
 - [ ] The file declares states: FRAMING, ANALYZING, TRACING, CONCLUDING, DONE
 - [ ] The file declares valid transitions between those states
 - [ ] The file declares an `agent_map` mapping each state to the appropriate agent to invoke
-- [ ] The file declares `storage_path: explorations/{topic}/`
+- [ ] The file declares `storage_path: pathly/explorations/{topic}/`
 - [ ] The file declares `feedback_routing` covering HUMAN_QUESTIONS at minimum
 
-**Delivered by:** Phase 3 → Conversation 1
+**Delivered by:** Phase 3 → Conversation 2
 
 ---
 
@@ -67,7 +79,7 @@ This feature extracts all flow-specific configuration into `core/flows/*.flow.ya
 - [ ] `orchestrator.md` contains no literal references to team-specific state names (BUILDING, REVIEWING, TESTING, RETRO) outside of comments
 - [ ] `orchestrator.md` writes STATE.json and EVENTS.jsonl to the `storage_path` from the flow config
 
-**Delivered by:** Phase 4 → Conversation 2
+**Delivered by:** Phase 4 → Conversation 3
 
 ---
 
@@ -78,7 +90,7 @@ This feature extracts all flow-specific configuration into `core/flows/*.flow.ya
 - [ ] `src/pathly_data/adapters/claude/_meta/orchestrator.yaml` contains a `flow_config` input field or parameter declaration
 - [ ] The codex adapter orchestrator.yaml (if it exists) contains the same `flow_config` declaration
 
-**Delivered by:** Phase 5 → Conversation 2
+**Delivered by:** Phase 5 → Conversation 3
 
 ---
 
@@ -89,7 +101,7 @@ This feature extracts all flow-specific configuration into `core/flows/*.flow.ya
 - [ ] `team.md` spawn instruction for orchestrator includes `flow_config: core/flows/team.flow.yaml`
 - [ ] `team.md` does not contain hardcoded team state names (BUILDING, REVIEWING, etc.) in the orchestrator spawn block
 
-**Delivered by:** Phase 6 → Conversation 3
+**Delivered by:** Phase 6 → Conversation 4
 
 ---
 
@@ -100,9 +112,9 @@ This feature extracts all flow-specific configuration into `core/flows/*.flow.ya
 - [ ] `debug.md` contains a `Spawn **orchestrator** agent` instruction
 - [ ] The spawn instruction passes `flow_config: core/flows/debug.flow.yaml` and `topic: <symptom-name>`
 - [ ] `debug.md` does not contain inline FSM state-transition logic (the six explicit step-to-state mapping)
-- [ ] A debug run produces STATE.json and EVENTS.jsonl under `debugs/<symptom-name>/`
+- [ ] A debug run produces STATE.json and EVENTS.jsonl under `pathly/debugs/<symptom-name>/`
 
-**Delivered by:** Phase 7 → Conversation 3
+**Delivered by:** Phase 7 → Conversation 4
 
 ---
 
@@ -113,6 +125,6 @@ This feature extracts all flow-specific configuration into `core/flows/*.flow.ya
 - [ ] `explore.md` contains a `Spawn **orchestrator** agent` instruction
 - [ ] The spawn instruction passes `flow_config: core/flows/explore.flow.yaml` and `topic: <topic>`
 - [ ] `explore.md` does not contain inline FSM state-transition logic
-- [ ] An explore run produces STATE.json and EVENTS.jsonl under `explorations/<topic>/`
+- [ ] An explore run produces STATE.json and EVENTS.jsonl under `pathly/explorations/<topic>/`
 
-**Delivered by:** Phase 8 → Conversation 3
+**Delivered by:** Phase 8 → Conversation 4
