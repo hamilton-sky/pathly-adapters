@@ -62,6 +62,45 @@ Ask the user to confirm or adjust the framing before continuing.
 
 ---
 
+## Scout spawning rules — MANDATORY
+
+These rules are hard constraints, not suggestions. Violating them is always wrong.
+
+**You MUST spawn scouts. You must NEVER read files directly during TRACING.**
+Direct tool calls (Read, Grep, Glob) by the orchestrator are forbidden during the trace phase.
+Scouts are the only permitted mechanism for reading codebase files.
+
+**Wide scout rule (always required):** One scout MUST always be designated as the
+**orientation scout**. Its job is to gather broad structural context — what files exist
+in the relevant layer(s), how they connect, what the dependency direction is, and which
+files are most relevant to the question. The orientation scout does NOT produce conclusions;
+it produces a map that the other scouts use to scope their work.
+The orientation scout counts toward the min/max total.
+
+**Clustering rule (all remaining scouts):** Every scout after the orientation scout
+must be clustered — assigned 2–3 related files in the same layer or the same risk area.
+A clustered scout that reads everything = wrong. A clustered scout that reads one file only
+= probably too narrow, reconsider the split. Target: each clustered scout covers one
+coherent concern and produces cited file:line findings for that concern only.
+
+**Scout count:**
+| Scope | Min scouts | Max scouts |
+|---|---|---|
+| Single risk / single question | 2 | 2 |
+| 2–3 related risks | 2 | 3 |
+| 4–5 distinct risk areas | 3 | 4 |
+| Genuinely independent risks requiring full isolation | — | 5 (hard ceiling) |
+
+Spawning fewer than 2 scouts is always wrong — even for a narrow question.
+Spawning more than 4 scouts requires explicit justification written into EXPLORE.md before spawning.
+5 scouts is the absolute ceiling; it may only be used when risks are structurally independent
+and cannot be clustered without losing findings.
+
+**Parallelism rule:** All scouts for a given TRACING phase MUST be launched in a single
+message (parallel tool calls). Sequential scout launches are wrong.
+
+---
+
 ## Spawn orchestrator
 
 Spawn the **orchestrator** agent with:
