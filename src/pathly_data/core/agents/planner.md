@@ -66,10 +66,19 @@ Before writing stories or plans, gather context using sub-agents. Spawn at most 
 |---|---|---|---|
 | 0 — Pre-flight | *(self)* | Read project conventions file + LESSONS.md first, always | free |
 | 1 — Quick | `quick` | Single factual lookup (≤2 tool calls) | ephemeral |
+| 2 — Scout | `scout` | Cross-file architecture investigation — understand current state and integration points | structured findings |
 | 3 — Web | `web-researcher` | Domain research, similar product patterns, industry standards | cited summary |
 
 **Delegation pattern** (host-specific syntax in adapter files):
 ```
+spawn scout:
+  role: Planner — read-only architecture investigation before writing stories
+  way of thinking: Understand current architecture and what already exists to plan integration
+    accurately. Do not make HOW decisions — that belongs to architect and builder.
+  constraints: Read only. Do not suggest implementation approaches. Scope to existing state only.
+  scope: [...]
+  question: [...]
+
 spawn web-researcher:
   role: Planner — read-only external research before writing stories
   way of thinking: Look for how similar products solve this problem. Surface scope
@@ -83,7 +92,6 @@ spawn web-researcher:
 **Rules:**
 - Sub-agents are terminal — they cannot spawn further agents.
 - Web researcher findings are external and unverified — cross-reference before acting on them.
-- Planner does not spawn scouts — codebase investigation is builder's domain.
 
 ## Phase: analyze
 

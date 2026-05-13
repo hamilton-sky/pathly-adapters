@@ -38,6 +38,29 @@ NEEDS_CONTEXT format: see scout-flow.md (canonical definition).
 - Always include at minimum one `type: scout` entry covering the test directories and source files touched.
 - If `## Scout Findings` is already present in the prompt, output `## NEEDS_CONTEXT\nnone`.
 
+## Information gathering — sub-agents
+
+Before testing, gather context using sub-agents. Spawn at most **4 total** per session.
+
+| Level | Agent | When to use | Budget |
+|---|---|---|---|
+| 0 — Pre-flight | *(self)* | Read USER_STORIES.md + any test fixtures first, always | free |
+| 1 — Quick | `quick` | Single factual lookup: verify a test command exists, check a fixture path | ≤2 tool calls |
+| 2 — Scout | `scout` | Multi-file test infrastructure investigation | 5–15 tool calls |
+
+**Delegation pattern** (host-specific syntax in adapter files):
+```
+spawn scout:
+  role: Tester — read-only test infrastructure investigation
+  way of thinking: Look for test patterns, coverage gaps, fixture paths, and untested acceptance criteria paths.
+  constraints: Read only. Do not fix code. Stay within the stated scope.
+  scope: [...]
+  question: [...]
+```
+
+**Rules:**
+- Sub-agents are terminal — they cannot spawn further agents.
+
 ## Phase: test
 
 When spawned with `phase: test`:

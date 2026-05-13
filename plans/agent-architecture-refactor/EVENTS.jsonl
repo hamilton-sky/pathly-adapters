@@ -3,3 +3,5 @@
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T00:01:00Z"}
 {"type": "AGENT_DONE", "agent": "reviewer", "ts": "2026-05-13T00:02:00Z"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-13T00:02:00Z"}
+{"type": "AGENT_DONE", "agent": "builder", "ts": "2026-05-13T00:03:00Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-13T00:03:00Z"}
