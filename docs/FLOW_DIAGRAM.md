@@ -63,6 +63,10 @@ flowchart TD
 │   │   └── SKILL.md
 │   ├── pathly-test/
 │   │   └── SKILL.md
+│   ├── pathly-commit/
+│   │   └── SKILL.md           ← transition-action (spawned by orchestrator)
+│   ├── pathly-archive-artifacts/
+│   │   └── SKILL.md           ← transition-action (spawned by orchestrator)
 │   └── pathly-*/              (one folder per sub-skill, all prefixed)
 └── plugins/pathly/
     └── templates/pathly plan/

@@ -52,8 +52,9 @@ src/install_cli/stitch.py        core/ + _meta/*.yaml → deployable agent/skill
 src/install_cli/materialize.py   atomic write to host config + manifest tracking
 src/install_cli/setup_command.py pathly-setup CLI (dry-run, apply, repair, force,
                                uninstall, per-host subcommands)
-src/pathly_data/core/agents/                 11 host-neutral agent behavior contracts
-src/pathly_data/core/skills/                 skill logic in natural language
+src/pathly_data/core/agents/                 12 host-neutral agent behavior contracts
+src/pathly_data/core/skills/                 24 skill files (22 user-facing + 2 transition-action)
+src/pathly_data/core/flows/                  3 FSM flow definitions (team, debug, explore)
 src/pathly_data/core/templates/plan/         plan file templates
 src/pathly_data/adapters/claude/_meta/       per-agent/skill YAML for Claude Code
 src/pathly_data/adapters/codex/_meta/        per-agent/skill YAML for Codex
