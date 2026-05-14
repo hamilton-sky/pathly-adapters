@@ -1,0 +1,4 @@
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "tokens_in": 21531, "tokens_out": 0, "cost_usd": 0, "tool_uses": 22, "wall_seconds": 100, "timestamp": "2026-05-14T16:13:13Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-14T16:13:13Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "tokens_in": 10514, "tokens_out": 0, "cost_usd": 0, "tool_uses": 8, "wall_seconds": 28, "timestamp": "2026-05-14T16:15:00Z"}
+{"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-14T16:15:00Z"}
