@@ -3,3 +3,7 @@
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-14T16:20:00Z"}
 {"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "tokens_in": 13388, "tokens_out": 0, "cost_usd": 0, "tool_uses": 3, "wall_seconds": 21, "timestamp": "2026-05-14T16:22:00Z"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-14T16:22:00Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "tokens_in": 17948, "tokens_out": 0, "cost_usd": 0, "tool_uses": 22, "wall_seconds": 131, "timestamp": "2026-05-14T16:30:00Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-14T16:30:00Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 3, "result": "PASS", "tokens_in": 9779, "tokens_out": 0, "cost_usd": 0, "tool_uses": 6, "wall_seconds": 17, "timestamp": "2026-05-14T16:32:00Z"}
+{"type": "STATE_TRANSITION", "to": "DONE", "ts": "2026-05-14T16:32:00Z"}
