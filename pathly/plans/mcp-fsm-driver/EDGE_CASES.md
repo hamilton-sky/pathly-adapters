@@ -44,6 +44,21 @@ No-op. `get_transition_actions(flow)` returns `{}`.
 
 ## MCP server (`mcp_server.py`)
 
+**`project_root` is a relative path or does not exist**
+Both tools resolve `storage_path` as `Path(project_root) / ...`. If
+`project_root` is relative or points to a non-existent directory, every
+path operation will silently resolve to the wrong location. Validate at
+call time: if `Path(project_root)` is not an absolute path or does not
+exist as a directory, return `{"error": "project_root must be an absolute
+path to an existing directory: <value>"}`.
+
+**Agent contract file missing from package data**
+`build_prompt` loads `core/agents/<agent>.md` via `importlib.resources`. If
+the agent name in `agent_map` does not match any installed `.md` file, this
+raises a `FileNotFoundError`. Catch it and return
+`{"error": "agent contract not found: <agent>"}` rather than crashing the
+MCP server.
+
 **Unknown `flow` parameter**
 `next_action("nonexistent", topic)` — flow YAML not found in package data.
 Returns `{"error": "flow YAML not found: nonexistent.flow.yaml"}`. Does not
@@ -110,6 +125,55 @@ Document this constraint in `mcp_server.py` docstrings.
 
 ---
 
+## Architectural edge cases (disingenuous patterns)
+
+**Sub-agent writes STATE.json directly, bypassing `complete_stage`**
+Nothing prevents a domain agent (planner, builder, reviewer) from writing
+`STATE.json` directly instead of calling `complete_stage`. If it does, the MCP
+server reads the modified state on the next call and advances from the wrong
+point — silently.
+Solution: Document in every agent contract that writing `STATE.json` is
+forbidden; agents must call `complete_stage`. Additionally, `complete_stage`
+reads `STATE.json` before and after `run_transition_actions` and raises
+`RuntimeError` if the state changed between the two reads (concurrent write
+detected).
+
+**`agent_map` values are implicit unvalidated file paths**
+Flow YAMLs map states to agent names (e.g. `PLANNING: planner`), but
+`validate_flow_cli` does not verify that `core/agents/<agent>.md` exists in
+the installed package. A typo in `agent_map` reaches `build_prompt` at runtime
+and raises `FileNotFoundError`.
+Solution: Extend `validate_flow_cli` (in `state.py`) to check every value in
+`agent_map` against the list of `.md` files in `core/agents/` via
+`importlib.resources`. Report all missing agent contracts as validation errors,
+not runtime failures.
+
+**`BLOCKED_ON_HUMAN` state has no agent contract**
+`next_action` or `complete_stage` returning `{blocked: true}` means a feedback
+file is present. The `target_agent` field names the agent that should resolve
+the feedback (e.g. `"builder"`). But if the feedback file is `HUMAN_QUESTIONS.md`
+the correct target is the *user*, not an LLM agent — there is no
+`core/agents/human.md`. `build_prompt` will raise `FileNotFoundError`.
+Solution: `route_feedback` must distinguish human-targeted feedback from
+LLM-targeted feedback. For `HUMAN_QUESTIONS` priority files, `route_feedback`
+returns `{file, target_agent: "human", instructions: <file contents>}`. The
+MCP server propagates this without calling `build_prompt`. Skill files surface
+the instructions to the user and halt until the file is deleted.
+
+**`orchestrator.md` (fallback) will drift from `fsm.py` (primary)**
+Over time, `fsm.py` will handle new edge cases, support new action types, or
+change transition evaluation logic. `orchestrator.md` will not be updated in
+parallel. When someone falls back to the orchestrator agent they get different
+— and likely incorrect — FSM behavior.
+Solution: Add a comment block at the top of `orchestrator.md` listing the exact
+`fsm.py` version and behavioral invariants it was synchronized with. Treat
+orchestrator.md as a snapshot, not a living document. CI check: if `fsm.py`
+changes and `orchestrator.md` has not been touched in the same PR, emit a
+warning (not a failure). Long-term: remove the fallback path after two stable
+releases and rely on MCP server availability checks in skill files.
+
+---
+
 ## Test cases derived from edge cases
 
 | Edge case | Test in |
@@ -121,5 +185,10 @@ Document this constraint in `mcp_server.py` docstrings.
 | Two feedback files → priority winner | `test_fsm.py::test_route_feedback_priority` |
 | git commit nothing-to-commit → no-op | `test_fsm.py::test_run_actions_empty_commit` |
 | Unknown flow name → error dict | `test_mcp_server.py::test_next_action_bad_flow` |
+| Relative project_root → error dict | `test_mcp_server.py::test_next_action_relative_project_root` |
+| Missing agent contract → error dict | `test_mcp_server.py::test_build_prompt_missing_agent` |
 | Feedback present → blocked response | `test_mcp_server.py::test_complete_stage_blocked` |
 | Already DONE → done response | `test_mcp_server.py::test_complete_stage_already_done` |
+| HUMAN_QUESTIONS feedback → human target, no build_prompt | `test_mcp_server.py::test_route_feedback_human_questions` |
+| Concurrent STATE.json write → RuntimeError | `test_mcp_server.py::test_complete_stage_concurrent_write` |
+| agent_map typo → validation error at validate_flow_cli | `test_fsm.py::test_validate_flow_missing_agent_contract` |

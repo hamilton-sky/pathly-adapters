@@ -102,43 +102,54 @@ Load flow YAMLs via importlib.resources:
   yaml_text = files("pathly_data").joinpath(f"core/flows/{flow}.flow.yaml").read_text()
   flow_config = yaml.safe_load(yaml_text)
 
-Resolve storage_path by substituting {topic} in flow_config["storage_path"]
-and joining with Path.cwd().
+Both tools take flow, topic, and project_root (str) as parameters.
+The skill file passes project_root explicitly — the server never calls Path.cwd().
 
-FEEDBACK_PRIORITY = [
-    "HUMAN_QUESTIONS", "ARCH_FEEDBACK", "DESIGN_QUESTIONS",
-    "IMPL_QUESTIONS", "REVIEW_FAILURES", "TEST_FAILURES"
-]
+Resolve storage_path like this:
+  template = flow_config["storage_path"]          # e.g. "pathly/plans/{topic}/"
+  storage_path = Path(project_root) / template.format(topic=topic)
 
-Tool 1 — next_action(flow: str, topic: str) -> dict:
+All git subprocess calls must pass cwd=project_root so commits land in the
+correct repo.
+
+Implement a private build_prompt(flow_config, state_name, storage_path) helper:
+  1. agent = flow_config["agent_map"][state_name]
+  2. agent_text = files("pathly_data").joinpath(f"core/agents/{agent}.md").read_text()
+  3. Return agent_text + "\n## Current task\n" +
+       f"Feature: {storage_path.name}\nState: {state_name}\nStorage path: {storage_path}\n"
+Use build_prompt() for all instructions fields — never f"You are the {agent}. ..."
+
+Tool 1 — next_action(flow: str, topic: str, project_root: str) -> dict:
   1. Load flow config.
-  2. Create storage_path dir if absent.
-  3. Call recover_state(storage_path, flow_config).
-  4. Call route_feedback(flow_config, storage_path).
-  5. If feedback found:
+  2. Resolve storage_path = Path(project_root) / template.format(topic=topic).
+  3. Create storage_path dir if absent.
+  4. Call recover_state(storage_path, flow_config).
+  5. Call route_feedback(flow_config, storage_path).
+  6. If feedback found:
        return {"blocked": True,
                "target_agent": feedback["target_agent"],
-               "instructions": f"Resolve {feedback['file']}: ..." }
-  6. Else:
+               "instructions": build_prompt(flow_config, feedback["target_agent"], storage_path)}
+  7. Else:
        current = state["current_state"]
        return {"current_state": current,
                "agent": flow_config["agent_map"][current],
-               "instructions": f"You are the {flow_config['agent_map'][current]}. ...",
+               "instructions": build_prompt(flow_config, current, storage_path),
                "storage_path": str(storage_path)}
 
-Tool 2 — complete_stage(flow: str, topic: str) -> dict:
+Tool 2 — complete_stage(flow: str, topic: str, project_root: str) -> dict:
   1. Load flow config.
-  2. Call recover_state.
-  3. Call route_feedback. If feedback found → return blocked (same as above).
-  4. current = state["current_state"]
-  5. next_state = evaluate_transition_rules(flow_config, current, storage_path)
-  6. Write STATE.json: update "current" to next_state; update "updated_at".
-  7. Append to EVENTS.jsonl: {"type": "STATE_TRANSITION", "from": current, "to": next_state}
-  8. Call run_transition_actions(flow_config, current, next_state, storage_path, topic, state["conv"])
-  9. If next_state == "DONE": return {"done": True}
-  10. Return {"next_state": next_state,
-              "agent": flow_config["agent_map"][next_state],
-              "instructions": f"You are the {flow_config['agent_map'][next_state]}. ..."}
+  2. Resolve storage_path.
+  3. Call recover_state.
+  4. Call route_feedback. If feedback found → return blocked (same as above).
+  5. current = state["current_state"]
+  6. next_state = evaluate_transition_rules(flow_config, current, storage_path)
+  7. Write STATE.json: update "current" to next_state; update "updated_at".
+  8. Append to EVENTS.jsonl: {"type": "STATE_TRANSITION", "from": current, "to": next_state}
+  9. Call run_transition_actions(flow_config, current, next_state, storage_path, topic, state["conv"])
+  10. If next_state == "DONE": return {"done": True}
+  11. Return {"next_state": next_state,
+               "agent": flow_config["agent_map"][next_state],
+               "instructions": build_prompt(flow_config, next_state, storage_path)}
 
 Add a main() function that starts the MCP server.
 Add if __name__ == "__main__": main() at the bottom.

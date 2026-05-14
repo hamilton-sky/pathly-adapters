@@ -110,28 +110,28 @@ Two tools exposed to LLM clients:
 
 ```python
 @mcp_tool
-def next_action(flow: str, topic: str) -> dict:
+def next_action(flow: str, topic: str, project_root: str) -> dict:
     fsm_data = load_flow(flow)                     # importlib.resources
-    storage_path = resolve_storage_path(fsm_data, topic)
+    storage_path = Path(project_root) / fsm_data["storage_path"].format(topic=topic)
     state = recover_state(storage_path, fsm_data)
     feedback = route_feedback(fsm_data, storage_path)
     if feedback:
         return {"blocked": True, "target_agent": feedback["target_agent"],
-                "instructions": build_prompt(fsm_data, feedback["target_agent"])}
+                "instructions": build_prompt(fsm_data, feedback["target_agent"], storage_path)}
     return {"current_state": state["current_state"],
             "agent": fsm_data["agent_map"][state["current_state"]],
-            "instructions": build_prompt(fsm_data, state["current_state"]),
+            "instructions": build_prompt(fsm_data, state["current_state"], storage_path),
             "storage_path": str(storage_path)}
 
 @mcp_tool
-def complete_stage(flow: str, topic: str) -> dict:
+def complete_stage(flow: str, topic: str, project_root: str) -> dict:
     fsm_data = load_flow(flow)
-    storage_path = resolve_storage_path(fsm_data, topic)
+    storage_path = Path(project_root) / fsm_data["storage_path"].format(topic=topic)
     state = recover_state(storage_path, fsm_data)
     feedback = route_feedback(fsm_data, storage_path)
     if feedback:
         return {"blocked": True, "target_agent": feedback["target_agent"],
-                "instructions": build_prompt(fsm_data, feedback["target_agent"])}
+                "instructions": build_prompt(fsm_data, feedback["target_agent"], storage_path)}
     next_state = evaluate_transition_rules(fsm_data, state["current_state"], storage_path)
     write_state(storage_path, next_state, state)
     append_event(storage_path, {"type": "STATE_TRANSITION", "to": next_state})
@@ -141,7 +141,7 @@ def complete_stage(flow: str, topic: str) -> dict:
         return {"done": True}
     return {"next_state": next_state,
             "agent": fsm_data["agent_map"][next_state],
-            "instructions": build_prompt(fsm_data, next_state)}
+            "instructions": build_prompt(fsm_data, next_state, storage_path)}
 ```
 
 ### `src/install_cli/mcp_config.py` — registration
@@ -205,6 +205,10 @@ One Python server. Both hosts. Registered once via `pathly-setup --apply`.
   the orchestrator agent can still be spawned manually. It is not removed.
 - **`fsm.py` has no MCP dependency** — pure functions, importable in tests
   without starting an MCP server.
-- **`build_prompt` is adapter-agnostic** — returns the canonical agent
-  instructions from `core/agents/<agent>.md`. Adapter skill files are responsible
-  for any host-specific wrapping.
+- **`build_prompt` loads the full agent contract** — reads `core/agents/<agent>.md`
+  via `importlib.resources` and appends a minimal context block (feature name,
+  state, storage path). The LLM receives the complete role spec without the skill
+  file having to load or pass agent content separately.
+- **`project_root` is explicit, never inferred** — both tools require `project_root`
+  as a parameter. The skill file passes it; the server never calls `Path.cwd()`.
+  All git subprocess calls pass `cwd=project_root`.
