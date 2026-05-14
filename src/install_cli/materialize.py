@@ -306,7 +306,12 @@ def materialize_flows(
     force: bool = False,
     dry_run: bool = False,
 ) -> list[str]:
-    """Copy *.flow.yaml files from the installed package to dest. Returns list of filenames written."""
+    """Copy *.flow.yaml files from the installed package to dest. Returns list of filenames written.
+
+    Flow YAMLs are always authoritative — repair=True is forced so that
+    re-running the installer keeps installed flows in sync with the source
+    without requiring an explicit --repair flag.
+    """
     from .resources import core_flows_path
 
     flows_src = core_flows_path()
@@ -314,7 +319,7 @@ def materialize_flows(
         f.name: f.read_text(encoding="utf-8")
         for f in sorted(flows_src.glob("*.flow.yaml"))
     }
-    return materialize(files, dest, repair=repair, force=force, dry_run=dry_run)
+    return materialize(files, dest, repair=True, force=force, dry_run=dry_run)
 
 
 def uninstall(dest: Path, *, dry_run: bool = False) -> list[str]:
