@@ -2,8 +2,8 @@
 
 | Conv | Scope | Stories | Status |
 |------|-------|---------|--------|
-| 1 | Extend flow YAMLs with transition_actions | S1.1, S1.2 | NOT STARTED |
-| 2 | Generalize orchestrator.md; remove hardcoded side effects | S2.1 | NOT STARTED |
+| 1 | Extend flow YAMLs with transition_actions | S1.1, S1.2 | DONE |
+| 2 | Generalize orchestrator.md; remove hardcoded side effects | S2.1 | DONE |
 | 3 | Update state.py / validate_flow (BLOCKED on fsm-configurable Phase 5c) | S3.1 | BLOCKED |
 
 ## Status key

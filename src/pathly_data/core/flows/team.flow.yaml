@@ -76,3 +76,10 @@ transition_rules:
       TEST_FAILURES.md: TESTING
       BLOCKED_ON_HUMAN.md: BLOCKED_ON_HUMAN
     default: RETRO
+
+transition_actions:
+  "BUILDING->REVIEWING":
+    - type: git_commit
+      message: "feat: complete building stage"
+  "RETRO->DONE":
+    - type: archive_artifacts

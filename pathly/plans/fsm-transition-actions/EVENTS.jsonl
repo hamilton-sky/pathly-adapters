@@ -1,3 +1,8 @@
 {"type": "FSM_INIT", "to": "STORMING"}
 {"type": "STATE_TRANSITION", "to": "PLANNING"}
 {"type": "STATE_TRANSITION", "to": "BUILDING"}
+{"type": "AGENT_DONE", "agent": "builder", "conv": 1}
+{"type": "AGENT_DONE", "agent": "builder", "conv": 2}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance"}
+{"type": "STATE_TRANSITION", "to": "BUILDING"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING"}

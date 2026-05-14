@@ -82,6 +82,29 @@ After each sub-agent or sub-skill returns control, determine the next state:
 3. If no artifact matched → set `next_state` to `default`.
 4. Write `<storage_path>/STATE.json` with `{"current": next_state}`.
 5. Append `{"type": "STATE_TRANSITION", "to": next_state}` to `<storage_path>/EVENTS.jsonl`.
+
+### Execute transition_actions
+
+After appending the transition event:
+
+1. Read `transition_actions` from the active flow YAML. If the key is absent or the value
+   is empty, treat as an empty map and skip to step 6 (no-op).
+2. Construct the lookup key as `"PREV_STATE->NEW_STATE"` using the state values from this
+   iteration's transition.
+3. Look up that key in `transition_actions`. Also check `"->NEW_STATE"` as a wildcard for
+   any transition that lands in NEW_STATE.
+4. For each matched action in YAML list order (sequential, not parallel):
+   - `git_commit`: run `git add -A` then `git commit -m <message>`.
+   - `update_progress`: if `mark` is `conv_done`, mark the current conversation row DONE
+     in PROGRESS.md (read current conv number from STATE.json); if `mark` is
+     `all_phases_done`, mark every phase in the current conversation DONE.
+   - `archive_artifacts`: dual-write feedback files to
+     `pathly/pipeline-walkthrough/<topic>/artifacts/`
+     using naming `<FILENAME>_conv<N>_attempt<M>.md`.
+5. If no key matches, continue (no-op).
+6. On action failure: halt and surface the error (same halt-and-report behavior as other
+   unexpected errors in the loop).
+
 6. Continue FSM loop with `next_state`.
 
 ## Feedback routing
@@ -122,46 +145,10 @@ When `HUMAN_QUESTIONS.md` exists in `<storage_path>/feedback/`:
 
 These actions are the orchestrator's job — sub-agents do NOT perform them.
 
-### autoFlow commits
-
-If `autoFlow = true`, commit all changed files when a sub-agent's work produces a completed
-state transition:
-
-```bash
-git add -A
-git commit -m "feat(<topic>): <state> complete
-
-Co-Authored-By: Pathly Orchestrator <noreply@anthropic.com>"
-```
-
 ### Feedback re-route
 
 When a feedback file triggers re-routing to a fixing agent: no commit and no PROGRESS.md
 update until the feedback is resolved and the state advances cleanly.
-
-## Artifact archiving — dual-write rule
-
-**This rule applies to the orchestrator and all sub-skills.**
-
-Whenever any feedback file is written to `<storage_path>/feedback/`, also write
-a copy to `pathly/pipeline-walkthrough/<topic>/artifacts/` at the same time.
-
-Naming: `<FILENAME>_conv<N>_attempt<M>.md`
-Examples: `REVIEW_FAILURES_conv1_attempt2.md`, `HUMAN_QUESTIONS_conv1_stall.md`
-
-Create `pathly/pipeline-walkthrough/<topic>/artifacts/` if it does not exist.
-
-**Why:** feedback files are deleted when resolved — the archive is the only permanent
-record of what each agent said. The FSM only reads `<storage_path>/feedback/`;
-it never scans `pathly/pipeline-walkthrough/`, so the archive never jams the state machine.
-
-**Applies to all feedback files:**
-- `REVIEW_FAILURES.md` — written by reviewer
-- `ARCH_FEEDBACK.md` — written by reviewer
-- `TEST_FAILURES.md` — written by tester
-- `IMPL_QUESTIONS.md` — written by builder
-- `DESIGN_QUESTIONS.md` — written by builder
-- `HUMAN_QUESTIONS.md` — written by orchestrator (escalation, stall, rigor offer)
 
 ## What you must NOT do
 

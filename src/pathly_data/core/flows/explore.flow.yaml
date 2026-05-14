@@ -28,3 +28,5 @@ agent_map:
 
 feedback_routing:
   HUMAN_QUESTIONS: human
+
+transition_actions: {}

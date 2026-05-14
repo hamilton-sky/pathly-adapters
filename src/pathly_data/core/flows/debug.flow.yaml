@@ -35,3 +35,5 @@ agent_map:
 feedback_routing:
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
+
+transition_actions: {}
