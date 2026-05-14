@@ -1,0 +1,5 @@
+{"type": "FSM_INIT", "to": "STORMING"}
+{"type": "STATE_TRANSITION", "to": "PLANNING"}
+{type: ENTRY_OVERRIDE, to: STORMING, reason: entryStage=discovery}
+{"type": "STATE_TRANSITION", "to": "PLANNING"}
+{"type": "STATE_TRANSITION", "to": "BUILDING"}
