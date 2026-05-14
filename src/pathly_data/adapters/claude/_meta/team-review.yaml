@@ -2,5 +2,6 @@ name: team/review
 description: "Review stage for the team pipeline — spawns reviewer with scout-gathered context, routes failures back to builder or architect."
 model: sonnet
 filename: team/review.md
+core_file: skills/team/review.md
 tools: [Read, Glob, Grep, Write, Edit, Bash]
 can_spawn: [reviewer, scout, quick, architect, builder]

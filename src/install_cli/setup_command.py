@@ -98,11 +98,14 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         if meta_file.stem.endswith("_skill"):
             continue
         agent_name = meta_file.stem
-        core_file = core_dir / f"{agent_name}.md"
+        agent_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
+        if "core_file" in agent_meta:
+            core_file = core_dir.parent / agent_meta["core_file"]
+        else:
+            core_file = core_dir / f"{agent_name}.md"
         if not core_file.exists():
             print(f"  [warn] No core file for {agent_name!r}, skipping", file=sys.stderr)
             continue
-        agent_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
         stitched = stitch_agent(core_file, meta_file, footer=footer)
         if host == "codex":
             agent_files[f"{agent_name}.toml"] = _codex_agent_toml(agent_meta, stitched)

@@ -2,5 +2,6 @@ name: team/retro
 description: "Retrospective stage for the team pipeline — spawns quick to gather retro answers, writes RETRO.md and pipeline-walkthrough files."
 model: sonnet
 filename: team/retro.md
+core_file: skills/team/retro.md
 tools: [Read, Glob, Grep, Write, Edit, Bash]
 can_spawn: [quick]
