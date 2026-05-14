@@ -16,3 +16,6 @@
 {"type": "FILE_DELETED", "file": "pathly/plans/fsm-transition-actions/feedback/REVIEW_FAILURES.md"}
 {"type": "AGENT_DONE", "agent": "reviewer"}
 {"type": "HUMAN_RESPONSE", "value": "auto-advance"}
+{"type": "STATE_TRANSITION", "to": "TESTING"}
+{"type": "STATE_TRANSITION", "to": "RETRO"}
+{"type": "STATE_TRANSITION", "to": "DONE"}
