@@ -1,0 +1,6 @@
+name: team/test
+description: "Test stage for the team pipeline — spawns tester with scout-gathered context, routes failures to builder for fix loop."
+model: sonnet
+filename: team/test.md
+tools: [Read, Glob, Grep, Write, Edit, Bash]
+can_spawn: [tester, scout, quick, builder]

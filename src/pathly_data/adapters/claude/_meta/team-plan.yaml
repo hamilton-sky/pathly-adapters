@@ -1,0 +1,6 @@
+name: team/plan
+description: "Storm and Plan stages for the team pipeline — spawns architect scouts then planner to produce IMPLEMENTATION_PLAN.md and the 5 core plan files."
+model: sonnet
+filename: team/plan.md
+tools: [Read, Glob, Grep, Write, Edit]
+can_spawn: [architect, planner, po, scout, quick, web-researcher]

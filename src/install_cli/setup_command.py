@@ -102,12 +102,13 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         if not core_file.exists():
             print(f"  [warn] No core file for {agent_name!r}, skipping", file=sys.stderr)
             continue
+        agent_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
         stitched = stitch_agent(core_file, meta_file, footer=footer)
         if host == "codex":
-            agent_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
             agent_files[f"{agent_name}.toml"] = _codex_agent_toml(agent_meta, stitched)
         else:
-            agent_files[f"{agent_name}.md"] = stitched
+            filename = agent_meta.get("filename", f"{agent_name}.md")
+            agent_files[filename] = stitched
 
     skills_cfg = install_cfg.get("skills")
     skill_files: dict[str, str] = {}
