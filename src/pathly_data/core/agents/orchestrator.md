@@ -87,31 +87,12 @@ After each sub-agent or sub-skill returns control, determine the next state:
 
 After appending the transition event:
 
-1. Read `transition_actions` from the active flow YAML. If the key is absent or the value
-   is empty, treat as an empty map and skip to step 7 (no-op).
-2. Construct the lookup key as `"PREV_STATE->NEW_STATE"` using the state values from this
-   iteration's transition.
-3. Look up that key in `transition_actions`. Also check `"->NEW_STATE"` as a wildcard for
-   any transition that lands in NEW_STATE.
-4. For each matched action in YAML list order (sequential, not parallel):
-   - Before executing `git_commit` or `update_progress`: check whether any feedback file
-     (`REVIEW_FAILURES.md`, `ARCH_FEEDBACK.md`, `TEST_FAILURES.md`, `IMPL_QUESTIONS.md`,
-     `DESIGN_QUESTIONS.md`, `HUMAN_QUESTIONS.md`) exists in `<storage_path>/feedback/`.
-     If any feedback file is present, skip that action and log that it was suppressed due
-     to an active feedback file. `archive_artifacts` is not subject to this guard.
-   - `git_commit`: run `git add -A` then `git commit -m <message>`.
-   - `update_progress`: if `mark` is `conv_done`, mark the current conversation row DONE
-     in PROGRESS.md (read current conv number from STATE.json); if `mark` is
-     `all_phases_done`, mark every phase in the current conversation DONE.
-   - `archive_artifacts`: dual-write feedback files to
-     `pathly/pipeline-walkthrough/<topic>/artifacts/`
-     using naming `<FILENAME>_conv<N>_attempt<M>.md`.
-   - Otherwise: halt and report "unknown transition action type: <type>".
-5. If no key matches, continue (no-op).
-6. On action failure: halt and surface the error (same halt-and-report behavior as other
-   unexpected errors in the loop).
-
-7. Continue FSM loop with `next_state`.
+1. Read `transition_actions[PREV->NEW]` from the flow YAML (also check `->NEW` wildcard). If absent or empty: no-op, continue.
+2. For each action in list order:
+   - Read `action.skill` — the skill name to spawn.
+   - Spawn that skill with: `topic`, `storage_path`, `conv` (current conversation number from STATE.json), and any additional fields from the action object (e.g. `message`).
+   - Wait for the skill to return before spawning the next.
+3. Continue FSM loop with `next_state`.
 
 ## Feedback routing
 
