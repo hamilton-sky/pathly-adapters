@@ -44,6 +44,21 @@ No-op. `get_transition_actions(flow)` returns `{}`.
 
 ## MCP server (`mcp_server.py`)
 
+**`project_root` is a relative path or does not exist**
+Both tools resolve `storage_path` as `Path(project_root) / ...`. If
+`project_root` is relative or points to a non-existent directory, every
+path operation will silently resolve to the wrong location. Validate at
+call time: if `Path(project_root)` is not an absolute path or does not
+exist as a directory, return `{"error": "project_root must be an absolute
+path to an existing directory: <value>"}`.
+
+**Agent contract file missing from package data**
+`build_prompt` loads `core/agents/<agent>.md` via `importlib.resources`. If
+the agent name in `agent_map` does not match any installed `.md` file, this
+raises a `FileNotFoundError`. Catch it and return
+`{"error": "agent contract not found: <agent>"}` rather than crashing the
+MCP server.
+
 **Unknown `flow` parameter**
 `next_action("nonexistent", topic)` — flow YAML not found in package data.
 Returns `{"error": "flow YAML not found: nonexistent.flow.yaml"}`. Does not
@@ -121,5 +136,7 @@ Document this constraint in `mcp_server.py` docstrings.
 | Two feedback files → priority winner | `test_fsm.py::test_route_feedback_priority` |
 | git commit nothing-to-commit → no-op | `test_fsm.py::test_run_actions_empty_commit` |
 | Unknown flow name → error dict | `test_mcp_server.py::test_next_action_bad_flow` |
+| Relative project_root → error dict | `test_mcp_server.py::test_next_action_relative_project_root` |
+| Missing agent contract → error dict | `test_mcp_server.py::test_build_prompt_missing_agent` |
 | Feedback present → blocked response | `test_mcp_server.py::test_complete_stage_blocked` |
 | Already DONE → done response | `test_mcp_server.py::test_complete_stage_already_done` |

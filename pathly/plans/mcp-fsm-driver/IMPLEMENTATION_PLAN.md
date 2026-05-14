@@ -99,17 +99,48 @@ Import only: stdlib, `pathlib`, `subprocess`, `yaml`, `pathly_orchestrator.state
 ### `mcp_server.py` — what to implement
 
 - Use the MCP Python SDK (or equivalent) to define and serve two tools.
-- `next_action(flow: str, topic: str)` and `complete_stage(flow: str, topic: str)`.
+- Both tools take `flow`, `topic`, and **`project_root`** as parameters.
+  `project_root` is the absolute path to the user's project directory. The caller
+  (skill file) passes it explicitly — the server never calls `Path.cwd()`.
 - Load flow YAML via `importlib.resources`:
   ```python
   from importlib.resources import files
   yaml_text = files("pathly_data").joinpath(f"core/flows/{flow}.flow.yaml").read_text()
   flow_config = yaml.safe_load(yaml_text)
   ```
-- Resolve `storage_path` from `flow_config["storage_path"]` with `{topic}` substituted.
-  All paths are relative to `Path.cwd()` (the user's project root).
+- Resolve `storage_path` from `flow_config["storage_path"]` with `{topic}` substituted,
+  joined to `Path(project_root)`. Example:
+  ```python
+  template = flow_config["storage_path"]          # e.g. "pathly/plans/{topic}/"
+  storage_path = Path(project_root) / template.format(topic=topic)
+  ```
+- `git` subprocess calls in `run_transition_actions` must use `cwd=project_root` so
+  commits land in the correct repo.
 - `main()` function that starts the MCP server (called by `pathly-fsm` entry point
   and by `python -m pathly_orchestrator.mcp_server`).
+
+### `build_prompt` — what to implement
+
+`build_prompt` is a private helper in `mcp_server.py`. It constructs the
+instructions string returned in every tool response.
+
+```python
+def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
+    """
+    1. Look up agent name: agent = flow_config["agent_map"][state_name]
+    2. Load core/agents/<agent>.md via importlib.resources:
+         agent_text = files("pathly_data").joinpath(f"core/agents/{agent}.md").read_text()
+    3. Append a context block:
+         f"## Current task\n"
+         f"Feature: {storage_path.name}\n"
+         f"State: {state_name}\n"
+         f"Storage path: {storage_path}\n"
+    4. Return the combined string.
+    """
+```
+
+This ensures the LLM receives the full agent contract plus the minimal context it
+needs. The skill file does not need to load or pass agent content separately.
 
 ### `pyproject.toml` — what to add
 

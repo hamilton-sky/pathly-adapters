@@ -46,21 +46,27 @@ spawning the orchestrator LLM agent.
 
 ### Acceptance criteria
 
-- `next_action(flow: str, topic: str) -> dict` — resolves `flow` to
-  `src/pathly_data/core/flows/<flow>.flow.yaml`; calls `recover_state` and
-  `route_feedback`; returns
+- `next_action(flow: str, topic: str, project_root: str) -> dict` — resolves
+  `flow` to `src/pathly_data/core/flows/<flow>.flow.yaml`; resolves
+  `storage_path` as `Path(project_root) / template.format(topic=topic)`; calls
+  `recover_state` and `route_feedback`; returns
   `{current_state, agent, instructions, storage_path}`.
   If feedback is open, returns `{blocked: true, target_agent, instructions}`.
-- `complete_stage(flow: str, topic: str) -> dict` — checks feedback first; if
-  open returns `{blocked: true, ...}`; otherwise calls
-  `evaluate_transition_rules`, writes `STATE.json`, appends to `EVENTS.jsonl`,
-  calls `run_transition_actions`, returns
+- `complete_stage(flow: str, topic: str, project_root: str) -> dict` — same
+  `project_root` → `storage_path` resolution; checks feedback first; if open
+  returns `{blocked: true, ...}`; otherwise calls `evaluate_transition_rules`,
+  writes `STATE.json`, appends to `EVENTS.jsonl`, calls
+  `run_transition_actions` with `cwd=project_root` for any git calls, returns
   `{next_state, agent, instructions}` or `{done: true}` when state is DONE.
+- The `instructions` field in every response is produced by `build_prompt`:
+  loads `core/agents/<agent>.md` via `importlib.resources` and appends a
+  context block with feature name, state, and storage path.
 - Both tools are registered with the MCP server framework and visible to MCP
   clients.
 - `python -m pathly_orchestrator.mcp_server` starts the server without error.
-- The server reads flow YAMLs from the installed package data via
-  `importlib.resources` (not repo-relative paths).
+- The server reads flow YAMLs and agent contracts from the installed package
+  data via `importlib.resources` (not repo-relative paths).
+- The server never calls `Path.cwd()`.
 
 ---
 
