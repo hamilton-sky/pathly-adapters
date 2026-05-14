@@ -2,14 +2,15 @@
 FSM state for STATE.json.
 
 The LLM writes STATE.json directly — it does not import this file.
-This file is the authoritative schema reference for STATE.json content.
+This file provides flow-agnostic helpers for reading *.flow.yaml files
+and a CLI for validating them.
 
-STATE.json lives at plans/<feature>/STATE.json and is rewritten after every event.
+STATE.json lives at <storage_path>/STATE.json and is rewritten after every event.
 
 ── Schema ────────────────────────────────────────────────────────────────────
 
 {
-  "current": "<FSM state name>",    // see STATES below
+  "current": "<FSM state name>",    // must be in flow["states"]
   "feature": "<feature-name>",
   "rigor": "lite|standard|strict",
   "current_conversation": 0,        // 0 = not in build stage yet; 1+ = active conv
@@ -25,39 +26,46 @@ STATE.json lives at plans/<feature>/STATE.json and is rewritten after every even
 ── FSM States ────────────────────────────────────────────────────────────────
 """
 
-STATES = {
-    "IDLE":               "Pipeline not started",
-    "DISCOVERING":        "Explore/audit agent running",
-    "PLANNING":           "Planner agent running",
-    "PLAN_DONE":          "4 plan files written, awaiting build or escalator decision",
-    "CONSULT_OPEN":       "Architect consult file open (/pathly meet)",
-    "BUILDING":           "Builder agent running",
-    "REVIEWING":          "Reviewer agent running",
-    "REVIEW_BLOCKED":     "REVIEW_FAILURES.md present — routing to builder",
-    "TESTING":            "Tester agent running",
-    "TEST_BLOCKED":       "TEST_FAILURES.md present — routing to builder or user",
-    "BLOCKED_ON_HUMAN":   "HUMAN_QUESTIONS.md present — pipeline paused for user",
-    "RETRO":              "Retro agent running",
-    "DONE":               "All conversations complete, retro written",
-}
+from __future__ import annotations
+import sys
+from pathlib import Path
 
-VALID_STATES: frozenset[str] = frozenset(STATES.keys())
+import yaml
 
-TRANSITIONS: dict[str, frozenset[str]] = {
-    "IDLE":             frozenset(["DISCOVERING", "PLANNING", "BUILDING", "BLOCKED_ON_HUMAN"]),
-    "DISCOVERING":      frozenset(["PLANNING", "IDLE", "BLOCKED_ON_HUMAN"]),
-    "PLANNING":         frozenset(["PLAN_DONE", "BUILDING", "BLOCKED_ON_HUMAN"]),
-    "PLAN_DONE":        frozenset(["BUILDING", "CONSULT_OPEN", "BLOCKED_ON_HUMAN"]),
-    "CONSULT_OPEN":     frozenset(["PLANNING", "BUILDING", "PLAN_DONE", "BLOCKED_ON_HUMAN"]),
-    "BUILDING":         frozenset(["REVIEWING", "TESTING", "BLOCKED_ON_HUMAN", "DONE"]),
-    "REVIEWING":        frozenset(["BUILDING", "REVIEW_BLOCKED", "BLOCKED_ON_HUMAN", "DONE"]),
-    "REVIEW_BLOCKED":   frozenset(["BUILDING", "BLOCKED_ON_HUMAN"]),
-    "TESTING":          frozenset(["RETRO", "TEST_BLOCKED", "BLOCKED_ON_HUMAN", "DONE"]),
-    "TEST_BLOCKED":     frozenset(["BUILDING", "TESTING", "BLOCKED_ON_HUMAN"]),
-    "BLOCKED_ON_HUMAN": VALID_STATES,
-    "RETRO":            frozenset(["DONE", "BLOCKED_ON_HUMAN"]),
-    "DONE":             frozenset(),
-}
+_REQUIRED_FLOW_KEYS = {"storage_path", "states", "transitions", "agent_map", "feedback_routing"}
+
+
+def load_flow(yaml_path: str) -> dict:
+    with open(yaml_path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def valid_states(flow: dict) -> frozenset[str]:
+    return frozenset(flow.get("states", []))
+
+
+def flow_transitions(flow: dict) -> dict[str, frozenset[str]]:
+    return {k: frozenset(v) for k, v in flow.get("transitions", {}).items()}
+
+
+def validate_flow_cli() -> None:
+    if len(sys.argv) < 2:
+        print("Usage: pathly-validate-flow <path>")
+        sys.exit(1)
+    path = sys.argv[1]
+    try:
+        flow = load_flow(path)
+    except Exception as e:
+        print(f"Error loading {path}: {e}")
+        sys.exit(1)
+    missing = _REQUIRED_FLOW_KEYS - set(flow.keys())
+    if missing:
+        for key in sorted(missing):
+            print(f"Missing required field: {key}")
+        sys.exit(1)
+    print(f"OK: {path}")
+    sys.exit(0)
+
 
 # ── Example STATE.json ────────────────────────────────────────────────────────
 #

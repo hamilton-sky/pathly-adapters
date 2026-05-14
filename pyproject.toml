@@ -17,6 +17,7 @@ pathly-setup = "install_cli.__main__:main"
 pathly-tokens = "pathly_telemetry.report:main"
 pathly-events = "pathly_orchestrator.eventlog:_cli"
 pathly-state = "pathly_orchestrator.eventlog:_state_cli"
+pathly-validate-flow = "pathly_orchestrator.state:validate_flow_cli"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
