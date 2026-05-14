@@ -19,3 +19,4 @@
 {"type": "STATE_TRANSITION", "to": "TESTING"}
 {"type": "STATE_TRANSITION", "to": "RETRO"}
 {"type": "STATE_TRANSITION", "to": "DONE"}
+{"type": "FSM_RESTART", "entryStage": "discovery"}
