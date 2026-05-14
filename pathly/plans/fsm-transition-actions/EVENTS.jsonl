@@ -20,3 +20,7 @@
 {"type": "STATE_TRANSITION", "to": "RETRO"}
 {"type": "STATE_TRANSITION", "to": "DONE"}
 {"type": "FSM_RESTART", "entryStage": "discovery"}
+{"type": "AGENT_DONE", "agent": "builder", "ts": "2026-05-14T14:17:26Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-14T14:17:26Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "ts": "2026-05-14T14:20:33Z"}
+{"type": "STATE_TRANSITION", "to": "TESTING", "ts": "2026-05-14T14:20:33Z"}
