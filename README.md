@@ -55,6 +55,8 @@ pathly-setup --force                # overwrite all files, even non-Pathly-owned
 pathly-setup --uninstall            # remove all Pathly-owned files
 pathly-events summary <feature>     # print token/cost table for a pipeline run
 pathly-state <feature>              # print current FSM state for a feature
+pathly-tokens                       # print token/cost summary across all pipeline runs
+pathly-validate-flow <flow.yaml>    # validate a flow YAML against the FSM schema
 ```
 
 `--dry-run` never writes. `--apply` is required for any writes.
@@ -105,6 +107,7 @@ twine upload dist/*
 | [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) | Adapter release criteria: install checks for each host, pathly-setup flags, package build/publish, marketplace manifests |
 | [docs/SECURITY.md](docs/SECURITY.md) | Hook injection risks, subprocess calls in installer, file write safety, trust boundaries, marketplace manifest integrity |
 | [docs/SYSTEM_REVIEW.md](docs/SYSTEM_REVIEW.md) | Adapter strengths, risks, design decisions, hardening recommendations |
+| [src/pathly_data/core/SKILLS_OVERVIEW.md](src/pathly_data/core/SKILLS_OVERVIEW.md) | Full reference for all 22 user-facing Pathly skills with ASCII flow diagrams |
 
 For engine-specific docs (FSM, orchestrator, state machine, team-flow driver):
 see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) — `pathly-engine/docs/` folder.

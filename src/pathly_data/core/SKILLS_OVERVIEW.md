@@ -1,7 +1,8 @@
 # Pathly Skills Overview
 
-20 canonical skills. Each lives in `core/skills/`. Adapters translate them to
-host-native surfaces. This document is the authoritative reference.
+22 user-facing skills plus 2 internal transition-action skills. Each lives in
+`core/skills/`. Adapters translate them to host-native surfaces. This document
+is the authoritative reference.
 
 ---
 
@@ -830,6 +831,115 @@ verify-state [feature | all]
 
 ---
 
+## 21. po — Product Owner Consultation
+
+Opens a structured Product Owner discussion for a feature. Use it to clarify
+requirements, validate scope, or resolve ambiguity before planning or mid-flow.
+
+```
+po [feature]
+      │
+      ▼
+  Detect feature context
+  (from args or active plans/)
+      │
+      ▼
+  Spawn po agent:
+  ┌──────────────────────────────────┐
+  │ Reads: USER_STORIES.md, plans    │
+  │ Asks clarifying questions        │
+  │ Validates scope, ACs, criteria   │
+  │ No code or plan edits            │
+  └──────────────────────────────────┘
+      │
+      ▼
+  Write PO_NOTES.md:
+  plans/<feature>/PO_NOTES.md
+      │
+      ▼
+  "Next: /pathly plan <feature>"
+```
+
+---
+
+## 22. scout-path — Targeted Code-Path Scout
+
+**Called by other skills, not by users directly.**
+
+Receives a `NEEDS_CONTEXT` block from a calling skill (plan, build, review, etc.),
+spawns scout agents in parallel, and returns a compressed summary of findings.
+
+```
+scout-path is invoked by:
+  plan / build / review / debug / explore / test
+      │
+      ▼
+  Receives NEEDS_CONTEXT block + ROLE + FEATURE
+      │
+      ▼
+  Spawn scout agents in parallel
+  (one per NEEDS_CONTEXT entry)
+      │
+      ▼
+  Compress findings → Scout Findings block
+      │
+      ▼
+  Return to calling skill
+```
+
+---
+
+## Transition-Action Skills (internal, orchestrator-only)
+
+These two skills are not user-facing. The orchestrator spawns them automatically
+as `transition_actions` in flow YAMLs when specific state transitions occur.
+
+### commit
+
+Commits staged changes to git. Guards against committing when feedback files are open.
+
+```
+Inputs: message, storage_path, topic
+  │
+  ▼
+Check feedback/ for open files
+  (if any exist → suppress commit)
+  │
+  ▼
+git add -A && git commit -m "<message>"
+  │
+  ▼
+Append ACTION_DONE event to EVENTS.jsonl
+```
+
+Invoked by the orchestrator on: `BUILDING->REVIEWING` (team flow)
+
+### archive-artifacts
+
+Copies active feedback files to `pathly/pipeline-walkthrough/<topic>/artifacts/`
+for record-keeping before they are deleted by the resolving agent.
+
+```
+Inputs: storage_path, topic, conv
+  │
+  ▼
+Collect *.md files from feedback/
+  │
+  ▼
+Determine attempt number (M)
+  │
+  ▼
+Copy to: pipeline-walkthrough/<topic>/artifacts/
+  <FILENAME>_conv<conv>_attempt<M>.md
+  │
+  ▼
+Append ACTION_DONE event to EVENTS.jsonl
+```
+
+Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug), `CONCLUDING->DONE` (explore)
+
+---
+
 ## Skill Map — Who Does What
 
 ```
@@ -850,6 +960,14 @@ verify-state [feature | all]
   bug symptom     ──►  debug     ──►  fix + FIX.md
   any feature     ──►  verify-   ──►  health report
                        state
+  feature work    ──►  po        ──►  PO_NOTES.md
+  (by other skills)──► scout-    ──►  Scout Findings block
+                       path
+  ─────────────────────────────────────────────────────
+  TRANSITION ACTIONS (spawned by orchestrator, not users)
+  BUILDING→REVIEWING──► commit   ──►  git commit
+  RETRO→DONE       ──►  archive- ──►  pipeline-walkthrough/
+                        artifacts     artifacts/
   ─────────────────────────────────────────────────────
   MACHINE CONTROLS (no output files, change only state)
   /pathly start   ──►  start     ──►  welcome menu
@@ -880,4 +998,4 @@ Priority order (highest to lowest):
 
 ---
 
-_Generated 2026-05-12 — update this file after any core/skills/ change._
+_Generated 2026-05-14 — update this file after any core/skills/ change._

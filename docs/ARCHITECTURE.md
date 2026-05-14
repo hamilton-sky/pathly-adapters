@@ -35,13 +35,17 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   │   ├── tester.md
 │       │   │   └── web-researcher.md
 │       │   ├── skills/          ← Skill logic in natural language (tool-agnostic .md)
-│       │   │   ├── team.md
+│       │   │   ├── team.md      ← full pipeline entry point
 │       │   │   ├── explore.md
 │       │   │   ├── build.md
 │       │   │   ├── review.md
 │       │   │   ├── storm.md
+│       │   │   ├── po.md        ← product owner consultation
 │       │   │   ├── scout-path.md
-│       │   │   └── ...
+│       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
+│       │   │   ├── archive-artifacts.md  ← transition-action skill (orchestrator only)
+│       │   │   └── ...          (22 user-facing + 2 transition-action skills total)
+│       │   ├── flows/           ← Flow YAML definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
@@ -110,7 +114,7 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 | `src/install_cli/codex_plugin_config.py` | Codex local marketplace registration and plugin config |
 | `src/pathly_data/core/` | Source-of-truth agent contracts, skill logic, plan templates — never edited by install |
 | `src/pathly_data/adapters/` | Per-tool YAML metadata (`_meta/`) and plugin manifests |
-| `src/pathly_orchestrator/` | FSM event-log package. Implements `pathly-events` and `pathly-state` CLI entry points. |
+| `src/pathly_orchestrator/` | FSM event-log package. Implements `pathly-events`, `pathly-state`, and `pathly-validate-flow` CLI entry points. Loads and validates `*.flow.yaml` files. |
 | `src/pathly_hooks/` | Hook scripts (`classify_feedback.py`, `inject_feedback_ttl.py`) deployed by install into host tool settings. |
 
 ## Host Detection
@@ -193,6 +197,20 @@ See [FLOW_DIAGRAM.md](FLOW_DIAGRAM.md) for the full command reference and deploy
 | Windows | `%LOCALAPPDATA%\Pathly\` or `%APPDATA%\Pathly\` |
 | macOS/Linux | XDG-compatible data directory |
 | Project state | Always under the active project `plans/` directory |
+
+## Flow YAMLs
+
+`src/pathly_data/core/flows/` contains three FSM definition files consumed by the orchestrator:
+
+| Flow | File | States | Used for |
+|---|---|---|---|
+| `team` | `team.flow.yaml` | IDLE → STORMING → PLANNING → BUILDING → REVIEWING → TESTING → RETRO → DONE | Full feature pipeline |
+| `debug` | `debug.flow.yaml` | INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE | Bug investigation |
+| `explore` | `explore.flow.yaml` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE | Codebase exploration |
+
+Each flow YAML specifies: `states`, `transitions`, `agent_map`, `feedback_routing`, `transition_rules`, and `transition_actions`.
+
+`transition_actions` are skills the orchestrator spawns automatically at specific state transitions (e.g., `commit` on `BUILDING->REVIEWING`, `archive-artifacts` on `RETRO->DONE`). These are transparent to the user.
 
 ## Source of Truth
 

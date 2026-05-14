@@ -73,8 +73,8 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── review.md
 │       │   │   ├── debug.md
 │       │   │   ├── explore.md   ← routes through explorer agent + scout-flow
-│       │   │   ├── scout-path.md
-│       │   │   ├── po.md
+│       │   │   ├── scout-path.md ← called by other skills, not users directly
+│       │   │   ├── po.md        ← product owner consultation (/pathly po)
 │       │   │   ├── meet.md
 │       │   │   ├── verify-state.md
 │       │   │   ├── pause.md
@@ -84,7 +84,10 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── lessons.md
 │       │   │   ├── prd-import.md
 │       │   │   ├── help.md
+│       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
+│       │   │   ├── archive-artifacts.md ← transition-action skill (orchestrator only)
 │       │   │   └── team/        ← sub-skills for team pipeline phases (discover, plan, build, review, test, retro)
+│       │   ├── flows/           ← FSM flow definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
@@ -106,7 +109,7 @@ The repository uses a `src/` layout. The source packages are:
 | `install_cli` | `src/install_cli/` | Install CLI — `pathly-setup` entry point and stitch pipeline |
 | `pathly_telemetry` | `src/pathly_telemetry/` | Telemetry — `pathly-tokens` entry point |
 | `pathly_data` | `src/pathly_data/` | Installed package data — agent contracts, skill logic, adapter metadata |
-| `pathly_orchestrator` | `src/pathly_orchestrator/` | FSM event-log — `pathly-events` and `pathly-state` entry points |
+| `pathly_orchestrator` | `src/pathly_orchestrator/` | FSM event-log — `pathly-events`, `pathly-state`, and `pathly-validate-flow` entry points; loads and validates `*.flow.yaml` files |
 | `pathly_hooks` | `src/pathly_hooks/` | Hook scripts deployed into host tool settings by installer |
 
 Entry points are declared in `pyproject.toml`. `src/install_cli/` contains the
@@ -140,6 +143,33 @@ package's internal resource API rather than repo-relative path assumptions.
 - `src/pathly_data/adapters/claude/` — `.claude-plugin/plugin.json` + `_meta/` per-agent and per-skill `.yaml` files
 - `src/pathly_data/adapters/codex/` — `.codex-plugin/plugin.json` + `_meta/`
 - `src/pathly_data/adapters/copilot/` — `_meta/`
+
+---
+
+## Flow YAMLs
+
+`src/pathly_data/core/flows/` contains the FSM definitions consumed by the orchestrator at runtime. There are three flows:
+
+| Flow | File | Storage path | States |
+|---|---|---|---|
+| `team` | `team.flow.yaml` | `pathly/plans/{topic}/` | IDLE → STORMING → PLANNING → BUILDING → REVIEWING → TESTING → RETRO → DONE |
+| `debug` | `debug.flow.yaml` | `pathly/debugs/{topic}/` | INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE |
+| `explore` | `explore.flow.yaml` | `pathly/explorations/{topic}/` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE |
+
+Each YAML specifies: `version`, `flow`, `storage_path`, `states`, `transitions`, `agent_map`, `feedback_routing`, `transition_rules`, and `transition_actions`.
+
+**transition_actions** are skills the orchestrator automatically spawns at specific state transitions:
+
+```yaml
+transition_actions:
+  "BUILDING->REVIEWING":
+    - skill: commit
+      message: "feat: complete building stage"
+  "RETRO->DONE":
+    - skill: archive-artifacts
+```
+
+Flow YAMLs are tool-agnostic — they live in `core/` and are not adapter-specific. The orchestrator agent reads them at spawn time via the `flow_config` input.
 
 ---
 
@@ -238,6 +268,7 @@ pathly-setup = "install_cli.__main__:main"
 pathly-tokens = "pathly_telemetry.report:main"
 pathly-events = "pathly_orchestrator.eventlog:_cli"
 pathly-state = "pathly_orchestrator.eventlog:_state_cli"
+pathly-validate-flow = "pathly_orchestrator.state:validate_flow_cli"
 ```
 
 ---
