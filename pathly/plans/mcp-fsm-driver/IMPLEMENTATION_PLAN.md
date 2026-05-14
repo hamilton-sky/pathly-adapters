@@ -96,6 +96,12 @@ def run_transition_actions(
 
 Import only: stdlib, `pathlib`, `subprocess`, `yaml`, `pathly_orchestrator.state`.
 
+**Also extend `state.py`:** add agent-contract validation to `validate_flow_cli`.
+For every value in `flow["agent_map"]`, check that
+`files("pathly_data").joinpath(f"core/agents/{agent}.md")` exists. If any are
+missing, raise `ValueError` listing all missing contracts. This catches `agent_map`
+typos at install time rather than at runtime inside `build_prompt`.
+
 ### `mcp_server.py` — what to implement
 
 - Use the MCP Python SDK (or equivalent) to define and serve two tools.
@@ -118,6 +124,14 @@ Import only: stdlib, `pathlib`, `subprocess`, `yaml`, `pathly_orchestrator.state
   commits land in the correct repo.
 - `main()` function that starts the MCP server (called by `pathly-fsm` entry point
   and by `python -m pathly_orchestrator.mcp_server`).
+- **`route_feedback` must distinguish human feedback**: if the file is
+  `HUMAN_QUESTIONS.md`, return `{file, target_agent: "human", instructions: <file contents>}`.
+  The MCP server propagates this without calling `build_prompt`. `build_prompt` is
+  never called when `target_agent == "human"`.
+- **`complete_stage` concurrent-write guard**: read `STATE.json` once before
+  `run_transition_actions` and once after. If the `current` field differs between
+  reads, raise `RuntimeError("STATE.json modified externally during transition")`.
+  This catches sub-agents that bypass `complete_stage` and write state directly.
 
 ### `build_prompt` — what to implement
 
