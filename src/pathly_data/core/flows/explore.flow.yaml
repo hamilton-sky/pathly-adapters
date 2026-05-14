@@ -29,4 +29,8 @@ agent_map:
 feedback_routing:
   HUMAN_QUESTIONS: human
 
-transition_actions: {}
+transition_actions:
+  "CONCLUDING->DONE":
+    - skill: commit
+      message: "docs: exploration complete for {topic}"
+    - skill: archive-artifacts

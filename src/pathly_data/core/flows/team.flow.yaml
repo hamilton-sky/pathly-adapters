@@ -79,7 +79,7 @@ transition_rules:
 
 transition_actions:
   "BUILDING->REVIEWING":
-    - type: git_commit
+    - skill: commit
       message: "feat: complete building stage"
   "RETRO->DONE":
-    - type: archive_artifacts
+    - skill: archive-artifacts

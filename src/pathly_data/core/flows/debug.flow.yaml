@@ -29,11 +29,16 @@ agent_map:
   INVESTIGATING: scout
   REPRODUCING: tester
   ROOT_CAUSE_FOUND: builder
-  FIXING: tester
+  FIXING: builder
   VERIFYING: reviewer
 
 feedback_routing:
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
 
-transition_actions: {}
+transition_actions:
+  "FIXING->VERIFYING":
+    - skill: commit
+      message: "fix: implement fix for {topic}"
+  "VERIFYING->DONE":
+    - skill: archive-artifacts
