@@ -1,0 +1,7 @@
+name: team/test
+description: "Test stage for the team pipeline — spawns tester with scout-gathered context, routes failures to builder for fix loop."
+model: gpt-5.5
+filename: team/test.toml
+core_file: skills/team/test.md
+tools: [Read, Glob, Grep, Write, Edit, Bash]
+can_spawn: [tester, scout, quick, builder]

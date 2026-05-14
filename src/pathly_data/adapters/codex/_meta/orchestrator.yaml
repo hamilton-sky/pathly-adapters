@@ -1,7 +1,7 @@
 ﻿name: orchestrator
 description: Pipeline orchestrator — deterministic filesystem FSM for the feature pipeline. Recovers state from disk, processes one event, emits one next action, and never implements anything itself.
 model: gpt-5.5
-can_spawn: [architect, planner, builder, reviewer, tester, quick]
+can_spawn: [architect, planner, builder, reviewer, tester, quick, "team/plan", "team/build", "team/review", "team/test", "team/retro", "team/discover"]
 inputs:
   flow_config:
     description: "Path to a *.flow.yaml file defining the FSM for this run"

@@ -1,0 +1,7 @@
+name: team/review
+description: "Review stage for the team pipeline — spawns reviewer with scout-gathered context, routes failures back to builder or architect."
+model: gpt-5.5
+filename: team/review.toml
+core_file: skills/team/review.md
+tools: [Read, Glob, Grep, Write, Edit, Bash]
+can_spawn: [reviewer, scout, quick, architect, builder]

@@ -1,0 +1,7 @@
+name: team/retro
+description: "Retrospective stage for the team pipeline — spawns quick to gather retro answers, writes RETRO.md and pipeline-walkthrough files."
+model: gpt-5.5
+filename: team/retro.toml
+core_file: skills/team/retro.md
+tools: [Read, Glob, Grep, Write, Edit, Bash]
+can_spawn: [quick]

@@ -108,7 +108,11 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             continue
         stitched = stitch_agent(core_file, meta_file, footer=footer)
         if host == "codex":
-            agent_files[f"{agent_name}.toml"] = _codex_agent_toml(agent_meta, stitched)
+            default_toml = f"{agent_name}.toml"
+            toml_stem = agent_meta.get("filename", default_toml)
+            if not toml_stem.endswith(".toml"):
+                toml_stem = toml_stem.removesuffix(".md") + ".toml"
+            agent_files[toml_stem] = _codex_agent_toml(agent_meta, stitched)
         else:
             filename = agent_meta.get("filename", f"{agent_name}.md")
             agent_files[filename] = stitched
