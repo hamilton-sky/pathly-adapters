@@ -265,3 +265,67 @@
   NEVER pass feedback["target_agent"] to build_prompt()
   — agent names are not keys in agent_map → KeyError
 ```
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  LAYER 1 — ORCHESTRATION SPEC  (authored by human or wizard)        ║
+║                                                                      ║
+║   future: wizard/form UI                                            ║
+║   ┌──────────────────────────────────────────────┐                  ║
+║   │  "I want a pipeline that:                    │                  ║
+║   │   - plans → builds → reviews → tests         │                  ║
+║   │   - uses planner/builder/reviewer agents     │                  ║
+║   │   - commits on each transition               │                  ║
+║   │   - max 3 scout calls per stage"             │                  ║
+║   └──────────────────┬───────────────────────────┘                  ║
+║                      │ generates                                     ║
+║                      ▼                                               ║
+║             team.flow.yaml                                           ║
+║   ┌──────────────────────────────────────────────┐                  ║
+║   │  states, agent_map, transition_rules,        │                  ║
+║   │  transition_actions, feedback_routing,       │                  ║
+║   │  limits                                      │                  ║
+║   └──────────────────────────────────────────────┘                  ║
+╚══════════════════════════════════════════════════════════════════════╝
+                              │
+                              │ loaded at runtime via importlib.resources
+                              ▼
+╔══════════════════════════════════════════════════════════════════════╗
+║  LAYER 2 — PYTHON FSM MCP SERVER  (deterministic, no LLM)           ║
+║                                                                      ║
+║   pathly_orchestrator.mcp_server                                     ║
+║                                                                      ║
+║   holds:  core/agents/*.md     ← agent contracts (planner, builder) ║
+║           core/skills/*.md     ← skill loop definitions             ║
+║           core/flows/*.yaml    ← all flow specs (team/debug/explore)║
+║                                                                      ║
+║   exposes two MCP tools:                                             ║
+║   ┌─────────────────────────┐  ┌─────────────────────────────────┐  ║
+║   │  next_action()          │  │  complete_stage()               │  ║
+║   │  → which agent + why    │  │  → advance state + next agent   │  ║
+║   │  → what instructions    │  │  → run git/archive actions      │  ║
+║   │  → what limits apply    │  │  → enforce limits               │  ║
+║   └─────────────────────────┘  └─────────────────────────────────┘  ║
+║                                                                      ║
+║   Python decides: routing, transitions, feedback priority, limits    ║
+║   Python never calls LLM                                             ║
+╚══════════════════════════════════════════════════════════════════════╝
+                              │
+                              │ MCP tool calls (host-native syntax)
+                              ▼
+╔══════════════════════════════════════════════════════════════════════╗
+║  LAYER 3 — LLM EXECUTION  (Claude / Codex / Copilot)                ║
+║                                                                      ║
+║   receives:  agent contract + context from Layer 2                   ║
+║   does:      actual work — plans, writes code, reviews, tests        ║
+║   uses:      scouts when it needs codebase context                   ║
+║   signals:   complete_stage() when done with a stage                 ║
+║                                                                      ║
+║   ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  ║
+║   │ Claude Code  │  │    Codex     │  │  Copilot / other         │  ║
+║   │ (claude.md   │  │ (codex.yaml  │  │  (adapter per host)      │  ║
+║   │  adapter)    │  │  adapter)    │  │                          │  ║
+║   └──────────────┘  └──────────────┘  └──────────────────────────┘  ║
+║                                                                      ║
+║   LLM never decides: which state, which agent, when to commit        ║
+║   LLM only decides: HOW to do the work it was given                  ║
+╚══════════════════════════════════════════════════════════════════════╝
