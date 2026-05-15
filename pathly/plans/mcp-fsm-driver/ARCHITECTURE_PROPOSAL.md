@@ -93,8 +93,26 @@ def recover_state(storage_path: Path, flow: dict) -> dict:
                        → defaults {needs_context_per_stage: 3, feedback_rounds_per_stage: 2}
     Per-state keys override top-level keys individually."""
 
-def evaluate_transition_rules(flow: dict, current_state: str, storage_path: Path) -> str:
-    """Check on_artifact entries for current_state. Return next state name."""
+def evaluate_transition_rules(
+    flow: dict, current_state: str, storage_path: Path
+) -> str | dict:
+    """
+    Evaluate transition rules for current_state in three levels, in order:
+
+    Level 1 — on_artifact: check Path.exists() for each mapped file.
+              First match wins. Pure Python, no LLM.
+    Level 2 — on_content: read file, apply regex/contains check.
+              First match wins. Pure Python, no LLM.
+    Level 3 — decide: return a dict sentinel so the caller (mcp_server.py)
+              can make a constrained LLM classifier call.
+              Returns: {"decide": True, "context_file": str,
+                        "question": str, "options": dict[str, str],
+                        "default": str}
+              fsm.py never calls the LLM — mcp_server.py handles it.
+
+    If no rule matches: return flow["transitions"][current_state][0] (default).
+    If transitions also absent: raise ValueError.
+    """
 
 def route_feedback(flow: dict, storage_path: Path) -> dict | None:
     """Read feedback/ dir. Return {file, target_agent} or None."""
@@ -149,7 +167,14 @@ def complete_stage(flow: str, topic: str, project_root: str) -> dict:
                         else build_prompt_for_agent(fsm_data, feedback["target_agent"], storage_path))
         return {"blocked": True, "target_agent": feedback["target_agent"],
                 "instructions": instructions}
-    next_state = evaluate_transition_rules(fsm_data, state["current_state"], storage_path)
+    routing = evaluate_transition_rules(fsm_data, state["current_state"], storage_path)
+    if isinstance(routing, dict) and routing.get("decide"):
+        # Level 3: constrained LLM classifier call
+        next_state = resolve_decide(routing, storage_path)
+        append_event(storage_path, {"type": "DECIDE_ROUTING",
+                                    "chosen": next_state, "options": routing["options"]})
+    else:
+        next_state = routing
     write_state(storage_path, next_state, state)
     append_event(storage_path, {"type": "STATE_TRANSITION", "to": next_state})
     run_transition_actions(fsm_data, state["current_state"], next_state,
@@ -159,6 +184,67 @@ def complete_stage(flow: str, topic: str, project_root: str) -> dict:
     return {"next_state": next_state,
             "agent": fsm_data["agent_map"][next_state],
             "instructions": build_prompt(fsm_data, next_state, storage_path)}
+```
+
+### `resolve_decide` — Level 3 classifier (private helper in `mcp_server.py`)
+
+```python
+def resolve_decide(decide_config: dict, storage_path: Path) -> str:
+    """
+    Make a constrained LLM classifier call to choose between 2–3 options.
+    1. Read decide_config["context_file"] from storage_path.
+    2. Call LLM (claude-haiku — cheap, stateless) with:
+         "Read the following content and choose exactly one option key.
+          Reply with only the key, nothing else.
+          Options: {option_key_1}, {option_key_2}, {option_key_3}
+          ---
+          {file contents}"
+    3. Strip and validate: response must be a key in decide_config["options"].
+    4. If valid: return decide_config["options"][response]  (mapped next state).
+    5. If invalid or LLM call fails: return decide_config["default"].
+       Log a warning event to EVENTS.jsonl in both cases.
+    """
+```
+
+**Why haiku:** routing decisions are classification tasks — short, cheap, high-accuracy
+on bounded choice sets. Using a full model wastes cost and latency.
+
+**Why fsm.py stays LLM-free:** `evaluate_transition_rules` returns a plain dict
+sentinel for Level 3. `mcp_server.py` detects it and calls `resolve_decide`. The
+LLM SDK dependency stays in the MCP server layer only.
+
+### YAML shape — all three routing levels together
+
+```yaml
+transition_rules:
+  REVIEWING:
+
+    # Level 1 — artifact existence (pure Python, Path.exists)
+    on_artifact:
+      - file: REVIEW_FAILURES.md
+        next: BUILDING
+
+    # Level 2 — content pattern (pure Python, regex/contains)
+    on_content:
+      - file: REVIEW_FAILURES.md
+        contains: "CRITICAL"
+        next: SECURITY_REVIEW
+
+    # Level 3 — semantic classify (constrained LLM, 2–3 options)
+    decide:
+      context_file: REVIEW_FAILURES.md
+      question: "What type of fix does this review require?"
+      options:
+        refactor:     REFACTOR_STAGE
+        architecture: ARCH_REVIEW
+        minor:        BUILDING
+      default: BUILDING       # used if LLM fails or returns invalid key
+
+    # fallback if nothing matched at any level
+    default: TESTING
+
+# Evaluation order — Python tries each level in sequence, stops at first match:
+# L1 on_artifact → L2 on_content → L3 decide → default
 ```
 
 ### `src/install_cli/mcp_config.py` — registration

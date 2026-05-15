@@ -28,9 +28,9 @@ Expected: first three return matches; last three return "OK - not present".
 
 **Stories delivered:** S1.1, S1.2, S1.3
 
-**Scope:** Create `fsm.py` with four pure-Python FSM functions and `mcp_server.py`
-with two MCP tools. Add `pathly-fsm` entry point to `pyproject.toml`. No skill
-files touched; no `mcp_config.py` touched.
+**Scope:** Create `fsm.py` with six pure-Python FSM functions and `mcp_server.py`
+with two MCP tools plus `resolve_decide`. Add `pathly-fsm` entry point to
+`pyproject.toml`. No skill files touched; no `mcp_config.py` touched.
 
 **Natural seam:** After this conversation the MCP server exists and can be
 started. Nothing registers it yet — no behavior change to existing installs.
@@ -40,7 +40,7 @@ Codebase is runnable. `pytest -q` must still pass.
 
 | File | Action | Change |
 |------|--------|--------|
-| `src/pathly_orchestrator/fsm.py` | CREATE | Four FSM core functions (see below) |
+| `src/pathly_orchestrator/fsm.py` | CREATE | Six FSM core functions (see below) |
 | `src/pathly_orchestrator/mcp_server.py` | CREATE | `next_action` + `complete_stage` MCP tools |
 | `pyproject.toml` | EDIT | Add `pathly-fsm` entry point |
 
@@ -62,13 +62,32 @@ def recover_state(storage_path: Path, flow: dict) -> dict:
     Per-state limits override top-level limits key by key (not wholesale replace).
     """
 
-def evaluate_transition_rules(flow: dict, current_state: str, storage_path: Path) -> str:
+def evaluate_transition_rules(
+    flow: dict, current_state: str, storage_path: Path
+) -> str | dict:
     """
-    Read flow["transition_rules"][current_state].
-    Check each on_artifact key: if that file exists under storage_path, return mapped state.
-    If no artifact matches, return the "default" value.
-    If transition_rules absent for current_state: return first entry in
-    flow["transitions"][current_state].
+    Evaluate routing rules for current_state in strict level order.
+    Stop and return at the first match.
+
+    Level 1 — on_artifact (list):
+      For each entry: if storage_path / entry["file"] exists → return entry["next"].
+
+    Level 2 — on_content (list):
+      For each entry: read storage_path / entry["file"] (skip if missing).
+        If entry["contains"] is a substring of file contents → return entry["next"].
+        If entry["regex"] is set, use re.search instead of substring check.
+
+    Level 3 — decide (dict):
+      Do NOT call LLM here. Return the decide dict as a sentinel:
+        {"decide": True, "context_file": str, "question": str,
+         "options": dict[str, str], "default": str}
+      mcp_server.py detects this sentinel and calls resolve_decide().
+      fsm.py never imports or calls any LLM SDK.
+
+    Fallback — default (str):
+      Return flow["transition_rules"][current_state]["default"] if present.
+      Else return flow["transitions"][current_state][0].
+      If neither exists: raise ValueError.
     """
 
 def route_feedback(flow: dict, storage_path: Path) -> dict | None:
@@ -190,6 +209,37 @@ def build_prompt_for_agent(flow_config: dict, agent_name: str, storage_path: Pat
 `agent_map`. `build_prompt_for_agent` takes an *agent name* directly. Never pass
 a `feedback["target_agent"]` value (an agent name) to `build_prompt` — it will
 `KeyError` because agent names are not keys in `agent_map`.
+
+### `resolve_decide` — what to implement
+
+Private helper in `mcp_server.py`. Called only when `evaluate_transition_rules`
+returns a `{"decide": True, ...}` sentinel.
+
+```python
+def resolve_decide(decide_config: dict, storage_path: Path) -> str:
+    """
+    1. Read decide_config["context_file"] from storage_path.
+       If file missing: return decide_config["default"], log warning.
+    2. Build a constrained prompt:
+         "Read the content below and reply with exactly one of these keys:
+          {comma-separated option keys}
+          Reply with only the key — no explanation, no punctuation.
+          ---
+          {file contents}"
+    3. Call claude-haiku-4-5 via Anthropic SDK (max_tokens=10, temperature=0).
+    4. Strip response. Check it is a key in decide_config["options"].
+       If valid: return decide_config["options"][response]  (mapped next state).
+       If invalid or SDK raises: return decide_config["default"].
+    5. Always append event:
+         {"type": "DECIDE_ROUTING", "chosen": next_state,
+          "raw_response": response, "options": decide_config["options"]}
+    """
+```
+
+**Model choice:** `claude-haiku-4-5` — classification is a short, cheap task.
+`max_tokens=10` prevents verbose answers; `temperature=0` maximises consistency.
+**Failure mode:** any SDK error or invalid response → silent fallback to
+`default`, event logged. Never raises to the MCP client.
 
 **Human feedback special case:** When `feedback["target_agent"] == "human"`,
 `route_feedback` returns the file contents as `feedback["instructions"]`. The MCP
@@ -406,8 +456,15 @@ Using `team.flow.yaml` loaded via `importlib.resources`:
 - `recover_state`: absent STATE.json → returns `states[0]` from flow; present
   STATE.json → returns its `current` value; `open_feedback_files` list reflects
   files in `feedback/` dir.
-- `evaluate_transition_rules`: artifact file present → mapped next state;
-  artifact absent → `default`; no `transition_rules` entry → `transitions[0]`.
+- `evaluate_transition_rules`:
+  - L1: artifact present → mapped next state; artifact absent → falls through.
+  - L2: file contains pattern → mapped next state; no match → falls through.
+  - L3: no L1/L2 match → returns decide sentinel dict (not a string).
+  - fallback: no rules match → returns `default` / `transitions[0]`.
+  - evaluation order: L1 before L2 before L3 before fallback.
+- `resolve_decide`: mock Anthropic SDK; valid option key → returns mapped state;
+  invalid response → returns `default`; SDK exception → returns `default`;
+  DECIDE_ROUTING event appended in all cases.
 - `route_feedback`: empty feedback dir → None; single file → correct agent;
   two files of different priority → highest priority wins; HUMAN_QUESTIONS
   always wins regardless of discovery order.

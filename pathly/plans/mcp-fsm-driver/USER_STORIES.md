@@ -86,6 +86,40 @@ spawning the orchestrator LLM agent.
 
 ---
 
+## Story S1.4 — Three-level transition routing (L1 artifact, L2 content, L3 decide)
+
+**As a** flow author,
+**I want** to express routing rules at three levels of complexity in the flow YAML,
+**so that** transitions can be driven by file existence, file content, or a
+constrained LLM classification — in that order, cheapest first.
+
+**Delivered by:** Conversation 1
+
+### Acceptance criteria
+
+- `evaluate_transition_rules` evaluates L1 → L2 → L3 sentinel → fallback in
+  strict order, stopping at the first match.
+- **L1 `on_artifact`:** `Path.exists()` check per entry. Pure Python, no I/O
+  beyond stat call.
+- **L2 `on_content`:** reads the named file; matches via `contains` (substring)
+  or `regex` (`re.search`). Skips silently if file missing.
+- **L3 `decide`:** `fsm.py` returns a sentinel dict
+  `{"decide": True, "context_file", "question", "options", "default"}`.
+  `fsm.py` never calls any LLM.
+- **`resolve_decide` in `mcp_server.py`:**
+  - Reads `context_file` from storage path.
+  - Calls `claude-haiku-4-5` with `max_tokens=10`, `temperature=0`.
+  - Prompt constrains LLM to reply with exactly one option key.
+  - Valid key → returns mapped next state from `options`.
+  - Invalid key or SDK error → returns `decide["default"]`.
+  - Appends `DECIDE_ROUTING` event to `EVENTS.jsonl` in all cases.
+- `validate_flow_cli` warns (does not raise) if a `decide` block has fewer
+  than 2 options.
+- All three levels coexist in one `transition_rules` entry; only the first
+  matching level is used.
+
+---
+
 ## Story S2.1 — `mcp_config.py` registers `pathly-fsm` for Claude and Codex
 
 **As a** user running `pathly-setup --apply`,

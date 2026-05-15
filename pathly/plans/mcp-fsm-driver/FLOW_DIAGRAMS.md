@@ -266,6 +266,94 @@
   — agent names are not keys in agent_map → KeyError
 ```
 
+---
+
+## 8. Three-level transition routing — evaluation order
+
+```
+  evaluate_transition_rules(flow, current_state, storage_path)
+          │
+          ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  LEVEL 1 — on_artifact  (pure Python, Path.exists)         │
+  │                                                             │
+  │  for each entry in transition_rules[state]["on_artifact"]:  │
+  │    if storage_path / entry["file"] exists:                  │
+  │      return entry["next"]   ◄── STOP, cheapest check first  │
+  └───────────────────────────────┬─────────────────────────────┘
+                                  │ no match
+                                  ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  LEVEL 2 — on_content  (pure Python, regex/contains)       │
+  │                                                             │
+  │  for each entry in transition_rules[state]["on_content"]:   │
+  │    read file (skip if missing)                              │
+  │    if entry["contains"] in contents:                        │
+  │      return entry["next"]   ◄── STOP                        │
+  │    if entry["regex"] matches:                               │
+  │      return entry["next"]   ◄── STOP                        │
+  └───────────────────────────────┬─────────────────────────────┘
+                                  │ no match
+                                  ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  LEVEL 3 — decide  (constrained LLM classifier)            │
+  │                                                             │
+  │  fsm.py returns sentinel dict — does NOT call LLM:         │
+  │    {"decide": True, "context_file": "REVIEW_FAILURES.md",  │
+  │     "question": "...", "options": {...}, "default": "..."}  │
+  │                                                             │
+  │  mcp_server.py calls resolve_decide():                     │
+  │    read context_file                                        │
+  │    call claude-haiku (max_tokens=10, temperature=0):        │
+  │      "Choose one: option_a, option_b, option_c"            │
+  │      reply = strip(response)                                │
+  │    reply in options?                                        │
+  │      YES → return options[reply]  ◄── mapped next state     │
+  │      NO  → return decide["default"]                         │
+  │    append DECIDE_ROUTING event either way                   │
+  └───────────────────────────────┬─────────────────────────────┘
+                                  │ no decide block / LLM failed
+                                  ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  FALLBACK — default                                         │
+  │    transition_rules[state]["default"]                       │
+  │    or transitions[state][0]                                 │
+  │    or raise ValueError                                      │
+  └─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 9. Decision tree — non-linear pipeline example
+
+```
+  With three-level routing the FSM becomes a DAG, not a line:
+
+                        PLANNING
+                           │
+                        BUILDING
+                           │
+                        REVIEWING
+                        /   │   \
+                       /    │    \
+              L2 match /    │     \ L3 decide
+     contains "CRITICAL"    │      \
+                /       default     architecture
+               /            │            \
+      SECURITY_REVIEW    BUILDING     ARCH_REVIEW
+               \            │            /
+                \           │           /
+                 └──────────┼──────────┘
+                            │
+                         TESTING
+                            │
+                           DONE
+
+  Python owns every branch decision.
+  LLM (haiku) only participates in the L3 "decide" branch —
+  choosing between 2–3 predefined options, never inventing paths.
+```
+
 ╔══════════════════════════════════════════════════════════════════════╗
 ║  LAYER 1 — ORCHESTRATION SPEC  (authored by human or wizard)        ║
 ║                                                                      ║

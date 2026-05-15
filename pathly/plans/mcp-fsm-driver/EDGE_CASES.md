@@ -19,6 +19,39 @@ user.
 (the first valid transition). If `transitions[current_state]` is also absent or
 empty, raises `ValueError` — this indicates a broken flow YAML.
 
+**Level 2 `on_content` — target file missing from storage_path**
+The entry is skipped silently (same as an artifact-absent skip in L1). Does not
+raise. Evaluation continues to the next `on_content` entry, then L3, then default.
+
+**Level 2 `on_content` — file exists but pattern does not match**
+Evaluation falls through to the next entry or next level. No error.
+
+**Level 3 `decide` — only one option defined**
+Valid but pointless — the LLM always returns the same key. `validate_flow_cli`
+emits a warning: "decide block for state X has only one option — use on_artifact
+or default instead." Does not block startup.
+
+**Level 3 `decide` — LLM returns invalid key**
+`resolve_decide` falls back to `decide["default"]`. Appends a DECIDE_ROUTING
+event with `{"chosen": default, "raw_response": <invalid>, "fallback": true}`.
+Never raises to the MCP client.
+
+**Level 3 `decide` — Anthropic SDK call fails (network, timeout, rate limit)**
+Same fallback as invalid key. Appends event with `{"error": <exception message>,
+"fallback": true}`. The pipeline continues on the default path.
+
+**Level 3 `decide` — context_file missing from storage_path**
+`resolve_decide` cannot build a meaningful prompt. Returns `decide["default"]`
+immediately. Appends event with `{"error": "context_file not found", "fallback": true}`.
+
+**L1 match shadows L2/L3**
+If an `on_artifact` entry matches, evaluation stops. `on_content` and `decide`
+are never evaluated. This is intentional — cheaper checks run first.
+
+**All three levels defined but none match, and no `default` key**
+`evaluate_transition_rules` falls through to `flow["transitions"][current_state][0]`.
+If that is also absent, raises `ValueError`.
+
 **`feedback/` directory does not exist**
 `route_feedback` returns `None`. Does not raise. The directory is optional.
 
@@ -280,3 +313,12 @@ releases and rely on MCP server availability checks in skill files.
 | limits absent from YAML → defaults applied | `test_fsm.py::test_recover_state_limits_defaults` |
 | per-state limits override top-level partially | `test_fsm.py::test_recover_state_limits_per_state_merge` |
 | limits returned in next_action response | `test_mcp_server.py::test_next_action_returns_limits` |
+| L2 on_content pattern matches → correct state | `test_fsm.py::test_evaluate_content_match` |
+| L2 on_content file missing → falls through | `test_fsm.py::test_evaluate_content_missing_file` |
+| L1 match → L2/L3 never evaluated | `test_fsm.py::test_evaluate_l1_shadows_l2` |
+| L3 decide → sentinel dict returned by fsm.py | `test_fsm.py::test_evaluate_decide_sentinel` |
+| resolve_decide valid response → mapped state | `test_mcp_server.py::test_resolve_decide_valid` |
+| resolve_decide invalid response → default | `test_mcp_server.py::test_resolve_decide_invalid_key` |
+| resolve_decide SDK error → default + event | `test_mcp_server.py::test_resolve_decide_sdk_error` |
+| resolve_decide context_file missing → default | `test_mcp_server.py::test_resolve_decide_missing_file` |
+| DECIDE_ROUTING event appended in all cases | `test_mcp_server.py::test_resolve_decide_event_logged` |
