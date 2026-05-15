@@ -6,7 +6,8 @@
 
 **STATE.json absent on first run**
 `recover_state` returns `current_state = flow["states"][0]` (first state in
-the YAML list). EVENTS.jsonl need not exist. `conv = 0`, `open_feedback_files = []`.
+the YAML list). With IDLE removed, `states[0]` is now STORMING — the first
+real work state. EVENTS.jsonl need not exist. `conv = 0`, `open_feedback_files = []`.
 
 **STATE.json present but `current` field missing or invalid**
 `recover_state` treats this as corrupt state. Raises `ValueError` with the path
@@ -23,8 +24,13 @@ empty, raises `ValueError` — this indicates a broken flow YAML.
 
 **Multiple feedback files present**
 `route_feedback` returns only the highest-priority file per the fixed priority
-list. The caller must resolve one file at a time. After resolution the caller
-calls `route_feedback` again to check for remaining files.
+list. It never returns a list. The caller (skill loop) must:
+1. Receive the single blocked file.
+2. Resolve it (run the target agent).
+3. **Delete the file** from `feedback/`.
+4. Call `complete_stage` again — which calls `route_feedback` again.
+If the skill does not delete the file, `route_feedback` will return the same
+file on every call and the pipeline will never advance.
 
 **Feedback file present with unknown stem (not in `feedback_routing`)**
 `route_feedback` skips unknown files and continues scanning for known ones. If
@@ -139,6 +145,27 @@ If a state defines only `needs_context_per_stage`, the other keys still fall
 through to the top-level `limits` (or defaults). Keys are merged individually,
 not replaced wholesale.
 
+**Skill must delete the feedback file before calling `complete_stage` again**
+`route_feedback` is a read-only scan — it never deletes files. After the skill
+resolves a blocked feedback file (runs the target agent, gets a result), the skill
+is responsible for deleting that file from `feedback/` before calling
+`complete_stage` again. The explicit loop:
+```
+result = complete_stage(...)
+if result.blocked and result.target_agent != "human":
+    resolve_with_agent(result.target_agent, result.instructions)
+    delete(result.file)          # ← skill deletes; Python never does
+    continue                     # ← explicit re-entry; do not batch
+```
+For `target_agent == "human"`: the skill halts and waits. The user deletes the
+file manually (or tooling does). The skill then calls `complete_stage` again.
+
+**`complete_stage` returns exactly one blocked file per call**
+The MCP server never returns a list of blocked files. It returns the single
+highest-priority file. The skill loop resolves files one at a time. A skill that
+tries to batch-resolve all feedback before calling `complete_stage` will fail
+silently if new feedback files were created during resolution.
+
 **scout-path returns no useful summary**
 `scout-path` may return an empty or trivially short summary (e.g. if the
 codebase has no matching files for the agent's query). The skill feeds whatever
@@ -188,17 +215,17 @@ Solution: Extend `validate_flow_cli` (in `state.py`) to check every value in
 `importlib.resources`. Report all missing agent contracts as validation errors,
 not runtime failures.
 
-**`BLOCKED_ON_HUMAN` state has no agent contract**
-`next_action` or `complete_stage` returning `{blocked: true}` means a feedback
-file is present. The `target_agent` field names the agent that should resolve
-the feedback (e.g. `"builder"`). But if the feedback file is `HUMAN_QUESTIONS.md`
-the correct target is the *user*, not an LLM agent — there is no
-`core/agents/human.md`. Calling `build_prompt` or `build_prompt_for_agent` here
-would raise `FileNotFoundError`.
-Solution: `route_feedback` returns `{file, target_agent: "human", instructions: <file contents>}`
-for `HUMAN_QUESTIONS` priority files. The MCP server returns `instructions`
-verbatim — neither `build_prompt` nor `build_prompt_for_agent` is called.
-Skill files surface the instructions to the user and halt until the file is
+**`BLOCKED_ON_HUMAN` state removed — collapsed into feedback**
+`BLOCKED_ON_HUMAN` no longer exists as a state. Having both a `BLOCKED_ON_HUMAN`
+state and a `HUMAN_QUESTIONS` feedback type was two mechanisms for the same
+concept. They have been collapsed: `BLOCKED_ON_HUMAN.md` is now a feedback file
+(like `HUMAN_QUESTIONS.md`) that routes to `"human"` in `feedback_routing`.
+Both stem names map to `target_agent: "human"`.
+
+When `target_agent == "human"`, `route_feedback` returns `{file, target_agent: "human", instructions: <file contents>}`.
+The MCP server returns `instructions` verbatim — neither `build_prompt` nor
+`build_prompt_for_agent` is called (there is no `core/agents/human.md`).
+The skill surfaces the instructions to the user and halts until the file is
 deleted.
 
 **`build_prompt` receives an agent name instead of a state name**
@@ -245,7 +272,9 @@ releases and rely on MCP server availability checks in skill files.
 | Feedback present → blocked response | `test_mcp_server.py::test_complete_stage_blocked` |
 | Already DONE → done response | `test_mcp_server.py::test_complete_stage_already_done` |
 | HUMAN_QUESTIONS feedback → human target, no build_prompt | `test_mcp_server.py::test_route_feedback_human_questions` |
+| BLOCKED_ON_HUMAN.md feedback → human target, no build_prompt | `test_mcp_server.py::test_route_feedback_blocked_on_human` |
 | Non-human feedback blocked → build_prompt_for_agent used | `test_mcp_server.py::test_complete_stage_blocked_nonhuman` |
+| Skill deletes feedback file before re-calling complete_stage | `test_mcp_server.py::test_complete_stage_file_deleted_between_calls` |
 | Concurrent STATE.json write → RuntimeError | `test_mcp_server.py::test_complete_stage_concurrent_write` |
 | agent_map typo → validation error at validate_flow_cli | `test_fsm.py::test_validate_flow_missing_agent_contract` |
 | limits absent from YAML → defaults applied | `test_fsm.py::test_recover_state_limits_defaults` |

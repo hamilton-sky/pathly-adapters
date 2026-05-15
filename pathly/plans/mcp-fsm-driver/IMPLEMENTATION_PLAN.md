@@ -312,9 +312,9 @@ instructions with:
 1. Call FSM tool: next_action(flow="team", topic=<TOPIC>, project_root=<PROJECT_ROOT>)
    - Receives: {current_state, agent, instructions, storage_path}
    - If {blocked: true, target_agent: "human"}: surface instructions to the user
-     and halt until the feedback file is deleted.
+     and halt until the user deletes the file manually. Then call next_action again.
    - If {blocked: true, target_agent: <agent>}: follow instructions to resolve
-     feedback, then call next_action again.
+     feedback, **delete result.file from feedback/**, then call next_action again.
 
 2. Execute the instructions for the returned agent.
    Track two counters, reset at the start of each stage:
@@ -333,12 +333,24 @@ instructions with:
 
 3. When stage work is complete, call FSM tool: complete_stage(flow="team", topic=<TOPIC>, project_root=<PROJECT_ROOT>)
    - Receives: {next_state, agent, instructions, limits} or {done: true}
-   - If {blocked: true}:
+   - If {blocked: true, target_agent: "human"}:
+       Surface instructions to the user and halt. Wait for the user to
+       delete the file. Then call complete_stage again.
+   - If {blocked: true, target_agent: <agent>}:
        a. feedback_round_count += 1
        b. If feedback_round_count >= limits.feedback_rounds_per_stage:
             write HUMAN_QUESTIONS.md with escalation note regardless of
-            original feedback type. Surface to user.
-       c. Otherwise: resolve feedback, call complete_stage again.
+            original feedback type. Surface to user and halt.
+       c. Otherwise:
+            i.  Follow instructions to resolve feedback with <agent>.
+            ii. **Delete result.file from feedback/** — the skill deletes it;
+                Python never does. If not deleted, complete_stage will return
+                the same file again forever.
+            iii. Call complete_stage again (loop — do NOT batch-resolve
+                 multiple files before calling).
+
+   Each call to complete_stage returns at most one blocked file. Resolve
+   one file, delete it, call complete_stage again. Repeat until not blocked.
 
 4. Repeat from step 2 until done=true.
 ```
