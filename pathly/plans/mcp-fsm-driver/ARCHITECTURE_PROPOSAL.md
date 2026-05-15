@@ -83,11 +83,15 @@ executes domain work (implement, review, test, plan). All routing is Python.
 
 ### `src/pathly_orchestrator/fsm.py` — FSM core (pure Python, no LLM)
 
-Four functions, no side effects beyond filesystem writes:
+Six functions, no side effects beyond filesystem writes:
 
 ```python
 def recover_state(storage_path: Path, flow: dict) -> dict:
-    """Read STATE.json + EVENTS.jsonl. Return {current_state, conv, open_feedback_files}."""
+    """Read STATE.json + EVENTS.jsonl. Return {current_state, conv, open_feedback_files, limits}.
+    limits resolved from: flow["states"][current_state]["limits"]
+                       → flow["limits"]
+                       → defaults {needs_context_per_stage: 3, feedback_rounds_per_stage: 2}
+    Per-state keys override top-level keys individually."""
 
 def evaluate_transition_rules(flow: dict, current_state: str, storage_path: Path) -> str:
     """Check on_artifact entries for current_state. Return next state name."""
@@ -98,6 +102,12 @@ def route_feedback(flow: dict, storage_path: Path) -> dict | None:
 def run_transition_actions(flow: dict, prev: str, next_: str,
                            storage_path: Path, topic: str, conv: int) -> None:
     """Execute transition_actions[prev->next] in YAML order."""
+
+def write_state(storage_path: Path, next_state: str, prior_state: dict) -> None:
+    """Write STATE.json with updated current field, preserving conv and other fields."""
+
+def append_event(storage_path: Path, event: dict) -> None:
+    """Append a JSON line to EVENTS.jsonl, adding an ISO-8601 timestamp field."""
 ```
 
 Priority for `route_feedback` follows `protocol_contract.yaml`:
@@ -116,12 +126,17 @@ def next_action(flow: str, topic: str, project_root: str) -> dict:
     state = recover_state(storage_path, fsm_data)
     feedback = route_feedback(fsm_data, storage_path)
     if feedback:
+        # HUMAN_QUESTIONS: target_agent == "human", instructions = raw file contents (no build_prompt)
+        # All other feedback: build_prompt using agent name directly, not as agent_map key
+        instructions = (feedback["instructions"] if feedback["target_agent"] == "human"
+                        else build_prompt_for_agent(fsm_data, feedback["target_agent"], storage_path))
         return {"blocked": True, "target_agent": feedback["target_agent"],
-                "instructions": build_prompt(fsm_data, feedback["target_agent"], storage_path)}
+                "instructions": instructions}
     return {"current_state": state["current_state"],
             "agent": fsm_data["agent_map"][state["current_state"]],
             "instructions": build_prompt(fsm_data, state["current_state"], storage_path),
-            "storage_path": str(storage_path)}
+            "storage_path": str(storage_path),
+            "limits": state["limits"]}
 
 @mcp_tool
 def complete_stage(flow: str, topic: str, project_root: str) -> dict:
@@ -130,8 +145,10 @@ def complete_stage(flow: str, topic: str, project_root: str) -> dict:
     state = recover_state(storage_path, fsm_data)
     feedback = route_feedback(fsm_data, storage_path)
     if feedback:
+        instructions = (feedback["instructions"] if feedback["target_agent"] == "human"
+                        else build_prompt_for_agent(fsm_data, feedback["target_agent"], storage_path))
         return {"blocked": True, "target_agent": feedback["target_agent"],
-                "instructions": build_prompt(fsm_data, feedback["target_agent"], storage_path)}
+                "instructions": instructions}
     next_state = evaluate_transition_rules(fsm_data, state["current_state"], storage_path)
     write_state(storage_path, next_state, state)
     append_event(storage_path, {"type": "STATE_TRANSITION", "to": next_state})

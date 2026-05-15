@@ -106,6 +106,46 @@ adding. If it finds it, skips. Does not duplicate.
 
 ## Skill file behavior
 
+**Agent emits NEEDS_CONTEXT repeatedly without making progress**
+The skill loop calls `scout-path` each time an agent emits `NEEDS_CONTEXT`, but
+without a cap an agent that never stops asking for context will loop indefinitely.
+Solution: the skill reads `limits.needs_context_per_stage` from the tool response
+(resolved by `recover_state` from flow YAML, default 3). When the counter reaches
+the limit the skill surfaces a warning to the user and halts. The limit can be
+raised or lowered per-flow or per-state in the YAML:
+```yaml
+limits:
+  needs_context_per_stage: 5   # flow-wide default
+states:
+  BUILDING:
+    limits:
+      needs_context_per_stage: 2  # tighter cap for builder
+```
+
+**Feedback blocks a stage more times than expected**
+If a stage is repeatedly blocked by feedback (e.g. reviewer keeps finding new
+failures), the skill reads `limits.feedback_rounds_per_stage` from the tool
+response (default 2). When reached, the skill escalates by writing
+`HUMAN_QUESTIONS.md` regardless of the original feedback type, and surfaces it
+to the user. Configurable in YAML the same way as `needs_context_per_stage`.
+
+**`limits` key absent from flow YAML**
+`recover_state` applies module defaults:
+`{needs_context_per_stage: 3, feedback_rounds_per_stage: 2}`.
+No error raised — missing limits key is valid.
+
+**Per-state `limits` partially overrides top-level**
+If a state defines only `needs_context_per_stage`, the other keys still fall
+through to the top-level `limits` (or defaults). Keys are merged individually,
+not replaced wholesale.
+
+**scout-path returns no useful summary**
+`scout-path` may return an empty or trivially short summary (e.g. if the
+codebase has no matching files for the agent's query). The skill feeds whatever
+`scout-path` returns back to the agent unchanged — it does not validate the
+summary. If the agent then emits `NEEDS_CONTEXT` again, the normal cycle counter
+applies.
+
 **MCP server not running when skill calls `next_action`**
 The MCP call fails. The error surfaces to the LLM as a tool error. The skill
 should instruct the LLM to fall back to spawning the orchestrator agent manually
@@ -153,12 +193,22 @@ not runtime failures.
 file is present. The `target_agent` field names the agent that should resolve
 the feedback (e.g. `"builder"`). But if the feedback file is `HUMAN_QUESTIONS.md`
 the correct target is the *user*, not an LLM agent — there is no
-`core/agents/human.md`. `build_prompt` will raise `FileNotFoundError`.
-Solution: `route_feedback` must distinguish human-targeted feedback from
-LLM-targeted feedback. For `HUMAN_QUESTIONS` priority files, `route_feedback`
-returns `{file, target_agent: "human", instructions: <file contents>}`. The
-MCP server propagates this without calling `build_prompt`. Skill files surface
-the instructions to the user and halt until the file is deleted.
+`core/agents/human.md`. Calling `build_prompt` or `build_prompt_for_agent` here
+would raise `FileNotFoundError`.
+Solution: `route_feedback` returns `{file, target_agent: "human", instructions: <file contents>}`
+for `HUMAN_QUESTIONS` priority files. The MCP server returns `instructions`
+verbatim — neither `build_prompt` nor `build_prompt_for_agent` is called.
+Skill files surface the instructions to the user and halt until the file is
+deleted.
+
+**`build_prompt` receives an agent name instead of a state name**
+`build_prompt(flow_config, state_name, storage_path)` resolves the agent via
+`agent_map[state_name]`. When feedback is open, `feedback["target_agent"]` is
+already an agent name — passing it as `state_name` causes a `KeyError` because
+agent names are not keys in `agent_map`.
+Solution: use `build_prompt_for_agent(flow_config, agent_name, storage_path)` for
+all blocked-feedback responses (non-human). This helper loads the agent `.md`
+directly without an `agent_map` lookup.
 
 **`orchestrator.md` (fallback) will drift from `fsm.py` (primary)**
 Over time, `fsm.py` will handle new edge cases, support new action types, or
@@ -184,11 +234,20 @@ releases and rely on MCP server availability checks in skill files.
 | Empty feedback dir → None | `test_fsm.py::test_route_feedback_empty` |
 | Two feedback files → priority winner | `test_fsm.py::test_route_feedback_priority` |
 | git commit nothing-to-commit → no-op | `test_fsm.py::test_run_actions_empty_commit` |
+| git_commit action → correct cwd + args | `test_fsm.py::test_run_actions_git_commit` |
+| archive_artifacts → files copied with attempt counter | `test_fsm.py::test_run_actions_archive_artifacts` |
+| update_progress → PROGRESS.md row marked DONE | `test_fsm.py::test_run_actions_update_progress` |
+| write_state → STATE.json correct + prior fields preserved | `test_fsm.py::test_write_state` |
+| append_event → EVENTS.jsonl gains one line with ts | `test_fsm.py::test_append_event` |
 | Unknown flow name → error dict | `test_mcp_server.py::test_next_action_bad_flow` |
 | Relative project_root → error dict | `test_mcp_server.py::test_next_action_relative_project_root` |
 | Missing agent contract → error dict | `test_mcp_server.py::test_build_prompt_missing_agent` |
 | Feedback present → blocked response | `test_mcp_server.py::test_complete_stage_blocked` |
 | Already DONE → done response | `test_mcp_server.py::test_complete_stage_already_done` |
 | HUMAN_QUESTIONS feedback → human target, no build_prompt | `test_mcp_server.py::test_route_feedback_human_questions` |
+| Non-human feedback blocked → build_prompt_for_agent used | `test_mcp_server.py::test_complete_stage_blocked_nonhuman` |
 | Concurrent STATE.json write → RuntimeError | `test_mcp_server.py::test_complete_stage_concurrent_write` |
 | agent_map typo → validation error at validate_flow_cli | `test_fsm.py::test_validate_flow_missing_agent_contract` |
+| limits absent from YAML → defaults applied | `test_fsm.py::test_recover_state_limits_defaults` |
+| per-state limits override top-level partially | `test_fsm.py::test_recover_state_limits_per_state_merge` |
+| limits returned in next_action response | `test_mcp_server.py::test_next_action_returns_limits` |

@@ -46,15 +46,20 @@ Codebase is runnable. `pytest -q` must still pass.
 
 ### `fsm.py` — what to implement
 
-Four functions with exactly these signatures:
+Six functions with exactly these signatures:
 
 ```python
 def recover_state(storage_path: Path, flow: dict) -> dict:
     """
     Read STATE.json and EVENTS.jsonl from storage_path.
-    Return {"current_state": str, "conv": int, "open_feedback_files": list[str]}.
+    Return {"current_state": str, "conv": int, "open_feedback_files": list[str],
+            "limits": dict}.
     If STATE.json absent: current_state = first entry in flow["states"].
     open_feedback_files: list of .md filenames in storage_path/feedback/ (stems only).
+    limits: resolved from flow["states"][current_state]["limits"] if present,
+            falling back to flow["limits"], falling back to module defaults
+            {needs_context_per_stage: 3, feedback_rounds_per_stage: 2}.
+    Per-state limits override top-level limits key by key (not wholesale replace).
     """
 
 def evaluate_transition_rules(flow: dict, current_state: str, storage_path: Path) -> str:
@@ -87,10 +92,25 @@ def run_transition_actions(
       git_commit: subprocess git add -A + git commit -m <message>
       archive_artifacts: copy feedback/*.md to
         pathly/pipeline-walkthrough/<topic>/artifacts/<NAME>_conv<conv>_attempt<M>.md
+        <M> = count of existing files in that dir matching <NAME>_conv<conv>_attempt*.md + 1
       update_progress: edit PROGRESS.md — mark conv row DONE (mark: conv_done)
         or all phases DONE (mark: all_phases_done)
     No-op if no key matches.
     On action failure: raise RuntimeError with description.
+    """
+
+def write_state(storage_path: Path, next_state: str, prior_state: dict) -> None:
+    """
+    Write STATE.json atomically (write to .tmp then rename).
+    Preserve all fields from prior_state; overwrite "current" with next_state.
+    Create storage_path if it does not exist.
+    """
+
+def append_event(storage_path: Path, event: dict) -> None:
+    """
+    Append a single JSON line to EVENTS.jsonl.
+    Inject "ts": datetime.utcnow().isoformat() into event before writing.
+    Create the file if absent.
     """
 ```
 
@@ -108,6 +128,9 @@ typos at install time rather than at runtime inside `build_prompt`.
 - Both tools take `flow`, `topic`, and **`project_root`** as parameters.
   `project_root` is the absolute path to the user's project directory. The caller
   (skill file) passes it explicitly — the server never calls `Path.cwd()`.
+- Both tools include a `limits` field in every non-error response, taken from
+  `recover_state`'s resolved limits dict. The skill reads these values to enforce
+  `NEEDS_CONTEXT` and feedback-round caps without hardcoding them.
 - Load flow YAML via `importlib.resources`:
   ```python
   from importlib.resources import files
@@ -133,14 +156,15 @@ typos at install time rather than at runtime inside `build_prompt`.
   reads, raise `RuntimeError("STATE.json modified externally during transition")`.
   This catches sub-agents that bypass `complete_stage` and write state directly.
 
-### `build_prompt` — what to implement
+### `build_prompt` and `build_prompt_for_agent` — what to implement
 
-`build_prompt` is a private helper in `mcp_server.py`. It constructs the
-instructions string returned in every tool response.
+Two private helpers in `mcp_server.py`. They construct the instructions string
+returned in every tool response.
 
 ```python
 def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     """
+    Used for normal (non-blocked) responses where state_name is a key in agent_map.
     1. Look up agent name: agent = flow_config["agent_map"][state_name]
     2. Load core/agents/<agent>.md via importlib.resources:
          agent_text = files("pathly_data").joinpath(f"core/agents/{agent}.md").read_text()
@@ -151,7 +175,26 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
          f"Storage path: {storage_path}\n"
     4. Return the combined string.
     """
+
+def build_prompt_for_agent(flow_config: dict, agent_name: str, storage_path: Path) -> str:
+    """
+    Used for blocked responses where the agent name is already known directly
+    (e.g. from feedback_routing), not via agent_map lookup.
+    1. Load core/agents/<agent_name>.md via importlib.resources.
+    2. Append the same context block as build_prompt.
+    3. Return the combined string.
+    """
 ```
+
+**Key distinction:** `build_prompt` takes a *state name* and resolves it through
+`agent_map`. `build_prompt_for_agent` takes an *agent name* directly. Never pass
+a `feedback["target_agent"]` value (an agent name) to `build_prompt` — it will
+`KeyError` because agent names are not keys in `agent_map`.
+
+**Human feedback special case:** When `feedback["target_agent"] == "human"`,
+`route_feedback` returns the file contents as `feedback["instructions"]`. The MCP
+server returns those contents directly — neither `build_prompt` nor
+`build_prompt_for_agent` is called.
 
 This ensures the LLM receives the full agent contract plus the minimal context it
 needs. The skill file does not need to load or pass agent content separately.
@@ -259,20 +302,49 @@ the prior orchestrator agent — the adapter files are only deployed on next
 
 ### Core skill change — `team.md` shape
 
-Replace any `spawn orchestrator` or `Agent(subagent_type="orchestrator", ...)` 
+Core skill files use **generic pseudo-syntax** — no host-specific MCP call
+syntax. The adapter `_meta/*.yaml` files expand this for each host.
+
+Replace any `spawn orchestrator` or `Agent(subagent_type="orchestrator", ...)`
 instructions with:
 
 ```
-1. Call next_action(flow="team", topic=<TOPIC>)
+1. Call FSM tool: next_action(flow="team", topic=<TOPIC>, project_root=<PROJECT_ROOT>)
    - Receives: {current_state, agent, instructions, storage_path}
-   - If {blocked: true}: follow target_agent instructions to resolve feedback,
-     then call next_action again.
+   - If {blocked: true, target_agent: "human"}: surface instructions to the user
+     and halt until the feedback file is deleted.
+   - If {blocked: true, target_agent: <agent>}: follow instructions to resolve
+     feedback, then call next_action again.
+
 2. Execute the instructions for the returned agent.
-3. When stage work is complete, call complete_stage(flow="team", topic=<TOPIC>)
-   - Receives: {next_state, agent, instructions} or {done: true}
-   - If {blocked: true}: resolve feedback first (see step 1).
+   Track two counters, reset at the start of each stage:
+   needs_context_count = 0, feedback_round_count = 0.
+
+   - If the agent outputs NEEDS_CONTEXT:
+       a. needs_context_count += 1
+       b. If needs_context_count >= limits.needs_context_per_stage:
+            surface warning to user: "Agent has requested context
+            {N} times without completing this stage." Halt and await
+            user instruction.
+       c. Otherwise: call scout-path, feed summary back, resume.
+       d. Repeat until agent no longer emits NEEDS_CONTEXT.
+   - The FSM is not notified about NEEDS_CONTEXT cycles — they are entirely
+     internal to the skill loop.
+
+3. When stage work is complete, call FSM tool: complete_stage(flow="team", topic=<TOPIC>, project_root=<PROJECT_ROOT>)
+   - Receives: {next_state, agent, instructions, limits} or {done: true}
+   - If {blocked: true}:
+       a. feedback_round_count += 1
+       b. If feedback_round_count >= limits.feedback_rounds_per_stage:
+            write HUMAN_QUESTIONS.md with escalation note regardless of
+            original feedback type. Surface to user.
+       c. Otherwise: resolve feedback, call complete_stage again.
+
 4. Repeat from step 2 until done=true.
 ```
+
+"FSM tool" in core means the abstract operation. Adapters map it to the concrete
+host syntax (e.g. `mcp__pathly-fsm__next_action(...)` for Claude Code).
 
 Apply equivalent changes to `debug.md` (`flow="debug"`) and `explore.md`
 (`flow="explore"`).
@@ -327,6 +399,23 @@ Using `team.flow.yaml` loaded via `importlib.resources`:
 - `route_feedback`: empty feedback dir → None; single file → correct agent;
   two files of different priority → highest priority wins; HUMAN_QUESTIONS
   always wins regardless of discovery order.
+- `run_transition_actions` — `git_commit`: mock subprocess; assert `git add -A`
+  and `git commit` called with correct `cwd`; assert "nothing to commit" exit
+  code treated as no-op.
+- `run_transition_actions` — `archive_artifacts`: create two feedback files;
+  assert both copied to pipeline-walkthrough dir with correct naming including
+  attempt counter `<M>`.
+- `run_transition_actions` — `update_progress`: write a PROGRESS.md with a conv
+  row; assert the row is marked DONE after action.
+- `write_state`: assert STATE.json written with correct `current` field and that
+  prior fields are preserved.
+- `append_event`: assert EVENTS.jsonl gains exactly one new JSON line with a `ts`
+  field after each call.
+- `recover_state` — limits resolution:
+  - no `limits` key in flow → defaults `{needs_context_per_stage: 3, feedback_rounds_per_stage: 2}`
+  - top-level `limits` only → used as-is
+  - per-state `limits` partially defined → merged with top-level; missing keys
+    fall through to top-level or defaults
 
 Use `tmp_path` fixture for all filesystem interactions.
 

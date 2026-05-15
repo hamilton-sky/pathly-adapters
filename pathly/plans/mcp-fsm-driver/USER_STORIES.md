@@ -122,15 +122,27 @@ possibility of LLM drift.
 
 ### Acceptance criteria
 
-- `src/pathly_data/core/skills/team.md` calls
-  `mcp__pathly-fsm__next_action(flow="team", topic=<TOPIC>)` at session start
-  and `mcp__pathly-fsm__complete_stage(flow="team", topic=<TOPIC>)` after each
-  stage completes.
+- `src/pathly_data/core/skills/team.md` calls the FSM `next_action` tool at
+  session start and `complete_stage` after each stage completes, using generic
+  pseudo-syntax (not host-specific MCP call syntax).
 - `src/pathly_data/core/skills/debug.md` uses `flow="debug"` equivalently.
 - `src/pathly_data/core/skills/explore.md` uses `flow="explore"` equivalently.
+- Each skill loop handles the `NEEDS_CONTEXT` cycle internally:
+  - When the active agent emits `NEEDS_CONTEXT`, the skill calls `scout-path`.
+  - `scout-path` spawns multiple scouts in parallel and returns a summary.
+  - The summary is fed back to the agent; execution resumes.
+  - This cycle repeats until the agent no longer emits `NEEDS_CONTEXT`.
+  - `complete_stage` is only called after the agent fully completes its work —
+    the FSM never sees `NEEDS_CONTEXT` events.
+- Skill loop enforces limits read from the tool response (`limits` field):
+  - `needs_context_count` reaches `limits.needs_context_per_stage` → warn user, halt.
+  - `feedback_round_count` reaches `limits.feedback_rounds_per_stage` → escalate
+    to human (write `HUMAN_QUESTIONS.md`), surface to user.
+  - Limits are defined in the flow YAML (top-level or per-state); defaults apply
+    when absent. Skills never hardcode limit values.
 - No skill file spawns the `orchestrator` agent directly.
-- Adapter `_meta/*.yaml` files for Claude and Codex updated to reflect the MCP
-  tool invocation syntax for each host.
+- Adapter `_meta/*.yaml` files for Claude and Codex updated to expand generic
+  FSM tool calls into host-specific MCP syntax.
 - Skills remain tool-agnostic in `core/`; only adapter files carry host-specific
   MCP tool call syntax.
 
