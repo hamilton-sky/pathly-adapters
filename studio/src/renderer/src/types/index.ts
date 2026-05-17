@@ -54,3 +54,27 @@ export interface FsmEvent {
   type: string
   detail: string
 }
+
+export interface SkillFrontmatter {
+  type: 'skill'
+  name?: string
+  description?: string
+  adapters?: string[]
+  tools?: string[]
+}
+
+export interface AgentFrontmatter {
+  type: 'agent'
+  name?: string
+  description?: string
+  adapters?: string[]
+  model?: string
+}
+
+export interface TemplateFrontmatter {
+  type: 'template'
+  name?: string
+  category?: string
+}
+
+export type FrontmatterValues = SkillFrontmatter | AgentFrontmatter | TemplateFrontmatter

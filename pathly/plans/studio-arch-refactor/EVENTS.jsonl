@@ -1,3 +1,6 @@
 {"type": "FSM_START", "state": "STORMING"}
 {"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-17T20:52:21.801848"}
 {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING", "ts": "2026-05-17T20:53:45.801827"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-17T21:13:03.088410"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "ts": "2026-05-17T21:13:26.725601"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "BUILDING", "reason": "conv-2-not-done"}

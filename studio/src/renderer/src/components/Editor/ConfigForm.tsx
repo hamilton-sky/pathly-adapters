@@ -1,12 +1,5 @@
 import styles from './ConfigForm.module.css'
-
-export interface FrontmatterValues {
-  name?: string
-  description?: string
-  adapters?: string[]
-  tools?: string[]
-  [key: string]: unknown
-}
+import type { FrontmatterValues } from '../../types'
 
 interface ConfigFormProps {
   values: FrontmatterValues
@@ -14,7 +7,7 @@ interface ConfigFormProps {
   compact?: boolean
 }
 
-const KNOWN_KEYS = ['name', 'description', 'adapters', 'tools']
+const KNOWN_KEYS = ['name', 'description', 'adapters', 'tools', 'model', 'category', 'type']
 const ADAPTER_OPTIONS = ['claude', 'codex', 'copilot']
 
 // Brand colours — not theme-derived, intentionally static
@@ -30,19 +23,28 @@ function chipVars(active: boolean, meta: typeof ADAPTER_META['claude']): React.C
     : {}
 }
 
+function hasAdapters(v: FrontmatterValues): v is Extract<FrontmatterValues, { adapters?: string[] }> {
+  return v.type === 'skill' || v.type === 'agent'
+}
+
+function hasTools(v: FrontmatterValues): v is Extract<FrontmatterValues, { tools?: string[] }> {
+  return v.type === 'skill'
+}
+
 export function ConfigForm({ values, onChange, compact = false }: ConfigFormProps): JSX.Element {
   const unknownKeys = Object.keys(values).filter((k) => !KNOWN_KEYS.includes(k))
 
-  function set(patch: Partial<FrontmatterValues>): void {
-    onChange({ ...values, ...patch })
+  function set(patch: Partial<Record<string, unknown>>): void {
+    onChange({ ...values, ...patch } as FrontmatterValues)
   }
 
   function toggleAdapter(adapter: string, active: boolean): void {
+    if (!hasAdapters(values)) return
     const current = values.adapters ?? []
     set({ adapters: active ? [...current, adapter] : current.filter((a) => a !== adapter) })
   }
 
-  const adapterChips = (
+  const adapterChipsEl = hasAdapters(values) ? (
     <div className={styles.adapterChips}>
       {ADAPTER_OPTIONS.map((adapter) => {
         const meta = ADAPTER_META[adapter]
@@ -61,14 +63,14 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
         )
       })}
     </div>
-  )
+  ) : null
 
   if (compact) {
     return (
       <div className={styles.card}>
         <div className={styles.cardBodyCompact}>
           <span className={styles.nameValue}>{values.name || '—'}</span>
-          {adapterChips}
+          {adapterChipsEl}
         </div>
       </div>
     )
@@ -89,40 +91,46 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
           />
         </div>
 
-        <div className={styles.row}>
-          <span className={styles.label}>Description</span>
-          <input
-            className={styles.input}
-            type="text"
-            value={values.description ?? ''}
-            onChange={(e) => set({ description: e.target.value })}
-            placeholder="What does this skill do?"
-          />
-        </div>
+        {'description' in values && (
+          <div className={styles.row}>
+            <span className={styles.label}>Description</span>
+            <input
+              className={styles.input}
+              type="text"
+              value={values.description ?? ''}
+              onChange={(e) => set({ description: e.target.value })}
+              placeholder="What does this skill do?"
+            />
+          </div>
+        )}
 
-        <div className={styles.row}>
-          <span className={styles.label}>Adapters</span>
-          {adapterChips}
-        </div>
+        {hasAdapters(values) && (
+          <div className={styles.row}>
+            <span className={styles.label}>Adapters</span>
+            {adapterChipsEl}
+          </div>
+        )}
 
-        <div className={styles.row}>
-          <span className={styles.label}>Tools</span>
-          <input
-            className={styles.input}
-            type="text"
-            value={(values.tools ?? []).join(', ')}
-            onChange={(e) => {
-              const tools = e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
-              set({ tools })
-            }}
-            placeholder="Bash, Read, Glob, …"
-          />
-        </div>
+        {hasTools(values) && (
+          <div className={styles.row}>
+            <span className={styles.label}>Tools</span>
+            <input
+              className={styles.input}
+              type="text"
+              value={(values.tools ?? []).join(', ')}
+              onChange={(e) => {
+                const tools = e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                set({ tools })
+              }}
+              placeholder="Bash, Read, Glob, …"
+            />
+          </div>
+        )}
 
         {unknownKeys.map((k) => (
           <div key={k} className={styles.row}>
             <span className={styles.label}>{k}</span>
-            <span className={styles.unknownValue}>{String(values[k])}</span>
+            <span className={styles.unknownValue}>{String((values as Record<string, unknown>)[k])}</span>
           </div>
         ))}
       </div>
