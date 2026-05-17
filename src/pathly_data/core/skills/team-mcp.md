@@ -25,22 +25,32 @@ Parse `$ARGUMENTS` (order doesn't matter):
   Re-run: /pathly-team-mcp <feature-name> [fast|lite|standard|strict]
   ```
 
-### Guard — MCP server check
+### Guard — FSM connection check
 
-Before doing anything else, call:
-`mcp__pathly-fsm__next_action(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
+Before doing anything else, establish a connection to the FSM engine:
 
-If the tool is unavailable or returns a connection error, stop immediately:
-```
-MCP server not connected.
-The pathly-fsm MCP server must be running before using /pathly-team-mcp.
+**Step 1:** Try to call `mcp__pathly-fsm__next_action(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`.
+If the tool is available and responds, continue to Mode selection.
 
-To use the LLM engine instead, run: /pathly-team <feature> [rigor]
-
-To check server status:
-  python -m pathly_orchestrator.mcp_server   (should start without error)
-  Check ~/.claude/settings.json → mcpServers → pathly-fsm
-```
+**Step 2:** If MCP tool is unavailable (tool not found):
+1. Detect if HTTP server is running on port 8765: `curl -s http://127.0.0.1:8765/health`
+2. If HTTP server is running: Use HTTP endpoints. Set `use_http = true`.
+3. If HTTP server is not running:
+   - Try to start it: `python -m pathly_orchestrator.http_server` (background)
+   - Wait 2 seconds for startup
+   - Verify with health check; if it responds, set `use_http = true`
+   - If still unavailable after 2 seconds:
+     ```
+     FSM server not connected.
+     
+     To fix this, install pathly-orchestrator and start the HTTP server:
+       pip install pathly-orchestrator
+       python -m pathly_orchestrator.http_server   (run in another terminal)
+     
+     Or use the LLM engine instead:
+       /pathly-team <feature> [rigor]
+     ```
+     Stop.
 
 ## Mode selection
 
@@ -61,11 +71,36 @@ Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
 ---
 
-## MCP engine loop
+## HTTP Endpoint Usage
+
+If `use_http = true`, replace all MCP tool calls with HTTP requests:
+
+**Via curl (for reference):**
+```bash
+curl -X POST http://127.0.0.1:8765/next_action \
+  -H "Content-Type: application/json" \
+  -d '{"flow":"team", "topic":"FEATURE", "project_root":"PROJECT_ROOT"}'
+
+curl -X POST http://127.0.0.1:8765/complete_stage \
+  -H "Content-Type: application/json" \
+  -d '{"flow":"team", "topic":"FEATURE", "project_root":"PROJECT_ROOT"}'
+```
+
+**In Claude Code:** Use the built-in HTTP request capabilities to POST to these endpoints
+and parse the JSON response the same way you would handle MCP tool responses.
+
+---
+
+## FSM engine loop
 
 ### Step 1 — Get next action
 
-Call: `mcp__pathly-fsm__next_action(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
+If `use_http = false` (MCP available):
+  Call: `mcp__pathly-fsm__next_action(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
+
+If `use_http = true` (HTTP fallback):
+  Call: HTTP POST to `http://127.0.0.1:8765/next_action`
+  with body: `{"flow":"team", "topic":FEATURE, "project_root":PROJECT_ROOT}`
 
 Receives one of:
 - `{current_state, agent, instructions, storage_path, limits}` — normal routing
@@ -144,7 +179,12 @@ The FSM is NOT notified about NEEDS_CONTEXT cycles.
 
 ### Step 4 — Complete the stage
 
-Call: `mcp__pathly-fsm__complete_stage(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
+If `use_http = false` (MCP available):
+  Call: `mcp__pathly-fsm__complete_stage(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
+
+If `use_http = true` (HTTP fallback):
+  Call: HTTP POST to `http://127.0.0.1:8765/complete_stage`
+  with body: `{"flow":"team", "topic":FEATURE, "project_root":PROJECT_ROOT, ...other fields}`
 
 Receives one of:
 - `{next_state, agent, instructions, limits}` — advance

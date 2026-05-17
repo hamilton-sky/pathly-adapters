@@ -365,11 +365,12 @@ def _handle(req: dict) -> dict | None:
     params = req.get("params") or {}
 
     if method == "initialize":
+        client_version = params.get("protocolVersion", "2024-11-05")
         return {
             "jsonrpc": "2.0",
             "id": rid,
             "result": {
-                "protocolVersion": "2024-11-05",
+                "protocolVersion": client_version,
                 "capabilities": {"tools": {}},
                 "serverInfo": {"name": "pathly-fsm", "version": "0.1.0"},
             },
@@ -435,7 +436,35 @@ def run() -> None:
 
 
 def main() -> None:
-    run()
+    import os, datetime, traceback
+    log_path = os.path.join(os.path.expanduser("~"), ".claude", "pathly-fsm-startup.log")
+    def _log(msg: str) -> None:
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.datetime.now().isoformat()} {msg}\n")
+        except Exception:
+            pass
+
+    # Patch _read_message and _send to trace each message
+    import pathly_orchestrator.mcp_server as _self
+    _orig_read = _self._read_message
+    _orig_send = _self._send
+    def _traced_read():
+        msg = _orig_read()
+        _log(f"recv: {msg.get('method') if msg else 'EOF'}")
+        return msg
+    def _traced_send(obj):
+        _log(f"send: id={obj.get('id')} result_keys={list(obj.get('result', {}).keys()) if isinstance(obj.get('result'), dict) else '?'}")
+        _orig_send(obj)
+    _self._read_message = _traced_read
+    _self._send = _traced_send
+
+    _log(f"startup pid={os.getpid()} cwd={os.getcwd()} stdin_isatty={sys.stdin.isatty()}")
+    try:
+        run()
+        _log("run() returned normally (EOF)")
+    except Exception as exc:
+        _log(f"run() crashed: {traceback.format_exc()}")
 
 
 if __name__ == "__main__":
