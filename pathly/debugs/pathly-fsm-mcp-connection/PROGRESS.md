@@ -4,9 +4,10 @@
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| INVESTIGATING | IN_PROGRESS | Spawning scout to investigate MCP tool registration issue |
-| REPRODUCING | PENDING | Tester will reproduce the symptom |
-| ROOT_CAUSE_FOUND | PENDING | Builder will identify root cause |
-| FIXING | PENDING | Builder will implement fix |
-| VERIFYING | PENDING | Reviewer will verify the fix |
+| INVESTIGATING | COMPLETE | Root cause identified: `.exe` wrapper has stdout buffering issue on Windows; direct `python.exe -m` works correctly |
+| REPRODUCING | COMPLETE | Issue verified: MCP tools never appeared in Claude Code sessions |
+| ROOT_CAUSE_FOUND | COMPLETE | Diagnosed: `settings.json` used setuptools `.exe` wrapper; `mcp_config.py` used bare `python` |
+| FIXING | COMPLETE | Applied fixes: updated `settings.json` to use `python.exe -m`, updated `mcp_config.py` to use `sys.executable`, added missing `human.md` agent file |
+| VERIFYING | COMPLETE | Verified: all changes committed in 08f10fc, mcp_server.py has `__main__` guard, secondary issue (human.md) resolved |
+| DONE | COMPLETE | FSM workflow complete |
 
