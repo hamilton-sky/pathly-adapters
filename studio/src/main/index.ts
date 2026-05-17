@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
+import { registerFsHandlers } from './ipc/fs'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -62,16 +63,5 @@ function registerIpcHandlers(): void {
     createWindow(projectPath)
   })
 
-  // Stubs — full implementation in Conv 2
-  ipcMain.handle('fs:read', async (_event, _path: string): Promise<string | null> => {
-    return null
-  })
-
-  ipcMain.handle('fs:write', async (_event, _path: string, _content: string): Promise<void> => {
-    // no-op stub
-  })
-
-  ipcMain.handle('fs:list', async (_event, _dir: string): Promise<string[]> => {
-    return []
-  })
+  registerFsHandlers()
 }

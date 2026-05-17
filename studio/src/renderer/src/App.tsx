@@ -1,6 +1,7 @@
 import { useStore } from './store'
 import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/Sidebar'
+import { Editor } from './components/Editor'
 
 function TopBar(): JSX.Element {
   const { setProjectPath } = useStore()
@@ -15,6 +16,20 @@ function TopBar(): JSX.Element {
 }
 
 function MainPanel(): JSX.Element {
+  const { activePanel, selectedItem } = useStore()
+  if (activePanel === 'editor' && selectedItem) return <Editor />
+  if (activePanel === 'flow')
+    return (
+      <div style={mainPanelStyles.panel}>
+        <span style={mainPanelStyles.placeholder}>Flow editor coming in Conv 3</span>
+      </div>
+    )
+  if (activePanel === 'monitor')
+    return (
+      <div style={mainPanelStyles.panel}>
+        <span style={mainPanelStyles.placeholder}>Monitor coming in Conv 4</span>
+      </div>
+    )
   return (
     <div style={mainPanelStyles.panel}>
       <span style={mainPanelStyles.placeholder}>Select an item from the sidebar</span>
