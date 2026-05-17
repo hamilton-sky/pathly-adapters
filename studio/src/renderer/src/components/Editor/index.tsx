@@ -1,24 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store'
-import { useTheme } from '../../useTheme'
-import type { Theme } from '../../theme'
 import { ConfigForm, FrontmatterValues } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
+import styles from './index.module.css'
 
 type TabMode = 'edit' | 'preview' | 'split'
 
+// ── Frontmatter parsing / serialization ────────────────────────────────────
+
 function parseFrontmatter(raw: string): { config: FrontmatterValues; body: string } {
-  if (!raw.startsWith('---')) {
-    return { config: {}, body: raw }
-  }
+  if (!raw.startsWith('---')) return { config: {}, body: raw }
   const end = raw.indexOf('\n---', 3)
-  if (end === -1) {
-    return { config: {}, body: raw }
-  }
-  const yamlText = raw.slice(4, end).trim()
+  if (end === -1) return { config: {}, body: raw }
+  const config = parseSimpleYaml(raw.slice(4, end).trim())
   const body = raw.slice(end + 4).replace(/^\n/, '')
-  const config = parseSimpleYaml(yamlText)
   return { config, body }
 }
 
@@ -27,34 +23,24 @@ function parseSimpleYaml(text: string): FrontmatterValues {
   const lines = text.split('\n')
   let i = 0
   while (i < lines.length) {
-    const line = lines[i]
-    const keyMatch = line.match(/^(\w[\w-]*):\s*(.*)$/)
-    if (!keyMatch) {
-      i++
-      continue
-    }
-    const key = keyMatch[1]
-    const rest = keyMatch[2].trim()
-
-    if (rest === '' || rest === '|' || rest === '>') {
+    const keyMatch = lines[i].match(/^(\w[\w-]*):\s*(.*)$/)
+    if (!keyMatch) { i++; continue }
+    const [, key, rest] = keyMatch
+    const trimmed = rest.trim()
+    if (trimmed === '' || trimmed === '|' || trimmed === '>') {
       const items: string[] = []
       i++
-      while (i < lines.length && lines[i].match(/^\s+-\s+/)) {
+      while (i < lines.length && /^\s+-\s+/.test(lines[i])) {
         items.push(lines[i].replace(/^\s+-\s+/, '').trim())
         i++
       }
       result[key] = items.length > 0 ? items : ''
       continue
     }
-
-    if (rest.startsWith('[') && rest.endsWith(']')) {
-      const inner = rest.slice(1, -1)
-      result[key] = inner
-        .split(',')
-        .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
-        .filter(Boolean)
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      result[key] = trimmed.slice(1, -1).split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
     } else {
-      result[key] = rest.replace(/^['"]|['"]$/g, '')
+      result[key] = trimmed.replace(/^['"]|['"]$/g, '')
     }
     i++
   }
@@ -62,125 +48,36 @@ function parseSimpleYaml(text: string): FrontmatterValues {
 }
 
 function serializeFrontmatter(config: FrontmatterValues): string {
-  const lines: string[] = []
-  for (const [key, value] of Object.entries(config)) {
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        lines.push(`${key}: []`)
-      } else {
-        lines.push(`${key}:`)
-        for (const item of value) {
-          lines.push(`  - ${item}`)
-        }
+  return Object.entries(config)
+    .flatMap(([key, value]) => {
+      if (value === undefined || value === null) return []
+      if (Array.isArray(value)) {
+        return value.length === 0
+          ? [`${key}: []`]
+          : [`${key}:`, ...value.map((v) => `  - ${v}`)]
       }
-    } else if (value === undefined || value === null) {
-      // skip
-    } else {
-      lines.push(`${key}: ${String(value)}`)
-    }
-  }
-  return lines.join('\n')
+      return [`${key}: ${String(value)}`]
+    })
+    .join('\n')
 }
 
-function makeStyles(t: Theme): Record<string, React.CSSProperties> {
-  return {
-    panel: {
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: t.bgBase,
-      overflow: 'hidden'
-    },
-    toolbar: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '6px 12px',
-      backgroundColor: t.bgMantle,
-      borderBottom: `1px solid ${t.bgSurface0}`,
-      flexShrink: 0
-    },
-    tabs: {
-      display: 'flex',
-      gap: '4px'
-    },
-    tab: {
-      background: 'none',
-      border: `1px solid ${t.bgSurface1}`,
-      borderRadius: '4px',
-      color: t.textSecondary,
-      cursor: 'pointer',
-      padding: '3px 10px',
-      fontSize: '12px'
-    },
-    tabActive: {
-      background: t.bgSurface0,
-      border: `1px solid ${t.accent}`,
-      borderRadius: '4px',
-      color: t.accent,
-      cursor: 'pointer',
-      padding: '3px 10px',
-      fontSize: '12px'
-    },
-    actions: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px'
-    },
-    saveBtn: {
-      background: t.accent,
-      border: 'none',
-      borderRadius: '4px',
-      color: t.bgBase,
-      cursor: 'pointer',
-      padding: '4px 14px',
-      fontSize: '13px',
-      fontWeight: 600
-    },
-    error: {
-      color: t.red,
-      fontSize: '12px'
-    },
-    editorArea: {
-      flex: 1,
-      overflow: 'hidden',
-      display: 'flex'
-    },
-    full: {
-      flex: 1,
-      overflow: 'hidden'
-    },
-    splitRow: {
-      flex: 1,
-      display: 'flex',
-      overflow: 'hidden'
-    },
-    half: {
-      flex: 1,
-      overflow: 'hidden'
-    },
-    divider: {
-      width: '1px',
-      backgroundColor: t.bgSurface0,
-      flexShrink: 0
-    },
-    message: {
-      color: t.textMuted,
-      fontSize: '15px',
-      margin: 'auto'
-    }
-  }
-}
+// ── Component ──────────────────────────────────────────────────────────────
 
 export function Editor(): JSX.Element {
-  const { selectedItem, markDirty, clearDirty } = useStore()
-  const t = useTheme()
-  const styles = makeStyles(t)
+  const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
+
   const [config, setConfig] = useState<FrontmatterValues>({})
-  const [body, setBody] = useState('')
-  const [tab, setTab] = useState<TabMode>('edit')
-  const [loading, setLoading] = useState(false)
+  const [body, setBody]     = useState('')
+  const [tab, setTab]       = useState<TabMode>('edit')
+  const [loading, setLoading]     = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const isDirty = selectedItem ? dirtyItems.has(selectedItem.path) : false
+  const isSkillOrAgent = selectedItem?.type === 'skill' || selectedItem?.type === 'agent'
+  const breadcrumb = selectedItem
+    ? `${selectedItem.type.charAt(0).toUpperCase() + selectedItem.type.slice(1)}s / ${selectedItem.name}`
+    : ''
 
   useEffect(() => {
     if (!selectedItem) return
@@ -193,12 +90,29 @@ export function Editor(): JSX.Element {
         setConfig(parsed.config)
         setBody(parsed.body)
       })
-      .catch(() => {
-        setConfig({})
-        setBody('')
-      })
+      .catch(() => { setConfig({}); setBody('') })
       .finally(() => setLoading(false))
   }, [selectedItem?.path])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent): void {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); void performSave(body, config) }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  })
+
+  async function performSave(currentBody: string, currentConfig: FrontmatterValues): Promise<void> {
+    if (!selectedItem) return
+    setSaveError(null)
+    const merged = `---\n${serializeFrontmatter(currentConfig)}\n---\n${currentBody}`
+    try {
+      await window.pathly.fs.write(selectedItem.path, merged)
+      clearDirty(selectedItem.path)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   function handleConfigChange(v: FrontmatterValues): void {
     setConfig(v)
@@ -208,80 +122,71 @@ export function Editor(): JSX.Element {
   function handleBodyChange(v: string): void {
     setBody(v)
     if (selectedItem) markDirty(selectedItem.path)
-  }
-
-  async function handleSave(): Promise<void> {
-    if (!selectedItem) return
-    setSaveError(null)
-    const yaml = serializeFrontmatter(config)
-    const merged = `---\n${yaml}\n---\n${body}`
-    try {
-      await window.pathly.fs.write(selectedItem.path, merged)
-      clearDirty(selectedItem.path)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err))
-    }
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
+    autoSaveRef.current = setTimeout(() => void performSave(v, config), 2000)
   }
 
   if (loading) {
-    return (
-      <div style={styles.panel}>
-        <span style={styles.message}>Loading…</span>
-      </div>
-    )
+    return <div className={styles.panel}><div className={styles.message}>Loading…</div></div>
   }
 
-  return (
-    <div style={styles.panel}>
-      <ConfigForm values={config} onChange={handleConfigChange} />
+  const tabs: TabMode[] = ['edit', 'preview', 'split']
 
-      <div style={styles.toolbar}>
-        <div style={styles.tabs}>
-          <button
-            style={tab === 'edit' ? styles.tabActive : styles.tab}
-            onClick={() => setTab('edit')}
-          >
-            Edit
-          </button>
-          <button
-            style={tab === 'preview' ? styles.tabActive : styles.tab}
-            onClick={() => setTab('preview')}
-          >
-            Preview
-          </button>
-          <button
-            style={tab === 'split' ? styles.tabActive : styles.tab}
-            onClick={() => setTab('split')}
-          >
-            ⊟ Split
-          </button>
+  return (
+    <div className={styles.panel}>
+      {/* Toolbar — always at top, matches UX diagram */}
+      <div className={styles.toolbar}>
+        <div className={styles.tabs}>
+          {tabs.map((t_) => (
+            <button
+              key={t_}
+              className={tab === t_ ? styles.tabActive : styles.tab}
+              onClick={() => setTab(t_)}
+            >
+              {t_ === 'split' ? '⊟ Split' : t_.charAt(0).toUpperCase() + t_.slice(1)}
+            </button>
+          ))}
         </div>
-        <div style={styles.actions}>
-          {saveError && <span style={styles.error}>{saveError}</span>}
-          <button style={styles.saveBtn} onClick={handleSave}>
-            Save
+        <span className={styles.breadcrumb}>{breadcrumb}</span>
+        <div className={styles.actions}>
+          {saveError && <span className={styles.error}>{saveError}</span>}
+          <button
+            className={`${styles.saveBtn} ${isDirty ? '' : styles.saveBtnClean}`}
+            onClick={() => void performSave(body, config)}
+          >
+            {isDirty ? 'Save ●' : 'Saved'}
           </button>
         </div>
       </div>
 
-      <div style={styles.editorArea}>
+      {/* Configuration card — only for skills/agents, compact in preview/split */}
+      {isSkillOrAgent && (
+        <ConfigForm
+          values={config}
+          onChange={handleConfigChange}
+          compact={tab !== 'edit'}
+        />
+      )}
+
+      {/* Content area */}
+      <div className={styles.editorArea}>
         {tab === 'edit' && (
-          <div style={styles.full}>
+          <div className={styles.full}>
             <MarkdownEditor value={body} onChange={handleBodyChange} />
           </div>
         )}
         {tab === 'preview' && (
-          <div style={styles.full}>
+          <div className={styles.full}>
             <MarkdownPreview content={body} />
           </div>
         )}
         {tab === 'split' && (
-          <div style={styles.splitRow}>
-            <div style={styles.half}>
+          <div className={styles.splitRow}>
+            <div className={styles.half}>
               <MarkdownEditor value={body} onChange={handleBodyChange} />
             </div>
-            <div style={styles.divider} />
-            <div style={styles.half}>
+            <div className={styles.splitDivider} />
+            <div className={styles.half}>
               <MarkdownPreview content={body} />
             </div>
           </div>

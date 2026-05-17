@@ -4,7 +4,7 @@ import { readFileSync } from 'fs'
 import chokidar from 'chokidar'
 
 export function registerWatcherHandlers(win: BrowserWindow): void {
-  ipcMain.handle('watch:start', (_event, topic: string, projectPath: string) => {
+  ipcMain.handle('watch:start', (_event, projectPath: string, topic: string) => {
     const base = join(projectPath, 'pathly/plans', topic)
     chokidar
       .watch([join(base, 'STATE.json'), join(base, 'EVENTS.jsonl')])

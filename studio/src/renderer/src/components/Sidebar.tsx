@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { useTheme } from '../useTheme'
-import type { Theme } from '../theme'
 import type { PathlyItem, PathlyItemType } from '../types'
 import { FlowWizard } from './FlowWizard'
 import { NewItemDialog } from './NewItemDialog'
+import styles from './Sidebar.module.css'
 
 interface TemplateSubdir {
   name: string
@@ -31,244 +30,40 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
-  { label: 'Flows', type: 'flow', dir: 'src/pathly_data/core/flows' },
-  { label: 'Skills', type: 'skill', dir: 'src/pathly_data/core/skills' },
-  { label: 'Agents', type: 'agent', dir: 'src/pathly_data/core/agents' },
-  { label: 'Templates', type: 'template', dir: 'src/pathly_data/core/templates' }
+  { label: 'Flows',     type: 'flow',     dir: 'src/pathly_data/core/flows'     },
+  { label: 'Skills',    type: 'skill',    dir: 'src/pathly_data/core/skills'    },
+  { label: 'Agents',    type: 'agent',    dir: 'src/pathly_data/core/agents'    },
+  { label: 'Templates', type: 'template', dir: 'src/pathly_data/core/templates' },
 ]
 
 function parseProgressMd(md: string): ConvRow[] {
   const rows: ConvRow[] = []
-  let inConvBreakdown = false
   let headerParsed = false
-
   for (const line of md.split('\n')) {
     const trimmed = line.trim()
-    if (trimmed.startsWith('## Conversation Breakdown')) {
-      inConvBreakdown = true
-      headerParsed = false
-      continue
-    }
-    if (inConvBreakdown && trimmed.startsWith('##')) break
-    if (!inConvBreakdown) continue
-
-    if (trimmed.startsWith('|')) {
-      const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
-      if (!headerParsed) { headerParsed = true; continue }
-      if (parts[0]?.startsWith('---')) continue
-      const num = parseInt(parts[0], 10)
-      if (isNaN(num)) continue
-      const status = parts[parts.length - 1] ?? ''
-      rows.push({ num, title: parts[1] ?? '', status: status.toUpperCase() })
-    }
+    if (!trimmed.startsWith('|')) continue
+    const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
+    if (!headerParsed) { headerParsed = true; continue }
+    if (parts[0]?.startsWith('---')) continue
+    const num = parseInt(parts[0], 10)
+    if (isNaN(num)) continue
+    const status = parts[parts.length - 1] ?? ''
+    rows.push({ num, title: parts[1] ?? '', status: status.toUpperCase() })
   }
   return rows
 }
 
-function makeStyles(t: Theme): Record<string, React.CSSProperties> {
-  return {
-    sidebar: {
-      width: '240px',
-      flexShrink: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: t.bgMantle,
-      borderRight: `1px solid ${t.bgSurface0}`,
-      height: '100%',
-      overflow: 'hidden'
-    },
-    collapsed: {
-      width: '32px',
-      flexShrink: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      paddingTop: '8px',
-      backgroundColor: t.bgMantle,
-      borderRight: `1px solid ${t.bgSurface0}`,
-      height: '100%'
-    },
-    expandBtn: {
-      background: 'none',
-      border: `1px solid ${t.bgSurface1}`,
-      borderRadius: '4px',
-      color: t.textPrimary,
-      cursor: 'pointer',
-      padding: '4px 6px',
-      fontSize: '11px'
-    },
-    filterRow: {
-      padding: '8px'
-    },
-    filterInput: {
-      width: '100%',
-      boxSizing: 'border-box' as const,
-      backgroundColor: t.bgSurface0,
-      border: `1px solid ${t.bgSurface1}`,
-      borderRadius: '4px',
-      color: t.textPrimary,
-      padding: '5px 8px',
-      fontSize: '12px',
-      outline: 'none'
-    },
-    treeContainer: {
-      flex: 1,
-      overflowY: 'auto' as const
-    },
-    sectionHeader: {
-      display: 'flex',
-      alignItems: 'center',
-      width: '100%',
-      background: 'none',
-      border: 'none',
-      color: t.textSecondary,
-      cursor: 'pointer',
-      padding: '6px 12px',
-      fontSize: '12px',
-      fontWeight: 600,
-      textTransform: 'uppercase' as const,
-      letterSpacing: '0.05em',
-      textAlign: 'left' as const,
-      gap: '4px'
-    },
-    sectionSub: {
-      color: t.textMuted,
-      fontWeight: 400,
-      textTransform: 'none' as const,
-      letterSpacing: 0,
-      marginLeft: '4px',
-      fontSize: '11px'
-    },
-    chevron: {
-      marginRight: '2px',
-      fontSize: '10px',
-      flexShrink: 0
-    },
-    subdirHeader: {
-      display: 'flex',
-      alignItems: 'center',
-      width: '100%',
-      background: 'none',
-      border: 'none',
-      color: t.textSecondary,
-      cursor: 'pointer',
-      padding: '4px 12px 4px 24px',
-      fontSize: '12px',
-      textAlign: 'left' as const,
-      gap: '2px'
-    },
-    convRow: {
-      display: 'flex',
-      alignItems: 'center',
-      width: '100%',
-      background: 'none',
-      border: 'none',
-      color: t.textPrimary,
-      cursor: 'pointer',
-      padding: '3px 12px 3px 24px',
-      fontSize: '12px',
-      textAlign: 'left' as const
-    },
-    convLabel: {
-      flex: 1,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap' as const
-    },
-    convStatus: {
-      fontSize: '10px',
-      fontWeight: 600,
-      flexShrink: 0,
-      marginLeft: '6px'
-    },
-    convEmpty: {
-      color: t.textMuted,
-      fontSize: '12px',
-      padding: '4px 24px',
-      fontStyle: 'italic'
-    },
-    itemRow: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      width: '100%',
-      background: 'none',
-      border: 'none',
-      color: t.textPrimary,
-      cursor: 'pointer',
-      padding: '4px 12px 4px 28px',
-      fontSize: '13px',
-      textAlign: 'left' as const
-    },
-    itemRowSelected: {
-      backgroundColor: t.bgSurface0,
-      color: t.accent
-    },
-    itemName: {
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap' as const
-    },
-    dirtyDot: {
-      color: t.red,
-      flexShrink: 0,
-      marginLeft: '4px',
-      fontSize: '10px'
-    },
-    divider: {
-      height: '1px',
-      backgroundColor: t.bgSurface0,
-      margin: '4px 0'
-    },
-    monitorRow: {
-      display: 'flex',
-      alignItems: 'center',
-      width: '100%',
-      background: 'none',
-      border: 'none',
-      color: t.textPrimary,
-      cursor: 'pointer',
-      padding: '8px 12px',
-      fontSize: '13px',
-      textAlign: 'left' as const
-    },
-    monitorRowActive: {
-      backgroundColor: t.bgSurface0,
-      color: t.accent
-    },
-    monitorDot: {
-      color: t.green,
-      marginRight: '6px'
-    },
-    collapseBtn: {
-      background: 'none',
-      border: 'none',
-      color: t.textMuted,
-      cursor: 'pointer',
-      padding: '8px 12px',
-      fontSize: '12px',
-      textAlign: 'right' as const,
-      alignSelf: 'flex-end' as const
-    },
-    newBtn: {
-      display: 'block',
-      width: '100%',
-      background: 'none',
-      border: 'none',
-      color: t.textMuted,
-      cursor: 'pointer',
-      padding: '3px 12px 3px 28px',
-      fontSize: '12px',
-      textAlign: 'left' as const
-    }
-  }
+function convStatusClass(status: string): string {
+  if (status === 'DONE') return styles.statusDone
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return styles.statusActive
+  if (status === 'BLOCKED') return styles.statusBlocked
+  return styles.statusDefault
 }
 
-function convStatusColor(status: string, t: Theme): string {
-  if (status === 'DONE') return t.green
-  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return t.blue
-  if (status === 'BLOCKED') return t.red
-  return t.textMuted
+function convIcon(status: string): string {
+  if (status === 'DONE') return '✓'
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return '●'
+  return '○'
 }
 
 export function Sidebar(): JSX.Element {
@@ -281,22 +76,19 @@ export function Sidebar(): JSX.Element {
     setSelectedItem,
     setActivePanel,
     dirtyItems,
-    activePanel
+    activePanel,
   } = useStore()
 
-  const t = useTheme()
-  const styles = makeStyles(t)
-
   const [sections, setSections] = useState<Record<string, SectionState>>({
-    Flows: { items: [], open: false },
-    Skills: { items: [], open: false },
-    Agents: { items: [], open: false },
-    Templates: { items: [], open: true }
+    Flows:     { items: [], open: false },
+    Skills:    { items: [], open: false },
+    Agents:    { items: [], open: false },
+    Templates: { items: [], open: true  },
   })
-  const [planConvs, setPlanConvs] = useState<ConvRow[]>([])
-  const [planOpen, setPlanOpen] = useState(true)
-  const [filter, setFilter] = useState('')
-  const [showFlowWizard, setShowFlowWizard] = useState(false)
+  const [planConvs, setPlanConvs]     = useState<ConvRow[]>([])
+  const [planOpen, setPlanOpen]       = useState(true)
+  const [filter, setFilter]           = useState('')
+  const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: PathlyItemType; dir: string } | null>(null)
 
@@ -304,7 +96,6 @@ export function Sidebar(): JSX.Element {
 
   useEffect(() => {
     if (!projectPath) return
-
     async function loadItems(): Promise<void> {
       for (const section of SECTIONS) {
         try {
@@ -317,93 +108,55 @@ export function Sidebar(): JSX.Element {
               let files: PathlyItem[] = []
               try {
                 const fileNames = await window.pathly.fs.list(subdirPath)
-                files = fileNames.map((fname) => ({
-                  name: fname,
-                  path: `${subdirPath}/${fname}`,
-                  type: 'template' as const
-                }))
-              } catch {
-                // empty subdir
-              }
+                files = fileNames.map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: 'template' as const }))
+              } catch { /* empty subdir */ }
               subdirs.push({ name: subdirName, open: false, files })
             }
-            setSections((prev) => ({
-              ...prev,
-              [section.label]: { ...prev[section.label], items: [], subdirs }
-            }))
+            setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs } }))
           } else {
             const names = await window.pathly.fs.list(`${projectPath}/${section.dir}`)
             const items: PathlyItem[] = names.map((name) => ({
-              name,
-              path: `${projectPath}/${section.dir}/${name}`,
-              type: section.type
+              name, path: `${projectPath}/${section.dir}/${name}`, type: section.type,
             }))
-            setSections((prev) => ({
-              ...prev,
-              [section.label]: { ...prev[section.label], items }
-            }))
+            setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items } }))
           }
         } catch {
-          setSections((prev) => ({
-            ...prev,
-            [section.label]: { ...prev[section.label], items: [] }
-          }))
+          setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [] } }))
         }
       }
     }
-
     loadItemsRef.current = loadItems
     loadItems()
   }, [projectPath])
 
   useEffect(() => {
-    if (!projectPath || !activeTopic) {
-      setPlanConvs([])
-      return
-    }
-
+    if (!projectPath || !activeTopic) { setPlanConvs([]); return }
     async function loadPlan(): Promise<void> {
       try {
-        const md = await window.pathly.fs.read(
-          `${projectPath}/pathly/plans/${activeTopic}/PROGRESS.md`
-        )
+        const md = await window.pathly.fs.read(`${projectPath}/pathly/plans/${activeTopic}/PROGRESS.md`)
         setPlanConvs(parseProgressMd(md))
-      } catch {
-        setPlanConvs([])
-      }
+      } catch { setPlanConvs([]) }
     }
-
     loadPlan()
   }, [projectPath, activeTopic])
 
   if (sidebarCollapsed) {
     return (
-      <div style={styles.collapsed}>
-        <button
-          style={styles.expandBtn}
-          onClick={() => setSidebarCollapsed(false)}
-          title="Expand sidebar"
-        >
-          ►
-        </button>
+      <div className={styles.collapsed}>
+        <button className={styles.expandBtn} onClick={() => setSidebarCollapsed(false)} title="Expand sidebar">►</button>
       </div>
     )
   }
 
   function toggleSection(label: string): void {
-    setSections((prev) => ({
-      ...prev,
-      [label]: { ...prev[label], open: !prev[label].open }
-    }))
+    setSections((prev) => ({ ...prev, [label]: { ...prev[label], open: !prev[label].open } }))
   }
 
-  function toggleSubdir(sectionLabel: string, subdirIndex: number): void {
+  function toggleSubdir(sectionLabel: string, idx: number): void {
     setSections((prev) => {
       const section = prev[sectionLabel]
       if (!section.subdirs) return prev
-      const subdirs = section.subdirs.map((sd, i) =>
-        i === subdirIndex ? { ...sd, open: !sd.open } : sd
-      )
+      const subdirs = section.subdirs.map((sd, i) => i === idx ? { ...sd, open: !sd.open } : sd)
       return { ...prev, [sectionLabel]: { ...section, subdirs } }
     })
   }
@@ -416,7 +169,7 @@ export function Sidebar(): JSX.Element {
   function handleNewItem(section: Section): void {
     if (section.type === 'flow') {
       setShowFlowWizard(true)
-    } else if (section.type === 'skill' || section.type === 'agent') {
+    } else {
       setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
       setShowNewItemDialog(true)
     }
@@ -425,47 +178,37 @@ export function Sidebar(): JSX.Element {
   const lowerFilter = filter.toLowerCase()
 
   return (
-    <div style={styles.sidebar}>
-      <div style={styles.filterRow}>
+    <div className={styles.sidebar}>
+      <div className={styles.filterRow}>
         <input
-          style={styles.filterInput}
+          className={styles.filterInput}
           placeholder="Filter…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
       </div>
 
-      <div style={styles.treeContainer}>
+      <div className={styles.treeContainer}>
         {/* Plan section */}
-        <button style={styles.sectionHeader} onClick={() => setPlanOpen((v) => !v)}>
-          <span style={styles.chevron}>{planOpen ? '▼' : '▶'}</span>
+        <button className={styles.sectionHeader} onClick={() => setPlanOpen((v) => !v)}>
+          <span className={styles.chevron}>{planOpen ? '▼' : '▶'}</span>
           PLAN
-          <span style={styles.sectionSub}>[{activeTopic ?? 'no topic'}]</span>
+          <span className={styles.sectionSub}>[{activeTopic ?? 'no topic'}]</span>
         </button>
         {planOpen && (
           <div>
             {planConvs.length === 0 ? (
-              <div style={styles.convEmpty}>No conversations</div>
+              <div className={styles.convEmpty}>No conversations</div>
             ) : (
               planConvs.map((conv) => {
-                const color = convStatusColor(conv.status, t)
-                const icon =
-                  conv.status === 'DONE'
-                    ? '✓'
-                    : conv.status === 'IN_PROGRESS' || conv.status === 'REVIEWING' || conv.status === 'BUILDING'
-                      ? '●'
-                      : '○'
+                const cls = convStatusClass(conv.status)
                 return (
-                  <button
-                    key={conv.num}
-                    style={styles.convRow}
-                    onClick={() => setActivePanel('plan')}
-                  >
-                    <span style={{ color, marginRight: '6px', flexShrink: 0 }}>{icon}</span>
-                    <span style={styles.convLabel}>
-                      Conv {conv.num} — {conv.title}
+                  <button key={conv.num} className={styles.convRow} onClick={() => setActivePanel('plan')}>
+                    <span className={`${cls} ${styles.convStatus}`} style={{ marginRight: 6, flexShrink: 0 }}>
+                      {convIcon(conv.status)}
                     </span>
-                    <span style={{ ...styles.convStatus, color }}>{conv.status}</span>
+                    <span className={styles.convLabel}>Conv {conv.num} — {conv.title}</span>
+                    <span className={`${styles.convStatus} ${cls}`}>{conv.status}</span>
                   </button>
                 )
               })
@@ -473,7 +216,7 @@ export function Sidebar(): JSX.Element {
           </div>
         )}
 
-        <div style={styles.divider} />
+        <div className={styles.divider} />
 
         {/* File sections */}
         {SECTIONS.map((section) => {
@@ -481,87 +224,58 @@ export function Sidebar(): JSX.Element {
 
           if (section.type === 'template') {
             const subdirs = state.subdirs ?? []
-            const hasMatch =
-              !filter ||
-              subdirs.some((sd) =>
-                sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter))
-              )
+            const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
             if (!hasMatch) return null
-
             return (
               <div key={section.label}>
-                <button
-                  style={styles.sectionHeader}
-                  onClick={() => toggleSection(section.label)}
-                >
-                  <span style={styles.chevron}>{state.open ? '▼' : '▶'}</span>
+                <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
+                  <span className={styles.chevron}>{state.open ? '▼' : '▶'}</span>
                   {section.label.toUpperCase()}
                 </button>
                 {state.open && (
                   <div>
                     {subdirs.map((subdir, idx) => {
-                      const filteredFiles = filter
-                        ? subdir.files.filter((f) =>
-                            f.name.toLowerCase().includes(lowerFilter)
-                          )
-                        : subdir.files
+                      const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
                       if (filter && filteredFiles.length === 0) return null
-
                       return (
                         <div key={subdir.name}>
-                          <button
-                            style={styles.subdirHeader}
-                            onClick={() => toggleSubdir(section.label, idx)}
-                          >
-                            <span style={styles.chevron}>
-                              {subdir.open ? '▼' : '▶'}
-                            </span>
+                          <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
+                            <span className={styles.chevron}>{subdir.open ? '▼' : '▶'}</span>
                             {subdir.name}/
                           </button>
-                          {subdir.open && (
-                            <div>
-                              {filteredFiles.map((item) => {
-                                const isDirty = dirtyItems.has(item.path)
-                                const isSelected = selectedItem?.path === item.path
-                                return (
-                                  <button
-                                    key={item.path}
-                                    style={{
-                                      ...styles.itemRow,
-                                      paddingLeft: '44px',
-                                      ...(isSelected ? styles.itemRowSelected : {})
-                                    }}
-                                    onClick={() => handleItemClick(item)}
-                                    title={item.path}
-                                  >
-                                    <span style={styles.itemName}>{item.name}</span>
-                                    {isDirty && <span style={styles.dirtyDot}>●</span>}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )}
+                          {subdir.open && filteredFiles.map((item) => {
+                            const isDirty = dirtyItems.has(item.path)
+                            const isSelected = selectedItem?.path === item.path
+                            return (
+                              <button
+                                key={item.path}
+                                className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
+                                onClick={() => handleItemClick(item)}
+                                title={item.path}
+                              >
+                                <span className={styles.itemName}>{item.name}</span>
+                                {isDirty && <span className={styles.dirtyDot}>●</span>}
+                              </button>
+                            )
+                          })}
                         </div>
                       )
                     })}
+                    {!filter && (
+                      <button className={styles.newBtn} onClick={() => handleNewItem(section)}>+ new template</button>
+                    )}
                   </div>
                 )}
               </div>
             )
           }
 
-          const filtered = filter
-            ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter))
-            : state.items
+          const filtered = filter ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter)) : state.items
           if (filter && filtered.length === 0) return null
-
           return (
             <div key={section.label}>
-              <button
-                style={styles.sectionHeader}
-                onClick={() => toggleSection(section.label)}
-              >
-                <span style={styles.chevron}>{state.open ? '▼' : '▶'}</span>
+              <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
+                <span className={styles.chevron}>{state.open ? '▼' : '▶'}</span>
                 {section.label.toUpperCase()}
               </button>
               {state.open && (
@@ -572,22 +286,17 @@ export function Sidebar(): JSX.Element {
                     return (
                       <button
                         key={item.path}
-                        style={{
-                          ...styles.itemRow,
-                          ...(isSelected ? styles.itemRowSelected : {})
-                        }}
+                        className={`${styles.itemRow} ${isSelected ? styles.itemRowSelected : ''}`}
                         onClick={() => handleItemClick(item)}
                         title={item.path}
                       >
-                        <span style={styles.itemName}>{item.name}</span>
-                        {isDirty && <span style={styles.dirtyDot}>●</span>}
+                        <span className={styles.itemName}>{item.name}</span>
+                        {isDirty && <span className={styles.dirtyDot}>●</span>}
                       </button>
                     )
                   })}
                   {!filter && (
-                    <button style={styles.newBtn} onClick={() => handleNewItem(section)}>
-                      + new
-                    </button>
+                    <button className={styles.newBtn} onClick={() => handleNewItem(section)}>+ new</button>
                   )}
                 </div>
               )}
@@ -595,48 +304,54 @@ export function Sidebar(): JSX.Element {
           )
         })}
 
-        <div style={styles.divider} />
+        <div className={styles.divider} />
 
         <button
-          style={{
-            ...styles.monitorRow,
-            ...(activePanel === 'monitor' ? styles.monitorRowActive : {})
-          }}
+          className={`${styles.bottomRow} ${activePanel === 'monitor' ? styles.bottomRowActive : ''}`}
           onClick={() => setActivePanel('monitor')}
         >
-          <span style={styles.monitorDot}>●</span> Monitor
+          <span className={styles.monitorDot}>●</span> Monitor
         </button>
 
         <button
-          style={{
-            ...styles.monitorRow,
-            ...(activePanel === 'settings' ? styles.monitorRowActive : {})
-          }}
+          className={`${styles.bottomRow} ${activePanel === 'settings' ? styles.bottomRowActive : ''}`}
           onClick={() => setActivePanel('settings')}
         >
           ⚙ Settings
         </button>
 
-        <div style={styles.divider} />
+        <div className={styles.divider} />
       </div>
 
-      <button
-        style={styles.collapseBtn}
-        onClick={() => setSidebarCollapsed(true)}
-        title="Collapse sidebar"
-      >
+      <button className={styles.collapseBtn} onClick={() => setSidebarCollapsed(true)} title="Collapse sidebar">
         ◄
       </button>
 
       {showFlowWizard && (
         <FlowWizard
           onClose={() => setShowFlowWizard(false)}
-          onCreated={() => { setShowFlowWizard(false); loadItemsRef.current() }}
+          onCreated={(filePath) => {
+            setShowFlowWizard(false)
+            // Keep the Flows section open so the new flow is immediately visible
+            setSections((prev) => ({ ...prev, Flows: { ...prev.Flows, open: true } }))
+            // Reload file list, then select the newly created flow
+            loadItemsRef.current().then(() => {
+              if (filePath) {
+                const item: PathlyItem = {
+                  name: filePath.split('/').pop() ?? '',
+                  path: filePath,
+                  type: 'flow',
+                }
+                setSelectedItem(item)
+                setActivePanel('flow')
+              }
+            })
+          }}
         />
       )}
       {showNewItemDialog && newItemTarget && (
         <NewItemDialog
-          type={newItemTarget.type as 'skill' | 'agent'}
+          type={newItemTarget.type as 'skill' | 'agent' | 'template'}
           dir={newItemTarget.dir}
           onClose={() => setShowNewItemDialog(false)}
           onCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor') }}

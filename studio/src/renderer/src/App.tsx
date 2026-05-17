@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { Component, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { useStore } from './store'
 import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/Sidebar'
@@ -10,6 +11,23 @@ import { PlanBoard } from './components/PlanBoard'
 import { Settings } from './components/Settings'
 import { useTheme } from './useTheme'
 import { darkTheme, lightTheme } from './theme'
+
+class PanelErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null }
+  static getDerivedStateFromError(e: Error) { return { error: e.message } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontSize: '14px', color: '#f87171' }}>Panel error</span>
+          <span style={{ fontSize: '12px', color: '#5a5d8a', maxWidth: '400px', textAlign: 'center' }}>{this.state.error}</span>
+          <button style={{ marginTop: '8px', padding: '4px 12px', fontSize: '12px', cursor: 'pointer' }} onClick={() => this.setState({ error: null })}>Dismiss</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function MainPanel(): JSX.Element {
   const { activePanel, selectedItem } = useStore()
@@ -62,7 +80,7 @@ export default function App(): JSX.Element {
       <TopBar />
       <div style={appStyles.body}>
         <Sidebar />
-        <MainPanel />
+        <PanelErrorBoundary><MainPanel /></PanelErrorBoundary>
       </div>
     </div>
   )

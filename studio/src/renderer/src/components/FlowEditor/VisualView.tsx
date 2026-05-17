@@ -37,7 +37,7 @@ interface EdgeDetail {
 type PanelDetail = NodeDetail | EdgeDetail | null
 
 function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node[]; edges: Edge[] } {
-  const nodes: Node[] = data.states.map((state, i) => ({
+  const nodes: Node[] = (data.states ?? []).map((state, i) => ({
     id: state,
     position: { x: i * 220, y: 100 },
     data: {
@@ -61,7 +61,7 @@ function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node[]; edges: Edge[] }
 
   const edges: Edge[] = []
   let edgeIdx = 0
-  for (const [source, targets] of Object.entries(data.transitions)) {
+  for (const [source, targets] of Object.entries(data.transitions ?? {})) {
     for (const target of targets) {
       const edgeId = `e-${edgeIdx++}`
       const rules = data.transition_rules as Record<string, Record<string, string>> | undefined

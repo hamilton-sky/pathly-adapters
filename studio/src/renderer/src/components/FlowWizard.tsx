@@ -5,7 +5,7 @@ import type { Theme } from '../theme'
 
 interface Props {
   onClose: () => void
-  onCreated: () => void
+  onCreated: (filePath: string) => void
 }
 
 interface Transition {
@@ -299,6 +299,7 @@ function generateYaml(
   agentMap: Record<string, string>,
   transitions: Transition[]
 ): string {
+  // Build plain target-list map (matches FlowYaml: Record<string, string[]>)
   const transitionMap: Record<string, string[]> = {}
   for (const tr of transitions) {
     if (!transitionMap[tr.from]) transitionMap[tr.from] = []
@@ -331,9 +332,7 @@ function generateYaml(
     if (targets && targets.length > 0) {
       lines.push(`  ${s}:`)
       for (const target of targets) {
-        const tr = transitions.find((t) => t.from === s && t.to === target)
-        const label = tr?.label || 'default'
-        lines.push(`    - ${label}: ${target}`)
+        lines.push(`    - ${target}`)      // plain string list, not label:target objects
       }
     }
   }
@@ -441,7 +440,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     const filePath = `${projectPath}/src/pathly_data/core/flows/${trimmedName}.flow.yaml`
     try {
       await window.pathly.fs.write(filePath, yaml)
-      onCreated()
+      onCreated(filePath)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }

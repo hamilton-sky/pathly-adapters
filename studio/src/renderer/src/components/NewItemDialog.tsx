@@ -1,118 +1,86 @@
 import { useEffect, useRef, useState } from 'react'
-import { useTheme } from '../useTheme'
-import type { Theme } from '../theme'
 import type { PathlyItem } from '../types'
+import styles from './NewItemDialog.module.css'
 
 interface Props {
-  type: 'skill' | 'agent'
+  type: 'skill' | 'agent' | 'template'
   dir: string
   onClose: () => void
   onCreated: (item: PathlyItem) => void
 }
 
-function makeStyles(t: Theme): Record<string, React.CSSProperties> {
-  return {
-    overlay: {
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    },
-    card: {
-      width: '400px',
-      backgroundColor: t.bgMantle,
-      border: `1px solid ${t.bgSurface0}`,
-      borderRadius: '8px',
-      padding: '24px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '16px'
-    },
-    title: {
-      fontSize: '16px',
-      fontWeight: 600,
-      color: t.textPrimary,
-      margin: 0
-    },
-    input: {
-      width: '100%',
-      boxSizing: 'border-box' as const,
-      backgroundColor: t.bgBase,
-      border: `1px solid ${t.bgSurface0}`,
-      borderRadius: '4px',
-      color: t.textPrimary,
-      fontSize: '13px',
-      padding: '8px 10px',
-      outline: 'none',
-      fontFamily: 'monospace'
-    },
-    error: {
-      color: t.red,
-      fontSize: '12px'
-    },
-    btnRow: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      gap: '8px'
-    },
-    cancelBtn: {
-      background: 'none',
-      border: `1px solid ${t.bgSurface1}`,
-      borderRadius: '4px',
-      color: t.textSecondary,
-      cursor: 'pointer',
-      padding: '6px 16px',
-      fontSize: '13px'
-    },
-    createBtn: {
-      background: t.accent,
-      border: 'none',
-      borderRadius: '4px',
-      color: t.bgBase,
-      cursor: 'pointer',
-      padding: '6px 16px',
-      fontSize: '13px',
-      fontWeight: 600
-    }
-  }
+const ADAPTER_OPTIONS = ['claude', 'codex', 'copilot']
+
+// Brand colours — intentionally static, not theme-derived
+const ADAPTER_COLORS: Record<string, { color: string; bg: string; border: string }> = {
+  claude:  { color: '#E07535', bg: 'rgba(224,117,53,0.12)',  border: 'rgba(224,117,53,0.5)'  },
+  codex:   { color: '#0EA5E9', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.5)'  },
+  copilot: { color: '#8888AA', bg: 'rgba(136,136,170,0.12)', border: 'rgba(136,136,170,0.5)' },
+}
+
+function chipVars(active: boolean, meta: typeof ADAPTER_COLORS['claude']): React.CSSProperties {
+  return active
+    ? { '--chip-color': meta.color, '--chip-bg': meta.bg, '--chip-border': meta.border, '--chip-dot-color': meta.color } as React.CSSProperties
+    : {}
+}
+
+function buildSkillFrontmatter(name: string, description: string, adapters: string[], tools: string[]): string {
+  const lines = [
+    `name: ${name}`,
+    `description: ${description || ''}`,
+    adapters.length > 0
+      ? `adapters:\n${adapters.map((a) => `  - ${a}`).join('\n')}`
+      : 'adapters: []',
+    tools.length > 0
+      ? `tools:\n${tools.map((t) => `  - ${t}`).join('\n')}`
+      : 'tools: []',
+  ]
+  return `---\n${lines.join('\n')}\n---\n`
 }
 
 export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Element {
-  const t = useTheme()
-  const styles = makeStyles(t)
-  const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const [name, setName]           = useState('')
+  const [description, setDesc]    = useState('')
+  const [adapters, setAdapters]   = useState<string[]>(['claude'])
+  const [toolsRaw, setToolsRaw]   = useState('')
+  const [subdirName, setSubdir]   = useState('')
+  const [error, setError]         = useState<string | null>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
-    function handleKeyDown(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    function onKey(e: KeyboardEvent): void { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  function toggleAdapter(adapter: string): void {
+    setAdapters((prev) => prev.includes(adapter) ? prev.filter((a) => a !== adapter) : [...prev, adapter])
+  }
 
   async function handleCreate(): Promise<void> {
     const trimmed = name.trim()
-    if (!trimmed) {
-      setError('Name is required')
-      return
-    }
-    if (!/^[a-zA-Z0-9-]+$/.test(trimmed)) {
-      setError('Name must be alphanumeric with hyphens only')
-      return
-    }
+    if (!trimmed) { setError('Name is required'); return }
+    if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) { setError('Alphanumeric, hyphens and underscores only'); return }
     setError(null)
 
-    const filePath = `${dir}/${trimmed}.md`
-    const content =
-      type === 'skill'
-        ? `# ${trimmed}\n\n## Description\n\n[Describe what this skill does]\n\n## Instructions\n\n`
-        : `# ${trimmed}\n\n## Role\n\n[Describe the agent role]\n\n## Instructions\n\n`
+    let filePath: string
+    let content: string
+
+    if (type === 'skill') {
+      const tools = toolsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+      filePath = `${dir}/${trimmed}.md`
+      content  = buildSkillFrontmatter(trimmed, description.trim(), adapters, tools)
+              + `\n# ${trimmed}\n\n## Instructions\n\n[Describe what this skill does step by step]\n`
+    } else if (type === 'template') {
+      const subdir = subdirName.trim() || 'general'
+      filePath = `${dir}/${subdir}/${trimmed}.md`
+      content  = `# ${trimmed}\n\n[Template content here]\n`
+    } else {
+      filePath = `${dir}/${trimmed}.md`
+      content  = `---\nname: ${trimmed}\ndescription: ${description.trim()}\n---\n\n# ${trimmed}\n\n## Role\n\n[Describe the agent role]\n\n## Instructions\n\n`
+    }
 
     try {
       await window.pathly.fs.write(filePath, content)
@@ -122,30 +90,96 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent): void {
-    if (e.key === 'Enter') handleCreate()
-  }
-
-  const title = type === 'skill' ? 'New Skill' : 'New Agent'
-  const placeholder = type === 'skill' ? 'my-skill' : 'my-agent'
+  const titles     = { skill: 'New Skill', agent: 'New Agent', template: 'New Template' }
+  const namePH     = { skill: 'my-skill',  agent: 'my-agent',  template: 'my-template'  }
 
   return (
-    <div style={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={styles.card}>
-        <h2 style={styles.title}>{title}</h2>
-        <input
-          ref={inputRef}
-          style={styles.input}
-          type="text"
-          placeholder={placeholder}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-        {error && <div style={styles.error}>{error}</div>}
-        <div style={styles.btnRow}>
-          <button style={styles.cancelBtn} onClick={onClose}>Cancel</button>
-          <button style={styles.createBtn} onClick={handleCreate}>Create</button>
+    <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className={styles.card}>
+        <div className={styles.header}>{titles[type]}</div>
+
+        <div className={styles.body}>
+          <div className={styles.fieldGroup}>
+            <label className={styles.label}>Name</label>
+            <input
+              ref={inputRef}
+              className={`${styles.input} ${styles.inputMono}`}
+              type="text"
+              placeholder={namePH[type]}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate() }}
+            />
+          </div>
+
+          {(type === 'skill' || type === 'agent') && (
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>Description</label>
+              <input
+                className={styles.input}
+                type="text"
+                placeholder={type === 'skill' ? 'Continue active pipeline feature' : 'Agent role description'}
+                value={description}
+                onChange={(e) => setDesc(e.target.value)}
+              />
+            </div>
+          )}
+
+          {type === 'skill' && (
+            <>
+              <div className={styles.fieldGroup}>
+                <label className={styles.label}>Adapters</label>
+                <div className={styles.chips}>
+                  {ADAPTER_OPTIONS.map((adapter) => {
+                    const active = adapters.includes(adapter)
+                    const meta   = ADAPTER_COLORS[adapter]
+                    return (
+                      <div
+                        key={adapter}
+                        className={styles.chip}
+                        style={chipVars(active, meta)}
+                        onClick={() => toggleAdapter(adapter)}
+                      >
+                        <span className={styles.chipDot} />
+                        {adapter}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.label}>Tools</label>
+                <input
+                  className={styles.input}
+                  type="text"
+                  placeholder="Bash, Read, Glob, Grep, TodoWrite, Agent"
+                  value={toolsRaw}
+                  onChange={(e) => setToolsRaw(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {type === 'template' && (
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>Category (subfolder)</label>
+              <input
+                className={`${styles.input} ${styles.inputMono}`}
+                type="text"
+                placeholder="general"
+                value={subdirName}
+                onChange={(e) => setSubdir(e.target.value)}
+              />
+            </div>
+          )}
+
+          {error && <div className={styles.error}>{error}</div>}
+        </div>
+
+        <div className={styles.footer}>
+          <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
+          <button className={styles.createBtn} onClick={() => void handleCreate()}>Create</button>
         </div>
       </div>
     </div>

@@ -14,31 +14,31 @@ export interface Theme {
 }
 
 export const darkTheme: Theme = {
-  bgBase: '#1e1e2e',
-  bgMantle: '#181825',
-  bgSurface0: '#313244',
-  bgSurface1: '#45475a',
-  textPrimary: '#cdd6f4',
-  textSecondary: '#a6adc8',
-  textMuted: '#6c7086',
-  accent: '#cba6f7',
-  blue: '#89b4fa',
-  green: '#a6e3a1',
-  red: '#f38ba8',
-  yellow: '#f9e2af',
+  bgBase: '#13131f',
+  bgMantle: '#0f0f1a',
+  bgSurface0: '#252538',
+  bgSurface1: '#343452',
+  textPrimary: '#e2e4f0',
+  textSecondary: '#9b9ec8',
+  textMuted: '#5a5d8a',
+  accent: '#A78BFA',   // Pathly violet
+  blue: '#60AAFF',     // Codex blue
+  green: '#4ade80',
+  red: '#f87171',
+  yellow: '#fbbf24',
 }
 
 export const lightTheme: Theme = {
-  bgBase: '#eff1f5',
-  bgMantle: '#e6e9ef',
-  bgSurface0: '#ccd0da',
-  bgSurface1: '#bcc0cc',
-  textPrimary: '#4c4f69',
-  textSecondary: '#6c6f85',
-  textMuted: '#9ca0b0',
-  accent: '#8839ef',
-  blue: '#1e66f5',
-  green: '#40a02b',
-  red: '#d20f39',
-  yellow: '#df8e1d',
+  bgBase: '#f5f5ff',
+  bgMantle: '#eeeef8',
+  bgSurface0: '#ddddf0',
+  bgSurface1: '#c8c8e0',
+  textPrimary: '#1e1e3a',
+  textSecondary: '#4a4a7a',
+  textMuted: '#8888aa',
+  accent: '#7C3AED',   // Pathly violet
+  blue: '#0070E0',     // Codex blue
+  green: '#16a34a',
+  red: '#dc2626',
+  yellow: '#d97706',
 }

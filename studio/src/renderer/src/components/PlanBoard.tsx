@@ -27,36 +27,18 @@ interface CardState {
 
 function parseProgressMd(md: string): ConvRow[] {
   const rows: ConvRow[] = []
-  let inConvBreakdown = false
   let headerParsed = false
 
   for (const line of md.split('\n')) {
     const trimmed = line.trim()
-
-    if (trimmed.startsWith('## Conversation Breakdown')) {
-      inConvBreakdown = true
-      headerParsed = false
-      continue
-    }
-    if (inConvBreakdown && trimmed.startsWith('##')) {
-      break
-    }
-    if (!inConvBreakdown) continue
-
-    if (trimmed.startsWith('|')) {
-      const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
-      if (!headerParsed) {
-        headerParsed = true
-        continue
-      }
-      if (parts[0]?.startsWith('---')) continue
-
-      const num = parseInt(parts[0], 10)
-      if (isNaN(num)) continue
-      const status = parts[parts.length - 1] ?? ''
-      const title = parts[1] ?? ''
-      rows.push({ num, title, status: status.toUpperCase() })
-    }
+    if (!trimmed.startsWith('|')) continue
+    const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
+    if (!headerParsed) { headerParsed = true; continue }
+    if (parts[0]?.startsWith('---')) continue
+    const num = parseInt(parts[0], 10)
+    if (isNaN(num)) continue
+    const status = parts[parts.length - 1] ?? ''
+    rows.push({ num, title: parts[1] ?? '', status: status.toUpperCase() })
   }
   return rows
 }

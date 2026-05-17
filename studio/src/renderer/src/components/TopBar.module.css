@@ -1,0 +1,130 @@
+/* TopBar.module.css */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 46px;
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--bg-surface0);
+  flex-shrink: 0;
+}
+
+.backBtn {
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.backBtn:hover { background: var(--bg-surface0); color: var(--text-primary); }
+
+.brand {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.topicSelect {
+  background: var(--bg-base);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.topicSelect:focus { border-color: var(--accent); }
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.badgeLive {
+  font-size: 12px;
+  color: var(--green);
+  white-space: nowrap;
+}
+
+.badgeWatch {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.publishBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 5px;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: opacity 0.12s;
+}
+.publishBtn:hover { opacity: 0.85; }
+.publishBtn:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Publish log panel ── */
+.logPanel {
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--bg-surface0);
+  flex-shrink: 0;
+  max-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.logHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--bg-surface0);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.logClose {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 4px;
+  transition: color 0.12s;
+}
+.logClose:hover { color: var(--text-primary); }
+
+.logBody {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 12px;
+  font-family: 'Fira Mono', 'Cascadia Code', monospace;
+  font-size: 12px;
+  color: var(--green);
+}
+
+.logLine {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
