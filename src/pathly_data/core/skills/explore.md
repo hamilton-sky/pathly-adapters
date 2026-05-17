@@ -101,14 +101,35 @@ message (parallel tool calls). Sequential scout launches are wrong.
 
 ---
 
-## Spawn orchestrator
+## Engine selection
+
+Determine which FSM engine to use. `PROJECT_ROOT` = cwd at skill invocation.
+
+- If called with `engine=llm` → go to **LLM engine** below.
+- If called with `engine=mcp` → go to **MCP engine** below.
+- Default (`auto`): try `{{FSM_NEXT_ACTION}}`; if unavailable → **LLM engine**.
+
+## MCP engine (Python FSM)
+
+Call FSM tool: `{{FSM_NEXT_ACTION}}(flow="explore", topic=TOPIC, project_root=PROJECT_ROOT)`
+
+Display the contextual menu (same format as team.md — see CONTEXTUAL_MENU_UX.md for format).
+Use the explore guidance table from CONTEXTUAL_MENU_UX.md for state-specific lines.
+
+Execute the returned agent instructions. When complete, call:
+`{{FSM_COMPLETE_STAGE}}(flow="explore", topic=TOPIC, project_root=PROJECT_ROOT)`
+
+Handle blocked, decide, and feedback cases using the same protocol as team.md.
+Repeat until `done=true`.
+
+**Important:** The scout spawning rules above still apply during TRACING state.
+The MCP server does not enforce them — the skill must enforce min/max scout count
+and parallelism rules from the "## Scout spawning rules — MANDATORY" section.
+
+## LLM engine (orchestrator agent)
 
 Spawn the **orchestrator** agent with:
 - flow_config: src/pathly_data/core/flows/explore.flow.yaml
 - topic: [TOPIC]
 - rigor: lite
 - autoFlow: [autoFlow]
-
-The orchestrator drives the full explore pipeline (frame → analyze → trace → conclude)
-using the FSM defined in `explore.flow.yaml`. It handles all state tracking, agent spawning,
-and feedback routing. Do not perform these actions in explore.md.

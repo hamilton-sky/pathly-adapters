@@ -1,3 +1,6 @@
 skill: explore
 filename: pathly-explore/SKILL.md
 natural_language: "/pathly explore, explore codebase, investigate code, explore"
+variables:
+  FSM_NEXT_ACTION: "mcp__pathly-fsm__next_action"
+  FSM_COMPLETE_STAGE: "mcp__pathly-fsm__complete_stage"

@@ -20,16 +20,21 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pathly_orchestrator.state import valid_states, flow_transitions
+from pathly_orchestrator.state import valid_states, flow_transitions, VALID_STATES, TRANSITIONS
 
 _APPEND_LOCK = threading.Lock()
 CURRENT_SCHEMA_VERSION = 1
 
 
+def _plans_dir() -> Path:
+    return Path("pathly") / "plans"
+
+
 # bare feature names auto-resolved to pathly/plans/<name>/ for backward compat
 def _resolve_path(storage_path: str) -> Path:
+    import pathly_orchestrator.eventlog as _self
     if "/" not in storage_path and "\\" not in storage_path:
-        return Path("pathly") / "plans" / storage_path
+        return _self._plans_dir() / storage_path
     return Path(storage_path)
 
 
@@ -46,13 +51,15 @@ def _now() -> str:
 
 
 def append_event(storage_path: str, event: dict, flow: dict | None = None) -> None:
-    if flow is not None and event.get("type") == "STATE_TRANSITION":
+    if event.get("type") == "STATE_TRANSITION":
         to_state = event.get("to")
-        if to_state is not None and to_state not in valid_states(flow):
-            raise ValueError(
-                f"Invalid state in STATE_TRANSITION: {to_state!r}. "
-                f"Must be one of {sorted(valid_states(flow))}"
-            )
+        if to_state is not None:
+            states = valid_states(flow) if flow is not None else VALID_STATES
+            if to_state not in states:
+                raise ValueError(
+                    f"Invalid state in STATE_TRANSITION: {to_state!r}. "
+                    f"Must be one of {sorted(states)}"
+                )
 
     path = _events_path(storage_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -76,21 +83,24 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
 def write_state(storage_path: str, state: dict, flow: dict | None = None) -> None:
     new_current = state.get("current")
 
-    if flow is not None and new_current is not None:
-        states = valid_states(flow)
+    if new_current is not None:
+        states = valid_states(flow) if flow is not None else VALID_STATES
         if new_current not in states:
             raise ValueError(
                 f"Invalid state: {new_current!r}. Must be one of {sorted(states)}"
             )
 
     path = _state_path(storage_path)
-    if flow is not None and path.exists() and new_current is not None:
+    if path.exists() and new_current is not None:
         try:
             old = json.loads(path.read_text(encoding="utf-8"))
             old_current = old.get("current")
             if old_current and old_current != new_current:
-                transitions = flow_transitions(flow)
-                allowed = transitions.get(old_current, frozenset())
+                if flow is not None:
+                    transitions = flow_transitions(flow)
+                    allowed = transitions.get(old_current, frozenset())
+                else:
+                    allowed = frozenset(TRANSITIONS.get(old_current, []))
                 if new_current not in allowed:
                     raise ValueError(
                         f"Invalid state transition: {old_current!r} → {new_current!r}. "

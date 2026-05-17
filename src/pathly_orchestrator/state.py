@@ -27,14 +27,27 @@ STATE.json lives at <storage_path>/STATE.json and is rewritten after every event
 """
 
 from __future__ import annotations
+import json
 import sys
+from importlib.resources import files
 from pathlib import Path
 
 import yaml
 
+_SCHEMA_PATH = Path(__file__).parent.parent / "pathly_data" / "schemas" / "state.schema.json"
+_SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+
+STATES: dict[str, list[str]] = _SCHEMA["transitions"]
+VALID_STATES: frozenset[str] = frozenset(STATES.keys())
+TRANSITIONS: dict[str, list[str]] = STATES
+
 _REQUIRED_FLOW_KEYS = {"storage_path", "states", "transitions", "agent_map", "feedback_routing"}
 _KNOWN_OPTIONAL_FLOW_KEYS = {"transition_rules", "version", "flow", "transition_actions"}
-_ACTION_VOCAB = {"git_commit", "update_progress", "archive_artifacts"}
+_ACTION_VOCAB = {
+    "git_commit", "commit",
+    "update_progress",
+    "archive_artifacts", "archive-artifacts",
+}
 
 
 def load_flow(yaml_path: str) -> dict:
@@ -100,11 +113,29 @@ def validate_flow_cli() -> None:
                     )
 
             for action in (actions or []):
-                action_type = action.get("type") if isinstance(action, dict) else None
+                if isinstance(action, dict):
+                    action_type = action.get("skill") or action.get("type")
+                else:
+                    action_type = None
                 if action_type not in _ACTION_VOCAB:
                     errors.append(
                         f"Unknown action type '{action_type}' in transition_actions[{key}]"
                     )
+
+    # Addition 1 — Agent-contract validation
+    for agent in (flow.get("agent_map") or {}).values():
+        agent_path = files("pathly_data").joinpath(f"core/agents/{agent}.md")
+        try:
+            agent_path.read_bytes()
+        except (FileNotFoundError, TypeError, Exception):
+            errors.append(f"Missing agent contract: core/agents/{agent}.md")
+
+    # Addition 2 — Decide-block option count
+    for state, rule in (flow.get("transition_rules") or {}).items():
+        if isinstance(rule, dict) and "decide" in rule:
+            decide = rule["decide"]
+            if isinstance(decide, dict) and len(decide.get("options", {})) < 2:
+                print(f"Warning: decide block in state '{state}' has fewer than 2 options.")
 
     if errors:
         for err in errors:
