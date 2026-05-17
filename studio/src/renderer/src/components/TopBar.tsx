@@ -1,5 +1,107 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { useTheme } from '../useTheme'
+import type { Theme } from '../theme'
+
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    bar: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '0 16px',
+      height: '44px',
+      backgroundColor: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      flexShrink: 0
+    },
+    backBtn: {
+      background: 'none',
+      border: `1px solid ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.textPrimary,
+      cursor: 'pointer',
+      padding: '4px 10px',
+      fontSize: '13px'
+    },
+    center: {
+      flex: 1,
+      display: 'flex',
+      justifyContent: 'center'
+    },
+    topicSelect: {
+      background: t.bgBase,
+      border: `1px solid ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.textPrimary,
+      fontSize: '13px',
+      padding: '4px 8px',
+      cursor: 'pointer'
+    },
+    right: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
+    },
+    badgeLive: {
+      fontSize: '12px',
+      color: t.green,
+      whiteSpace: 'nowrap' as const
+    },
+    badgeWatch: {
+      fontSize: '12px',
+      color: t.textMuted,
+      whiteSpace: 'nowrap' as const
+    },
+    publishBtn: {
+      background: t.accent,
+      border: 'none',
+      borderRadius: '4px',
+      color: t.bgBase,
+      cursor: 'pointer',
+      padding: '4px 12px',
+      fontSize: '13px',
+      fontWeight: 600
+    },
+    logPanel: {
+      backgroundColor: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      flexShrink: 0,
+      maxHeight: '200px',
+      display: 'flex',
+      flexDirection: 'column' as const
+    },
+    logHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '4px 12px',
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      fontSize: '12px',
+      color: t.textMuted
+    },
+    logClose: {
+      background: 'none',
+      border: 'none',
+      color: t.textMuted,
+      cursor: 'pointer',
+      fontSize: '12px',
+      padding: '0 4px'
+    },
+    logBody: {
+      overflowY: 'auto' as const,
+      flex: 1,
+      padding: '4px 12px',
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      color: t.green
+    },
+    logLine: {
+      whiteSpace: 'pre-wrap' as const,
+      wordBreak: 'break-all' as const
+    }
+  }
+}
 
 export function TopBar(): JSX.Element {
   const {
@@ -15,6 +117,9 @@ export function TopBar(): JSX.Element {
     appendPublishLog,
     clearPublishLog
   } = useStore()
+
+  const t = useTheme()
+  const styles = makeStyles(t)
 
   const [topics, setTopics] = useState<string[]>([])
   const [showLog, setShowLog] = useState(false)
@@ -54,7 +159,6 @@ export function TopBar(): JSX.Element {
     clearPublishLog()
     setShowLog(true)
     setPublishing(true)
-    // Register listener once, storing the cleanup so it can be removed after publish
     if (removeOutputListenerRef.current) removeOutputListenerRef.current()
     removeOutputListenerRef.current = window.pathly.shell.onOutput((line) => {
       appendPublishLog(line)
@@ -94,9 +198,9 @@ export function TopBar(): JSX.Element {
             }}
           >
             <option value="">— select topic —</option>
-            {topics.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            {topics.map((topic) => (
+              <option key={topic} value={topic}>
+                {topic}
               </option>
             ))}
           </select>
@@ -134,102 +238,4 @@ export function TopBar(): JSX.Element {
       )}
     </>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  bar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '0 16px',
-    height: '44px',
-    backgroundColor: '#181825',
-    borderBottom: '1px solid #313244',
-    flexShrink: 0
-  },
-  backBtn: {
-    background: 'none',
-    border: '1px solid #45475a',
-    borderRadius: '4px',
-    color: '#cdd6f4',
-    cursor: 'pointer',
-    padding: '4px 10px',
-    fontSize: '13px'
-  },
-  center: {
-    flex: 1,
-    display: 'flex',
-    justifyContent: 'center'
-  },
-  topicSelect: {
-    background: '#1e1e2e',
-    border: '1px solid #45475a',
-    borderRadius: '4px',
-    color: '#cdd6f4',
-    fontSize: '13px',
-    padding: '4px 8px',
-    cursor: 'pointer'
-  },
-  right: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px'
-  },
-  badgeLive: {
-    fontSize: '12px',
-    color: '#a6e3a1',
-    whiteSpace: 'nowrap'
-  },
-  badgeWatch: {
-    fontSize: '12px',
-    color: '#6c7086',
-    whiteSpace: 'nowrap'
-  },
-  publishBtn: {
-    background: '#cba6f7',
-    border: 'none',
-    borderRadius: '4px',
-    color: '#1e1e2e',
-    cursor: 'pointer',
-    padding: '4px 12px',
-    fontSize: '13px',
-    fontWeight: 600
-  },
-  logPanel: {
-    backgroundColor: '#11111b',
-    borderBottom: '1px solid #313244',
-    flexShrink: 0,
-    maxHeight: '200px',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  logHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '4px 12px',
-    borderBottom: '1px solid #313244',
-    fontSize: '12px',
-    color: '#6c7086'
-  },
-  logClose: {
-    background: 'none',
-    border: 'none',
-    color: '#6c7086',
-    cursor: 'pointer',
-    fontSize: '12px',
-    padding: '0 4px'
-  },
-  logBody: {
-    overflowY: 'auto',
-    flex: 1,
-    padding: '4px 12px',
-    fontFamily: 'monospace',
-    fontSize: '12px',
-    color: '#a6e3a1'
-  },
-  logLine: {
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-all'
-  }
 }

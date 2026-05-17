@@ -2,37 +2,15 @@ import { useEffect, useRef } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorState } from '@codemirror/state'
+import { useTheme } from '../../useTheme'
 
 interface MarkdownEditorProps {
   value: string
   onChange: (value: string) => void
 }
 
-const editorTheme = EditorView.theme({
-  '&': {
-    height: '100%',
-    fontSize: '14px',
-    backgroundColor: '#1e1e2e',
-    color: '#cdd6f4'
-  },
-  '.cm-content': {
-    padding: '12px',
-    fontFamily: "'Fira Mono', 'Cascadia Code', monospace",
-    caretColor: '#cba6f7'
-  },
-  '.cm-gutters': {
-    backgroundColor: '#181825',
-    color: '#6c7086',
-    border: 'none',
-    borderRight: '1px solid #313244'
-  },
-  '.cm-activeLine': { backgroundColor: '#313244' },
-  '.cm-selectionBackground, .cm-focused .cm-selectionBackground': {
-    backgroundColor: '#45475a'
-  }
-})
-
 export function MarkdownEditor({ value, onChange }: MarkdownEditorProps): JSX.Element {
+  const t = useTheme()
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
@@ -40,6 +18,30 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps): JSX.El
 
   useEffect(() => {
     if (!containerRef.current) return
+
+    const editorTheme = EditorView.theme({
+      '&': {
+        height: '100%',
+        fontSize: '14px',
+        backgroundColor: t.bgBase,
+        color: t.textPrimary
+      },
+      '.cm-content': {
+        padding: '12px',
+        fontFamily: "'Fira Mono', 'Cascadia Code', monospace",
+        caretColor: t.accent
+      },
+      '.cm-gutters': {
+        backgroundColor: t.bgMantle,
+        color: t.textMuted,
+        border: 'none',
+        borderRight: `1px solid ${t.bgSurface0}`
+      },
+      '.cm-activeLine': { backgroundColor: t.bgSurface0 },
+      '.cm-selectionBackground, .cm-focused .cm-selectionBackground': {
+        backgroundColor: t.bgSurface1
+      }
+    })
 
     const view = new EditorView({
       state: EditorState.create({
@@ -64,9 +66,8 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps): JSX.El
       view.destroy()
       viewRef.current = null
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync external value changes (e.g. when a different file is loaded)
   useEffect(() => {
     const view = viewRef.current
     if (!view) return

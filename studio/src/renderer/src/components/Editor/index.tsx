@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store'
+import { useTheme } from '../../useTheme'
+import type { Theme } from '../../theme'
 import { ConfigForm, FrontmatterValues } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
@@ -35,7 +37,6 @@ function parseSimpleYaml(text: string): FrontmatterValues {
     const rest = keyMatch[2].trim()
 
     if (rest === '' || rest === '|' || rest === '>') {
-      // Could be a block list or multi-line — look ahead for list items
       const items: string[] = []
       i++
       while (i < lines.length && lines[i].match(/^\s+-\s+/)) {
@@ -81,8 +82,100 @@ function serializeFrontmatter(config: FrontmatterValues): string {
   return lines.join('\n')
 }
 
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    panel: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: t.bgBase,
+      overflow: 'hidden'
+    },
+    toolbar: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '6px 12px',
+      backgroundColor: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      flexShrink: 0
+    },
+    tabs: {
+      display: 'flex',
+      gap: '4px'
+    },
+    tab: {
+      background: 'none',
+      border: `1px solid ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.textSecondary,
+      cursor: 'pointer',
+      padding: '3px 10px',
+      fontSize: '12px'
+    },
+    tabActive: {
+      background: t.bgSurface0,
+      border: `1px solid ${t.accent}`,
+      borderRadius: '4px',
+      color: t.accent,
+      cursor: 'pointer',
+      padding: '3px 10px',
+      fontSize: '12px'
+    },
+    actions: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    },
+    saveBtn: {
+      background: t.accent,
+      border: 'none',
+      borderRadius: '4px',
+      color: t.bgBase,
+      cursor: 'pointer',
+      padding: '4px 14px',
+      fontSize: '13px',
+      fontWeight: 600
+    },
+    error: {
+      color: t.red,
+      fontSize: '12px'
+    },
+    editorArea: {
+      flex: 1,
+      overflow: 'hidden',
+      display: 'flex'
+    },
+    full: {
+      flex: 1,
+      overflow: 'hidden'
+    },
+    splitRow: {
+      flex: 1,
+      display: 'flex',
+      overflow: 'hidden'
+    },
+    half: {
+      flex: 1,
+      overflow: 'hidden'
+    },
+    divider: {
+      width: '1px',
+      backgroundColor: t.bgSurface0,
+      flexShrink: 0
+    },
+    message: {
+      color: t.textMuted,
+      fontSize: '15px',
+      margin: 'auto'
+    }
+  }
+}
+
 export function Editor(): JSX.Element {
   const { selectedItem, markDirty, clearDirty } = useStore()
+  const t = useTheme()
+  const styles = makeStyles(t)
   const [config, setConfig] = useState<FrontmatterValues>({})
   const [body, setBody] = useState('')
   const [tab, setTab] = useState<TabMode>('edit')
@@ -196,92 +289,4 @@ export function Editor(): JSX.Element {
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  panel: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundColor: '#1e1e2e',
-    overflow: 'hidden'
-  },
-  toolbar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '6px 12px',
-    backgroundColor: '#181825',
-    borderBottom: '1px solid #313244',
-    flexShrink: 0
-  },
-  tabs: {
-    display: 'flex',
-    gap: '4px'
-  },
-  tab: {
-    background: 'none',
-    border: '1px solid #45475a',
-    borderRadius: '4px',
-    color: '#a6adc8',
-    cursor: 'pointer',
-    padding: '3px 10px',
-    fontSize: '12px'
-  },
-  tabActive: {
-    background: '#313244',
-    border: '1px solid #cba6f7',
-    borderRadius: '4px',
-    color: '#cba6f7',
-    cursor: 'pointer',
-    padding: '3px 10px',
-    fontSize: '12px'
-  },
-  actions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  },
-  saveBtn: {
-    background: '#cba6f7',
-    border: 'none',
-    borderRadius: '4px',
-    color: '#1e1e2e',
-    cursor: 'pointer',
-    padding: '4px 14px',
-    fontSize: '13px',
-    fontWeight: 600
-  },
-  error: {
-    color: '#f38ba8',
-    fontSize: '12px'
-  },
-  editorArea: {
-    flex: 1,
-    overflow: 'hidden',
-    display: 'flex'
-  },
-  full: {
-    flex: 1,
-    overflow: 'hidden'
-  },
-  splitRow: {
-    flex: 1,
-    display: 'flex',
-    overflow: 'hidden'
-  },
-  half: {
-    flex: 1,
-    overflow: 'hidden'
-  },
-  divider: {
-    width: '1px',
-    backgroundColor: '#313244',
-    flexShrink: 0
-  },
-  message: {
-    color: '#6c7086',
-    fontSize: '15px',
-    margin: 'auto'
-  }
 }

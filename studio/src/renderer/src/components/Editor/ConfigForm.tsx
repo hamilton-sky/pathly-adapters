@@ -1,3 +1,6 @@
+import { useTheme } from '../../useTheme'
+import type { Theme } from '../../theme'
+
 export interface FrontmatterValues {
   name?: string
   description?: string
@@ -14,7 +17,64 @@ interface ConfigFormProps {
 const KNOWN_KEYS = ['name', 'description', 'adapters', 'tools']
 const ADAPTER_OPTIONS = ['claude', 'codex', 'copilot']
 
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    form: {
+      padding: '12px 16px',
+      backgroundColor: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px'
+    },
+    row: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
+    },
+    label: {
+      width: '100px',
+      fontSize: '12px',
+      color: t.textSecondary,
+      fontFamily: "'Fira Mono', monospace",
+      flexShrink: 0
+    },
+    input: {
+      flex: 1,
+      backgroundColor: t.bgBase,
+      border: `1px solid ${t.bgSurface0}`,
+      borderRadius: '4px',
+      color: t.textPrimary,
+      fontSize: '13px',
+      padding: '4px 8px',
+      outline: 'none'
+    },
+    checkboxGroup: {
+      display: 'flex',
+      gap: '16px'
+    },
+    checkboxLabel: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      fontSize: '13px',
+      color: t.textPrimary,
+      cursor: 'pointer'
+    },
+    checkbox: {
+      accentColor: t.accent
+    },
+    unknownValue: {
+      fontSize: '13px',
+      color: t.textSecondary,
+      fontFamily: "'Fira Mono', monospace"
+    }
+  }
+}
+
 export function ConfigForm({ values, onChange }: ConfigFormProps): JSX.Element {
+  const t = useTheme()
+  const styles = makeStyles(t)
   const unknownKeys = Object.keys(values).filter((k) => !KNOWN_KEYS.includes(k))
 
   function set(patch: Partial<FrontmatterValues>): void {
@@ -92,57 +152,4 @@ export function ConfigForm({ values, onChange }: ConfigFormProps): JSX.Element {
       ))}
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  form: {
-    padding: '12px 16px',
-    backgroundColor: '#181825',
-    borderBottom: '1px solid #313244',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px'
-  },
-  row: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px'
-  },
-  label: {
-    width: '100px',
-    fontSize: '12px',
-    color: '#a6adc8',
-    fontFamily: "'Fira Mono', monospace",
-    flexShrink: 0
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#1e1e2e',
-    border: '1px solid #313244',
-    borderRadius: '4px',
-    color: '#cdd6f4',
-    fontSize: '13px',
-    padding: '4px 8px',
-    outline: 'none'
-  },
-  checkboxGroup: {
-    display: 'flex',
-    gap: '16px'
-  },
-  checkboxLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    fontSize: '13px',
-    color: '#cdd6f4',
-    cursor: 'pointer'
-  },
-  checkbox: {
-    accentColor: '#cba6f7'
-  },
-  unknownValue: {
-    fontSize: '13px',
-    color: '#a6adc8',
-    fontFamily: "'Fira Mono', monospace"
-  }
 }

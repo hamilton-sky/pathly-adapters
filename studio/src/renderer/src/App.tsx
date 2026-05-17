@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useStore } from './store'
 import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/Sidebar'
@@ -6,6 +7,9 @@ import { FlowEditor } from './components/FlowEditor'
 import { TopBar } from './components/TopBar'
 import { Monitor } from './components/Monitor'
 import { PlanBoard } from './components/PlanBoard'
+import { Settings } from './components/Settings'
+import { useTheme } from './useTheme'
+import { darkTheme, lightTheme } from './theme'
 
 function MainPanel(): JSX.Element {
   const { activePanel, selectedItem } = useStore()
@@ -19,6 +23,7 @@ function MainPanel(): JSX.Element {
       </div>
     )
   if (activePanel === 'monitor') return <Monitor />
+  if (activePanel === 'settings') return <Settings />
   return (
     <div style={mainPanelStyles.panel}>
       <span style={mainPanelStyles.placeholder}>Select an item from the sidebar</span>
@@ -28,13 +33,32 @@ function MainPanel(): JSX.Element {
 
 export default function App(): JSX.Element {
   const projectPath = useStore((s) => s.projectPath)
+  const theme = useStore((s) => s.theme)
+  const t = useTheme()
+
+  useEffect(() => {
+    const resolved = theme === 'dark' ? darkTheme : lightTheme
+    const el = document.documentElement
+    el.style.setProperty('--bg-base', resolved.bgBase)
+    el.style.setProperty('--bg-mantle', resolved.bgMantle)
+    el.style.setProperty('--bg-surface0', resolved.bgSurface0)
+    el.style.setProperty('--bg-surface1', resolved.bgSurface1)
+    el.style.setProperty('--text-primary', resolved.textPrimary)
+    el.style.setProperty('--text-secondary', resolved.textSecondary)
+    el.style.setProperty('--text-muted', resolved.textMuted)
+    el.style.setProperty('--accent', resolved.accent)
+    el.style.setProperty('--blue', resolved.blue)
+    el.style.setProperty('--green', resolved.green)
+    el.style.setProperty('--red', resolved.red)
+    el.style.setProperty('--yellow', resolved.yellow)
+  }, [theme])
 
   if (projectPath === '') {
     return <HomeScreen />
   }
 
   return (
-    <div style={appStyles.root}>
+    <div style={{ ...appStyles.root, backgroundColor: t.bgBase, color: t.textPrimary }}>
       <TopBar />
       <div style={appStyles.body}>
         <Sidebar />
@@ -49,8 +73,6 @@ const appStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    backgroundColor: '#1e1e2e',
-    color: '#cdd6f4',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     overflow: 'hidden'
   },
@@ -61,18 +83,15 @@ const appStyles: Record<string, React.CSSProperties> = {
   }
 }
 
-
 const mainPanelStyles: Record<string, React.CSSProperties> = {
   panel: {
     flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1e1e2e',
     overflow: 'auto'
   },
   placeholder: {
-    color: '#6c7086',
     fontSize: '15px'
   }
 }

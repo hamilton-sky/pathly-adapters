@@ -12,6 +12,8 @@ import ReactFlow, {
   type EdgeMouseHandler
 } from 'reactflow'
 import 'reactflow/dist/style.css'
+import { useTheme } from '../../useTheme'
+import type { Theme } from '../../theme'
 import type { FlowYaml } from '../../types'
 
 interface Props {
@@ -34,7 +36,7 @@ interface EdgeDetail {
 
 type PanelDetail = NodeDetail | EdgeDetail | null
 
-function flowToGraph(data: FlowYaml): { nodes: Node[]; edges: Edge[] } {
+function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = data.states.map((state, i) => ({
     id: state,
     position: { x: i * 220, y: 100 },
@@ -42,17 +44,17 @@ function flowToGraph(data: FlowYaml): { nodes: Node[]; edges: Edge[] } {
       label: (
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 600, fontSize: '13px' }}>{state}</div>
-          <div style={{ fontSize: '11px', color: '#a6adc8', marginTop: '2px' }}>
+          <div style={{ fontSize: '11px', color: t.textSecondary, marginTop: '2px' }}>
             {data.agent_map[state] ?? ''}
           </div>
         </div>
       )
     },
     style: {
-      backgroundColor: '#313244',
-      border: '1px solid #45475a',
+      backgroundColor: t.bgSurface0,
+      border: `1px solid ${t.bgSurface1}`,
       borderRadius: '6px',
-      color: '#cdd6f4',
+      color: t.textPrimary,
       width: 160
     }
   }))
@@ -67,7 +69,7 @@ function flowToGraph(data: FlowYaml): { nodes: Node[]; edges: Edge[] } {
       if (rules) {
         for (const [artifact, mapping] of Object.entries(rules)) {
           const m = mapping as Record<string, string>
-          if (m[source] === target || Object.entries(m).some(([s, t]) => s === source && t === target)) {
+          if (m[source] === target || Object.entries(m).some(([s, tgt]) => s === source && tgt === target)) {
             label = artifact
             break
           }
@@ -78,9 +80,9 @@ function flowToGraph(data: FlowYaml): { nodes: Node[]; edges: Edge[] } {
         source,
         target,
         label,
-        style: { stroke: '#89b4fa' },
-        labelStyle: { fill: '#a6adc8', fontSize: '11px' },
-        labelBgStyle: { fill: '#181825' }
+        style: { stroke: t.blue },
+        labelStyle: { fill: t.textSecondary, fontSize: '11px' },
+        labelBgStyle: { fill: t.bgMantle }
       })
     }
   }
@@ -88,20 +90,147 @@ function flowToGraph(data: FlowYaml): { nodes: Node[]; edges: Edge[] } {
   return { nodes, edges }
 }
 
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    wrapper: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden'
+    },
+    toolbar: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: '6px 12px',
+      backgroundColor: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      flexShrink: 0
+    },
+    saveBtn: {
+      background: t.accent,
+      border: 'none',
+      borderRadius: '4px',
+      color: t.bgBase,
+      cursor: 'pointer',
+      padding: '4px 14px',
+      fontSize: '13px',
+      fontWeight: 600
+    },
+    canvas: {
+      flex: 1,
+      position: 'relative' as const,
+      overflow: 'hidden'
+    },
+    detailPanel: {
+      position: 'absolute' as const,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      width: '220px',
+      zIndex: 10,
+      overflowY: 'auto' as const
+    }
+  }
+}
+
+function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    panel: {
+      backgroundColor: t.bgMantle,
+      borderLeft: `1px solid ${t.bgSurface0}`,
+      padding: '12px',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px'
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '4px'
+    },
+    title: {
+      fontWeight: 600,
+      fontSize: '13px',
+      color: t.accent
+    },
+    closeBtn: {
+      background: 'none',
+      border: 'none',
+      color: t.textMuted,
+      cursor: 'pointer',
+      fontSize: '14px',
+      padding: '0 4px'
+    },
+    label: {
+      fontSize: '11px',
+      color: t.textMuted,
+      textTransform: 'uppercase' as const,
+      letterSpacing: '0.5px'
+    },
+    input: {
+      backgroundColor: t.bgSurface0,
+      border: `1px solid ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.textPrimary,
+      fontSize: '12px',
+      padding: '4px 6px',
+      outline: 'none'
+    },
+    ruleRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      fontSize: '12px'
+    },
+    actionRow: {
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '2px',
+      fontSize: '12px'
+    },
+    ruleArtifact: {
+      color: t.green,
+      fontSize: '11px',
+      wordBreak: 'break-all' as const
+    },
+    ruleArrow: {
+      color: t.textMuted
+    },
+    ruleTarget: {
+      color: t.blue,
+      fontSize: '11px'
+    },
+    addBtn: {
+      background: 'none',
+      border: `1px dashed ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.blue,
+      cursor: 'pointer',
+      fontSize: '12px',
+      padding: '4px 8px',
+      marginTop: '4px'
+    }
+  }
+}
+
 export function VisualView({ data, onChange, onSave }: Props): JSX.Element {
-  const { nodes: initNodes, edges: initEdges } = flowToGraph(data)
+  const t = useTheme()
+  const styles = makeStyles(t)
+  const { nodes: initNodes, edges: initEdges } = flowToGraph(data, t)
   const [nodes, , onNodesChange] = useNodesState(initNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges)
   const [detail, setDetail] = useState<PanelDetail>(null)
 
-  // Always-current ref so handlers never close over stale props
   const dataRef = useRef(data)
   useEffect(() => { dataRef.current = data }, [data])
+
+  const localData = dataRef.current
 
   const onConnect = useCallback(
     (connection: Connection) => {
       setEdges((eds) => addEdge(connection, eds))
-      // Propagate new connection into FlowYaml transitions
       const { source, target } = connection
       if (!source || !target) return
       const d = dataRef.current
@@ -175,7 +304,7 @@ export function VisualView({ data, onChange, onSave }: Props): JSX.Element {
           onEdgeClick={onEdgeClick}
           fitView
         >
-          <Background color="#313244" />
+          <Background color={t.bgSurface0} />
           <Controls />
         </ReactFlow>
 
@@ -188,6 +317,7 @@ export function VisualView({ data, onChange, onSave }: Props): JSX.Element {
                 onAgentChange={handleAgentChange}
                 onAddRule={handleAddTransitionRule}
                 onClose={() => setDetail(null)}
+                t={t}
               />
             )}
             {detail.type === 'edge' && (
@@ -197,6 +327,7 @@ export function VisualView({ data, onChange, onSave }: Props): JSX.Element {
                 data={localData}
                 onAddAction={handleAddTransitionAction}
                 onClose={() => setDetail(null)}
+                t={t}
               />
             )}
           </div>
@@ -212,9 +343,11 @@ interface NodePanelProps {
   onAgentChange: (stateId: string, value: string) => void
   onAddRule: (source: string) => void
   onClose: () => void
+  t: Theme
 }
 
-function NodePanel({ stateId, data, onAgentChange, onAddRule, onClose }: NodePanelProps): JSX.Element {
+function NodePanel({ stateId, data, onAgentChange, onAddRule, onClose, t }: NodePanelProps): JSX.Element {
+  const panelStyles = makePanelStyles(t)
   const rules = (data.transition_rules as Record<string, Record<string, string>> | undefined) ?? {}
   const relevantRules = Object.entries(rules).filter(([, mapping]) =>
     Object.prototype.hasOwnProperty.call(mapping, stateId)
@@ -253,9 +386,11 @@ interface EdgePanelProps {
   data: FlowYaml
   onAddAction: (source: string, target: string) => void
   onClose: () => void
+  t: Theme
 }
 
-function EdgePanel({ source, target, data, onAddAction, onClose }: EdgePanelProps): JSX.Element {
+function EdgePanel({ source, target, data, onAddAction, onClose, t }: EdgePanelProps): JSX.Element {
+  const panelStyles = makePanelStyles(t)
   const actions = (data.transition_actions as Record<string, Array<{ skill: string; message: string }>> | undefined) ?? {}
   const key = `${source}->${target}`
   const actionList = actions[key] ?? []
@@ -278,125 +413,4 @@ function EdgePanel({ source, target, data, onAddAction, onClose }: EdgePanelProp
       </button>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  wrapper: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden'
-  },
-  toolbar: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    padding: '6px 12px',
-    backgroundColor: '#181825',
-    borderBottom: '1px solid #313244',
-    flexShrink: 0
-  },
-  saveBtn: {
-    background: '#cba6f7',
-    border: 'none',
-    borderRadius: '4px',
-    color: '#1e1e2e',
-    cursor: 'pointer',
-    padding: '4px 14px',
-    fontSize: '13px',
-    fontWeight: 600
-  },
-  canvas: {
-    flex: 1,
-    position: 'relative',
-    overflow: 'hidden'
-  },
-  detailPanel: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: '220px',
-    zIndex: 10,
-    overflowY: 'auto'
-  }
-}
-
-const panelStyles: Record<string, React.CSSProperties> = {
-  panel: {
-    backgroundColor: '#181825',
-    borderLeft: '1px solid #313244',
-    padding: '12px',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '4px'
-  },
-  title: {
-    fontWeight: 600,
-    fontSize: '13px',
-    color: '#cba6f7'
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#6c7086',
-    cursor: 'pointer',
-    fontSize: '14px',
-    padding: '0 4px'
-  },
-  label: {
-    fontSize: '11px',
-    color: '#6c7086',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px'
-  },
-  input: {
-    backgroundColor: '#313244',
-    border: '1px solid #45475a',
-    borderRadius: '4px',
-    color: '#cdd6f4',
-    fontSize: '12px',
-    padding: '4px 6px',
-    outline: 'none'
-  },
-  ruleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    fontSize: '12px'
-  },
-  actionRow: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '2px',
-    fontSize: '12px'
-  },
-  ruleArtifact: {
-    color: '#a6e3a1',
-    fontSize: '11px',
-    wordBreak: 'break-all' as const
-  },
-  ruleArrow: {
-    color: '#6c7086'
-  },
-  ruleTarget: {
-    color: '#89b4fa',
-    fontSize: '11px'
-  },
-  addBtn: {
-    background: 'none',
-    border: '1px dashed #45475a',
-    borderRadius: '4px',
-    color: '#89b4fa',
-    cursor: 'pointer',
-    fontSize: '12px',
-    padding: '4px 8px',
-    marginTop: '4px'
-  }
 }

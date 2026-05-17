@@ -1,20 +1,80 @@
 import { useEffect, useRef, useState } from 'react'
 import * as jsYaml from 'js-yaml'
 import { useStore } from '../../store'
+import { useTheme } from '../../useTheme'
+import type { Theme } from '../../theme'
 import type { FlowYaml } from '../../types'
 import { VisualView } from './VisualView'
 import { YamlView } from './YamlView'
 
 type TabMode = 'visual' | 'yaml'
 
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    panel: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: t.bgBase,
+      overflow: 'hidden'
+    },
+    toolbar: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '6px 12px',
+      backgroundColor: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      flexShrink: 0
+    },
+    tabs: {
+      display: 'flex',
+      gap: '4px'
+    },
+    tab: {
+      background: 'none',
+      border: `1px solid ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.textSecondary,
+      cursor: 'pointer',
+      padding: '3px 10px',
+      fontSize: '12px'
+    },
+    tabActive: {
+      background: t.bgSurface0,
+      border: `1px solid ${t.accent}`,
+      borderRadius: '4px',
+      color: t.accent,
+      cursor: 'pointer',
+      padding: '3px 10px',
+      fontSize: '12px'
+    },
+    error: {
+      color: t.red,
+      fontSize: '12px'
+    },
+    content: {
+      flex: 1,
+      display: 'flex',
+      overflow: 'hidden'
+    },
+    message: {
+      color: t.textMuted,
+      fontSize: '15px',
+      margin: 'auto'
+    }
+  }
+}
+
 export function FlowEditor(): JSX.Element {
   const { selectedItem, markDirty, clearDirty } = useStore()
+  const t = useTheme()
+  const styles = makeStyles(t)
   const [flowData, setFlowData] = useState<FlowYaml | null>(null)
   const [rawYaml, setRawYaml] = useState('')
   const [tab, setTab] = useState<TabMode>('visual')
   const [loading, setLoading] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  // Content to push into YamlView when switching from Visual
   const [yamlSyncContent, setYamlSyncContent] = useState<string | null>(null)
   const prevTabRef = useRef<TabMode>('visual')
 
@@ -46,18 +106,15 @@ export function FlowEditor(): JSX.Element {
   function handleTabSwitch(next: TabMode): void {
     if (next === tab) return
     if (next === 'yaml' && flowData) {
-      // Serialize current graph state to YAML string
       const serialized = jsYaml.dump(flowData, { lineWidth: 120 })
       setRawYaml(serialized)
       setYamlSyncContent(serialized)
     } else if (next === 'visual' && rawYaml) {
-      // Parse current YAML and re-render graph
       try {
         const parsed = jsYaml.load(rawYaml) as FlowYaml
         setFlowData(parsed)
         setYamlSyncContent(null)
       } catch {
-        // YAML is invalid — stay on YAML tab and show error
         setSaveError('Fix YAML errors before switching to Visual view')
         return
       }
@@ -167,59 +224,4 @@ export function FlowEditor(): JSX.Element {
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  panel: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundColor: '#1e1e2e',
-    overflow: 'hidden'
-  },
-  toolbar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '6px 12px',
-    backgroundColor: '#181825',
-    borderBottom: '1px solid #313244',
-    flexShrink: 0
-  },
-  tabs: {
-    display: 'flex',
-    gap: '4px'
-  },
-  tab: {
-    background: 'none',
-    border: '1px solid #45475a',
-    borderRadius: '4px',
-    color: '#a6adc8',
-    cursor: 'pointer',
-    padding: '3px 10px',
-    fontSize: '12px'
-  },
-  tabActive: {
-    background: '#313244',
-    border: '1px solid #cba6f7',
-    borderRadius: '4px',
-    color: '#cba6f7',
-    cursor: 'pointer',
-    padding: '3px 10px',
-    fontSize: '12px'
-  },
-  error: {
-    color: '#f38ba8',
-    fontSize: '12px'
-  },
-  content: {
-    flex: 1,
-    display: 'flex',
-    overflow: 'hidden'
-  },
-  message: {
-    color: '#6c7086',
-    fontSize: '15px',
-    margin: 'auto'
-  }
 }

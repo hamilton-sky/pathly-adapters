@@ -44,4 +44,18 @@ export function registerFsHandlers(): void {
     const entries = fs.readdirSync(dir, { withFileTypes: true })
     return entries.filter((e) => e.isFile()).map((e) => e.name)
   })
+
+  ipcMain.handle('fs:listDirs', async (_event, dir: string): Promise<string[]> => {
+    if (!isPathSafe(dir)) {
+      throw new Error('Path outside home directory is not allowed')
+    }
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      return entries
+        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+        .map((e) => e.name)
+    } catch {
+      return []
+    }
+  })
 }

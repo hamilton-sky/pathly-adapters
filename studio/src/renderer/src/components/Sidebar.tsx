@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { useTheme } from '../useTheme'
+import type { Theme } from '../theme'
 import type { PathlyItem, PathlyItemType } from '../types'
+import { FlowWizard } from './FlowWizard'
+import { NewItemDialog } from './NewItemDialog'
 
 interface TemplateSubdir {
   name: string
@@ -61,11 +65,210 @@ function parseProgressMd(md: string): ConvRow[] {
   return rows
 }
 
-function convStatusColor(status: string): string {
-  if (status === 'DONE') return '#a6e3a1'
-  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return '#89b4fa'
-  if (status === 'BLOCKED') return '#f38ba8'
-  return '#6c7086'
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    sidebar: {
+      width: '240px',
+      flexShrink: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: t.bgMantle,
+      borderRight: `1px solid ${t.bgSurface0}`,
+      height: '100%',
+      overflow: 'hidden'
+    },
+    collapsed: {
+      width: '32px',
+      flexShrink: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      paddingTop: '8px',
+      backgroundColor: t.bgMantle,
+      borderRight: `1px solid ${t.bgSurface0}`,
+      height: '100%'
+    },
+    expandBtn: {
+      background: 'none',
+      border: `1px solid ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.textPrimary,
+      cursor: 'pointer',
+      padding: '4px 6px',
+      fontSize: '11px'
+    },
+    filterRow: {
+      padding: '8px'
+    },
+    filterInput: {
+      width: '100%',
+      boxSizing: 'border-box' as const,
+      backgroundColor: t.bgSurface0,
+      border: `1px solid ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.textPrimary,
+      padding: '5px 8px',
+      fontSize: '12px',
+      outline: 'none'
+    },
+    treeContainer: {
+      flex: 1,
+      overflowY: 'auto' as const
+    },
+    sectionHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      width: '100%',
+      background: 'none',
+      border: 'none',
+      color: t.textSecondary,
+      cursor: 'pointer',
+      padding: '6px 12px',
+      fontSize: '12px',
+      fontWeight: 600,
+      textTransform: 'uppercase' as const,
+      letterSpacing: '0.05em',
+      textAlign: 'left' as const,
+      gap: '4px'
+    },
+    sectionSub: {
+      color: t.textMuted,
+      fontWeight: 400,
+      textTransform: 'none' as const,
+      letterSpacing: 0,
+      marginLeft: '4px',
+      fontSize: '11px'
+    },
+    chevron: {
+      marginRight: '2px',
+      fontSize: '10px',
+      flexShrink: 0
+    },
+    subdirHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      width: '100%',
+      background: 'none',
+      border: 'none',
+      color: t.textSecondary,
+      cursor: 'pointer',
+      padding: '4px 12px 4px 24px',
+      fontSize: '12px',
+      textAlign: 'left' as const,
+      gap: '2px'
+    },
+    convRow: {
+      display: 'flex',
+      alignItems: 'center',
+      width: '100%',
+      background: 'none',
+      border: 'none',
+      color: t.textPrimary,
+      cursor: 'pointer',
+      padding: '3px 12px 3px 24px',
+      fontSize: '12px',
+      textAlign: 'left' as const
+    },
+    convLabel: {
+      flex: 1,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap' as const
+    },
+    convStatus: {
+      fontSize: '10px',
+      fontWeight: 600,
+      flexShrink: 0,
+      marginLeft: '6px'
+    },
+    convEmpty: {
+      color: t.textMuted,
+      fontSize: '12px',
+      padding: '4px 24px',
+      fontStyle: 'italic'
+    },
+    itemRow: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '100%',
+      background: 'none',
+      border: 'none',
+      color: t.textPrimary,
+      cursor: 'pointer',
+      padding: '4px 12px 4px 28px',
+      fontSize: '13px',
+      textAlign: 'left' as const
+    },
+    itemRowSelected: {
+      backgroundColor: t.bgSurface0,
+      color: t.accent
+    },
+    itemName: {
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap' as const
+    },
+    dirtyDot: {
+      color: t.red,
+      flexShrink: 0,
+      marginLeft: '4px',
+      fontSize: '10px'
+    },
+    divider: {
+      height: '1px',
+      backgroundColor: t.bgSurface0,
+      margin: '4px 0'
+    },
+    monitorRow: {
+      display: 'flex',
+      alignItems: 'center',
+      width: '100%',
+      background: 'none',
+      border: 'none',
+      color: t.textPrimary,
+      cursor: 'pointer',
+      padding: '8px 12px',
+      fontSize: '13px',
+      textAlign: 'left' as const
+    },
+    monitorRowActive: {
+      backgroundColor: t.bgSurface0,
+      color: t.accent
+    },
+    monitorDot: {
+      color: t.green,
+      marginRight: '6px'
+    },
+    collapseBtn: {
+      background: 'none',
+      border: 'none',
+      color: t.textMuted,
+      cursor: 'pointer',
+      padding: '8px 12px',
+      fontSize: '12px',
+      textAlign: 'right' as const,
+      alignSelf: 'flex-end' as const
+    },
+    newBtn: {
+      display: 'block',
+      width: '100%',
+      background: 'none',
+      border: 'none',
+      color: t.textMuted,
+      cursor: 'pointer',
+      padding: '3px 12px 3px 28px',
+      fontSize: '12px',
+      textAlign: 'left' as const
+    }
+  }
+}
+
+function convStatusColor(status: string, t: Theme): string {
+  if (status === 'DONE') return t.green
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return t.blue
+  if (status === 'BLOCKED') return t.red
+  return t.textMuted
 }
 
 export function Sidebar(): JSX.Element {
@@ -81,6 +284,9 @@ export function Sidebar(): JSX.Element {
     activePanel
   } = useStore()
 
+  const t = useTheme()
+  const styles = makeStyles(t)
+
   const [sections, setSections] = useState<Record<string, SectionState>>({
     Flows: { items: [], open: false },
     Skills: { items: [], open: false },
@@ -90,6 +296,11 @@ export function Sidebar(): JSX.Element {
   const [planConvs, setPlanConvs] = useState<ConvRow[]>([])
   const [planOpen, setPlanOpen] = useState(true)
   const [filter, setFilter] = useState('')
+  const [showFlowWizard, setShowFlowWizard] = useState(false)
+  const [showNewItemDialog, setShowNewItemDialog] = useState(false)
+  const [newItemTarget, setNewItemTarget] = useState<{ type: PathlyItemType; dir: string } | null>(null)
+
+  const loadItemsRef = useRef<() => Promise<void>>(async () => {})
 
   useEffect(() => {
     if (!projectPath) return
@@ -141,6 +352,7 @@ export function Sidebar(): JSX.Element {
       }
     }
 
+    loadItemsRef.current = loadItems
     loadItems()
   }, [projectPath])
 
@@ -201,6 +413,15 @@ export function Sidebar(): JSX.Element {
     setActivePanel(item.type === 'flow' ? 'flow' : 'editor')
   }
 
+  function handleNewItem(section: Section): void {
+    if (section.type === 'flow') {
+      setShowFlowWizard(true)
+    } else if (section.type === 'skill' || section.type === 'agent') {
+      setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
+      setShowNewItemDialog(true)
+    }
+  }
+
   const lowerFilter = filter.toLowerCase()
 
   return (
@@ -227,7 +448,7 @@ export function Sidebar(): JSX.Element {
               <div style={styles.convEmpty}>No conversations</div>
             ) : (
               planConvs.map((conv) => {
-                const color = convStatusColor(conv.status)
+                const color = convStatusColor(conv.status, t)
                 const icon =
                   conv.status === 'DONE'
                     ? '✓'
@@ -363,6 +584,11 @@ export function Sidebar(): JSX.Element {
                       </button>
                     )
                   })}
+                  {!filter && (
+                    <button style={styles.newBtn} onClick={() => handleNewItem(section)}>
+                      + new
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -381,6 +607,16 @@ export function Sidebar(): JSX.Element {
           <span style={styles.monitorDot}>●</span> Monitor
         </button>
 
+        <button
+          style={{
+            ...styles.monitorRow,
+            ...(activePanel === 'settings' ? styles.monitorRowActive : {})
+          }}
+          onClick={() => setActivePanel('settings')}
+        >
+          ⚙ Settings
+        </button>
+
         <div style={styles.divider} />
       </div>
 
@@ -391,192 +627,21 @@ export function Sidebar(): JSX.Element {
       >
         ◄
       </button>
+
+      {showFlowWizard && (
+        <FlowWizard
+          onClose={() => setShowFlowWizard(false)}
+          onCreated={() => { setShowFlowWizard(false); loadItemsRef.current() }}
+        />
+      )}
+      {showNewItemDialog && newItemTarget && (
+        <NewItemDialog
+          type={newItemTarget.type as 'skill' | 'agent'}
+          dir={newItemTarget.dir}
+          onClose={() => setShowNewItemDialog(false)}
+          onCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor') }}
+        />
+      )}
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  sidebar: {
-    width: '240px',
-    flexShrink: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundColor: '#181825',
-    borderRight: '1px solid #313244',
-    height: '100%',
-    overflow: 'hidden'
-  },
-  collapsed: {
-    width: '32px',
-    flexShrink: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    paddingTop: '8px',
-    backgroundColor: '#181825',
-    borderRight: '1px solid #313244',
-    height: '100%'
-  },
-  expandBtn: {
-    background: 'none',
-    border: '1px solid #45475a',
-    borderRadius: '4px',
-    color: '#cdd6f4',
-    cursor: 'pointer',
-    padding: '4px 6px',
-    fontSize: '11px'
-  },
-  filterRow: {
-    padding: '8px'
-  },
-  filterInput: {
-    width: '100%',
-    boxSizing: 'border-box',
-    backgroundColor: '#313244',
-    border: '1px solid #45475a',
-    borderRadius: '4px',
-    color: '#cdd6f4',
-    padding: '5px 8px',
-    fontSize: '12px',
-    outline: 'none'
-  },
-  treeContainer: {
-    flex: 1,
-    overflowY: 'auto'
-  },
-  sectionHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    width: '100%',
-    background: 'none',
-    border: 'none',
-    color: '#a6adc8',
-    cursor: 'pointer',
-    padding: '6px 12px',
-    fontSize: '12px',
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    textAlign: 'left',
-    gap: '4px'
-  },
-  sectionSub: {
-    color: '#6c7086',
-    fontWeight: 400,
-    textTransform: 'none',
-    letterSpacing: 0,
-    marginLeft: '4px',
-    fontSize: '11px'
-  },
-  chevron: {
-    marginRight: '2px',
-    fontSize: '10px',
-    flexShrink: 0
-  },
-  subdirHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    width: '100%',
-    background: 'none',
-    border: 'none',
-    color: '#7f849c',
-    cursor: 'pointer',
-    padding: '4px 12px 4px 24px',
-    fontSize: '12px',
-    textAlign: 'left',
-    gap: '2px'
-  },
-  convRow: {
-    display: 'flex',
-    alignItems: 'center',
-    width: '100%',
-    background: 'none',
-    border: 'none',
-    color: '#cdd6f4',
-    cursor: 'pointer',
-    padding: '3px 12px 3px 24px',
-    fontSize: '12px',
-    textAlign: 'left'
-  },
-  convLabel: {
-    flex: 1,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
-  },
-  convStatus: {
-    fontSize: '10px',
-    fontWeight: 600,
-    flexShrink: 0,
-    marginLeft: '6px'
-  },
-  convEmpty: {
-    color: '#6c7086',
-    fontSize: '12px',
-    padding: '4px 24px',
-    fontStyle: 'italic'
-  },
-  itemRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    background: 'none',
-    border: 'none',
-    color: '#cdd6f4',
-    cursor: 'pointer',
-    padding: '4px 12px 4px 28px',
-    fontSize: '13px',
-    textAlign: 'left'
-  },
-  itemRowSelected: {
-    backgroundColor: '#313244',
-    color: '#cba6f7'
-  },
-  itemName: {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
-  },
-  dirtyDot: {
-    color: '#f38ba8',
-    flexShrink: 0,
-    marginLeft: '4px',
-    fontSize: '10px'
-  },
-  divider: {
-    height: '1px',
-    backgroundColor: '#313244',
-    margin: '4px 0'
-  },
-  monitorRow: {
-    display: 'flex',
-    alignItems: 'center',
-    width: '100%',
-    background: 'none',
-    border: 'none',
-    color: '#cdd6f4',
-    cursor: 'pointer',
-    padding: '8px 12px',
-    fontSize: '13px',
-    textAlign: 'left'
-  },
-  monitorRowActive: {
-    backgroundColor: '#313244',
-    color: '#cba6f7'
-  },
-  monitorDot: {
-    color: '#a6e3a1',
-    marginRight: '6px'
-  },
-  collapseBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#6c7086',
-    cursor: 'pointer',
-    padding: '8px 12px',
-    fontSize: '12px',
-    textAlign: 'right',
-    alignSelf: 'flex-end'
-  }
 }

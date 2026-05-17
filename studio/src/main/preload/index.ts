@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('pathly', {
     write: (path: string, content: string): Promise<void> =>
       ipcRenderer.invoke('fs:write', path, content),
     list: (dir: string): Promise<string[]> => ipcRenderer.invoke('fs:list', dir),
+    listDirs: (dir: string): Promise<string[]> => ipcRenderer.invoke('fs:listDirs', dir),
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('fs:pickFolder')
   },
   shell: {

@@ -4,7 +4,7 @@ import type { PathlyItem, ProjectEntry, FsmState, FsmEvent } from '../types'
 
 interface StudioStore {
   selectedItem: PathlyItem | null
-  activePanel: 'plan' | 'editor' | 'flow' | 'monitor'
+  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings'
   sidebarCollapsed: boolean
   projectPath: string
   projects: ProjectEntry[]
@@ -15,6 +15,9 @@ interface StudioStore {
   monitorSource: 'mcp' | 'chokidar' | null
   publishing: boolean
   publishLog: string[]
+  theme: 'dark' | 'light'
+  mcpCommand: string
+  routingEngine: 'python-mcp' | 'llm'
   setSelectedItem: (item: PathlyItem | null) => void
   setActivePanel: (panel: StudioStore['activePanel']) => void
   setSidebarCollapsed: (v: boolean) => void
@@ -31,6 +34,9 @@ interface StudioStore {
   setPublishing: (v: boolean) => void
   appendPublishLog: (line: string) => void
   clearPublishLog: () => void
+  setTheme: (t: 'dark' | 'light') => void
+  setMcpCommand: (s: string) => void
+  setRoutingEngine: (e: 'python-mcp' | 'llm') => void
 }
 
 export const useStore = create<StudioStore>()(
@@ -51,6 +57,9 @@ export const useStore = create<StudioStore>()(
       // Persisted state
       sidebarCollapsed: false,
       projects: [],
+      theme: 'dark',
+      mcpCommand: 'pathly-mcp-server',
+      routingEngine: 'llm',
 
       setSelectedItem: (item) => set({ selectedItem: item }),
       setActivePanel: (panel) => set({ activePanel: panel }),
@@ -92,13 +101,19 @@ export const useStore = create<StudioStore>()(
       setMonitorSource: (s) => set({ monitorSource: s }),
       setPublishing: (v) => set({ publishing: v }),
       appendPublishLog: (line) => set((s) => ({ publishLog: [...s.publishLog, line] })),
-      clearPublishLog: () => set({ publishLog: [] })
+      clearPublishLog: () => set({ publishLog: [] }),
+      setTheme: (t) => set({ theme: t }),
+      setMcpCommand: (s) => set({ mcpCommand: s }),
+      setRoutingEngine: (e) => set({ routingEngine: e })
     }),
     {
       name: 'pathly-studio',
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
-        projects: state.projects
+        projects: state.projects,
+        theme: state.theme,
+        mcpCommand: state.mcpCommand,
+        routingEngine: state.routingEngine
       }),
       // Set must be serialized/deserialized manually
       storage: {

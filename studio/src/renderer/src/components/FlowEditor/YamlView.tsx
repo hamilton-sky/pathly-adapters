@@ -3,6 +3,8 @@ import { EditorView, basicSetup } from 'codemirror'
 import { yaml } from '@codemirror/lang-yaml'
 import { EditorState } from '@codemirror/state'
 import * as jsYaml from 'js-yaml'
+import { useTheme } from '../../useTheme'
+import type { Theme } from '../../theme'
 import type { FlowYaml } from '../../types'
 
 interface Props {
@@ -13,7 +15,63 @@ interface Props {
   syncContent?: string | null
 }
 
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    wrapper: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden'
+    },
+    errorBanner: {
+      backgroundColor: `${t.red}33`,
+      borderBottom: `1px solid ${t.red}`,
+      padding: '6px 12px',
+      flexShrink: 0
+    },
+    errorText: {
+      color: t.red,
+      fontSize: '12px',
+      fontFamily: 'monospace'
+    },
+    toolbar: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: '6px 12px',
+      backgroundColor: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      flexShrink: 0
+    },
+    saveBtn: {
+      background: t.accent,
+      border: 'none',
+      borderRadius: '4px',
+      color: t.bgBase,
+      cursor: 'pointer',
+      padding: '4px 14px',
+      fontSize: '13px',
+      fontWeight: 600
+    },
+    saveBtnDisabled: {
+      background: t.bgSurface1,
+      border: 'none',
+      borderRadius: '4px',
+      color: t.textMuted,
+      cursor: 'not-allowed',
+      padding: '4px 14px',
+      fontSize: '13px',
+      fontWeight: 600
+    },
+    editor: {
+      flex: 1,
+      overflow: 'auto'
+    }
+  }
+}
+
 export function YamlView({ initialContent, onParsed, onDirty, onSave, syncContent }: Props): JSX.Element {
+  const t = useTheme()
+  const styles = makeStyles(t)
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -28,11 +86,11 @@ export function YamlView({ initialContent, onParsed, onDirty, onSave, syncConten
         basicSetup,
         yaml(),
         EditorView.theme({
-          '&': { backgroundColor: '#1e1e2e', color: '#cdd6f4', height: '100%' },
+          '&': { backgroundColor: t.bgBase, color: t.textPrimary, height: '100%' },
           '.cm-content': { fontFamily: 'monospace', fontSize: '13px' },
-          '.cm-gutters': { backgroundColor: '#181825', color: '#6c7086', border: 'none' },
-          '.cm-activeLine': { backgroundColor: '#313244' },
-          '.cm-cursor': { borderLeftColor: '#cba6f7' }
+          '.cm-gutters': { backgroundColor: t.bgMantle, color: t.textMuted, border: 'none' },
+          '.cm-activeLine': { backgroundColor: t.bgSurface0 },
+          '.cm-cursor': { borderLeftColor: t.accent }
         }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -58,11 +116,9 @@ export function YamlView({ initialContent, onParsed, onDirty, onSave, syncConten
       view.destroy()
       viewRef.current = null
     }
-    // Only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // When syncContent changes (switching from visual), update the editor content
   useEffect(() => {
     if (syncContent == null) return
     const view = viewRef.current
@@ -97,56 +153,4 @@ export function YamlView({ initialContent, onParsed, onDirty, onSave, syncConten
       <div ref={containerRef} style={styles.editor} />
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  wrapper: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden'
-  },
-  errorBanner: {
-    backgroundColor: '#f38ba833',
-    borderBottom: '1px solid #f38ba8',
-    padding: '6px 12px',
-    flexShrink: 0
-  },
-  errorText: {
-    color: '#f38ba8',
-    fontSize: '12px',
-    fontFamily: 'monospace'
-  },
-  toolbar: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    padding: '6px 12px',
-    backgroundColor: '#181825',
-    borderBottom: '1px solid #313244',
-    flexShrink: 0
-  },
-  saveBtn: {
-    background: '#cba6f7',
-    border: 'none',
-    borderRadius: '4px',
-    color: '#1e1e2e',
-    cursor: 'pointer',
-    padding: '4px 14px',
-    fontSize: '13px',
-    fontWeight: 600
-  },
-  saveBtnDisabled: {
-    background: '#45475a',
-    border: 'none',
-    borderRadius: '4px',
-    color: '#6c7086',
-    cursor: 'not-allowed',
-    padding: '4px 14px',
-    fontSize: '13px',
-    fontWeight: 600
-  },
-  editor: {
-    flex: 1,
-    overflow: 'auto'
-  }
 }

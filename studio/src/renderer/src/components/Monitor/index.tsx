@@ -1,16 +1,45 @@
 import { useEffect } from 'react'
 import { useStore } from '../../store'
+import { useTheme } from '../../useTheme'
+import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
+import type { FsmEvent } from '../../types'
+
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    panel: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: t.bgBase,
+      overflow: 'auto'
+    },
+    placeholder: {
+      margin: 'auto',
+      color: t.textMuted,
+      fontSize: '15px'
+    },
+    sourceBadge: {
+      padding: '4px 12px',
+      fontSize: '12px',
+      flexShrink: 0
+    }
+  }
+}
 
 export function Monitor(): JSX.Element {
   const {
     projectPath,
     activeTopic,
+    monitorSource,
     setMonitorSource,
     setFsmState,
     setEvents
   } = useStore()
+
+  const t = useTheme()
+  const styles = makeStyles(t)
 
   useEffect(() => {
     if (!activeTopic) return
@@ -26,6 +55,25 @@ export function Monitor(): JSX.Element {
     }
 
     init()
+
+    if (projectPath && activeTopic) {
+      const eventsPath = `${projectPath}/pathly/plans/${activeTopic}/EVENTS.jsonl`
+      window.pathly.fs.read(eventsPath).then((content) => {
+        const parsed: FsmEvent[] = []
+        for (const line of content.split('\n')) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          try {
+            parsed.push(JSON.parse(trimmed) as FsmEvent)
+          } catch {
+            // skip malformed lines
+          }
+        }
+        setEvents(parsed)
+      }).catch(() => {
+        // file may not exist yet
+      })
+    }
 
     const removeListener = window.pathly.watch.onEvent((data) => {
       if (data.path.endsWith('STATE.json')) {
@@ -59,25 +107,15 @@ export function Monitor(): JSX.Element {
     )
   }
 
+  const sourceBadge = monitorSource === 'mcp'
+    ? <span style={{ ...styles.sourceBadge, color: t.green }}>Source: ● MCP live</span>
+    : <span style={{ ...styles.sourceBadge, color: t.textMuted }}>Source: ○ File watch</span>
+
   return (
     <div style={styles.panel}>
+      {sourceBadge}
       <FsmView />
       <EventLog />
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  panel: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundColor: '#1e1e2e',
-    overflow: 'auto'
-  },
-  placeholder: {
-    margin: 'auto',
-    color: '#6c7086',
-    fontSize: '15px'
-  }
 }

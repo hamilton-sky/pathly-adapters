@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
+import { useTheme } from '../useTheme'
+import type { Theme } from '../theme'
 
 interface ConvRow {
   num: number
@@ -43,7 +45,6 @@ function parseProgressMd(md: string): ConvRow[] {
 
     if (trimmed.startsWith('|')) {
       const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
-      // Skip header row and separator row
       if (!headerParsed) {
         headerParsed = true
         continue
@@ -52,7 +53,6 @@ function parseProgressMd(md: string): ConvRow[] {
 
       const num = parseInt(parts[0], 10)
       if (isNaN(num)) continue
-      // Status is always the last non-empty cell
       const status = parts[parts.length - 1] ?? ''
       const title = parts[1] ?? ''
       rows.push({ num, title, status: status.toUpperCase() })
@@ -61,18 +61,18 @@ function parseProgressMd(md: string): ConvRow[] {
   return rows
 }
 
-function fsmStateColor(state: string): string {
-  if (state === 'DONE') return '#a6e3a1'
-  if (state === 'BUILDING' || state === 'REVIEWING') return '#89b4fa'
-  if (state === 'BLOCKED') return '#f38ba8'
-  return '#6c7086'
+function fsmStateColor(state: string, t: Theme): string {
+  if (state === 'DONE') return t.green
+  if (state === 'BUILDING' || state === 'REVIEWING') return t.blue
+  if (state === 'BLOCKED') return t.red
+  return t.textMuted
 }
 
-function statusBorderColor(status: string): string {
-  if (status === 'DONE') return '#a6e3a1'
-  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return '#89b4fa'
-  if (status === 'BLOCKED') return '#f38ba8'
-  return '#6c7086'
+function statusBorderColor(status: string, t: Theme): string {
+  if (status === 'DONE') return t.green
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return t.blue
+  if (status === 'BLOCKED') return t.red
+  return t.textMuted
 }
 
 function statusBgColor(status: string): string {
@@ -83,8 +83,152 @@ function statusBgColor(status: string): string {
   return 'rgba(108,112,134,0.05)'
 }
 
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    container: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: t.bgBase,
+      overflowY: 'auto' as const,
+      height: '100%'
+    },
+    placeholder: {
+      flex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: t.textMuted,
+      fontSize: '15px',
+      marginTop: '80px'
+    },
+    header: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '16px 24px',
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      flexShrink: 0
+    },
+    planName: {
+      fontSize: '16px',
+      fontWeight: 600,
+      color: t.textPrimary
+    },
+    fsmBadge: {
+      fontSize: '12px',
+      fontWeight: 700,
+      color: t.bgBase,
+      padding: '2px 10px',
+      borderRadius: '12px'
+    },
+    cardList: {
+      padding: '16px 24px',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '10px'
+    },
+    card: {
+      borderRadius: '6px',
+      overflow: 'hidden'
+    },
+    cardHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '100%',
+      background: 'none',
+      border: 'none',
+      color: t.textPrimary,
+      cursor: 'pointer',
+      padding: '10px 14px',
+      textAlign: 'left' as const
+    },
+    cardHeaderLeft: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      flex: 1,
+      overflow: 'hidden'
+    },
+    cardTitle: {
+      fontSize: '14px',
+      color: t.textPrimary,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap' as const,
+      flex: 1
+    },
+    eventCount: {
+      fontSize: '11px',
+      color: t.textMuted,
+      flexShrink: 0,
+      marginLeft: '8px'
+    },
+    cardHeaderRight: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      flexShrink: 0
+    },
+    statusBadge: {
+      fontSize: '11px',
+      fontWeight: 600,
+      textTransform: 'uppercase' as const
+    },
+    chevron: {
+      fontSize: '10px',
+      color: t.textMuted
+    },
+    eventLog: {
+      padding: '0 14px 10px 14px',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '4px'
+    },
+    noEvents: {
+      fontSize: '12px',
+      color: t.textMuted,
+      fontStyle: 'italic'
+    },
+    eventRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      fontSize: '12px',
+      fontFamily: 'monospace',
+      color: t.textSecondary,
+      padding: '2px 0'
+    },
+    eventType: {
+      color: t.blue,
+      fontWeight: 600,
+      flexShrink: 0
+    },
+    eventAgent: {
+      color: t.accent,
+      flexShrink: 0
+    },
+    eventResult: {
+      color: t.green,
+      flexShrink: 0
+    },
+    eventCost: {
+      color: t.yellow,
+      flexShrink: 0
+    },
+    eventTime: {
+      color: t.textMuted,
+      fontSize: '11px',
+      marginLeft: 'auto'
+    }
+  }
+}
+
 export function PlanBoard(): JSX.Element {
   const { projectPath, activeTopic } = useStore()
+  const t = useTheme()
+  const styles = makeStyles(t)
 
   const [fsmState, setFsmState] = useState<string>('')
   const [convs, setConvs] = useState<ConvRow[]>([])
@@ -104,7 +248,6 @@ export function PlanBoard(): JSX.Element {
     const base = `${projectPath}/pathly/plans/${activeTopic}`
 
     async function loadAll(): Promise<void> {
-      // Load STATE.json
       try {
         const raw = await window.pathly.fs.read(`${base}/STATE.json`)
         const parsed = JSON.parse(raw) as { current?: string }
@@ -113,7 +256,6 @@ export function PlanBoard(): JSX.Element {
         setFsmState('')
       }
 
-      // Load PROGRESS.md
       try {
         const md = await window.pathly.fs.read(`${base}/PROGRESS.md`)
         const rows = parseProgressMd(md)
@@ -124,7 +266,6 @@ export function PlanBoard(): JSX.Element {
         setNoProgress(true)
       }
 
-      // Load EVENTS.jsonl
       try {
         const raw = await window.pathly.fs.read(`${base}/EVENTS.jsonl`)
         const parsed: EventEntry[] = []
@@ -167,7 +308,7 @@ export function PlanBoard(): JSX.Element {
         <div style={styles.header}>
           <span style={styles.planName}>{activeTopic}</span>
           {fsmState && (
-            <span style={{ ...styles.fsmBadge, backgroundColor: fsmStateColor(fsmState) }}>
+            <span style={{ ...styles.fsmBadge, backgroundColor: fsmStateColor(fsmState, t) }}>
               {fsmState}
             </span>
           )}
@@ -182,7 +323,7 @@ export function PlanBoard(): JSX.Element {
       <div style={styles.header}>
         <span style={styles.planName}>{activeTopic}</span>
         {fsmState && (
-          <span style={{ ...styles.fsmBadge, backgroundColor: fsmStateColor(fsmState) }}>
+          <span style={{ ...styles.fsmBadge, backgroundColor: fsmStateColor(fsmState, t) }}>
             {fsmState}
           </span>
         )}
@@ -192,7 +333,7 @@ export function PlanBoard(): JSX.Element {
         {convs.map((conv) => {
           const isExpanded = cardStates[conv.num]?.expanded ?? false
           const convEvents = events.filter((e) => e.conversation === conv.num)
-          const borderColor = statusBorderColor(conv.status)
+          const borderColor = statusBorderColor(conv.status, t)
           const bgColor = statusBgColor(conv.status)
 
           return (
@@ -244,144 +385,4 @@ export function PlanBoard(): JSX.Element {
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundColor: '#1e1e2e',
-    overflowY: 'auto',
-    height: '100%'
-  },
-  placeholder: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#6c7086',
-    fontSize: '15px',
-    marginTop: '80px'
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '16px 24px',
-    borderBottom: '1px solid #313244',
-    flexShrink: 0
-  },
-  planName: {
-    fontSize: '16px',
-    fontWeight: 600,
-    color: '#cdd6f4'
-  },
-  fsmBadge: {
-    fontSize: '12px',
-    fontWeight: 700,
-    color: '#1e1e2e',
-    padding: '2px 10px',
-    borderRadius: '12px'
-  },
-  cardList: {
-    padding: '16px 24px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px'
-  },
-  card: {
-    borderRadius: '6px',
-    overflow: 'hidden'
-  },
-  cardHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    background: 'none',
-    border: 'none',
-    color: '#cdd6f4',
-    cursor: 'pointer',
-    padding: '10px 14px',
-    textAlign: 'left'
-  },
-  cardHeaderLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    flex: 1,
-    overflow: 'hidden'
-  },
-  cardTitle: {
-    fontSize: '14px',
-    color: '#cdd6f4',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    flex: 1
-  },
-  eventCount: {
-    fontSize: '11px',
-    color: '#6c7086',
-    flexShrink: 0,
-    marginLeft: '8px'
-  },
-  cardHeaderRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    flexShrink: 0
-  },
-  statusBadge: {
-    fontSize: '11px',
-    fontWeight: 600,
-    textTransform: 'uppercase' as const
-  },
-  chevron: {
-    fontSize: '10px',
-    color: '#6c7086'
-  },
-  eventLog: {
-    padding: '0 14px 10px 14px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px'
-  },
-  noEvents: {
-    fontSize: '12px',
-    color: '#6c7086',
-    fontStyle: 'italic'
-  },
-  eventRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    fontSize: '12px',
-    fontFamily: 'monospace',
-    color: '#a6adc8',
-    padding: '2px 0'
-  },
-  eventType: {
-    color: '#89b4fa',
-    fontWeight: 600,
-    flexShrink: 0
-  },
-  eventAgent: {
-    color: '#cba6f7',
-    flexShrink: 0
-  },
-  eventResult: {
-    color: '#a6e3a1',
-    flexShrink: 0
-  },
-  eventCost: {
-    color: '#f9e2af',
-    flexShrink: 0
-  },
-  eventTime: {
-    color: '#6c7086',
-    fontSize: '11px',
-    marginLeft: 'auto'
-  }
 }
