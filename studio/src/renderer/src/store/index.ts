@@ -4,7 +4,7 @@ import type { PathlyItem, ProjectEntry, FsmState, FsmEvent } from '../types'
 
 interface StudioStore {
   selectedItem: PathlyItem | null
-  activePanel: 'editor' | 'flow' | 'monitor'
+  activePanel: 'plan' | 'editor' | 'flow' | 'monitor'
   sidebarCollapsed: boolean
   projectPath: string
   projects: ProjectEntry[]
@@ -38,7 +38,7 @@ export const useStore = create<StudioStore>()(
     (set) => ({
       // Non-persisted state
       selectedItem: null,
-      activePanel: 'editor',
+      activePanel: 'plan',
       projectPath: '',
       activeTopic: null,
       dirtyItems: new Set<string>(),

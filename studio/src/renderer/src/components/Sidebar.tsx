@@ -2,6 +2,24 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import type { PathlyItem, PathlyItemType } from '../types'
 
+interface TemplateSubdir {
+  name: string
+  open: boolean
+  files: PathlyItem[]
+}
+
+interface SectionState {
+  items: PathlyItem[]
+  open: boolean
+  subdirs?: TemplateSubdir[]
+}
+
+interface ConvRow {
+  num: number
+  title: string
+  status: string
+}
+
 interface Section {
   label: string
   type: PathlyItemType
@@ -15,14 +33,29 @@ const SECTIONS: Section[] = [
   { label: 'Templates', type: 'template', dir: 'src/pathly_data/core/templates' }
 ]
 
-interface SectionState {
-  items: PathlyItem[]
-  open: boolean
+function parseProgressMd(md: string): ConvRow[] {
+  const rows: ConvRow[] = []
+  for (const line of md.split('\n')) {
+    const parts = line.split('|').map((p) => p.trim())
+    if (parts.length < 5) continue
+    const num = parseInt(parts[1], 10)
+    if (isNaN(num)) continue
+    rows.push({ num, title: parts[2], status: parts[4].toUpperCase() })
+  }
+  return rows
+}
+
+function convStatusColor(status: string): string {
+  if (status === 'DONE') return '#a6e3a1'
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return '#89b4fa'
+  if (status === 'BLOCKED') return '#f38ba8'
+  return '#6c7086'
 }
 
 export function Sidebar(): JSX.Element {
   const {
     projectPath,
+    activeTopic,
     sidebarCollapsed,
     setSidebarCollapsed,
     selectedItem,
@@ -33,44 +66,87 @@ export function Sidebar(): JSX.Element {
   } = useStore()
 
   const [sections, setSections] = useState<Record<string, SectionState>>({
-    Flows: { items: [], open: true },
+    Flows: { items: [], open: false },
     Skills: { items: [], open: false },
     Agents: { items: [], open: false },
-    Templates: { items: [], open: false }
+    Templates: { items: [], open: true }
   })
+  const [planConvs, setPlanConvs] = useState<ConvRow[]>([])
+  const [planOpen, setPlanOpen] = useState(true)
   const [filter, setFilter] = useState('')
 
   useEffect(() => {
     if (!projectPath) return
 
     async function loadItems(): Promise<void> {
-      const updates: Record<string, PathlyItem[]> = {}
-
       for (const section of SECTIONS) {
         try {
           const dir = `${projectPath}/${section.dir}`
-          const names = await window.pathly.fs.list(dir)
-          updates[section.label] = names.map((name) => ({
-            name,
-            path: `${dir}/${name}`,
-            type: section.type
-          }))
+          if (section.type === 'template') {
+            const subdirNames = await window.pathly.fs.listDirs(dir)
+            const subdirs: TemplateSubdir[] = []
+            for (const subdirName of subdirNames) {
+              const subdirPath = `${dir}/${subdirName}`
+              let files: PathlyItem[] = []
+              try {
+                const fileNames = await window.pathly.fs.list(subdirPath)
+                files = fileNames.map((fname) => ({
+                  name: fname,
+                  path: `${subdirPath}/${fname}`,
+                  type: 'template' as const
+                }))
+              } catch {
+                // empty subdir
+              }
+              subdirs.push({ name: subdirName, open: false, files })
+            }
+            setSections((prev) => ({
+              ...prev,
+              [section.label]: { ...prev[section.label], items: [], subdirs }
+            }))
+          } else {
+            const names = await window.pathly.fs.list(`${projectPath}/${section.dir}`)
+            const items: PathlyItem[] = names.map((name) => ({
+              name,
+              path: `${projectPath}/${section.dir}/${name}`,
+              type: section.type
+            }))
+            setSections((prev) => ({
+              ...prev,
+              [section.label]: { ...prev[section.label], items }
+            }))
+          }
         } catch {
-          updates[section.label] = []
+          setSections((prev) => ({
+            ...prev,
+            [section.label]: { ...prev[section.label], items: [] }
+          }))
         }
       }
-
-      setSections((prev) => {
-        const next = { ...prev }
-        for (const [label, items] of Object.entries(updates)) {
-          next[label] = { ...next[label], items }
-        }
-        return next
-      })
     }
 
     loadItems()
   }, [projectPath])
+
+  useEffect(() => {
+    if (!projectPath || !activeTopic) {
+      setPlanConvs([])
+      return
+    }
+
+    async function loadPlan(): Promise<void> {
+      try {
+        const md = await window.pathly.fs.read(
+          `${projectPath}/pathly/plans/${activeTopic}/PROGRESS.md`
+        )
+        setPlanConvs(parseProgressMd(md))
+      } catch {
+        setPlanConvs([])
+      }
+    }
+
+    loadPlan()
+  }, [projectPath, activeTopic])
 
   if (sidebarCollapsed) {
     return (
@@ -93,6 +169,17 @@ export function Sidebar(): JSX.Element {
     }))
   }
 
+  function toggleSubdir(sectionLabel: string, subdirIndex: number): void {
+    setSections((prev) => {
+      const section = prev[sectionLabel]
+      if (!section.subdirs) return prev
+      const subdirs = section.subdirs.map((sd, i) =>
+        i === subdirIndex ? { ...sd, open: !sd.open } : sd
+      )
+      return { ...prev, [sectionLabel]: { ...section, subdirs } }
+    })
+  }
+
   function handleItemClick(item: PathlyItem): void {
     setSelectedItem(item)
     setActivePanel(item.type === 'flow' ? 'flow' : 'editor')
@@ -112,8 +199,120 @@ export function Sidebar(): JSX.Element {
       </div>
 
       <div style={styles.treeContainer}>
+        {/* Plan section */}
+        <button style={styles.sectionHeader} onClick={() => setPlanOpen((v) => !v)}>
+          <span style={styles.chevron}>{planOpen ? '▼' : '▶'}</span>
+          PLAN
+          <span style={styles.sectionSub}>[{activeTopic ?? 'no topic'}]</span>
+        </button>
+        {planOpen && (
+          <div>
+            {planConvs.length === 0 ? (
+              <div style={styles.convEmpty}>No conversations</div>
+            ) : (
+              planConvs.map((conv) => {
+                const color = convStatusColor(conv.status)
+                const icon =
+                  conv.status === 'DONE'
+                    ? '✓'
+                    : conv.status === 'IN_PROGRESS' || conv.status === 'REVIEWING' || conv.status === 'BUILDING'
+                      ? '●'
+                      : '○'
+                return (
+                  <button
+                    key={conv.num}
+                    style={styles.convRow}
+                    onClick={() => setActivePanel('plan')}
+                  >
+                    <span style={{ color, marginRight: '6px', flexShrink: 0 }}>{icon}</span>
+                    <span style={styles.convLabel}>
+                      Conv {conv.num} — {conv.title}
+                    </span>
+                    <span style={{ ...styles.convStatus, color }}>{conv.status}</span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        )}
+
+        <div style={styles.divider} />
+
+        {/* File sections */}
         {SECTIONS.map((section) => {
           const state = sections[section.label]
+
+          if (section.type === 'template') {
+            const subdirs = state.subdirs ?? []
+            const hasMatch =
+              !filter ||
+              subdirs.some((sd) =>
+                sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter))
+              )
+            if (!hasMatch) return null
+
+            return (
+              <div key={section.label}>
+                <button
+                  style={styles.sectionHeader}
+                  onClick={() => toggleSection(section.label)}
+                >
+                  <span style={styles.chevron}>{state.open ? '▼' : '▶'}</span>
+                  {section.label.toUpperCase()}
+                </button>
+                {state.open && (
+                  <div>
+                    {subdirs.map((subdir, idx) => {
+                      const filteredFiles = filter
+                        ? subdir.files.filter((f) =>
+                            f.name.toLowerCase().includes(lowerFilter)
+                          )
+                        : subdir.files
+                      if (filter && filteredFiles.length === 0) return null
+
+                      return (
+                        <div key={subdir.name}>
+                          <button
+                            style={styles.subdirHeader}
+                            onClick={() => toggleSubdir(section.label, idx)}
+                          >
+                            <span style={styles.chevron}>
+                              {subdir.open ? '▼' : '▶'}
+                            </span>
+                            {subdir.name}/
+                          </button>
+                          {subdir.open && (
+                            <div>
+                              {filteredFiles.map((item) => {
+                                const isDirty = dirtyItems.has(item.path)
+                                const isSelected = selectedItem?.path === item.path
+                                return (
+                                  <button
+                                    key={item.path}
+                                    style={{
+                                      ...styles.itemRow,
+                                      paddingLeft: '44px',
+                                      ...(isSelected ? styles.itemRowSelected : {})
+                                    }}
+                                    onClick={() => handleItemClick(item)}
+                                    title={item.path}
+                                  >
+                                    <span style={styles.itemName}>{item.name}</span>
+                                    {isDirty && <span style={styles.dirtyDot}>●</span>}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
           const filtered = filter
             ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter))
             : state.items
@@ -126,7 +325,7 @@ export function Sidebar(): JSX.Element {
                 onClick={() => toggleSection(section.label)}
               >
                 <span style={styles.chevron}>{state.open ? '▼' : '▶'}</span>
-                {section.label}
+                {section.label.toUpperCase()}
               </button>
               {state.open && (
                 <div>
@@ -242,11 +441,64 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    textAlign: 'left'
+    textAlign: 'left',
+    gap: '4px'
+  },
+  sectionSub: {
+    color: '#6c7086',
+    fontWeight: 400,
+    textTransform: 'none',
+    letterSpacing: 0,
+    marginLeft: '4px',
+    fontSize: '11px'
   },
   chevron: {
-    marginRight: '6px',
-    fontSize: '10px'
+    marginRight: '2px',
+    fontSize: '10px',
+    flexShrink: 0
+  },
+  subdirHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    background: 'none',
+    border: 'none',
+    color: '#7f849c',
+    cursor: 'pointer',
+    padding: '4px 12px 4px 24px',
+    fontSize: '12px',
+    textAlign: 'left',
+    gap: '2px'
+  },
+  convRow: {
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    background: 'none',
+    border: 'none',
+    color: '#cdd6f4',
+    cursor: 'pointer',
+    padding: '3px 12px 3px 24px',
+    fontSize: '12px',
+    textAlign: 'left'
+  },
+  convLabel: {
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  convStatus: {
+    fontSize: '10px',
+    fontWeight: 600,
+    flexShrink: 0,
+    marginLeft: '6px'
+  },
+  convEmpty: {
+    color: '#6c7086',
+    fontSize: '12px',
+    padding: '4px 24px',
+    fontStyle: 'italic'
   },
   itemRow: {
     display: 'flex',

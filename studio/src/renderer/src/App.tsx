@@ -5,9 +5,11 @@ import { Editor } from './components/Editor'
 import { FlowEditor } from './components/FlowEditor'
 import { TopBar } from './components/TopBar'
 import { Monitor } from './components/Monitor'
+import { PlanBoard } from './components/PlanBoard'
 
 function MainPanel(): JSX.Element {
   const { activePanel, selectedItem } = useStore()
+  if (activePanel === 'plan') return <PlanBoard />
   if (activePanel === 'editor' && selectedItem) return <Editor />
   if (activePanel === 'flow' && selectedItem) return <FlowEditor />
   if (activePanel === 'flow')

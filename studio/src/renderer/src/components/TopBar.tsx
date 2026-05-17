@@ -10,6 +10,7 @@ export function TopBar(): JSX.Element {
     publishLog,
     setProjectPath,
     setActiveTopic,
+    setActivePanel,
     setPublishing,
     appendPublishLog,
     clearPublishLog
@@ -26,9 +27,9 @@ export function TopBar(): JSX.Element {
 
     async function loadTopics(): Promise<void> {
       try {
-        const entries = await window.pathly.fs.list(projectPath + '/pathly/plans/')
+        const entries = await window.pathly.fs.listDirs(projectPath + '/pathly/plans')
         if (!cancelled) {
-          setTopics(entries.filter((e) => !e.includes('.archive')))
+          setTopics(entries.filter((e) => e !== '.archive'))
         }
       } catch {
         // directory may not exist yet
@@ -87,7 +88,10 @@ export function TopBar(): JSX.Element {
           <select
             style={styles.topicSelect}
             value={activeTopic ?? ''}
-            onChange={(e) => setActiveTopic(e.target.value || null)}
+            onChange={(e) => {
+              setActiveTopic(e.target.value || null)
+              setActivePanel('plan')
+            }}
           >
             <option value="">— select topic —</option>
             {topics.map((t) => (
