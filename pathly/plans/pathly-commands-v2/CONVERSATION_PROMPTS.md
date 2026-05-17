@@ -1,15 +1,15 @@
 # CONVERSATION_PROMPTS.md — pathly-commands-v2
 
-_Ready-to-paste prompts. Run each conversation to completion before starting the next._
+_Ready-to-paste prompts. Run each to completion before starting the next._
 
-**Before any conversation:** verify mcp-fsm-driver is complete:
+**Before Conv 1:** verify mcp-fsm-driver is complete:
 ```bash
 python -c "from pathly_orchestrator.mcp_server import next_action, complete_stage; print('OK')"
 ```
 
 ---
 
-## Conversation 1 — `status` + `log`
+## Conversation 1 — Python CLI: `pathly-status` + `pathly-log`
 
 **Stories:** S1, S2
 
@@ -17,23 +17,25 @@ python -c "from pathly_orchestrator.mcp_server import next_action, complete_stag
 You are a builder. Do not ask clarifying questions — implement exactly what is described.
 
 Feature: pathly-commands-v2
-Conversation: 1 of 4
+Conversation: 1 of 5
 Stories: S1 (status), S2 (log)
 
 ## Context
 
-This plan adds six new Pathly commands and updates four existing ones.
-Conversation 1 adds two read-only skills: status (cross-feature dashboard)
-and log (readable event timeline). No state mutation. No MCP tool calls.
+status and log are Python CLI scripts — no LLM reasoning. They are exposed in
+conversations via thin skill wrappers that call them via the Bash tool. This
+makes them work on all surfaces: Claude Code CLI, Desktop, VS Code extension, Codex.
 
-Read these files before writing anything:
-  src/pathly_data/core/skills/pause.md          (for style reference)
-  src/pathly_data/core/skills/verify-state.md   (for file-scan pattern reference)
-  src/pathly_data/adapters/claude/_meta/         (list to understand YAML shape)
-  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md  (for border/panel format)
+Read before writing:
+  src/pathly_orchestrator/eventlog.py      (for EVENTS.jsonl append pattern)
+  src/pathly_orchestrator/state.py         (for flow loading helpers)
+  tests/test_orchestrator.py               (for test style)
+  src/pathly_data/adapters/claude/_meta/   (list files — understand YAML shape)
 
 ## Files to create
 
+  src/pathly_orchestrator/status_cli.py
+  src/pathly_orchestrator/log_cli.py
   src/pathly_data/core/skills/status.md
   src/pathly_data/core/skills/log.md
   src/pathly_data/adapters/claude/_meta/status_skill.yaml
@@ -41,330 +43,419 @@ Read these files before writing anything:
   src/pathly_data/adapters/codex/_meta/status_skill.yaml
   src/pathly_data/adapters/codex/_meta/log_skill.yaml
 
-## status.md — implement exactly this
+## pyproject.toml — add two entry points
 
-Scan for STATE.json files in (skip any path containing .archive/):
-  pathly/plans/*/STATE.json
-  pathly/debugs/*/STATE.json
-  pathly/explorations/*/STATE.json
+In [project.scripts], after pathly-fsm:
+  pathly-status = "pathly_orchestrator.status_cli:main"
+  pathly-log    = "pathly_orchestrator.log_cli:main"
 
-For each found file, read it and read feedback/ dir if it exists.
+## status_cli.py — implement exactly this
 
-Determine BLOCKED status: any *.md file in feedback/ = BLOCKED.
-If BLOCKED: find highest-priority file using feedback_routing priority order
-  (HUMAN_QUESTIONS > BLOCKED_ON_HUMAN > ARCH_FEEDBACK > DESIGN_QUESTIONS >
-   IMPL_QUESTIONS > REVIEW_FAILURES > TEST_FAILURES).
-  If multiple: show highest + "(+N more)".
+Entry point: main(). No class. Stdlib only (argparse, json, pathlib).
+
+Scan roots (skip any path containing ".archive"):
+  pathly/plans/*/STATE.json     → flow = "team"
+  pathly/debugs/*/STATE.json    → flow = "debug"
+  pathly/explorations/*/STATE.json → flow = "explore"
+
+For each STATE.json found:
+  - Read JSON. Extract "current" (state), "current_conversation" (conv, default 0).
+  - Check feedback/: if any *.md files exist, find highest priority by this order:
+    HUMAN_QUESTIONS > BLOCKED_ON_HUMAN > ARCH_FEEDBACK > DESIGN_QUESTIONS >
+    IMPL_QUESTIONS > REVIEW_FAILURES > TEST_FAILURES
+    Show highest + "(+N more)" if multiple.
+  - If state == "DONE": add to done list.
+  - Otherwise: add to active list.
+
+Sort active by STATE.json mtime descending (most recent first).
 
 Print:
+  ─────────────────────────────────────────────────────────
+    Pathly · Active features
+  ─────────────────────────────────────────────────────────
+    <topic>          ·  <flow>   ·  <state>         (conv N)
+    <topic>          ·  <flow>   ·  <state>         [BLOCKED: <file>]
+  ─────────────────────────────────────────────────────────
 
-─────────────────────────────────────────────────────────
-  Pathly · Active features
-─────────────────────────────────────────────────────────
-  <topic>      ·  <flow>  ·  <state>    (conv <N>)
-  <topic>      ·  <flow>  ·  <state>    [BLOCKED: <file>]
-  <topic>      ·  <flow>  ·  DONE ✓
-─────────────────────────────────────────────────────────
+--all flag: also show DONE topics with ✓ at the end.
+No active topics: print "Nothing in progress."
 
-Rules:
-- DONE topics listed last with ✓
-- Non-DONE topics sorted by most recently modified STATE.json first
-- If $ARGUMENTS contains "--all": include DONE topics; otherwise omit DONE
-- If no topics found: print "Nothing in progress."
-- Conv N: read "current_conversation" from STATE.json (default 0 if absent)
+## log_cli.py — implement exactly this
 
-## log.md — implement exactly this
+Entry point: main(). Stdlib only (argparse, json, datetime, pathlib).
 
-Parse $ARGUMENTS:
-  First non-keyword word = TOPIC (optional)
-  "--all" flag = show full history (default: last 20 events)
+Args: optional positional TOPIC, --all flag (default: last 20 events).
 
-If TOPIC not given:
-  Scan pathly/plans/ pathly/debugs/ pathly/explorations/ for most recently
-  modified STATE.json (skip .archive/). Use that topic.
-  Read flow from STATE.json "flow" field or infer from path (plans=team,
-  debugs=debug, explorations=explore).
+If TOPIC not given: find most recently modified STATE.json across all three
+scan roots (skip .archive). Use that topic's parent directory as storage_path.
 
-Locate EVENTS.jsonl at the storage_path of that topic. If absent:
-  Print: "No events recorded for <topic>."  Exit.
+Locate EVENTS.jsonl in storage_path. If absent: print "No events recorded." exit.
 
-Read lines. Apply --all or tail last-20 limit.
-For each event line (JSON), render one of:
+Read lines. Apply last-20 limit unless --all.
 
+Render each JSON line as:
   HH:MM:SS  STATE_TRANSITION      <from> → <to>
   HH:MM:SS  STATE_ROLLBACK        <from> → <to>
-  HH:MM:SS  DECIDE_ROUTING        chosen: <next_state>  (input: "<decision_input>")
-  HH:MM:SS  NEEDS_CONTEXT         count: <N>
+  HH:MM:SS  DECIDE_ROUTING        chosen: <chosen>  (input: "<decision_input>")
+  HH:MM:SS  NEEDS_CONTEXT         count: <count>
   HH:MM:SS  FEEDBACK_RESOLVED     <file>  agent: <agent>
-  HH:MM:SS  <other type>          <all remaining JSON fields as key: value>
+  HH:MM:SS  <other>               <remaining key: value pairs>
 
-Print header and footer:
+Print:
   ─────────────────────────────────────────────────────────
     Pathly log · <topic> · <flow>
   ─────────────────────────────────────────────────────────
-    [events]
+    [rendered lines]
   ─────────────────────────────────────────────────────────
     Showing last N of M events. Use --all for full history.
 
+## Skill wrappers — identical shape for both
+
+status.md:
+  # status
+  Cross-feature dashboard showing all active Pathly flows and their state.
+  ## Runtime
+  Run: pathly-status $ARGUMENTS
+  Print the output exactly as returned.
+  If command not found: print "Run pathly-setup first to install Pathly CLI tools."
+
+log.md:
+  # log
+  Readable timeline of FSM events for the active or named feature.
+  ## Runtime
+  Run: pathly-log $ARGUMENTS
+  Print the output exactly as returned.
+  If command not found: print "Run pathly-setup first to install Pathly CLI tools."
+
 ## Adapter YAML files
 
-Follow the exact pattern of an existing adapter YAML in the same directory.
-For each skill:
-  natural_language (or equivalent): one sentence matching the story AC summary.
-  No MCP syntax — these skills read files directly, no tool calls needed.
+Follow the exact pattern of an existing _meta YAML in each adapter directory.
+natural_language: one sentence matching the story AC summary. No MCP syntax.
 
 ## Constraints
 
 - Do not touch any existing skill files.
-- Do not touch any Python files.
-- Do not call next_action or complete_stage — these skills are read-only.
+- Do not touch mcp_server.py or fsm.py.
+- status_cli.py and log_cli.py must use stdlib only (no mcp package, no yaml needed
+  for status — just read STATE.json as JSON).
 
-## Verify after completion
+## Verify
 
-grep "feedback/" src/pathly_data/core/skills/status.md
-grep "EVENTS.jsonl" src/pathly_data/core/skills/log.md
-grep "status_skill" src/pathly_data/adapters/claude/_meta/status_skill.yaml
+python -c "from pathly_orchestrator.status_cli import main; print('OK')"
+python -c "from pathly_orchestrator.log_cli import main; print('OK')"
+grep "pathly-status\|pathly-log" pyproject.toml
+grep "pathly-status" src/pathly_data/core/skills/status.md
+pytest -q
 ```
 
 ---
 
-## Conversation 2 — `fix` + `ff`
+## Conversation 2 — Python CLI: `pathly-back` + `pathly-ff`
 
-**Stories:** S3, S4
+**Stories:** S5, S4
 
 ```
 You are a builder. Do not ask clarifying questions — implement exactly what is described.
 
 Feature: pathly-commands-v2
-Conversation: 2 of 4
-Stories: S3 (fix), S4 (ff)
+Conversation: 2 of 5
+Stories: S5 (back), S4 (ff)
 
 ## Prerequisite
 
 Conversation 1 must be complete. Verify:
-  grep "feedback/" src/pathly_data/core/skills/status.md
-Must return at least one match.
+  python -c "from pathly_orchestrator.status_cli import main; print('OK')"
 
 ## Context
 
-fix and ff are thin wrappers over the pathly-fsm MCP tools (next_action +
-complete_stage). Both require mcp-fsm-driver to be installed.
+back and ff are Python CLI scripts with input() confirmation. ff calls
+complete_stage from mcp_server.py directly as a Python function — not via
+the MCP protocol. If complete_stage returns {decide: True}, ff prompts the
+user for a typed answer via input().
 
 Read before writing:
-  src/pathly_data/core/skills/team.md       (for MCP tool call pattern + topic resolution)
-  src/pathly_data/core/skills/pause.md      (for style)
-  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md  (panel format — Scenario 2 for blocked)
+  src/pathly_orchestrator/mcp_server.py     (complete_stage + next_action signatures)
+  src/pathly_orchestrator/status_cli.py     (auto-detect topic pattern to reuse)
+  src/pathly_orchestrator/eventlog.py       (EVENTS.jsonl append pattern)
 
 ## Files to create
 
-  src/pathly_data/core/skills/fix.md
+  src/pathly_orchestrator/back_cli.py
+  src/pathly_orchestrator/ff_cli.py
+  src/pathly_data/core/skills/back.md
   src/pathly_data/core/skills/ff.md
-  src/pathly_data/adapters/claude/_meta/fix_skill.yaml
+  src/pathly_data/adapters/claude/_meta/back_skill.yaml
   src/pathly_data/adapters/claude/_meta/ff_skill.yaml
-  src/pathly_data/adapters/codex/_meta/fix_skill.yaml
+  src/pathly_data/adapters/codex/_meta/back_skill.yaml
   src/pathly_data/adapters/codex/_meta/ff_skill.yaml
 
-## fix.md — implement exactly this
+## pyproject.toml — add two entry points
 
-1. Resolve TOPIC from $ARGUMENTS or auto-detect (same logic as team.md).
-   Resolve flow from active STATE.json. Resolve project_root = cwd.
+  pathly-back = "pathly_orchestrator.back_cli:main"
+  pathly-ff   = "pathly_orchestrator.ff_cli:main"
 
-2. Call next_action(flow, topic, project_root).
+## back_cli.py — implement exactly this
 
-3. If not blocked:
-   Print: "No open feedback for <topic>. Use /pathly go to continue."  Exit.
+Entry point: main(). Stdlib + pathlib + json + datetime.
 
-4. If blocked, target_agent == "human":
-   Print the file contents.
-   Print: "This is a human decision — resolve it manually, then delete
-           feedback/<filename>, then run /pathly go."
-   Exit. Do not run any agent.
+1. Parse optional positional TOPIC from sys.argv. Auto-detect if absent
+   (reuse auto-detect logic from status_cli — scan for most recent active STATE.json).
+2. Resolve storage_path: same scan as status_cli, match topic to directory.
+3. Read EVENTS.jsonl. Scan lines newest→oldest (reversed).
+   Find first line where type == "STATE_TRANSITION". Extract "from" = prior_state.
+   If none found: print "No previous state to roll back to for <topic>." sys.exit(0).
+4. Read STATE.json. current = state["current"].
+5. Print:
+   "Roll back <topic>:  <current> → <prior_state>
+    Note: git commits and transition_actions are NOT undone by this command."
+   answer = input("Proceed? (y/n): ").strip().lower()
+   If not "y": print "Aborted." sys.exit(0).
+6. Write STATE.json atomically:
+   a. new_state = {**existing, "current": prior_state,
+                   "updated_at": datetime.utcnow().isoformat()}
+   b. Write to storage_path / "STATE.json.tmp", then rename to "STATE.json".
+7. Append to EVENTS.jsonl:
+   {"type": "STATE_ROLLBACK", "from": current, "to": prior_state,
+    "ts": datetime.utcnow().isoformat()}
+8. Print: "Rolled back <topic>: <current> → <prior_state>"
+   Print: "Run /pathly go or pathly-ff to resume."
 
-5. If blocked, target_agent == <agent>:
-   Display Scenario 2 panel from CONTEXTUAL_MENU_UX.md (blocked format).
-   Options:
-     [1] Resolve   — run <agent> on the feedback file now
-     [2] View      — print feedback file contents, then show menu again
-     [3] Escalate  — write HUMAN_QUESTIONS.md with escalation note, print
-                     contents, halt
-     [4] Abort     — exit without changes
+## ff_cli.py — implement exactly this
 
-6. On [1] Resolve:
-   a. Follow the instructions returned in next_action for <agent>.
-   b. After agent completes: delete the feedback file from feedback/.
-      Print: "Deleted: feedback/<filename>"
-   c. Call complete_stage(flow, topic, project_root).
-      - If blocked again: show blocked panel again (loop from step 5).
-      - If {decide: true}: show Scenario 3 Panel A from CONTEXTUAL_MENU_UX.md.
-        Wait for answer. Call complete_stage(... decision=<answer>).
-      - Otherwise: show the resulting state panel (Scenario 1 format).
-      - If done=true: print "Feature complete. All stages done."
+Entry point: main(). Import complete_stage and next_action directly:
+  from pathly_orchestrator.mcp_server import complete_stage, next_action
 
-## ff.md — implement exactly this
+1. Parse optional TOPIC. Auto-detect if absent. Resolve flow, project_root = str(Path.cwd()).
+2. Call next_action(flow=flow, topic=topic, project_root=project_root).
+   If result.get("blocked"): print blocked state. Print "Use pathly-fix first." sys.exit(0).
+3. current_state = result["current_state"]
+   Print: "Fast-forward <topic>: <current_state> → (evaluating...)"
+   Note: we don't pre-evaluate; just warn about git_commit if the flow YAML has
+   transition_actions for any transition from current_state containing git_commit.
+   If yes: print "! This transition may include a git commit."
+   answer = input("Proceed without running the current agent? (y/n): ").strip().lower()
+   If not "y": print "Aborted." sys.exit(0).
+4. result = complete_stage(flow=flow, topic=topic, project_root=project_root)
+5. Handle result:
+   - If result.get("decide"):
+       print "FSM needs a routing decision:"
+       print f"  Question: {result['question']}"
+       if result.get("context"):
+           print f"  Context:\n{result['context'][:500]}"
+       print f"  Options: {', '.join(result['options'].keys())}"
+       decision = input(f"  Your choice [{'/'.join(result['options'])}]: ").strip()
+       result = complete_stage(flow=flow, topic=topic,
+                               project_root=project_root, decision=decision)
+   - If result.get("done"): print "Feature complete." sys.exit(0).
+   - If result.get("blocked"): print "Blocked by feedback." print result. sys.exit(0).
+   - Otherwise:
+       print f"Advanced to: {result['next_state']}  Agent: {result['agent']}"
+       print "Run /pathly go to continue with the next agent."
 
-1. Resolve TOPIC from $ARGUMENTS or auto-detect. Resolve flow. Resolve project_root.
+## Skill wrappers
 
-2. Call next_action(flow, topic, project_root).
-   If blocked: show blocked panel. Print:
-     "Cannot fast-forward — open feedback must be resolved first. Use /pathly fix."
-   Exit.
+back.md:
+  # back
+  Roll back the FSM one state with confirmation. Does not undo git commits.
+  ## Runtime
+  Run: pathly-back $ARGUMENTS
+  Print the output exactly as returned.
+  If command not found: print "Run pathly-setup first to install Pathly CLI tools."
 
-3. Read current_state from the next_action response.
-   Evaluate what the next state would be — read transition_rules from flow YAML:
-     Check if any on_artifact files exist (L1). Check on_content (L2).
-     If decide: next_state = "<decide — will ask after confirmation>"
-     If default: next_state = <default>
-
-4. Print confirmation:
-   "Fast-forward <topic>: <current_state> → <next_state>
-    <If transition_actions has git_commit for this transition:>
-    ! This transition will run a git commit. Make sure your changes are staged.
-    Proceed without running the current agent? (y/n)"
-   Wait. On n: exit.
-
-5. On y: call complete_stage(flow, topic, project_root).
-   - If {decide: true}: show Scenario 3 Panel A. Wait for answer.
-     Call complete_stage(... decision=<answer>).
-   - Show resulting state panel.
-   - If done=true: print "Feature complete."
+ff.md:
+  # ff
+  Fast-forward to the next FSM state without running the current stage agent.
+  ## Runtime
+  Run: pathly-ff $ARGUMENTS
+  Print the output exactly as returned.
+  If command not found: print "Run pathly-setup first to install Pathly CLI tools."
 
 ## Constraints
 
-- Do not edit any existing skill files.
-- Do not touch any Python files.
-- The current stage's agent does NOT run in ff — advance state only.
+- Do not edit mcp_server.py or fsm.py.
+- back_cli.py must write STATE.json atomically (tmp + rename).
+- ff_cli.py must import complete_stage as a Python function, NOT via subprocess
+  or MCP protocol.
 
-## Verify after completion
+## Verify
 
-grep "complete_stage" src/pathly_data/core/skills/fix.md
-grep "complete_stage" src/pathly_data/core/skills/ff.md
-grep "HUMAN_QUESTIONS" src/pathly_data/core/skills/fix.md
-grep "agent does NOT run\|advance state only" src/pathly_data/core/skills/ff.md
+python -c "from pathly_orchestrator.back_cli import main; print('OK')"
+python -c "from pathly_orchestrator.ff_cli import main; print('OK')"
+grep "pathly-back\|pathly-ff" pyproject.toml
+pytest -q
 ```
 
 ---
 
-## Conversation 3 — `back` + `ask`
+## Conversation 3 — LLM skill: `fix`
 
-**Stories:** S5, S6
+**Stories:** S3
 
 ```
 You are a builder. Do not ask clarifying questions — implement exactly what is described.
 
 Feature: pathly-commands-v2
-Conversation: 3 of 4
-Stories: S5 (back), S6 (ask)
+Conversation: 3 of 5
+Story: S3 (fix)
 
 ## Prerequisite
 
 Conversation 2 must be complete. Verify:
-  grep "complete_stage" src/pathly_data/core/skills/fix.md
-Must return at least one match.
+  python -c "from pathly_orchestrator.back_cli import main; print('OK')"
 
 ## Context
 
-back writes STATE.json directly (not via MCP server — rollback has no MCP tool).
-ask spawns an agent without touching any FSM state.
+fix is the only new command that must be an LLM skill — it spawns an agent to
+resolve feedback content. Python cannot do this. No CLI backing script needed.
 
 Read before writing:
-  src/pathly_data/core/skills/team.md         (topic resolution pattern)
-  src/pathly_data/core/skills/pause.md        (style)
-  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md  (Scenario 1 panel format)
+  src/pathly_data/core/skills/team.md                       (topic resolution + MCP pattern)
+  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md         (Scenario 2 blocked panel format)
 
 ## Files to create
 
-  src/pathly_data/core/skills/back.md
-  src/pathly_data/core/skills/ask.md
-  src/pathly_data/adapters/claude/_meta/back_skill.yaml
-  src/pathly_data/adapters/claude/_meta/ask_skill.yaml
-  src/pathly_data/adapters/codex/_meta/back_skill.yaml
-  src/pathly_data/adapters/codex/_meta/ask_skill.yaml
+  src/pathly_data/core/skills/fix.md
+  src/pathly_data/adapters/claude/_meta/fix_skill.yaml
+  src/pathly_data/adapters/codex/_meta/fix_skill.yaml
 
-## back.md — implement exactly this
+## fix.md — implement exactly this
 
-1. Resolve TOPIC from $ARGUMENTS or auto-detect. Resolve flow and storage_path.
+1. Resolve TOPIC from $ARGUMENTS or auto-detect (same logic as team.md).
+   Resolve flow from STATE.json "flow" field. Resolve project_root = cwd.
 
-2. Read EVENTS.jsonl from storage_path. Scan from newest to oldest.
-   Find the most recent STATE_TRANSITION event.
-   Extract its "from" field = prior_state.
-   If no STATE_TRANSITION found:
-     Print: "No previous state to roll back to for <topic>."  Exit.
+2. Call next_action(flow, topic, project_root).
 
-3. Read STATE.json. Extract current = "current" field.
+3. If not blocked: "No open feedback for <topic>. Use /pathly go to continue."  Exit.
 
-4. Print confirmation:
-   "Roll back <topic>:  <current> → <prior_state>
-    Note: git commits and other transition_actions are NOT undone by this command.
-    Proceed? (y/n)"
-   Wait for reply. On n: print "Aborted." Exit.
+4. If blocked, target_agent == "human":
+   Print file contents in full.
+   Print: "Human decision required — resolve manually, delete feedback/<file>,
+           then run /pathly go."  Exit.
 
-5. On y:
-   a. Write STATE.json:
-        - Set "current" = prior_state
-        - Preserve all other fields (current_conversation, updated_at updated to now,
-          any other keys)
-        - Write atomically: write to STATE.json.tmp then rename to STATE.json
-   b. Append to EVENTS.jsonl:
-        {"type": "STATE_ROLLBACK", "from": "<current>", "to": "<prior_state>"}
-        (the append_event function in fsm.py injects "ts" — replicate that here:
-         add "ts": <ISO-8601 UTC now> to the dict before appending)
-   c. Display the contextual state panel for prior_state (Scenario 1 format from
-      CONTEXTUAL_MENU_UX.md). Options [1–4] as normal.
+5. If blocked, target_agent == <agent>:
+   Display Scenario 2 panel from CONTEXTUAL_MENU_UX.md (blocked format).
+   Options:
+     [1] Resolve  — run <agent> on feedback/<file> now
+     [2] View     — print feedback/<file> contents, show menu again
+     [3] Escalate — write HUMAN_QUESTIONS.md with escalation note, print contents, halt
+     [4] Abort    — exit without changes
 
-NOTE (include as a comment at the top of the skill file):
-  back.md writes STATE.json directly without going through the MCP server.
-  This is intentional — rollback has no MCP tool. This is the ONLY skill
-  permitted to do so. All forward transitions must use complete_stage.
-
-## ask.md — implement exactly this
-
-Parse $ARGUMENTS:
-  First word = ROLE
-  Remainder = QUESTION (everything after ROLE)
-
-Valid built-in roles (always valid regardless of active flow):
-  architect, builder, planner, reviewer, tester, scout, explorer
-
-Also valid: any agent name that appears as a value in agent_map of the active
-flow (read from flow YAML if a topic is active).
-
-If ROLE not in valid list:
-  Print: "Unknown role: <ROLE>"
-  Print: "Valid roles: architect, builder, planner, reviewer, tester, scout,
-          explorer  (+ any agent in the active flow's agent_map)"
-  Exit.
-
-If QUESTION is blank:
-  Ask: "What is your question for <ROLE>?"
-  Wait for reply. Store as QUESTION.
-
-Spawn <ROLE> agent with exactly this prompt and nothing else:
-  "Answer this question as <ROLE>. Give one focused reply only.
-   Do not write any files. Do not read STATE.json, feedback/, or any plan files.
-   Do not call next_action or complete_stage.
-   Question: <QUESTION>"
-
-After agent replies: exit. Do not call next_action, complete_stage, or any MCP tool.
-Do not write anything to storage_path or feedback/.
+6. On [1] Resolve:
+   a. Follow instructions returned by next_action for <agent>.
+   b. After agent completes: delete feedback/<file>.
+      Print: "Deleted: feedback/<filename>"
+   c. Call complete_stage(flow, topic, project_root).
+      - If blocked again: show Scenario 2 panel, loop from step 5.
+      - If {decide: true}: show Scenario 3 Panel A (CONTEXTUAL_MENU_UX.md).
+        Wait for user answer. Call complete_stage(..., decision=<answer>).
+      - Otherwise: show resulting state panel (Scenario 1 format).
+      - If done=true: "Feature complete."
 
 ## Constraints
 
-- Do not touch any existing skill files.
-- Do not touch any Python files.
-- ask.md must NOT call next_action or complete_stage under any circumstance.
-- back.md must write atomically (tmp + rename).
+- Do not create any Python files.
+- fix.md must resolve feedback one file at a time — never batch multiple files
+  before calling complete_stage.
 
-## Verify after completion
+## Verify
 
-grep "STATE_ROLLBACK" src/pathly_data/core/skills/back.md
-grep "STATE.json.tmp" src/pathly_data/core/skills/back.md
-grep "complete_stage\|next_action" src/pathly_data/core/skills/ask.md  # must return nothing
-grep "Do not write\|Do not call" src/pathly_data/core/skills/ask.md
+grep "complete_stage" src/pathly_data/core/skills/fix.md
+grep "HUMAN_QUESTIONS" src/pathly_data/core/skills/fix.md
+grep "target_agent" src/pathly_data/core/skills/fix.md
 ```
 
 ---
 
-## Conversation 4 — Update start / pause / end / go
+## Conversation 4 — `meet` enhancement: escalate to pipeline
+
+**Stories:** S6
+
+```
+You are a builder. Do not ask clarifying questions — implement exactly what is described.
+
+Feature: pathly-commands-v2
+Conversation: 4 of 5
+Story: S6
+
+## Prerequisite
+
+Conversation 3 must be complete. Verify:
+  grep "complete_stage" src/pathly_data/core/skills/fix.md
+
+## Context
+
+meet.md already has a well-designed consultation flow. We are adding ONE new
+option to Step 5 only. Do not touch Steps 1–4 or Step 6 (Promotion behavior).
+
+Read meet.md IN FULL before touching it. Understand the existing Step 5 output
+and choice handling. Make the minimum change to add [5] Escalate to pipeline.
+
+## File to edit
+
+  src/pathly_data/core/skills/meet.md   (Step 5 only)
+
+## What to add — Step 5 change
+
+The current Step 5 prints options [1]–[4] and a note about "See all commands".
+Replace that block with [1]–[5] plus "See all commands" renumbered:
+
+  [1] Return to <current stage>
+  [2] Promote to planner update
+  [3] Promote to architecture update
+  [4] Ask another meet question
+  [5] Escalate to pipeline
+  [6] See all commands
+
+Implement option [5] as follows:
+
+1. Print:
+   "Which feedback type fits this consultation?
+    [1] ARCH_FEEDBACK      → routes to architect
+    [2] DESIGN_QUESTIONS   → routes to architect
+    [3] IMPL_QUESTIONS     → routes to planner
+    Reply with 1–3:"
+
+2. Map choice → filename:
+     1 → ARCH_FEEDBACK.md
+     2 → DESIGN_QUESTIONS.md
+     3 → IMPL_QUESTIONS.md
+
+3. Read the consult note from plans/$FEATURE/consults/<most-recent>-<role>.md.
+   (The most recently written file in that directory for this feature.)
+
+4. Target file: plans/$FEATURE/feedback/<chosen>.md
+   - If file exists: append with separator:
+       \n---\n## Consultation escalated <ISO timestamp>\n<consult note content>
+   - If absent: write the consult note content as the file content.
+
+5. Resolve the target agent from the active flow's feedback_routing:
+   Read plans/$FEATURE/STATE.json to find the flow name.
+   Load the corresponding flow YAML via importlib.resources.
+   Look up feedback_routing[<chosen stem>] = target_agent.
+
+6. Print:
+   "Pipeline blocked on feedback/<chosen>.md
+    Next complete_stage will route to: <target_agent>
+    The consults/ file is preserved — escalation is additive.
+    Use /pathly fix or /pathly go to continue."
+
+## Constraints
+
+- Do not touch Steps 1–4 or Step 6 of meet.md.
+- Do not touch any Python files.
+- If the user picks [6] See all commands: existing behavior (print help reference).
+  Renumber from [5] to [6] for "See all commands" only.
+
+## Verify
+
+grep "Escalate to pipeline" src/pathly_data/core/skills/meet.md
+grep "ARCH_FEEDBACK\|DESIGN_QUESTIONS\|IMPL_QUESTIONS" src/pathly_data/core/skills/meet.md
+grep "\[5\]" src/pathly_data/core/skills/meet.md
+```
+
+---
+
+## Conversation 5 — Update start / pause / end / go
 
 **Stories:** S7
 
@@ -372,54 +463,48 @@ grep "Do not write\|Do not call" src/pathly_data/core/skills/ask.md
 You are a builder. Do not ask clarifying questions — implement exactly what is described.
 
 Feature: pathly-commands-v2
-Conversation: 4 of 4
+Conversation: 5 of 5
 Story: S7
 
 ## Prerequisite
 
-Conversation 3 must be complete. Verify:
-  grep "STATE_ROLLBACK" src/pathly_data/core/skills/back.md
-Must return at least one match.
+Conversation 4 must be complete. Verify:
+  grep "Escalate to pipeline" src/pathly_data/core/skills/meet.md
 
 ## Context
 
-This conversation adds the contextual state panel to four existing entry-point
-skills. This was deferred from mcp-fsm-driver Conv 3.
+This is the deferred work from mcp-fsm-driver Conv 3. Add the contextual state
+panel to four existing entry-point skills. Edits only — no new files.
 
-Read ALL of these before making any changes:
+Read ALL of these before making any change:
   src/pathly_data/core/skills/go.md
   src/pathly_data/core/skills/pause.md
   src/pathly_data/core/skills/end.md
   src/pathly_data/core/skills/start.md
-  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md  (authoritative format spec)
-  src/pathly_data/core/skills/team.md  (for topic resolution + next_action pattern)
+  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md   ← authoritative format spec
+  src/pathly_data/core/skills/team.md   ← topic resolution + next_action call pattern
 
-## Files to edit (no new files)
+## Files to edit
 
   src/pathly_data/core/skills/go.md
   src/pathly_data/core/skills/pause.md
   src/pathly_data/core/skills/end.md
   src/pathly_data/core/skills/start.md
 
-## go.md — what to add
+## go.md — insert after state recovery, before routing
 
-After recovering active state (reading STATE.json), before routing to the
-flow skill, insert:
+After the step that detects the active feature (reads STATE.json), add:
 
-1. Call next_action(flow, topic, project_root) to get {current_state, agent, limits}.
-2. Display full Scenario 1 contextual panel (CONTEXTUAL_MENU_UX.md format).
-   Show pipeline progress bar derived from flow YAML states list.
-   Show all 4 options: [1] Proceed  [2] Pause  [3] Status  [4] Switch
-3. On [1] or Enter: route to the appropriate flow skill (team/debug/explore).
+1. Call next_action(flow, topic, project_root).
+2. Display Scenario 1 panel from CONTEXTUAL_MENU_UX.md (all 4 options).
+3. On [1] or Enter: route to the flow skill (team/debug/explore) as before.
 4. On [2]: call pause skill. Stop.
-5. On [3]: print STATE.json + last 10 lines of EVENTS.jsonl. Show panel again.
+5. On [3]: print STATE.json + last 10 EVENTS.jsonl lines. Show panel again.
 6. On [4]: print "Switch to: (1) team  (2) debug  (3) explore" and route.
 
-Do not change any other behavior in go.md.
+## pause.md — insert before writing PAUSED
 
-## pause.md — what to add
-
-Before writing status: PAUSED, insert a read-only panel:
+Before the "write status: PAUSED" step, add this read-only panel:
 
 ─────────────────────────────────────────────────────────
   Pathly  ·  <flow>  ·  <topic>
@@ -427,44 +512,44 @@ Before writing status: PAUSED, insert a read-only panel:
   Pausing session.
 ─────────────────────────────────────────────────────────
 
-Read current_state and conv from STATE.json. Do not call next_action.
-After printing panel: write PAUSED and print resume instructions as before.
+Read STATE.json directly for current_state and conv. Do NOT call next_action.
+After printing: continue with existing PAUSED write and resume instructions.
 
-## end.md — what to add
+## end.md — insert before retro prompt
 
-Before the "Write a retro? (y/n)" prompt, insert:
+Before the "Write a retro? (y/n)" step, add:
 
-1. Call next_action(flow, topic, project_root) to get {current_state, agent}.
-2. Print a read-only summary panel:
+1. Call next_action(flow, topic, project_root).
+2. Print read-only summary panel:
 
 ─────────────────────────────────────────────────────────
   Pathly  ·  <flow>  ·  <topic>
   State : <current_state>      Conv : <N>
-  <If any *.md in feedback/:>
-  ! Open feedback files — resolve before archiving.
+  <If any *.md file in feedback/:>
+  ! Open feedback — resolve before archiving.
 ─────────────────────────────────────────────────────────
   Conversations completed: <N>
 ─────────────────────────────────────────────────────────
 
-Then ask "Write a retro? (y/n)" as before.
+Then "Write a retro? (y/n)" as before.
 
-## start.md — what to add
+## start.md — insert when user picks option [4]
 
-When user picks option [4] "Continue in-progress work":
+When the user selects option [4] "Continue in-progress work":
 1. Auto-detect active feature (same logic as team.md feature detection).
 2. Call next_action(flow, topic, project_root).
-3. Display full Scenario 1 contextual panel (all 4 options).
-4. Route based on user choice (same as go.md options).
+3. Display Scenario 1 panel from CONTEXTUAL_MENU_UX.md (all 4 options).
+4. Route based on user choice (same as go.md options above).
 
 No changes to options [1], [2], [3], [5].
 
 ## Constraints
 
-- Do not change any existing behavior in these files — only add the panel.
-- Do not change the structure or other steps in go/pause/end/start.
+- Do not change any existing behavior — only insert the panel at the specified point.
+- Do not create any new files.
 - Do not touch any Python files or adapter YAML files.
 
-## Verify after completion
+## Verify
 
 grep "next_action" src/pathly_data/core/skills/go.md
 grep "Pausing session" src/pathly_data/core/skills/pause.md
