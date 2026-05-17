@@ -30,13 +30,13 @@ _CODEX_TOML_BLOCK = (
 _FSM_SERVER_NAME = "pathly-fsm"
 
 _FSM_CLAUDE_ENTRY: dict = {
-    "command": "python",
+    "command": sys.executable,
     "args": ["-m", "pathly_orchestrator.mcp_server"],
 }
 
 _FSM_CODEX_TOML_BLOCK = (
     f"\n[mcp_servers.{_FSM_SERVER_NAME}]\n"
-    'command = "python"\n'
+    f'command = "{sys.executable.replace(chr(92), chr(92)+chr(92))}"\n'
     'args = ["-m", "pathly_orchestrator.mcp_server"]\n'
 )
 
