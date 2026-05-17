@@ -66,9 +66,6 @@ comparison — the only variable is the routing engine.
 - `src/pathly_data/adapters/claude/_meta/team_skill.yaml` (+ debug, explore)
 - `src/pathly_data/adapters/codex/_meta/team_skill.yaml` (+ debug, explore)
 
-**Edited agent:**
-- `src/pathly_data/core/agents/orchestrator.md` — add legacy/reference note
-
 **New tests:**
 - `tests/test_fsm.py`
 - `tests/test_mcp_server.py`
