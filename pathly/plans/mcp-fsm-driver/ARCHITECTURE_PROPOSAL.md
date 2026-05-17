@@ -315,8 +315,12 @@ One Python server. Both hosts. Registered once via `pathly-setup --apply`.
   just from the source checkout.
 - **No file watcher** — the LLM explicitly calls `complete_stage` to signal it
   is done. Pull-based. No async event loop; no race conditions.
-- **Orchestrator agent kept as fallback** — if the MCP server is unavailable,
-  the orchestrator agent can still be spawned manually. It is not removed.
+- **Orchestrator agent retained as part of the LLM flow** — `orchestrator.md`
+  and `orchestrator.yaml` are kept and updated in Conv 3 alongside the skill
+  rewrites. It is NOT wired as a "MCP unavailable" fallback: skills assume the
+  MCP server is available and do not probe for it. If the server is down,
+  `pathly-setup --apply` is the recovery path. The orchestrator's role is LLM
+  flow execution, not MCP fault tolerance.
 - **`fsm.py` has no MCP dependency** — pure functions, importable in tests
   without starting an MCP server.
 - **`build_prompt` loads the full agent contract** — reads `core/agents/<agent>.md`
