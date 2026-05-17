@@ -1,0 +1,37 @@
+{
+  "name": "pathly-studio",
+  "version": "0.1.0",
+  "description": "Pathly Studio — desktop app for configuring and monitoring the Pathly pipeline",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/lang-yaml": "^6.1.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
+    "chokidar": "^3.6.0",
+    "codemirror": "^6.0.2",
+    "js-yaml": "^4.1.1",
+    "marked": "^18.0.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "reactflow": "^11.11.4",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/marked": "^5.0.2",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "electron": "^28.0.0",
+    "electron-vite": "^2.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0"
+  }
+}
