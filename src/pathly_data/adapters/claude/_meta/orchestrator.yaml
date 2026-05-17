@@ -1,4 +1,5 @@
-﻿name: orchestrator
+﻿# Legacy: primary FSM executor is now mcp_server.py. See orchestrator.md for details.
+name: orchestrator
 description: Pipeline orchestrator — deterministic filesystem FSM for the feature pipeline. Recovers state from disk, processes one event, emits one next action, and never implements anything itself.
 model: haiku
 tools: [Read, Glob, Grep, Write, Edit, Bash]

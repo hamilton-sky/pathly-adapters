@@ -56,31 +56,122 @@ Choose execution mode:
 
 Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
-## Spawn orchestrator
+## FSM execution loop
 
-After mode selection is complete (autoFlow is set), spawn the **orchestrator** agent with
-**exactly these 5 parameters and nothing else**:
-- flow_config: src/pathly_data/core/flows/team.flow.yaml
-- topic: [parsed feature name]
-- rigor: [parsed rigor]
-- autoFlow: [true/false]
-- entryStage: [parsed entryStage, default: discovery]
+After mode selection is complete (autoFlow is set), run the FSM loop using MCP tools.
 
-### Guard 2 — Spawn isolation
+`PROJECT_ROOT` = the absolute path to the user's project directory (cwd at skill invocation).
 
-**CRITICAL:** Pass ONLY the 5 parameters above. Do NOT include any of the following in
-the orchestrator prompt:
-- Feature descriptions or problem summaries
-- File paths, line numbers, or code snippets
-- Implementation details or bug analysis
-- Conversation history or prior research
+### Step 1 — Get next action
 
-The FSM discovers all context through its own agents (discover → plan → build).
-Passing extra context into the orchestrator prompt bypasses the flow and causes the
-orchestrator to implement instead of route — breaking the entire pipeline.
+Call FSM tool: `{{FSM_NEXT_ACTION}}(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
 
-The orchestrator handles all FSM state recovery, routing, git commits, PROGRESS.md updates,
-and artifact archiving. Do not perform these actions in team.md.
+Receives one of:
+- `{current_state, agent, instructions, storage_path, limits}` — normal routing
+- `{blocked: true, target_agent: "human", file, instructions, limits}` — human must decide
+- `{blocked: true, target_agent: <agent>, file, instructions, limits}` — feedback to resolve
+
+### Step 2 — Display contextual menu
+
+After every `{{FSM_NEXT_ACTION}}` or `{{FSM_COMPLETE_STAGE}}` call, display the contextual
+menu before running any agent. Use the format exactly as specified in
+`pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md`:
+
+```
+─────────────────────────────────────────────────────────
+  Pathly  ·  team  ·  <FEATURE>
+  State : <current_state>    Conv : <conv>    Mode : <manual|auto-flow>
+  Agent : <agent>
+─────────────────────────────────────────────────────────
+  Pipeline:
+    <states with ✓ for completed, [ ] for current, lowercase for future>
+─────────────────────────────────────────────────────────
+  <state-specific guidance from table below>
+─────────────────────────────────────────────────────────
+  Options:
+    [1] Proceed   — run <agent> now
+    [2] Pause     — save state and stop
+    [3] Status    — print STATE.json + last 10 events
+    [4] Switch    — jump to /debug or /explore instead
+─────────────────────────────────────────────────────────
+  Reply [1–4] or press Enter to proceed:
+```
+
+When blocked by feedback (not human), swap option set per CONTEXTUAL_MENU_UX.md Scenario 2:
+```
+    [1] Resolve   — run <agent> on <file> now
+    [2] View      — print <file> contents
+    [3] Escalate  — write HUMAN_QUESTIONS.md and halt
+    [4] Pause     — save state and stop
+```
+
+When `complete_stage` returns `{decide: true, ...}` (Level 3 routing), display Scenario 3
+Panel A from CONTEXTUAL_MENU_UX.md. Wait for reply. Call
+`{{FSM_COMPLETE_STAGE}}(..., decision=<reply>)`. Display Panel B.
+
+**State-specific guidance lines:**
+
+| State | Guidance |
+|-------|----------|
+| STORMING | Architect discovers scope and risks. No implementation yet. |
+| PLANNING | Planner drafts IMPLEMENTATION_PLAN.md. Builder waits for it. |
+| BUILDING | Builder implements the plan. Reviewer runs automatically after. |
+| REVIEWING | Reviewer checks builder output. REVIEW_FAILURES.md blocks advance. |
+| TESTING | Tester validates. TEST_FAILURES.md loops back to builder. |
+| RETRO | Final retrospective. Topic closes when complete. |
+| DONE | Topic complete. Artifacts archived. |
+
+**Pipeline progress line:** Read EVENTS.jsonl STATE_TRANSITION entries to determine completed states.
+Current state is bracketed `[ STATE ]`. Completed states get `✓`. Future states are lowercase.
+
+If user chooses [2] Pause: call `pause` skill and stop.
+If user chooses [3]: print STATE.json pretty-printed and last 10 EVENTS.jsonl lines.
+If user chooses [4]: surface `/pathly team|debug|explore <FEATURE>` options.
+In auto-flow mode, default to [1] Proceed without asking. Still display the menu — just note "auto-flow: proceeding".
+
+### Step 3 — Execute agent instructions
+
+Execute the instructions returned by `{{FSM_NEXT_ACTION}}` for the returned agent.
+
+Track two counters, reset at the start of each stage:
+- `needs_context_count = 0`
+- `feedback_round_count = 0`
+
+**NEEDS_CONTEXT loop:**
+- If the agent outputs NEEDS_CONTEXT:
+  1. `needs_context_count += 1`
+  2. If `needs_context_count >= limits.needs_context_per_stage`: warn user and halt.
+  3. Else: call `scout-path`, feed summary back, resume.
+  4. Repeat until agent no longer emits NEEDS_CONTEXT.
+- The FSM is NOT notified about NEEDS_CONTEXT cycles — fully internal to the skill.
+
+### Step 4 — Complete the stage
+
+When stage work is complete, call:
+`{{FSM_COMPLETE_STAGE}}(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
+
+Receives one of:
+- `{next_state, agent, instructions, limits}` — advance
+- `{done: true}` — pipeline complete
+- `{blocked: true, target_agent: "human", file, instructions}` — human must decide
+- `{blocked: true, target_agent: <agent>, file, instructions}` — feedback to resolve
+- `{decide: true, question, context, options, default}` — Level 3 routing
+
+**Feedback resolution loop:**
+- `feedback_round_count += 1`
+- If `feedback_round_count >= limits.feedback_rounds_per_stage`: write HUMAN_QUESTIONS.md, halt.
+- Else: spawn feedback agent, resolve, call `{{FSM_COMPLETE_STAGE}}(resolved_files=[file])`.
+- Python deletes the file. Do NOT delete files manually.
+- One file at a time — do NOT batch-resolve before calling.
+
+**Human-blocked:** Surface instructions to user. When user confirms resolution, call
+`{{FSM_COMPLETE_STAGE}}(resolved_files=["HUMAN_QUESTIONS.md"])`. Python deletes the file.
+
+Display contextual menu after every call to `{{FSM_COMPLETE_STAGE}}` before executing the next agent.
+
+### Step 5 — Repeat
+
+Repeat Steps 2–4 until `done=true`.
 
 ## Nano mode
 

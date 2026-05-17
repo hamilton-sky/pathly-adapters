@@ -63,14 +63,20 @@ Confirm the symptom is written before continuing.
 
 ---
 
-## Spawn orchestrator
+## FSM execution loop
 
-Spawn the **orchestrator** agent with:
-- flow_config: src/pathly_data/core/flows/debug.flow.yaml
-- topic: [SYMPTOM_NAME]
-- rigor: lite
-- autoFlow: [autoFlow]
+After the symptom is confirmed, run the FSM loop using MCP tools.
 
-The orchestrator drives the full debug pipeline (investigate → reproduce → fix → verify → review)
-using the FSM defined in `debug.flow.yaml`. It handles all state tracking, agent spawning,
-and feedback routing. Do not perform these actions in debug.md.
+`PROJECT_ROOT` = the absolute path to the user's project directory (cwd at skill invocation).
+
+Call FSM tool: `{{FSM_NEXT_ACTION}}(flow="debug", topic=SYMPTOM_NAME, project_root=PROJECT_ROOT)`
+
+Display the contextual menu (same format as team.md — see CONTEXTUAL_MENU_UX.md Scenario 2 for
+the blocked variant). Use the debug guidance table from CONTEXTUAL_MENU_UX.md for state-specific
+lines.
+
+Execute the returned agent instructions. When complete, call:
+`{{FSM_COMPLETE_STAGE}}(flow="debug", topic=SYMPTOM_NAME, project_root=PROJECT_ROOT)`
+
+Handle blocked, decide, and feedback cases using the same protocol as team.md.
+Repeat until `done=true`.
