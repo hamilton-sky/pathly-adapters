@@ -120,6 +120,11 @@ Fast mode:
 - Add `fast` only if the user explicitly asks for no-pause/autonomous execution.
 - Never combine `strict` with `fast`.
 
+Engine selection:
+- Default to `team` (LLM orchestrator) — always works, no dependencies.
+- Use `team-mcp` only if the user explicitly asks for the Python FSM / MCP engine.
+- Never auto-detect or silently fall back between engines.
+
 ---
 
 ## Step 4 - Decide Whether To Ask
@@ -155,12 +160,13 @@ Use these route forms:
 
 ```text
 storm <topic>
-team <feature> nano
+team <feature> nano          ← LLM engine (default)
 team <feature> lite
 team <feature> standard
 team <feature> strict
 team <feature> build
 team <feature> test
+team-mcp <feature> <rigor>   ← Python FSM engine (explicit request only)
 review
 retro <feature>
 ```
