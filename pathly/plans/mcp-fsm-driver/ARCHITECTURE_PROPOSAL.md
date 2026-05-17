@@ -33,10 +33,38 @@ transition action. The flow YAML is a hint, not an executable spec.
 
 ---
 
-## Target state
+## Target state — dual engine, user picks at start
 
-A Python MCP server reads the flow YAML and drives the FSM. The LLM only
-executes domain work (implement, review, test, plan). All routing is Python.
+Both engines coexist on master. The user picks at start time; the choice is
+stored in `STATE.json` as `"engine": "python-mcp"` or `"engine": "llm"`.
+The LLM-driven path (orchestrator.md) is never touched by this plan.
+
+```
+/pathly team checkout-feature
+
+  ┌─ Start menu ────────────────────────────────┐
+  │  Routing engine:                            │
+  │  [1] Python FSM  — deterministic, MCP       │
+  │  [2] LLM driven  — orchestrator reads YAML  │
+  └─────────────────────────────────────────────┘
+  User picks [1] → STATE.json: { engine: "python-mcp" }
+  User picks [2] → STATE.json: { engine: "llm" }
+            │
+            ▼
+  go.md / team.md reads engine from STATE.json
+            │
+     ┌──────┴──────────┐
+  engine=llm        engine=python-mcp
+     │                  │
+     ▼                  ▼
+  spawn              call MCP tool
+  orchestrator.md    next_action(...)
+  (unchanged)        (new Python server)
+```
+
+When `engine = "python-mcp"`: a Python MCP server reads the flow YAML and
+drives the FSM. The LLM only executes domain work (implement, review, test,
+plan). All routing is Python.
 
 ```
 /pathly team checkout-feature

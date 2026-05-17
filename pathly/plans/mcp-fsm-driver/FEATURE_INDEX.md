@@ -2,20 +2,35 @@
 
 ## What this feature is
 
-Replace the LLM orchestrator agent with a Python MCP server
-(`pathly_orchestrator.mcp_server`) that reads flow YAMLs and drives the FSM
-deterministically. Skill files call two MCP tools — `next_action` and
-`complete_stage` — instead of spawning the orchestrator agent. All routing
-decisions move from LLM to Python. Both Claude Code and Codex consume the same
-server via their native MCP support.
+**Read `pathly/plans/STRATEGY.md` first — it explains the dual-engine goal
+this plan serves.**
+
+Add a Python MCP server (`pathly_orchestrator.mcp_server`) that reads flow
+YAMLs and drives the FSM deterministically — running **alongside** the existing
+LLM orchestrator, not replacing it. Skill files gain a new code path: when
+`engine = "python-mcp"` in STATE.json, they call `next_action` and
+`complete_stage` MCP tools instead of spawning the orchestrator agent. When
+`engine = "llm"`, the existing orchestrator.md path runs unchanged.
+
+Both Claude Code and Codex consume the same MCP server via native MCP support.
 
 ## Why it matters
 
 The LLM orchestrator is non-deterministic. Even with a flow YAML spec it can
 misread STATE.json, skip feedback file checks, or hallucinate a transition.
-Moving FSM execution to Python eliminates this class of failures entirely:
-the flow YAML becomes an executable spec run by Python, not a hint read by
-an LLM.
+The Python FSM eliminates this class of failures: the flow YAML becomes an
+executable spec run by Python, not a hint read by an LLM.
+
+Running both engines on the same flows and prompts gives a direct, measurable
+comparison — the only variable is the routing engine.
+
+## What this plan does NOT do
+
+- Does NOT modify `orchestrator.md`
+- Does NOT modify any flow YAMLs
+- Does NOT modify any agents or skills (except adding the `engine` branch to
+  `go`/`start`/`team`)
+- Does NOT break LLM-driven routing for any existing topic
 
 ## Prior work this builds on
 

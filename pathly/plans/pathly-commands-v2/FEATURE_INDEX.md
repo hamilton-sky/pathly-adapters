@@ -2,9 +2,15 @@
 
 ## What this feature is
 
+**Read `pathly/plans/STRATEGY.md` first — it explains the dual-engine goal
+this plan serves.**
+
 Five new commands plus a `meet` enhancement and deferred contextual menu for
 four entry-point skills. Commands that need no LLM reasoning are Python CLI
 scripts; the one that spawns an agent is a full LLM skill.
+
+All commands work with **both routing engines** (LLM-driven and Python FSM).
+They read `engine` from `STATE.json` and route accordingly.
 
 ## Why it matters
 
