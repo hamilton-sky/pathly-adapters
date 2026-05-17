@@ -42,6 +42,8 @@ Read before writing:
   src/pathly_data/adapters/claude/_meta/log_skill.yaml
   src/pathly_data/adapters/codex/_meta/status_skill.yaml
   src/pathly_data/adapters/codex/_meta/log_skill.yaml
+  src/pathly_data/adapters/copilot/_meta/status_skill.yaml
+  src/pathly_data/adapters/copilot/_meta/log_skill.yaml
 
 ## pyproject.toml — add two entry points
 
@@ -127,10 +129,13 @@ log.md:
   Print the output exactly as returned.
   If command not found: print "Run pathly-setup first to install Pathly CLI tools."
 
-## Adapter YAML files
+## Adapter YAML files (claude, codex, copilot — all three)
 
-Follow the exact pattern of an existing _meta YAML in each adapter directory.
-natural_language: one sentence matching the story AC summary. No MCP syntax.
+Before writing any YAML: read one existing skill YAML from each adapter directory.
+They differ: Claude uses `tools:` list, Codex uses `model: gpt-*`, Copilot is a
+subset with fewer fields. Match each adapter's own conventions exactly.
+natural_language / description: one sentence matching the story AC summary.
+No MCP syntax — these skills call Python CLI via Bash, not MCP tools.
 
 ## Constraints
 
@@ -188,6 +193,8 @@ Read before writing:
   src/pathly_data/adapters/claude/_meta/ff_skill.yaml
   src/pathly_data/adapters/codex/_meta/back_skill.yaml
   src/pathly_data/adapters/codex/_meta/ff_skill.yaml
+  src/pathly_data/adapters/copilot/_meta/back_skill.yaml
+  src/pathly_data/adapters/copilot/_meta/ff_skill.yaml
 
 ## pyproject.toml — add two entry points
 
@@ -317,6 +324,7 @@ Read before writing:
   src/pathly_data/core/skills/fix.md
   src/pathly_data/adapters/claude/_meta/fix_skill.yaml
   src/pathly_data/adapters/codex/_meta/fix_skill.yaml
+  src/pathly_data/adapters/copilot/_meta/fix_skill.yaml
 
 ## fix.md — implement exactly this
 

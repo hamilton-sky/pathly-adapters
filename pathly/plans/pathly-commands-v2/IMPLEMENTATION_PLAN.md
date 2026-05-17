@@ -41,6 +41,8 @@ history from any surface, in or out of a conversation.
 | `src/pathly_data/adapters/claude/_meta/log_skill.yaml` | Adapter | Claude |
 | `src/pathly_data/adapters/codex/_meta/status_skill.yaml` | Adapter | Codex |
 | `src/pathly_data/adapters/codex/_meta/log_skill.yaml` | Adapter | Codex |
+| `src/pathly_data/adapters/copilot/_meta/status_skill.yaml` | Adapter | Copilot |
+| `src/pathly_data/adapters/copilot/_meta/log_skill.yaml` | Adapter | Copilot |
 | `pyproject.toml` | Edit | Add `pathly-status` and `pathly-log` entry points |
 
 ### `status_cli.py` — what to implement
@@ -260,6 +262,8 @@ it prompts via `input()` — no LLM needed.
 | `src/pathly_data/adapters/claude/_meta/ff_skill.yaml` | Adapter | Claude |
 | `src/pathly_data/adapters/codex/_meta/back_skill.yaml` | Adapter | Codex |
 | `src/pathly_data/adapters/codex/_meta/ff_skill.yaml` | Adapter | Codex |
+| `src/pathly_data/adapters/copilot/_meta/back_skill.yaml` | Adapter | Copilot |
+| `src/pathly_data/adapters/copilot/_meta/ff_skill.yaml` | Adapter | Copilot |
 | `pyproject.toml` | Edit | Add `pathly-back` and `pathly-ff` entry points |
 
 ### `back_cli.py` — what to implement
@@ -338,6 +342,7 @@ Thin wrappers are not applicable here; this is a full skill.
 | `src/pathly_data/core/skills/fix.md` | LLM skill | Feedback resolver |
 | `src/pathly_data/adapters/claude/_meta/fix_skill.yaml` | Adapter | Claude |
 | `src/pathly_data/adapters/codex/_meta/fix_skill.yaml` | Adapter | Codex |
+| `src/pathly_data/adapters/copilot/_meta/fix_skill.yaml` | Adapter | Copilot |
 
 ### `fix.md` — what to implement
 
