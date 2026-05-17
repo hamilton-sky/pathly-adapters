@@ -8,11 +8,12 @@
 ## What this feature is
 
 An Electron desktop app for configuring and live-monitoring the Pathly pipeline.
-Three core panels: **Sidebar** (file tree of all agents/skills/flows/templates),
-**Editor** (config form + markdown editor with Edit/Preview tabs), and
-**Flow Editor** (ReactFlow visual graph + YAML tab).
-Live monitor shows real-time FSM state — auto-detects MCP server (Python-driven)
-or falls back to file watching (LLM-driven).
+Opens to a **Home Screen** listing all known projects with their live FSM state.
+Each project opens in its own window. Three core panels per window: **Sidebar**
+(file tree of all agents/skills/flows/templates), **Editor** (config form +
+markdown editor with Edit/Preview tabs), and **Flow Editor** (ReactFlow visual
+graph + YAML tab). Live monitor shows real-time FSM state — auto-detects MCP
+server (Python-driven) or falls back to file watching (LLM-driven).
 
 **This is Part 1 of 2.** Part 1 covers scaffold + editor + flow editor + monitor.
 Part 2 (`pathly-studio-part-2`) covers packaging, auto-update, and install wizard.
@@ -55,8 +56,9 @@ Part 2 (`pathly-studio-part-2`) covers packaging, auto-update, and install wizar
 | `studio/src/main/index.ts` | Conv 1 | CREATE — main process: window creation, IPC registration |
 | `studio/src/main/preload/index.ts` | Conv 1 | CREATE — contextBridge: safe API exposed to renderer |
 | `studio/src/renderer/src/App.tsx` | Conv 1 | CREATE — root layout: sidebar + main panel |
-| `studio/src/renderer/src/store/index.ts` | Conv 1 | CREATE — Zustand store: selectedItem, projectPath, sidebarCollapsed |
-| `studio/src/renderer/src/types/index.ts` | Conv 1 | CREATE — shared types: PathlyItem, FlowYaml, FsmState, Event |
+| `studio/src/renderer/src/store/index.ts` | Conv 1 | CREATE — Zustand store: selectedItem, projectPath, projects[], sidebarCollapsed |
+| `studio/src/renderer/src/types/index.ts` | Conv 1 | CREATE — shared types: PathlyItem, ProjectEntry, FlowYaml, FsmState, Event |
+| `studio/src/renderer/src/components/HomeScreen.tsx` | Conv 1 | CREATE — project list with live FSM badge, Open Project button |
 | `studio/src/renderer/src/components/Sidebar.tsx` | Conv 1 | CREATE — collapsible tree: Flows/Skills/Agents/Templates/Monitor |
 | `studio/src/main/ipc/fs.ts` | Conv 2 | CREATE — IPC handlers: readFile, writeFile, listDir |
 | `studio/src/renderer/src/components/Editor/index.tsx` | Conv 2 | CREATE — panel: config form + markdown editor, tab switcher |
@@ -83,7 +85,7 @@ Part 2 (`pathly-studio-part-2`) covers packaging, auto-update, and install wizar
 
 | Conv | Title | Stories | Status | Key files touched |
 |---|---|---|---|---|
-| 1 | Electron scaffold + sidebar | S1, S2 | TODO | `studio/package.json`, `main/index.ts`, `preload/index.ts`, `App.tsx`, `Sidebar.tsx`, `store/index.ts`, `types/index.ts` |
+| 1 | Electron scaffold + home screen + sidebar | S1, S2, S7 | TODO | `studio/package.json`, `main/index.ts`, `preload/index.ts`, `App.tsx`, `HomeScreen.tsx`, `Sidebar.tsx`, `store/index.ts`, `types/index.ts` |
 | 2 | Editor panel | S3 | TODO | `ipc/fs.ts`, `Editor/index.tsx`, `ConfigForm.tsx`, `MarkdownEditor.tsx`, `MarkdownPreview.tsx` |
 | 3 | Flow editor | S4 | TODO | `FlowEditor/index.tsx`, `VisualView.tsx`, `YamlView.tsx` |
 | 4 | Live monitor + Publish | S5, S6 | TODO | `Monitor/`, `TopBar.tsx`, `ipc/watcher.ts`, `ipc/mcp.ts`, `ipc/shell.ts` |

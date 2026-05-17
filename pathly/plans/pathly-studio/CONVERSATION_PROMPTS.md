@@ -2,11 +2,12 @@
 
 ---
 
-## Conversation 1 — Electron scaffold + sidebar
+## Conversation 1 — Electron scaffold + home screen + sidebar
 
 Read `pathly/plans/pathly-studio/FEATURE_INDEX.md` first to orient yourself and verify codebase paths.
+Read `pathly/plans/pathly-studio/UX_DIAGRAMS.md` — diagrams 1, 2, 3, and 17 show the layouts you must match.
 
-You are building the Electron scaffold and sidebar for Pathly Studio — a desktop app for configuring and monitoring the Pathly pipeline. This is a brand new Node.js/Electron project in a `studio/` directory at the repo root (alongside the existing `src/` Python package). Nothing in `studio/` exists yet.
+You are building the Electron scaffold, multi-project home screen, and sidebar for Pathly Studio — a desktop app for configuring and monitoring the Pathly pipeline. This is a brand new Node.js/Electron project in a `studio/` directory at the repo root (alongside the existing `src/` Python package). Nothing in `studio/` exists yet.
 
 **Stack:** Electron + electron-vite + React + Zustand + TypeScript.
 **Security requirements (non-negotiable):** `contextIsolation: true`, `nodeIntegration: false`, all Node access via `contextBridge` only.
@@ -36,6 +37,10 @@ Export these types:
 ```ts
 export type PathlyItemType = 'flow' | 'skill' | 'agent' | 'template'
 export interface PathlyItem { name: string; path: string; type: PathlyItemType }
+export interface ProjectEntry {
+  path: string; name: string; lastOpened: number
+  activeTopic?: string; fsmState?: string
+}
 export interface FlowYaml { version: number; flow: string; states: string[]; transitions: Record<string, string[]>; agent_map: Record<string, string>; transition_rules?: Record<string, unknown>; transition_actions?: Record<string, unknown> }
 export interface FsmState { state: string; flow: string; engine: string; conv_count: number }
 export interface FsmEvent { ts: string; type: string; detail: string }
@@ -48,6 +53,7 @@ interface StudioStore {
   activePanel: 'editor' | 'flow' | 'monitor'
   sidebarCollapsed: boolean
   projectPath: string
+  projects: ProjectEntry[]
   activeTopic: string | null
   dirtyItems: Set<string>
   setSelectedItem: (item: PathlyItem | null) => void
@@ -57,12 +63,34 @@ interface StudioStore {
   setActiveTopic: (t: string | null) => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void
+  addProject: (p: ProjectEntry) => void
+  removeProject: (path: string) => void
+  updateProject: (path: string, patch: Partial<ProjectEntry>) => void
 }
 ```
-`projectPath` defaults to `process.env.PROJECT_PATH ?? ''`. Persist `sidebarCollapsed` and `projectPath` to localStorage.
+`projectPath` defaults to `''` (not from env — home screen handles project selection).
+Persist to localStorage: `sidebarCollapsed`, `projects`. Do NOT persist `selectedItem`, `activePanel`, or `projectPath`.
 
-**Phase 1.6 — App shell** (`studio/src/renderer/src/App.tsx`)
-Two-column flex layout: sidebar (240px, `flex-shrink: 0`) + main panel (`flex: 1`). When `sidebarCollapsed = true`, sidebar width = 0. Import and render `<Sidebar />`.
+**Phase 1.6 — App shell + home screen routing** (`studio/src/renderer/src/App.tsx`)
+- When `store.projectPath === ''`: render `<HomeScreen />`
+- When `store.projectPath !== ''`: render TopBar (with `[← Projects]` button) + two-column layout (Sidebar 240px + MainPanel flex-1)
+
+**Phase 1.6b — Home screen** (`studio/src/renderer/src/components/HomeScreen.tsx`)
+Match UX_DIAGRAMS.md diagram 17. On mount: for each project in `store.projects`, call `window.pathly.fs.list(project.path + '/pathly/plans/')` then read the newest topic's `STATE.json` — update store with `activeTopic` and `fsmState`. Render rows sorted by `lastOpened` desc.
+
+Row: `[project name]  [truncated path]  [FSM badge]  [time ago]  [→]  [×]`
+- `[→]` click: `store.setProjectPath(p.path)`, update `lastOpened`
+- Cmd/Ctrl+click `[→]`: `window.pathly.shell.openWindow(p.path)`
+- `[×]` click: `store.removeProject(p.path)` — no file deletion
+- `[+ Open project folder]`: `window.pathly.fs.pickFolder()` → if path returned, add to `store.projects`
+
+Add to preload:
+- `window.pathly.fs.pickFolder()` → `ipcRenderer.invoke('fs:pickFolder')`
+- `window.pathly.shell.openWindow(path)` → `ipcRenderer.invoke('shell:openWindow', path)`
+
+Add IPC handlers in main:
+- `fs:pickFolder` → `dialog.showOpenDialog({ properties: ['openDirectory'] })` → return `filePaths[0] ?? null`
+- `shell:openWindow(path)` → create new `BrowserWindow` with same webPreferences, load renderer URL with `PROJECT_PATH=path`
 
 **Phase 1.7 — Sidebar** (`studio/src/renderer/src/components/Sidebar.tsx`)
 On mount: call `window.pathly.fs.list` on each of these dirs relative to `projectPath`:
@@ -88,7 +116,7 @@ Dirty items: if `store.dirtyItems.has(item.path)`, show a `●` dot after the it
 ```
 cd studio && npm run dev
 ```
-Window opens → sidebar shows at least 3 flows and 5+ skills from the real `src/pathly_data/` → clicking an item logs its path to console → collapse button hides sidebar.
+Window opens to home screen → `[+ Open project folder]` picker works → selecting the repo root adds it as a row → `[→]` enters the project → sidebar shows at least 3 flows and 5+ skills → `[← Projects]` returns to home screen → collapse button hides sidebar.
 
 If verification fails and the fix requires out-of-scope changes, stop and report. If fundamentally broken, run `git checkout` on affected files and retry.
 

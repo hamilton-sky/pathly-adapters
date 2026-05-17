@@ -2,6 +2,25 @@
 
 ---
 
+## S7 — Multi-project home screen
+
+**As a** developer working on several repos that each use Pathly,
+**I want** a home screen that lists all my known projects with their live pipeline
+state,
+**so that** I can see at a glance what is running and open any project in one click.
+
+**Acceptance criteria:**
+- App opens to home screen when no project is loaded (first launch or all windows closed)
+- Home screen lists all previously opened projects (persisted in localStorage)
+- Each row shows: project name (folder name), path, active topic name, current FSM state badge, time since last activity
+- FSM state badge is read from `pathly/plans/*/STATE.json` at load time — no file watching on home screen
+- `[→]` button opens the project in the current window; Cmd/Ctrl+click opens in a new Electron window
+- `[+ Open project folder]` button opens a native folder picker dialog — adds the chosen path to the list
+- Projects with no `pathly/plans/` folder show "— nothing in progress"
+- Removing a project from the list does not delete any files
+
+---
+
 ## S1 — Electron app launches and displays the shell
 
 **As a** Pathly developer,

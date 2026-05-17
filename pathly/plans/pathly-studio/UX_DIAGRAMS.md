@@ -4,6 +4,49 @@ ASCII mockups for every section of the app. Builder should match these layouts.
 
 ---
 
+## 17. Home screen — multi-project list
+
+Shown on first launch and when `[← Projects]` is clicked in the top bar.
+
+```
+┌─ Pathly Studio ──────────────────────────────────────────────────────────────┐
+│                                                                               │
+│                        Pathly Studio                                          │
+│                                                                               │
+│  Recent projects                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  pathly-adapters          C:\Users\Yafit\pathly-adapters                │ │
+│  │  ● BUILDING  user-auth-refactor                    2 min ago       [→] [×]│
+│  ├─────────────────────────────────────────────────────────────────────────┤ │
+│  │  my-saas-app              C:\Users\Yafit\my-saas-app                    │ │
+│  │  ✓ DONE  payment-flow                              1 day ago       [→] [×]│
+│  ├─────────────────────────────────────────────────────────────────────────┤ │
+│  │  api-service              C:\Users\Yafit\api-service                    │ │
+│  │  — nothing in progress                             5 days ago      [→] [×]│
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                               │
+│  [+ Open project folder]                                                      │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
+
+FSM badge colours: `● BUILDING` = blue, `● BLOCKED` = red, `✓ DONE` = green, `— nothing` = grey.
+Cmd/Ctrl+click `[→]` opens the project in a new Electron window (for side-by-side monitoring).
+
+---
+
+## 18. Top bar — inside a project (with back button)
+
+```
+┌─ Pathly Studio ──────────────────────────────────────────────────────────────┐
+│ [← Projects]  Pathly Studio     user-auth-refactor ▼   ● MCP live [↑ Publish]│
+├────────────────┬─────────────────────────────────────────────────────────────┤
+```
+
+Clicking `[← Projects]` returns to the home screen without closing the window.
+
+---
+
 ## 1. Full app layout
 
 ```

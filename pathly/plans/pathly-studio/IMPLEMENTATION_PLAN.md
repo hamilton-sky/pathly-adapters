@@ -5,7 +5,7 @@
 
 ---
 
-## Phase 1 — Electron scaffold   ← Conversation: 1
+## Phase 1 — Electron scaffold + home screen   ← Conversation: 1
 
 **File:** `studio/package.json`
 **Done when:** `npm run dev` inside `studio/` opens an Electron window with a white screen (no errors in terminal or DevTools console).
@@ -84,18 +84,64 @@ contextBridge.exposeInMainWorld('pathly', {
 ```
 (watcher, mcp, shell added in Conv 4)
 
-### 1.4 Renderer shell + Zustand store
-
-**File:** `studio/src/renderer/src/store/index.ts`
-**Done when:** store imports without error, `selectedItem` defaults to null.
+### 1.4 Types + multi-project store
 
 **File:** `studio/src/renderer/src/types/index.ts`
-**Done when:** all shared types exported (PathlyItem, FlowYaml, FsmState, FsmEvent).
+**Done when:** all shared types exported — `PathlyItem`, `ProjectEntry`, `FlowYaml`, `FsmState`, `FsmEvent`.
+
+Add `ProjectEntry`:
+```ts
+export interface ProjectEntry {
+  path: string        // absolute path to repo root
+  name: string        // basename of path
+  lastOpened: number  // Date.now() timestamp
+  activeTopic?: string
+  fsmState?: string   // read from STATE.json at load time
+}
+```
+
+**File:** `studio/src/renderer/src/store/index.ts`
+**Done when:** store imports without error; `projects` persists to localStorage; `selectedItem` defaults to null; `projectPath` defaults to `''`.
+
+Store shape additions for multi-project:
+```ts
+projects: ProjectEntry[]
+addProject:    (p: ProjectEntry) => void
+removeProject: (path: string) => void
+updateProject: (path: string, patch: Partial<ProjectEntry>) => void
+```
+Persist: `projects`, `sidebarCollapsed`. Do NOT persist `selectedItem` or `activePanel`.
+
+Add to preload (`preload/index.ts`):
+```ts
+fs: { read, write, list, pickFolder }   // pickFolder added here
+shell: { openWindow }                   // openWindow added here
+```
+
+Add IPC handlers:
+- `fs:pickFolder` → `dialog.showOpenDialog({ properties: ['openDirectory'] })` → returns path string or null
+- `shell:openWindow(path)` → spawns new `BrowserWindow` with `PROJECT_PATH=path` in env
+
+### 1.5 Home screen
+
+**File:** `studio/src/renderer/src/components/HomeScreen.tsx`
+**Done when:** app shows home screen when `store.projectPath === ''`; clicking `[→]` sets `projectPath` and transitions to main layout; `[+ Open project folder]` opens native picker and adds project to list.
+
+On mount: for each entry in `store.projects`, read `<entry.path>/pathly/plans/` via IPC, find the most recently modified topic folder, read its `STATE.json`, call `store.updateProject(entry.path, { activeTopic, fsmState })`. Run in parallel.
+
+Row layout: project name (bold) + truncated path + FSM state badge + time since `lastOpened` + `[→]` + `[×]`.
+- `[→]` click: `store.setProjectPath(entry.path)`, `store.updateProject(entry.path, { lastOpened: Date.now() })`
+- Cmd/Ctrl+click `[→]`: call `window.pathly.shell.openWindow(entry.path)`
+- `[×]` click: `store.removeProject(entry.path)` — no file deletion, no confirmation needed
+
+### 1.6 App.tsx routing + back button
 
 **File:** `studio/src/renderer/src/App.tsx`
-**Done when:** renders a two-column flex layout: sidebar (240px, fixed) + main panel (flex-1).
+**Done when:** renders `<HomeScreen />` when `projectPath === ''`; renders TopBar + Sidebar + MainPanel when `projectPath !== ''`.
 
-### 1.5 Sidebar
+TopBar gets a `[← Projects]` button at the far left — clicking it calls `store.setProjectPath('')`, returning to the home screen without closing the window.
+
+### 1.7 Sidebar
 
 **File:** `studio/src/renderer/src/components/Sidebar.tsx`
 **Done when:**
@@ -105,7 +151,7 @@ contextBridge.exposeInMainWorld('pathly', {
 - `[◄]` button sets `sidebarCollapsed = true`; main panel expands to full width
 - Collapsed state saved to localStorage on change
 
-**Verify:** `npm run dev` → sidebar shows at least 3 flows and 10+ skills from the real codebase.
+**Verify:** `npm run dev` → home screen lists any previously opened projects → clicking `[→]` enters the project → sidebar shows at least 3 flows and 10+ skills.
 
 **Purpose:** navigation layer — all other panels depend on item selection.
 
