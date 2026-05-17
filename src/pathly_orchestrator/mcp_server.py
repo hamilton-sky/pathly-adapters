@@ -103,11 +103,21 @@ def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> P
     return Path(project_root) / relative
 
 
-def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
-    agent = flow_config["agent_map"][state_name]
-    agent_text = files("pathly_data").joinpath(f"core/agents/{agent}.md").read_text(
+def _load_agent_text(agent: str) -> str:
+    # Agents with "/" (e.g. "team/build") live in core/skills/.
+    # Top-level agents (e.g. "builder") live in core/agents/.
+    if "/" in agent:
+        return files("pathly_data").joinpath(f"core/skills/{agent}.md").read_text(
+            encoding="utf-8"
+        )
+    return files("pathly_data").joinpath(f"core/agents/{agent}.md").read_text(
         encoding="utf-8"
     )
+
+
+def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
+    agent = flow_config["agent_map"][state_name]
+    agent_text = _load_agent_text(agent)
     context = (
         f"\n\n## Current task\n"
         f"Feature: {storage_path.name}\n"
@@ -118,9 +128,7 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
 
 
 def build_prompt_for_agent(flow_config: dict, agent_name: str, storage_path: Path) -> str:
-    agent_text = files("pathly_data").joinpath(f"core/agents/{agent_name}.md").read_text(
-        encoding="utf-8"
-    )
+    agent_text = _load_agent_text(agent_name)
     context = (
         f"\n\n## Current task\n"
         f"Feature: {storage_path.name}\n"
