@@ -1,0 +1,65 @@
+version: 1
+flow: test
+storage_path: "pathly/plans/{topic}/"
+
+states:
+  - STORMING
+  - PLANNING
+  - BUILDING
+  - REVIEWING
+  - TESTING
+  - DONE
+
+transitions:
+  STORMING:
+    - PLANNING
+  PLANNING:
+    - BUILDING
+  BUILDING:
+    - REVIEWING
+  REVIEWING:
+    - BUILDING
+    - TESTING
+  TESTING:
+    - BUILDING
+    - DONE
+  DONE: []
+
+agent_map:
+  STORMING: team/discover
+  PLANNING: team/plan
+  BUILDING: team/build
+  REVIEWING: team/review
+  TESTING: team/test
+
+# Priority order is fixed: HUMAN_QUESTIONS > BLOCKED_ON_HUMAN > ARCH_FEEDBACK >
+# DESIGN_QUESTIONS > IMPL_QUESTIONS > REVIEW_FAILURES > TEST_FAILURES.
+feedback_routing:
+  HUMAN_QUESTIONS: human
+  BLOCKED_ON_HUMAN: human
+  ARCH_FEEDBACK: architect
+  DESIGN_QUESTIONS: architect
+  IMPL_QUESTIONS: planner
+  REVIEW_FAILURES: builder
+  TEST_FAILURES: builder
+
+transition_rules:
+  PLANNING:
+    on_artifact:
+      IMPLEMENTATION_PLAN.md: BUILDING
+    default: PLANNING
+  BUILDING:
+    default: REVIEWING
+  REVIEWING:
+    on_artifact:
+      REVIEW_FAILURES.md: BUILDING
+    default: TESTING
+  TESTING:
+    on_artifact:
+      TEST_FAILURES.md: TESTING
+    default: DONE
+
+transition_actions:
+  "BUILDING->REVIEWING":
+    - skill: commit
+      message: "feat: complete building stage"
