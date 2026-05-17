@@ -12,6 +12,8 @@ Parse `$ARGUMENTS` (order doesn't matter):
 - `lite` → `rigor = lite` | `standard` → `rigor = standard` | `strict` → `rigor = strict`
 - `nano` → `mode = nano`
 - `fast` → `autoFlow = true`
+- `mcp` → `engine = mcp` | `llm` → `engine = llm`
+- Default: `engine = auto`
 - `plan` → `entryStage = plan` | `build` → `entryStage = build` | `test` → `entryStage = test`
 - Defaults: `entryStage = discovery`, `rigor = lite`
 
@@ -56,11 +58,22 @@ Choose execution mode:
 
 Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
-## FSM execution loop
+## Engine selection
 
-After mode selection is complete (autoFlow is set), run the FSM loop using MCP tools.
+After mode selection is complete (autoFlow is set), select the FSM engine.
 
 `PROJECT_ROOT` = the absolute path to the user's project directory (cwd at skill invocation).
+
+- If `engine = llm` → go to **LLM engine** below.
+- If `engine = mcp` → go to **MCP engine** below.
+- If `engine = auto` (default):
+  Try calling `{{FSM_NEXT_ACTION}}(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`.
+  - If the call succeeds → continue with the result in the **MCP engine** loop.
+  - If the tool is unavailable or returns a connection error → fall back to **LLM engine**.
+
+---
+
+## MCP engine (Python FSM)
 
 ### Step 1 — Get next action
 
@@ -172,6 +185,22 @@ Display contextual menu after every call to `{{FSM_COMPLETE_STAGE}}` before exec
 ### Step 5 — Repeat
 
 Repeat Steps 2–4 until `done=true`.
+
+---
+
+## LLM engine (orchestrator agent)
+
+Spawn the **orchestrator** agent with **exactly these 5 parameters and nothing else**:
+- flow_config: src/pathly_data/core/flows/team.flow.yaml
+- topic: [parsed feature name]
+- rigor: [parsed rigor]
+- autoFlow: [true/false]
+- entryStage: [parsed entryStage, default: discovery]
+
+**CRITICAL:** Pass ONLY the 5 parameters above. Do NOT include feature descriptions,
+file paths, implementation details, or conversation history. The FSM discovers all
+context through its own agents. Passing extra context bypasses the flow and breaks
+the pipeline.
 
 ## Nano mode
 

@@ -63,11 +63,15 @@ Confirm the symptom is written before continuing.
 
 ---
 
-## FSM execution loop
+## Engine selection
 
-After the symptom is confirmed, run the FSM loop using MCP tools.
+Determine which FSM engine to use. `PROJECT_ROOT` = cwd at skill invocation.
 
-`PROJECT_ROOT` = the absolute path to the user's project directory (cwd at skill invocation).
+- If called with `engine=llm` → go to **LLM engine** below.
+- If called with `engine=mcp` → go to **MCP engine** below.
+- Default (`auto`): try `{{FSM_NEXT_ACTION}}`; if unavailable → **LLM engine**.
+
+## MCP engine (Python FSM)
 
 Call FSM tool: `{{FSM_NEXT_ACTION}}(flow="debug", topic=SYMPTOM_NAME, project_root=PROJECT_ROOT)`
 
@@ -80,3 +84,11 @@ Execute the returned agent instructions. When complete, call:
 
 Handle blocked, decide, and feedback cases using the same protocol as team.md.
 Repeat until `done=true`.
+
+## LLM engine (orchestrator agent)
+
+Spawn the **orchestrator** agent with:
+- flow_config: src/pathly_data/core/flows/debug.flow.yaml
+- topic: [SYMPTOM_NAME]
+- rigor: lite
+- autoFlow: [autoFlow]

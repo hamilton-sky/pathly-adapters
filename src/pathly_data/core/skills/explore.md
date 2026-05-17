@@ -101,11 +101,15 @@ message (parallel tool calls). Sequential scout launches are wrong.
 
 ---
 
-## FSM execution loop
+## Engine selection
 
-After the question is framed and confirmed, run the FSM loop using MCP tools.
+Determine which FSM engine to use. `PROJECT_ROOT` = cwd at skill invocation.
 
-`PROJECT_ROOT` = the absolute path to the user's project directory (cwd at skill invocation).
+- If called with `engine=llm` → go to **LLM engine** below.
+- If called with `engine=mcp` → go to **MCP engine** below.
+- Default (`auto`): try `{{FSM_NEXT_ACTION}}`; if unavailable → **LLM engine**.
+
+## MCP engine (Python FSM)
 
 Call FSM tool: `{{FSM_NEXT_ACTION}}(flow="explore", topic=TOPIC, project_root=PROJECT_ROOT)`
 
@@ -118,6 +122,14 @@ Execute the returned agent instructions. When complete, call:
 Handle blocked, decide, and feedback cases using the same protocol as team.md.
 Repeat until `done=true`.
 
-**Important:** The scout spawning rules in the section above still apply during TRACING state.
-The MCP server does not enforce them — the skill must enforce the min/max scout count and
-parallelism rules from the "## Scout spawning rules — MANDATORY" section.
+**Important:** The scout spawning rules above still apply during TRACING state.
+The MCP server does not enforce them — the skill must enforce min/max scout count
+and parallelism rules from the "## Scout spawning rules — MANDATORY" section.
+
+## LLM engine (orchestrator agent)
+
+Spawn the **orchestrator** agent with:
+- flow_config: src/pathly_data/core/flows/explore.flow.yaml
+- topic: [TOPIC]
+- rigor: lite
+- autoFlow: [autoFlow]
