@@ -25,7 +25,12 @@ export function registerFsHandlers(): void {
     if (!isPathSafe(filePath)) {
       throw new Error('Path outside home directory is not allowed')
     }
-    return fs.readFileSync(filePath, 'utf-8')
+    try {
+      return fs.readFileSync(filePath, 'utf-8')
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw err
+    }
   })
 
   ipcMain.handle('fs:write', async (_event, filePath: string, content: string): Promise<void> => {

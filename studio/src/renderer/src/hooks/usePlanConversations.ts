@@ -29,6 +29,7 @@ export function usePlanConversations(): { planConvs: ConvRow[] } {
     async function loadPlan(): Promise<void> {
       try {
         const md = await readFile(`${projectPath}/pathly/plans/${activeTopic}/PROGRESS.md`)
+        if (!md) { setPlanConvs([]); return }
         setPlanConvs(parseProgressMd(md))
       } catch { setPlanConvs([]) }
     }

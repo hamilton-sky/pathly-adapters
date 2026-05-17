@@ -58,8 +58,15 @@ export function Monitor(): JSX.Element {
     init()
 
     if (projectPath && activeTopic) {
-      const eventsPath = `${projectPath}/pathly/plans/${activeTopic}/EVENTS.jsonl`
-      readFile(eventsPath).then((content) => {
+      const base = `${projectPath}/pathly/plans/${activeTopic}`
+
+      readFile(`${base}/STATE.json`).then((content) => {
+        if (!content) return
+        try { setFsmState(JSON.parse(content)) } catch { /* ignore malformed */ }
+      }).catch(() => { /* file may not exist yet */ })
+
+      readFile(`${base}/EVENTS.jsonl`).then((content) => {
+        if (!content) return
         const parsed: FsmEvent[] = []
         for (const line of content.split('\n')) {
           const trimmed = line.trim()
@@ -71,9 +78,7 @@ export function Monitor(): JSX.Element {
           }
         }
         setEvents(parsed)
-      }).catch(() => {
-        // file may not exist yet
-      })
+      }).catch(() => { /* file may not exist yet */ })
     }
 
     const removeListener = onWatchEvent((data) => {
