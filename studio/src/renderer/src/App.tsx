@@ -2,6 +2,7 @@ import { useStore } from './store'
 import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
+import { FlowEditor } from './components/FlowEditor'
 
 function TopBar(): JSX.Element {
   const { setProjectPath } = useStore()
@@ -18,10 +19,11 @@ function TopBar(): JSX.Element {
 function MainPanel(): JSX.Element {
   const { activePanel, selectedItem } = useStore()
   if (activePanel === 'editor' && selectedItem) return <Editor />
+  if (activePanel === 'flow' && selectedItem) return <FlowEditor />
   if (activePanel === 'flow')
     return (
       <div style={mainPanelStyles.panel}>
-        <span style={mainPanelStyles.placeholder}>Flow editor coming in Conv 3</span>
+        <span style={mainPanelStyles.placeholder}>Select a flow from the sidebar</span>
       </div>
     )
   if (activePanel === 'monitor')
