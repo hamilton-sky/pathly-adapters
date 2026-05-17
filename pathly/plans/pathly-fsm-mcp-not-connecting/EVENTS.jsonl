@@ -1,1 +1,2 @@
 {"type": "FSM_INIT", "state": "BUILDING", "topic": "pathly-fsm-mcp-not-connecting", "rigor": "lite", "autoFlow": true}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-18T02:35:00"}
