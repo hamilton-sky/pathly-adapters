@@ -25,12 +25,38 @@ interface CardState {
 
 function parseProgressMd(md: string): ConvRow[] {
   const rows: ConvRow[] = []
+  let inConvBreakdown = false
+  let headerParsed = false
+
   for (const line of md.split('\n')) {
-    const parts = line.split('|').map((p) => p.trim())
-    if (parts.length < 5) continue
-    const num = parseInt(parts[1], 10)
-    if (isNaN(num)) continue
-    rows.push({ num, title: parts[2], status: parts[4].toUpperCase() })
+    const trimmed = line.trim()
+
+    if (trimmed.startsWith('## Conversation Breakdown')) {
+      inConvBreakdown = true
+      headerParsed = false
+      continue
+    }
+    if (inConvBreakdown && trimmed.startsWith('##')) {
+      break
+    }
+    if (!inConvBreakdown) continue
+
+    if (trimmed.startsWith('|')) {
+      const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
+      // Skip header row and separator row
+      if (!headerParsed) {
+        headerParsed = true
+        continue
+      }
+      if (parts[0]?.startsWith('---')) continue
+
+      const num = parseInt(parts[0], 10)
+      if (isNaN(num)) continue
+      // Status is always the last non-empty cell
+      const status = parts[parts.length - 1] ?? ''
+      const title = parts[1] ?? ''
+      rows.push({ num, title, status: status.toUpperCase() })
+    }
   }
   return rows
 }
