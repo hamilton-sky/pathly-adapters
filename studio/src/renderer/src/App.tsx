@@ -3,18 +3,8 @@ import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
 import { FlowEditor } from './components/FlowEditor'
-
-function TopBar(): JSX.Element {
-  const { setProjectPath } = useStore()
-  return (
-    <div style={topBarStyles.bar}>
-      <button style={topBarStyles.backBtn} onClick={() => setProjectPath('')}>
-        ← Projects
-      </button>
-      <span style={topBarStyles.title}>Pathly Studio</span>
-    </div>
-  )
-}
+import { TopBar } from './components/TopBar'
+import { Monitor } from './components/Monitor'
 
 function MainPanel(): JSX.Element {
   const { activePanel, selectedItem } = useStore()
@@ -26,12 +16,7 @@ function MainPanel(): JSX.Element {
         <span style={mainPanelStyles.placeholder}>Select a flow from the sidebar</span>
       </div>
     )
-  if (activePanel === 'monitor')
-    return (
-      <div style={mainPanelStyles.panel}>
-        <span style={mainPanelStyles.placeholder}>Monitor coming in Conv 4</span>
-      </div>
-    )
+  if (activePanel === 'monitor') return <Monitor />
   return (
     <div style={mainPanelStyles.panel}>
       <span style={mainPanelStyles.placeholder}>Select an item from the sidebar</span>
@@ -74,32 +59,6 @@ const appStyles: Record<string, React.CSSProperties> = {
   }
 }
 
-const topBarStyles: Record<string, React.CSSProperties> = {
-  bar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    padding: '0 16px',
-    height: '44px',
-    backgroundColor: '#181825',
-    borderBottom: '1px solid #313244',
-    flexShrink: 0
-  },
-  backBtn: {
-    background: 'none',
-    border: '1px solid #45475a',
-    borderRadius: '4px',
-    color: '#cdd6f4',
-    cursor: 'pointer',
-    padding: '4px 10px',
-    fontSize: '13px'
-  },
-  title: {
-    fontSize: '15px',
-    fontWeight: 600,
-    color: '#cba6f7'
-  }
-}
 
 const mainPanelStyles: Record<string, React.CSSProperties> = {
   panel: {

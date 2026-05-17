@@ -11,6 +11,16 @@ declare global {
       }
       shell: {
         openWindow: (path: string) => Promise<void>
+        publish: (cwd: string) => Promise<number | null>
+        onOutput: (cb: (line: string) => void) => () => void
+      }
+      mcp: {
+        ping: () => Promise<boolean>
+        state: (topic: string) => Promise<unknown>
+      }
+      watch: {
+        start: (projectPath: string, topic: string) => Promise<void>
+        onEvent: (cb: (data: { path: string; content: string }) => void) => () => void
       }
     }
   }

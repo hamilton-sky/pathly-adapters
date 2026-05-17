@@ -1,6 +1,9 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { registerFsHandlers } from './ipc/fs'
+import { registerWatcherHandlers } from './ipc/watcher'
+import { registerMcpHandlers } from './ipc/mcp'
+import { registerShellHandlers } from './ipc/shell'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -37,14 +40,15 @@ function createWindow(projectPath?: string): BrowserWindow {
 }
 
 app.whenReady().then(() => {
-  registerIpcHandlers()
-  createWindow()
+  const mainWin = createWindow()
+  registerIpcHandlers(mainWin)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
     }
   })
+
 })
 
 app.on('window-all-closed', () => {
@@ -53,7 +57,7 @@ app.on('window-all-closed', () => {
   }
 })
 
-function registerIpcHandlers(): void {
+function registerIpcHandlers(win: BrowserWindow): void {
   ipcMain.handle('fs:pickFolder', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return result.filePaths[0] ?? null
@@ -64,4 +68,7 @@ function registerIpcHandlers(): void {
   })
 
   registerFsHandlers()
+  registerWatcherHandlers(win)
+  registerMcpHandlers()
+  registerShellHandlers(win)
 }
