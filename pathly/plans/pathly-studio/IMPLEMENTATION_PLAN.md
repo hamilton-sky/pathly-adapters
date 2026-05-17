@@ -1,0 +1,265 @@
+# IMPLEMENTATION_PLAN.md — pathly-studio
+
+> Pre-flight: before Conv 1, run `node --version` and `npm --version` to record baseline.
+> If either is missing, stop and report to user before proceeding.
+
+---
+
+## Phase 1 — Electron scaffold   ← Conversation: 1
+
+**File:** `studio/package.json`
+**Done when:** `npm run dev` inside `studio/` opens an Electron window with a white screen (no errors in terminal or DevTools console).
+
+### 1.1 Init the studio package
+
+Create `studio/` at the repo root (alongside `src/`). Initialize with:
+
+```json
+{
+  "name": "pathly-studio",
+  "version": "0.1.0",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview"
+  }
+}
+```
+
+Install deps:
+```
+npm install electron electron-vite react react-dom zustand
+npm install -D @types/react @types/react-dom typescript vite @vitejs/plugin-react
+```
+
+**File:** `studio/electron.vite.config.ts`
+**Done when:** vite resolves main/preload/renderer entry points without error.
+
+### 1.2 Main process
+
+**File:** `studio/src/main/index.ts`
+**Done when:** window opens at 1280×800, DevTools open in dev mode, `contextIsolation: true`, `nodeIntegration: false`.
+
+```ts
+import { app, BrowserWindow } from 'electron'
+import { join } from 'path'
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1280, height: 800,
+    title: 'Pathly Studio',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    }
+  })
+  if (process.env.ELECTRON_RENDERER_URL) {
+    win.loadURL(process.env.ELECTRON_RENDERER_URL)
+    win.webContents.openDevTools()
+  } else {
+    win.loadFile(join(__dirname, '../../renderer/index.html'))
+  }
+}
+
+app.whenReady().then(createWindow)
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
+```
+
+### 1.3 Preload / contextBridge
+
+**File:** `studio/src/main/preload/index.ts`
+**Done when:** `window.pathly` exists in renderer DevTools console.
+
+Expose only:
+```ts
+contextBridge.exposeInMainWorld('pathly', {
+  fs: {
+    read:  (path: string) => ipcRenderer.invoke('fs:read', path),
+    write: (path: string, content: string) => ipcRenderer.invoke('fs:write', { path, content }),
+    list:  (dir: string) => ipcRenderer.invoke('fs:list', dir),
+  }
+})
+```
+(watcher, mcp, shell added in Conv 4)
+
+### 1.4 Renderer shell + Zustand store
+
+**File:** `studio/src/renderer/src/store/index.ts`
+**Done when:** store imports without error, `selectedItem` defaults to null.
+
+**File:** `studio/src/renderer/src/types/index.ts`
+**Done when:** all shared types exported (PathlyItem, FlowYaml, FsmState, FsmEvent).
+
+**File:** `studio/src/renderer/src/App.tsx`
+**Done when:** renders a two-column flex layout: sidebar (240px, fixed) + main panel (flex-1).
+
+### 1.5 Sidebar
+
+**File:** `studio/src/renderer/src/components/Sidebar.tsx`
+**Done when:**
+- Reads `src/pathly_data/core/` subdirs via `window.pathly.fs.list`
+- Renders four collapsible sections: Flows / Skills / Agents / Templates
+- Clicking any item calls `store.setSelectedItem(item)`
+- `[◄]` button sets `sidebarCollapsed = true`; main panel expands to full width
+- Collapsed state saved to localStorage on change
+
+**Verify:** `npm run dev` → sidebar shows at least 3 flows and 10+ skills from the real codebase.
+
+**Purpose:** navigation layer — all other panels depend on item selection.
+
+---
+
+## Phase 2 — Editor panel   ← Conversation: 2
+
+### 2.1 IPC filesystem handlers
+
+**File:** `studio/src/main/ipc/fs.ts`
+**Done when:** `ipcMain.handle('fs:read', ...)` returns file content; `fs:write` writes atomically (tmp + rename); `fs:list` returns filenames in directory.
+
+Register all handlers in `main/index.ts` before `createWindow()`.
+
+Path guard: reject any path not under `app.getPath('home')` — prevents write outside project.
+
+### 2.2 Editor panel
+
+**File:** `studio/src/renderer/src/components/Editor/index.tsx`
+**Done when:** selecting a skill/agent/template in sidebar shows the editor panel with the file's content split into config form (top) and markdown area (bottom).
+
+### 2.3 Config form
+
+**File:** `studio/src/renderer/src/components/Editor/ConfigForm.tsx`
+**Done when:**
+- Parses YAML frontmatter between opening and closing `---`
+- Renders fields: name (text), description (text), adapters (checkboxes: claude/codex/copilot), tools (comma-separated text)
+- If no frontmatter: all fields empty, saving adds frontmatter block
+
+### 2.4 Markdown editor
+
+**File:** `studio/src/renderer/src/components/Editor/MarkdownEditor.tsx`
+**Done when:** CodeMirror instance loads with markdown language support, shows file content below frontmatter, syntax highlighted.
+
+Install: `npm install @codemirror/lang-markdown @codemirror/view @codemirror/state`
+
+### 2.5 Preview + tab switcher
+
+**File:** `studio/src/renderer/src/components/Editor/MarkdownPreview.tsx`
+**Done when:** `marked(content)` output rendered as HTML in a styled div — headings, code blocks, and lists visually match GitHub README style.
+
+Install: `npm install marked`
+
+Tab switcher in `Editor/index.tsx`:
+- `[ Edit ]` tab: shows MarkdownEditor
+- `[ Preview ]` tab: shows MarkdownPreview
+- `[⊟ Split]` button: side-by-side flex layout, editor left (50%) + preview right (50%)
+
+Save button: merges config form values back into frontmatter + markdown body → writes via `window.pathly.fs.write`. Unsaved changes: dot on sidebar item (store tracks `dirtyItems: Set<string>`).
+
+**Verify:** open `src/pathly_data/core/skills/go.md` → edit a word in Edit tab → click Preview → word appears rendered → click Save → file on disk updated.
+
+**Purpose:** core editing workflow — enables all config + prompt editing without leaving the app.
+
+---
+
+## Phase 3 — Flow editor   ← Conversation: 3
+
+### 3.1 Flow editor shell
+
+**File:** `studio/src/renderer/src/components/FlowEditor/index.tsx`
+**Done when:** selecting a flow in sidebar shows the flow editor panel with `[ Visual ]` and `[ YAML ]` tabs.
+
+### 3.2 Visual view
+
+**File:** `studio/src/renderer/src/components/FlowEditor/VisualView.tsx`
+**Done when:**
+- Parses flow YAML (`states`, `transitions`, `agent_map`, `transition_rules`)
+- Renders states as rectangular nodes (state name + agent name below)
+- Renders transitions as directed edges; label = artifact name or "default"
+- ReactFlow auto-layout positions nodes left-to-right
+
+Install: `npm install reactflow`
+
+Click node → slide-in panel on right:
+- Edit agent name (text input)
+- Add/remove transition_rules entries (artifact filename → target state)
+
+Click edge → slide-in panel:
+- Edit artifact trigger
+- Add/remove transition_actions (skill name + message)
+
+### 3.3 YAML view
+
+**File:** `studio/src/renderer/src/components/FlowEditor/YamlView.tsx`
+**Done when:** CodeMirror loads with YAML language support; js-yaml parse runs on every change; parse error shows red banner at top; Save disabled when error present.
+
+Install: `npm install @codemirror/lang-yaml js-yaml`
+
+Switching Visual → YAML: serialize current graph state back to YAML string.
+Switching YAML → Visual: parse YAML and re-render graph.
+
+Save: writes YAML to `src/pathly_data/core/flows/<name>.flow.yaml` via IPC.
+
+**Verify:** open `team.flow.yaml` in Visual tab → 6 nodes visible (STORMING through DONE) → switch to YAML tab → raw YAML visible → edit one state name → red error appears → fix → Save → file on disk updated.
+
+**Purpose:** visual FSM editing — the defining feature of the app for flow authoring.
+
+---
+
+## Phase 4 — Live monitor + Publish   ← Conversation: 4
+
+### 4.1 Top bar
+
+**File:** `studio/src/renderer/src/components/TopBar.tsx`
+**Done when:** top bar renders: app title left, topic selector dropdown center, connection status badge + Publish button right.
+
+Topic selector scans `pathly/plans/` via `window.pathly.fs.list` on mount and on 5-second interval. Excludes `.archive/`.
+
+### 4.2 Monitor panel
+
+**File:** `studio/src/renderer/src/components/Monitor/index.tsx`
+**Done when:** clicking Monitor in sidebar shows the monitor panel with FsmView + EventLog.
+
+### 4.3 FSM progress bar
+
+**File:** `studio/src/renderer/src/components/Monitor/FsmView.tsx`
+**Done when:** renders states as horizontal pills; active state has blue border; completed states show `✓`; blocked state shows `⚠ BLOCKED: <filename>`.
+
+State data flows from Zustand `fsmState` — either from MCP or file watch (both set the same store field).
+
+### 4.4 Event log
+
+**File:** `studio/src/renderer/src/components/Monitor/EventLog.tsx`
+**Done when:** renders events as `HH:MM:SS  EVENT_TYPE  detail` rows; scrollable; newest event at bottom; auto-scrolls on new event.
+
+### 4.5 File watcher IPC
+
+**File:** `studio/src/main/ipc/watcher.ts`
+**Done when:** `ipcMain.handle('watch:start', path)` starts chokidar watch on that path; on file change, pushes `watch:event` to renderer with new file content.
+
+Install: `npm install chokidar`
+
+Watch both `STATE.json` and `EVENTS.jsonl` for the active topic.
+Parse STATE.json → dispatch to `store.setFsmState`.
+Parse EVENTS.jsonl (last 50 lines) → dispatch to `store.setEvents`.
+
+### 4.6 MCP client IPC
+
+**File:** `studio/src/main/ipc/mcp.ts`
+**Done when:** `ipcMain.handle('mcp:ping')` attempts to call the MCP server and returns `true` within 500ms or `false` on timeout; `mcp:state` returns parsed FsmState or null.
+
+On monitor open: call `mcp:ping` → if true set `monitorSource = 'mcp'`; else set `monitorSource = 'filewatch'` and start watcher.
+Poll `mcp:state` every 2 seconds when source = mcp.
+
+Connection status badge: `● MCP live` (green) or `○ File watch` (grey).
+
+### 4.7 Publish IPC
+
+**File:** `studio/src/main/ipc/shell.ts`
+**Done when:** `ipcMain.handle('shell:publish', cwd)` spawns `pip install -e .` with args array (no shell), streams stdout/stderr lines to renderer via `shell:output` push event; resolves with exit code.
+
+Renderer: log panel slides up on Publish click, streams lines, shows success/error banner on exit, auto-hides on success after 3 seconds.
+
+**Verify:** click Publish → log panel opens → pip output streams → "Published successfully" banner appears.
+
+**Purpose:** closes the edit-publish loop entirely within the app.
