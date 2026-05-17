@@ -1,51 +1,55 @@
 # Root Cause — pathly-fsm-mcp-connection
 
-## What the server does
+## Previous (incorrect) diagnosis
 
-The `mcp_server.py` implementation is correct. Manual testing confirms:
-- `initialize` → responds with `{"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, ...}`
-- `notifications/initialized` → silent (correct)
-- `tools/list` → returns both `next_action` and `complete_stage` with correct schemas
+The prior investigation blamed the setuptools `.exe` wrapper for stdout buffering issues on Windows.
+This was **wrong**. After updating `settings.json` to `python -m` form and confirming the server
+responds correctly to initialize + tools/list, tools still never appeared after restarts.
 
-## Root cause
+---
 
-**`settings.json` registers `pathly-fsm` using the setuptools `.exe` wrapper instead of `python.exe -m`.**
+## Actual root cause
 
-```json
-// Current (broken)
-"pathly-fsm": {
-  "command": "C:\\Users\\Yafit\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\pathly-fsm.exe"
-}
+**`mcpServers` in `~/.claude/settings.json` is not loaded in Claude Code desktop CCD sessions.**
 
-// Required (matches pathly-telemetry which works)
-"pathly-fsm": {
-  "command": "C:\\Users\\Yafit\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
-  "args": ["-m", "pathly_orchestrator.mcp_server"]
+The desktop app runs in CCD mode (epitaxy sidebar, worktree sessions). In this mode all MCP
+servers are provided by the CCD daemon via `replaceRemoteMcpServers`. User-configured local
+stdio servers from `settings.json` are handled by `LocalMcpServerManager`, which is **never
+populated in CCD mode**.
+
+### Log evidence (`C:\Users\Yafit\AppData\Roaming\Claude\logs\main.log`, every restart since 2026-05-14)
+
+```
+[LocalMcpServerManager] Closing all (0 servers)
+[CCD] LocalSessions.replaceRemoteMcpServers: serverCount=0
+[CCD] [replaceRemoteMcpServers] Calling SDK with 7 total servers {
+  serverNames: ['Claude in Chrome', 'mcp-registry', 'Claude Preview', 'ccd_session', ...]
 }
 ```
 
-When Claude Code (Electron/Node.js) spawns a setuptools `.exe` wrapper as a child process on Windows,
-the child's stdout pipe is not flushed before Claude Code's MCP client times out the handshake.
-Direct `python.exe -m` invocation uses a different startup path that doesn't have this buffering issue.
+- `LocalMcpServerManager` is always 0 — never loads from `settings.json`
+- `serverCount=0` in every `replaceRemoteMcpServers` call — zero user servers passed to CCD
+- The 7 servers are fixed CCD-owned servers: `Claude in Chrome`, `mcp-registry`, `Claude Preview`,
+  `ccd_session`, `ccd_directory`, `ccd_session_mgmt`, `scheduled-tasks`
 
-Evidence:
-1. `pathly-telemetry` uses `python.exe` + `-m pathly_telemetry` — it works.
-2. `pathly-fsm` uses `pathly-fsm.exe` — it doesn't appear at session start.
-3. `python -m pathly_orchestrator.mcp_server` tested manually responds correctly in all cases.
+`pathly-fsm` and `pathly-telemetry` have never appeared in any session since registration.
 
-## Secondary issue
+### Why "pathly-telemetry works" was a false premise
 
-`mcp_config.py` generates:
-```python
-{"command": "python", "args": ["-m", "pathly_orchestrator.mcp_server"]}
-```
-This uses a bare `python` (PATH-relative) which may not resolve correctly in Claude Code's environment.
-It should use the absolute `python.exe` path, matching `pathly-telemetry`.
+The original analysis assumed `pathly-telemetry` was a working example. It is not — it has
+the same architectural issue. The assumption was never verified with log evidence.
 
-## Not a root cause
+### Server-side: no bug
 
-- `mcp_server.py` logic: fully correct, tested
-- `fsm.py` imports: clean
-- `pathly-fsm.exe` existence: confirmed present
-- `pathly_orchestrator` install: editable install at `jovial-cray-c49a0b` (on `origin/pathly-mcp`), works
-- Missing `human.md`: runtime issue when feedback routes to human — separate bug, does not affect startup
+The `pathly-fsm` server is fully functional:
+- `python -m pathly_orchestrator.mcp_server` responds correctly to initialize + tools/list
+- No crash, no buffering issue, no import error
+- The problem is entirely on the Claude Code client side
+
+---
+
+## Scope
+
+`mcpServers` in `~/.claude/settings.json` works for the `claude` CLI but is ignored by the
+Claude Code desktop app's CCD session interface. Restarting the desktop app cannot fix this —
+it is an architectural constraint of CCD mode, not a configuration problem.

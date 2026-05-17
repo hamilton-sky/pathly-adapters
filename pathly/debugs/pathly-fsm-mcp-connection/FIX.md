@@ -1,48 +1,63 @@
 # Fix — pathly-fsm-mcp-connection
 
-## Changes made
+## Status
 
-### 1. `~/.claude/settings.json` — immediate fix (takes effect on next Claude Code restart)
+The root cause is a Claude Code desktop app architectural constraint — CCD sessions do not
+load user-configured stdio MCP servers from `~/.claude/settings.json`. This cannot be fixed
+by changing `settings.json` or restarting the desktop app.
 
-```diff
-- "pathly-fsm": {
--   "command": "C:\\Users\\Yafit\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\pathly-fsm.exe"
-- }
-+ "pathly-fsm": {
-+   "command": "C:\\Users\\Yafit\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
-+   "args": ["-m", "pathly_orchestrator.mcp_server"]
-+ }
+---
+
+## Working paths (no code change needed)
+
+### Option A — Use the `claude` CLI (recommended)
+
+Open a terminal in the project directory and run `claude`. The CLI reads `settings.json`
+via `LocalMcpServerManager` and WILL load `pathly-fsm`. Then `/pathly-team <feature> mcp fast`
+works as designed.
+
+```powershell
+cd C:\Users\Yafit\pathly-adapters
+claude
 ```
 
-Matches the pattern used by the working `pathly-telemetry` server. The `.exe` wrapper has
-a Windows/Electron stdout flushing issue when spawned as a child process; direct `python.exe -m`
-does not.
+### Option B — Drop the `mcp` flag (desktop app sessions)
 
-### 2. `src/install_cli/mcp_config.py` — prevents regression on future installs
+The `/pathly-team` skill falls back to the LLM orchestrator when `mcp__pathly-fsm__*` tools
+are absent. Remove the `mcp` flag:
 
-```diff
-- _FSM_CLAUDE_ENTRY: dict = {
--     "command": "python",
--     "args": ["-m", "pathly_orchestrator.mcp_server"],
-- }
-+ _FSM_CLAUDE_ENTRY: dict = {
-+     "command": sys.executable,
-+     "args": ["-m", "pathly_orchestrator.mcp_server"],
-+ }
+```
+/pathly-team <feature> fast
 ```
 
-`sys.executable` resolves to the absolute path of the Python running the install script —
-the same Python that will have `pathly_orchestrator` in its site-packages.
+---
 
-## How to verify
+## Code changes needed (future work)
 
-1. **Restart Claude Code** (MCP servers connect at session start)
-2. In a new session, run `/pathly-team <any-feature> mcp fast`
-3. If `mcp__pathly-fsm__next_action` appears in available tools → fixed
+### 1. Auto-detect CCD mode in team.md / go.md
 
-## Secondary bug (open)
+When `engine = mcp` is requested but `mcp__pathly-fsm__next_action` is absent, the skill
+should detect this and either warn or fall back automatically instead of silently using
+Python subprocess calls.
 
-`src/pathly_data/core/agents/human.md` is missing. All three flows (`team`, `debug`, `explore`)
-route feedback to `human`, which causes `_load_agent_text("human")` to raise `FileNotFoundError`
-at runtime. This does NOT block startup but will crash the server when a human feedback gate
-is triggered. Tracked separately.
+### 2. Update `mcp_config.py` install documentation
+
+The install docs should note that `mcpServers` in `settings.json` only applies to the
+`claude` CLI, not the Claude Code desktop app CCD sessions.
+
+---
+
+## What was already fixed (still valid, not reverted)
+
+- `settings.json` uses `python -m` form (not `.exe`) — correct, keep it for CLI users
+- `mcp_config.py` uses `sys.executable` — correct, prevents future path issues
+- `src/pathly_data/core/agents/human.md` created — fixes runtime crash when feedback
+  routes to human (separate from the startup issue)
+
+---
+
+## How to verify Option A
+
+1. Open terminal: `cd C:\Users\Yafit\pathly-adapters && claude`
+2. Run `/pathly-team studio-arch-refactor mcp fast`
+3. `mcp__pathly-fsm__next_action` should appear in available tools and be called directly
