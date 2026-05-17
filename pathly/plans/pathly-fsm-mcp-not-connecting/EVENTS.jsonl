@@ -1,2 +1,12 @@
 {"type": "FSM_INIT", "state": "BUILDING", "topic": "pathly-fsm-mcp-not-connecting", "rigor": "lite", "autoFlow": true}
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-18T02:35:00"}
+{"type": "AGENT_DONE", "agent": "reviewer", "state": "REVIEWING", "conv": 1, "result": "PASS", "ts": "2026-05-17T23:39:20.158284"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "ts": "2026-05-17T23:39:20.173609"}
+{"type": "IMPLEMENT_COMPLETE", "ts": "2026-05-17T23:39:36.866027+00:00"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "ts": "2026-05-17T23:40:24.520090"}
+{"type": "AGENT_DONE", "agent": "tester", "state": "TESTING", "conv": 0, "result": "PASS", "criteria_passed": 5, "criteria_total": 5, "ts": "2026-05-17T23:40:34.721882+00:00"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "ts": "2026-05-17T23:40:34.724217+00:00"}
+{"type": "AGENT_DONE", "agent": "tester", "state": "TESTING", "conv": 0, "result": "PASS", "criteria_passed": 5, "criteria_total": 5, "ts": "2026-05-17T23:40:40.356812+00:00"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "ts": "2026-05-17T23:40:40.361366+00:00"}
+{"type": "AGENT_DONE", "agent": "retro", "state": "RETRO", "conv": 0, "result": "DONE", "ts": "2026-05-17T23:41:59.053631+00:00"}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "ts": "2026-05-17T23:41:59.058040+00:00"}
