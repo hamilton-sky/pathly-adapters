@@ -32,6 +32,7 @@ Part 2 (`pathly-studio-part-2`) covers packaging, auto-update, and install wizar
 | `EDGE_CASES.md` | Planner | Builder, Tester | Failure modes |
 | `ARCHITECTURE_PROPOSAL.md` | Planner | Architect, Builder | Design decisions |
 | `FLOW_DIAGRAM.md` | Planner | All agents | Component interaction diagram |
+| `UX_DIAGRAMS.md` | Planner | Builder | ASCII mockups of every UI section |
 
 ### Optional plan files
 
@@ -41,6 +42,7 @@ Part 2 (`pathly-studio-part-2`) covers packaging, auto-update, and install wizar
 | `EDGE_CASES.md` | yes | Failure modes and risk scenarios |
 | `HAPPY_FLOW.md` | yes | Golden-path narrative |
 | `FLOW_DIAGRAM.md` | yes | Multi-component interaction diagram |
+| `UX_DIAGRAMS.md` | yes | ASCII mockups — 16 diagrams covering every screen |
 
 ---
 
