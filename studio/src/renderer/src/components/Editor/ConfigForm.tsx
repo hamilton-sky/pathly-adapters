@@ -1,6 +1,8 @@
 import styles from './ConfigForm.module.css'
 import type { FrontmatterValues } from '../../types'
 
+type OmitType<T> = T extends unknown ? Omit<T, 'type'> : never
+
 interface ConfigFormProps {
   values: FrontmatterValues
   onChange: (v: FrontmatterValues) => void
@@ -34,7 +36,7 @@ function hasTools(v: FrontmatterValues): v is Extract<FrontmatterValues, { tools
 export function ConfigForm({ values, onChange, compact = false }: ConfigFormProps): JSX.Element {
   const unknownKeys = Object.keys(values).filter((k) => !KNOWN_KEYS.includes(k))
 
-  function set(patch: Partial<Record<string, unknown>>): void {
+  function set(patch: Partial<OmitType<FrontmatterValues>>): void {
     onChange({ ...values, ...patch } as FrontmatterValues)
   }
 

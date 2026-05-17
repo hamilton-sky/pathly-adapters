@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-interface UiState {
+export interface UiState {
   sidebarCollapsed: boolean
   activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings'
   dirtyItems: Set<string>

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { PathlyItem, ProjectEntry, FsmState, FsmEvent } from '../types'
 
-interface ProjectState {
+export interface ProjectState {
   projectPath: string
   projects: ProjectEntry[]
   activeTopic: string | null

@@ -4,3 +4,7 @@
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-17T21:13:03.088410"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "ts": "2026-05-17T21:13:26.725601"}
 {"type": "STATE_TRANSITION", "from": "TESTING", "to": "BUILDING", "reason": "conv-2-not-done"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-17T21:17:54.124335"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "ts": "2026-05-17T21:25:32.420790"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "ts": "2026-05-17T21:28:06.716034"}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "ts": "2026-05-17T21:28:38.623960"}
