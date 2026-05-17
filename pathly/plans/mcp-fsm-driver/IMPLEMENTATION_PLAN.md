@@ -356,6 +356,15 @@ pytest tests/test_mcp_config.py -q  # must still pass
 tools instead of spawning the orchestrator agent. Update adapter `_meta` YAML
 files for Claude and Codex. Add legacy note to orchestrator.md.
 
+**Out of scope (follow-up plan):** `start.md`, `pause.md`, `end.md`, and
+`go.md` are NOT updated in this conversation. They will get the contextual menu
+panel in a separate plan after this one ships and is validated.
+
+**Menu spec:** The builder must read
+`pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md` before touching any skill
+file. That document is the authoritative format reference — border style,
+pipeline progress bar, Panel A/B for decide, blocked-state option swap.
+
 **Natural seam:** After this conversation the full integration is wired. Users
 who have run `pathly-setup --apply` (which installed the MCP server from Conv 2)
 get deterministic FSM routing. Users who have not yet re-run setup continue using
@@ -530,9 +539,8 @@ Using `team.flow.yaml` loaded via `importlib.resources`:
   - L3: no L1/L2 match → returns decide sentinel dict (not a string).
   - fallback: no rules match → returns `default` / `transitions[0]`.
   - evaluation order: L1 before L2 before L3 before fallback.
-- `resolve_decide`: mock Anthropic SDK; valid option key → returns mapped state;
-  invalid response → returns `default`; SDK exception → returns `default`;
-  DECIDE_ROUTING event appended in all cases.
+- `evaluate_transition_rules` L3: when decide sentinel returned, no external SDK
+  call occurs (fsm.py is LLM-free). Sentinel is a plain dict with `decide=True`.
 - `route_feedback`: empty feedback dir → None; single file → correct agent;
   two files of different priority → highest priority wins; HUMAN_QUESTIONS
   always wins regardless of discovery order.
@@ -566,6 +574,24 @@ Call the tool functions directly (not via MCP protocol):
   → returns `next_state == "BUILDING"`.
 - `complete_stage` with `REVIEW_FAILURES.md` in `feedback/` → returns
   `blocked=True, target_agent="builder"`.
+
+**Two-call decide protocol — three additional cases (required):**
+
+- `test_complete_stage_returns_decide_sentinel`
+  Set STATE.json to a state whose transition_rules only has a `decide` block
+  (no on_artifact files present). Call `complete_stage(decision=None)`.
+  Assert: returns `{decide: True, question: ..., options: dict}`.
+  Assert: STATE.json unchanged. Assert: no STATE_TRANSITION in EVENTS.jsonl.
+
+- `test_complete_stage_with_valid_decision`
+  Same setup. Call `complete_stage(decision="<valid_key>")`.
+  Assert: returns `{next_state: options[valid_key], agent: ..., instructions: ...}`.
+  Assert: STATE.json updated. Assert: DECIDE_ROUTING + STATE_TRANSITION in EVENTS.jsonl.
+
+- `test_complete_stage_with_invalid_decision`
+  Same setup. Call `complete_stage(decision="nonsense")`.
+  Assert: returns `{next_state: decide_config["default"]}`.
+  Assert: no exception raised. Assert: DECIDE_ROUTING event with decision_input="nonsense".
 
 Use `tmp_path` + monkeypatching to override `Path.cwd()` for storage path
 resolution.

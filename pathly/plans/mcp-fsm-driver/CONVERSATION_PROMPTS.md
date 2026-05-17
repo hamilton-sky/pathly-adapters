@@ -310,6 +310,21 @@ Conversation 2 must be complete. Verify:
   grep "pathly-fsm" src/install_cli/mcp_config.py
 Must return at least one match.
 
+Before writing any skill file content, read:
+  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md
+This is the authoritative spec for the contextual state menu — border style,
+pipeline progress bar construction, Panel A/B for decide, blocked-state option
+swap. Implement the menu exactly as shown there. Do not invent a different format.
+
+## Out of scope for this conversation
+
+Do NOT update these skill files — they are a separate follow-up plan:
+  src/pathly_data/core/skills/start.md
+  src/pathly_data/core/skills/pause.md
+  src/pathly_data/core/skills/end.md
+  src/pathly_data/core/skills/go.md (if it exists)
+Only team.md, debug.md, and explore.md get the contextual menu in this plan.
+
 ## Overview
 
 Update three core skill files, their adapter YAML files, and add a legacy note
@@ -585,6 +600,34 @@ Cases:
   test_next_action_unknown_flow
     - next_action("nonexistent", "test-topic") returns dict with "error" key
     - Does not raise an unhandled exception
+
+  ## Two-call decide protocol (complete_stage)
+
+  test_complete_stage_returns_decide_sentinel
+    - Set up STATE.json {"current": "REVIEWING"}
+    - Configure a minimal flow dict with transition_rules for REVIEWING that
+      has a decide block (no on_artifact, no on_content files present)
+    - complete_stage("team", "test-topic") with no decision argument
+    - Returns dict with "decide" == True, "question" non-empty, "options" is dict
+    - STATE.json is NOT changed (still "REVIEWING")
+    - EVENTS.jsonl does NOT contain a STATE_TRANSITION entry
+
+  test_complete_stage_with_valid_decision
+    - Same setup as above (decide sentinel would fire)
+    - Call complete_stage("team", "test-topic", decision="refactor")
+      where "refactor" is a key in the options dict
+    - Returns dict with next_state == options["refactor"]
+    - STATE.json updated to that next_state
+    - EVENTS.jsonl contains DECIDE_ROUTING entry with decision_input="refactor"
+    - EVENTS.jsonl contains STATE_TRANSITION entry
+
+  test_complete_stage_with_invalid_decision
+    - Same setup
+    - Call complete_stage("team", "test-topic", decision="nonsense")
+      where "nonsense" is NOT a key in options
+    - Returns dict with next_state == decide_config["default"]
+    - No exception raised
+    - DECIDE_ROUTING event appended with decision_input="nonsense"
 
 ## Constraints
 
