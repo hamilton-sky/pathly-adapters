@@ -136,20 +136,48 @@ Tool 1 — next_action(flow: str, topic: str, project_root: str) -> dict:
                "instructions": build_prompt(flow_config, current, storage_path),
                "storage_path": str(storage_path)}
 
-Tool 2 — complete_stage(flow: str, topic: str, project_root: str) -> dict:
+Tool 2 — complete_stage(flow: str, topic: str, project_root: str,
+                        decision: str | None = None) -> dict:
+
+  No external API. No Anthropic SDK. Level 3 routing is resolved by the calling
+  LLM via a two-call protocol — see below.
+
+  Call path when decision is None:
   1. Load flow config.
   2. Resolve storage_path.
   3. Call recover_state.
   4. Call route_feedback. If feedback found → return blocked (same as above).
   5. current = state["current_state"]
-  6. next_state = evaluate_transition_rules(flow_config, current, storage_path)
-  7. Write STATE.json: update "current" to next_state; update "updated_at".
-  8. Append to EVENTS.jsonl: {"type": "STATE_TRANSITION", "from": current, "to": next_state}
-  9. Call run_transition_actions(flow_config, current, next_state, storage_path, topic, state["conv"])
-  10. If next_state == "DONE": return {"done": True}
-  11. Return {"next_state": next_state,
-               "agent": flow_config["agent_map"][next_state],
-               "instructions": build_prompt(flow_config, next_state, storage_path)}
+  6. routing = evaluate_transition_rules(flow_config, current, storage_path)
+  7. If routing is a dict with {"decide": True, ...} (Level 3 sentinel):
+       a. Read routing["context_file"] from storage_path. If missing: context = None.
+       b. Do NOT write STATE.json. Do NOT run transition_actions.
+       c. Return immediately:
+            {"decide": True,
+             "question": routing["question"],
+             "context": context,
+             "options": routing["options"],
+             "default": routing["default"]}
+  8. Otherwise (routing is a str): next_state = routing.
+     Write STATE.json: update "current" to next_state; update "updated_at".
+     Append to EVENTS.jsonl: {"type": "STATE_TRANSITION", "from": current, "to": next_state}
+     Call run_transition_actions(...)
+     If next_state == "DONE": return {"done": True}
+     Return {"next_state": next_state,
+             "agent": flow_config["agent_map"][next_state],
+             "instructions": build_prompt(flow_config, next_state, storage_path)}
+
+  Call path when decision is provided (Call 2 of the two-call protocol):
+  1–4. Same as above (load, resolve, recover, route_feedback check).
+  5. Re-evaluate transition rules.
+  6. If result is still a decide sentinel:
+       a. Validate decision is a key in routing["options"].
+       b. Valid: next_state = routing["options"][decision].
+       c. Invalid or None: next_state = routing["default"].
+       d. Append: {"type": "DECIDE_ROUTING", "chosen": next_state,
+                   "decision_input": decision, "options": routing["options"]}
+  7. Continue: write STATE.json, append STATE_TRANSITION, run_transition_actions,
+     return next agent response. Never raise for invalid decision — always fallback.
 
 Add a main() function that starts the MCP server.
 Add if __name__ == "__main__": main() at the bottom.
@@ -328,15 +356,70 @@ Replace the orchestrator invocation with:
 This skill drives the pipeline via the pathly-fsm MCP server. Do not spawn
 the orchestrator agent directly.
 
-1. Call `next_action(flow="<FLOW>", topic=<TOPIC>)`.
-   - Returns: `{current_state, agent, instructions, storage_path}`
-   - If `blocked=true`: follow `target_agent` instructions to resolve the
-     open feedback file. Then call `next_action` again.
-2. Follow the returned instructions as the specified agent.
-3. When stage work is complete, call `complete_stage(flow="<FLOW>", topic=<TOPIC>)`.
-   - Returns: `{next_state, agent, instructions}` or `{done: true}`
-   - If `blocked=true`: resolve feedback first (step 1).
-4. Repeat from step 2 until `done=true`.
+1. Call `next_action(flow="<FLOW>", topic=<TOPIC>, project_root=<PROJECT_ROOT>)`.
+   - Returns: `{current_state, agent, instructions, storage_path, limits}`
+   - If `blocked=true, target_agent="human"`: surface instructions to the user
+     and halt. Wait for user to delete the feedback file. Then call next_action again.
+   - If `blocked=true, target_agent=<agent>`: follow instructions, delete the
+     feedback file from feedback/, then call next_action again.
+
+2. BEFORE executing agent instructions, display the contextual state menu:
+
+   ```
+   ─────────────────────────────────────────
+   Pathly · <FLOW> · <TOPIC>
+   State: <current_state>  (conv <N>)
+   Agent: <agent>
+   ─────────────────────────────────────────
+   <STATE-SPECIFIC GUIDANCE LINE — see table>
+   ─────────────────────────────────────────
+   Options:
+     [1] Proceed
+     [2] Pause
+     [3] Show full state (STATE.json + last 10 events)
+     [4] Switch path (team / debug / explore)
+   ─────────────────────────────────────────
+   ```
+
+   State-specific guidance lines:
+     PLANNING  → "Planner will draft IMPLEMENTATION_PLAN.md."
+     BUILDING  → "Builder will implement. Reviewer runs after."
+     REVIEWING → "Reviewer checks output. REVIEW_FAILURES.md blocks forward."
+     TESTING   → "Tester validates. TEST_FAILURES.md loops back to builder."
+     RETRO     → "Final retrospective. Completes topic when done."
+     DONE      → "Topic complete. Artifacts archived."
+     (other)   → "Agent: <agent> will work on state <current_state>."
+
+   If user chooses [2]: call the pause skill and stop.
+   If user chooses [3]: print STATE.json and last 10 EVENTS.jsonl lines, then
+     show the menu again.
+   If user chooses [4]: surface /pathly team|debug|explore <TOPIC> and stop.
+   If user presses Enter or chooses [1]: proceed with agent instructions.
+
+3. Execute the returned instructions as the specified agent.
+   Track counters reset at each stage start:
+     needs_context_count = 0, feedback_round_count = 0
+
+   - If agent outputs NEEDS_CONTEXT:
+       needs_context_count += 1
+       If >= limits.needs_context_per_stage: surface warning to user, halt.
+       Otherwise: call scout-path, feed summary back, resume.
+
+4. When stage work is complete, call
+   `complete_stage(flow="<FLOW>", topic=<TOPIC>, project_root=<PROJECT_ROOT>)`.
+   - Returns `{next_state, agent, instructions}`, `{done: true}`, or
+     `{decide: true, question, context, options, default}`.
+   - If `{decide: true}`: read the question and context, choose one option key,
+     call `complete_stage(..., decision="<chosen_key>")`.
+   - If `blocked=true, target_agent="human"`: surface, halt, wait for file delete.
+   - If `blocked=true, target_agent=<agent>`:
+       feedback_round_count += 1
+       If >= limits.feedback_rounds_per_stage: write HUMAN_QUESTIONS.md with
+         escalation note, surface to user, halt.
+       Otherwise: resolve with <agent>, delete feedback file, call complete_stage
+         again. One file at a time — do NOT batch.
+
+5. Repeat from step 2 until done=true.
 ---
 
 Keep all other content in each skill file unchanged.

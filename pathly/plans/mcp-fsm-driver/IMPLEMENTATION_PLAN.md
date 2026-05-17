@@ -212,34 +212,62 @@ a `feedback["target_agent"]` value (an agent name) to `build_prompt` — it will
 
 ### `resolve_decide` — what to implement
 
-Private helper in `mcp_server.py`. Called only when `evaluate_transition_rules`
-returns a `{"decide": True, ...}` sentinel.
+`complete_stage` detects the Level 3 sentinel and returns it to the **calling
+LLM** (Claude or Codex) as a structured response. No external API or Anthropic
+SDK is involved — the same LLM that is running the skill makes the decision.
+
+#### `complete_stage` signature change
+
+Add an optional `decision` parameter:
 
 ```python
-def resolve_decide(decide_config: dict, storage_path: Path) -> str:
-    """
-    1. Read decide_config["context_file"] from storage_path.
-       If file missing: return decide_config["default"], log warning.
-    2. Build a constrained prompt:
-         "Read the content below and reply with exactly one of these keys:
-          {comma-separated option keys}
-          Reply with only the key — no explanation, no punctuation.
-          ---
-          {file contents}"
-    3. Call claude-haiku-4-5 via Anthropic SDK (max_tokens=10, temperature=0).
-    4. Strip response. Check it is a key in decide_config["options"].
-       If valid: return decide_config["options"][response]  (mapped next state).
-       If invalid or SDK raises: return decide_config["default"].
-    5. Always append event:
-         {"type": "DECIDE_ROUTING", "chosen": next_state,
-          "raw_response": response, "options": decide_config["options"]}
-    """
+@mcp_tool
+def complete_stage(flow: str, topic: str, project_root: str,
+                   decision: str | None = None) -> dict:
 ```
 
-**Model choice:** `claude-haiku-4-5` — classification is a short, cheap task.
-`max_tokens=10` prevents verbose answers; `temperature=0` maximises consistency.
-**Failure mode:** any SDK error or invalid response → silent fallback to
-`default`, event logged. Never raises to the MCP client.
+#### Level 3 flow (two-call protocol)
+
+**Call 1** — `complete_stage(flow, topic, project_root)` — no `decision`:
+1. L1 and L2 evaluate as normal.
+2. If `evaluate_transition_rules` returns a `{"decide": True, ...}` sentinel:
+   a. Read `decide_config["context_file"]` from `storage_path`.
+      If file missing: skip to fallback (see below).
+   b. Return immediately — do NOT write STATE.json, do NOT run actions:
+      ```json
+      {
+        "decide": true,
+        "question": "<decide_config.question>",
+        "context": "<file contents>",
+        "options": {"key1": "STATE_A", "key2": "STATE_B"},
+        "default": "<decide_config.default>"
+      }
+      ```
+3. The skill surfaces `question` + `context` to the calling LLM and asks it to
+   reply with exactly one option key.
+
+**Call 2** — `complete_stage(flow, topic, project_root, decision="<key>")`:
+1. Recover state (same as always).
+2. Evaluate transition rules again (L1/L2 may now resolve differently — check
+   first; only use `decision` if the result is still a decide sentinel).
+3. If still a decide sentinel: validate `decision` is a key in `options`.
+   - Valid: `next_state = options[decision]`.
+   - Invalid or missing: `next_state = decide_config["default"]`.
+4. Append event:
+   ```json
+   {"type": "DECIDE_ROUTING", "chosen": "<next_state>",
+    "decision_input": "<decision>", "options": {...}}
+   ```
+5. Continue normally: `write_state`, `append_event STATE_TRANSITION`,
+   `run_transition_actions`, return `{next_state, agent, instructions}`.
+
+**Failure mode:** if `context_file` is missing on Call 1, return the decide
+response with `"context": null` — the LLM should still be able to choose based
+on the question and option labels alone, falling back to `default` if it cannot.
+No exception is raised to the MCP client.
+
+`fsm.py` is unchanged — it still returns the `{"decide": True, ...}` sentinel.
+All two-call coordination logic lives in `mcp_server.py` only.
 
 **Human feedback special case:** When `feedback["target_agent"] == "human"`,
 `route_feedback` returns the file contents as `feedback["instructions"]`. The MCP
@@ -354,6 +382,46 @@ the prior orchestrator agent — the adapter files are only deployed on next
 
 Core skill files use **generic pseudo-syntax** — no host-specific MCP call
 syntax. The adapter `_meta/*.yaml` files expand this for each host.
+
+#### Contextual state menu (required)
+
+After calling `next_action` and before executing agent instructions, the skill
+**must display a contextual menu** whose content depends on the current state.
+This is the primary UX surface — do not skip it.
+
+```
+─────────────────────────────────────────
+Pathly · team · <TOPIC>
+State: <current_state>  (conv <N>)
+Agent: <agent_name>
+─────────────────────────────────────────
+<STATE-SPECIFIC GUIDANCE — see table below>
+─────────────────────────────────────────
+Options:
+  [1] Proceed
+  [2] Pause
+  [3] Show full state (STATE.json + recent events)
+  [4] Switch path (team / debug / explore)
+─────────────────────────────────────────
+```
+
+State-specific guidance:
+
+| State | Guidance line |
+|-------|--------------|
+| `PLANNING` | "Planner will draft IMPLEMENTATION_PLAN.md." |
+| `BUILDING` | "Builder will implement. Reviewer runs after." |
+| `REVIEWING` | "Reviewer checks BUILDING output. Any REVIEW_FAILURES.md blocks forward." |
+| `TESTING` | "Tester validates. TEST_FAILURES.md loops back to builder." |
+| `RETRO` | "Final retrospective. Completes this topic when done." |
+| `DONE` | "Topic complete. Artifacts archived." |
+| (any debug state) | Surface `debug.flow.yaml` agent_map description for that state. |
+| (any explore state) | Surface `explore.flow.yaml` agent_map description for that state. |
+
+If the user chooses [2] Pause, call `pause` skill and stop.  
+If the user chooses [3], print STATE.json pretty-printed and the last 10 EVENTS.jsonl lines.  
+If the user chooses [4], surface `/pathly team|debug|explore <TOPIC>` options.  
+If the user presses Enter or chooses [1], proceed with the returned instructions.
 
 Replace any `spawn orchestrator` or `Agent(subagent_type="orchestrator", ...)`
 instructions with:

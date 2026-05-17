@@ -186,32 +186,43 @@ def complete_stage(flow: str, topic: str, project_root: str) -> dict:
             "instructions": build_prompt(fsm_data, next_state, storage_path)}
 ```
 
-### `resolve_decide` — Level 3 classifier (private helper in `mcp_server.py`)
+### `resolve_decide` — Level 3 routing via the calling LLM
 
-```python
-def resolve_decide(decide_config: dict, storage_path: Path) -> str:
-    """
-    Make a constrained LLM classifier call to choose between 2–3 options.
-    1. Read decide_config["context_file"] from storage_path.
-    2. Call LLM (claude-haiku — cheap, stateless) with:
-         "Read the following content and choose exactly one option key.
-          Reply with only the key, nothing else.
-          Options: {option_key_1}, {option_key_2}, {option_key_3}
-          ---
-          {file contents}"
-    3. Strip and validate: response must be a key in decide_config["options"].
-    4. If valid: return decide_config["options"][response]  (mapped next state).
-    5. If invalid or LLM call fails: return decide_config["default"].
-       Log a warning event to EVENTS.jsonl in both cases.
-    """
+No external API. No Anthropic SDK. The same LLM that is already running the
+skill (Claude Code or Codex) makes the Level 3 decision.
+
+`complete_stage` uses a **two-call protocol**:
+
+**Call 1** — `complete_stage(flow, topic, project_root)`:  
+When `evaluate_transition_rules` returns a `{"decide": True, ...}` sentinel,
+`mcp_server.py` reads the `context_file` and returns immediately:
+```json
+{
+  "decide": true,
+  "question": "What type of fix does this review require?",
+  "context": "<contents of REVIEW_FAILURES.md>",
+  "options": {"refactor": "REFACTOR_STAGE", "architecture": "ARCH_REVIEW", "minor": "BUILDING"},
+  "default": "BUILDING"
+}
 ```
+No STATE.json write. No transition actions. Just the question + context.
 
-**Why haiku:** routing decisions are classification tasks — short, cheap, high-accuracy
-on bounded choice sets. Using a full model wastes cost and latency.
+**Call 2** — `complete_stage(flow, topic, project_root, decision="refactor")`:  
+The calling LLM chose "refactor". Python validates it's a key in `options`,
+maps it to `next_state = "REFACTOR_STAGE"`, then continues normally:
+write STATE.json, append event, run transition_actions, return next agent.
 
-**Why fsm.py stays LLM-free:** `evaluate_transition_rules` returns a plain dict
-sentinel for Level 3. `mcp_server.py` detects it and calls `resolve_decide`. The
-LLM SDK dependency stays in the MCP server layer only.
+**Why this design:**
+- The calling LLM (Claude/Codex) is already context-rich — it has just finished
+  the current stage and has full access to the context file.
+- No credentials needed in the MCP server at runtime.
+- No external network call on the critical path.
+- The decision is audited in EVENTS.jsonl as `DECIDE_ROUTING` regardless.
+- Invalid or missing decision → silent fallback to `default`.
+
+**`fsm.py` stays LLM-free:** `evaluate_transition_rules` still returns the
+`{"decide": True, ...}` sentinel. All two-call coordination is in `mcp_server.py`
+only. `fsm.py` has no SDK dependency.
 
 ### YAML shape — all three routing levels together
 
