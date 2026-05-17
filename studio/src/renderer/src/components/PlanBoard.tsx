@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
+import { readFile } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
 import type { Theme } from '../theme'
 
@@ -231,7 +232,7 @@ export function PlanBoard(): JSX.Element {
 
     async function loadAll(): Promise<void> {
       try {
-        const raw = await window.pathly.fs.read(`${base}/STATE.json`)
+        const raw = await readFile(`${base}/STATE.json`)
         const parsed = JSON.parse(raw) as { current?: string }
         setFsmState(parsed.current ?? '')
       } catch {
@@ -239,7 +240,7 @@ export function PlanBoard(): JSX.Element {
       }
 
       try {
-        const md = await window.pathly.fs.read(`${base}/PROGRESS.md`)
+        const md = await readFile(`${base}/PROGRESS.md`)
         const rows = parseProgressMd(md)
         setConvs(rows)
         setNoProgress(rows.length === 0)
@@ -249,7 +250,7 @@ export function PlanBoard(): JSX.Element {
       }
 
       try {
-        const raw = await window.pathly.fs.read(`${base}/EVENTS.jsonl`)
+        const raw = await readFile(`${base}/EVENTS.jsonl`)
         const parsed: EventEntry[] = []
         for (const line of raw.split('\n')) {
           const trimmed = line.trim()

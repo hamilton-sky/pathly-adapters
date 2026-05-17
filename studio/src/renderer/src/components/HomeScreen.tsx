@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
+import { listDirs, readFile, pickFolder, openWindow } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
 import type { Theme } from '../theme'
 import type { ProjectEntry } from '../types'
@@ -188,12 +189,12 @@ export function HomeScreen(): JSX.Element {
       for (const project of projects) {
         try {
           const plansDir = `${project.path}/pathly/plans`
-          const planFolders = await window.pathly.fs.listDirs(plansDir)
+          const planFolders = await listDirs(plansDir)
           const rows: PlanRow[] = []
           for (const folder of planFolders) {
             if (folder === '.archive') continue
             try {
-              const raw = await window.pathly.fs.read(`${plansDir}/${folder}/STATE.json`)
+              const raw = await readFile(`${plansDir}/${folder}/STATE.json`)
               const parsed = JSON.parse(raw) as { current?: string }
               rows.push({ name: folder, state: parsed.current ?? '' })
             } catch {
@@ -218,7 +219,7 @@ export function HomeScreen(): JSX.Element {
   const sorted = [...projects].sort((a, b) => b.lastOpened - a.lastOpened)
 
   async function handleOpenFolder(): Promise<void> {
-    const folderPath = await window.pathly.fs.pickFolder()
+    const folderPath = await pickFolder()
     if (!folderPath) return
     const name = folderPath.split(/[/\\]/).filter(Boolean).pop() ?? folderPath
     addProject({ path: folderPath, name, lastOpened: Date.now() })
@@ -226,7 +227,7 @@ export function HomeScreen(): JSX.Element {
 
   function handleOpen(project: ProjectEntry, topicName?: string, evt?: React.MouseEvent): void {
     if (evt?.metaKey || evt?.ctrlKey) {
-      window.pathly.shell.openWindow(project.path)
+      openWindow(project.path)
     } else {
       updateProject(project.path, { lastOpened: Date.now() })
       if (topicName) setActiveTopic(topicName)

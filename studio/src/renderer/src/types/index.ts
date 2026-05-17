@@ -1,5 +1,23 @@
 export type PathlyItemType = 'flow' | 'skill' | 'agent' | 'template'
 
+export interface TemplateSubdir {
+  name: string
+  open: boolean
+  files: PathlyItem[]
+}
+
+export interface SectionState {
+  items: PathlyItem[]
+  open: boolean
+  subdirs?: TemplateSubdir[]
+}
+
+export interface ConvRow {
+  num: number
+  title: string
+  status: string
+}
+
 export interface PathlyItem {
   name: string
   path: string

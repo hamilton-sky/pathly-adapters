@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
+import { writeFile } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
 import type { Theme } from '../theme'
 
@@ -439,7 +440,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     const yaml = generateYaml(trimmedName, storagePath, states.filter((s) => s.trim()), agentMap, transitions)
     const filePath = `${projectPath}/src/pathly_data/core/flows/${trimmedName}.flow.yaml`
     try {
-      await window.pathly.fs.write(filePath, yaml)
+      await writeFile(filePath, yaml)
       onCreated(filePath)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

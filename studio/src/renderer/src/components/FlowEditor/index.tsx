@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as jsYaml from 'js-yaml'
 import { useStore } from '../../store'
+import { readFile, writeFile } from '../../services/pathlyApi'
 import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
 import type { FlowYaml } from '../../types'
@@ -85,8 +86,7 @@ export function FlowEditor(): JSX.Element {
     setTab('visual')
     prevTabRef.current = 'visual'
     setYamlSyncContent(null)
-    window.pathly.fs
-      .read(selectedItem.path)
+    readFile(selectedItem.path)
       .then((content) => {
         setRawYaml(content ?? '')
         try {
@@ -141,7 +141,7 @@ export function FlowEditor(): JSX.Element {
     setSaveError(null)
     const content = jsYaml.dump(flowData, { lineWidth: 120 })
     try {
-      await window.pathly.fs.write(selectedItem.path, content)
+      await writeFile(selectedItem.path, content)
       clearDirty(selectedItem.path)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))
@@ -152,7 +152,7 @@ export function FlowEditor(): JSX.Element {
     if (!selectedItem) return
     setSaveError(null)
     try {
-      await window.pathly.fs.write(selectedItem.path, content)
+      await writeFile(selectedItem.path, content)
       setRawYaml(content)
       clearDirty(selectedItem.path)
     } catch (err) {

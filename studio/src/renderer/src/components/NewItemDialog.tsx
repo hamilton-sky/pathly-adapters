@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PathlyItem } from '../types'
+import { writeFile } from '../services/pathlyApi'
 import styles from './NewItemDialog.module.css'
 
 interface Props {
@@ -83,7 +84,7 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
     }
 
     try {
-      await window.pathly.fs.write(filePath, content)
+      await writeFile(filePath, content)
       onCreated({ name: `${trimmed}.md`, path: filePath, type })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

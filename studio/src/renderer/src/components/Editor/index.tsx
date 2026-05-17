@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store'
+import { readFile, writeFile } from '../../services/pathlyApi'
 import { ConfigForm, FrontmatterValues } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
@@ -83,8 +84,7 @@ export function Editor(): JSX.Element {
     if (!selectedItem) return
     setLoading(true)
     setSaveError(null)
-    window.pathly.fs
-      .read(selectedItem.path)
+    readFile(selectedItem.path)
       .then((content) => {
         const parsed = parseFrontmatter(content ?? '')
         setConfig(parsed.config)
@@ -107,7 +107,7 @@ export function Editor(): JSX.Element {
     setSaveError(null)
     const merged = `---\n${serializeFrontmatter(currentConfig)}\n---\n${currentBody}`
     try {
-      await window.pathly.fs.write(selectedItem.path, merged)
+      await writeFile(selectedItem.path, merged)
       clearDirty(selectedItem.path)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))

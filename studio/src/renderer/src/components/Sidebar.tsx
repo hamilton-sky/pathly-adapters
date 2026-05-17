@@ -1,27 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useStore } from '../store'
 import type { PathlyItem, PathlyItemType } from '../types'
+import { useProjectFiles } from '../hooks/useProjectFiles'
+import { usePlanConversations } from '../hooks/usePlanConversations'
 import { FlowWizard } from './FlowWizard'
 import { NewItemDialog } from './NewItemDialog'
 import styles from './Sidebar.module.css'
-
-interface TemplateSubdir {
-  name: string
-  open: boolean
-  files: PathlyItem[]
-}
-
-interface SectionState {
-  items: PathlyItem[]
-  open: boolean
-  subdirs?: TemplateSubdir[]
-}
-
-interface ConvRow {
-  num: number
-  title: string
-  status: string
-}
 
 interface Section {
   label: string
@@ -35,23 +19,6 @@ const SECTIONS: Section[] = [
   { label: 'Agents',    type: 'agent',    dir: 'src/pathly_data/core/agents'    },
   { label: 'Templates', type: 'template', dir: 'src/pathly_data/core/templates' },
 ]
-
-function parseProgressMd(md: string): ConvRow[] {
-  const rows: ConvRow[] = []
-  let headerParsed = false
-  for (const line of md.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed.startsWith('|')) continue
-    const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
-    if (!headerParsed) { headerParsed = true; continue }
-    if (parts[0]?.startsWith('---')) continue
-    const num = parseInt(parts[0], 10)
-    if (isNaN(num)) continue
-    const status = parts[parts.length - 1] ?? ''
-    rows.push({ num, title: parts[1] ?? '', status: status.toUpperCase() })
-  }
-  return rows
-}
 
 function convStatusClass(status: string): string {
   if (status === 'DONE') return styles.statusDone
@@ -79,66 +46,14 @@ export function Sidebar(): JSX.Element {
     activePanel,
   } = useStore()
 
-  const [sections, setSections] = useState<Record<string, SectionState>>({
-    Flows:     { items: [], open: false },
-    Skills:    { items: [], open: false },
-    Agents:    { items: [], open: false },
-    Templates: { items: [], open: true  },
-  })
-  const [planConvs, setPlanConvs]     = useState<ConvRow[]>([])
+  const { sections, setSections, loadItems } = useProjectFiles()
+  const { planConvs } = usePlanConversations()
+
   const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: PathlyItemType; dir: string } | null>(null)
-
-  const loadItemsRef = useRef<() => Promise<void>>(async () => {})
-
-  useEffect(() => {
-    if (!projectPath) return
-    async function loadItems(): Promise<void> {
-      for (const section of SECTIONS) {
-        try {
-          const dir = `${projectPath}/${section.dir}`
-          if (section.type === 'template') {
-            const subdirNames = await window.pathly.fs.listDirs(dir)
-            const subdirs: TemplateSubdir[] = []
-            for (const subdirName of subdirNames) {
-              const subdirPath = `${dir}/${subdirName}`
-              let files: PathlyItem[] = []
-              try {
-                const fileNames = await window.pathly.fs.list(subdirPath)
-                files = fileNames.map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: 'template' as const }))
-              } catch { /* empty subdir */ }
-              subdirs.push({ name: subdirName, open: false, files })
-            }
-            setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs } }))
-          } else {
-            const names = await window.pathly.fs.list(`${projectPath}/${section.dir}`)
-            const items: PathlyItem[] = names.map((name) => ({
-              name, path: `${projectPath}/${section.dir}/${name}`, type: section.type,
-            }))
-            setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items } }))
-          }
-        } catch {
-          setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [] } }))
-        }
-      }
-    }
-    loadItemsRef.current = loadItems
-    loadItems()
-  }, [projectPath])
-
-  useEffect(() => {
-    if (!projectPath || !activeTopic) { setPlanConvs([]); return }
-    async function loadPlan(): Promise<void> {
-      try {
-        const md = await window.pathly.fs.read(`${projectPath}/pathly/plans/${activeTopic}/PROGRESS.md`)
-        setPlanConvs(parseProgressMd(md))
-      } catch { setPlanConvs([]) }
-    }
-    loadPlan()
-  }, [projectPath, activeTopic])
 
   if (sidebarCollapsed) {
     return (
@@ -335,7 +250,7 @@ export function Sidebar(): JSX.Element {
             // Keep the Flows section open so the new flow is immediately visible
             setSections((prev) => ({ ...prev, Flows: { ...prev.Flows, open: true } }))
             // Reload file list, then select the newly created flow
-            loadItemsRef.current().then(() => {
+            loadItems().then(() => {
               if (filePath) {
                 const item: PathlyItem = {
                   name: filePath.split('/').pop() ?? '',

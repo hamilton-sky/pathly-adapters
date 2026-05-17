@@ -1,1 +1,3 @@
 {"type": "FSM_START", "state": "STORMING"}
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-17T20:52:21.801848"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING", "ts": "2026-05-17T20:53:45.801827"}

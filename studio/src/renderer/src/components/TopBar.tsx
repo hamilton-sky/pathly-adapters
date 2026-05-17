@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
 import styles from './TopBar.module.css'
 
 export function TopBar(): JSX.Element {
@@ -27,7 +28,7 @@ export function TopBar(): JSX.Element {
     let cancelled = false
     async function loadTopics(): Promise<void> {
       try {
-        const entries = await window.pathly.fs.listDirs(projectPath + '/pathly/plans')
+        const entries = await listDirs(projectPath + '/pathly/plans')
         if (!cancelled) setTopics(entries.filter((e) => e !== '.archive'))
       } catch { /* directory may not exist yet */ }
     }
@@ -45,9 +46,9 @@ export function TopBar(): JSX.Element {
     setShowLog(true)
     setPublishing(true)
     if (removeListenerRef.current) removeListenerRef.current()
-    removeListenerRef.current = window.pathly.shell.onOutput((line) => appendPublishLog(line))
+    removeListenerRef.current = onPublishOutput((line) => appendPublishLog(line))
     try {
-      await window.pathly.shell.publish(projectPath)
+      await publish(projectPath)
     } finally {
       setPublishing(false)
       removeListenerRef.current?.()

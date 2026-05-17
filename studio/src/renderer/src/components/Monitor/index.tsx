@@ -5,6 +5,7 @@ import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
 import type { FsmEvent } from '../../types'
+import { mcpPing, watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   return {
@@ -45,12 +46,12 @@ export function Monitor(): JSX.Element {
     if (!activeTopic) return
 
     async function init(): Promise<void> {
-      const mcpAlive = await window.pathly.mcp.ping()
+      const mcpAlive = await mcpPing()
       if (mcpAlive) {
         setMonitorSource('mcp')
       } else {
         setMonitorSource('chokidar')
-        window.pathly.watch.start(projectPath, activeTopic ?? '')
+        watchStart(projectPath, activeTopic ?? '')
       }
     }
 
@@ -58,7 +59,7 @@ export function Monitor(): JSX.Element {
 
     if (projectPath && activeTopic) {
       const eventsPath = `${projectPath}/pathly/plans/${activeTopic}/EVENTS.jsonl`
-      window.pathly.fs.read(eventsPath).then((content) => {
+      readFile(eventsPath).then((content) => {
         const parsed: FsmEvent[] = []
         for (const line of content.split('\n')) {
           const trimmed = line.trim()
@@ -75,7 +76,7 @@ export function Monitor(): JSX.Element {
       })
     }
 
-    const removeListener = window.pathly.watch.onEvent((data) => {
+    const removeListener = onWatchEvent((data) => {
       if (data.path.endsWith('STATE.json')) {
         try {
           setFsmState(JSON.parse(data.content))
