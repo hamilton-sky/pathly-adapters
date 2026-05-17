@@ -7,6 +7,12 @@
 Electron runs two processes. All filesystem and subprocess access is in main.
 Renderer is a sandboxed React app — it can only call what the preload exposes.
 
+> **Persistence note:** Use `electron-store` (not `localStorage`) for persisting
+> `projects[]` and `sidebarCollapsed`. `electron-store` writes to the OS user-data
+> directory, survives app updates, and is accessible from the main process without
+> IPC. `localStorage` is renderer-only and can be wiped by Electron on origin change.
+> Install: `npm install electron-store`.
+
 ```
 Main process (Node.js)
   ├── window management
@@ -80,6 +86,18 @@ interface StudioStore {
 
 The MCP server (`pathly-mcp-server`) runs as a separate stdio process, launched
 by Claude/Codex. Studio connects as a second MCP client on the same server.
+
+> **Risk — stdio is single-client.** MCP over stdio is point-to-point: one process
+> writes to stdin, one reads from stdout. A second client attaching to the same stdio
+> pipe will corrupt the framing. Two options:
+> 1. **(Recommended for Part 1)** Don't attach to the running server — run a separate
+>    read-only `pathly-mcp-server` instance as a child process of Studio's main process.
+>    Pass `--read-only` (or equivalent) so it doesn't mutate FSM state.
+> 2. **(Part 2+)** Add a TCP/named-pipe transport to `pathly-mcp-server` so multiple
+>    clients can connect.
+>
+> For now: treat the MCP path as best-effort. The file-watch fallback is the reliable
+> path and must always work correctly.
 
 Connection sequence:
 1. On monitor open: spawn `pathly-mcp-server` in stdio mode (or attach if already running)

@@ -135,11 +135,20 @@ def append_event(storage_path: Path, event: dict) -> None:
 
 Import only: stdlib, `pathlib`, `subprocess`, `yaml`, `pathly_orchestrator.state`.
 
-**Also extend `state.py`:** add agent-contract validation to `validate_flow_cli`.
-For every value in `flow["agent_map"]`, check that
-`files("pathly_data").joinpath(f"core/agents/{agent}.md")` exists. If any are
-missing, raise `ValueError` listing all missing contracts. This catches `agent_map`
-typos at install time rather than at runtime inside `build_prompt`.
+**Also extend `state.py`:** add two validations to `validate_flow_cli`.
+
+1. **Agent-contract validation:** for every value in `flow["agent_map"]`, check
+   that `files("pathly_data").joinpath(f"core/agents/{agent}.md")` exists. If
+   any are missing, raise `ValueError` listing all missing contracts. This catches
+   `agent_map` typos at install time rather than at runtime inside `build_prompt`.
+
+2. **Decide-block option count:** for every `decide` block in
+   `flow["transition_rules"]`, if `len(decide["options"]) < 2`, print a warning
+   (do not raise):
+   ```
+   Warning: decide block in state '<state>' has fewer than 2 options.
+   ```
+   A single-option decide block is never useful — it should be a `default` instead.
 
 ### `mcp_server.py` — what to implement
 
@@ -174,6 +183,19 @@ typos at install time rather than at runtime inside `build_prompt`.
   `run_transition_actions` and once after. If the `current` field differs between
   reads, raise `RuntimeError("STATE.json modified externally during transition")`.
   This catches sub-agents that bypass `complete_stage` and write state directly.
+- **`complete_stage` owns feedback file deletion**: `complete_stage` accepts an
+  optional `resolved_files: list[str] | None = None` parameter. When the skill
+  has resolved a blocked feedback file, it passes the filename back on the next
+  call. Python deletes those files from `feedback/` before evaluating transition
+  rules. The skill never touches the feedback directory directly.
+  - Files in `resolved_files` that do not exist are silently ignored (no error).
+  - Deletion is logged: append a `FEEDBACK_RESOLVED` event per deleted file:
+    ```json
+    {"type": "FEEDBACK_RESOLVED", "file": "<filename>"}
+    ```
+  - Human-blocked files (`HUMAN_QUESTIONS.md`) follow the same protocol: the skill
+    passes `resolved_files=["HUMAN_QUESTIONS.md"]` only after the user has confirmed
+    resolution. Python deletes it. The user no longer deletes files manually.
 
 ### `build_prompt` and `build_prompt_for_agent` — what to implement
 
@@ -218,12 +240,13 @@ SDK is involved — the same LLM that is running the skill makes the decision.
 
 #### `complete_stage` signature change
 
-Add an optional `decision` parameter:
+Add optional `decision` and `resolved_files` parameters:
 
 ```python
 @mcp_tool
 def complete_stage(flow: str, topic: str, project_root: str,
-                   decision: str | None = None) -> dict:
+                   decision: str | None = None,
+                   resolved_files: list[str] | None = None) -> dict:
 ```
 
 #### Level 3 flow (two-call protocol)
@@ -437,11 +460,14 @@ instructions with:
 
 ```
 1. Call FSM tool: next_action(flow="team", topic=<TOPIC>, project_root=<PROJECT_ROOT>)
-   - Receives: {current_state, agent, instructions, storage_path}
-   - If {blocked: true, target_agent: "human"}: surface instructions to the user
-     and halt until the user deletes the file manually. Then call next_action again.
-   - If {blocked: true, target_agent: <agent>}: follow instructions to resolve
-     feedback, **delete result.file from feedback/**, then call next_action again.
+   - Receives: {current_state, agent, instructions, storage_path, limits}
+   - If {blocked: true, target_agent: "human"}:
+       Surface instructions to the user and halt. When the user confirms
+       resolution, call next_action(resolved_files=[result.file]) — Python
+       deletes the file. Do not delete files manually.
+   - If {blocked: true, target_agent: <agent>}:
+       Follow instructions to resolve feedback with <agent>, then call
+       next_action(resolved_files=[result.file]). Python deletes the file.
 
 2. Execute the instructions for the returned agent.
    Track two counters, reset at the start of each stage:
@@ -461,8 +487,9 @@ instructions with:
 3. When stage work is complete, call FSM tool: complete_stage(flow="team", topic=<TOPIC>, project_root=<PROJECT_ROOT>)
    - Receives: {next_state, agent, instructions, limits} or {done: true}
    - If {blocked: true, target_agent: "human"}:
-       Surface instructions to the user and halt. Wait for the user to
-       delete the file. Then call complete_stage again.
+       Surface instructions to the user and halt. When the user confirms
+       resolution, call complete_stage(resolved_files=[result.file]).
+       Python deletes the file. Do not delete files manually.
    - If {blocked: true, target_agent: <agent>}:
        a. feedback_round_count += 1
        b. If feedback_round_count >= limits.feedback_rounds_per_stage:
@@ -470,14 +497,13 @@ instructions with:
             original feedback type. Surface to user and halt.
        c. Otherwise:
             i.  Follow instructions to resolve feedback with <agent>.
-            ii. **Delete result.file from feedback/** — the skill deletes it;
-                Python never does. If not deleted, complete_stage will return
-                the same file again forever.
-            iii. Call complete_stage again (loop — do NOT batch-resolve
-                 multiple files before calling).
+            ii. Call complete_stage(resolved_files=[result.file]).
+                Python deletes the file. Do not delete files manually.
+                Loop — do NOT batch-resolve multiple files before calling.
 
    Each call to complete_stage returns at most one blocked file. Resolve
-   one file, delete it, call complete_stage again. Repeat until not blocked.
+   one file, pass it in resolved_files, call complete_stage again. Repeat
+   until not blocked.
 
 4. Repeat from step 2 until done=true.
 ```

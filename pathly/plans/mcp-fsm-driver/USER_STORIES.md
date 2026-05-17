@@ -52,12 +52,16 @@ spawning the orchestrator LLM agent.
   `recover_state` and `route_feedback`; returns
   `{current_state, agent, instructions, storage_path}`.
   If feedback is open, returns `{blocked: true, target_agent, instructions}`.
-- `complete_stage(flow: str, topic: str, project_root: str) -> dict` — same
-  `project_root` → `storage_path` resolution; checks feedback first; if open
+- `complete_stage(flow: str, topic: str, project_root: str, decision: str | None = None, resolved_files: list[str] | None = None) -> dict` — same
+  `project_root` → `storage_path` resolution; if `resolved_files` provided,
+  deletes those files from `feedback/` and appends a `FEEDBACK_RESOLVED` event
+  per file before evaluating anything; checks remaining feedback first; if open
   returns `{blocked: true, ...}`; otherwise calls `evaluate_transition_rules`,
   writes `STATE.json`, appends to `EVENTS.jsonl`, calls
   `run_transition_actions` with `cwd=project_root` for any git calls, returns
   `{next_state, agent, instructions}` or `{done: true}` when state is DONE.
+  The skill never deletes feedback files directly — it always passes them via
+  `resolved_files` and Python owns the deletion.
 - The `instructions` field in every response is produced by `build_prompt`:
   loads `core/agents/<agent>.md` via `importlib.resources` and appends a
   context block with feature name, state, and storage path.
@@ -106,13 +110,17 @@ constrained LLM classification — in that order, cheapest first.
 - **L3 `decide`:** `fsm.py` returns a sentinel dict
   `{"decide": True, "context_file", "question", "options", "default"}`.
   `fsm.py` never calls any LLM.
-- **`resolve_decide` in `mcp_server.py`:**
-  - Reads `context_file` from storage path.
-  - Calls `claude-haiku-4-5` with `max_tokens=10`, `temperature=0`.
-  - Prompt constrains LLM to reply with exactly one option key.
-  - Valid key → returns mapped next state from `options`.
-  - Invalid key or SDK error → returns `decide["default"]`.
-  - Appends `DECIDE_ROUTING` event to `EVENTS.jsonl` in all cases.
+- **`resolve_decide` in `mcp_server.py` — two-call protocol (no external API):**
+  - **Call 1** (`decision=None`): reads `context_file`; returns
+    `{decide: true, question, context, options, default}` to the calling LLM.
+    STATE.json is NOT written. No transition actions run.
+  - **Call 2** (`decision="<key>"`): calling LLM passes back its chosen key.
+    Python validates the key is in `options`; valid → maps to next state;
+    invalid or missing → falls back to `decide["default"]`. No exception raised.
+  - Appends `DECIDE_ROUTING` event to `EVENTS.jsonl` in all cases (Call 2).
+  - No Anthropic SDK import. No external network call. No credentials required.
+  - If `context_file` is missing on Call 1, returns `"context": null` — the
+    calling LLM chooses from option labels alone.
 - `validate_flow_cli` warns (does not raise) if a `decide` block has fewer
   than 2 options.
 - All three levels coexist in one `transition_rules` entry; only the first
@@ -174,6 +182,10 @@ possibility of LLM drift.
     to human (write `HUMAN_QUESTIONS.md`), surface to user.
   - Limits are defined in the flow YAML (top-level or per-state); defaults apply
     when absent. Skills never hardcode limit values.
+- **Python owns feedback file deletion.** When a skill resolves a blocked feedback
+  file, it passes the filename via `resolved_files` on the next `complete_stage`
+  or `next_action` call. Python deletes it and appends a `FEEDBACK_RESOLVED`
+  event. Skills never delete files in `feedback/` directly.
 - No skill file spawns the `orchestrator` agent directly.
 - Adapter `_meta/*.yaml` files for Claude and Codex updated to expand generic
   FSM tool calls into host-specific MCP syntax.

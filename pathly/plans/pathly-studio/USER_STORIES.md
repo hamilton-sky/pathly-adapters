@@ -48,7 +48,9 @@ state,
 - Clicking an item in Flows/Skills/Agents/Templates opens it in the editor panel
 - Clicking Monitor opens the monitor panel
 - Sidebar collapse button (`[◄]`) hides the sidebar; `[►]` restores it
-- Collapsed state persists across app restarts (stored in Zustand + localStorage)
+- Collapsed state persists across app restarts (stored in electron-store via main process)
+- A search/filter input at the top of the sidebar filters items across all sections in real time (matches on item name, case-insensitive); clearing the input restores the full tree
+- `Cmd/Ctrl+S` anywhere in the app saves the currently active item (same as clicking Save)
 
 ---
 
@@ -65,6 +67,8 @@ state,
 - Split pane button (`[⊟ Split]`) shows editor left + live preview right simultaneously
 - Save button writes the updated file back via IPC — config form changes update the frontmatter, markdown changes update the body
 - Unsaved changes show a dot indicator on the item in the sidebar
+- `Cmd/Ctrl+S` saves the active item without clicking the Save button
+- YAML frontmatter keys not known to ConfigForm (e.g. `version`, `model`) are displayed as read-only `key: value` rows under a collapsed "Additional fields" section and are preserved exactly on save (see E3)
 
 ---
 
@@ -84,6 +88,8 @@ state,
 - Switching from YAML tab to Visual tab re-parses the YAML and re-renders the graph
 - Save button writes YAML back to `src/pathly_data/core/flows/` via IPC
 - Invalid YAML shows a red error banner — Save is disabled until fixed
+- Dragging from one node's output handle to another node creates a new transition (ReactFlow handle API); the edge label defaults to "default" and opens the edge panel immediately
+- `Cmd/Ctrl+Z` undoes the last graph change (add/remove node, add/remove edge, agent name edit) — CodeMirror handles undo inside the YAML tab independently
 
 ---
 

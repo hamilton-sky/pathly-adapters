@@ -29,7 +29,7 @@ Create `studio/` at the repo root (alongside `src/`). Initialize with:
 
 Install deps:
 ```
-npm install electron electron-vite react react-dom zustand
+npm install electron electron-vite react react-dom zustand electron-store
 npm install -D @types/react @types/react-dom typescript vite @vitejs/plugin-react
 ```
 
@@ -101,7 +101,14 @@ export interface ProjectEntry {
 ```
 
 **File:** `studio/src/renderer/src/store/index.ts`
-**Done when:** store imports without error; `projects` persists to localStorage; `selectedItem` defaults to null; `projectPath` defaults to `''`.
+**Done when:** store imports without error; `projects` persists via electron-store IPC; `selectedItem` defaults to null; `projectPath` defaults to `''`.
+
+Use `electron-store` (main process) instead of localStorage for persistence. Add IPC channels:
+- `store:get(key)` → value
+- `store:set(key, value)` → void
+
+Expose via preload as `window.pathly.store.get` / `window.pathly.store.set`.
+Persist via electron-store: `projects`, `sidebarCollapsed`. Do NOT persist `selectedItem` or `activePanel`.
 
 Store shape additions for multi-project:
 ```ts
@@ -110,7 +117,6 @@ addProject:    (p: ProjectEntry) => void
 removeProject: (path: string) => void
 updateProject: (path: string, patch: Partial<ProjectEntry>) => void
 ```
-Persist: `projects`, `sidebarCollapsed`. Do NOT persist `selectedItem` or `activePanel`.
 
 Add to preload (`preload/index.ts`):
 ```ts
@@ -151,7 +157,17 @@ TopBar gets a `[← Projects]` button at the far left — clicking it calls `sto
 - `[◄]` button sets `sidebarCollapsed = true`; main panel expands to full width
 - Collapsed state saved to localStorage on change
 
-**Verify:** `npm run dev` → home screen lists any previously opened projects → clicking `[→]` enters the project → sidebar shows at least 3 flows and 10+ skills.
+Add a search/filter input at the top of the sidebar:
+- Controlled input, placeholder "Filter…"
+- On change: filter `items` in all sections to those whose `name.toLowerCase().includes(query)`
+- Sections with zero matches collapse automatically; sections with matches expand and show only matched items
+- Clearing the input restores full tree state
+
+Add global keyboard shortcut:
+- In `App.tsx` effect: `window.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); store.triggerSave() } })`
+- Add `triggerSave: () => void` to store — sets `savePending = true`; Editor/FlowEditor observe and call their save logic when `savePending` flips
+
+**Verify:** `npm run dev` → home screen lists any previously opened projects → clicking `[→]` enters the project → sidebar shows at least 3 flows and 10+ skills → typing "go" in filter shows only items matching "go".
 
 **Purpose:** navigation layer — all other panels depend on item selection.
 
@@ -178,7 +194,8 @@ Path guard: reject any path not under `app.getPath('home')` — prevents write o
 **File:** `studio/src/renderer/src/components/Editor/ConfigForm.tsx`
 **Done when:**
 - Parses YAML frontmatter between opening and closing `---`
-- Renders fields: name (text), description (text), adapters (checkboxes: claude/codex/copilot), tools (comma-separated text)
+- Renders known fields: name (text), description (text), adapters (checkboxes: claude/codex/copilot), tools (comma-separated text)
+- Unknown frontmatter keys (e.g. `version`, `model`) rendered as read-only `key: value` rows under a collapsed `▶ Additional fields` section — these keys must be round-tripped exactly on save (see E3)
 - If no frontmatter: all fields empty, saving adds frontmatter block
 
 ### 2.4 Markdown editor
@@ -226,6 +243,11 @@ Save button: merges config form values back into frontmatter + markdown body →
 
 Install: `npm install reactflow`
 
+Each node renders a ReactFlow source handle (right side) and target handle (left side).
+Dragging from a source handle to a target handle creates a new edge:
+- New edge label defaults to "default"
+- Edge panel slides in immediately on creation so the user can set the artifact trigger
+
 Click node → slide-in panel on right:
 - Edit agent name (text input)
 - Add/remove transition_rules entries (artifact filename → target state)
@@ -233,6 +255,12 @@ Click node → slide-in panel on right:
 Click edge → slide-in panel:
 - Edit artifact trigger
 - Add/remove transition_actions (skill name + message)
+
+Undo/redo for graph operations:
+- Maintain a `history: FlowYaml[]` stack in the store (max 50 entries)
+- Push to history on every node add/remove, edge add/remove, or agent name change
+- `Cmd/Ctrl+Z` pops the stack and re-renders the graph; `Cmd/Ctrl+Shift+Z` redoes
+- Note: CodeMirror handles undo independently inside the YAML tab — do not intercept its keydown events
 
 ### 3.3 YAML view
 

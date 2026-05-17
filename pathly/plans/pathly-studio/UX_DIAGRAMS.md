@@ -76,6 +76,8 @@ Clicking `[← Projects]` returns to the home screen without closing the window.
 
 ```
 ┌────────────────┐
+│ [ Filter…    ] │  ← search input, filters all sections
+├────────────────┤
 │ ▼ Flows        │
 │   team.yaml    │
 │   debug.yaml   │
@@ -101,6 +103,9 @@ Clicking `[← Projects]` returns to the home screen without closing the window.
 │           [◄]  │
 └────────────────┘
 ```
+
+Typing "go" collapses all sections to zero matches except Skills (which shows only "go").
+Clearing the input restores full tree.
 
 ---
 
@@ -422,6 +427,43 @@ Clicking `[►]` restores the sidebar to full width.
 │                │                                                                      │
 │                │          (main panel continues below)                               │
 └────────────────┴─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 19. Keyboard shortcuts reference
+
+Not a screen — a reference table for the builder.
+
+| Shortcut | Scope | Action |
+|---|---|---|
+| `Cmd/Ctrl+S` | Global | Save active item (editor or flow) |
+| `Cmd/Ctrl+Z` | Flow editor visual tab | Undo last graph change |
+| `Cmd/Ctrl+Shift+Z` | Flow editor visual tab | Redo |
+| `Cmd/Ctrl+Z` | Editor markdown area | CodeMirror built-in undo (no custom handling needed) |
+
+The global `Cmd+S` listener lives in `App.tsx`. The flow editor captures `Cmd+Z` / `Cmd+Shift+Z` only when the visual tab is active, so it does not interfere with CodeMirror undo in the YAML tab.
+
+---
+
+## 20. Flow editor — drag-to-connect
+
+Dragging from any node's right-side handle to another node's left-side handle creates a new transition edge. The edge panel slides in immediately.
+
+```
+┌─ Flows / team.flow.yaml ───────────────────────────────────────────────────┐
+│  [ Visual ]  [ YAML ]                                             [Save]   │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────┐ ●─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─●┌──────────┐          │
+│  │ STORMING │  (dragging to connect)                │ PLANNING │          │
+│  │ discover │─────────────────────────────────────► │  planner │          │
+│  └──────────┘                                        └──────────┘          │
+│                                                                             │
+│  ● = source handle (right)    ● = target handle (left)                     │
+│  Drag source handle → target handle to create edge                         │
+│  Edge label defaults to "default" — edit in edge panel                     │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
