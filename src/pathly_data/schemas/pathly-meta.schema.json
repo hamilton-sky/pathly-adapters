@@ -20,6 +20,10 @@
       "items": { "type": "string" },
       "description": "List of tool names available to this agent or skill"
     },
+    "core_file ":{
+      "type": "string",
+      "description": "Path to the core file for this adapter entry"
+    },
     "can_spawn": {
       "type": "array",
       "items": { "type": "string" },
