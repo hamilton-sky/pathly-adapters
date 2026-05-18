@@ -2,7 +2,7 @@
 
 Codebase: `pathly-adapters` v2.4.1  
 Reviewer: Claude Code (automated deep review)  
-Date: 2026-05-18  
+Date: 2026-05-18 — verified against source 2026-05-18  
 Scope: All Python source in `src/`, existing docs cross-checked for accuracy
 
 ---
@@ -11,24 +11,33 @@ Scope: All Python source in `src/`, existing docs cross-checked for accuracy
 
 The codebase is well-structured for its stage. The core/adapter separation is clean, the stitch pipeline is deterministic, and the atomic install with rollback is a genuinely good design. The issues below are real but not architectural — they are hardening gaps, consistency problems, and missing tests. None of them are blockers for a public beta; several are blockers before calling this production-ready.
 
+**Note (post-verification):** Issue #1 (hook path validation) was verified against source and found to be a false positive — `inject_feedback_ttl.py` already implements the correct `Path.resolve()` + `is_relative_to()` pattern. All other issues (#2–#15) were confirmed against the actual code.
+
 ---
 
 ## Issues and Solutions
 
-### 1. Hook path validation is string-based (SECURITY · HIGH)
+### 1. Hook path validation — both hooks already safe (SECURITY · VERIFIED)
 
-**File:** `src/pathly_hooks/classify_feedback.py:49–56`, `src/pathly_hooks/inject_feedback_ttl.py`
+**File:** `src/pathly_hooks/classify_feedback.py:49–56`, `src/pathly_hooks/inject_feedback_ttl.py:68–71`
 
-**Issue:** `inject_feedback_ttl.py` uses string-based path checking. A crafted path like `plans/../../etc/passwd` that contains a `feedback/` substring would pass the check if the string match is not canonicalized. `classify_feedback.py` uses `Path.resolve()` + `is_relative_to()` correctly, but `inject_feedback_ttl.py` may not.
+**Original claim:** `inject_feedback_ttl.py` used string-based path checking, making it vulnerable to path traversal.
 
-**Solution:** Both hooks must resolve the path before any check:
+**Verified finding:** This claim is **incorrect**. Source inspection confirms `inject_feedback_ttl.py` already uses `Path.resolve()` + `is_relative_to()` identically to `classify_feedback.py`:
+
 ```python
-resolved = Path(raw_path).resolve()
+# inject_feedback_ttl.py:68-71 (current code — already safe)
 plans_dir = (Path(project_root_env) / "plans").resolve()
+resolved = Path(raw_path).resolve()
 if not resolved.is_relative_to(plans_dir):
     sys.exit(1)
 ```
-Add unit tests for: path pointing outside `plans/`, symlink traversal, missing `PATHLY_PROJECT_ROOT`, malformed JSON payload.
+
+**Action required:** None on path validation itself. However, unit tests for edge cases are still missing and should be added:
+- path pointing outside `plans/`
+- symlink traversal
+- missing `PATHLY_PROJECT_ROOT`
+- malformed JSON payload
 
 ---
 
@@ -266,24 +275,24 @@ finally:
 
 Items that must be resolved before calling v3.0 production-ready:
 
-| # | Issue | Priority |
-|---|-------|----------|
-| 2 | Manifest integrity not verified | HIGH |
-| 1 | Hook path validation (inject_feedback_ttl) | HIGH |
-| 13 | No rollback regression test | HIGH |
-| 12 | No manifest schema validation in CI | MEDIUM |
-| 5 | `datetime.utcnow()` deprecation | MEDIUM |
-| 6 | Git subprocess no timeout | MEDIUM |
+| # | Issue | Priority | Status |
+|---|-------|----------|--------|
+| 2 | Manifest integrity not verified | HIGH | Open |
+| 1 | Hook path validation (inject_feedback_ttl) | HIGH | **Already fixed** — both hooks use `Path.resolve()` + `is_relative_to()` correctly |
+| 13 | No rollback regression test | HIGH | Open |
+| 12 | No manifest schema validation in CI | MEDIUM | Open |
+| 5 | `datetime.utcnow()` deprecation | MEDIUM | Open |
+| 6 | Git subprocess no timeout | MEDIUM | Open |
 
 Items that are hardening recommendations (can ship beta without them):
 
-| # | Issue | Priority |
-|---|-------|----------|
-| 3 | SSE project_root path traversal | MEDIUM |
-| 4 | Traceback in 500 responses | LOW |
-| 9 | CLI path-discovery duplication | LOW |
-| 15 | SSE tailer thread leak | LOW |
-| 7 | Broad except in CLI | LOW |
-| 8 | EVENTS.jsonl corrupt-line handling | LOW |
-| 14 | PROGRESS.md silent no-op | LOW |
-| 11 | No retry in Studio installer | LOW |
+| # | Issue | Priority | Status |
+|---|-------|----------|--------|
+| 3 | SSE project_root path traversal | MEDIUM | Open |
+| 4 | Traceback in 500 responses | LOW | Open |
+| 9 | CLI path-discovery duplication | LOW | Open |
+| 15 | SSE tailer thread leak | LOW | Open |
+| 7 | Broad except in CLI | LOW | Open |
+| 8 | EVENTS.jsonl corrupt-line handling | LOW | Open |
+| 14 | PROGRESS.md silent no-op | LOW | Open |
+| 11 | No retry in Studio installer | LOW | Open |
