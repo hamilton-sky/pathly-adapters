@@ -170,13 +170,13 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
     const instance = tabInstancesRef.current.get(tabId)!
 
     if (containerRef.current && instance.container !== containerRef.current) {
-      instance.xterm.open(containerRef.current)
+      if (instance.xterm.element) {
+        // xterm already opened — move its DOM to the new container instead of calling open() again
+        containerRef.current.appendChild(instance.xterm.element)
+      } else {
+        instance.xterm.open(containerRef.current)
+      }
       instance.container = containerRef.current
-      try {
-        instance.fitAddon.fit()
-        const { cols, rows } = instance.xterm
-        void window.pathly?.terminal?.resize(tabId, cols, rows)
-      } catch { /* ignore */ }
 
       setTimeout(() => {
         const inst = tabInstancesRef.current.get(tabId)
@@ -200,7 +200,7 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
           const { cols, rows } = instance.xterm
           void window.pathly?.terminal?.resize(tabId, cols, rows)
         } catch { /* ignore */ }
-      }, 0)
+      }, 100)
     }
   }, [tabId, active, tabInstancesRef])
 
@@ -297,46 +297,57 @@ function PaneTabBar({
               {tab.label}
             </span>
           )}
-          <span
-            title="Pop out to window"
+          {/* Pop-out button — visible on tab hover via CSS-in-JS inline state */}
+          <button
+            title="Pop out to its own window"
             onClick={(e) => { e.stopPropagation(); onPopout(tab.id) }}
             style={{
-              fontSize: '13px',
+              background: 'none',
+              border: `1px solid transparent`,
+              borderRadius: '3px',
+              cursor: 'pointer',
+              padding: '1px 4px',
+              fontSize: '10px',
               color: theme.textMuted,
               lineHeight: 1,
-              padding: '1px 3px',
-              borderRadius: '2px',
-              cursor: 'pointer',
-              marginRight: '1px',
-              userSelect: 'none',
+              marginLeft: '4px',
+              flexShrink: 0,
+              letterSpacing: '0.5px',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = theme.accent }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = theme.textMuted }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLElement
+              el.style.color = theme.accent
+              el.style.borderColor = theme.accent
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLElement
+              el.style.color = theme.textMuted
+              el.style.borderColor = 'transparent'
+            }}
           >
-            ↗
-          </span>
-          <span
-            onClick={(e) => onCloseTab(tab.id, e)}
-            style={styles.closeBtn}
+            ⬡ pop
+          </button>
+          <button
+            title="Close tab"
+            onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px', fontSize: '11px', color: theme.textMuted, lineHeight: 1, flexShrink: 0 }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = theme.red }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = theme.textMuted }}
-          >
-            ✕
-          </span>
+          >✕</button>
         </div>
       ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
-        <button onClick={() => onAddTab(pane)} style={styles.iconBtn} title="New shell">⌨</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '2px', paddingLeft: '4px' }}>
+        <button onClick={() => onAddTab(pane)} style={{ ...styles.iconBtn, fontSize: '11px' }} title="New shell">+ Shell</button>
         <button
           onClick={() => onLaunch('claude', 'Claude', pane)}
           style={{ ...styles.iconBtn, fontSize: '10px', fontWeight: 700, color: theme.accent }}
           title="Launch Claude Code"
-        >◆</button>
+        >Claude</button>
         <button
           onClick={() => onLaunch('codex', 'Codex', pane)}
           style={{ ...styles.iconBtn, fontSize: '10px', fontWeight: 700, color: theme.green }}
           title="Launch Codex"
-        >⬡</button>
+        >Codex</button>
       </div>
     </div>
   )
