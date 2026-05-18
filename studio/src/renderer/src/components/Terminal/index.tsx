@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
-import { darkTheme } from '../../theme'
 import type { TabInstance } from './types'
 import { TerminalTabView } from './TerminalTabView'
 import { PaneTabBar } from './PaneTabBar'
@@ -13,8 +12,6 @@ export function Terminal(): JSX.Element {
     toggle, addTab, closeTab, setActiveTab, renameTab, toggleSplit,
   } = useTerminalStore()
   const projectPath = useStore((s) => s.projectPath)
-  // Terminal panel always uses dark theme — terminal stays dark regardless of app theme
-  const theme = darkTheme
   const [panelHeight, setPanelHeight] = useState(260)
   const [splitRatio, setSplitRatio] = useState(0.5)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -140,25 +137,11 @@ export function Terminal(): JSX.Element {
     </div>
   )
 
-  // CSS custom properties for theme colors — child components reference via var(--t-*)
-  const themeVars = {
-    '--t-bg': theme.bgBase,
-    '--t-surface0': theme.bgSurface0,
-    '--t-surface1': theme.bgSurface1,
-    '--t-mantle': theme.bgMantle,
-    '--t-text': theme.textPrimary,
-    '--t-text-muted': theme.textMuted,
-    '--t-accent': theme.accent,
-    '--t-red': theme.red,
-    '--t-green': theme.green,
-    '--t-blue': theme.blue,
-  } as React.CSSProperties
-
   return (
     <div
       ref={panelRef}
       className={styles.panel}
-      style={{ ...themeVars, height: `${panelHeight}px`, display: open ? 'flex' : 'none' }}
+      style={{ height: `${panelHeight}px`, display: open ? 'flex' : 'none' }}
     >
       <div onMouseDown={onDragMouseDown} className={styles.dragHandle} />
 
