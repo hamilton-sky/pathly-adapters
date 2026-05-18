@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
 import styles from './TopBar.module.css'
 
@@ -64,6 +65,8 @@ export function TopBar(): JSX.Element {
     }
   }
 
+  const { toggle: toggleTerminal } = useTerminalStore()
+
   const badge = monitorSource === 'sse'
     ? <span className={styles.badgeLive}>● SSE live</span>
     : <span className={styles.badgeWatch}>○ File watch</span>
@@ -96,6 +99,7 @@ export function TopBar(): JSX.Element {
 
         <div className={styles.right}>
           {badge}
+          <button className={styles.terminalBtn} onClick={() => toggleTerminal()} title="Toggle terminal (Ctrl+`)">⌨</button>
           <button className={styles.publishBtn} onClick={() => void handlePublish()} disabled={publishing}>
             {publishing ? '…' : '↑ Publish'}
           </button>

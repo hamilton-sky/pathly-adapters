@@ -30,5 +30,21 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on('watch:event', listener)
       return () => ipcRenderer.removeListener('watch:event', listener)
     }
+  },
+  terminal: {
+    spawn: (tabId: string, cwd: string): Promise<void> =>
+      ipcRenderer.invoke('terminal:spawn', tabId, cwd),
+    write: (tabId: string, data: string): Promise<void> =>
+      ipcRenderer.invoke('terminal:write', tabId, data),
+    resize: (tabId: string, cols: number, rows: number): Promise<void> =>
+      ipcRenderer.invoke('terminal:resize', tabId, cols, rows),
+    kill: (tabId: string): Promise<void> =>
+      ipcRenderer.invoke('terminal:kill', tabId),
+    onData: (tabId: string, cb: (data: string) => void): (() => void) => {
+      const channel = `terminal:data:${tabId}`
+      const listener = (_e: Electron.IpcRendererEvent, data: string): void => cb(data)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    }
   }
 })

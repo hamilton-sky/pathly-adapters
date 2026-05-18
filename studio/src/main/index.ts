@@ -4,6 +4,7 @@ import { registerFsHandlers } from './ipc/fs'
 import { registerWatcherHandlers } from './ipc/watcher'
 import { registerMcpHandlers } from './ipc/mcp'
 import { registerShellHandlers } from './ipc/shell'
+import { registerTerminalHandlers } from './ipc/terminal'
 import { spawn, ChildProcess } from 'child_process'
 import net from 'net'
 
@@ -109,4 +110,5 @@ function registerIpcHandlers(win: BrowserWindow): void {
   registerWatcherHandlers(win)
   registerMcpHandlers()
   registerShellHandlers(win)
+  registerTerminalHandlers(win)
 }

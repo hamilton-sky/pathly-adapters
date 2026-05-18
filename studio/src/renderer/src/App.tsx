@@ -9,6 +9,7 @@ import { TopBar } from './components/TopBar'
 import { Monitor } from './components/Monitor'
 import { PlanBoard } from './components/PlanBoard'
 import { Settings } from './components/Settings'
+import { Terminal } from './components/Terminal'
 import { useTheme } from './useTheme'
 import { darkTheme, lightTheme } from './theme'
 
@@ -82,6 +83,7 @@ export default function App(): JSX.Element {
         <Sidebar />
         <PanelErrorBoundary><MainPanel /></PanelErrorBoundary>
       </div>
+      <Terminal />
     </div>
   )
 }

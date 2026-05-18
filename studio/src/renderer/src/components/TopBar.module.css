@@ -84,6 +84,19 @@
   white-space: nowrap;
 }
 
+.terminalBtn {
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.terminalBtn:hover { background: var(--bg-surface0); color: var(--text-primary); }
+
 .publishBtn {
   background: var(--accent);
   border: none;
