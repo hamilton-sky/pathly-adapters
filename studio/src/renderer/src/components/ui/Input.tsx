@@ -29,7 +29,6 @@ export function Input({
     padding: '5px 9px',
     fontSize: '12px',
     fontFamily: 'monospace',
-    outline: 'none',
     transition: 'border-color 0.15s',
     width: '100%',
     boxSizing: 'border-box',
@@ -38,6 +37,7 @@ export function Input({
 
   return (
     <input
+      className="pathly-input"
       style={baseStyle}
       value={value}
       onChange={onChange}

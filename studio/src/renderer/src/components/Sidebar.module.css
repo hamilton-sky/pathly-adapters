@@ -37,6 +37,7 @@
   background: var(--bg-surface0);
   color: var(--text-primary);
 }
+.expandBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
 .filterRow {
   padding: 8px 10px;
@@ -57,6 +58,7 @@
 }
 .filterInput::placeholder { color: var(--text-muted); }
 .filterInput:focus { border-color: var(--accent); }
+.filterInput:focus-visible { outline: 2px solid #89b4fa; outline-offset: 2px; }
 
 .treeContainer {
   flex: 1;
@@ -85,6 +87,7 @@
   transition: color 0.12s;
 }
 .sectionHeader:hover { color: var(--text-secondary); }
+.sectionHeader:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
 .sectionSub {
   color: var(--text-muted);
@@ -117,6 +120,7 @@
   transition: color 0.1s;
 }
 .subdirHeader:hover { color: var(--text-primary); }
+.subdirHeader:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
 /* ── Plan / conversation rows ── */
 .convRow {
@@ -137,6 +141,7 @@
   background: var(--bg-surface0);
   color: var(--text-primary);
 }
+.convRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
 
 .convLabel {
   flex: 1;
@@ -185,6 +190,7 @@
   background: var(--bg-surface0);
   color: var(--text-primary);
 }
+.itemRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
 .itemRowSelected {
   background: var(--bg-surface0);
   border-left-color: var(--accent);
@@ -233,6 +239,7 @@
   background: var(--bg-surface0);
   color: var(--text-primary);
 }
+.bottomRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
 .bottomRowActive {
   background: var(--bg-surface0);
   border-left-color: var(--accent);
@@ -258,6 +265,7 @@
   transition: color 0.12s;
 }
 .collapseBtn:hover { color: var(--text-secondary); }
+.collapseBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
 .newBtn {
   display: block;
@@ -274,3 +282,4 @@
   transition: opacity 0.12s;
 }
 .newBtn:hover { opacity: 1; }
+.newBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }

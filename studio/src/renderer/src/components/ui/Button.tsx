@@ -23,7 +23,6 @@ export function Button({
 }: ButtonProps): JSX.Element {
   const t = useTheme()
   const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
 
   const padding = size === 'sm' ? '4px 10px' : '6px 14px'
   const fontSize = size === 'sm' ? '12px' : '13px'
@@ -57,20 +56,17 @@ export function Button({
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? 0.5 : 1,
     transition: 'background 0.12s, color 0.12s',
-    outline: focused ? `2px solid ${t.accent}` : 'none',
-    outlineOffset: '2px',
     ...style,
   }
 
   return (
     <button
+      className="pathly-btn"
       style={baseStyle}
       disabled={disabled}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
     >
       {children}
     </button>

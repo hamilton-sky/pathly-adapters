@@ -68,14 +68,14 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
 }
 
 function HeaderBar(): JSX.Element {
-  const { fsmState, events } = useStore()
+  const { fsmState, events, activeTopic } = useStore()
   const t = useTheme()
   const styles = makeStyles(t)
 
   const flow = fsmState?.flow ?? '—'
   const topic = fsmState?.feature
-    ? truncate(fsmState.feature, 32)
-    : '—'
+    ? truncate(fsmState.feature as string, 32)
+    : activeTopic ? truncate(activeTopic, 32) : '—'
   const state = fsmState?.current ?? '—'
   const conv = fsmState?.current_conversation != null
     ? String(fsmState.current_conversation)
@@ -141,6 +141,14 @@ export function Monitor(): JSX.Element {
       if (!content) return
       try {
         const parsed = JSON.parse(content)
+        if (!parsed.flow) {
+          if (base.includes('/pathly/debugs/')) parsed.flow = 'debug'
+          else if (base.includes('/pathly/explorations/')) parsed.flow = 'explore'
+          else parsed.flow = 'team'
+        }
+        if (!parsed.feature && activeTopic) {
+          parsed.feature = activeTopic
+        }
         setFsmState(parsed)
         const flowName = parsed.flow as string | undefined
         if (!flowName) return

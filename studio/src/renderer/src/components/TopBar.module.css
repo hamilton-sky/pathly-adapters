@@ -23,6 +23,7 @@
   transition: background 0.12s, color 0.12s;
 }
 .backBtn:hover { background: var(--bg-surface0); color: var(--text-primary); }
+.backBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
 .brand {
   font-size: 13px;
@@ -51,6 +52,7 @@
   transition: border-color 0.15s;
 }
 .topicSelect:focus { border-color: var(--accent); }
+.topicSelect:focus-visible { outline: 2px solid #89b4fa; outline-offset: 2px; }
 
 .topicSelectArchive {
   background: var(--bg-base);
@@ -64,6 +66,7 @@
   transition: border-color 0.15s;
 }
 .topicSelectArchive:focus { border-color: var(--bg-surface1); }
+.topicSelectArchive:focus-visible { outline: 2px solid #89b4fa; outline-offset: 2px; }
 .topicSelectArchive:hover { border-color: var(--bg-surface1); }
 
 .right {
@@ -96,6 +99,7 @@
   transition: background 0.12s, color 0.12s;
 }
 .terminalBtn:hover { background: var(--bg-surface0); color: var(--text-primary); }
+.terminalBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
 .publishBtn {
   background: var(--accent);
@@ -110,6 +114,7 @@
   transition: opacity 0.12s;
 }
 .publishBtn:hover { opacity: 0.85; }
+.publishBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 .publishBtn:disabled { opacity: 0.5; cursor: default; }
 
 /* ── Publish log panel ── */
@@ -142,6 +147,7 @@
   transition: color 0.12s;
 }
 .logClose:hover { color: var(--text-primary); }
+.logClose:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
 .logBody {
   overflow-y: auto;

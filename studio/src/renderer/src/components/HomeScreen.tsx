@@ -173,13 +173,13 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '8px 16px 8px 24px',
+      padding: '5px 16px 5px 20px',
       borderBottom: `1px solid ${t.bgBase}`,
+      borderLeft: '3px solid transparent',
       cursor: 'pointer',
-      transition: 'background 0.1s'
     },
     planName: {
-      fontSize: '13px',
+      fontSize: '12px',
       color: t.textSecondary,
       fontFamily: 'monospace'
     },
@@ -201,7 +201,7 @@ export function HomeScreen(): JSX.Element {
   const t = useTheme()
   const styles = makeStyles(t)
   const [projectPlans, setProjectPlans] = useState<ProjectPlans>({})
-  const [hideDone, setHideDone] = useState(false)
+  const [hideDone, setHideDone] = useState(true)
 
   useEffect(() => {
     const ROOTS: Array<{ subdir: string; flowType: 'team' | 'debug' | 'explore' }> = [
@@ -343,6 +343,8 @@ export function HomeScreen(): JSX.Element {
                       style={styles.planRow}
                       onClick={(e) => handleOpen(project, plan.name, e)}
                       title={`Open ${plan.name}`}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = t.bgSurface0 }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '' }}
                     >
                       <span style={styles.planName}>{plan.name}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -144,6 +144,18 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
         const { cols, rows } = instance.xterm
         void window.pathly?.terminal?.resize(tabId, cols, rows)
       } catch { /* ignore */ }
+
+      // Trigger redraw after mount so PowerShell prompt re-renders
+      setTimeout(() => {
+        const inst = tabInstancesRef.current.get(tabId)
+        if (inst) {
+          try {
+            inst.fitAddon.fit()
+            const { cols, rows } = inst.xterm
+            void window.pathly?.terminal?.resize(tabId, cols, rows)
+          } catch { /* ignore */ }
+        }
+      }, 150)
     }
   }, [tabId, tabInstancesRef])
 
@@ -204,10 +216,8 @@ export function Terminal(): JSX.Element {
   const theme = useTheme()
   const styles = makeStyles(theme)
   const [panelHeight, setPanelHeight] = useState(260)
-  const [launcherOpen, setLauncherOpen] = useState(false)
   const dragStartRef = useRef<{ y: number; h: number } | null>(null)
   const tabInstancesRef = useRef(new Map<string, TabInstance>())
-  const launcherRef = useRef<HTMLDivElement>(null)
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.ctrlKey && e.key === '`') {
@@ -247,20 +257,9 @@ export function Terminal(): JSX.Element {
     return removeOnExit
   }, [])
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent): void => {
-      if (launcherRef.current && !launcherRef.current.contains(e.target as Node)) {
-        setLauncherOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   const handleLaunch = async (command: string | undefined, label: string): Promise<void> => {
     const id = crypto.randomUUID()
     addTab(id, label)
-    setLauncherOpen(false)
     try {
       await window.pathly?.terminal?.spawn(id, projectPath, command)
     } catch (err) {
@@ -342,49 +341,22 @@ export function Terminal(): JSX.Element {
             </span>
           </div>
         ))}
-        <div ref={launcherRef} style={{ position: 'relative', display: 'flex', flexShrink: 0 }}>
-          <button onClick={handleAddTab} style={styles.addBtn} title="New shell">+</button>
+        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, gap: '2px', paddingRight: '4px' }}>
           <button
-            onClick={() => setLauncherOpen((v) => !v)}
-            style={{ ...styles.addBtn, padding: '0 6px', fontSize: '10px' }}
-            title="Launch CLI"
-          >
-            ▾
-          </button>
-          {launcherOpen && (
-            <div style={{
-              position: 'absolute',
-              bottom: '100%',
-              right: 0,
-              backgroundColor: theme.bgSurface0,
-              border: `1px solid ${theme.bgSurface1}`,
-              borderRadius: '4px',
-              minWidth: '140px',
-              zIndex: 100,
-              fontSize: '12px',
-              fontFamily: 'monospace',
-            }}>
-              {[
-                { label: 'PowerShell', command: undefined as string | undefined },
-                { label: 'Claude Code', command: 'claude' as string | undefined },
-                { label: 'Codex', command: 'codex' as string | undefined },
-              ].map(({ label, command }) => (
-                <div
-                  key={label}
-                  onClick={() => void handleLaunch(command, label)}
-                  style={{
-                    padding: '6px 12px',
-                    cursor: 'pointer',
-                    color: theme.textPrimary,
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = theme.bgSurface1 }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-          )}
+            onClick={handleAddTab}
+            style={styles.addBtn}
+            title="New terminal (PowerShell)"
+          >⌨</button>
+          <button
+            onClick={() => void handleLaunch('claude', 'Claude')}
+            style={{ ...styles.addBtn, fontSize: '11px', fontWeight: 700, color: theme.accent }}
+            title="Launch Claude Code"
+          >◆</button>
+          <button
+            onClick={() => void handleLaunch('codex', 'Codex')}
+            style={{ ...styles.addBtn, fontSize: '11px', fontWeight: 700, color: theme.green }}
+            title="Launch Codex"
+          >⬡</button>
         </div>
       </div>
 
