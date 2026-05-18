@@ -5,6 +5,7 @@ storage_path: "pathly/plans/{topic}/"
 states:
   - STORMING
   - PLANNING
+  - DESIGNING
   - BUILDING
   - REVIEWING
   - TESTING
@@ -15,6 +16,8 @@ transitions:
   STORMING:
     - PLANNING
   PLANNING:
+    - DESIGNING
+  DESIGNING:
     - BUILDING
   BUILDING:
     - REVIEWING
@@ -31,6 +34,7 @@ transitions:
 agent_map:
   STORMING: team/discover
   PLANNING: team/plan
+  DESIGNING: team/design
   BUILDING: team/build
   REVIEWING: team/review
   TESTING: team/test
@@ -51,10 +55,15 @@ feedback_routing:
 
 transition_rules:
   PLANNING:
-    # Artifact gate: planner must produce IMPLEMENTATION_PLAN.md before BUILDING
+    # Artifact gate: planner must produce IMPLEMENTATION_PLAN.md before DESIGNING
     on_artifact:
-      IMPLEMENTATION_PLAN.md: BUILDING
+      IMPLEMENTATION_PLAN.md: DESIGNING
     default: PLANNING
+  DESIGNING:
+    # Artifact gate: design agent must produce DESIGN.md before BUILDING
+    on_artifact:
+      DESIGN.md: BUILDING
+    default: DESIGNING
   BUILDING:
     default: REVIEWING
   REVIEWING:
