@@ -3,13 +3,16 @@ import { useStore } from '../store'
 import { listDir, listDirs } from '../services/pathlyApi'
 import type { PathlyItem, SectionState, TemplateSubdir } from '../types'
 
-const SECTIONS = [
-  { label: 'Flows',        type: 'flow'     as const, dir: 'src/pathly_data/core/flows'     },
-  { label: 'Skills',       type: 'skill'    as const, dir: 'src/pathly_data/core/skills'    },
-  { label: 'Agents',       type: 'agent'    as const, dir: 'src/pathly_data/core/agents'    },
-  { label: 'Templates',    type: 'template' as const, dir: 'src/pathly_data/core/templates' },
-  { label: 'Debugs',       type: 'debug'    as const, dir: 'pathly/debugs'                  },
-  { label: 'Explorations', type: 'explore'  as const, dir: 'pathly/explorations'            },
+const PATHLY_SECTIONS = [
+  { label: 'Flows',     type: 'flow'     as const, dir: 'src/pathly_data/core/flows'     },
+  { label: 'Skills',    type: 'skill'    as const, dir: 'src/pathly_data/core/skills'    },
+  { label: 'Agents',    type: 'agent'    as const, dir: 'src/pathly_data/core/agents'    },
+  { label: 'Templates', type: 'template' as const, dir: 'src/pathly_data/core/templates' },
+]
+
+const WORKSPACE_SECTIONS = [
+  { label: 'Debugs',       type: 'debug'   as const, dir: 'pathly/debugs'       },
+  { label: 'Explorations', type: 'explore' as const, dir: 'pathly/explorations' },
 ]
 
 const INITIAL_SECTIONS: Record<string, SectionState> = {
@@ -30,11 +33,18 @@ export function useProjectFiles(): {
   const [sections, setSections] = useState<Record<string, SectionState>>(INITIAL_SECTIONS)
 
   const loadItems = useCallback(async (): Promise<void> => {
-    if (!projectPath) return
-    for (const section of SECTIONS) {
+    for (const section of PATHLY_SECTIONS) {
+      if (!projectPath) {
+        if (section.type === 'template') {
+          setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: [] } }))
+        } else {
+          setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [] } }))
+        }
+        continue
+      }
       try {
         const dir = `${projectPath}/${section.dir}`
-        if (section.type === 'template' || section.type === 'debug' || section.type === 'explore') {
+        if (section.type === 'template') {
           const subdirNames = await listDirs(dir)
           const subdirs: TemplateSubdir[] = []
           for (const subdirName of subdirNames) {
@@ -48,24 +58,45 @@ export function useProjectFiles(): {
           }
           setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs } }))
         } else {
-          const names = await listDir(`${projectPath}/${section.dir}`)
+          const names = await listDir(dir)
           const items: PathlyItem[] = names.map((name) => ({
-            name, path: `${projectPath}/${section.dir}/${name}`, type: section.type,
+            name, path: `${dir}/${name}`, type: section.type,
           }))
           setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items } }))
         }
       } catch {
-        if (section.type === 'template' || section.type === 'debug' || section.type === 'explore') {
+        if (section.type === 'template') {
           setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: null } }))
         } else {
           setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [] } }))
         }
       }
     }
+
+    if (!projectPath) return
+
+    for (const section of WORKSPACE_SECTIONS) {
+      try {
+        const dir = `${projectPath}/${section.dir}`
+        const subdirNames = await listDirs(dir)
+        const subdirs: TemplateSubdir[] = []
+        for (const subdirName of subdirNames) {
+          const subdirPath = `${dir}/${subdirName}`
+          let files: PathlyItem[] = []
+          try {
+            const fileNames = await listDir(subdirPath)
+            files = fileNames.map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: section.type }))
+          } catch { /* empty subdir */ }
+          subdirs.push({ name: subdirName, open: false, files })
+        }
+        setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs } }))
+      } catch {
+        setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: null } }))
+      }
+    }
   }, [projectPath])
 
   useEffect(() => {
-    if (!projectPath) return
     void loadItems()
   }, [projectPath, loadItems])
 

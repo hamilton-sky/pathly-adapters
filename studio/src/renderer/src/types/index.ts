@@ -59,6 +59,7 @@ export interface FsmEvent {
   from?: string
   to?: string
   reason?: string
+  agent?: string
 }
 
 export interface SkillFrontmatter {

@@ -1,6 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStore } from '../../store'
-import { useProjectStore } from '../../store/projectStore'
 import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
@@ -28,7 +27,11 @@ function getFlowYamlName(flow: string | undefined): string {
     case 'team': return 'team.flow.yaml'
     case 'debug': return 'debug.flow.yaml'
     case 'explore': return 'explore.flow.yaml'
-    default: return `${flow}.flow.yaml`
+    default:
+      if (flow !== undefined) {
+        console.warn(`[Monitor] Unknown flow type "${flow}", falling back to team.flow.yaml`)
+      }
+      return 'team.flow.yaml'
   }
 }
 
@@ -92,9 +95,7 @@ function HeaderBar(): JSX.Element {
     : '—'
 
   const lastAgentEvent = [...events].reverse().find((e) => e.type === 'AGENT_SPAWNED')
-  const agent = lastAgentEvent
-    ? ((lastAgentEvent as FsmEvent & { agent?: string }).agent ?? '—')
-    : '—'
+  const agent = lastAgentEvent?.agent ?? '—'
 
   return (
     <div style={styles.header}>
@@ -115,12 +116,16 @@ export function Monitor(): JSX.Element {
     projectPath,
     activeTopic,
     fsmState,
+    events,
     monitorSource,
     setMonitorSource,
     setFsmState,
     setEvents,
     setPipelineStates
   } = useStore()
+
+  const eventsRef = useRef(events)
+  eventsRef.current = events
 
   const t = useTheme()
   const styles = makeStyles(t)
@@ -193,8 +198,7 @@ export function Monitor(): JSX.Element {
       try {
         const event = JSON.parse(ev.data) as FsmEvent
         if (event.type === 'connected') return
-        const current = useProjectStore.getState().events
-        useProjectStore.getState().setEvents([...current, event])
+        setEvents([...eventsRef.current, event])
       } catch { /* skip malformed */ }
     }
 
