@@ -87,6 +87,7 @@ export function Sidebar(): JSX.Element {
   }
 
   function handleNewItem(section: Section): void {
+    if (!projectPath) return
     if (section.type === 'flow') {
       setShowFlowWizard(true)
     } else {

@@ -17,6 +17,24 @@ function timeAgo(ts: number): string {
   return `${diffDay}d ago`
 }
 
+function FlowTypeBadge({ flowType, t }: { flowType: 'team' | 'debug' | 'explore'; t: Theme }): JSX.Element {
+  const label = flowType === 'team' ? 'team' : flowType === 'debug' ? 'debug' : 'explore'
+  const color = flowType === 'team' ? t.accent : flowType === 'debug' ? t.red : t.green
+  return (
+    <span style={{
+      fontSize: '10px',
+      fontWeight: 600,
+      color,
+      border: `1px solid ${color}`,
+      borderRadius: '3px',
+      padding: '1px 5px',
+      opacity: 0.8,
+      fontFamily: 'monospace',
+      flexShrink: 0
+    }}>{label}</span>
+  )
+}
+
 function FsmBadge({ state, t }: { state: string; t: Theme }): JSX.Element {
   const s = state.toUpperCase()
   if (!s || s === 'IDLE') return <span style={{ color: t.textMuted, fontSize: '12px' }}>—</span>
@@ -32,6 +50,7 @@ function FsmBadge({ state, t }: { state: string; t: Theme }): JSX.Element {
 interface PlanRow {
   name: string
   state: string
+  flowType: 'team' | 'debug' | 'explore'
 }
 
 interface ProjectPlans {
@@ -184,27 +203,47 @@ export function HomeScreen(): JSX.Element {
   const [projectPlans, setProjectPlans] = useState<ProjectPlans>({})
 
   useEffect(() => {
+    const ROOTS: Array<{ subdir: string; flowType: 'team' | 'debug' | 'explore' }> = [
+      { subdir: 'pathly/plans',        flowType: 'team'    },
+      { subdir: 'pathly/debugs',       flowType: 'debug'   },
+      { subdir: 'pathly/explorations', flowType: 'explore' },
+    ]
+
+    async function scanRoot(
+      projectPath: string,
+      subdir: string,
+      flowType: 'team' | 'debug' | 'explore'
+    ): Promise<PlanRow[]> {
+      const dir = `${projectPath}/${subdir}`
+      const folders = await listDirs(dir).catch(() => [] as string[])
+      const rows: PlanRow[] = []
+      for (const folder of folders) {
+        if (folder === '.archive') continue
+        try {
+          const raw = await readFile(`${dir}/${folder}/STATE.json`)
+          const parsed = JSON.parse(raw) as { current?: string }
+          rows.push({ name: folder, state: parsed.current ?? '', flowType })
+        } catch {
+          rows.push({ name: folder, state: '', flowType })
+        }
+      }
+      return rows
+    }
+
     async function loadAllPlans(): Promise<void> {
       const result: ProjectPlans = {}
       for (const project of projects) {
         try {
-          const plansDir = `${project.path}/pathly/plans`
-          const activeFolders = await listDirs(plansDir).catch(() => [] as string[])
-          const rows: PlanRow[] = []
-          for (const folder of activeFolders) {
-            try {
-              const raw = await readFile(`${plansDir}/${folder}/STATE.json`)
-              const parsed = JSON.parse(raw) as { current?: string }
-              rows.push({ name: folder, state: parsed.current ?? '' })
-            } catch {
-              rows.push({ name: folder, state: '' })
-            }
+          const allRows: PlanRow[] = []
+          for (const root of ROOTS) {
+            const rows = await scanRoot(project.path, root.subdir, root.flowType)
+            allRows.push(...rows)
           }
-          result[project.path] = rows
-          const active = rows.find((r) => r.state && r.state !== 'DONE' && r.state !== 'IDLE')
+          result[project.path] = allRows
+          const active = allRows.find((r) => r.state && r.state !== 'DONE' && r.state !== 'IDLE')
           updateProject(project.path, {
-            activeTopic: active?.name ?? rows[0]?.name,
-            fsmState: active?.state ?? rows[0]?.state ?? ''
+            activeTopic: active?.name ?? allRows[0]?.name,
+            fsmState: active?.state ?? allRows[0]?.state ?? ''
           })
         } catch {
           result[project.path] = []
@@ -272,18 +311,21 @@ export function HomeScreen(): JSX.Element {
               </div>
 
               {plans.length === 0 ? (
-                <div style={styles.noPlans}>No plans found in pathly/plans/</div>
+                <div style={styles.noPlans}>No topics found</div>
               ) : (
                 <div style={styles.planTable}>
                   {plans.map((plan) => (
                     <div
-                      key={plan.name}
+                      key={`${plan.flowType}:${plan.name}`}
                       style={styles.planRow}
                       onClick={(e) => handleOpen(project, plan.name, e)}
                       title={`Open ${plan.name}`}
                     >
                       <span style={styles.planName}>{plan.name}</span>
-                      <FsmBadge state={plan.state} t={t} />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FlowTypeBadge flowType={plan.flowType} t={t} />
+                        <FsmBadge state={plan.state} t={t} />
+                      </span>
                     </div>
                   ))}
                 </div>

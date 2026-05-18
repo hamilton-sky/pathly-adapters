@@ -1,45 +1,34 @@
-## Review Failures — Conv 2 (studio-v2)
+## Review Failures — Conv 3 (studio-v2)
 
-Reviewed file: `studio/src/renderer/src/components/Monitor/index.tsx`
-
----
-
-### VIOLATION 1 — Wrong store reference in SSE onmessage handler
-**File:** `studio/src/renderer/src/components/Monitor/index.tsx:196-197`
-**Rule:** Store contract — all reads and writes must go through the declared merge layer (`useStore`), not bypass it via direct store access.
-**Description:** `es.onmessage` calls `useProjectStore.getState().events` and `useProjectStore.getState().setEvents(...)` instead of using the `setEvents` already destructured from `useStore()` at line 122. This creates a second divergent write path that bypasses the merge layer and any middleware that may be added to it.
+Reviewed files:
+- `studio/src/renderer/src/hooks/useProjectFiles.ts`
+- `studio/src/renderer/src/components/Sidebar.tsx`
 
 ---
 
-### VIOLATION 2 — `getFlowYamlName` default branch produces `undefined.flow.yaml`
-**File:** `studio/src/renderer/src/components/Monitor/index.tsx:31`
-**Rule:** S2 acceptance criterion — correct `.flow.yaml` loaded per flow type; unknown/undefined input must not silently produce a bad filename.
-**Description:** The `default` branch returns `` `${flow}.flow.yaml` ``. When `flow` is `undefined` (e.g., before STATE.json is loaded), this produces the string `"undefined.flow.yaml"` rather than a safe fallback. Contrast with `getBasePath`, which explicitly handles `undefined` and warns. The parallel logic is missing here.
+### VIOLATION 1 — `handleNewItem` builds path without null-guarding `projectPath`
+
+**File:** `studio/src/renderer/src/components/Sidebar.tsx:93`
+**Rule:** S3 acceptance criterion — no crash when `projectPath` is empty; null guard on API calls.
+**Description:** `handleNewItem` computes `dir: \`${projectPath}/${section.dir}\`` unconditionally. The "+ new" button (line 191) and "+ new template" button (line 157) are both inside Section A, which renders regardless of `projectPath`. A user can expand Flows/Skills/Agents/Templates (all default `open: false` but toggleable) and click "+ new" with no project open. `projectPath` is `undefined` or `null` at that point, so `dir` becomes `"undefined/src/pathly_data/core/skills"` (or similar). That string is passed to `NewItemDialog`, which will attempt a filesystem write to an invalid path — a runtime error. The fix is to guard `handleNewItem` with an early return when `!projectPath`, or to hide the "+ new" buttons in Section A when `projectPath` is falsy.
 
 ---
 
-### VIOLATION 3 — `agent` field not modeled on `FsmEvent`; cast is load-bearing and unverifiable
-**File:** `studio/src/renderer/src/components/Monitor/index.tsx:97`
-**Rule:** Type contract — `FsmEvent` in `types/index.ts` does not declare an `agent` field and has no index signature, so accessing `.agent` requires an unsafe cast.
-**Description:** `(lastAgentEvent as FsmEvent & { agent?: string }).agent` is the only mechanism that exposes the agent name. Because `FsmEvent` is a closed interface with no index signature, the TypeScript compiler cannot verify the field exists at runtime. The `agent` field on `AGENT_SPAWNED` events must be added to `FsmEvent` (or a discriminated subtype) to make this type-safe.
+### WARNINGS (non-blocking)
 
----
-
-### WARNING 1 — Bootstrap race: `fsmState` not in `useEffect` dependency array
-**File:** `studio/src/renderer/src/components/Monitor/index.tsx:135-136`
+**Warning 1 — PLAN header renders `[no topic]` when `activeTopic` is null**
+**File:** `studio/src/renderer/src/components/Sidebar.tsx:208`
 **Severity:** Non-blocking
-**Description:** `initialFlow` is read from `fsmState?.flow` at effect-entry. When `fsmState` is null on first mount (common case), `getBasePath(undefined)` silently falls back to `pathly/plans/`. For a `debug` or `explore` topic this means the initial STATE.json read targets the wrong directory. The effect dependency array (line 210) does not include `fsmState`, so there is no retry after the state is populated. This can cause the monitor to silently show nothing for non-team flows on first open.
+**Description:** When `projectPath` is set but `activeTopic` is null (no plan selected), the PLAN section header renders `[no topic]` and the body shows "No conversations". This is cosmetically odd but does not crash and no acceptance criterion forbids it. Worth a future UX pass.
 
 ---
 
-### WARNING 2 — Unnecessary full array copy on every `HeaderBar` render
-**File:** `studio/src/renderer/src/components/Monitor/index.tsx:94`
-**Severity:** Non-blocking
-**Description:** `[...events].reverse().find(...)` copies the entire events array on every render. `Array.prototype.findLast` or manual reverse-iteration would avoid the allocation.
+### PASS
 
----
-
-### WARNING 3 — `FlowType` declared but provides no exhaustiveness guarantee
-**File:** `studio/src/renderer/src/components/Monitor/index.tsx:11`
-**Severity:** Non-blocking
-**Description:** `FlowType = 'team' | 'debug' | 'explore'` is defined but `getFlowYamlName` casts to it with `flow as FlowType` while keeping a `default` branch, so no exhaustiveness check fires. The type is unused in any meaningful way.
+- S3: PATHLY_SECTIONS (`useProjectFiles.ts`) do not call `listDir`/`listDirs` when `projectPath` is empty — the inner loop uses `continue` to set empty items and skip API calls. No crash path.
+- S3: The `if (!projectPath) return` early guard (line 76) is placed after the PATHLY_SECTIONS loop, so Section A state is always initialised.
+- S4: Section B (Plans + Debugs + Explorations + divider) is entirely wrapped in `{projectPath && (<> ... </>)}` at `Sidebar.tsx:200-283`. No orphaned separator when `projectPath` is unset.
+- S4: Plans conversations render using `conv.num`, `conv.title`, `conv.status`, matching the `ConvRow` interface in `types/index.ts:15-19`.
+- Return shape of `useProjectFiles` unchanged — still `{ sections, setSections, loadItems }`. Only one caller exists (`Sidebar.tsx`).
+- Silent-catch pattern preserved in `useProjectFiles.ts` (lines 67-73, 93-95) and `usePlanConversations.ts` (line 73).
+- `usePlanConversations` null-guards `projectPath` and `activeTopic` before calling `readFile`.
