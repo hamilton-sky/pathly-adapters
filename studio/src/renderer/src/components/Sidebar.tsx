@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import type { PathlyItem, PathlyItemType } from '../types'
 import { useProjectFiles } from '../hooks/useProjectFiles'
@@ -38,6 +38,13 @@ function convIcon(status: string): string {
   return '○'
 }
 
+interface ContextMenu {
+  x: number
+  y: number
+  item: PathlyItem
+  itemDir: string
+}
+
 export function Sidebar(): JSX.Element {
   const {
     projectPath,
@@ -59,6 +66,19 @@ export function Sidebar(): JSX.Element {
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!contextMenu) return
+    function handleClick(e: MouseEvent): void {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [contextMenu])
 
   if (sidebarCollapsed) {
     return (
@@ -96,7 +116,97 @@ export function Sidebar(): JSX.Element {
     }
   }
 
+  async function handleInlineCreate(section: Section, e: React.MouseEvent): Promise<void> {
+    e.stopPropagation()
+    if (!projectPath) return
+    const name = window.prompt('Name:')
+    if (!name || !name.trim()) return
+    const trimmed = name.trim()
+
+    if (section.type === 'flow') {
+      setShowFlowWizard(true)
+      return
+    }
+
+    if (section.type === 'debug' || section.type === 'explore') {
+      const dirPath = `${projectPath}/${section.dir}/${trimmed}`
+      await window.pathly.fs.write(`${dirPath}/STATE.json`, JSON.stringify({ current: 'INIT' }))
+    } else {
+      await window.pathly.fs.write(`${projectPath}/${section.dir}/${trimmed}.yaml`, '')
+    }
+    await loadItems()
+  }
+
+  async function handleInlineCreatePlan(e: React.MouseEvent): Promise<void> {
+    e.stopPropagation()
+    if (!projectPath) return
+    const name = window.prompt('Name:')
+    if (!name || !name.trim()) return
+    const trimmed = name.trim()
+    await window.pathly.fs.write(`${projectPath}/pathly/plans/${trimmed}/STATE.json`, JSON.stringify({ current: 'INIT' }))
+    await loadItems()
+  }
+
+  function handleContextMenu(e: React.MouseEvent, item: PathlyItem, itemDir: string): void {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, item, itemDir })
+  }
+
+  async function handleRename(): Promise<void> {
+    if (!contextMenu || !projectPath) return
+    const { item, itemDir } = contextMenu
+    setContextMenu(null)
+    const currentName = item.name
+    const newName = window.prompt('New name:', currentName)
+    if (!newName || !newName.trim() || newName.trim() === currentName) return
+    const trimmed = newName.trim()
+    const ext = currentName.includes('.') ? currentName.slice(currentName.lastIndexOf('.')) : ''
+    const newPath = `${itemDir}/${trimmed}${ext}`
+    const content = await window.pathly.fs.read(item.path).catch(() => '')
+    await window.pathly.fs.write(newPath, content ?? '')
+    await window.pathly.fs.delete(item.path)
+    await loadItems()
+  }
+
+  async function handleDelete(): Promise<void> {
+    if (!contextMenu || !projectPath) return
+    const { item } = contextMenu
+    setContextMenu(null)
+    if (!window.confirm(`Delete ${item.name}?`)) return
+    await window.pathly.fs.delete(item.path)
+    await loadItems()
+  }
+
   const lowerFilter = filter.toLowerCase()
+
+  const contextMenuStyle: React.CSSProperties = contextMenu ? {
+    position: 'fixed',
+    top: contextMenu.y,
+    left: contextMenu.x,
+    background: 'var(--bg-surface0)',
+    border: '1px solid var(--bg-surface1)',
+    borderRadius: '4px',
+    zIndex: 9999,
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    padding: '4px 0',
+    minWidth: '120px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+  } : {}
+
+  const ctxItemStyle: React.CSSProperties = {
+    display: 'block',
+    width: '100%',
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    padding: '5px 14px',
+    textAlign: 'left',
+    fontSize: '12px',
+    fontFamily: 'monospace'
+  }
 
   return (
     <div className={styles.sidebar}>
@@ -124,6 +234,13 @@ export function Sidebar(): JSX.Element {
                 <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
                   <span className={styles.chevron}>{state.open ? '▼' : '▶'}</span>
                   {section.label.toUpperCase()}
+                  {projectPath && (
+                    <span
+                      style={{ marginLeft: 'auto', paddingLeft: 8, color: 'var(--accent)', opacity: 0.7, fontSize: 13, lineHeight: 1 }}
+                      onClick={(e) => { void handleInlineCreate(section, e) }}
+                      title={`New ${section.label.slice(0, -1).toLowerCase()}`}
+                    >+</span>
+                  )}
                 </button>
                 {state.open && (
                   <div>
@@ -139,11 +256,13 @@ export function Sidebar(): JSX.Element {
                           {subdir.open && filteredFiles.map((item) => {
                             const isDirty = dirtyItems.has(item.path)
                             const isSelected = selectedItem?.path === item.path
+                            const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
                             return (
                               <button
                                 key={item.path}
                                 className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
                                 onClick={() => handleItemClick(item)}
+                                onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
                                 title={item.path}
                               >
                                 <span className={styles.itemName}>{item.name}</span>
@@ -170,17 +289,26 @@ export function Sidebar(): JSX.Element {
               <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
                 <span className={styles.chevron}>{state.open ? '▼' : '▶'}</span>
                 {section.label.toUpperCase()}
+                {projectPath && (
+                  <span
+                    style={{ marginLeft: 'auto', paddingLeft: 8, color: 'var(--accent)', opacity: 0.7, fontSize: 13, lineHeight: 1 }}
+                    onClick={(e) => { void handleInlineCreate(section, e) }}
+                    title={`New ${section.label.slice(0, -1).toLowerCase()}`}
+                  >+</span>
+                )}
               </button>
               {state.open && (
                 <div>
                   {filtered.map((item) => {
                     const isDirty = dirtyItems.has(item.path)
                     const isSelected = selectedItem?.path === item.path
+                    const itemDir = `${projectPath}/${section.dir}`
                     return (
                       <button
                         key={item.path}
                         className={`${styles.itemRow} ${isSelected ? styles.itemRowSelected : ''}`}
                         onClick={() => handleItemClick(item)}
+                        onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
                         title={item.path}
                       >
                         <span className={styles.itemName}>{item.name}</span>
@@ -207,6 +335,11 @@ export function Sidebar(): JSX.Element {
               <span className={styles.chevron}>{planOpen ? '▼' : '▶'}</span>
               PLAN
               <span className={styles.sectionSub}>[{activeTopic ?? 'no topic'}]</span>
+              <span
+                style={{ marginLeft: 'auto', paddingLeft: 8, color: 'var(--accent)', opacity: 0.7, fontSize: 13, lineHeight: 1 }}
+                onClick={(e) => { void handleInlineCreatePlan(e) }}
+                title="New plan"
+              >+</span>
             </button>
             {planOpen && (
               <div>
@@ -240,6 +373,11 @@ export function Sidebar(): JSX.Element {
                   <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
                     <span className={styles.chevron}>{state.open ? '▼' : '▶'}</span>
                     {section.label.toUpperCase()}
+                    <span
+                      style={{ marginLeft: 'auto', paddingLeft: 8, color: 'var(--accent)', opacity: 0.7, fontSize: 13, lineHeight: 1 }}
+                      onClick={(e) => { void handleInlineCreate(section, e) }}
+                      title={`New ${section.label.slice(0, -1).toLowerCase()}`}
+                    >+</span>
                   </button>
                   {state.open && (
                     <div>
@@ -255,11 +393,13 @@ export function Sidebar(): JSX.Element {
                             {subdir.open && filteredFiles.map((item) => {
                               const isDirty = dirtyItems.has(item.path)
                               const isSelected = selectedItem?.path === item.path
+                              const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
                               return (
                                 <button
                                   key={item.path}
                                   className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
                                   onClick={() => handleItemClick(item)}
+                                  onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
                                   title={item.path}
                                 >
                                   <span className={styles.itemName}>{item.name}</span>
@@ -311,9 +451,7 @@ export function Sidebar(): JSX.Element {
           onClose={() => setShowFlowWizard(false)}
           onCreated={(filePath) => {
             setShowFlowWizard(false)
-            // Keep the Flows section open so the new flow is immediately visible
             setSections((prev) => ({ ...prev, Flows: { ...prev.Flows, open: true } }))
-            // Reload file list, then select the newly created flow
             loadItems().then(() => {
               if (filePath) {
                 const item: PathlyItem = {
@@ -335,6 +473,13 @@ export function Sidebar(): JSX.Element {
           onClose={() => setShowNewItemDialog(false)}
           onCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor') }}
         />
+      )}
+
+      {contextMenu && (
+        <div ref={contextMenuRef} style={contextMenuStyle}>
+          <button style={ctxItemStyle} onClick={() => { void handleRename() }}>Rename</button>
+          <button style={{ ...ctxItemStyle, color: 'var(--red)' }} onClick={() => { void handleDelete() }}>Delete</button>
+        </div>
       )}
     </div>
   )

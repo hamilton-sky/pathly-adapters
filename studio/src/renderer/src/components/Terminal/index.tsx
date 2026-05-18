@@ -3,6 +3,8 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
+import { useTheme } from '../../useTheme'
+import type { Theme } from '../../theme'
 import '@xterm/xterm/css/xterm.css'
 
 interface TabInstance {
@@ -11,22 +13,111 @@ interface TabInstance {
   container: HTMLDivElement | null
 }
 
-const TAB_INSTANCES = new Map<string, TabInstance>()
+function makeStyles(t: Theme): Record<string, React.CSSProperties> {
+  return {
+    panel: {
+      display: 'flex',
+      flexDirection: 'column',
+      background: t.bgBase,
+      borderTop: `1px solid ${t.bgSurface1}`,
+      flexShrink: 0,
+      position: 'relative',
+    },
+    dragHandle: {
+      height: '5px',
+      cursor: 'ns-resize',
+      background: t.bgSurface1,
+      flexShrink: 0,
+    },
+    tabBar: {
+      display: 'flex',
+      alignItems: 'center',
+      height: '32px',
+      background: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface1}`,
+      flexShrink: 0,
+      paddingLeft: '4px',
+      overflow: 'hidden',
+    },
+    tabActive: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '0 10px',
+      height: '100%',
+      cursor: 'pointer',
+      fontSize: '12px',
+      color: t.textPrimary,
+      background: t.bgBase,
+      borderRight: `1px solid ${t.bgSurface1}`,
+      userSelect: 'none',
+      whiteSpace: 'nowrap',
+    },
+    tabInactive: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '0 10px',
+      height: '100%',
+      cursor: 'pointer',
+      fontSize: '12px',
+      color: t.textMuted,
+      background: 'transparent',
+      borderRight: `1px solid ${t.bgSurface1}`,
+      userSelect: 'none',
+      whiteSpace: 'nowrap',
+    },
+    closeBtn: {
+      fontSize: '10px',
+      color: t.textMuted,
+      lineHeight: 1,
+      padding: '1px 2px',
+      borderRadius: '2px',
+      cursor: 'pointer',
+    },
+    addBtn: {
+      background: 'none',
+      border: 'none',
+      color: t.textMuted,
+      cursor: 'pointer',
+      fontSize: '16px',
+      padding: '0 10px',
+      height: '100%',
+      lineHeight: 1,
+      flexShrink: 0,
+    },
+    contentArea: {
+      flex: 1,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    emptyHint: {
+      position: 'absolute',
+      inset: 0,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: t.textMuted,
+      fontSize: '13px',
+    },
+  }
+}
 
 function createTabId(): string {
-  return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  return crypto.randomUUID()
 }
 
 interface TerminalTabViewProps {
   tabId: string
   active: boolean
+  tabInstancesRef: React.MutableRefObject<Map<string, TabInstance>>
 }
 
-function TerminalTabView({ tabId, active }: TerminalTabViewProps): JSX.Element {
+function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!TAB_INSTANCES.has(tabId)) {
+    if (!tabInstancesRef.current.has(tabId)) {
       const xterm = new XTerm({
         theme: {
           background: '#1e1e2e',
@@ -40,44 +131,47 @@ function TerminalTabView({ tabId, active }: TerminalTabViewProps): JSX.Element {
       })
       const fitAddon = new FitAddon()
       xterm.loadAddon(fitAddon)
-      TAB_INSTANCES.set(tabId, { xterm, fitAddon, container: null })
+      tabInstancesRef.current.set(tabId, { xterm, fitAddon, container: null })
     }
 
-    const instance = TAB_INSTANCES.get(tabId)!
+    const instance = tabInstancesRef.current.get(tabId)!
 
     if (containerRef.current && instance.container !== containerRef.current) {
       instance.xterm.open(containerRef.current)
       instance.container = containerRef.current
       try { instance.fitAddon.fit() } catch { /* ignore */ }
     }
-  }, [tabId])
+  }, [tabId, tabInstancesRef])
 
   useEffect(() => {
-    const instance = TAB_INSTANCES.get(tabId)
+    const instance = tabInstancesRef.current.get(tabId)
     if (instance && active) {
       setTimeout(() => {
         try { instance.fitAddon.fit() } catch { /* ignore */ }
       }, 0)
     }
-  }, [tabId, active])
+  }, [tabId, active, tabInstancesRef])
 
   useEffect(() => {
-    const instance = TAB_INSTANCES.get(tabId)
+    const instance = tabInstancesRef.current.get(tabId)
     if (!instance) return
 
-    const removeListener = (window as unknown as { pathly: { terminal: { onData(tabId: string, cb: (data: string) => void): () => void } } }).pathly.terminal.onData(tabId, (data) => {
+    const pathlyApi = window.pathly?.terminal
+    if (!pathlyApi) return
+
+    const removeListener = pathlyApi.onData(tabId, (data) => {
       instance.xterm.write(data)
     })
 
     const disposeOnData = instance.xterm.onData((data: string) => {
-      ;(window as unknown as { pathly: { terminal: { write(tabId: string, data: string): Promise<void> } } }).pathly.terminal.write(tabId, data).catch(() => {})
+      pathlyApi.write(tabId, data)
     })
 
     return () => {
       removeListener()
       disposeOnData.dispose()
     }
-  }, [tabId])
+  }, [tabId, tabInstancesRef])
 
   return (
     <div
@@ -92,18 +186,18 @@ function TerminalTabView({ tabId, active }: TerminalTabViewProps): JSX.Element {
   )
 }
 
-const pathlyTerminal = (): {
-  spawn(tabId: string, cwd: string): Promise<void>
-  kill(tabId: string): Promise<void>
-} => {
-  return (window as unknown as { pathly: { terminal: { spawn(tabId: string, cwd: string): Promise<void>; kill(tabId: string): Promise<void> } } }).pathly.terminal
+const pathlyTerminal = (): Window['pathly']['terminal'] | null => {
+  return window.pathly?.terminal ?? null
 }
 
-export function Terminal(): JSX.Element | null {
+export function Terminal(): JSX.Element {
   const { open, tabs, activeTabId, toggle, addTab, closeTab, setActiveTab } = useTerminalStore()
   const projectPath = useStore((s) => s.projectPath)
-  const [panelHeight, setPanelHeight] = useState(240)
+  const theme = useTheme()
+  const styles = makeStyles(theme)
+  const [panelHeight, setPanelHeight] = useState(260)
   const dragStartRef = useRef<{ y: number; h: number } | null>(null)
+  const tabInstancesRef = useRef(new Map<string, TabInstance>())
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.ctrlKey && e.key === '`') {
@@ -120,21 +214,33 @@ export function Terminal(): JSX.Element | null {
   useEffect(() => {
     if (open) {
       setTimeout(() => {
-        TAB_INSTANCES.forEach((inst) => {
+        tabInstancesRef.current.forEach((inst) => {
           try { inst.fitAddon.fit() } catch { /* ignore */ }
         })
       }, 50)
     }
   }, [open, panelHeight])
 
+  useEffect(() => {
+    const api = pathlyTerminal()
+    if (!api) return
+    const removeOnExit = api.onExit((tabId) => {
+      const instance = tabInstancesRef.current.get(tabId)
+      if (instance) {
+        instance.xterm.write('\r\n[process exited]\r\n')
+      }
+    })
+    return removeOnExit
+  }, [])
+
   const handleAddTab = async (): Promise<void> => {
     const id = createTabId()
     const label = `Shell ${tabs.length + 1}`
     addTab(id, label)
     try {
-      await pathlyTerminal().spawn(id, projectPath)
+      await pathlyTerminal()?.spawn(id, projectPath)
     } catch (err) {
-      const instance = TAB_INSTANCES.get(id)
+      const instance = tabInstancesRef.current.get(id)
       if (instance) {
         instance.xterm.write(`\r\nError: could not start terminal — ${String(err)}\r\n`)
       }
@@ -144,12 +250,12 @@ export function Terminal(): JSX.Element | null {
   const handleCloseTab = async (id: string, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation()
     try {
-      await pathlyTerminal().kill(id)
+      await pathlyTerminal()?.kill(id)
     } catch { /* PTY may already be dead */ }
-    const instance = TAB_INSTANCES.get(id)
+    const instance = tabInstancesRef.current.get(id)
     if (instance) {
       instance.xterm.dispose()
-      TAB_INSTANCES.delete(id)
+      tabInstancesRef.current.delete(id)
     }
     closeTab(id)
   }
@@ -163,7 +269,7 @@ export function Terminal(): JSX.Element | null {
     const onMouseMove = (e: MouseEvent): void => {
       if (!dragStartRef.current) return
       const delta = dragStartRef.current.y - e.clientY
-      const newH = Math.max(80, dragStartRef.current.h + delta)
+      const newH = Math.min(800, Math.max(80, dragStartRef.current.h + delta))
       setPanelHeight(newH)
     }
     const onMouseUp = (): void => { dragStartRef.current = null }
@@ -175,76 +281,34 @@ export function Terminal(): JSX.Element | null {
     }
   }, [])
 
-  if (!open) return null
-
   return (
     <div
       style={{
+        ...styles.panel,
         height: `${panelHeight}px`,
-        display: 'flex',
-        flexDirection: 'column',
-        background: '#1e1e2e',
-        borderTop: '1px solid #313244',
-        flexShrink: 0,
-        position: 'relative',
+        display: open ? 'flex' : 'none',
       }}
     >
       {/* drag handle */}
       <div
         onMouseDown={onDragMouseDown}
-        style={{
-          height: '5px',
-          cursor: 'ns-resize',
-          background: '#313244',
-          flexShrink: 0,
-        }}
+        style={styles.dragHandle}
       />
 
       {/* tab bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          height: '32px',
-          background: '#181825',
-          borderBottom: '1px solid #313244',
-          flexShrink: 0,
-          paddingLeft: '4px',
-          overflow: 'hidden',
-        }}
-      >
+      <div style={styles.tabBar}>
         {tabs.map((tab) => (
           <div
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '0 10px',
-              height: '100%',
-              cursor: 'pointer',
-              fontSize: '12px',
-              color: tab.id === activeTabId ? '#cdd6f4' : '#6c7086',
-              background: tab.id === activeTabId ? '#1e1e2e' : 'transparent',
-              borderRight: '1px solid #313244',
-              userSelect: 'none',
-              whiteSpace: 'nowrap',
-            }}
+            style={tab.id === activeTabId ? styles.tabActive : styles.tabInactive}
           >
             {tab.label}
             <span
               onClick={(e) => void handleCloseTab(tab.id, e)}
-              style={{
-                fontSize: '10px',
-                color: '#6c7086',
-                lineHeight: 1,
-                padding: '1px 2px',
-                borderRadius: '2px',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#f38ba8' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#6c7086' }}
+              style={styles.closeBtn}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = theme.red }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = theme.textMuted }}
             >
               ✕
             </span>
@@ -252,17 +316,7 @@ export function Terminal(): JSX.Element | null {
         ))}
         <button
           onClick={() => void handleAddTab()}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#6c7086',
-            cursor: 'pointer',
-            fontSize: '16px',
-            padding: '0 10px',
-            height: '100%',
-            lineHeight: 1,
-            flexShrink: 0,
-          }}
+          style={styles.addBtn}
           title="New terminal"
         >
           +
@@ -270,19 +324,9 @@ export function Terminal(): JSX.Element | null {
       </div>
 
       {/* xterm content area */}
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div style={styles.contentArea}>
         {tabs.length === 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#6c7086',
-              fontSize: '13px',
-            }}
-          >
+          <div style={styles.emptyHint}>
             Press + to open a terminal
           </div>
         )}
@@ -291,6 +335,7 @@ export function Terminal(): JSX.Element | null {
             key={tab.id}
             tabId={tab.id}
             active={tab.id === activeTabId}
+            tabInstancesRef={tabInstancesRef}
           />
         ))}
       </div>

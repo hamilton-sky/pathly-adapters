@@ -73,7 +73,12 @@ export default function App(): JSX.Element {
   }, [theme])
 
   if (projectPath === '') {
-    return <HomeScreen />
+    return (
+      <>
+        <HomeScreen />
+        <PanelErrorBoundary><Terminal /></PanelErrorBoundary>
+      </>
+    )
   }
 
   return (
@@ -83,7 +88,7 @@ export default function App(): JSX.Element {
         <Sidebar />
         <PanelErrorBoundary><MainPanel /></PanelErrorBoundary>
       </div>
-      <Terminal />
+      <PanelErrorBoundary><Terminal /></PanelErrorBoundary>
     </div>
   )
 }

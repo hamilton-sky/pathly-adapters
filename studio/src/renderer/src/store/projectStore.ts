@@ -4,6 +4,7 @@ import type { PathlyItem, ProjectEntry, FsmState, FsmEvent } from '../types'
 
 export interface ProjectState {
   projectPath: string
+  pathlyRoot: string
   projects: ProjectEntry[]
   activeTopic: string | null
   selectedItem: PathlyItem | null
@@ -16,6 +17,7 @@ export interface ProjectState {
   mcpCommand: string
   routingEngine: 'python-mcp' | 'llm'
   setProjectPath: (p: string) => void
+  setPathlyRoot: (p: string) => void
   setActiveTopic: (t: string | null) => void
   setSelectedItem: (item: PathlyItem | null) => void
   addProject: (p: ProjectEntry) => void
@@ -36,6 +38,7 @@ export const useProjectStore = create<ProjectState>()(
   persist(
     (set) => ({
       projectPath: '',
+      pathlyRoot: '',
       projects: [],
       activeTopic: null,
       selectedItem: null,
@@ -48,6 +51,7 @@ export const useProjectStore = create<ProjectState>()(
       mcpCommand: 'pathly-mcp-server',
       routingEngine: 'llm',
       setProjectPath: (p) => set({ projectPath: p }),
+      setPathlyRoot: (p) => set({ pathlyRoot: p }),
       setActiveTopic: (t) => set({ activeTopic: t }),
       setSelectedItem: (item) => set({ selectedItem: item }),
       addProject: (p) => set((s) => ({ projects: [...s.projects, p] })),
@@ -68,7 +72,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'pathly-studio-project',
-      partialize: (s) => ({ projects: s.projects, mcpCommand: s.mcpCommand, routingEngine: s.routingEngine }),
+      partialize: (s) => ({ projects: s.projects, pathlyRoot: s.pathlyRoot, mcpCommand: s.mcpCommand, routingEngine: s.routingEngine }),
     }
   )
 )

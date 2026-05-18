@@ -13,7 +13,6 @@ export function TopBar(): JSX.Element {
     publishLog,
     setProjectPath,
     setActiveTopic,
-    setActivePanel,
     setPublishing,
     appendPublishLog,
     clearPublishLog,
@@ -82,7 +81,7 @@ export function TopBar(): JSX.Element {
           <select
             className={styles.topicSelect}
             value={activeTopic?.startsWith('.archive/') ? '' : (activeTopic ?? '')}
-            onChange={(e) => { setActiveTopic(e.target.value || null); setActivePanel('monitor') }}
+            onChange={(e) => { setActiveTopic(e.target.value || null) }}
           >
             <option value="">— active topic —</option>
             {activeTopics.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -90,7 +89,7 @@ export function TopBar(): JSX.Element {
           <select
             className={styles.topicSelectArchive}
             value={activeTopic?.startsWith('.archive/') ? activeTopic : ''}
-            onChange={(e) => { setActiveTopic(e.target.value || null); setActivePanel('monitor') }}
+            onChange={(e) => { setActiveTopic(e.target.value || null) }}
           >
             <option value="">— archive —</option>
             {archivedTopics.map((t) => <option key={t} value={`.archive/${t}`}>{t}</option>)}

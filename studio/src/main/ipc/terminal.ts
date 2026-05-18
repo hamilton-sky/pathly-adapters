@@ -1,5 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron'
-import { app } from 'electron'
+import { ipcMain, BrowserWindow, app } from 'electron'
 
 let pty: typeof import('node-pty') | null = null
 try {
@@ -9,6 +8,13 @@ try {
 }
 
 const activePtys = new Map<string, import('node-pty').IPty>()
+
+export function killAllPtys(): void {
+  activePtys.forEach((ptyProcess) => {
+    try { ptyProcess.kill() } catch { /* ignore */ }
+  })
+  activePtys.clear()
+}
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
   ipcMain.handle('terminal:spawn', (_event, tabId: string, cwd: string) => {
@@ -34,12 +40,15 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
 
     ptyProcess.onExit(() => {
       activePtys.delete(tabId)
+      if (!win.isDestroyed()) {
+        win.webContents.send('terminal:exit', tabId)
+      }
     })
 
     activePtys.set(tabId, ptyProcess)
   })
 
-  ipcMain.handle('terminal:write', (_event, tabId: string, data: string) => {
+  ipcMain.on('terminal:write', (_event, tabId: string, data: string) => {
     const ptyProcess = activePtys.get(tabId)
     if (ptyProcess) {
       ptyProcess.write(data)

@@ -4,7 +4,7 @@ import { registerFsHandlers } from './ipc/fs'
 import { registerWatcherHandlers } from './ipc/watcher'
 import { registerMcpHandlers } from './ipc/mcp'
 import { registerShellHandlers } from './ipc/shell'
-import { registerTerminalHandlers } from './ipc/terminal'
+import { registerTerminalHandlers, killAllPtys } from './ipc/terminal'
 import { spawn, ChildProcess } from 'child_process'
 import net from 'net'
 
@@ -84,6 +84,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+  killAllPtys()
   if (fsmServer) {
     fsmServer.kill()
     fsmServer = null

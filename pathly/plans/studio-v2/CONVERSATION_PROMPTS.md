@@ -173,6 +173,94 @@ HomeScreen lists topics from pathly/plans/, pathly/debugs/, and pathly/explorati
 
 ---
 
+## Conv 6 — Sidebar ops + Monitor polish (S9, S11)
+
+```
+Route to build studio-v2 Conv 6.
+Plan root: pathly/plans/studio-v2/
+Stories: S9 (trimmed), S11
+Depends on: Conv 3 complete
+
+## Goal
+Two parts: (A) Add file-creation and rename/delete to the Sidebar. (B) Fix Monitor event log,
+SSE live connection, and cost tracking in runner.py.
+
+---
+
+## Part A — Sidebar file operations (S9 trimmed — no drag/drop)
+
+### Sidebar component (studio/src/renderer/src/components/Sidebar/index.tsx or similar)
+
+**+ Create button per section:**
+- Section A (Flows, Skills, Agents, Templates): small `+` icon button at the right of each section header
+- Section B (Plans, Debugs, Explorations): `+` icon button per section header
+- On click: prompt user for a name (use a simple inline input or `window.prompt`), then:
+  - For Plans/Debugs/Explorations: write `{"current": "INIT"}` to `${sectionDir}/${name}/STATE.json`
+  - For Flows/Skills/Agents/Templates: write empty string to `${sectionDir}/${name}.yaml`
+- Use `window.pathly.fs.write(path, content)` for all writes
+
+**Right-click context menu (Rename + Delete) per item:**
+- On right-click of any sidebar item: show a small custom context menu with:
+  - **Rename**: `window.prompt` for new name → write new file → delete old
+  - **Delete**: `window.confirm` → `window.pathly.fs.delete(path)`
+- No drag/drop reordering at all
+
+**IPC: add fs:delete if missing:**
+- Check `studio/src/main/ipc/fs.ts`: add `ipcMain.handle('fs:delete', ...)` using `fs.rm({ recursive: true, force: true })`
+- `studio/src/main/preload/index.ts`: expose `window.pathly.fs.delete(path): Promise<void>`
+- `studio/src/renderer/src/types/global.d.ts`: add `delete: (path: string) => Promise<void>` to fs type
+
+---
+
+## Part B — Monitor polish (S11)
+
+### studio/src/renderer/src/components/Monitor/EventLog.tsx
+
+**Raw JSONL display (replace formatted table):**
+- Each event renders as one monospace line: `JSON.stringify(ev)` (no pretty-print)
+- Color-code by event type:
+  - STATE_TRANSITION → accent
+  - AGENT_DONE with result PASS → green; DONE → blue
+  - FILE_CREATED / FILE_DELETED → yellow
+  - RETRY → red
+  - HUMAN_RESPONSE → textMuted
+  - all others → textSecondary
+- Keep auto-scroll to bottom and "No events yet" empty state
+
+### studio/src/renderer/src/components/Monitor/index.tsx
+
+**SSE null-guard:**
+- Add `if (!projectPath) return` before constructing the EventSource URL
+- On SSE onerror: console.warn with the URL that failed
+
+**Monitor entry point — one place only:**
+- Find all places in TopBar and Sidebar that set `activePanel` to `'monitor'`
+- Keep only ONE (TopBar preferred) — remove any duplicate in Sidebar
+
+### src/pathly_orchestrator/runner.py
+
+**Real cost tracking:**
+- Find where AGENT_DONE is appended (search `AGENT_DONE`)
+- Capture `usage.input_tokens` and `usage.output_tokens` from the Claude API response
+- Pricing: input $3/M tokens, output $15/M tokens
+  → `cost_usd = (input_tokens * 3 + output_tokens * 15) / 1_000_000`
+- Write actual values to the event (not zeros)
+- `tool_uses`: count of tool_use content blocks in the response
+
+## Acceptance checks
+- S9: `+` on Flows section → name prompt → empty .yaml created
+- S9: `+` on Plans section → STATE.json created at pathly/plans/<name>/STATE.json
+- S9: Right-click item → Rename + Delete options appear
+- S9: Delete a flow → file removed, sidebar refreshes
+- S11: Event log shows raw JSON lines (e.g. {"type":"STATE_TRANSITION","from":"STORMING",...})
+- S11: STATE_TRANSITION lines in accent color, AGENT_DONE PASS in green
+- S11: Monitor shows "● Live" badge when SSE connects
+- S11: Empty projectPath does not cause URL error in Monitor
+- S11: After a real agent run, AGENT_DONE events have non-zero token and cost values
+```
+
+---
+
 ## Conv 5 — Terminal panel (S8)
 
 ```

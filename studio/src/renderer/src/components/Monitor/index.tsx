@@ -9,19 +9,6 @@ import { watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
 
 type FlowType = 'team' | 'debug' | 'explore'
 
-function getBasePath(flow: string | undefined): string {
-  switch (flow) {
-    case 'team': return 'pathly/plans/'
-    case 'debug': return 'pathly/debugs/'
-    case 'explore': return 'pathly/explorations/'
-    default:
-      if (flow !== undefined) {
-        console.warn(`[Monitor] Unknown flow type "${flow}", falling back to pathly/plans/`)
-      }
-      return 'pathly/plans/'
-  }
-}
-
 function getFlowYamlName(flow: string | undefined): string {
   switch (flow as FlowType) {
     case 'team': return 'team.flow.yaml'
@@ -115,7 +102,6 @@ export function Monitor(): JSX.Element {
   const {
     projectPath,
     activeTopic,
-    fsmState,
     events,
     monitorSource,
     setMonitorSource,
@@ -136,12 +122,22 @@ export function Monitor(): JSX.Element {
       return
     }
 
-    // Use flow from already-loaded fsmState if available, otherwise fall back to plans
-    const initialFlow = fsmState?.flow
-    const base = `${projectPath}/${getBasePath(initialFlow)}${activeTopic}`
+    if (!projectPath) {
+      setMonitorSource('chokidar')
+      return
+    }
 
-    // STATE.json — initial read
-    readFile(`${base}/STATE.json`).then((content) => {
+    // Probe all three roots in parallel — use whichever has STATE.json.
+    // This avoids the bootstrap race where fsmState.flow is stale/null on first load.
+    const roots = [
+      `${projectPath}/pathly/plans/${activeTopic}`,
+      `${projectPath}/pathly/debugs/${activeTopic}`,
+      `${projectPath}/pathly/explorations/${activeTopic}`,
+    ]
+
+    Promise.any(
+      roots.map((r) => readFile(`${r}/STATE.json`).then((c) => ({ base: r, content: c })))
+    ).then(({ base, content }) => {
       if (!content) return
       try {
         const parsed = JSON.parse(content)
@@ -163,20 +159,20 @@ export function Monitor(): JSX.Element {
             }
           })
           .catch(() => { /* flow YAML missing — FsmView uses fallback */ })
-      } catch { /* ignore malformed */ }
-    }).catch(() => { /* file may not exist yet */ })
 
-    // EVENTS.jsonl — initial snapshot
-    readFile(`${base}/EVENTS.jsonl`).then((content) => {
-      if (!content) return
-      const parsed: FsmEvent[] = []
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
-        try { parsed.push(JSON.parse(trimmed) as FsmEvent) } catch { /* skip */ }
-      }
-      setEvents(parsed)
-    }).catch(() => { /* file may not exist yet */ })
+        // Load events from the correct base path
+        readFile(`${base}/EVENTS.jsonl`).then((evContent) => {
+          if (!evContent) return
+          const parsed2: FsmEvent[] = []
+          for (const line of evContent.split('\n')) {
+            const trimmed = line.trim()
+            if (!trimmed) continue
+            try { parsed2.push(JSON.parse(trimmed) as FsmEvent) } catch { /* skip */ }
+          }
+          setEvents(parsed2)
+        }).catch(() => { /* file may not exist yet */ })
+      } catch { /* ignore malformed */ }
+    }).catch(() => { /* topic not found in any root */ })
 
     // STATE.json — live updates via chokidar (low frequency, keep as-is)
     watchStart(projectPath, activeTopic)

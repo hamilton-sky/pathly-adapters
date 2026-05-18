@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
-import { listDirs, readFile, pickFolder, openWindow } from '../services/pathlyApi'
+import { listDirs, listDir, readFile, pickFolder, openWindow } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
 import type { Theme } from '../theme'
 import type { ProjectEntry } from '../types'
@@ -197,10 +197,11 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
 }
 
 export function HomeScreen(): JSX.Element {
-  const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic } = useStore()
+  const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic, setPathlyRoot } = useStore()
   const t = useTheme()
   const styles = makeStyles(t)
   const [projectPlans, setProjectPlans] = useState<ProjectPlans>({})
+  const [hideDone, setHideDone] = useState(false)
 
   useEffect(() => {
     const ROOTS: Array<{ subdir: string; flowType: 'team' | 'debug' | 'explore' }> = [
@@ -234,6 +235,11 @@ export function HomeScreen(): JSX.Element {
       const result: ProjectPlans = {}
       for (const project of projects) {
         try {
+          // Auto-detect pathly installation: project that has src/pathly_data/core/flows
+          listDir(`${project.path}/src/pathly_data/core/flows`)
+            .then(() => setPathlyRoot(project.path))
+            .catch(() => { /* not a pathly installation */ })
+
           const allRows: PlanRow[] = []
           for (const root of ROOTS) {
             const rows = await scanRoot(project.path, root.subdir, root.flowType)
@@ -278,7 +284,23 @@ export function HomeScreen(): JSX.Element {
       <h1 style={styles.title}>Pathly Studio</h1>
 
       <div style={styles.section}>
-        <div style={styles.sectionLabel}>Recent projects</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={styles.sectionLabel}>Recent projects</div>
+          <button
+            onClick={() => setHideDone((v) => !v)}
+            style={{
+              background: 'none',
+              border: `1px solid ${hideDone ? t.accent : t.bgSurface1}`,
+              borderRadius: '4px',
+              color: hideDone ? t.accent : t.textMuted,
+              cursor: 'pointer',
+              fontSize: '11px',
+              padding: '2px 8px'
+            }}
+          >
+            {hideDone ? 'show all' : 'hide done'}
+          </button>
+        </div>
 
         {sorted.length === 0 && (
           <div style={styles.emptyState}>
@@ -287,7 +309,8 @@ export function HomeScreen(): JSX.Element {
         )}
 
         {sorted.map((project) => {
-          const plans = projectPlans[project.path] ?? []
+          const allPlans = projectPlans[project.path] ?? []
+          const plans = hideDone ? allPlans.filter((p) => p.state.toUpperCase() !== 'DONE') : allPlans
           return (
             <div key={project.path} style={styles.projectCard}>
               <div style={styles.projectHeader}>

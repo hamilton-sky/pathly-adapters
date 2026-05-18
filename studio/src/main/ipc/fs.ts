@@ -64,4 +64,9 @@ export function registerFsHandlers(): void {
       return []
     }
   })
+
+  ipcMain.handle('fs:delete', (_event, filePath: string) => {
+    if (!isPathSafe(filePath)) throw new Error('Path not allowed')
+    return fs.promises.rm(filePath, { recursive: true, force: true })
+  })
 }

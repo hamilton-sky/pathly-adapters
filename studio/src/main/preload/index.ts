@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('fs:write', path, content),
     list: (dir: string): Promise<string[]> => ipcRenderer.invoke('fs:list', dir),
     listDirs: (dir: string): Promise<string[]> => ipcRenderer.invoke('fs:listDirs', dir),
+    delete: (path: string): Promise<void> => ipcRenderer.invoke('fs:delete', path),
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('fs:pickFolder')
   },
   shell: {
@@ -34,8 +35,8 @@ contextBridge.exposeInMainWorld('pathly', {
   terminal: {
     spawn: (tabId: string, cwd: string): Promise<void> =>
       ipcRenderer.invoke('terminal:spawn', tabId, cwd),
-    write: (tabId: string, data: string): Promise<void> =>
-      ipcRenderer.invoke('terminal:write', tabId, data),
+    write: (tabId: string, data: string): void =>
+      ipcRenderer.send('terminal:write', tabId, data),
     resize: (tabId: string, cols: number, rows: number): Promise<void> =>
       ipcRenderer.invoke('terminal:resize', tabId, cols, rows),
     kill: (tabId: string): Promise<void> =>
@@ -45,6 +46,11 @@ contextBridge.exposeInMainWorld('pathly', {
       const listener = (_e: Electron.IpcRendererEvent, data: string): void => cb(data)
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
+    },
+    onExit: (cb: (tabId: string) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, tabId: string): void => cb(tabId)
+      ipcRenderer.on('terminal:exit', listener)
+      return () => ipcRenderer.removeListener('terminal:exit', listener)
     }
   }
 })

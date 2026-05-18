@@ -4,17 +4,16 @@ import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
 import type { FsmEvent } from '../../types'
 
-function formatTime(ts?: string): string {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (isNaN(d.getTime())) return '—'
-  return d.toTimeString().slice(0, 8)
-}
-
-function eventDetail(ev: FsmEvent): string {
-  if (ev.from && ev.to) return `${ev.from} → ${ev.to}`
-  if (ev.reason) return ev.reason
-  return ev.detail ?? ''
+function eventColor(ev: FsmEvent, t: Theme): string {
+  if (ev.type === 'STATE_TRANSITION') return t.accent
+  if (ev.type === 'AGENT_DONE') {
+    if (ev.result === 'PASS') return t.green
+    if (ev.result === 'DONE') return t.blue
+  }
+  if (ev.type === 'FILE_CREATED' || ev.type === 'FILE_DELETED') return t.yellow
+  if (ev.type === 'RETRY') return t.red
+  if (ev.type === 'HUMAN_RESPONSE') return t.textMuted
+  return t.textSecondary
 }
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
@@ -47,32 +46,6 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       fontSize: '13px',
       textAlign: 'center' as const,
       marginTop: '120px'
-    },
-    row: {
-      display: 'flex',
-      gap: '12px',
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      padding: '2px 0',
-      borderBottom: `1px solid ${t.bgBase}`
-    },
-    ts: {
-      color: t.bgSurface1,
-      flexShrink: 0,
-      width: '70px'
-    },
-    type: {
-      color: t.accent,
-      flexShrink: 0,
-      width: '140px',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis'
-    },
-    detail: {
-      color: t.textPrimary,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap' as const
     }
   }
 }
@@ -95,10 +68,17 @@ export function EventLog(): JSX.Element {
           <div style={styles.empty}>No events yet</div>
         ) : (
           events.map((ev, i) => (
-            <div key={i} style={styles.row}>
-              <span style={styles.ts}>{formatTime(ev.ts)}</span>
-              <span style={styles.type}>{ev.type}</span>
-              <span style={styles.detail}>{eventDetail(ev)}</span>
+            <div
+              key={i}
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '11px',
+                wordBreak: 'break-all',
+                color: eventColor(ev, t),
+                padding: '1px 0'
+              }}
+            >
+              {JSON.stringify(ev)}
             </div>
           ))
         )}

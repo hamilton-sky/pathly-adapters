@@ -8,6 +8,7 @@ declare global {
         write: (path: string, content: string) => Promise<void>
         list: (dir: string) => Promise<string[]>
         listDirs: (dir: string) => Promise<string[]>
+        delete: (path: string) => Promise<void>
         pickFolder: () => Promise<string | null>
       }
       shell: {
@@ -22,6 +23,14 @@ declare global {
       watch: {
         start: (projectPath: string, topic: string) => Promise<void>
         onEvent: (cb: (data: { path: string; content: string }) => void) => () => void
+      }
+      terminal: {
+        spawn: (tabId: string, cwd: string) => Promise<void>
+        kill: (tabId: string) => Promise<void>
+        write: (tabId: string, data: string) => void
+        resize: (tabId: string, cols: number, rows: number) => Promise<void>
+        onData: (tabId: string, cb: (data: string) => void) => () => void
+        onExit: (cb: (tabId: string) => void) => () => void
       }
     }
   }

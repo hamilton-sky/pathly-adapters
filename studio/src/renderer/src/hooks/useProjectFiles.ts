@@ -29,12 +29,16 @@ export function useProjectFiles(): {
   setSections: React.Dispatch<React.SetStateAction<Record<string, SectionState>>>
   loadItems: () => Promise<void>
 } {
-  const { projectPath } = useStore()
+  const { projectPath, pathlyRoot } = useStore()
   const [sections, setSections] = useState<Record<string, SectionState>>(INITIAL_SECTIONS)
+
+  // Section A (Flows/Skills/Agents/Templates) loads from the pathly installation,
+  // not the open workspace project.
+  const coreRoot = pathlyRoot || projectPath
 
   const loadItems = useCallback(async (): Promise<void> => {
     for (const section of PATHLY_SECTIONS) {
-      if (!projectPath) {
+      if (!coreRoot) {
         if (section.type === 'template') {
           setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: [] } }))
         } else {
@@ -43,7 +47,7 @@ export function useProjectFiles(): {
         continue
       }
       try {
-        const dir = `${projectPath}/${section.dir}`
+        const dir = `${coreRoot}/${section.dir}`
         if (section.type === 'template') {
           const subdirNames = await listDirs(dir)
           const subdirs: TemplateSubdir[] = []
@@ -94,11 +98,11 @@ export function useProjectFiles(): {
         setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: null } }))
       }
     }
-  }, [projectPath])
+  }, [coreRoot, projectPath])
 
   useEffect(() => {
     void loadItems()
-  }, [projectPath, loadItems])
+  }, [coreRoot, projectPath, loadItems])
 
   return { sections, setSections, loadItems }
 }
