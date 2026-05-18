@@ -31,14 +31,18 @@ export function TopBar(): JSX.Element {
     let cancelled = false
     async function loadTopics(): Promise<void> {
       try {
-        const base = projectPath + '/pathly/plans'
-        const [active, archived] = await Promise.all([
-          listDirs(base).catch(() => [] as string[]),
-          listDirs(base + '/.archive').catch(() => [] as string[]),
+        const plansBase = projectPath + '/pathly/plans'
+        const [planActive, planArchived, debugTopics, exploreTopics] = await Promise.all([
+          listDirs(plansBase).catch(() => [] as string[]),
+          listDirs(plansBase + '/.archive').catch(() => [] as string[]),
+          listDirs(projectPath + '/pathly/debugs').catch(() => [] as string[]),
+          listDirs(projectPath + '/pathly/explorations').catch(() => [] as string[]),
         ])
         if (!cancelled) {
-          setActiveTopics(active.filter((e) => e !== '.archive'))
-          setArchivedTopics(archived)
+          const planNames = planActive.filter((e) => e !== '.archive')
+          const extra = [...debugTopics, ...exploreTopics].filter((t) => !planNames.includes(t))
+          setActiveTopics([...planNames, ...extra])
+          setArchivedTopics(planArchived)
         }
       } catch { /* directory may not exist yet */ }
     }
