@@ -250,17 +250,52 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
 
     const container = instance.container
     if (!container) return
+
+    // Capture selection on right-mousedown BEFORE xterm clears it on contextmenu
+    let savedSel = ''
+    const handleMouseDown = (e: MouseEvent): void => {
+      if (e.button === 2) savedSel = instance.xterm.getSelection()
+    }
+
     const handleContextMenu = (e: MouseEvent): void => {
       e.preventDefault()
-      const sel = instance.xterm.getSelection()
+      const sel = savedSel || instance.xterm.getSelection()
+      savedSel = ''
       if (sel) {
         clipWrite(sel)
       } else {
         clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
       }
     }
+
+    // Accept text and file-path drops into the terminal
+    const handleDragOver = (e: DragEvent): void => {
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+    }
+    const handleDrop = (e: DragEvent): void => {
+      e.preventDefault()
+      if (e.dataTransfer?.files.length) {
+        const paths = Array.from(e.dataTransfer.files)
+          .map((f) => (f as File & { path?: string }).path ?? f.name)
+          .join(' ')
+        if (paths) void window.pathly?.terminal?.write(tabId, paths)
+        return
+      }
+      const text = e.dataTransfer?.getData('text/plain') ?? ''
+      if (text) void window.pathly?.terminal?.write(tabId, text)
+    }
+
+    container.addEventListener('mousedown', handleMouseDown)
     container.addEventListener('contextmenu', handleContextMenu)
-    return () => container.removeEventListener('contextmenu', handleContextMenu)
+    container.addEventListener('dragover', handleDragOver)
+    container.addEventListener('drop', handleDrop)
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown)
+      container.removeEventListener('contextmenu', handleContextMenu)
+      container.removeEventListener('dragover', handleDragOver)
+      container.removeEventListener('drop', handleDrop)
+    }
   }, [tabId, tabInstancesRef])
 
   return (

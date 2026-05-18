@@ -60,11 +60,57 @@ export function PopoutTerminal({ tabId, label }: Props): JSX.Element {
     }
     window.addEventListener('resize', onResize)
 
+    // Clipboard: capture selection before xterm clears it on right-click
+    const container = containerRef.current!
+    let savedSel = ''
+    const clipWrite = (text: string): void => { void window.pathly?.clipboard?.write(text) }
+    const clipRead = (cb: (t: string) => void): void => {
+      void window.pathly?.clipboard?.read().then(cb)
+    }
+
+    xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      if (event.type !== 'keydown') return true
+      if (event.ctrlKey && event.shiftKey && event.key === 'C') {
+        const sel = xterm.getSelection(); if (sel) clipWrite(sel); return false
+      }
+      if (event.ctrlKey && event.shiftKey && event.key === 'V') {
+        clipRead((text) => window.pathly?.terminal?.write(tabId, text)); return false
+      }
+      return true
+    })
+
+    const onMouseDown = (e: MouseEvent): void => { if (e.button === 2) savedSel = xterm.getSelection() }
+    const onContextMenu = (e: MouseEvent): void => {
+      e.preventDefault()
+      const sel = savedSel || xterm.getSelection(); savedSel = ''
+      if (sel) clipWrite(sel)
+      else clipRead((text) => window.pathly?.terminal?.write(tabId, text))
+    }
+    const onDragOver = (e: DragEvent): void => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy' }
+    const onDrop = (e: DragEvent): void => {
+      e.preventDefault()
+      if (e.dataTransfer?.files.length) {
+        const paths = Array.from(e.dataTransfer.files).map((f) => (f as File & { path?: string }).path ?? f.name).join(' ')
+        if (paths) window.pathly?.terminal?.write(tabId, paths)
+        return
+      }
+      const text = e.dataTransfer?.getData('text/plain') ?? ''
+      if (text) window.pathly?.terminal?.write(tabId, text)
+    }
+    container.addEventListener('mousedown', onMouseDown)
+    container.addEventListener('contextmenu', onContextMenu)
+    container.addEventListener('dragover', onDragOver)
+    container.addEventListener('drop', onDrop)
+
     return () => {
       removeOnData?.()
       removeOnExit?.()
       disposeOnKey.dispose()
       window.removeEventListener('resize', onResize)
+      container.removeEventListener('mousedown', onMouseDown)
+      container.removeEventListener('contextmenu', onContextMenu)
+      container.removeEventListener('dragover', onDragOver)
+      container.removeEventListener('drop', onDrop)
       xterm.dispose()
     }
   }, [tabId])
