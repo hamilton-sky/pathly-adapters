@@ -150,6 +150,7 @@ export function Terminal(): JSX.Element {
     '--t-accent': theme.accent,
     '--t-red': theme.red,
     '--t-green': theme.green,
+    '--t-blue': theme.blue,
   } as React.CSSProperties
 
   return (

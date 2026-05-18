@@ -2,7 +2,64 @@ import { useEffect, useRef } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { TabInstance } from './types'
+import { useTheme } from '../../useTheme'
+import { darkTheme } from '../../theme'
+import type { Theme } from '../../theme'
 import styles from './Terminal.module.css'
+
+function xtermThemeFor(t: Theme, isDark: boolean): Record<string, string> {
+  if (isDark) {
+    return {
+      background:            t.bgMantle,
+      foreground:            t.textPrimary,
+      cursor:                t.accent,
+      cursorAccent:          t.bgMantle,
+      selectionBackground:   t.bgSurface1,
+      selectionForeground:   t.textPrimary,
+      black:                 t.bgSurface0,
+      red:                   t.red,
+      green:                 t.green,
+      yellow:                t.yellow,
+      blue:                  t.blue,
+      magenta:               t.accent,
+      cyan:                  '#67e8f9',
+      white:                 '#cdd6f4',
+      brightBlack:           t.textMuted,
+      brightRed:             '#fca5a5',
+      brightGreen:           '#86efac',
+      brightYellow:          '#fde68a',
+      brightBlue:            '#93c5fd',
+      brightMagenta:         '#c4b5fd',
+      brightCyan:            '#a5f3fc',
+      brightWhite:           '#f5f5ff',
+    }
+  } else {
+    return {
+      background:            t.bgMantle,
+      foreground:            t.textPrimary,
+      cursor:                t.accent,
+      cursorAccent:          t.bgMantle,
+      selectionBackground:   t.bgSurface1,
+      selectionForeground:   t.textPrimary,
+      black:                 '#1e1e3a',
+      red:                   t.red,
+      green:                 t.green,
+      yellow:                '#b45309',
+      blue:                  '#1d4ed8',
+      magenta:               t.accent,
+      cyan:                  '#0e7490',
+      white:                 t.textSecondary,
+      brightBlack:           t.textMuted,
+      brightRed:             '#ef4444',
+      brightGreen:           '#22c55e',
+      brightYellow:          t.yellow,
+      brightBlue:            t.blue,
+      brightMagenta:         '#9333ea',
+      brightCyan:            '#06b6d4',
+      brightWhite:           '#f5f5ff',
+    }
+  }
+}
 
 interface TerminalTabViewProps {
   tabId: string
@@ -12,19 +69,19 @@ interface TerminalTabViewProps {
 
 export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
+  const t = useTheme()
+  const isDark = t === darkTheme
 
   useEffect(() => {
     if (!tabInstancesRef.current.has(tabId)) {
       const xterm = new XTerm({
-        theme: {
-          background: '#1e1e2e',
-          foreground: '#cdd6f4',
-          cursor: '#f5c2e7',
-          selectionBackground: '#45475a',
-        },
-        fontSize: 13,
-        fontFamily: "'Fira Mono', 'Cascadia Code', monospace",
+        theme: xtermThemeFor(t, isDark) as any,
+        fontSize: 14,
+        fontFamily: "'Cascadia Code', 'Fira Mono', 'JetBrains Mono', monospace",
         cursorBlink: true,
+        cursorStyle: 'bar',
+        lineHeight: 1.2,
+        scrollback: 5000,
       })
       const fitAddon = new FitAddon()
       xterm.loadAddon(fitAddon)
@@ -35,7 +92,6 @@ export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabV
 
     if (containerRef.current && instance.container !== containerRef.current) {
       if (instance.xterm.element) {
-        // xterm already opened — move its DOM to the new container instead of calling open() again
         containerRef.current.appendChild(instance.xterm.element)
       } else {
         instance.xterm.open(containerRef.current)
@@ -54,6 +110,14 @@ export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabV
       }, 150)
     }
   }, [tabId, tabInstancesRef])
+
+  // Update xterm theme when Pathly theme changes
+  useEffect(() => {
+    const instance = tabInstancesRef.current.get(tabId)
+    if (instance) {
+      instance.xterm.options.theme = xtermThemeFor(t, isDark) as any
+    }
+  }, [isDark, tabId, tabInstancesRef, t])
 
   useEffect(() => {
     const instance = tabInstancesRef.current.get(tabId)
@@ -98,13 +162,11 @@ export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabV
 
     instance.xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       if (event.type !== 'keydown') return true
-      // Ctrl+C → copy if text selected, else pass through as SIGINT
       if (event.ctrlKey && !event.shiftKey && event.key === 'c') {
         const sel = instance.xterm.getSelection()
         if (sel) { clipWrite(sel); return false }
         return true
       }
-      // Ctrl+V → paste from clipboard (image takes priority)
       if (event.ctrlKey && !event.shiftKey && event.key === 'v') {
         void (async () => {
           const imgPath = await window.pathly?.clipboard?.readImagePath()
@@ -116,13 +178,11 @@ export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabV
         })()
         return false
       }
-      // Ctrl+Shift+C → copy selection (always, no SIGINT ambiguity)
       if (event.ctrlKey && event.shiftKey && event.key === 'C') {
         const sel = instance.xterm.getSelection()
         if (sel) clipWrite(sel)
         return false
       }
-      // Ctrl+Shift+V → paste from clipboard (image takes priority)
       if (event.ctrlKey && event.shiftKey && event.key === 'V') {
         void (async () => {
           const imgPath = await window.pathly?.clipboard?.readImagePath()
@@ -140,7 +200,6 @@ export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabV
     const container = instance.container
     if (!container) return
 
-    // Capture selection on right-mousedown BEFORE xterm clears it on contextmenu
     let savedSel = ''
     const handleMouseDown = (e: MouseEvent): void => {
       if (e.button === 2) savedSel = instance.xterm.getSelection()
@@ -157,20 +216,13 @@ export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabV
       }
     }
 
-    // Accept text and file-path drops into the terminal.
-    // Use capture phase so our handlers fire before xterm.js can stopPropagation on its canvas.
-    const handleDragEnter = (e: DragEvent): void => {
-      e.preventDefault()
-      e.stopPropagation()
-    }
+    const handleDragEnter = (e: DragEvent): void => { e.preventDefault(); e.stopPropagation() }
     const handleDragOver = (e: DragEvent): void => {
-      e.preventDefault()
-      e.stopPropagation()
+      e.preventDefault(); e.stopPropagation()
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
     }
     const handleDrop = (e: DragEvent): void => {
-      e.preventDefault()
-      e.stopPropagation()
+      e.preventDefault(); e.stopPropagation()
       if (e.dataTransfer?.files.length) {
         const paths = Array.from(e.dataTransfer.files)
           .map((f) => (f as File & { path?: string }).path ?? f.name)

@@ -20,8 +20,8 @@ function eventColor(ev: FsmEvent, t: Theme): string {
 }
 
 function formatTime(ts?: string): string {
-  if (!ts) return '??:??:??'
-  try { return new Date(ts).toTimeString().slice(0, 8) } catch { return '??:??:??' }
+  if (!ts) return '--:--:--'
+  try { return new Date(ts).toTimeString().slice(0, 8) } catch { return '--:--:--' }
 }
 
 function formatEvent(ev: FsmEvent): string {
@@ -157,20 +157,23 @@ export function EventLog(): JSX.Element {
         )}
         <div ref={bottomRef} />
       </div>
-      {hasTelemetry && (
-        <div style={styles.totalsBar}>
-          <span style={styles.totalsLabel}>
-            Total&nbsp;&nbsp;
-            <span style={styles.totalsValue}>
-              {totalIn > 0 ? `${(totalIn / 1000).toFixed(1)}k` : '—'}↑
-              &nbsp;&nbsp;
-              {totalOut > 0 ? `${(totalOut / 1000).toFixed(1)}k` : '—'}↓
-              &nbsp;&nbsp;
-              {totalCost > 0 ? `$${totalCost.toFixed(4)}` : '—'}
-            </span>
+      <div style={styles.totalsBar}>
+        <span style={styles.totalsLabel}>
+          Total&nbsp;&nbsp;
+          <span style={styles.totalsValue}>
+            {totalIn > 0 ? `${(totalIn / 1000).toFixed(1)}k` : '—'}↑
+            &nbsp;&nbsp;
+            {totalOut > 0 ? `${(totalOut / 1000).toFixed(1)}k` : '—'}↓
+            &nbsp;&nbsp;
+            {totalCost > 0 ? `$${totalCost.toFixed(4)}` : '—'}
           </span>
-        </div>
-      )}
+          {!hasTelemetry && agentDone.length > 0 && (
+            <span style={{ ...styles.totalsLabel, marginLeft: 12, opacity: 0.5 }}>
+              (no telemetry — FSM needs cost_usd in AGENT_DONE events)
+            </span>
+          )}
+        </span>
+      </div>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal, X } from 'lucide-react'
+import { Terminal, X, Moon, Sun } from 'lucide-react'
 import { useStore } from '../store'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
@@ -13,11 +13,13 @@ export function TopBar(): JSX.Element {
     monitorSource,
     publishing,
     publishLog,
+    theme,
     setProjectPath,
     setActiveTopic,
     setPublishing,
     appendPublishLog,
     clearPublishLog,
+    setTheme,
   } = useStore()
 
   const [activeTopics,   setActiveTopics]   = useState<string[]>([])
@@ -106,6 +108,12 @@ export function TopBar(): JSX.Element {
 
         <div className={styles.right}>
           {badge}
+          <IconButton
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </IconButton>
           <IconButton onClick={() => toggleTerminal()} title="Toggle terminal (Ctrl+`)">
             <Terminal size={14} />
           </IconButton>
