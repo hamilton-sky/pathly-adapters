@@ -14,10 +14,12 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
-  { label: 'Flows',     type: 'flow',     dir: 'src/pathly_data/core/flows'     },
-  { label: 'Skills',    type: 'skill',    dir: 'src/pathly_data/core/skills'    },
-  { label: 'Agents',    type: 'agent',    dir: 'src/pathly_data/core/agents'    },
-  { label: 'Templates', type: 'template', dir: 'src/pathly_data/core/templates' },
+  { label: 'Flows',        type: 'flow',     dir: 'src/pathly_data/core/flows'     },
+  { label: 'Skills',       type: 'skill',    dir: 'src/pathly_data/core/skills'    },
+  { label: 'Agents',       type: 'agent',    dir: 'src/pathly_data/core/agents'    },
+  { label: 'Templates',    type: 'template', dir: 'src/pathly_data/core/templates' },
+  { label: 'Debugs',       type: 'debug',    dir: 'pathly/debugs'                  },
+  { label: 'Explorations', type: 'explore',  dir: 'pathly/explorations'            },
 ]
 
 function convStatusClass(status: string): string {
@@ -137,7 +139,7 @@ export function Sidebar(): JSX.Element {
         {SECTIONS.map((section) => {
           const state = sections[section.label]
 
-          if (section.type === 'template') {
+          if (section.type === 'template' || section.type === 'debug' || section.type === 'explore') {
             const subdirs = state.subdirs ?? []
             const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
             if (!hasMatch) return null

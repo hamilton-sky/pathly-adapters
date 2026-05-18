@@ -4,17 +4,21 @@ import { listDir, listDirs } from '../services/pathlyApi'
 import type { PathlyItem, SectionState, TemplateSubdir } from '../types'
 
 const SECTIONS = [
-  { label: 'Flows',     type: 'flow'     as const, dir: 'src/pathly_data/core/flows'     },
-  { label: 'Skills',    type: 'skill'    as const, dir: 'src/pathly_data/core/skills'    },
-  { label: 'Agents',    type: 'agent'    as const, dir: 'src/pathly_data/core/agents'    },
-  { label: 'Templates', type: 'template' as const, dir: 'src/pathly_data/core/templates' },
+  { label: 'Flows',        type: 'flow'     as const, dir: 'src/pathly_data/core/flows'     },
+  { label: 'Skills',       type: 'skill'    as const, dir: 'src/pathly_data/core/skills'    },
+  { label: 'Agents',       type: 'agent'    as const, dir: 'src/pathly_data/core/agents'    },
+  { label: 'Templates',    type: 'template' as const, dir: 'src/pathly_data/core/templates' },
+  { label: 'Debugs',       type: 'debug'    as const, dir: 'pathly/debugs'                  },
+  { label: 'Explorations', type: 'explore'  as const, dir: 'pathly/explorations'            },
 ]
 
 const INITIAL_SECTIONS: Record<string, SectionState> = {
-  Flows:     { items: [], open: false },
-  Skills:    { items: [], open: false },
-  Agents:    { items: [], open: false },
-  Templates: { items: [], open: true  },
+  Flows:        { items: [], open: false },
+  Skills:       { items: [], open: false },
+  Agents:       { items: [], open: false },
+  Templates:    { items: [], open: true  },
+  Debugs:       { items: [], open: false },
+  Explorations: { items: [], open: false },
 }
 
 export function useProjectFiles(): {
@@ -30,7 +34,7 @@ export function useProjectFiles(): {
     for (const section of SECTIONS) {
       try {
         const dir = `${projectPath}/${section.dir}`
-        if (section.type === 'template') {
+        if (section.type === 'template' || section.type === 'debug' || section.type === 'explore') {
           const subdirNames = await listDirs(dir)
           const subdirs: TemplateSubdir[] = []
           for (const subdirName of subdirNames) {
@@ -38,7 +42,7 @@ export function useProjectFiles(): {
             let files: PathlyItem[] = []
             try {
               const fileNames = await listDir(subdirPath)
-              files = fileNames.map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: 'template' as const }))
+              files = fileNames.map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: section.type }))
             } catch { /* empty subdir */ }
             subdirs.push({ name: subdirName, open: false, files })
           }

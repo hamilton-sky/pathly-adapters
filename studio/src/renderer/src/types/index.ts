@@ -1,4 +1,4 @@
-export type PathlyItemType = 'flow' | 'skill' | 'agent' | 'template'
+export type PathlyItemType = 'flow' | 'skill' | 'agent' | 'template' | 'debug' | 'explore'
 
 export interface TemplateSubdir {
   name: string

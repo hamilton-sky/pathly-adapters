@@ -5,16 +5,22 @@ import type { ConvRow } from '../types'
 
 function parseProgressMd(md: string): ConvRow[] {
   const rows: ConvRow[] = []
+  const lines = md.split('\n')
+  let inSection = false
   let headerParsed = false
-  for (const line of md.split('\n')) {
+  for (const line of lines) {
     const trimmed = line.trim()
+    if (trimmed.startsWith('## Conversation Breakdown')) { inSection = true; continue }
+    if (inSection && trimmed.startsWith('##')) break
+    if (!inSection) continue
     if (!trimmed.startsWith('|')) continue
     const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
     if (!headerParsed) { headerParsed = true; continue }
     if (parts[0]?.startsWith('---')) continue
     const num = parseInt(parts[0], 10)
     if (isNaN(num)) continue
-    const status = parts[parts.length - 1] ?? ''
+    // columns: Conv, Phases(title), Stories, Status — NOT the last Verify column
+    const status = parts[3] ?? ''
     rows.push({ num, title: parts[1] ?? '', status: status.toUpperCase() })
   }
   return rows

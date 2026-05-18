@@ -22,23 +22,25 @@ interface EventEntry {
   ts?: string
 }
 
-interface CardState {
-  expanded: boolean
-}
 
 function parseProgressMd(md: string): ConvRow[] {
   const rows: ConvRow[] = []
+  const lines = md.split('\n')
+  let inSection = false
   let headerParsed = false
-
-  for (const line of md.split('\n')) {
+  for (const line of lines) {
     const trimmed = line.trim()
+    if (trimmed.startsWith('## Conversation Breakdown')) { inSection = true; continue }
+    if (inSection && trimmed.startsWith('##')) break
+    if (!inSection) continue
     if (!trimmed.startsWith('|')) continue
     const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
     if (!headerParsed) { headerParsed = true; continue }
     if (parts[0]?.startsWith('---')) continue
     const num = parseInt(parts[0], 10)
     if (isNaN(num)) continue
-    const status = parts[parts.length - 1] ?? ''
+    // columns: Conv, Phases(title), Stories, Status — NOT the last Verify column
+    const status = parts[3] ?? ''
     rows.push({ num, title: parts[1] ?? '', status: status.toUpperCase() })
   }
   return rows
@@ -204,6 +206,20 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       color: t.textMuted,
       fontSize: '11px',
       marginLeft: 'auto'
+    },
+    recentEventsSection: {
+      padding: '0 24px 16px 24px',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '4px'
+    },
+    recentEventsHeader: {
+      fontSize: '12px',
+      fontWeight: 600,
+      color: t.textMuted,
+      textTransform: 'uppercase' as const,
+      letterSpacing: '0.05em',
+      marginBottom: '6px'
     }
   }
 }
@@ -216,7 +232,6 @@ export function PlanBoard(): JSX.Element {
   const [fsmState, setFsmState] = useState<string>('')
   const [convs, setConvs] = useState<ConvRow[]>([])
   const [events, setEvents] = useState<EventEntry[]>([])
-  const [cardStates, setCardStates] = useState<Record<number, CardState>>({})
   const [noProgress, setNoProgress] = useState(false)
 
   useEffect(() => {
@@ -270,13 +285,6 @@ export function PlanBoard(): JSX.Element {
     loadAll()
   }, [projectPath, activeTopic])
 
-  function toggleCard(num: number): void {
-    setCardStates((prev) => ({
-      ...prev,
-      [num]: { expanded: !prev[num]?.expanded }
-    }))
-  }
-
   if (!activeTopic) {
     return (
       <div style={styles.container}>
@@ -314,8 +322,6 @@ export function PlanBoard(): JSX.Element {
 
       <div style={styles.cardList}>
         {convs.map((conv) => {
-          const isExpanded = cardStates[conv.num]?.expanded ?? false
-          const convEvents = events.filter((e) => e.conversation === conv.num)
           const borderColor = statusBorderColor(conv.status, t)
           const bgColor = statusBgColor(conv.status)
 
@@ -328,44 +334,39 @@ export function PlanBoard(): JSX.Element {
                 backgroundColor: bgColor
               }}
             >
-              <button style={styles.cardHeader} onClick={() => toggleCard(conv.num)}>
+              <div style={styles.cardHeader}>
                 <div style={styles.cardHeaderLeft}>
                   <span style={{ color: borderColor, marginRight: '8px', fontWeight: 700 }}>
                     {conv.status === 'DONE' ? '✓' : conv.num}
                   </span>
                   <span style={styles.cardTitle}>{conv.title}</span>
-                  <span style={styles.eventCount}>{convEvents.length} events</span>
                 </div>
                 <div style={styles.cardHeaderRight}>
                   <span style={{ ...styles.statusBadge, color: borderColor }}>{conv.status}</span>
-                  <span style={styles.chevron}>{isExpanded ? '▼' : '▶'}</span>
                 </div>
-              </button>
-
-              {isExpanded && (
-                <div style={styles.eventLog}>
-                  {convEvents.length === 0 ? (
-                    <div style={styles.noEvents}>No events for this conversation</div>
-                  ) : (
-                    convEvents.map((ev, i) => (
-                      <div key={i} style={styles.eventRow}>
-                        <span style={styles.eventType}>{ev.type}</span>
-                        {ev.agent && <span style={styles.eventAgent}>{ev.agent}</span>}
-                        {ev.result && <span style={styles.eventResult}>{ev.result}</span>}
-                        {ev.to && <span style={styles.eventResult}>→ {ev.to}</span>}
-                        {ev.cost_usd !== undefined && (
-                          <span style={styles.eventCost}>${ev.cost_usd.toFixed(4)}</span>
-                        )}
-                        <span style={styles.eventTime}>{ev.timestamp ?? ev.ts ?? ''}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+              </div>
             </div>
           )
         })}
       </div>
+
+      {events.length > 0 && (
+        <div style={styles.recentEventsSection}>
+          <div style={styles.recentEventsHeader}>Recent events</div>
+          {events.map((ev, i) => (
+            <div key={i} style={styles.eventRow}>
+              <span style={styles.eventType}>{ev.type}</span>
+              {ev.agent && <span style={styles.eventAgent}>{ev.agent}</span>}
+              {ev.result && <span style={styles.eventResult}>{ev.result}</span>}
+              {ev.to && <span style={styles.eventResult}>→ {ev.to}</span>}
+              {ev.cost_usd !== undefined && (
+                <span style={styles.eventCost}>${ev.cost_usd.toFixed(4)}</span>
+              )}
+              <span style={styles.eventTime}>{ev.timestamp ?? ev.ts ?? ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
