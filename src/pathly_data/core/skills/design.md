@@ -46,10 +46,10 @@ Query: "<description>"
 
 Run:
 ```bash
-python "C:/Users/Yafit/.claude/skills/ui-ux-pro-max/src/ui-ux-pro-max/scripts/search.py" "<description>" --design-system --stack <stack> -p "<feature>"
+pathly-design "<description>" --design-system --stack <stack> -p "<feature>"
 ```
 
-If Python is not at `python`, try `python3`.
+If `pathly-design` is not found, fall back to `python -m pathly_data.core.design.cli`.
 
 Capture the full output.
 

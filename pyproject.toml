@@ -26,6 +26,7 @@ pathly-log = "pathly_orchestrator.log_cli:main"
 pathly-back = "pathly_orchestrator.back_cli:main"
 pathly-ff   = "pathly_orchestrator.ff_cli:main"
 pathly-studio = "pathly_studio_cli.install:main"
+pathly-design = "pathly_data.core.design.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -39,6 +40,8 @@ include = ["install_cli*", "pathly_telemetry*", "pathly_data*", "pathly_orchestr
 [tool.setuptools.package-data]
 "pathly_data" = [
     "core/**/*",
+    "core/design/data/**/*",
+    "core/design/scripts/**/*",
     "adapters/**/*",
     "adapters/claude/.claude-plugin/*",
     "adapters/codex/.codex-plugin/*",

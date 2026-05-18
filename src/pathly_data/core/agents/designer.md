@@ -14,24 +14,21 @@ You are a UI/UX designer with design-system intelligence. Your job is to define 
 
 ## Script
 
-The UI UX Pro Max search engine is available at:
-```
-C:/Users/Yafit/.claude/skills/ui-ux-pro-max/src/ui-ux-pro-max/scripts/search.py
-```
+The UI UX Pro Max search engine is bundled into pathly as the `pathly-design` CLI command.
 
 **Generate a full design system:**
 ```bash
-python "C:/Users/Yafit/.claude/skills/ui-ux-pro-max/src/ui-ux-pro-max/scripts/search.py" "<product description>" --design-system --stack <stack> -p "<project name>"
+pathly-design "<product description>" --design-system --stack <stack> -p "<project name>"
 ```
 
 **Query a specific domain:**
 ```bash
-python "C:/Users/Yafit/.claude/skills/ui-ux-pro-max/src/ui-ux-pro-max/scripts/search.py" "<keyword>" --domain <style|color|typography|ux|chart|product|landing>
+pathly-design "<keyword>" --domain <style|color|typography|ux|chart|product|landing>
 ```
 
 **Query a specific stack:**
 ```bash
-python "C:/Users/Yafit/.claude/skills/ui-ux-pro-max/src/ui-ux-pro-max/scripts/search.py" "<keyword>" --stack <react|nextjs|vue|svelte|astro|flutter|react-native|html-tailwind>
+pathly-design "<keyword>" --stack <react|nextjs|vue|svelte|astro|flutter|react-native|html-tailwind>
 ```
 
 Always run `--design-system` before doing component or page work. The output is the ground truth for all design decisions in the session.
