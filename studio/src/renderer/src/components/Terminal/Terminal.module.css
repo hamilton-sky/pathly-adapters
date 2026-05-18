@@ -1,0 +1,283 @@
+@import '@xterm/xterm/css/xterm.css';
+
+/* ── Panel shell ── */
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--t-bg);
+  border-top: 1px solid var(--t-surface1);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.dragHandle {
+  height: 5px;
+  cursor: ns-resize;
+  background: var(--t-surface1);
+  flex-shrink: 0;
+}
+
+/* ── Toolbars ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  background: var(--t-mantle);
+  border-bottom: 1px solid var(--t-surface1);
+  flex-shrink: 0;
+  padding-left: 4px;
+  gap: 2px;
+  justify-content: space-between;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 6px;
+  flex-shrink: 0;
+}
+
+.splitHeader {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  height: 28px;
+  background: var(--t-mantle);
+  border-bottom: 1px solid var(--t-surface1);
+  flex-shrink: 0;
+  gap: 4px;
+  padding-right: 6px;
+}
+
+/* ── Tab bar ── */
+.paneTabBar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  background: var(--t-mantle);
+  border-bottom: 1px solid var(--t-surface0);
+  padding-left: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.paneTabBarInline {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  flex: 1;
+  overflow: hidden;
+  gap: 2px;
+  padding-left: 4px;
+}
+
+/* ── Tabs ── */
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  height: 100%;
+  cursor: pointer;
+  font-size: 12px;
+  border-right: 1px solid var(--t-surface1);
+  -webkit-user-select: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.tabActive {
+  color: var(--t-text);
+  background: var(--t-bg);
+}
+
+.tabInactive {
+  color: var(--t-text-muted);
+  background: transparent;
+}
+
+.labelInput {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--t-accent);
+  color: var(--t-text);
+  font-size: 12px;
+  outline: none;
+  width: 80px;
+  padding: 0 2px;
+}
+
+/* ── Tab buttons ── */
+.popoutBtn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 1px 4px;
+  font-size: 10px;
+  color: var(--t-text-muted);
+  line-height: 1;
+  margin-left: 4px;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.popoutBtn:hover {
+  color: var(--t-accent);
+  border-color: var(--t-accent);
+}
+
+.closeTabBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 1px 4px;
+  font-size: 11px;
+  color: var(--t-text-muted);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.closeTabBtn:hover {
+  color: var(--t-red);
+}
+
+/* ── Action group (+ Shell, Claude, Codex) ── */
+.actionGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 4px;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  color: var(--t-text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 7px;
+  height: 100%;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.iconBtnClaude {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t-accent);
+}
+
+.iconBtnCodex {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t-green);
+}
+
+/* ── Panel-level buttons (split, close) ── */
+.splitIconBtn {
+  background: none;
+  border: 1px solid var(--t-surface1);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+}
+
+.splitIconBtnActive {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+}
+
+.splitBar {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.splitBarPiece {
+  width: 7px;
+  height: 13px;
+  background: var(--t-text-muted);
+  border-radius: 1px;
+  display: inline-block;
+}
+
+.splitBarPieceInverse {
+  width: 7px;
+  height: 13px;
+  background: var(--t-bg);
+  border-radius: 1px;
+  display: inline-block;
+}
+
+.closePanelBtn {
+  background: none;
+  border: 1px solid var(--t-surface1);
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: 3px;
+  color: var(--t-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.closePanelBtn:hover {
+  color: var(--t-red);
+}
+
+/* ── Content layout ── */
+.splitArea {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+}
+
+.splitDivider {
+  width: 4px;
+  cursor: col-resize;
+  background: var(--t-surface1);
+  flex-shrink: 0;
+}
+
+.contentArea {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.emptyHint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t-text-muted);
+  font-size: 13px;
+}
+
+/* ── xterm container ── */
+.tabViewActive {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tabViewHidden {
+  display: none;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}

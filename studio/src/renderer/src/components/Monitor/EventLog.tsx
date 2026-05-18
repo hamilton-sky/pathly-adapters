@@ -19,20 +19,60 @@ function eventColor(ev: FsmEvent, t: Theme): string {
   }
 }
 
+function formatTime(ts?: string): string {
+  if (!ts) return '??:??:??'
+  try { return new Date(ts).toTimeString().slice(0, 8) } catch { return '??:??:??' }
+}
+
+function formatEvent(ev: FsmEvent): string {
+  const ts = formatTime(ev.ts ?? ev.timestamp)
+  const pad = (s: string, n: number): string => s.padEnd(n)
+
+  switch (ev.type) {
+    case 'STATE_TRANSITION':
+      return `${ts}  ${pad('TRANSITION', 14)}  ${ev.from ?? '?'} → ${ev.to ?? '?'}`
+    case 'AGENT_DONE': {
+      const conv = ev.conversation != null ? ` #${ev.conversation}` : ''
+      const result = ev.result ?? ''
+      const tools = ev.tool_uses != null ? `  ${ev.tool_uses} tools` : ''
+      const secs = ev.wall_seconds != null ? `  ${ev.wall_seconds}s` : ''
+      const cost = ev.cost_usd != null && ev.cost_usd > 0 ? `  $${ev.cost_usd.toFixed(4)}` : ''
+      return `${ts}  ${pad('AGENT_DONE', 14)}  ${ev.agent ?? '?'}${conv}  ${result}${tools}${secs}${cost}`
+    }
+    case 'AGENT_SPAWNED':
+      return `${ts}  ${pad('AGENT_SPAWNED', 14)}  ${ev.agent ?? '?'}${ev.conversation != null ? ` #${ev.conversation}` : ''}`
+    case 'FILE_CREATED':
+      return `${ts}  ${pad('FILE_CREATED', 14)}  ${ev.file ?? ''}`
+    case 'FILE_DELETED':
+      return `${ts}  ${pad('FILE_DELETED', 14)}  ${ev.file ?? ''}`
+    case 'RETRY':
+      return `${ts}  ${pad('RETRY', 14)}  ${ev.key ?? ev.detail ?? ''}`
+    case 'HUMAN_RESPONSE':
+      return `${ts}  ${pad('HUMAN_RESPONSE', 14)}  ${ev.value ?? ''}`
+    case 'IMPLEMENT_COMPLETE':
+      return `${ts}  IMPLEMENT_COMPLETE`
+    default: {
+      const { type, ts: _ts, timestamp: _ts2, ...rest } = ev
+      const extra = Object.entries(rest).map(([k, v]) => `${k}=${String(v)}`).join('  ')
+      return `${ts}  ${pad(type, 14)}  ${extra}`
+    }
+  }
+}
+
 function RawEventLine({ ev, t }: { ev: FsmEvent; t: Theme }): JSX.Element {
   const color = eventColor(ev, t)
   return (
     <div style={{
       color,
-      fontFamily: 'monospace',
-      fontSize: '11px',
-      lineHeight: '1.6',
+      fontFamily: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace",
+      fontSize: '12px',
+      lineHeight: '1.7',
       whiteSpace: 'pre',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       padding: '1px 0',
     }}>
-      {JSON.stringify(ev)}
+      {formatEvent(ev)}
     </div>
   )
 }
@@ -78,13 +118,13 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       flexShrink: 0,
     },
     totalsLabel: {
-      fontSize: '11px',
-      fontFamily: 'monospace',
+      fontSize: '12px',
+      fontFamily: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace",
       color: t.textMuted,
     },
     totalsValue: {
-      fontSize: '11px',
-      fontFamily: 'monospace',
+      fontSize: '12px',
+      fontFamily: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace",
       color: t.textSecondary,
     },
   }
@@ -104,7 +144,7 @@ export function EventLog(): JSX.Element {
   const totalIn = agentDone.reduce((s, e) => s + (e.tokens_in ?? 0), 0)
   const totalOut = agentDone.reduce((s, e) => s + (e.tokens_out ?? 0), 0)
   const totalCost = agentDone.reduce((s, e) => s + (e.cost_usd ?? 0), 0)
-  const hasTelemetry = totalIn > 0 || totalOut > 0 || totalCost > 0
+  const hasTelemetry = agentDone.length > 0
 
   return (
     <div style={styles.container}>
@@ -122,8 +162,11 @@ export function EventLog(): JSX.Element {
           <span style={styles.totalsLabel}>
             Total&nbsp;&nbsp;
             <span style={styles.totalsValue}>
-              {(totalIn / 1000).toFixed(1)}k↑&nbsp;&nbsp;{(totalOut / 1000).toFixed(1)}k↓
-              {totalCost > 0 && <>&nbsp;&nbsp;${totalCost.toFixed(4)}</>}
+              {totalIn > 0 ? `${(totalIn / 1000).toFixed(1)}k` : '—'}↑
+              &nbsp;&nbsp;
+              {totalOut > 0 ? `${(totalOut / 1000).toFixed(1)}k` : '—'}↓
+              &nbsp;&nbsp;
+              {totalCost > 0 ? `$${totalCost.toFixed(4)}` : '—'}
             </span>
           </span>
         </div>
