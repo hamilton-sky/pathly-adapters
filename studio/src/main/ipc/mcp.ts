@@ -1,11 +1,28 @@
 import { ipcMain } from 'electron'
 
-// mcp_server.py does not yet exist — stubs return false/null until mcp-fsm-driver is complete.
+const FSM_BASE = `http://127.0.0.1:${process.env['PATHLY_FSM_HTTP_PORT'] ?? '8765'}`
+
 export function registerMcpHandlers(): void {
-  ipcMain.handle('mcp:ping', async () => {
-    console.warn('[mcp] mcp_server.py not available — using file-watch fallback')
-    return false
+  ipcMain.handle('mcp:ping', async (): Promise<boolean> => {
+    try {
+      const res = await fetch(`${FSM_BASE}/health`, { signal: AbortSignal.timeout(500) })
+      return res.ok
+    } catch {
+      return false
+    }
   })
 
-  ipcMain.handle('mcp:state', async () => null)
+  ipcMain.handle('mcp:state', async (_event, topic: string, projectRoot: string) => {
+    try {
+      const res = await fetch(`${FSM_BASE}/next_action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flow: 'team', topic, project_root: projectRoot }),
+        signal: AbortSignal.timeout(2000),
+      })
+      return res.ok ? res.json() : null
+    } catch {
+      return null
+    }
+  })
 }

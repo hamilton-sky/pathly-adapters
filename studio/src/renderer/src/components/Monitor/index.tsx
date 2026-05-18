@@ -132,11 +132,9 @@ export function Monitor(): JSX.Element {
     )
   }
 
-  const sourceBadge = monitorSource === 'mcp'
-    ? <span style={{ ...styles.sourceBadge, color: t.green }}>Source: ● MCP live</span>
-    : monitorSource === 'sse'
-    ? <span style={{ ...styles.sourceBadge, color: t.green }}>Source: ● SSE live</span>
-    : <span style={{ ...styles.sourceBadge, color: t.textMuted }}>Source: ○ File watch</span>
+  const sourceBadge = monitorSource === 'sse'
+    ? <span style={{ ...styles.sourceBadge, color: t.green }}>● Live</span>
+    : <span style={{ ...styles.sourceBadge, color: t.textMuted }}>○ File watch</span>
 
   return (
     <div style={styles.panel}>
