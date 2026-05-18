@@ -1,18 +1,20 @@
 """Pathly FSM MCP server.
 
-Zero external dependencies — implements the MCP stdio protocol (JSON-RPC 2.0
-with Content-Length framing) directly. Works with Claude Code and Codex.
+Uses the official MCP Python SDK for correct protocol handling.
 
-Run via:  pathly-fsm
+Run via:  pathly-fsm   or   python -m pathly_orchestrator.mcp_server
 """
 from __future__ import annotations
 
+import asyncio
 import json
-import sys
 from importlib.resources import files
 from pathlib import Path
 
 import yaml
+from mcp import types
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
 
 from pathly_orchestrator.fsm import (
     append_event,
@@ -23,75 +25,7 @@ from pathly_orchestrator.fsm import (
     write_state,
 )
 
-_MAX_BODY = 1_048_576  # 1 MiB
-
-# Use raw file-descriptor IO to bypass Python's buffering layer entirely.
-# On Windows this avoids CRLF translation and buffering issues with subprocess pipes.
-import os as _os
-_STDIN_FD = 0
-_STDOUT_FD = 1
-
-_TOOLS = [
-    {
-        "name": "next_action",
-        "description": (
-            "Return the next action for the FSM: the current state, agent instructions, "
-            "and any blocked feedback that must be resolved first."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "flow": {
-                    "type": "string",
-                    "description": "Flow name (e.g. 'team'). Resolves to core/flows/<flow>.flow.yaml.",
-                },
-                "topic": {
-                    "type": "string",
-                    "description": "Feature or topic name (used to format storage_path).",
-                },
-                "project_root": {
-                    "type": "string",
-                    "description": "Absolute path to the project root directory.",
-                },
-            },
-            "required": ["flow", "topic", "project_root"],
-        },
-    },
-    {
-        "name": "complete_stage",
-        "description": (
-            "Advance the FSM to the next state after the current stage is done. "
-            "Handles decide-blocks, transition actions, and state persistence."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "flow": {
-                    "type": "string",
-                    "description": "Flow name (e.g. 'team').",
-                },
-                "topic": {
-                    "type": "string",
-                    "description": "Feature or topic name.",
-                },
-                "project_root": {
-                    "type": "string",
-                    "description": "Absolute path to the project root directory.",
-                },
-                "decision": {
-                    "type": "string",
-                    "description": "Decision key chosen from a decide-block options dict (Call 2 only).",
-                },
-                "resolved_files": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Feedback filenames (with .md) that have been resolved and should be deleted.",
-                },
-            },
-            "required": ["flow", "topic", "project_root"],
-        },
-    },
-]
+server = Server("pathly-fsm")
 
 
 # ── Private helpers ───────────────────────────────────────────────────────────
@@ -110,8 +44,6 @@ def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> P
 
 
 def _load_agent_text(agent: str) -> str:
-    # Agents with "/" (e.g. "team/build") live in core/skills/.
-    # Top-level agents (e.g. "builder") live in core/agents/.
     if "/" in agent:
         return files("pathly_data").joinpath(f"core/skills/{agent}.md").read_text(
             encoding="utf-8"
@@ -204,7 +136,6 @@ def _complete_stage(args: dict) -> dict:
     flow_config = _load_flow(flow_name)
     storage_path = _resolve_storage_path(flow_config, project_root, topic)
 
-    # Step 2: resolve feedback files
     if resolved_files:
         feedback_dir = storage_path / "feedback"
         for filename in resolved_files:
@@ -213,7 +144,6 @@ def _complete_stage(args: dict) -> dict:
                 target.unlink()
                 append_event(storage_path, {"type": "FEEDBACK_RESOLVED", "file": filename})
 
-    # Step 3: read STATE.json for concurrent-write guard
     state_file = storage_path / "STATE.json"
     state_before: dict | None = None
     if state_file.exists():
@@ -222,10 +152,8 @@ def _complete_stage(args: dict) -> dict:
         except (json.JSONDecodeError, OSError):
             state_before = None
 
-    # Step 4: recover state
     state_info = recover_state(storage_path, flow_config)
 
-    # Step 5: route feedback
     feedback = route_feedback(flow_config, storage_path)
     if feedback is not None:
         result = _blocked_response(feedback, state_info)
@@ -237,17 +165,13 @@ def _complete_stage(args: dict) -> dict:
                 result["instructions"] = None
         return result
 
-    # Step 7: check DONE
     if state_info["current_state"] == "DONE":
         return {"done": True}
 
-    # Step 8: evaluate transition rules
     result = evaluate_transition_rules(flow_config, state_info["current_state"], storage_path)
 
-    # Step 9: handle decide sentinel
     if isinstance(result, dict) and result.get("decide") is True:
         if decision is None:
-            # Call 1: return decide prompt
             context_file = result.get("context_file", "")
             context_contents: str | None = None
             if context_file:
@@ -265,7 +189,6 @@ def _complete_stage(args: dict) -> dict:
                 "default": result["default"],
             }
         else:
-            # Call 2: resolve decision
             options = result["options"]
             default = result["default"]
             if decision not in options:
@@ -280,7 +203,6 @@ def _complete_stage(args: dict) -> dict:
     else:
         next_state = result  # type: ignore[assignment]
 
-    # Step 11: concurrent-write guard
     if state_before is not None and state_file.exists():
         try:
             state_after = json.loads(state_file.read_text(encoding="utf-8"))
@@ -289,7 +211,6 @@ def _complete_stage(args: dict) -> dict:
         except (json.JSONDecodeError, OSError):
             pass
 
-    # Step 12: run transition actions
     run_transition_actions(
         flow_config,
         state_info["current_state"],
@@ -299,22 +220,18 @@ def _complete_stage(args: dict) -> dict:
         state_info["conv"],
     )
 
-    # Step 13: write state
     prior_state = state_before or {}
     write_state(storage_path, next_state, prior_state)
 
-    # Step 14: append event
     append_event(storage_path, {
         "type": "STATE_TRANSITION",
         "from": state_info["current_state"],
         "to": next_state,
     })
 
-    # Step 15: check DONE
     if next_state == "DONE":
         return {"done": True}
 
-    # Step 16-17: build instructions and return
     instructions = build_prompt(flow_config, next_state, storage_path)
     return {
         "next_state": next_state,
@@ -324,197 +241,98 @@ def _complete_stage(args: dict) -> dict:
     }
 
 
-# ── MCP wire protocol ─────────────────────────────────────────────────────────
-# Raw fd IO bypasses Python's buffering/CRLF layer entirely on Windows.
+# ── MCP server (SDK-based) ────────────────────────────────────────────────────
 
-def _fd_write_all(data: bytes) -> None:
-    """Write all bytes to stdout fd, looping on partial writes."""
-    view = memoryview(data)
-    offset = 0
-    while offset < len(view):
-        n = _os.write(_STDOUT_FD, view[offset:])
-        offset += n
-
-
-def _fd_read_exact(n: int) -> bytes | None:
-    """Read exactly n bytes from stdin fd; return None on EOF."""
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = _os.read(_STDIN_FD, n - len(buf))
-        if not chunk:
-            return None
-        buf.extend(chunk)
-    return bytes(buf)
-
-
-def _fd_readline() -> bytes | None:
-    """Read bytes from stdin until \\n (inclusive); return None on EOF."""
-    buf = bytearray()
-    while True:
-        ch = _os.read(_STDIN_FD, 1)
-        if not ch:
-            return None if not buf else bytes(buf)
-        buf.extend(ch)
-        if ch == b"\n":
-            return bytes(buf)
-
-
-def _send(obj: dict) -> None:
-    body = json.dumps(obj)
-    encoded = body.encode("utf-8")
-    header = f"Content-Length: {len(encoded)}\r\n\r\n".encode("utf-8")
-    _fd_write_all(header + encoded)
-
-
-def _read_message() -> dict | None:
-    headers: dict[str, str] = {}
-
-    try:
-        while True:
-            raw = _fd_readline()
-            if raw is None:
-                return None  # EOF
-            line = raw.rstrip(b"\r\n").decode("utf-8", errors="replace")
-            if not line:
-                if not headers:
-                    continue  # skip leading blank lines
-                break
-            if line.startswith("{"):
-                try:
-                    return json.loads(line)
-                except json.JSONDecodeError:
-                    pass
-                return None
-            if ":" in line:
-                key, _, val = line.partition(":")
-                headers[key.strip().lower()] = val.strip()
-
-        try:
-            length = int(headers.get("content-length", 0))
-        except ValueError:
-            return None
-        if length <= 0 or length > _MAX_BODY:
-            return None
-
-        body_bytes = _fd_read_exact(length)
-        if body_bytes is None:
-            return None
-        try:
-            return json.loads(body_bytes.decode("utf-8", errors="replace"))
-        except json.JSONDecodeError:
-            return None
-    except OSError:
-        return None
-
-
-def _handle(req: dict) -> dict | None:
-    rid = req.get("id")
-    method = req.get("method", "")
-    params = req.get("params") or {}
-
-    if method == "initialize":
-        client_version = params.get("protocolVersion", "2024-11-05")
-        return {
-            "jsonrpc": "2.0",
-            "id": rid,
-            "result": {
-                "protocolVersion": client_version,
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "pathly-fsm", "version": "0.1.0"},
+@server.list_tools()
+async def list_tools() -> list[types.Tool]:
+    return [
+        types.Tool(
+            name="next_action",
+            description=(
+                "Return the next action for the FSM: the current state, agent instructions, "
+                "and any blocked feedback that must be resolved first."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "flow": {
+                        "type": "string",
+                        "description": "Flow name (e.g. 'team'). Resolves to core/flows/<flow>.flow.yaml.",
+                    },
+                    "topic": {
+                        "type": "string",
+                        "description": "Feature or topic name (used to format storage_path).",
+                    },
+                    "project_root": {
+                        "type": "string",
+                        "description": "Absolute path to the project root directory.",
+                    },
+                },
+                "required": ["flow", "topic", "project_root"],
             },
-        }
-
-    if method == "notifications/initialized":
-        return None  # notification — no response
-
-    if method == "tools/list":
-        return {"jsonrpc": "2.0", "id": rid, "result": {"tools": _TOOLS}}
-
-    if method == "tools/call":
-        name = params.get("name")
-        args = params.get("arguments") or {}
-
-        if name == "next_action":
-            try:
-                result = _next_action(args)
-            except Exception as exc:
-                result = {"error": str(exc)}
-            return {
-                "jsonrpc": "2.0",
-                "id": rid,
-                "result": {"content": [{"type": "text", "text": json.dumps(result)}]},
-            }
-
-        if name == "complete_stage":
-            try:
-                result = _complete_stage(args)
-            except Exception as exc:
-                result = {"error": str(exc)}
-            return {
-                "jsonrpc": "2.0",
-                "id": rid,
-                "result": {"content": [{"type": "text", "text": json.dumps(result)}]},
-            }
-
-        return {
-            "jsonrpc": "2.0",
-            "id": rid,
-            "error": {"code": -32601, "message": f"Unknown tool: {name}"},
-        }
-
-    # Notifications have no id — swallow silently
-    if rid is None:
-        return None
-
-    return {
-        "jsonrpc": "2.0",
-        "id": rid,
-        "error": {"code": -32601, "message": f"Unknown method: {method}"},
-    }
+        ),
+        types.Tool(
+            name="complete_stage",
+            description=(
+                "Advance the FSM to the next state after the current stage is done. "
+                "Handles decide-blocks, transition actions, and state persistence."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "flow": {"type": "string", "description": "Flow name (e.g. 'team')."},
+                    "topic": {"type": "string", "description": "Feature or topic name."},
+                    "project_root": {
+                        "type": "string",
+                        "description": "Absolute path to the project root directory.",
+                    },
+                    "decision": {
+                        "type": "string",
+                        "description": "Decision key chosen from a decide-block options dict (Call 2 only).",
+                    },
+                    "resolved_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Feedback filenames (with .md) that have been resolved and should be deleted.",
+                    },
+                },
+                "required": ["flow", "topic", "project_root"],
+            },
+        ),
+    ]
 
 
-def run() -> None:
-    while True:
-        msg = _read_message()
-        if msg is None:
-            break
-        response = _handle(msg)
-        if response is not None:
-            _send(response)
+@server.call_tool()
+async def call_tool(name: str, arguments: dict | None = None) -> list[types.TextContent]:
+    args = arguments or {}
+    if name == "next_action":
+        try:
+            result = _next_action(args)
+        except Exception as exc:
+            result = {"error": str(exc)}
+        return [types.TextContent(type="text", text=json.dumps(result))]
+
+    if name == "complete_stage":
+        try:
+            result = _complete_stage(args)
+        except Exception as exc:
+            result = {"error": str(exc)}
+        return [types.TextContent(type="text", text=json.dumps(result))]
+
+    raise ValueError(f"Unknown tool: {name}")
+
+
+async def _amain() -> None:
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(
+            read_stream,
+            write_stream,
+            server.create_initialization_options(),
+        )
 
 
 def main() -> None:
-    import os, datetime, traceback
-    log_path = os.path.join(os.path.expanduser("~"), ".claude", "pathly-fsm-startup.log")
-    def _log(msg: str) -> None:
-        try:
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(f"{datetime.datetime.now().isoformat()} {msg}\n")
-        except Exception:
-            pass
-
-    # Patch via globals() so run() (which shares this module's __dict__) picks it up.
-    # Using `import pathly_orchestrator.mcp_server` doesn't work when running as __main__
-    # because that gives a different module object than the one run() was defined in.
-    _g = globals()
-    _orig_read = _g["_read_message"]
-    _orig_send = _g["_send"]
-    def _traced_read():
-        msg = _orig_read()
-        _log(f"recv: {msg.get('method') if msg else 'EOF'}")
-        return msg
-    def _traced_send(obj):
-        _log(f"send: id={obj.get('id')} result_keys={list(obj.get('result', {}).keys()) if isinstance(obj.get('result'), dict) else '?'}")
-        _orig_send(obj)
-    _g["_read_message"] = _traced_read
-    _g["_send"] = _traced_send
-
-    _log(f"startup pid={os.getpid()} cwd={os.getcwd()} stdin_isatty={sys.stdin.isatty()}")
-    try:
-        run()
-        _log("run() returned normally (EOF)")
-    except Exception as exc:
-        _log(f"run() crashed: {traceback.format_exc()}")
+    asyncio.run(_amain())
 
 
 if __name__ == "__main__":
