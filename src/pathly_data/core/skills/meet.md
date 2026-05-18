@@ -270,27 +270,73 @@ Meet note written:
 
 What do you want to do next?
 
-[1] Return to build
+[1] Return to <current stage>
 [2] Promote to planner update
 [3] Promote to architecture update
 [4] Ask another meet question
-[5] See all commands
+[5] Escalate to pipeline
+[6] See all commands
 
-Reply with 1-5:
+Reply with 1-6:
 ```
 
 Interpret the choices as:
 
-- **Return to build** -> route back to `team <feature> build`
+- **Return to `<current stage>`** -> route back to the current workflow stage
+  (e.g. `team <feature> build`, `team <feature> test`, or `team <feature> review`).
+  Adapt the label to the most natural return route for the current state.
 - **Promote to planner update** -> planner reads the consult note and updates
   plan files if warranted
 - **Promote to architecture update** -> architect reads the consult note and
   updates architecture docs if warranted
 - **Ask another meet question** -> restart `meet <feature>`
+- **Escalate to pipeline** -> write the consult note content to a feedback file
+  so the pipeline FSM will block on it and route to the appropriate agent.
+  See escalation procedure below.
 - **See all commands** -> print the help command reference
 
-If the current state is not building, adapt the first option label to the most
-natural return route, such as `Return to test` or `Return to review resolution`.
+### Escalation procedure (option [5])
+
+Print:
+
+```text
+Which feedback type fits this consultation?
+  [1] ARCH_FEEDBACK      -> routes to architect
+  [2] DESIGN_QUESTIONS   -> routes to architect
+  [3] IMPL_QUESTIONS     -> routes to planner
+Reply with 1-3:
+```
+
+Map the user's choice to a filename:
+
+| Choice | Filename            | Target agent |
+|--------|---------------------|--------------|
+| 1      | ARCH_FEEDBACK.md    | architect    |
+| 2      | DESIGN_QUESTIONS.md | architect    |
+| 3      | IMPL_QUESTIONS.md   | planner      |
+
+Read the consult note from the most recently written file in
+`plans/$FEATURE/consults/` for this feature (the file written in Step 4).
+
+Target file: `plans/$FEATURE/feedback/<chosen>.md`
+
+- If the target file **already exists**: append the following block to it:
+  ```
+  \n---\n## Consultation escalated <ISO timestamp>\n<consult note content>
+  ```
+- If the target file **does not exist**: write the consult note content as the
+  entire file content.
+
+Then print:
+
+```text
+Pipeline blocked on feedback/<chosen>.md
+Next complete_stage will route to: <target_agent>
+The consults/ file is preserved — escalation is additive.
+Use /pathly fix or /pathly go to continue.
+```
+
+The consults/ file is never deleted or modified during escalation.
 
 ## Step 6: Promotion behavior
 
