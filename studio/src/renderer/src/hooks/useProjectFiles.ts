@@ -55,7 +55,11 @@ export function useProjectFiles(): {
           setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items } }))
         }
       } catch {
-        setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [] } }))
+        if (section.type === 'template' || section.type === 'debug' || section.type === 'explore') {
+          setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: null } }))
+        } else {
+          setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [] } }))
+        }
       }
     }
   }, [projectPath])

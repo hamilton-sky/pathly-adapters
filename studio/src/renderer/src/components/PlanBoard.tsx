@@ -3,12 +3,8 @@ import { useStore } from '../store'
 import { readFile } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
 import type { Theme } from '../theme'
-
-interface ConvRow {
-  num: number
-  title: string
-  status: string
-}
+import type { ConvRow } from '../types'
+import { parseProgressMd } from '../hooks/usePlanConversations'
 
 interface EventEntry {
   type: string
@@ -22,29 +18,6 @@ interface EventEntry {
   ts?: string
 }
 
-
-function parseProgressMd(md: string): ConvRow[] {
-  const rows: ConvRow[] = []
-  const lines = md.split('\n')
-  let inSection = false
-  let headerParsed = false
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (trimmed.startsWith('## Conversation Breakdown')) { inSection = true; continue }
-    if (inSection && trimmed.startsWith('##')) break
-    if (!inSection) continue
-    if (!trimmed.startsWith('|')) continue
-    const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
-    if (!headerParsed) { headerParsed = true; continue }
-    if (parts[0]?.startsWith('---')) continue
-    const num = parseInt(parts[0], 10)
-    if (isNaN(num)) continue
-    // columns: Conv, Phases(title), Stories, Status — NOT the last Verify column
-    const status = parts[3] ?? ''
-    rows.push({ num, title: parts[1] ?? '', status: status.toUpperCase() })
-  }
-  return rows
-}
 
 function fsmStateColor(state: string, t: Theme): string {
   if (state === 'DONE') return t.green

@@ -55,7 +55,7 @@ export function Sidebar(): JSX.Element {
   const [filter, setFilter]           = useState('')
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
-  const [newItemTarget, setNewItemTarget] = useState<{ type: PathlyItemType; dir: string } | null>(null)
+  const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template'; dir: string } | null>(null)
 
   if (sidebarCollapsed) {
     return (
@@ -86,6 +86,8 @@ export function Sidebar(): JSX.Element {
   function handleNewItem(section: Section): void {
     if (section.type === 'flow') {
       setShowFlowWizard(true)
+    } else if (section.type === 'debug' || section.type === 'explore') {
+      return
     } else {
       setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
       setShowNewItemDialog(true)
@@ -140,6 +142,7 @@ export function Sidebar(): JSX.Element {
           const state = sections[section.label]
 
           if (section.type === 'template' || section.type === 'debug' || section.type === 'explore') {
+            if (state.subdirs === null) return null
             const subdirs = state.subdirs ?? []
             const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
             if (!hasMatch) return null
@@ -178,7 +181,7 @@ export function Sidebar(): JSX.Element {
                         </div>
                       )
                     })}
-                    {!filter && (
+                    {!filter && section.type === 'template' && (
                       <button className={styles.newBtn} onClick={() => handleNewItem(section)}>+ new template</button>
                     )}
                   </div>
@@ -268,7 +271,7 @@ export function Sidebar(): JSX.Element {
       )}
       {showNewItemDialog && newItemTarget && (
         <NewItemDialog
-          type={newItemTarget.type as 'skill' | 'agent' | 'template'}
+          type={newItemTarget.type}
           dir={newItemTarget.dir}
           onClose={() => setShowNewItemDialog(false)}
           onCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor') }}

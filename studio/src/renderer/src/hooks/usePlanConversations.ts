@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { readFile } from '../services/pathlyApi'
 import type { ConvRow } from '../types'
 
-function parseProgressMd(md: string): ConvRow[] {
+export function parseProgressMd(md: string): ConvRow[] {
   const rows: ConvRow[] = []
   const lines = md.split('\n')
   let inSection = false

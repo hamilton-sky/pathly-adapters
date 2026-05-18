@@ -9,7 +9,7 @@ export interface TemplateSubdir {
 export interface SectionState {
   items: PathlyItem[]
   open: boolean
-  subdirs?: TemplateSubdir[]
+  subdirs?: TemplateSubdir[] | null
 }
 
 export interface ConvRow {
