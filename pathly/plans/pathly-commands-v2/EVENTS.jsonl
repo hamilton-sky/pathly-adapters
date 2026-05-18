@@ -17,3 +17,9 @@
 {"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 4, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 5, "wall_seconds": 37, "timestamp": "2026-05-18T09:27:39.176325+00:00"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-18T09:27:50.907274"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 5, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 14, "wall_seconds": 97, "timestamp": "2026-05-18T09:30:08.762490+00:00"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-18T09:30:15.026956"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 5, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 6, "wall_seconds": 37, "timestamp": "2026-05-18T09:31:14.971398+00:00"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "ts": "2026-05-18T09:31:39.093524"}
+{"type": "AGENT_DONE", "agent": "tester", "model": "claude-sonnet-4-6", "conversation": 5, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 45, "wall_seconds": 320, "timestamp": "2026-05-18T09:38:04.013764+00:00"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "ts": "2026-05-18T09:38:33.983011"}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "ts": "2026-05-18T09:39:36.892507"}
