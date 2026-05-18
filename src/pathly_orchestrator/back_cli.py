@@ -125,3 +125,4 @@ def main() -> None:
 
     print(f"Rolled back {topic}: {current} → {prior_state}")
     print("Run /pathly go or pathly-ff to resume.")
+    sys.exit(0)

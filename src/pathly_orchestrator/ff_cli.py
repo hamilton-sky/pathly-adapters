@@ -141,3 +141,4 @@ def main() -> None:
 
     print(f"Advanced to: {result['next_state']}  Agent: {result.get('agent', '?')}")
     print("Run /pathly go to continue with the next agent.")
+    sys.exit(0)
