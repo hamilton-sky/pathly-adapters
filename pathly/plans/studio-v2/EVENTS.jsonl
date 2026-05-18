@@ -1,0 +1,2 @@
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-18T09:48:38.221898"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING", "ts": "2026-05-18T09:58:08.243155"}
