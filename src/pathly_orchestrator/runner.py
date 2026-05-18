@@ -1,8 +1,10 @@
 """pathly-run — autonomous FSM runner. Entry point: main()."""
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import yaml
@@ -18,6 +20,30 @@ def _storage_path(flow: str, project_root: str, topic: str) -> Path:
     return Path(project_root) / template.format(topic=topic)
 
 
+def _patch_last_agent_done(storage_path: Path, cost_usd: float, tokens_in: int, tokens_out: int, wall_seconds: int) -> None:
+    """Find the last AGENT_DONE line in EVENTS.jsonl and fill in real cost/token data."""
+    events_file = storage_path / "EVENTS.jsonl"
+    if not events_file.exists():
+        return
+    lines = events_file.read_text(encoding="utf-8").splitlines()
+    patched = False
+    for i in range(len(lines) - 1, -1, -1):
+        try:
+            ev = json.loads(lines[i])
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") == "AGENT_DONE":
+            ev["cost_usd"] = cost_usd
+            ev["tokens_in"] = tokens_in
+            ev["tokens_out"] = tokens_out
+            ev["wall_seconds"] = wall_seconds
+            lines[i] = json.dumps(ev)
+            patched = True
+            break
+    if patched:
+        events_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def invoke_agent(
     instructions: str,
     project_root: str,
@@ -25,6 +51,7 @@ def invoke_agent(
     state: str = "",
     topic: str = "",
     timeout: int = 600,
+    storage_path: Path | None = None,
 ) -> None:
     prompt = (
         f"You are running pathly stage {state!r} for topic {topic!r}.\n\n"
@@ -35,20 +62,46 @@ def invoke_agent(
         "-p", prompt,
         "--model", model,
         "--dangerously-skip-permissions",
+        "--output-format", "json",
     ]
+    t_start = time.monotonic()
     proc = subprocess.Popen(
         cmd,
         cwd=project_root,
-        stdout=sys.stdout,
+        stdout=subprocess.PIPE,
         stderr=sys.stderr,
     )
     try:
-        return_code = proc.wait(timeout=timeout)
+        stdout_bytes, _ = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         proc.kill()
         raise RuntimeError(f"Claude subprocess timed out after {timeout}s")
-    if return_code != 0:
-        raise RuntimeError(f"Claude subprocess exited with code {return_code}")
+
+    wall_seconds = int(time.monotonic() - t_start)
+
+    if proc.returncode != 0:
+        raise RuntimeError(f"Claude subprocess exited with code {proc.returncode}")
+
+    # Parse JSON output for cost + token counts
+    cost_usd = 0.0
+    tokens_in = 0
+    tokens_out = 0
+    try:
+        output = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
+        cost_usd   = float(output.get("cost_usd", output.get("total_cost_usd", 0.0)) or 0.0)
+        usage      = output.get("usage", {})
+        tokens_in  = int(usage.get("input_tokens", 0))
+        tokens_out = int(usage.get("output_tokens", 0))
+        # Print the agent's text result so the terminal isn't silent
+        result_text = output.get("result", "")
+        if result_text:
+            print(result_text)
+    except (json.JSONDecodeError, ValueError):
+        pass  # non-JSON output — cost stays 0.0
+
+    # Patch the AGENT_DONE event the agent wrote with real numbers
+    if storage_path:
+        _patch_last_agent_done(storage_path, cost_usd, tokens_in, tokens_out, wall_seconds)
 
 
 def handle_blocked(response: dict) -> None:
@@ -81,6 +134,7 @@ def resolve_stage(
     model: str,
     state: str,
     timeout: int = 600,
+    storage_path: Path | None = None,
 ) -> dict:
     resolved: list[str] = []
     feedback_rounds = 0
@@ -128,7 +182,7 @@ def resolve_stage(
 
             print(f"\n↩  Feedback: {file}  →  resolving with {target}")
             fb_instructions = result.get("instructions", f"Resolve feedback in feedback/{file}")
-            invoke_agent(fb_instructions, project_root, model, state=f"resolving {file}", topic=topic, timeout=timeout)
+            invoke_agent(fb_instructions, project_root, model, state=f"resolving {file}", topic=topic, timeout=timeout, storage_path=storage_path)
             resolved = [file]
             continue
 
@@ -144,6 +198,7 @@ def run_flow(
     timeout: int = 600,
 ) -> int:
     print(f"── pathly-run ──  flow={flow}  topic={topic}  project_root={project_root}")
+    storage = _storage_path(flow, project_root, topic)
 
     while True:
         try:
@@ -168,13 +223,14 @@ def run_flow(
                 state=current_state,
                 topic=topic,
                 timeout=timeout,
+                storage_path=storage,
             )
         except RuntimeError as exc:
             print(str(exc))
             return 1
 
         try:
-            result = resolve_stage(flow, topic, project_root, model, current_state, timeout)
+            result = resolve_stage(flow, topic, project_root, model, current_state, timeout, storage_path=storage)
         except RuntimeError as exc:
             print(str(exc))
             return 1
