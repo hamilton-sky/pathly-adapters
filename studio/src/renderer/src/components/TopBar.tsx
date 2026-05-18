@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { Terminal, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
+import { IconButton } from './ui'
 import styles from './TopBar.module.css'
 
 export function TopBar(): JSX.Element {
@@ -98,7 +100,9 @@ export function TopBar(): JSX.Element {
 
         <div className={styles.right}>
           {badge}
-          <button className={styles.terminalBtn} onClick={() => toggleTerminal()} title="Toggle terminal (Ctrl+`)">⌨</button>
+          <IconButton onClick={() => toggleTerminal()} title="Toggle terminal (Ctrl+`)">
+            <Terminal size={14} />
+          </IconButton>
           <button className={styles.publishBtn} onClick={() => void handlePublish()} disabled={publishing}>
             {publishing ? '…' : '↑ Publish'}
           </button>
@@ -109,7 +113,9 @@ export function TopBar(): JSX.Element {
         <div className={styles.logPanel}>
           <div className={styles.logHeader}>
             <span>Publish output</span>
-            <button className={styles.logClose} onClick={() => setShowLog(false)}>✕</button>
+            <IconButton onClick={() => setShowLog(false)} title="Close publish log">
+              <X size={12} />
+            </IconButton>
           </div>
           <div className={styles.logBody}>
             {publishLog.map((line, i) => <div key={i} className={styles.logLine}>{line}</div>)}

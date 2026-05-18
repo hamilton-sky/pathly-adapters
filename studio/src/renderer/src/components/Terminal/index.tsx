@@ -139,7 +139,11 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
     if (containerRef.current && instance.container !== containerRef.current) {
       instance.xterm.open(containerRef.current)
       instance.container = containerRef.current
-      try { instance.fitAddon.fit() } catch { /* ignore */ }
+      try {
+        instance.fitAddon.fit()
+        const { cols, rows } = instance.xterm
+        void window.pathly?.terminal?.resize(tabId, cols, rows)
+      } catch { /* ignore */ }
     }
   }, [tabId, tabInstancesRef])
 
@@ -147,7 +151,11 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
     const instance = tabInstancesRef.current.get(tabId)
     if (instance && active) {
       setTimeout(() => {
-        try { instance.fitAddon.fit() } catch { /* ignore */ }
+        try {
+          instance.fitAddon.fit()
+          const { cols, rows } = instance.xterm
+          void window.pathly?.terminal?.resize(tabId, cols, rows)
+        } catch { /* ignore */ }
       }, 0)
     }
   }, [tabId, active, tabInstancesRef])
@@ -196,8 +204,10 @@ export function Terminal(): JSX.Element {
   const theme = useTheme()
   const styles = makeStyles(theme)
   const [panelHeight, setPanelHeight] = useState(260)
+  const [launcherOpen, setLauncherOpen] = useState(false)
   const dragStartRef = useRef<{ y: number; h: number } | null>(null)
   const tabInstancesRef = useRef(new Map<string, TabInstance>())
+  const launcherRef = useRef<HTMLDivElement>(null)
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.ctrlKey && e.key === '`') {
@@ -214,8 +224,12 @@ export function Terminal(): JSX.Element {
   useEffect(() => {
     if (open) {
       setTimeout(() => {
-        tabInstancesRef.current.forEach((inst) => {
-          try { inst.fitAddon.fit() } catch { /* ignore */ }
+        tabInstancesRef.current.forEach((inst, tid) => {
+          try {
+            inst.fitAddon.fit()
+            const { cols, rows } = inst.xterm
+            void window.pathly?.terminal?.resize(tid, cols, rows)
+          } catch { /* ignore */ }
         })
       }, 50)
     }
@@ -233,18 +247,32 @@ export function Terminal(): JSX.Element {
     return removeOnExit
   }, [])
 
-  const handleAddTab = async (): Promise<void> => {
-    const id = createTabId()
-    const label = `Shell ${tabs.length + 1}`
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent): void => {
+      if (launcherRef.current && !launcherRef.current.contains(e.target as Node)) {
+        setLauncherOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleLaunch = async (command: string | undefined, label: string): Promise<void> => {
+    const id = crypto.randomUUID()
     addTab(id, label)
+    setLauncherOpen(false)
     try {
-      await pathlyTerminal()?.spawn(id, projectPath)
+      await window.pathly?.terminal?.spawn(id, projectPath, command)
     } catch (err) {
       const instance = tabInstancesRef.current.get(id)
       if (instance) {
         instance.xterm.write(`\r\nError: could not start terminal — ${String(err)}\r\n`)
       }
     }
+  }
+
+  const handleAddTab = (): void => {
+    void handleLaunch(undefined, `Shell ${tabs.length + 1}`)
   }
 
   const handleCloseTab = async (id: string, e: React.MouseEvent): Promise<void> => {
@@ -314,13 +342,50 @@ export function Terminal(): JSX.Element {
             </span>
           </div>
         ))}
-        <button
-          onClick={() => void handleAddTab()}
-          style={styles.addBtn}
-          title="New terminal"
-        >
-          +
-        </button>
+        <div ref={launcherRef} style={{ position: 'relative', display: 'flex', flexShrink: 0 }}>
+          <button onClick={handleAddTab} style={styles.addBtn} title="New shell">+</button>
+          <button
+            onClick={() => setLauncherOpen((v) => !v)}
+            style={{ ...styles.addBtn, padding: '0 6px', fontSize: '10px' }}
+            title="Launch CLI"
+          >
+            ▾
+          </button>
+          {launcherOpen && (
+            <div style={{
+              position: 'absolute',
+              bottom: '100%',
+              right: 0,
+              backgroundColor: theme.bgSurface0,
+              border: `1px solid ${theme.bgSurface1}`,
+              borderRadius: '4px',
+              minWidth: '140px',
+              zIndex: 100,
+              fontSize: '12px',
+              fontFamily: 'monospace',
+            }}>
+              {[
+                { label: 'PowerShell', command: undefined as string | undefined },
+                { label: 'Claude Code', command: 'claude' as string | undefined },
+                { label: 'Codex', command: 'codex' as string | undefined },
+              ].map(({ label, command }) => (
+                <div
+                  key={label}
+                  onClick={() => void handleLaunch(command, label)}
+                  style={{
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    color: theme.textPrimary,
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = theme.bgSurface1 }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* xterm content area */}

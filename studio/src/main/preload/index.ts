@@ -33,8 +33,8 @@ contextBridge.exposeInMainWorld('pathly', {
     }
   },
   terminal: {
-    spawn: (tabId: string, cwd: string): Promise<void> =>
-      ipcRenderer.invoke('terminal:spawn', tabId, cwd),
+    spawn: (tabId: string, cwd: string, command?: string): Promise<void> =>
+      ipcRenderer.invoke('terminal:spawn', tabId, cwd, command),
     write: (tabId: string, data: string): void =>
       ipcRenderer.send('terminal:write', tabId, data),
     resize: (tabId: string, cols: number, rows: number): Promise<void> =>

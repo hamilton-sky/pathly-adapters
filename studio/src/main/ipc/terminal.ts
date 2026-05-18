@@ -17,11 +17,11 @@ export function killAllPtys(): void {
 }
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
-  ipcMain.handle('terminal:spawn', (_event, tabId: string, cwd: string) => {
+  ipcMain.handle('terminal:spawn', (_event, tabId: string, cwd: string, command?: string) => {
     if (!pty) throw new Error('node-pty is not available')
     if (activePtys.has(tabId)) return
 
-    const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash'
+    const shell = command ?? (process.platform === 'win32' ? 'powershell.exe' : 'bash')
     const resolvedCwd = cwd || app.getAppPath()
 
     const ptyProcess = pty.spawn(shell, [], {

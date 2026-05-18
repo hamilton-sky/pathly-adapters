@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
+import { ChevronRight, ChevronDown, Plus } from 'lucide-react'
 import { useStore } from '../store'
 import type { PathlyItem, PathlyItemType } from '../types'
 import { useProjectFiles } from '../hooks/useProjectFiles'
 import { usePlanConversations } from '../hooks/usePlanConversations'
 import { FlowWizard } from './FlowWizard'
 import { NewItemDialog } from './NewItemDialog'
+import { IconButton, Separator, ContextMenu } from './ui'
 import styles from './Sidebar.module.css'
 
 interface Section {
@@ -38,7 +40,7 @@ function convIcon(status: string): string {
   return '○'
 }
 
-interface ContextMenu {
+interface ContextMenuState {
   x: number
   y: number
   item: PathlyItem
@@ -66,24 +68,14 @@ export function Sidebar(): JSX.Element {
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
-  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!contextMenu) return
-    function handleClick(e: MouseEvent): void {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-        setContextMenu(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [contextMenu])
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
   if (sidebarCollapsed) {
     return (
       <div className={styles.collapsed}>
-        <button className={styles.expandBtn} onClick={() => setSidebarCollapsed(false)} title="Expand sidebar">►</button>
+        <button className={styles.expandBtn} onClick={() => setSidebarCollapsed(false)} title="Expand sidebar">
+          <ChevronRight size={13} />
+        </button>
       </div>
     )
   }
@@ -116,7 +108,7 @@ export function Sidebar(): JSX.Element {
     }
   }
 
-  async function handleInlineCreate(section: Section, e: React.MouseEvent): Promise<void> {
+  async function handleInlineCreate(section: Section, e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
     e.stopPropagation()
     if (!projectPath) return
     const name = window.prompt('Name:')
@@ -137,7 +129,7 @@ export function Sidebar(): JSX.Element {
     await loadItems()
   }
 
-  async function handleInlineCreatePlan(e: React.MouseEvent): Promise<void> {
+  async function handleInlineCreatePlan(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
     e.stopPropagation()
     if (!projectPath) return
     const name = window.prompt('Name:')
@@ -156,7 +148,6 @@ export function Sidebar(): JSX.Element {
   async function handleRename(): Promise<void> {
     if (!contextMenu || !projectPath) return
     const { item, itemDir } = contextMenu
-    setContextMenu(null)
     const currentName = item.name
     const newName = window.prompt('New name:', currentName)
     if (!newName || !newName.trim() || newName.trim() === currentName) return
@@ -164,49 +155,32 @@ export function Sidebar(): JSX.Element {
     const ext = currentName.includes('.') ? currentName.slice(currentName.lastIndexOf('.')) : ''
     const newPath = `${itemDir}/${trimmed}${ext}`
     const content = await window.pathly.fs.read(item.path).catch(() => '')
-    await window.pathly.fs.write(newPath, content ?? '')
-    await window.pathly.fs.delete(item.path)
-    await loadItems()
+    try {
+      await window.pathly.fs.write(newPath, content ?? '')
+      await window.pathly.fs.delete(item.path)
+    } catch (err) {
+      console.error('Rename failed:', err)
+      alert(`Failed to rename ${item.name}. The file may exist at both the old and new path.`)
+    } finally {
+      await loadItems()
+    }
   }
 
   async function handleDelete(): Promise<void> {
     if (!contextMenu || !projectPath) return
     const { item } = contextMenu
-    setContextMenu(null)
     if (!window.confirm(`Delete ${item.name}?`)) return
-    await window.pathly.fs.delete(item.path)
-    await loadItems()
+    try {
+      await window.pathly.fs.delete(item.path)
+    } catch (err) {
+      console.error('Delete failed:', err)
+      alert(`Failed to delete ${item.name}.`)
+    } finally {
+      await loadItems()
+    }
   }
 
   const lowerFilter = filter.toLowerCase()
-
-  const contextMenuStyle: React.CSSProperties = contextMenu ? {
-    position: 'fixed',
-    top: contextMenu.y,
-    left: contextMenu.x,
-    background: 'var(--bg-surface0)',
-    border: '1px solid var(--bg-surface1)',
-    borderRadius: '4px',
-    zIndex: 9999,
-    fontFamily: 'monospace',
-    fontSize: '12px',
-    padding: '4px 0',
-    minWidth: '120px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
-  } : {}
-
-  const ctxItemStyle: React.CSSProperties = {
-    display: 'block',
-    width: '100%',
-    background: 'none',
-    border: 'none',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    padding: '5px 14px',
-    textAlign: 'left',
-    fontSize: '12px',
-    fontFamily: 'monospace'
-  }
 
   return (
     <div className={styles.sidebar}>
@@ -232,14 +206,18 @@ export function Sidebar(): JSX.Element {
             return (
               <div key={section.label}>
                 <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
-                  <span className={styles.chevron}>{state.open ? '▼' : '▶'}</span>
+                  <span className={styles.chevron}>
+                    {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                  </span>
                   {section.label.toUpperCase()}
                   {projectPath && (
-                    <span
-                      style={{ marginLeft: 'auto', paddingLeft: 8, color: 'var(--accent)', opacity: 0.7, fontSize: 13, lineHeight: 1 }}
+                    <IconButton
+                      style={{ marginLeft: 'auto' }}
                       onClick={(e) => { void handleInlineCreate(section, e) }}
                       title={`New ${section.label.slice(0, -1).toLowerCase()}`}
-                    >+</span>
+                    >
+                      <Plus size={12} />
+                    </IconButton>
                   )}
                 </button>
                 {state.open && (
@@ -250,7 +228,9 @@ export function Sidebar(): JSX.Element {
                       return (
                         <div key={subdir.name}>
                           <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
-                            <span className={styles.chevron}>{subdir.open ? '▼' : '▶'}</span>
+                            <span className={styles.chevron}>
+                              {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                            </span>
                             {subdir.name}/
                           </button>
                           {subdir.open && filteredFiles.map((item) => {
@@ -287,14 +267,18 @@ export function Sidebar(): JSX.Element {
           return (
             <div key={section.label}>
               <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
-                <span className={styles.chevron}>{state.open ? '▼' : '▶'}</span>
+                <span className={styles.chevron}>
+                  {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                </span>
                 {section.label.toUpperCase()}
                 {projectPath && (
-                  <span
-                    style={{ marginLeft: 'auto', paddingLeft: 8, color: 'var(--accent)', opacity: 0.7, fontSize: 13, lineHeight: 1 }}
+                  <IconButton
+                    style={{ marginLeft: 'auto' }}
                     onClick={(e) => { void handleInlineCreate(section, e) }}
                     title={`New ${section.label.slice(0, -1).toLowerCase()}`}
-                  >+</span>
+                  >
+                    <Plus size={12} />
+                  </IconButton>
                 )}
               </button>
               {state.open && (
@@ -328,18 +312,22 @@ export function Sidebar(): JSX.Element {
         {/* Section B — Workspace: only when a project is open */}
         {projectPath && (
           <>
-            <div className={styles.divider} />
+            <Separator label="Workspace" />
 
             {/* Plan section */}
             <button className={styles.sectionHeader} onClick={() => setPlanOpen((v) => !v)}>
-              <span className={styles.chevron}>{planOpen ? '▼' : '▶'}</span>
+              <span className={styles.chevron}>
+                {planOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              </span>
               PLAN
               <span className={styles.sectionSub}>[{activeTopic ?? 'no topic'}]</span>
-              <span
-                style={{ marginLeft: 'auto', paddingLeft: 8, color: 'var(--accent)', opacity: 0.7, fontSize: 13, lineHeight: 1 }}
+              <IconButton
+                style={{ marginLeft: 'auto' }}
                 onClick={(e) => { void handleInlineCreatePlan(e) }}
                 title="New plan"
-              >+</span>
+              >
+                <Plus size={12} />
+              </IconButton>
             </button>
             {planOpen && (
               <div>
@@ -371,13 +359,17 @@ export function Sidebar(): JSX.Element {
               return (
                 <div key={section.label}>
                   <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
-                    <span className={styles.chevron}>{state.open ? '▼' : '▶'}</span>
+                    <span className={styles.chevron}>
+                      {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                    </span>
                     {section.label.toUpperCase()}
-                    <span
-                      style={{ marginLeft: 'auto', paddingLeft: 8, color: 'var(--accent)', opacity: 0.7, fontSize: 13, lineHeight: 1 }}
+                    <IconButton
+                      style={{ marginLeft: 'auto' }}
                       onClick={(e) => { void handleInlineCreate(section, e) }}
                       title={`New ${section.label.slice(0, -1).toLowerCase()}`}
-                    >+</span>
+                    >
+                      <Plus size={12} />
+                    </IconButton>
                   </button>
                   {state.open && (
                     <div>
@@ -387,7 +379,9 @@ export function Sidebar(): JSX.Element {
                         return (
                           <div key={subdir.name}>
                             <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
-                              <span className={styles.chevron}>{subdir.open ? '▼' : '▶'}</span>
+                              <span className={styles.chevron}>
+                                {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                              </span>
                               {subdir.name}/
                             </button>
                             {subdir.open && filteredFiles.map((item) => {
@@ -443,7 +437,7 @@ export function Sidebar(): JSX.Element {
       </div>
 
       <button className={styles.collapseBtn} onClick={() => setSidebarCollapsed(true)} title="Collapse sidebar">
-        ◄
+        <ChevronRight size={13} style={{ transform: 'rotate(180deg)' }} />
       </button>
 
       {showFlowWizard && (
@@ -476,10 +470,14 @@ export function Sidebar(): JSX.Element {
       )}
 
       {contextMenu && (
-        <div ref={contextMenuRef} style={contextMenuStyle}>
-          <button style={ctxItemStyle} onClick={() => { void handleRename() }}>Rename</button>
-          <button style={{ ...ctxItemStyle, color: 'var(--red)' }} onClick={() => { void handleDelete() }}>Delete</button>
-        </div>
+        <ContextMenu
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          onClose={() => setContextMenu(null)}
+          items={[
+            { label: 'Rename', onClick: () => { void handleRename() } },
+            { label: 'Delete', onClick: () => { void handleDelete() }, destructive: true },
+          ]}
+        />
       )}
     </div>
   )

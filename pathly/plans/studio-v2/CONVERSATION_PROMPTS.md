@@ -261,6 +261,88 @@ SSE live connection, and cost tracking in runner.py.
 
 ---
 
+## Conv 7 — Design system (S10)
+
+```
+Route to build studio-v2 Conv 7.
+Plan root: pathly/plans/studio-v2/
+Stories: S10
+Depends on: Conv 6 complete
+
+## Goal
+Create a shared ui/ component library and migrate interactive elements to use it.
+Replace all arrow/chevron HTML entities and Unicode characters with Lucide icons.
+
+## Files to create
+
+### studio/src/renderer/src/components/ui/Button.tsx
+- Primary, ghost, and destructive variants
+- Accepts: variant, size, disabled, onClick, children
+- Theme-aware via CSS variables (t.accent, t.red, etc. from useTheme())
+- Shows focus-visible ring (outline: 2px solid t.accent, offset 2px)
+- Hover and active state via onMouseEnter/Leave (same pattern as existing components)
+
+### studio/src/renderer/src/components/ui/IconButton.tsx
+- Compact square button (24×24px) for icon-only actions
+- Accepts: onClick, title (tooltip text), children, disabled
+- Same focus-visible ring as Button
+- Shows title as native browser tooltip (title attribute)
+
+### studio/src/renderer/src/components/ui/Input.tsx
+- Single-line text input
+- Accepts: value, onChange, placeholder, onKeyDown, autoFocus
+- Theme-aware border and background colors
+- Focus ring consistent with Button
+
+### studio/src/renderer/src/components/ui/Badge.tsx
+- Small label chip (e.g. flow type, state label)
+- Accepts: label, color (defaults to t.textMuted)
+- Inline-flex, rounded-sm, monospace font, 11px
+
+### studio/src/renderer/src/components/ui/Separator.tsx
+- Horizontal rule with optional label
+- Accepts: label? (string)
+- Label centered between two faint lines using flex layout
+- Color: t.bgSurface1 for line, t.textMuted for label text
+
+### studio/src/renderer/src/components/ui/ContextMenu.tsx
+- Floating menu for right-click actions
+- Accepts: items: Array<{label, onClick, destructive?}>, position: {x, y}, onClose
+- Renders as fixed-position div over everything (zIndex: 9999)
+- Closes on outside click or Escape key
+- Destructive items colored t.red
+
+### studio/src/renderer/src/components/ui/index.ts
+- Barrel export: re-export all 6 components above
+
+## Files to migrate (replace inline elements with ui/ components)
+
+### studio/src/renderer/src/components/Sidebar/index.tsx
+- Replace all + create buttons with <IconButton>
+- Replace right-click inline context menu div with <ContextMenu>
+- Replace any ▶ ▼ ► ▸ or HTML arrow entities with Lucide ChevronRight/ChevronDown
+  Import: import { ChevronRight, ChevronDown } from 'lucide-react'
+- Section divider between Section A and B: use <Separator label="Workspace" />
+
+### studio/src/renderer/src/components/TopBar/index.tsx
+- Replace icon buttons (⌨, Monitor toggle, etc.) with <IconButton>
+- Verify title attribute is set for tooltip text on each
+
+### studio/src/renderer/src/components/Monitor/index.tsx
+- Replace any inline icon buttons with <IconButton>
+
+## Acceptance checks
+- S10: All 7 ui/ files exist and export correctly from ui/index.ts
+- S10: grep -r "▶\|▼\|►\|▸\|&#9658;\|&#9660;" studio/src/ → zero matches
+- S10: Sidebar section collapse chevrons are Lucide icons (not text characters)
+- S10: All buttons show blue focus ring on keyboard Tab navigation
+- S10: ContextMenu appears on right-click, disappears on outside click or Escape
+- S10: No layout regressions in Sidebar, TopBar, or Monitor
+- S10: lucide-react is already a dependency (check package.json); if missing, add it
+```
+
+---
+
 ## Conv 5 — Terminal panel (S8)
 
 ```

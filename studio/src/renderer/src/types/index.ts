@@ -53,13 +53,27 @@ export interface FsmState {
 }
 
 export interface FsmEvent {
-  ts?: string
   type: string
-  detail: string
+  ts?: string
+  timestamp?: string      // some runners use this instead of ts
+  detail?: string
   from?: string
   to?: string
   reason?: string
   agent?: string
+  model?: string
+  result?: 'PASS' | 'DONE' | string
+  conversation?: number
+  tool_uses?: number
+  wall_seconds?: number
+  cost_usd?: number
+  tokens_in?: number
+  tokens_out?: number
+  file?: string
+  key?: string
+  value?: string
+  note?: string
+  [key: string]: unknown
 }
 
 export interface SkillFrontmatter {

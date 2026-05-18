@@ -21,7 +21,7 @@ Plan files generated 2026-05-18. Ready to begin Conv 1.
 | 3 | Sidebar restructure | S3, S4 | DONE |
 | 4 | HomeScreen all flows | S5 | DONE |
 | 5 | Terminal panel | S8 | DONE |
-| 6 | Sidebar ops + Monitor polish | S9, S11 | pending |
+| 6 | Sidebar ops + Monitor polish | S9, S11 | DONE |
 | 7 | Design system | S10 | pending |
 
 ---

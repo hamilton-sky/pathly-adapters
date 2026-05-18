@@ -25,7 +25,7 @@ declare global {
         onEvent: (cb: (data: { path: string; content: string }) => void) => () => void
       }
       terminal: {
-        spawn: (tabId: string, cwd: string) => Promise<void>
+        spawn: (tabId: string, cwd: string, command?: string) => Promise<void>
         kill: (tabId: string) => Promise<void>
         write: (tabId: string, data: string) => void
         resize: (tabId: string, cols: number, rows: number) => Promise<void>
