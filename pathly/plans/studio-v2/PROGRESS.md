@@ -21,6 +21,8 @@ Plan files generated 2026-05-18. Ready to begin Conv 1.
 | 3 | Sidebar restructure | S3, S4 | pending |
 | 4 | HomeScreen all flows | S5 | pending |
 | 5 | Terminal panel | S8 | pending |
+| 6 | Sidebar file operations | S9 | pending |
+| 7 | Design system | S10 | pending |
 
 ---
 
@@ -36,3 +38,5 @@ Plan files generated 2026-05-18. Ready to begin Conv 1.
 | S4 | Sidebar: two-section structure | 3 | pending |
 | S5 | HomeScreen scans all three workspace roots | 4 | pending |
 | S8 | Terminal panel | 5 | pending |
+| S9 | Sidebar: VS Code-style file operations | 6 | pending |
+| S10 | Design system: reusable components + modern UI | 7 | pending |

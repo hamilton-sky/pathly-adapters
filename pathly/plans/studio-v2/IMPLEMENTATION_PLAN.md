@@ -124,3 +124,67 @@ is clean before any structural changes are layered on.
 - Close panel and reopen: PTY session still alive (shell prompt returns).
 - `Ctrl+C` kills a running process inside the tab — tab shows "[process exited]".
 - Open 3 tabs, close middle tab: remaining tabs are unaffected.
+
+---
+
+## Conv 6 — Sidebar file operations
+
+**Stories:** S9
+**Goal:** Make the sidebar actionable — create, rename, delete, and reorder items without leaving Studio.
+**Depends on:** Conv 3 (sidebar sections stable), Conv 5 (layout stable)
+
+**Files:**
+- `studio/src/renderer/src/components/Sidebar/index.tsx` — action buttons, context menus, drag handles
+- `studio/src/renderer/src/components/Sidebar/SidebarItem.tsx` — new file for per-item row with context menu
+- `studio/src/renderer/src/components/ui/Tooltip.tsx` — needed for button tooltips (may be created in Conv 7 — use inline if Conv 7 not done)
+- `studio/src/renderer/src/components/ui/ContextMenu.tsx` — right-click menu primitive
+- `studio/src/preload/index.ts` — expose `window.pathly.fs.createFile`, `deleteFile`, `renameFile` if not already present
+- `studio/src/main/index.ts` — IPC handlers for file create/delete/rename
+
+**Deliverables:**
+- `+` button per section opens a name prompt and creates the correct file/folder.
+- Right-click → Rename / Delete / Open in Explorer on each item.
+- Drag handle on items; drag-drop reorders within section (display order only, no FS move).
+- Tooltip on every icon button (400ms delay, label + keyboard hint).
+- Chevron collapse indicator uses Lucide `ChevronRight`/`ChevronDown` SVG.
+
+**Verification:**
+- Click `+` on Plans: prompt appears, enter name, folder created in `pathly/plans/`, item appears in sidebar.
+- Right-click item → Delete: confirm dialog, folder removed, sidebar refreshes.
+- Hover icon button for 400ms: tooltip appears with label.
+- Collapse a section: chevron rotates smoothly (CSS transition), no HTML entity arrows visible.
+
+---
+
+## Conv 7 — Design system
+
+**Stories:** S10
+**Goal:** Establish a shared `ui/` component library and modernise all interactive elements.
+**Depends on:** Conv 6 (file-ops UI uses the new primitives)
+
+**Files:**
+- `studio/src/renderer/src/components/ui/Button.tsx` — new
+- `studio/src/renderer/src/components/ui/IconButton.tsx` — new
+- `studio/src/renderer/src/components/ui/Input.tsx` — new
+- `studio/src/renderer/src/components/ui/Tooltip.tsx` — new (replaces any inline tooltip logic)
+- `studio/src/renderer/src/components/ui/Badge.tsx` — new
+- `studio/src/renderer/src/components/ui/Separator.tsx` — new
+- `studio/src/renderer/src/components/ui/ContextMenu.tsx` — new (replaces Conv 6 inline if needed)
+- `studio/src/renderer/src/components/ui/index.ts` — barrel export
+- All files with `▶`, `▼`, `►`, `▸` or HTML arrow entities — replace with Lucide chevrons
+- `studio/src/renderer/src/components/Sidebar/index.tsx` — migrate to `ui/` components
+- `studio/src/renderer/src/components/TopBar/index.tsx` — migrate buttons to `ui/IconButton`
+- `studio/src/renderer/src/components/Monitor/index.tsx` — migrate any interactive elements
+
+**Deliverables:**
+- All seven `ui/` components exist, are typed, theme-aware (CSS vars), and exported from barrel.
+- Zero old arrow characters/entities remain in TSX/CSS (verified by grep).
+- All interactive elements have consistent hover state, active state, and `focus-visible` ring.
+- No new CSS framework added — components extend existing Tailwind/CSS-vars setup.
+- Storybook is out of scope (simple components, no new dev tooling required).
+
+**Verification:**
+- Grep for `▶▼►▸&#9658;&#9660;` across `studio/src/` — zero matches.
+- All buttons and icon buttons show blue focus ring on keyboard navigation.
+- Toggle dark/light theme (if supported): all components respond to CSS var change.
+- Visual regression: Sidebar, TopBar, Monitor all render without layout breakage.

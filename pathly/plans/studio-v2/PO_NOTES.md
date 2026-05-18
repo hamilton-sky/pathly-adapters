@@ -87,6 +87,28 @@ use `"timestamp"`. EventLog.tsx uses `ev.ts` for display. Need one canonical fie
 - Small "⌨" button in TopBar to toggle terminal visibility
 - Panel collapses/shows without killing running processes
 
+### S9 — Sidebar: VS Code-style file operations
+**Problem:** Sidebar is read-only — no way to create new plans/skills/flows from within Studio.
+No drag-drop, no context menus, no tooltips.
+**AC:**
+- `+` action button at top of each Section B folder (Plans → new plan, Debugs → new debug, Explorations → new exploration)
+- `+` action button for Section A items (Flows, Skills, Agents, Templates → create new file in the correct folder)
+- Tooltip on every icon button (hover delay ~400ms, shows label + keyboard hint)
+- Drag-drop reordering within a section (reorders display order only, no filesystem move)
+- Right-click context menu on items: Rename, Delete, Open in Explorer
+- Modern chevron collapse indicator (SVG `▾`/`▸`, not old HTML entities or `▶`)
+
+### S10 — Design system: reusable components + modern UI
+**Problem:** Studio has no shared component library — every file reimplements buttons,
+inputs, and expand/collapse differently. UI looks dated with mismatched styles.
+**AC:**
+- Create `studio/src/renderer/src/components/ui/` with: `Button`, `IconButton`, `Input`, `Tooltip`, `Badge`, `Separator`, `ContextMenu`
+- Each component is typed, theme-aware (CSS vars), and exported from a barrel `index.ts`
+- Replace all old `▶`/`▼` and HTML entity arrows across the codebase with Lucide `ChevronRight`/`ChevronDown` SVG icons
+- Consistent hover, active, and focus-visible ring states on all interactive elements
+- All sidebar section headers, file-tree rows, and TopBar buttons use the new `ui/` components
+- No new external CSS framework — extend existing Tailwind/CSS-vars setup
+
 ---
 
 ## Out of scope
@@ -95,4 +117,4 @@ use `"timestamp"`. EventLog.tsx uses `ev.ts` for display. Need one canonical fie
 - Any changes to Python FSM engine or flow YAMLs
 
 ## Priority order
-S1 (pipeline fix) → S3+S4 (sidebar) → S2 (monitor routing) → S5 (homescreen) → S6 (header) → S7 (ts field) → S8 (terminal)
+S1+S7 (quick fixes) → S2+S6 (monitor) → S3+S4 (sidebar structure) → S5 (homescreen) → S8 (terminal) → S9 (sidebar file ops) → S10 (design system)
