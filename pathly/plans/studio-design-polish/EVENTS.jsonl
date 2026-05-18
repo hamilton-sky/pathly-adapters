@@ -1,0 +1,4 @@
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-18T22:45:23.152471"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "PLANNING", "ts": "2026-05-18T22:51:55.691394"}
+{type: STATE_TRANSITION, from: PLANNING, to: BUILDING, ts: 2026-05-19T00:00:00.000000}
+{type: AGENT_DONE, agent: builder, conversation: 1, result: DONE, ts: 2026-05-19T00:10:00.000000}

@@ -11,6 +11,11 @@ export interface Theme {
   green: string
   red: string
   yellow: string
+  fontFamilyBase: string
+  fontSizeBase: string
+  fontSizeSm: string
+  fontSizeLg: string
+  focusRing: string
 }
 
 export const darkTheme: Theme = {
@@ -26,6 +31,11 @@ export const darkTheme: Theme = {
   green: '#4ade80',
   red: '#f87171',
   yellow: '#fbbf24',
+  fontFamilyBase: "'Inter', system-ui, sans-serif",
+  fontSizeBase: '14px',
+  fontSizeSm: '12px',
+  fontSizeLg: '16px',
+  focusRing: '2px solid #A78BFA',
 }
 
 export const lightTheme: Theme = {
@@ -41,4 +51,9 @@ export const lightTheme: Theme = {
   green: '#16a34a',
   red: '#dc2626',
   yellow: '#d97706',
+  fontFamilyBase: "'Inter', system-ui, sans-serif",
+  fontSizeBase: '14px',
+  fontSizeSm: '12px',
+  fontSizeLg: '16px',
+  focusRing: '2px solid #7C3AED',
 }

@@ -42,19 +42,19 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       padding: '24px'
     },
     stepHeader: {
-      fontSize: '16px',
+      fontSize: 'var(--font-size-lg)',
       fontWeight: 600,
       color: t.textPrimary,
       marginBottom: '4px'
     },
     stepSub: {
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       color: t.textMuted,
       marginBottom: '20px'
     },
     label: {
       display: 'block',
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       color: t.textSecondary,
       marginBottom: '6px',
       fontWeight: 600
@@ -66,7 +66,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '4px',
       color: t.textPrimary,
-      fontSize: '13px',
+      fontSize: 'var(--font-size-base)',
       padding: '8px 10px',
       outline: 'none',
       marginBottom: '16px',
@@ -79,7 +79,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '4px',
       color: t.textPrimary,
-      fontSize: '13px',
+      fontSize: 'var(--font-size-base)',
       padding: '8px 10px',
       outline: 'none',
       marginBottom: '16px',
@@ -99,7 +99,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '4px',
       color: t.textPrimary,
-      fontSize: '13px',
+      fontSize: 'var(--font-size-base)',
       padding: '6px 10px',
       outline: 'none',
       fontFamily: 'monospace'
@@ -120,7 +120,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       borderRadius: '4px',
       color: t.blue,
       cursor: 'pointer',
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       padding: '6px 12px',
       marginTop: '4px'
     },
@@ -140,7 +140,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '4px',
       color: t.textPrimary,
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       padding: '5px 8px',
       outline: 'none',
       cursor: 'pointer'
@@ -155,7 +155,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '4px',
       color: t.textPrimary,
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       padding: '5px 8px',
       outline: 'none'
     },
@@ -167,7 +167,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
     },
     agentStateName: {
       width: '120px',
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       color: t.textSecondary,
       fontFamily: 'monospace',
       flexShrink: 0
@@ -178,13 +178,13 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '4px',
       color: t.textPrimary,
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       padding: '5px 8px',
       outline: 'none',
       fontFamily: 'monospace'
     },
     terminalNote: {
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       color: t.textMuted,
       fontStyle: 'italic'
     },
@@ -193,7 +193,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '4px',
       padding: '12px',
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       fontFamily: 'monospace',
       color: t.textPrimary,
       overflowX: 'auto',
@@ -208,7 +208,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       marginTop: '16px'
     },
     storageLabel: {
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       color: t.textSecondary,
       flexShrink: 0
     },
@@ -218,7 +218,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '4px',
       color: t.textPrimary,
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       padding: '5px 8px',
       outline: 'none',
       fontFamily: 'monospace'
@@ -238,7 +238,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       color: t.textSecondary,
       cursor: 'pointer',
       padding: '6px 16px',
-      fontSize: '13px'
+      fontSize: 'var(--font-size-base)'
     },
     nextBtn: {
       background: t.accent,
@@ -247,7 +247,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       color: t.bgBase,
       cursor: 'pointer',
       padding: '6px 16px',
-      fontSize: '13px',
+      fontSize: 'var(--font-size-base)',
       fontWeight: 600
     },
     cancelBtn: {
@@ -256,11 +256,11 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       color: t.textMuted,
       cursor: 'pointer',
       padding: '6px 10px',
-      fontSize: '13px'
+      fontSize: 'var(--font-size-base)'
     },
     error: {
       color: t.red,
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       marginTop: '4px'
     }
   }
@@ -274,7 +274,7 @@ export function stepDotStyle(t: Theme, active: boolean, done: boolean): CSSPrope
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-base)',
     fontWeight: 600,
     backgroundColor: done ? t.green : active ? t.accent : t.bgSurface0,
     color: done || active ? t.bgBase : t.textMuted,

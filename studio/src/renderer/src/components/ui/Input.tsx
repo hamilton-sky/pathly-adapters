@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../../useTheme'
+import styles from './ui.module.css'
 
 interface InputProps {
   value: string
@@ -37,7 +38,7 @@ export function Input({
 
   return (
     <input
-      className="pathly-input"
+      className={`pathly-input ${styles.focusVisible}`}
       style={baseStyle}
       value={value}
       onChange={onChange}

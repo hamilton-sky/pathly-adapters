@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../../useTheme'
+import styles from './ui.module.css'
 
 type Variant = 'primary' | 'ghost' | 'destructive'
 type Size = 'sm' | 'md'
@@ -61,7 +62,7 @@ export function Button({
 
   return (
     <button
-      className="pathly-btn"
+      className={`pathly-btn ${styles.focusVisible}`}
       style={baseStyle}
       disabled={disabled}
       onClick={onClick}

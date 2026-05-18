@@ -1,7 +1,10 @@
 """Entry point for the pathly-design CLI command.
 
-Adds the bundled scripts directory to sys.path so search.py can import
+Scripts and data are bundled in pathly_data/core/design/.
+Adds the scripts directory to sys.path so search.py can import
 core.py and design_system.py as sibling modules, then runs search.py.
+core.py resolves DATA_DIR as Path(__file__).parent.parent / "data",
+which points at the bundled data/ folder next to scripts/.
 """
 import sys
 import runpy

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../../useTheme'
+import styles from './ui.module.css'
 
 interface IconButtonProps {
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
@@ -39,7 +40,7 @@ export function IconButton({
 
   return (
     <button
-      className="pathly-btn"
+      className={`pathly-btn ${styles.focusVisible}`}
       style={baseStyle}
       title={title}
       disabled={disabled}

@@ -19,7 +19,7 @@ export function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
     },
     title: {
       fontWeight: 600,
-      fontSize: '13px',
+      fontSize: 'var(--font-size-base)',
       color: t.accent
     },
     closeBtn: {
@@ -27,7 +27,7 @@ export function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
       border: 'none',
       color: t.textMuted,
       cursor: 'pointer',
-      fontSize: '14px',
+      fontSize: 'var(--font-size-base)',
       padding: '0 4px'
     },
     label: {
@@ -41,7 +41,7 @@ export function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
       border: `1px solid ${t.bgSurface1}`,
       borderRadius: '4px',
       color: t.textPrimary,
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       padding: '4px 6px',
       outline: 'none'
     },
@@ -49,13 +49,13 @@ export function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
       display: 'flex',
       alignItems: 'center',
       gap: '4px',
-      fontSize: '12px'
+      fontSize: 'var(--font-size-sm)'
     },
     actionRow: {
       display: 'flex',
       flexDirection: 'column' as const,
       gap: '2px',
-      fontSize: '12px'
+      fontSize: 'var(--font-size-sm)'
     },
     ruleArtifact: {
       color: t.green,
@@ -75,7 +75,7 @@ export function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
       borderRadius: '4px',
       color: t.blue,
       cursor: 'pointer',
-      fontSize: '12px',
+      fontSize: 'var(--font-size-sm)',
       padding: '4px 8px',
       marginTop: '4px'
     }

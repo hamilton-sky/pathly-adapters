@@ -92,6 +92,11 @@ function MainApp(): JSX.Element | null {
     el.style.setProperty('--green', resolved.green)
     el.style.setProperty('--red', resolved.red)
     el.style.setProperty('--yellow', resolved.yellow)
+    el.style.setProperty('--font-family-base', resolved.fontFamilyBase)
+    el.style.setProperty('--font-size-base', resolved.fontSizeBase)
+    el.style.setProperty('--font-size-sm', resolved.fontSizeSm)
+    el.style.setProperty('--font-size-lg', resolved.fontSizeLg)
+    el.style.setProperty('--focus-ring', resolved.focusRing)
   }, [theme])
 
   if (setupDone === null) return null
