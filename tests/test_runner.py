@@ -1,0 +1,183 @@
+"""Unit tests for pathly_orchestrator.runner."""
+from __future__ import annotations
+
+import subprocess
+from unittest.mock import MagicMock, call, patch
+
+import pytest
+
+import pathly_orchestrator.runner as runner_mod
+from pathly_orchestrator.runner import (
+    handle_blocked,
+    handle_decide,
+    invoke_agent,
+    resolve_stage,
+    run_flow,
+)
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+_NEXT_ACTION_PATH = "pathly_orchestrator.runner._next_action"
+_COMPLETE_STAGE_PATH = "pathly_orchestrator.runner._complete_stage"
+_INVOKE_AGENT_PATH = "pathly_orchestrator.runner.invoke_agent"
+
+
+def _na_state(state: str = "STORMING") -> dict:
+    return {"current_state": state, "agent": "team/storm", "instructions": "do stuff", "limits": {}}
+
+
+def _cs_next(from_: str = "STORMING", to: str = "PLANNING") -> dict:
+    return {"next_state": to, "agent": "team/plan", "instructions": "plan stuff", "limits": {}}
+
+
+def _cs_done() -> dict:
+    return {"done": True}
+
+
+# ── run_flow: happy path (single stage → done) ────────────────────────────────
+
+def test_run_flow_single_stage_done(capsys):
+    with (
+        patch(_NEXT_ACTION_PATH, return_value=_na_state()) as mock_na,
+        patch(_INVOKE_AGENT_PATH) as mock_invoke,
+        patch(_COMPLETE_STAGE_PATH, return_value=_cs_done()) as mock_cs,
+    ):
+        rc = run_flow("team", "my-topic", "/proj")
+    assert rc == 0
+    mock_na.assert_called_once_with({"flow": "team", "topic": "my-topic", "project_root": "/proj"})
+    mock_invoke.assert_called_once()
+    out = capsys.readouterr().out
+    assert "✓ Complete" in out
+
+
+# ── run_flow: multi-stage ─────────────────────────────────────────────────────
+
+def test_run_flow_multi_stage(capsys):
+    na_calls = [_na_state("STORMING"), _na_state("PLANNING")]
+    cs_calls = [_cs_next("STORMING", "PLANNING"), _cs_done()]
+    with (
+        patch(_NEXT_ACTION_PATH, side_effect=na_calls),
+        patch(_INVOKE_AGENT_PATH),
+        patch(_COMPLETE_STAGE_PATH, side_effect=cs_calls),
+    ):
+        rc = run_flow("team", "my-topic", "/proj")
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "STORMING → PLANNING" in out
+    assert "✓ Complete" in out
+
+
+# ── run_flow: blocked on human before first stage ────────────────────────────
+
+def test_run_flow_blocked_human(capsys):
+    blocked = {"blocked": True, "target_agent": "human", "file": "HUMAN_QUESTIONS.md", "instructions": "Answer me!"}
+    with (
+        patch(_NEXT_ACTION_PATH, return_value=blocked),
+        patch(_INVOKE_AGENT_PATH),
+    ):
+        rc = run_flow("team", "my-topic", "/proj")
+    assert rc == 1
+    out = capsys.readouterr().out
+    assert "Human checkpoint" in out
+
+
+# ── handle_decide: valid input ────────────────────────────────────────────────
+
+def test_handle_decide_valid_input():
+    response = {
+        "decide": True,
+        "question": "Which path?",
+        "options": {"a": "PATH_A", "b": "PATH_B"},
+        "default": "a",
+    }
+    with (
+        patch("builtins.input", return_value="b"),
+        patch(_COMPLETE_STAGE_PATH, return_value=_cs_done()) as mock_cs,
+    ):
+        result = handle_decide("team", "topic", "/proj", response)
+    mock_cs.assert_called_once_with({
+        "flow": "team",
+        "topic": "topic",
+        "project_root": "/proj",
+        "decision": "b",
+    })
+    assert result == _cs_done()
+
+
+# ── handle_decide: invalid input falls back to default ───────────────────────
+
+def test_handle_decide_invalid_input_uses_default():
+    response = {
+        "decide": True,
+        "question": "Which path?",
+        "options": {"a": "PATH_A", "b": "PATH_B"},
+        "default": "a",
+    }
+    with (
+        patch("builtins.input", return_value="zzz"),
+        patch(_COMPLETE_STAGE_PATH, return_value=_cs_done()) as mock_cs,
+    ):
+        handle_decide("team", "topic", "/proj", response)
+    mock_cs.assert_called_once_with({
+        "flow": "team",
+        "topic": "topic",
+        "project_root": "/proj",
+        "decision": "a",
+    })
+
+
+# ── resolve_stage: feedback resolved on second call ──────────────────────────
+
+def test_resolve_stage_feedback_once():
+    blocked = {"blocked": True, "target_agent": "reviewer", "file": "REVIEW.md", "instructions": "fix it"}
+    cs_sequence = [blocked, _cs_done()]
+    with (
+        patch(_COMPLETE_STAGE_PATH, side_effect=cs_sequence) as mock_cs,
+        patch(_INVOKE_AGENT_PATH),
+    ):
+        result = resolve_stage("team", "topic", "/proj", "claude-sonnet-4-6", "REVIEWING")
+    assert result.get("done") is True
+    assert mock_cs.call_count == 2
+    # second call passes resolved_files
+    second_call_args = mock_cs.call_args_list[1][0][0]
+    assert second_call_args["resolved_files"] == ["REVIEW.md"]
+
+
+# ── resolve_stage: exceeds MAX_FEEDBACK_ROUNDS ───────────────────────────────
+
+def test_resolve_stage_exceeds_max_feedback_rounds(tmp_path):
+    blocked = {"blocked": True, "target_agent": "reviewer", "file": "REVIEW.md", "instructions": "fix it"}
+    # Returns blocked 4 times (exceeds MAX_FEEDBACK_ROUNDS=3), then done
+    cs_calls = [blocked] * 4 + [_cs_done()]
+    with (
+        patch(_COMPLETE_STAGE_PATH, side_effect=cs_calls),
+        patch(_INVOKE_AGENT_PATH),
+        patch("pathly_orchestrator.runner._storage_path", return_value=tmp_path),
+        patch("builtins.input", return_value=""),
+    ):
+        result = resolve_stage("team", "topic", "/proj", "claude-sonnet-4-6", "REVIEWING")
+    escalation = tmp_path / "feedback" / "HUMAN_QUESTIONS.md"
+    assert escalation.exists()
+    assert "Escalation" in escalation.read_text()
+    assert result.get("done") is True
+
+
+# ── invoke_agent: timeout raises RuntimeError ────────────────────────────────
+
+def test_invoke_agent_timeout():
+    mock_proc = MagicMock()
+    mock_proc.wait.side_effect = subprocess.TimeoutExpired(cmd="claude", timeout=1)
+    with patch("subprocess.Popen", return_value=mock_proc):
+        with pytest.raises(RuntimeError, match="timed out"):
+            invoke_agent("do stuff", "/proj", "claude-sonnet-4-6", timeout=1)
+    mock_proc.kill.assert_called_once()
+
+
+# ── invoke_agent: non-zero exit raises RuntimeError ──────────────────────────
+
+def test_invoke_agent_nonzero_exit():
+    mock_proc = MagicMock()
+    mock_proc.wait.return_value = 1
+    with patch("subprocess.Popen", return_value=mock_proc):
+        with pytest.raises(RuntimeError, match="exited with code 1"):
+            invoke_agent("do stuff", "/proj", "claude-sonnet-4-6")

@@ -20,6 +20,7 @@ pathly-state = "pathly_orchestrator.eventlog:_state_cli"
 pathly-fsm = "pathly_orchestrator.mcp_server:main"
 pathly-fsm-http = "pathly_orchestrator.http_server:main"
 pathly-validate-flow = "pathly_orchestrator.state:validate_flow_cli"
+pathly-run = "pathly_orchestrator.runner:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
