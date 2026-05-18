@@ -23,6 +23,8 @@ pathly-validate-flow = "pathly_orchestrator.state:validate_flow_cli"
 pathly-run = "pathly_orchestrator.runner:main"
 pathly-status = "pathly_orchestrator.status_cli:main"
 pathly-log = "pathly_orchestrator.log_cli:main"
+pathly-back = "pathly_orchestrator.back_cli:main"
+pathly-ff   = "pathly_orchestrator.ff_cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,3 +1,7 @@
 {"type": "PLAN_CREATED", "ts": "2026-05-17T00:00:00Z", "note": "pathly-commands-v2 plan initialised"}
 {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING", "ts": "2026-05-18T08:29:14.356805"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 23, "wall_seconds": 150, "timestamp": "2026-05-18T08:34:58.628235Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-18T08:35:03.971632"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 28, "wall_seconds": 95, "timestamp": "2026-05-18T08:40:55.315387+00:00"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-18T08:41:11.681272"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 23, "wall_seconds": 2205, "timestamp": "2026-05-18T09:19:54.755065+00:00"}

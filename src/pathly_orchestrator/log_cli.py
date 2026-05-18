@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -51,9 +53,7 @@ def _ts(event: dict) -> str:
     if not raw:
         return "?"
     try:
-        # Strip timezone suffix for simple parsing
         trimmed = raw[:19]
-        from datetime import datetime
         dt = datetime.fromisoformat(trimmed)
         return dt.strftime("%H:%M:%S")
     except Exception:
@@ -121,20 +121,20 @@ def main() -> None:
         result = _find_topic_dir(cwd, args.topic)
         if result is None:
             print(f"Topic '{args.topic}' not found in any scan root.")
-            return
+            sys.exit(1)
         storage_path, flow = result
         topic = args.topic
     else:
         found = _find_most_recent_state(cwd)
         if found is None:
             print("No active features found.")
-            return
+            sys.exit(1)
         storage_path, topic, flow = found
 
     events_file = storage_path / "EVENTS.jsonl"
     if not events_file.exists():
         print("No events recorded.")
-        return
+        sys.exit(0)
 
     lines = [line.strip() for line in events_file.read_text(encoding="utf-8").splitlines() if line.strip()]
     events: list[dict] = []
@@ -164,3 +164,4 @@ def main() -> None:
         print(f"  Showing all {total} events.")
     else:
         print(f"  Showing last {shown} of {total} events. Use --all for full history.")
+    sys.exit(0)

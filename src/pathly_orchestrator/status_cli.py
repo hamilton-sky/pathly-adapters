@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
@@ -151,3 +152,4 @@ def main() -> None:
             print(f"  {topic.ljust(20)} ·  {flow.ljust(8)} ·  DONE             ✓")
 
     print(_SEP)
+    sys.exit(0)
