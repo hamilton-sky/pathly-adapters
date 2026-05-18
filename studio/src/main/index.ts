@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, clipboard } from 'electron'
 import { join } from 'path'
 import { registerFsHandlers } from './ipc/fs'
 import { registerWatcherHandlers } from './ipc/watcher'
@@ -107,6 +107,9 @@ function registerIpcHandlers(win: BrowserWindow): void {
   ipcMain.handle('shell:openWindow', async (_event, projectPath: string) => {
     createWindow(projectPath)
   })
+
+  ipcMain.handle('clipboard:read', () => clipboard.readText())
+  ipcMain.handle('clipboard:write', (_event, text: string) => { clipboard.writeText(text) })
 
   registerFsHandlers()
   registerWatcherHandlers(win)

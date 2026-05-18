@@ -225,19 +225,24 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
     const instance = tabInstancesRef.current.get(tabId)
     if (!instance) return
 
+    const clipWrite = (text: string): void => {
+      void window.pathly?.clipboard?.write(text)
+    }
+    const clipRead = (cb: (text: string) => void): void => {
+      void window.pathly?.clipboard?.read().then(cb)
+    }
+
     instance.xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       if (event.type !== 'keydown') return true
       // Ctrl+Shift+C → copy selection
       if (event.ctrlKey && event.shiftKey && event.key === 'C') {
         const sel = instance.xterm.getSelection()
-        if (sel) void navigator.clipboard.writeText(sel)
+        if (sel) clipWrite(sel)
         return false
       }
       // Ctrl+Shift+V → paste from clipboard
       if (event.ctrlKey && event.shiftKey && event.key === 'V') {
-        void navigator.clipboard.readText().then((text) => {
-          void window.pathly?.terminal?.write(tabId, text)
-        })
+        clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
         return false
       }
       return true
@@ -249,11 +254,9 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
       e.preventDefault()
       const sel = instance.xterm.getSelection()
       if (sel) {
-        void navigator.clipboard.writeText(sel)
+        clipWrite(sel)
       } else {
-        void navigator.clipboard.readText().then((text) => {
-          void window.pathly?.terminal?.write(tabId, text)
-        })
+        clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
       }
     }
     container.addEventListener('contextmenu', handleContextMenu)

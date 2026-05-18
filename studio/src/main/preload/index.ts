@@ -55,6 +55,10 @@ contextBridge.exposeInMainWorld('pathly', {
       return () => ipcRenderer.removeListener('terminal:exit', listener)
     }
   },
+  clipboard: {
+    read: (): Promise<string> => ipcRenderer.invoke('clipboard:read'),
+    write: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text)
+  },
   setup: {
     isNeeded: (): Promise<boolean> => ipcRenderer.invoke('setup:isNeeded'),
     run: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('setup:run'),
@@ -98,6 +102,10 @@ declare global {
         popout: (tabId: string, label: string) => Promise<void>
         onData: (tabId: string, cb: (data: string) => void) => () => void
         onExit: (cb: (tabId: string) => void) => () => void
+      }
+      clipboard: {
+        read: () => Promise<string>
+        write: (text: string) => Promise<void>
       }
       setup: {
         isNeeded: () => Promise<boolean>
