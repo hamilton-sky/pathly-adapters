@@ -62,3 +62,4 @@
 {"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "ts": "2026-05-18T12:27:42.303385"}
 {"type":"AGENT_DONE","agent":"retro","model":"claude-sonnet-4-6","result":"DONE","ts":"2026-05-18T12:28:56.557Z"}
 {"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "ts": "2026-05-18T12:29:04.285464"}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":6,"result":"DONE","tokens_in":0,"tokens_out":0,"cost_usd":0,"tool_uses":23,"wall_seconds":196,"ts":"2026-05-19T00:00:00Z"}

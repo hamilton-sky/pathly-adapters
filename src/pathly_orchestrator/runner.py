@@ -20,8 +20,8 @@ def _storage_path(flow: str, project_root: str, topic: str) -> Path:
     return Path(project_root) / template.format(topic=topic)
 
 
-def _patch_last_agent_done(storage_path: Path, cost_usd: float, tokens_in: int, tokens_out: int, wall_seconds: int) -> None:
-    """Find the last AGENT_DONE line in EVENTS.jsonl and fill in real cost/token data."""
+def _patch_last_agent_done(storage_path: Path, cost_usd: float, tokens_in: int, tokens_out: int, wall_seconds: int, tool_uses: int = 0) -> None:
+    """Find the last AGENT_DONE line in EVENTS.jsonl and fill in real cost/token/tool data."""
     events_file = storage_path / "EVENTS.jsonl"
     if not events_file.exists():
         return
@@ -37,6 +37,7 @@ def _patch_last_agent_done(storage_path: Path, cost_usd: float, tokens_in: int, 
             ev["tokens_in"] = tokens_in
             ev["tokens_out"] = tokens_out
             ev["wall_seconds"] = wall_seconds
+            ev["tool_uses"] = tool_uses
             lines[i] = json.dumps(ev)
             patched = True
             break
@@ -86,12 +87,19 @@ def invoke_agent(
     cost_usd = 0.0
     tokens_in = 0
     tokens_out = 0
+    tool_uses = 0
     try:
         output = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
         cost_usd   = float(output.get("cost_usd", output.get("total_cost_usd", 0.0)) or 0.0)
         usage      = output.get("usage", {})
         tokens_in  = int(usage.get("input_tokens", 0))
         tokens_out = int(usage.get("output_tokens", 0))
+        # Count tool_use content blocks across all messages in the conversation
+        messages = output.get("messages", [])
+        for msg in messages:
+            for block in msg.get("content", []) if isinstance(msg.get("content"), list) else []:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    tool_uses += 1
         # Print the agent's text result so the terminal isn't silent
         result_text = output.get("result", "")
         if result_text:
@@ -101,7 +109,7 @@ def invoke_agent(
 
     # Patch the AGENT_DONE event the agent wrote with real numbers
     if storage_path:
-        _patch_last_agent_done(storage_path, cost_usd, tokens_in, tokens_out, wall_seconds)
+        _patch_last_agent_done(storage_path, cost_usd, tokens_in, tokens_out, wall_seconds, tool_uses)
 
 
 def handle_blocked(response: dict) -> None:
