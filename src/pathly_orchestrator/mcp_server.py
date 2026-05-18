@@ -332,30 +332,33 @@ def _read_message() -> dict | None:
     stdin = sys.stdin.buffer
     headers: dict[str, str] = {}
 
-    while True:
-        raw = stdin.readline()
-        if not raw:
-            return None  # EOF
-        line = raw.decode("utf-8").strip()
-        if not line:
-            break  # blank line ends headers
-        if ":" in line:
-            key, _, val = line.partition(":")
-            headers[key.strip().lower()] = val.strip()
-
     try:
-        length = int(headers.get("content-length", 0))
-    except ValueError:
-        return None
-    if length < 0 or length > _MAX_BODY:
-        return None
-    if not length:
-        return None
+        while True:
+            raw = stdin.readline()
+            if not raw:
+                return None  # EOF
+            line = raw.decode("utf-8", errors="replace").strip()
+            if not line:
+                break  # blank line ends headers
+            if ":" in line:
+                key, _, val = line.partition(":")
+                headers[key.strip().lower()] = val.strip()
 
-    body = stdin.read(length).decode("utf-8")
-    try:
-        return json.loads(body)
-    except json.JSONDecodeError:
+        try:
+            length = int(headers.get("content-length", 0))
+        except ValueError:
+            return None
+        if length < 0 or length > _MAX_BODY:
+            return None
+        if not length:
+            return None
+
+        body = stdin.read(length).decode("utf-8", errors="replace")
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError:
+            return None
+    except OSError:
         return None
 
 
@@ -437,6 +440,13 @@ def run() -> None:
 
 def main() -> None:
     import os, datetime, traceback
+    # On Windows, stdin/stdout are opened in text mode by the C runtime.
+    # Force binary mode so the Content-Length framing is not corrupted by CRLF translation.
+    if sys.platform == "win32":
+        import msvcrt
+        msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+
     log_path = os.path.join(os.path.expanduser("~"), ".claude", "pathly-fsm-startup.log")
     def _log(msg: str) -> None:
         try:

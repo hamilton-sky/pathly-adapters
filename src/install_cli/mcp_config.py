@@ -24,7 +24,11 @@ _CLAUDE_ENTRY: dict = {
 _CODEX_TOML_BLOCK = (
     f"\n[mcp_servers.{_SERVER_NAME}]\n"
     f'command = "{sys.executable.replace(chr(92), chr(92)+chr(92))}"\n'
-    'args = ["-m", "pathly_telemetry"]\n'
+    'args = ["-u", "-m", "pathly_telemetry"]\n'
+    "startup_timeout_sec = 60\n"
+    f"\n[mcp_servers.{_SERVER_NAME}.env]\n"
+    'PYTHONUNBUFFERED = "1"\n'
+    'PYTHONIOENCODING = "utf-8"\n'
 )
 
 _FSM_SERVER_NAME = "pathly-fsm"
@@ -37,7 +41,11 @@ _FSM_CLAUDE_ENTRY: dict = {
 _FSM_CODEX_TOML_BLOCK = (
     f"\n[mcp_servers.{_FSM_SERVER_NAME}]\n"
     f'command = "{sys.executable.replace(chr(92), chr(92)+chr(92))}"\n'
-    'args = ["-m", "pathly_orchestrator.mcp_server"]\n'
+    'args = ["-u", "-m", "pathly_orchestrator.mcp_server"]\n'
+    "startup_timeout_sec = 60\n"
+    f"\n[mcp_servers.{_FSM_SERVER_NAME}.env]\n"
+    'PYTHONUNBUFFERED = "1"\n'
+    'PYTHONIOENCODING = "utf-8"\n'
 )
 
 

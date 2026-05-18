@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pathly-adapters"
-version = "2.7.0"
+version = "2.8.0"
 description = "Pathly adapter installer — stitches and deploys agent files to AI host tools."
 requires-python = ">=3.11"
 dependencies = ["pyyaml>=6.0", "flask>=2.3"]
@@ -25,6 +25,7 @@ pathly-status = "pathly_orchestrator.status_cli:main"
 pathly-log = "pathly_orchestrator.log_cli:main"
 pathly-back = "pathly_orchestrator.back_cli:main"
 pathly-ff   = "pathly_orchestrator.ff_cli:main"
+pathly-studio = "pathly_studio_cli.install:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -33,7 +34,7 @@ addopts = ["-p", "no:cacheprovider"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["install_cli*", "pathly_telemetry*", "pathly_data*", "pathly_orchestrator*", "pathly_hooks*"]
+include = ["install_cli*", "pathly_telemetry*", "pathly_data*", "pathly_orchestrator*", "pathly_hooks*", "pathly_studio_cli*"]
 
 [tool.setuptools.package-data]
 "pathly_data" = [

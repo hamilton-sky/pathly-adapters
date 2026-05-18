@@ -65,30 +65,33 @@ def _read_message() -> dict | None:
     stdin = sys.stdin.buffer
     headers: dict[str, str] = {}
 
-    while True:
-        raw = stdin.readline()
-        if not raw:
-            return None  # EOF
-        line = raw.decode("utf-8").strip()
-        if not line:
-            break  # blank line ends headers
-        if ":" in line:
-            key, _, val = line.partition(":")
-            headers[key.strip().lower()] = val.strip()
-
     try:
-        length = int(headers.get("content-length", 0))
-    except ValueError:
-        return None
-    if length < 0 or length > _MAX_BODY:
-        return None
-    if not length:
-        return None
+        while True:
+            raw = stdin.readline()
+            if not raw:
+                return None  # EOF
+            line = raw.decode("utf-8", errors="replace").strip()
+            if not line:
+                break  # blank line ends headers
+            if ":" in line:
+                key, _, val = line.partition(":")
+                headers[key.strip().lower()] = val.strip()
 
-    body = stdin.read(length).decode("utf-8")
-    try:
-        return json.loads(body)
-    except json.JSONDecodeError:
+        try:
+            length = int(headers.get("content-length", 0))
+        except ValueError:
+            return None
+        if length < 0 or length > _MAX_BODY:
+            return None
+        if not length:
+            return None
+
+        body = stdin.read(length).decode("utf-8", errors="replace")
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError:
+            return None
+    except OSError:
         return None
 
 
