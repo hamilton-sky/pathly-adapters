@@ -497,7 +497,7 @@ export function Terminal(): JSX.Element {
     <div ref={panelRef} style={{ ...styles.panel, height: `${panelHeight}px`, display: open ? 'flex' : 'none' }}>
       <div onMouseDown={onDragMouseDown} style={styles.dragHandle} />
 
-      {/* Toolbar: only shown when NOT split (split panes have their own tab bars) */}
+      {/* Toolbar row — tabs on left, action buttons on right */}
       {!splitEnabled && (
         <div style={{ ...styles.toolbar, justifyContent: 'space-between' }}>
           <PaneTabBar
@@ -513,50 +513,52 @@ export function Terminal(): JSX.Element {
             onPopout={(id) => void handlePopout(id)}
             onRenameTab={renameTab}
           />
-          <button
-            onClick={handleToggleSplit}
-            title="Split pane side-by-side"
-            style={{
-              background: 'none',
-              border: `1px solid ${theme.bgSurface1}`,
-              cursor: 'pointer',
-              padding: '3px 6px',
-              borderRadius: '3px',
-              display: 'flex',
-              alignItems: 'center',
-              marginRight: '6px',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-              <span style={{ width: '7px', height: '13px', background: theme.textMuted, borderRadius: '1px', display: 'inline-block' }} />
-              <span style={{ width: '7px', height: '13px', background: theme.textMuted, borderRadius: '1px', display: 'inline-block' }} />
-            </span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingRight: '6px', flexShrink: 0 }}>
+            {/* Split button — only when 2+ tabs exist */}
+            {tabs.length >= 2 && (
+              <button
+                onClick={handleToggleSplit}
+                title="Split pane side-by-side"
+                style={{ background: 'none', border: `1px solid ${theme.bgSurface1}`, cursor: 'pointer', padding: '3px 6px', borderRadius: '3px', display: 'flex', alignItems: 'center' }}
+              >
+                <span style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                  <span style={{ width: '7px', height: '13px', background: theme.textMuted, borderRadius: '1px', display: 'inline-block' }} />
+                  <span style={{ width: '7px', height: '13px', background: theme.textMuted, borderRadius: '1px', display: 'inline-block' }} />
+                </span>
+              </button>
+            )}
+            {/* Close panel button */}
+            <button
+              onClick={toggle}
+              title="Close terminal"
+              style={{ background: 'none', border: `1px solid ${theme.bgSurface1}`, cursor: 'pointer', padding: '2px 7px', borderRadius: '3px', color: theme.textMuted, fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = theme.red }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = theme.textMuted }}
+            >✕</button>
+          </div>
         </div>
       )}
 
-      {/* When split, show the split button in a thin header row above both panes */}
+      {/* When split, header row shows split (active) + close buttons */}
       {splitEnabled && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', height: '28px', background: theme.bgMantle, borderBottom: `1px solid ${theme.bgSurface1}`, flexShrink: 0, paddingRight: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', height: '28px', background: theme.bgMantle, borderBottom: `1px solid ${theme.bgSurface1}`, flexShrink: 0, gap: '4px', paddingRight: '6px' }}>
           <button
             onClick={handleToggleSplit}
             title="Close split"
-            style={{
-              background: theme.accent,
-              border: `1px solid ${theme.accent}`,
-              cursor: 'pointer',
-              padding: '3px 6px',
-              borderRadius: '3px',
-              display: 'flex',
-              alignItems: 'center',
-            }}
+            style={{ background: theme.accent, border: `1px solid ${theme.accent}`, cursor: 'pointer', padding: '3px 6px', borderRadius: '3px', display: 'flex', alignItems: 'center' }}
           >
             <span style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
               <span style={{ width: '7px', height: '13px', background: theme.bgBase, borderRadius: '1px', display: 'inline-block' }} />
               <span style={{ width: '7px', height: '13px', background: theme.bgBase, borderRadius: '1px', display: 'inline-block' }} />
             </span>
           </button>
+          <button
+            onClick={toggle}
+            title="Close terminal"
+            style={{ background: 'none', border: `1px solid ${theme.bgSurface1}`, cursor: 'pointer', padding: '2px 7px', borderRadius: '3px', color: theme.textMuted, fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = theme.red }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = theme.textMuted }}
+          >✕</button>
         </div>
       )}
 

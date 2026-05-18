@@ -14,6 +14,10 @@ from .storage import append_activity
 
 _MAX_BODY = 1_048_576  # 1 MiB
 
+import os as _os
+_STDIN_FD = 0
+_STDOUT_FD = 1
+
 _TOOLS = [
     {
         "name": "record_activity",
@@ -53,27 +57,54 @@ _TOOLS = [
 ]
 
 
+def _fd_write_all(data: bytes) -> None:
+    view = memoryview(data)
+    offset = 0
+    while offset < len(view):
+        n = _os.write(_STDOUT_FD, view[offset:])
+        offset += n
+
+
+def _fd_read_exact(n: int) -> bytes | None:
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = _os.read(_STDIN_FD, n - len(buf))
+        if not chunk:
+            return None
+        buf.extend(chunk)
+    return bytes(buf)
+
+
+def _fd_readline() -> bytes | None:
+    buf = bytearray()
+    while True:
+        ch = _os.read(_STDIN_FD, 1)
+        if not ch:
+            return None if not buf else bytes(buf)
+        buf.extend(ch)
+        if ch == b"\n":
+            return bytes(buf)
+
+
 def _send(obj: dict) -> None:
     body = json.dumps(obj)
     encoded = body.encode("utf-8")
-    header = f"Content-Length: {len(encoded)}\r\n\r\n"
-    sys.stdout.buffer.write(header.encode("utf-8") + encoded)
-    sys.stdout.buffer.flush()
+    header = f"Content-Length: {len(encoded)}\r\n\r\n".encode("utf-8")
+    _fd_write_all(header + encoded)
 
 
 def _read_message() -> dict | None:
-    stdin = sys.stdin.buffer
     headers: dict[str, str] = {}
 
     try:
         while True:
-            raw = stdin.readline()
-            if not raw:
-                return None  # EOF
-            line = raw.decode("utf-8", errors="replace").strip()
+            raw = _fd_readline()
+            if raw is None:
+                return None
+            line = raw.rstrip(b"\r\n").decode("utf-8", errors="replace")
             if not line:
                 if not headers:
-                    continue  # skip leading blank lines
+                    continue
                 break
             if line.startswith("{"):
                 try:
@@ -89,14 +120,14 @@ def _read_message() -> dict | None:
             length = int(headers.get("content-length", 0))
         except ValueError:
             return None
-        if length < 0 or length > _MAX_BODY:
-            return None
-        if not length:
+        if length <= 0 or length > _MAX_BODY:
             return None
 
-        body = stdin.read(length).decode("utf-8", errors="replace")
+        body_bytes = _fd_read_exact(length)
+        if body_bytes is None:
+            return None
         try:
-            return json.loads(body)
+            return json.loads(body_bytes.decode("utf-8", errors="replace"))
         except json.JSONDecodeError:
             return None
     except OSError:

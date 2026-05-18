@@ -58,8 +58,7 @@ def main() -> None:
 
     raw_path = payload.get("file") or payload.get("path")
     if not raw_path:
-        print("pathly-hook: invalid JSON", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(0)  # no feedback file in this payload — nothing to do
 
     project_root_env = os.environ.get("PATHLY_PROJECT_ROOT")
     if not project_root_env:

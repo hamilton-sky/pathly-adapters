@@ -66,10 +66,19 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
   toggleSplit: () =>
     set((s) => {
       if (s.splitEnabled) {
-        // Collapse: move all right-pane tabs to left
+        // Collapse: move all right-pane tabs back to left
         const tabs = s.tabs.map((t) => ({ ...t, pane: 'left' as const }))
-        return { splitEnabled: false, tabs, activeTabIdRight: null }
+        const lastLeft = tabs[tabs.length - 1]?.id ?? null
+        return { splitEnabled: false, tabs, activeTabIdLeft: lastLeft ?? s.activeTabIdLeft, activeTabIdRight: null }
       }
-      return { splitEnabled: true }
+      // Split: put first tab left, second tab right (requires 2+ tabs)
+      if (s.tabs.length < 2) return { splitEnabled: true }
+      const tabs = s.tabs.map((t, i) => ({ ...t, pane: (i === 0 ? 'left' : 'right') as 'left' | 'right' }))
+      return {
+        splitEnabled: true,
+        tabs,
+        activeTabIdLeft: tabs[0].id,
+        activeTabIdRight: tabs[1].id,
+      }
     }),
 }))

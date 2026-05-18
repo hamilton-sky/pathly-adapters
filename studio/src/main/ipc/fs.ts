@@ -4,20 +4,23 @@ import * as path from 'path'
 
 function isPathSafe(filePath: string): boolean {
   const home = path.resolve(app.getPath('home'))
-  // Resolve symlinks for existing paths; for new files check the parent dir
   let resolved: string
   try {
     resolved = fs.realpathSync(filePath)
   } catch {
-    // File doesn't exist yet (write target) — resolve the parent directory instead
     try {
       const parent = fs.realpathSync(path.dirname(filePath))
       resolved = path.join(parent, path.basename(filePath))
     } catch {
-      return false
+      // Parent doesn't exist either — use normalized absolute path
+      resolved = path.resolve(filePath)
     }
   }
-  return resolved.startsWith(home + path.sep) || resolved === home
+  // Windows paths are case-insensitive; normalize before comparing
+  const norm = (p: string): string => process.platform === 'win32' ? p.toLowerCase() : p
+  const r = norm(resolved)
+  const h = norm(home)
+  return r.startsWith(h + path.sep) || r === h
 }
 
 export function registerFsHandlers(): void {
