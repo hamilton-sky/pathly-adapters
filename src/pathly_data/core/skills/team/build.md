@@ -123,6 +123,6 @@ Both files can exist simultaneously. Route one at a time using the priority orde
 ## Transition to review
 
 After Phase 3 completes with no blocking feedback files:
-Append `{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "timestamp": "<iso-timestamp>"}` to EVENTS.jsonl.
+Append `{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
 
 Return. Orchestrator determines next state from transition_rules.

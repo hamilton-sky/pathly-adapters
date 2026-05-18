@@ -62,12 +62,13 @@ export function Monitor(): JSX.Element {
         if (!flowName) return
         readFile(`${projectPath}/src/pathly_data/core/flows/${flowName}.flow.yaml`)
           .then((yaml) => {
-            const match = yaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
+            const cleanYaml = yaml.replace(/\r/g, '')
+            const match = cleanYaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
             if (match) {
               const states = match[1]
                 .trim()
                 .split('\n')
-                .map((l) => l.replace(/^[ \t]+-[ \t]+/, '').trim())
+                .map((l) => l.replace(/^[ \t]+-[ \t]+/, '').trim().toUpperCase())
                 .filter(Boolean)
               setPipelineStates(states)
             }

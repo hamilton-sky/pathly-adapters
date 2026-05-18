@@ -137,7 +137,7 @@ git diff HEAD -- . ":(exclude)plans/"
 
 ### If no feedback files — PASS
 
-Append `{"type": "AGENT_DONE", "agent": "reviewer", "model": "<model>", "conversation": <N>, "result": "PASS", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "timestamp": "<iso-timestamp>"}` to EVENTS.jsonl.
+Append `{"type": "AGENT_DONE", "agent": "reviewer", "model": "<model>", "conversation": <N>, "result": "PASS", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
 
 ---
 

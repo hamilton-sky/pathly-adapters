@@ -64,8 +64,8 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
     path = _events_path(storage_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     event.setdefault("schema_version", CURRENT_SCHEMA_VERSION)
-    if "timestamp" not in event:
-        event["timestamp"] = _now()
+    if "ts" not in event:
+        event["ts"] = _now()
     line = json.dumps(event) + "\n"
     with _APPEND_LOCK:
         with open(path, "a", encoding="utf-8") as f:

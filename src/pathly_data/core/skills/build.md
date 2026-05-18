@@ -142,7 +142,7 @@ Write `plans/<feature>/STATE.json`:
 
 Append to `plans/<feature>/EVENTS.jsonl`:
 ```
-{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "timestamp": "<iso-timestamp>"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "<iso-timestamp>"}
 ```
 

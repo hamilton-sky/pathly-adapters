@@ -27,7 +27,7 @@ Do not write files; quick is read-only. The retro skill/orchestrator writes RETR
 After quick completes:
 - Write `plans/[feature]/RETRO.md` with the summary provided.
 - Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or plans/).
-- Append `{"type": "AGENT_DONE", "agent": "quick", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "timestamp": "<iso-timestamp>"}` to EVENTS.jsonl.
+- Append `{"type": "AGENT_DONE", "agent": "quick", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
 
 **Generate pipeline-walkthrough files:**
 Read `plans/[feature]/EVENTS.jsonl`. Fill and write the three templates from
