@@ -154,6 +154,46 @@ mechanics unless the workflow blocks and the user must act.
 
 ---
 
+## Step 5a - Contextual State Panel (active feature only)
+
+If an active feature was detected in Step 1 (a feature with status IN PROGRESS):
+
+1. Call next_action (HTTP POST or MCP tool) with `{flow, topic, project_root}` where
+   `flow` is the detected flow (team/debug/explore), `topic` is the feature name, and
+   `project_root` is the current working directory.
+
+2. Display the Scenario 1 panel using data from the next_action response:
+
+```
+─────────────────────────────────────────────────────────
+  Pathly  ·  <flow>  ·  <topic>
+  State : <current_state>    Conv : <N>    Mode : <manual|auto-flow>
+  Agent : <agent>
+─────────────────────────────────────────────────────────
+  Options:
+    [1] Proceed   — run <agent> now
+    [2] Pause     — save state and stop
+    [3] Status    — print STATE.json + last 10 events
+    [4] Switch    — jump to /debug or /explore instead
+─────────────────────────────────────────────────────────
+  Reply [1–4] or press Enter to proceed:
+```
+
+3. Wait for user input and route:
+   - **[1] or Enter**: continue to Step 6 and invoke the route as normal.
+   - **[2]**: call the `pause` skill. Stop — do not proceed to Step 6.
+   - **[3]**: print the contents of the active feature's STATE.json and the last 10
+     lines of EVENTS.jsonl. Show the panel again and wait for input.
+   - **[4]**: print:
+     ```
+     Switch to: (1) team  (2) debug  (3) explore
+     ```
+     Wait for reply and route to the chosen flow skill directly.
+
+If no active feature was detected (new work), skip this step entirely.
+
+---
+
 ## Step 6 - Invoke Route
 
 Use these route forms:

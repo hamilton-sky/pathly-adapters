@@ -13,3 +13,7 @@
 {"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 3, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 9, "wall_seconds": 33, "timestamp": "2026-05-18T09:24:59.924963+00:00"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-18T09:25:26.150986"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 4, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 5, "wall_seconds": 40, "timestamp": "2026-05-18T09:26:40.190806+00:00"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-18T09:26:45.127958"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 4, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 5, "wall_seconds": 37, "timestamp": "2026-05-18T09:27:39.176325+00:00"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-18T09:27:50.907274"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 5, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 14, "wall_seconds": 97, "timestamp": "2026-05-18T09:30:08.762490+00:00"}

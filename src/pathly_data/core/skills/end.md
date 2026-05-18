@@ -19,14 +19,25 @@ Look for a feature whose `PROGRESS.md` contains `status: IN PROGRESS` or `Status
 
 ## Step 2 — If a feature is in progress
 
-Print a completion summary:
+1. Call next_action (HTTP POST or MCP tool) with `{flow, topic, project_root}` where
+   `flow` is the detected flow, `topic` is the feature name, and `project_root` is
+   the current working directory.
+
+2. Print the read-only summary panel using data from the next_action response.
+   Check whether any `*.md` files exist in `plans/<feature>/feedback/`:
 
 ```
-Feature: <feature-name>
-Conversations done / total: <X> / <Y>
+─────────────────────────────────────────────────────────
+  Pathly  ·  <flow>  ·  <topic>
+  State : <current_state>      Conv : <N>
+  <If any *.md file exists in feedback/:>
+  ! Open feedback — resolve before archiving.
+─────────────────────────────────────────────────────────
+  Conversations completed: <N>
+─────────────────────────────────────────────────────────
 ```
 
-Ask:
+3. Then ask:
 
 ```
 Write a retro? (y/n):

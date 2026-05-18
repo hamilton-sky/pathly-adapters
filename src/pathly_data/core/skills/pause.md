@@ -19,6 +19,17 @@ Look for a feature whose `PROGRESS.md` contains `status: IN PROGRESS` or `Status
 
 ## Step 2 — If a feature is in progress
 
+Read STATE.json for the active feature to get `current_state` and `conv`. Then print
+the read-only info panel before writing PAUSED status. Do NOT call next_action.
+
+```
+─────────────────────────────────────────────────────────
+  Pathly  ·  <flow>  ·  <topic>
+  State : <current_state>      Conv : <N>
+  Pausing session.
+─────────────────────────────────────────────────────────
+```
+
 Write `status: PAUSED` to that feature's `PROGRESS.md`.
 
 Print:
