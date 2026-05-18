@@ -1,3 +1,6 @@
+---
+
+---
 # Fix — pathly-fsm-mcp-connection
 
 ## Status

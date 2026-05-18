@@ -1,3 +1,6 @@
+---
+
+---
 # director
 
 This is the canonical, tool-agnostic Pathly agent contract for the director role.

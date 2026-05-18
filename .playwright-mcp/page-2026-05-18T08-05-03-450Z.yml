@@ -1,0 +1,6 @@
+- generic [ref=e3]:
+  - heading "Pathly Studio" [level=1] [ref=e4]
+  - generic [ref=e5]:
+    - generic [ref=e6]: Recent projects
+    - generic [ref=e7]: No projects yet. Open a project folder to get started.
+  - button "+ Open project folder" [ref=e8] [cursor=pointer]

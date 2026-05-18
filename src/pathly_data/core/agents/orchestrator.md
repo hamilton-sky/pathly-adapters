@@ -1,3 +1,6 @@
+---
+
+---
 > **Runtime note (mcp-fsm-driver):** The primary FSM executor is now
 > `pathly_orchestrator.mcp_server`. This file is the reference spec the MCP
 > server implements, retained for documentation and as a manual fallback when
