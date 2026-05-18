@@ -50,9 +50,12 @@ export interface FsmState {
 }
 
 export interface FsmEvent {
-  ts: string
+  ts?: string
   type: string
   detail: string
+  from?: string
+  to?: string
+  reason?: string
 }
 
 export interface SkillFrontmatter {

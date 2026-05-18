@@ -93,7 +93,6 @@ export function Monitor(): JSX.Element {
           const lines = data.content
             .split('\n')
             .filter((l) => l.trim() !== '')
-            .slice(-50)
             .map((l) => JSON.parse(l))
           setEvents(lines)
         } catch {

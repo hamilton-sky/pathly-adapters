@@ -2,14 +2,19 @@ import { useEffect, useRef } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
+import type { FsmEvent } from '../../types'
 
-function formatTime(ts: string): string {
-  try {
-    const d = new Date(ts)
-    return d.toTimeString().slice(0, 8)
-  } catch {
-    return ts.slice(0, 8)
-  }
+function formatTime(ts?: string): string {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return '—'
+  return d.toTimeString().slice(0, 8)
+}
+
+function eventDetail(ev: FsmEvent): string {
+  if (ev.from && ev.to) return `${ev.from} → ${ev.to}`
+  if (ev.reason) return ev.reason
+  return ev.detail ?? ''
 }
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
@@ -93,7 +98,7 @@ export function EventLog(): JSX.Element {
             <div key={i} style={styles.row}>
               <span style={styles.ts}>{formatTime(ev.ts)}</span>
               <span style={styles.type}>{ev.type}</span>
-              <span style={styles.detail}>{ev.detail}</span>
+              <span style={styles.detail}>{eventDetail(ev)}</span>
             </div>
           ))
         )}

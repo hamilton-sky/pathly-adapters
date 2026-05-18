@@ -1,0 +1,4 @@
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-17T23:55:20.002561"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING", "ts": "2026-05-17T23:56:33.675967"}
+{"type":"STATE_TRANSITION","to":"BUILDING"}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"result":"DONE","timestamp":"2026-05-18T00:00:00Z"}
