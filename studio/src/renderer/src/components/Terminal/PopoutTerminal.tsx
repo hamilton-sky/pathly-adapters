@@ -70,6 +70,12 @@ export function PopoutTerminal({ tabId, label }: Props): JSX.Element {
 
     xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       if (event.type !== 'keydown') return true
+      if (event.ctrlKey && !event.shiftKey && event.key === 'c') {
+        const sel = xterm.getSelection(); if (sel) { clipWrite(sel); return false } return true
+      }
+      if (event.ctrlKey && !event.shiftKey && event.key === 'v') {
+        clipRead((text) => window.pathly?.terminal?.write(tabId, text)); return false
+      }
       if (event.ctrlKey && event.shiftKey && event.key === 'C') {
         const sel = xterm.getSelection(); if (sel) clipWrite(sel); return false
       }
@@ -86,9 +92,10 @@ export function PopoutTerminal({ tabId, label }: Props): JSX.Element {
       if (sel) clipWrite(sel)
       else clipRead((text) => window.pathly?.terminal?.write(tabId, text))
     }
-    const onDragOver = (e: DragEvent): void => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy' }
+    const onDragEnter = (e: DragEvent): void => { e.preventDefault(); e.stopPropagation() }
+    const onDragOver = (e: DragEvent): void => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy' }
     const onDrop = (e: DragEvent): void => {
-      e.preventDefault()
+      e.preventDefault(); e.stopPropagation()
       if (e.dataTransfer?.files.length) {
         const paths = Array.from(e.dataTransfer.files).map((f) => (f as File & { path?: string }).path ?? f.name).join(' ')
         if (paths) window.pathly?.terminal?.write(tabId, paths)
@@ -99,8 +106,9 @@ export function PopoutTerminal({ tabId, label }: Props): JSX.Element {
     }
     container.addEventListener('mousedown', onMouseDown)
     container.addEventListener('contextmenu', onContextMenu)
-    container.addEventListener('dragover', onDragOver)
-    container.addEventListener('drop', onDrop)
+    container.addEventListener('dragenter', onDragEnter, true)
+    container.addEventListener('dragover', onDragOver, true)
+    container.addEventListener('drop', onDrop, true)
 
     return () => {
       removeOnData?.()
@@ -109,8 +117,9 @@ export function PopoutTerminal({ tabId, label }: Props): JSX.Element {
       window.removeEventListener('resize', onResize)
       container.removeEventListener('mousedown', onMouseDown)
       container.removeEventListener('contextmenu', onContextMenu)
-      container.removeEventListener('dragover', onDragOver)
-      container.removeEventListener('drop', onDrop)
+      container.removeEventListener('dragenter', onDragEnter, true)
+      container.removeEventListener('dragover', onDragOver, true)
+      container.removeEventListener('drop', onDrop, true)
       xterm.dispose()
     }
   }, [tabId])

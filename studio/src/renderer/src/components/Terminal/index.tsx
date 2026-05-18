@@ -234,7 +234,18 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
 
     instance.xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       if (event.type !== 'keydown') return true
-      // Ctrl+Shift+C → copy selection
+      // Ctrl+C → copy if text selected, else pass through as SIGINT
+      if (event.ctrlKey && !event.shiftKey && event.key === 'c') {
+        const sel = instance.xterm.getSelection()
+        if (sel) { clipWrite(sel); return false }
+        return true
+      }
+      // Ctrl+V → paste from clipboard
+      if (event.ctrlKey && !event.shiftKey && event.key === 'v') {
+        clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
+        return false
+      }
+      // Ctrl+Shift+C → copy selection (always, no SIGINT ambiguity)
       if (event.ctrlKey && event.shiftKey && event.key === 'C') {
         const sel = instance.xterm.getSelection()
         if (sel) clipWrite(sel)
@@ -268,13 +279,20 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
       }
     }
 
-    // Accept text and file-path drops into the terminal
+    // Accept text and file-path drops into the terminal.
+    // Use capture phase so our handlers fire before xterm.js can stopPropagation on its canvas.
+    const handleDragEnter = (e: DragEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     const handleDragOver = (e: DragEvent): void => {
       e.preventDefault()
+      e.stopPropagation()
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
     }
     const handleDrop = (e: DragEvent): void => {
       e.preventDefault()
+      e.stopPropagation()
       if (e.dataTransfer?.files.length) {
         const paths = Array.from(e.dataTransfer.files)
           .map((f) => (f as File & { path?: string }).path ?? f.name)
@@ -288,13 +306,15 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
 
     container.addEventListener('mousedown', handleMouseDown)
     container.addEventListener('contextmenu', handleContextMenu)
-    container.addEventListener('dragover', handleDragOver)
-    container.addEventListener('drop', handleDrop)
+    container.addEventListener('dragenter', handleDragEnter, true)
+    container.addEventListener('dragover', handleDragOver, true)
+    container.addEventListener('drop', handleDrop, true)
     return () => {
       container.removeEventListener('mousedown', handleMouseDown)
       container.removeEventListener('contextmenu', handleContextMenu)
-      container.removeEventListener('dragover', handleDragOver)
-      container.removeEventListener('drop', handleDrop)
+      container.removeEventListener('dragenter', handleDragEnter, true)
+      container.removeEventListener('dragover', handleDragOver, true)
+      container.removeEventListener('drop', handleDrop, true)
     }
   }, [tabId, tabInstancesRef])
 
