@@ -54,7 +54,6 @@ function createWindow(projectPath?: string): BrowserWindow {
       ? `${devServerUrl}?PROJECT_PATH=${encodeURIComponent(projectPath)}`
       : devServerUrl
     win.loadURL(url)
-    win.webContents.openDevTools()
   } else {
     const indexPath = join(__dirname, '../renderer/index.html')
     if (projectPath) {
