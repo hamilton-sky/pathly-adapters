@@ -36,14 +36,18 @@ export function Monitor(): JSX.Element {
     monitorSource,
     setMonitorSource,
     setFsmState,
-    setEvents
+    setEvents,
+    setPipelineStates
   } = useStore()
 
   const t = useTheme()
   const styles = makeStyles(t)
 
   useEffect(() => {
-    if (!activeTopic) return
+    if (!activeTopic) {
+      setPipelineStates([])
+      return
+    }
 
     async function init(): Promise<void> {
       const mcpAlive = await mcpPing()
@@ -62,7 +66,23 @@ export function Monitor(): JSX.Element {
 
       readFile(`${base}/STATE.json`).then((content) => {
         if (!content) return
-        try { setFsmState(JSON.parse(content)) } catch { /* ignore malformed */ }
+        try {
+          const parsed = JSON.parse(content)
+          setFsmState(parsed)
+          readFile(`${projectPath}/src/pathly_data/core/flows/${parsed.flow}.flow.yaml`)
+            .then((yaml) => {
+              const match = yaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
+              if (match) {
+                const states = match[1]
+                  .trim()
+                  .split('\n')
+                  .map((l) => l.replace(/^[ \t]+-[ \t]+/, '').trim())
+                  .filter(Boolean)
+                setPipelineStates(states)
+              }
+            })
+            .catch(() => { /* flow YAML missing — FsmView uses fallback */ })
+        } catch { /* ignore malformed */ }
       }).catch(() => { /* file may not exist yet */ })
 
       readFile(`${base}/EVENTS.jsonl`).then((content) => {
@@ -102,7 +122,7 @@ export function Monitor(): JSX.Element {
     })
 
     return () => { removeListener() }
-  }, [activeTopic, projectPath, setMonitorSource, setFsmState, setEvents])
+  }, [activeTopic, projectPath, setMonitorSource, setFsmState, setEvents, setPipelineStates])
 
   if (!activeTopic) {
     return (

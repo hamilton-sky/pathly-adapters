@@ -9,6 +9,7 @@ export interface ProjectState {
   selectedItem: PathlyItem | null
   fsmState: FsmState | null
   events: FsmEvent[]
+  pipelineStates: string[]
   monitorSource: 'mcp' | 'chokidar' | null
   publishing: boolean
   publishLog: string[]
@@ -22,6 +23,7 @@ export interface ProjectState {
   updateProject: (path: string, patch: Partial<ProjectEntry>) => void
   setFsmState: (s: FsmState | null) => void
   setEvents: (e: FsmEvent[]) => void
+  setPipelineStates: (s: string[]) => void
   setMonitorSource: (s: 'mcp' | 'chokidar' | null) => void
   setPublishing: (v: boolean) => void
   appendPublishLog: (line: string) => void
@@ -39,6 +41,7 @@ export const useProjectStore = create<ProjectState>()(
       selectedItem: null,
       fsmState: null,
       events: [],
+      pipelineStates: [],
       monitorSource: null,
       publishing: false,
       publishLog: [],
@@ -55,6 +58,7 @@ export const useProjectStore = create<ProjectState>()(
         })),
       setFsmState: (s) => set({ fsmState: s }),
       setEvents: (e) => set({ events: e }),
+      setPipelineStates: (s) => set({ pipelineStates: s }),
       setMonitorSource: (s) => set({ monitorSource: s }),
       setPublishing: (v) => set({ publishing: v }),
       appendPublishLog: (line) => set((s) => ({ publishLog: [...s.publishLog, line] })),

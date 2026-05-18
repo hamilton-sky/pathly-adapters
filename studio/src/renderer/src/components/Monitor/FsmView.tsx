@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 
-const PIPELINE: string[] = ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'COMMITTING', 'DONE']
 
 const PULSE_CSS = `
 @keyframes pathly-pulse {
@@ -14,6 +13,10 @@ const PULSE_CSS = `
 
 export function FsmView(): JSX.Element {
   const fsmState = useStore((s) => s.fsmState)
+  const pipelineStates = useStore((s) => s.pipelineStates)
+  const PIPELINE = pipelineStates.length > 0
+    ? pipelineStates
+    : ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'DONE']
   const t = useTheme()
   const styleInjectedRef = useRef(false)
 

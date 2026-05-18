@@ -6,7 +6,7 @@
 
 | Story | Title | Delivered by | Status |
 |---|---|---|---|
-| S1 | Event log timestamps + detail | Conv 1 | TODO |
+| S1 | Event log timestamps + detail | Conv 1 | DONE |
 | S2 | Dynamic pipeline states | Conv 2 | TODO |
 | S3 | Clean PLAN sidebar conversations | Conv 3 | TODO |
 | S4 | Sidebar debugs + explorations | Conv 3 | TODO |
@@ -15,7 +15,7 @@
 
 | Conv | Phases | Stories | Status | Verify |
 |---|---|---|---|---|
-| 1 | 1.1–1.3 | S1 | TODO | `cd studio && npm run typecheck` → zero errors |
+| 1 | 1.1–1.3 | S1 | DONE | `cd studio && npm run typecheck` → zero errors |
 | 2 | 2.1–2.3 | S2 | TODO | `cd studio && npm run typecheck` → zero errors |
 | 3 | 3.1–3.5 | S3, S4 | TODO | `cd studio && npm run typecheck` → zero errors |
 

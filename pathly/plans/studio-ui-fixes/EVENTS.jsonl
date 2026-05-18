@@ -2,3 +2,7 @@
 {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING", "ts": "2026-05-17T23:56:33.675967"}
 {"type":"STATE_TRANSITION","to":"BUILDING"}
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"result":"DONE","timestamp":"2026-05-18T00:00:00Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-18T00:02:24.131568"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-18T00:03:51.504894"}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":2,"result":"DONE","timestamp":"2026-05-18T00:00:00Z"}
