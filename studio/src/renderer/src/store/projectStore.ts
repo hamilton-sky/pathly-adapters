@@ -10,7 +10,7 @@ export interface ProjectState {
   fsmState: FsmState | null
   events: FsmEvent[]
   pipelineStates: string[]
-  monitorSource: 'mcp' | 'chokidar' | null
+  monitorSource: 'mcp' | 'chokidar' | 'sse' | null
   publishing: boolean
   publishLog: string[]
   mcpCommand: string
@@ -24,7 +24,7 @@ export interface ProjectState {
   setFsmState: (s: FsmState | null) => void
   setEvents: (e: FsmEvent[]) => void
   setPipelineStates: (s: string[]) => void
-  setMonitorSource: (s: 'mcp' | 'chokidar' | null) => void
+  setMonitorSource: (s: 'mcp' | 'chokidar' | 'sse' | null) => void
   setPublishing: (v: boolean) => void
   appendPublishLog: (line: string) => void
   clearPublishLog: () => void

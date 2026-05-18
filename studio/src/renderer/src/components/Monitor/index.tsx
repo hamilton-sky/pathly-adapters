@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { useStore } from '../../store'
+import { useProjectStore } from '../../store/projectStore'
 import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
 import type { FsmEvent } from '../../types'
-import { mcpPing, watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
+import { watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   return {
@@ -49,79 +50,76 @@ export function Monitor(): JSX.Element {
       return
     }
 
-    async function init(): Promise<void> {
-      const mcpAlive = await mcpPing()
-      if (mcpAlive) {
-        setMonitorSource('mcp')
-      } else {
-        setMonitorSource('chokidar')
-        watchStart(projectPath, activeTopic ?? '')
+    const base = `${projectPath}/pathly/plans/${activeTopic}`
+
+    // STATE.json — initial read
+    readFile(`${base}/STATE.json`).then((content) => {
+      if (!content) return
+      try {
+        const parsed = JSON.parse(content)
+        setFsmState(parsed)
+        readFile(`${projectPath}/src/pathly_data/core/flows/${parsed.flow}.flow.yaml`)
+          .then((yaml) => {
+            const match = yaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
+            if (match) {
+              const states = match[1]
+                .trim()
+                .split('\n')
+                .map((l) => l.replace(/^[ \t]+-[ \t]+/, '').trim())
+                .filter(Boolean)
+              setPipelineStates(states)
+            }
+          })
+          .catch(() => { /* flow YAML missing — FsmView uses fallback */ })
+      } catch { /* ignore malformed */ }
+    }).catch(() => { /* file may not exist yet */ })
+
+    // EVENTS.jsonl — initial snapshot
+    readFile(`${base}/EVENTS.jsonl`).then((content) => {
+      if (!content) return
+      const parsed: FsmEvent[] = []
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        try { parsed.push(JSON.parse(trimmed) as FsmEvent) } catch { /* skip */ }
       }
-    }
+      setEvents(parsed)
+    }).catch(() => { /* file may not exist yet */ })
 
-    init()
-
-    if (projectPath && activeTopic) {
-      const base = `${projectPath}/pathly/plans/${activeTopic}`
-
-      readFile(`${base}/STATE.json`).then((content) => {
-        if (!content) return
-        try {
-          const parsed = JSON.parse(content)
-          setFsmState(parsed)
-          readFile(`${projectPath}/src/pathly_data/core/flows/${parsed.flow}.flow.yaml`)
-            .then((yaml) => {
-              const match = yaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
-              if (match) {
-                const states = match[1]
-                  .trim()
-                  .split('\n')
-                  .map((l) => l.replace(/^[ \t]+-[ \t]+/, '').trim())
-                  .filter(Boolean)
-                setPipelineStates(states)
-              }
-            })
-            .catch(() => { /* flow YAML missing — FsmView uses fallback */ })
-        } catch { /* ignore malformed */ }
-      }).catch(() => { /* file may not exist yet */ })
-
-      readFile(`${base}/EVENTS.jsonl`).then((content) => {
-        if (!content) return
-        const parsed: FsmEvent[] = []
-        for (const line of content.split('\n')) {
-          const trimmed = line.trim()
-          if (!trimmed) continue
-          try {
-            parsed.push(JSON.parse(trimmed) as FsmEvent)
-          } catch {
-            // skip malformed lines
-          }
-        }
-        setEvents(parsed)
-      }).catch(() => { /* file may not exist yet */ })
-    }
-
+    // STATE.json — live updates via chokidar (low frequency, keep as-is)
+    watchStart(projectPath, activeTopic)
     const removeListener = onWatchEvent((data) => {
       if (data.path.endsWith('STATE.json')) {
-        try {
-          setFsmState(JSON.parse(data.content))
-        } catch {
-          // ignore malformed JSON
-        }
-      } else if (data.path.endsWith('EVENTS.jsonl')) {
-        try {
-          const lines = data.content
-            .split('\n')
-            .filter((l) => l.trim() !== '')
-            .map((l) => JSON.parse(l))
-          setEvents(lines)
-        } catch {
-          // ignore malformed JSONL
-        }
+        try { setFsmState(JSON.parse(data.content)) } catch { /* ignore */ }
       }
+      // EVENTS.jsonl handled by SSE below — ignore here
     })
 
-    return () => { removeListener() }
+    // EVENTS.jsonl — live appends via SSE
+    const port = 8765
+    const params = new URLSearchParams({ topic: activeTopic, project_root: projectPath })
+    const es = new EventSource(`http://127.0.0.1:${port}/events/stream?${params}`)
+
+    es.onopen = () => setMonitorSource('sse')
+
+    es.onmessage = (ev) => {
+      try {
+        const event = JSON.parse(ev.data) as FsmEvent
+        if (event.type === 'connected') return
+        const current = useProjectStore.getState().events
+        useProjectStore.getState().setEvents([...current, event])
+      } catch { /* skip malformed */ }
+    }
+
+    es.onerror = () => {
+      // SSE unavailable — fall back to chokidar badge only (file watch already active)
+      setMonitorSource('chokidar')
+    }
+
+    return () => {
+      removeListener()
+      es.close()
+    }
   }, [activeTopic, projectPath, setMonitorSource, setFsmState, setEvents, setPipelineStates])
 
   if (!activeTopic) {
@@ -134,6 +132,8 @@ export function Monitor(): JSX.Element {
 
   const sourceBadge = monitorSource === 'mcp'
     ? <span style={{ ...styles.sourceBadge, color: t.green }}>Source: ● MCP live</span>
+    : monitorSource === 'sse'
+    ? <span style={{ ...styles.sourceBadge, color: t.green }}>Source: ● SSE live</span>
     : <span style={{ ...styles.sourceBadge, color: t.textMuted }}>Source: ○ File watch</span>
 
   return (
