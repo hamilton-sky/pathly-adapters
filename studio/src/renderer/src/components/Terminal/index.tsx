@@ -221,6 +221,45 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
     }
   }, [tabId, tabInstancesRef])
 
+  useEffect(() => {
+    const instance = tabInstancesRef.current.get(tabId)
+    if (!instance) return
+
+    instance.xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      if (event.type !== 'keydown') return true
+      // Ctrl+Shift+C → copy selection
+      if (event.ctrlKey && event.shiftKey && event.key === 'C') {
+        const sel = instance.xterm.getSelection()
+        if (sel) void navigator.clipboard.writeText(sel)
+        return false
+      }
+      // Ctrl+Shift+V → paste from clipboard
+      if (event.ctrlKey && event.shiftKey && event.key === 'V') {
+        void navigator.clipboard.readText().then((text) => {
+          void window.pathly?.terminal?.write(tabId, text)
+        })
+        return false
+      }
+      return true
+    })
+
+    const container = instance.container
+    if (!container) return
+    const handleContextMenu = (e: MouseEvent): void => {
+      e.preventDefault()
+      const sel = instance.xterm.getSelection()
+      if (sel) {
+        void navigator.clipboard.writeText(sel)
+      } else {
+        void navigator.clipboard.readText().then((text) => {
+          void window.pathly?.terminal?.write(tabId, text)
+        })
+      }
+    }
+    container.addEventListener('contextmenu', handleContextMenu)
+    return () => container.removeEventListener('contextmenu', handleContextMenu)
+  }, [tabId, tabInstancesRef])
+
   return (
     <div
       ref={containerRef}
