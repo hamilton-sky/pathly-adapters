@@ -58,6 +58,21 @@ Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
 ---
 
+## Design system check
+
+Before spawning the orchestrator, check for `pathly/plans/<feature>/DESIGN.md`:
+
+- **If it exists** → print: `Design system found: pathly/plans/<feature>/DESIGN.md ✓`
+- **If it does not exist** and `entryStage` is `discovery` or `build` → print:
+  ```
+  No DESIGN.md found for <feature>.
+  If this feature includes UI work, run /pathly design first to generate a visual spec.
+  (Skip this if the feature is backend-only.)
+  ```
+  Do not block — continue to the orchestrator regardless of the user's choice.
+
+---
+
 ## LLM engine (orchestrator agent)
 
 Spawn the **orchestrator** agent with **exactly these 5 parameters and nothing else**:

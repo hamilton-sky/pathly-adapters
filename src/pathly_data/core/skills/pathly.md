@@ -28,6 +28,7 @@ Split `$ARGUMENTS` into:
 | `build` | `b` | → **pathly-build** skill directly |
 | `storm` | — | → **pathly-storm** skill directly |
 | `plan` | `p` | → **pathly-plan** skill directly |
+| `design` | `d` | → **pathly-design** skill directly |
 | `review` | `r` | → **pathly-review** skill directly |
 | `test` | `t` | → **pathly-test** skill directly |
 | `retro` | — | → **pathly-retro** skill directly |
@@ -70,9 +71,10 @@ Typical path for a new feature:
   0. /pathly po      — clarify requirements with the Product Owner (optional, recommended for ambiguous features)
   1. /pathly storm   — brainstorm the approach with the architect
   2. /pathly go      — plan + route to build (director chooses rigor)
-  3. /pathly build   — implement conversation by conversation
+  3. /pathly design  — generate a DESIGN.md visual spec (style, palette, fonts, UX rules)
+  4. /pathly build   — implement conversation by conversation
      (review + test happen automatically inside the pipeline)
-  4. /pathly end     — retro + archive
+  5. /pathly end     — retro + archive
 
 Also: debug · explore · verify · meet · help
 
@@ -344,9 +346,9 @@ Reply with 1–4:
   /pathly end     /pathly help
 
 ── Pipeline ──────────────────────────────
-  /pathly plan    /pathly review  /pathly test
-  /pathly retro   /pathly archive /pathly lessons
-  /pathly team
+  /pathly plan    /pathly design  /pathly build
+  /pathly review  /pathly test    /pathly retro
+  /pathly archive /pathly lessons /pathly team
 
 ── Specialized ───────────────────────────
   /pathly po      /pathly debug
