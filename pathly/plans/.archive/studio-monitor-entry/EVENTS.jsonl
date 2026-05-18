@@ -1,0 +1,2 @@
+{"type": "FSM_INIT", "flow": "team", "topic": "studio-monitor-entry", "rigor": "lite", "autoFlow": true, "entryStage": "discovery"}
+{"type": "STATE_TRANSITION", "to": "STORMING"}
