@@ -55,3 +55,10 @@
 {"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":7,"result":"PASS","tool_uses":15,"wall_seconds":54,"ts":"2026-05-18T12:24:21.375Z"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-18T12:24:34.969265"}
 {"type":"FILE_DELETED","file":"MORE_CONVS_NEEDED.md","ts":"2026-05-18T12:25:22.973Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-18T12:25:29.470692"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance","ts":"2026-05-18T12:25:50.891Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "ts": "2026-05-18T12:26:08.544740"}
+{"type":"AGENT_DONE","agent":"tester","model":"claude-sonnet-4-6","conversation":7,"result":"PASS","tool_uses":10,"wall_seconds":51,"ts":"2026-05-18T12:27:32.572Z"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "ts": "2026-05-18T12:27:42.303385"}
+{"type":"AGENT_DONE","agent":"retro","model":"claude-sonnet-4-6","result":"DONE","ts":"2026-05-18T12:28:56.557Z"}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "ts": "2026-05-18T12:29:04.285464"}
