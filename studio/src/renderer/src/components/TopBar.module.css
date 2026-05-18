@@ -36,6 +36,7 @@
   flex: 1;
   display: flex;
   justify-content: center;
+  gap: 8px;
 }
 
 .topicSelect {
@@ -50,6 +51,20 @@
   transition: border-color 0.15s;
 }
 .topicSelect:focus { border-color: var(--accent); }
+
+.topicSelectArchive {
+  background: var(--bg-base);
+  border: 1px solid var(--bg-surface0);
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.topicSelectArchive:focus { border-color: var(--bg-surface1); }
+.topicSelectArchive:hover { border-color: var(--bg-surface1); }
 
 .right {
   display: flex;

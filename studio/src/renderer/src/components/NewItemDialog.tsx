@@ -4,7 +4,7 @@ import { writeFile } from '../services/pathlyApi'
 import styles from './NewItemDialog.module.css'
 
 interface Props {
-  type: 'skill' | 'agent' | 'template'
+  type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'
   dir: string
   onClose: () => void
   onCreated: (item: PathlyItem) => void
@@ -78,6 +78,12 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
       const subdir = subdirName.trim() || 'general'
       filePath = `${dir}/${subdir}/${trimmed}.md`
       content  = `# ${trimmed}\n\n[Template content here]\n`
+    } else if (type === 'explore') {
+      filePath = `${dir}/${trimmed}/EXPLORE.md`
+      content  = `# Exploration — ${trimmed}\n\n## Question\n\n[What do you want to explore?]\n\n## Scope\n\n[Files, layers, or components in scope]\n\n## Out of scope\n\n[What to skip]\n\n## Success criterion\n\n[How we'll know the exploration is complete]\n`
+    } else if (type === 'debug') {
+      filePath = `${dir}/${trimmed}/DEBUG.md`
+      content  = `# Debug — ${trimmed}\n\n## Symptom\n\n[What is the observed behavior?]\n\n## Expected\n\n[What should happen?]\n\n## Repro steps\n\n1. \n\n## Hypotheses\n\n- \n`
     } else {
       filePath = `${dir}/${trimmed}.md`
       content  = `---\nname: ${trimmed}\ndescription: ${description.trim()}\n---\n\n# ${trimmed}\n\n## Role\n\n[Describe the agent role]\n\n## Instructions\n\n`
@@ -85,14 +91,17 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
 
     try {
       await writeFile(filePath, content)
-      onCreated({ name: `${trimmed}.md`, path: filePath, type })
+      const itemName = (type === 'explore' || type === 'debug')
+        ? filePath.split('/').slice(-2).join('/')
+        : `${trimmed}.md`
+      onCreated({ name: itemName, path: filePath, type })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
   }
 
-  const titles     = { skill: 'New Skill', agent: 'New Agent', template: 'New Template' }
-  const namePH     = { skill: 'my-skill',  agent: 'my-agent',  template: 'my-template'  }
+  const titles = { skill: 'New Skill', agent: 'New Agent', template: 'New Template', explore: 'New Exploration', debug: 'New Debug Session' }
+  const namePH = { skill: 'my-skill',  agent: 'my-agent',  template: 'my-template',  explore: 'my-exploration', debug: 'my-bug'          }
 
   return (
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>

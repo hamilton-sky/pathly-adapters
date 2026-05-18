@@ -55,7 +55,7 @@ export function Sidebar(): JSX.Element {
   const [filter, setFilter]           = useState('')
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
-  const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template'; dir: string } | null>(null)
+  const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
 
   if (sidebarCollapsed) {
     return (
@@ -86,8 +86,6 @@ export function Sidebar(): JSX.Element {
   function handleNewItem(section: Section): void {
     if (section.type === 'flow') {
       setShowFlowWizard(true)
-    } else if (section.type === 'debug' || section.type === 'explore') {
-      return
     } else {
       setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
       setShowNewItemDialog(true)
@@ -181,8 +179,10 @@ export function Sidebar(): JSX.Element {
                         </div>
                       )
                     })}
-                    {!filter && section.type === 'template' && (
-                      <button className={styles.newBtn} onClick={() => handleNewItem(section)}>+ new template</button>
+                    {!filter && (
+                      <button className={styles.newBtn} onClick={() => handleNewItem(section)}>
+                        {section.type === 'template' ? '+ new template' : section.type === 'explore' ? '+ new exploration' : '+ new debug'}
+                      </button>
                     )}
                   </div>
                 )}

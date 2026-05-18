@@ -189,10 +189,9 @@ export function HomeScreen(): JSX.Element {
       for (const project of projects) {
         try {
           const plansDir = `${project.path}/pathly/plans`
-          const planFolders = await listDirs(plansDir)
+          const activeFolders = await listDirs(plansDir).catch(() => [] as string[])
           const rows: PlanRow[] = []
-          for (const folder of planFolders) {
-            if (folder === '.archive') continue
+          for (const folder of activeFolders) {
             try {
               const raw = await readFile(`${plansDir}/${folder}/STATE.json`)
               const parsed = JSON.parse(raw) as { current?: string }

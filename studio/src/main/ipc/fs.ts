@@ -37,6 +37,7 @@ export function registerFsHandlers(): void {
     if (!isPathSafe(filePath)) {
       throw new Error('Path outside home directory is not allowed')
     }
+    fs.mkdirSync(path.dirname(filePath), { recursive: true })
     const tmpPath = filePath + '.tmp'
     fs.writeFileSync(tmpPath, content, 'utf-8')
     fs.renameSync(tmpPath, filePath)

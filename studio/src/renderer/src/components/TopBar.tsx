@@ -18,7 +18,8 @@ export function TopBar(): JSX.Element {
     clearPublishLog,
   } = useStore()
 
-  const [topics, setTopics]   = useState<string[]>([])
+  const [activeTopics,   setActiveTopics]   = useState<string[]>([])
+  const [archivedTopics, setArchivedTopics] = useState<string[]>([])
   const [showLog, setShowLog] = useState(false)
   const logEndRef = useRef<HTMLDivElement>(null)
   const removeListenerRef = useRef<(() => void) | null>(null)
@@ -28,8 +29,15 @@ export function TopBar(): JSX.Element {
     let cancelled = false
     async function loadTopics(): Promise<void> {
       try {
-        const entries = await listDirs(projectPath + '/pathly/plans')
-        if (!cancelled) setTopics(entries.filter((e) => e !== '.archive'))
+        const base = projectPath + '/pathly/plans'
+        const [active, archived] = await Promise.all([
+          listDirs(base).catch(() => [] as string[]),
+          listDirs(base + '/.archive').catch(() => [] as string[]),
+        ])
+        if (!cancelled) {
+          setActiveTopics(active.filter((e) => e !== '.archive'))
+          setArchivedTopics(archived)
+        }
       } catch { /* directory may not exist yet */ }
     }
     loadTopics()
@@ -56,8 +64,8 @@ export function TopBar(): JSX.Element {
     }
   }
 
-  const badge = monitorSource === 'mcp'
-    ? <span className={styles.badgeLive}>● MCP live</span>
+  const badge = monitorSource === 'sse'
+    ? <span className={styles.badgeLive}>● SSE live</span>
     : <span className={styles.badgeWatch}>○ File watch</span>
 
   return (
@@ -70,11 +78,19 @@ export function TopBar(): JSX.Element {
         <div className={styles.center}>
           <select
             className={styles.topicSelect}
-            value={activeTopic ?? ''}
-            onChange={(e) => { setActiveTopic(e.target.value || null); setActivePanel('plan') }}
+            value={activeTopic?.startsWith('.archive/') ? '' : (activeTopic ?? '')}
+            onChange={(e) => { setActiveTopic(e.target.value || null); setActivePanel('monitor') }}
           >
-            <option value="">— select topic —</option>
-            {topics.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
+            <option value="">— active topic —</option>
+            {activeTopics.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select
+            className={styles.topicSelectArchive}
+            value={activeTopic?.startsWith('.archive/') ? activeTopic : ''}
+            onChange={(e) => { setActiveTopic(e.target.value || null); setActivePanel('monitor') }}
+          >
+            <option value="">— archive —</option>
+            {archivedTopics.map((t) => <option key={t} value={`.archive/${t}`}>{t}</option>)}
           </select>
         </div>
 

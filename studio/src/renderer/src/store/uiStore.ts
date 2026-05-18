@@ -17,7 +17,7 @@ export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       sidebarCollapsed: false,
-      activePanel: 'plan',
+      activePanel: 'monitor',
       dirtyItems: new Set(),
       theme: 'dark',
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
