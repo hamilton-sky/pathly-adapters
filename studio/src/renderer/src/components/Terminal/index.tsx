@@ -429,10 +429,6 @@ export function Terminal(): JSX.Element {
 
   const handleToggleSplit = (): void => {
     toggleSplit()
-    if (!splitEnabled) {
-      // Spawn a shell in right pane if none exist
-      void handleLaunch(undefined, 'Shell', 'right')
-    }
   }
 
   // Horizontal drag (panel height)
@@ -503,52 +499,66 @@ export function Terminal(): JSX.Element {
 
       {/* Toolbar: only shown when NOT split (split panes have their own tab bars) */}
       {!splitEnabled && (
-        <PaneTabBar
-          pane="left"
-          tabs={leftTabs}
-          activeTabId={activeTabIdLeft}
-          theme={theme}
-          styles={{ ...styles, paneTabBar: styles.toolbar }}
-          onSelectTab={setActiveTab}
-          onCloseTab={(id, e) => void handleCloseTab(id, e)}
-          onAddTab={() => void handleLaunch(undefined, `Shell ${tabs.length + 1}`, 'left')}
-          onLaunch={(cmd, label) => void handleLaunch(cmd, label, 'left')}
-          onPopout={(id) => void handlePopout(id)}
-          onRenameTab={renameTab}
-        />
+        <div style={{ ...styles.toolbar, justifyContent: 'space-between' }}>
+          <PaneTabBar
+            pane="left"
+            tabs={leftTabs}
+            activeTabId={activeTabIdLeft}
+            theme={theme}
+            styles={{ ...styles, paneTabBar: { display: 'flex', alignItems: 'center', height: '100%', flex: 1, overflow: 'hidden', gap: '2px', paddingLeft: '4px' } }}
+            onSelectTab={setActiveTab}
+            onCloseTab={(id, e) => void handleCloseTab(id, e)}
+            onAddTab={() => void handleLaunch(undefined, `Shell ${tabs.length + 1}`, 'left')}
+            onLaunch={(cmd, label) => void handleLaunch(cmd, label, 'left')}
+            onPopout={(id) => void handlePopout(id)}
+            onRenameTab={renameTab}
+          />
+          <button
+            onClick={handleToggleSplit}
+            title="Split pane side-by-side"
+            style={{
+              background: 'none',
+              border: `1px solid ${theme.bgSurface1}`,
+              cursor: 'pointer',
+              padding: '3px 6px',
+              borderRadius: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              marginRight: '6px',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+              <span style={{ width: '7px', height: '13px', background: theme.textMuted, borderRadius: '1px', display: 'inline-block' }} />
+              <span style={{ width: '7px', height: '13px', background: theme.textMuted, borderRadius: '1px', display: 'inline-block' }} />
+            </span>
+          </button>
+        </div>
       )}
 
-      {/* Split toggle button — always visible, floated right in the drag handle area */}
-      <div style={{ position: 'absolute', top: '6px', right: '8px', zIndex: 10 }}>
-        <button
-          onClick={handleToggleSplit}
-          title={splitEnabled ? 'Close split' : 'Split pane side-by-side'}
-          style={{
-            background: splitEnabled ? theme.accent : theme.bgSurface0,
-            border: `1px solid ${splitEnabled ? theme.accent : theme.bgSurface1}`,
-            cursor: 'pointer',
-            padding: '3px 6px',
-            borderRadius: '3px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '3px',
-          }}
-        >
-          {/* Two vertical columns icon */}
-          <span style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-            <span style={{
-              width: '7px', height: '13px',
-              background: splitEnabled ? theme.bgBase : theme.textMuted,
-              borderRadius: '1px', display: 'inline-block',
-            }} />
-            <span style={{
-              width: '7px', height: '13px',
-              background: splitEnabled ? theme.bgBase : theme.textMuted,
-              borderRadius: '1px', display: 'inline-block',
-            }} />
-          </span>
-        </button>
-      </div>
+      {/* When split, show the split button in a thin header row above both panes */}
+      {splitEnabled && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', height: '28px', background: theme.bgMantle, borderBottom: `1px solid ${theme.bgSurface1}`, flexShrink: 0, paddingRight: '6px' }}>
+          <button
+            onClick={handleToggleSplit}
+            title="Close split"
+            style={{
+              background: theme.accent,
+              border: `1px solid ${theme.accent}`,
+              cursor: 'pointer',
+              padding: '3px 6px',
+              borderRadius: '3px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <span style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+              <span style={{ width: '7px', height: '13px', background: theme.bgBase, borderRadius: '1px', display: 'inline-block' }} />
+              <span style={{ width: '7px', height: '13px', background: theme.bgBase, borderRadius: '1px', display: 'inline-block' }} />
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Content */}
       {splitEnabled ? (

@@ -108,25 +108,15 @@ export function Sidebar(): JSX.Element {
     }
   }
 
-  async function handleInlineCreate(section: Section, e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
+  function handleInlineCreate(section: Section, e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation()
     if (!projectPath) return
-    const name = window.prompt('Name:')
-    if (!name || !name.trim()) return
-    const trimmed = name.trim()
-
     if (section.type === 'flow') {
       setShowFlowWizard(true)
-      return
-    }
-
-    if (section.type === 'debug' || section.type === 'explore') {
-      const dirPath = `${projectPath}/${section.dir}/${trimmed}`
-      await window.pathly.fs.write(`${dirPath}/STATE.json`, JSON.stringify({ current: 'INIT' }))
     } else {
-      await window.pathly.fs.write(`${projectPath}/${section.dir}/${trimmed}.yaml`, '')
+      setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
+      setShowNewItemDialog(true)
     }
-    await loadItems()
   }
 
   async function handleInlineCreatePlan(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
