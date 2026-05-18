@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('terminal:resize', tabId, cols, rows),
     kill: (tabId: string): Promise<void> =>
       ipcRenderer.invoke('terminal:kill', tabId),
+    popout: (tabId: string, label: string): Promise<void> =>
+      ipcRenderer.invoke('terminal:popout', tabId, label),
     onData: (tabId: string, cb: (data: string) => void): (() => void) => {
       const channel = `terminal:data:${tabId}`
       const listener = (_e: Electron.IpcRendererEvent, data: string): void => cb(data)
@@ -52,5 +54,56 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on('terminal:exit', listener)
       return () => ipcRenderer.removeListener('terminal:exit', listener)
     }
+  },
+  setup: {
+    isNeeded: (): Promise<boolean> => ipcRenderer.invoke('setup:isNeeded'),
+    run: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('setup:run'),
+    onProgress: (cb: (msg: string) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, msg: string): void => cb(msg)
+      ipcRenderer.on('setup:progress', listener)
+      return () => ipcRenderer.removeListener('setup:progress', listener)
+    }
   }
 })
+
+declare global {
+  interface Window {
+    pathly: {
+      fs: {
+        read: (path: string) => Promise<string>
+        write: (path: string, content: string) => Promise<void>
+        list: (dir: string) => Promise<string[]>
+        listDirs: (dir: string) => Promise<string[]>
+        delete: (path: string) => Promise<void>
+        pickFolder: () => Promise<string | null>
+      }
+      shell: {
+        openWindow: (path: string) => Promise<void>
+        publish: (cwd: string) => Promise<number | null>
+        onOutput: (cb: (line: string) => void) => () => void
+      }
+      mcp: {
+        ping: () => Promise<boolean>
+        state: (topic: string) => Promise<unknown>
+      }
+      watch: {
+        start: (projectPath: string, topic: string) => Promise<void>
+        onEvent: (cb: (data: { path: string; content: string }) => void) => () => void
+      }
+      terminal: {
+        spawn: (tabId: string, cwd: string, command?: string) => Promise<void>
+        write: (tabId: string, data: string) => void
+        resize: (tabId: string, cols: number, rows: number) => Promise<void>
+        kill: (tabId: string) => Promise<void>
+        popout: (tabId: string, label: string) => Promise<void>
+        onData: (tabId: string, cb: (data: string) => void) => () => void
+        onExit: (cb: (tabId: string) => void) => () => void
+      }
+      setup: {
+        isNeeded: () => Promise<boolean>
+        run: () => Promise<{ ok: boolean; error?: string }>
+        onProgress: (cb: (msg: string) => void) => () => void
+      }
+    }
+  }
+}

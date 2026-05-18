@@ -1,0 +1,8 @@
+{
+  "event": "PostToolUse",
+  "command": {
+    "windows": "python C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\inject_feedback_ttl.py ",
+    "linux": "python3 C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\inject_feedback_ttl.py ",
+    "osx": "python3 C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\inject_feedback_ttl.py "
+  }
+}

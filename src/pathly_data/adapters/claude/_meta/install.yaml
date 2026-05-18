@@ -9,7 +9,7 @@ templates:
   destination: ~/.claude/plugins/pathly/templates
 telemetry: true
 hooks:
-  - event: post_tool_call
+  - event: PostToolUse
     script: hooks/classify_feedback.py
-  - event: post_tool_call
+  - event: PostToolUse
     script: hooks/inject_feedback_ttl.py

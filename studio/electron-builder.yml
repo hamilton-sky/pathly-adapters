@@ -1,0 +1,42 @@
+appId: com.pathly.studio
+productName: Pathly Studio
+copyright: Copyright © 2026 Pathly
+
+directories:
+  buildResources: resources
+  output: dist
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: resources/python
+    to: python
+    filter: "**/*"
+  - from: resources/wheels
+    to: wheels
+    filter: "*.whl"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+  icon: resources/icon.icns
+
+linux:
+  target: AppImage
+  category: Development
+
+publish: []

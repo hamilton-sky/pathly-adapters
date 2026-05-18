@@ -47,6 +47,7 @@ export interface FsmState {
   flow?: string
   feature?: string
   rigor?: string
+  conv?: number
   current_conversation?: number
   updated_at?: string
   [key: string]: unknown

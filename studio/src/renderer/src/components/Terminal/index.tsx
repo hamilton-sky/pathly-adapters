@@ -29,7 +29,7 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       background: t.bgSurface1,
       flexShrink: 0,
     },
-    tabBar: {
+    toolbar: {
       display: 'flex',
       alignItems: 'center',
       height: '32px',
@@ -37,13 +37,23 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       borderBottom: `1px solid ${t.bgSurface1}`,
       flexShrink: 0,
       paddingLeft: '4px',
+      gap: '2px',
+    },
+    paneTabBar: {
+      display: 'flex',
+      alignItems: 'center',
+      height: '28px',
+      background: t.bgMantle,
+      borderBottom: `1px solid ${t.bgSurface0}`,
+      paddingLeft: '4px',
       overflow: 'hidden',
+      flexShrink: 0,
     },
     tabActive: {
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
-      padding: '0 10px',
+      padding: '0 8px',
       height: '100%',
       cursor: 'pointer',
       fontSize: '12px',
@@ -57,7 +67,7 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
-      padding: '0 10px',
+      padding: '0 8px',
       height: '100%',
       cursor: 'pointer',
       fontSize: '12px',
@@ -75,15 +85,32 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       borderRadius: '2px',
       cursor: 'pointer',
     },
-    addBtn: {
+    iconBtn: {
       background: 'none',
       border: 'none',
       color: t.textMuted,
       cursor: 'pointer',
-      fontSize: '16px',
-      padding: '0 10px',
+      fontSize: '14px',
+      padding: '0 7px',
       height: '100%',
       lineHeight: 1,
+      flexShrink: 0,
+    },
+    splitArea: {
+      flex: 1,
+      display: 'flex',
+      overflow: 'hidden',
+    },
+    pane: {
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      flex: 1,
+    },
+    splitDivider: {
+      width: '4px',
+      cursor: 'col-resize',
+      background: t.bgSurface1,
       flexShrink: 0,
     },
     contentArea: {
@@ -100,11 +127,17 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       color: t.textMuted,
       fontSize: '13px',
     },
+    labelInput: {
+      background: 'transparent',
+      border: 'none',
+      borderBottom: `1px solid ${t.accent}`,
+      color: t.textPrimary,
+      fontSize: '12px',
+      outline: 'none',
+      width: '80px',
+      padding: '0 2px',
+    },
   }
-}
-
-function createTabId(): string {
-  return crypto.randomUUID()
 }
 
 interface TerminalTabViewProps {
@@ -145,7 +178,6 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
         void window.pathly?.terminal?.resize(tabId, cols, rows)
       } catch { /* ignore */ }
 
-      // Trigger redraw after mount so PowerShell prompt re-renders
       setTimeout(() => {
         const inst = tabInstancesRef.current.get(tabId)
         if (inst) {
@@ -175,18 +207,14 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
   useEffect(() => {
     const instance = tabInstancesRef.current.get(tabId)
     if (!instance) return
-
     const pathlyApi = window.pathly?.terminal
     if (!pathlyApi) return
-
     const removeListener = pathlyApi.onData(tabId, (data) => {
       instance.xterm.write(data)
     })
-
     const disposeOnData = instance.xterm.onData((data: string) => {
       pathlyApi.write(tabId, data)
     })
-
     return () => {
       removeListener()
       disposeOnData.dispose()
@@ -206,24 +234,134 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
   )
 }
 
-const pathlyTerminal = (): Window['pathly']['terminal'] | null => {
-  return window.pathly?.terminal ?? null
+interface PaneTabBarProps {
+  pane: 'left' | 'right'
+  tabs: import('../../store/terminalStore').TerminalTab[]
+  activeTabId: string | null
+  theme: Theme
+  styles: Record<string, React.CSSProperties>
+  onSelectTab: (id: string) => void
+  onCloseTab: (id: string, e: React.MouseEvent) => void
+  onAddTab: (pane: 'left' | 'right') => void
+  onLaunch: (cmd: string | undefined, label: string, pane: 'left' | 'right') => void
+  onPopout: (id: string) => void
+  onRenameTab: (id: string, label: string) => void
+}
+
+function PaneTabBar({
+  pane, tabs, activeTabId, theme, styles,
+  onSelectTab, onCloseTab, onAddTab, onLaunch, onPopout, onRenameTab,
+}: PaneTabBarProps): JSX.Element {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+
+  const startEdit = (id: string, currentLabel: string, e: React.MouseEvent): void => {
+    e.stopPropagation()
+    setEditingId(id)
+    setEditValue(currentLabel)
+  }
+
+  const commitEdit = (): void => {
+    if (editingId && editValue.trim()) {
+      onRenameTab(editingId, editValue.trim())
+    }
+    setEditingId(null)
+  }
+
+  const cancelEdit = (): void => setEditingId(null)
+
+  return (
+    <div style={styles.paneTabBar}>
+      {tabs.map((tab) => (
+        <div
+          key={tab.id}
+          onClick={() => onSelectTab(tab.id)}
+          style={tab.id === activeTabId ? styles.tabActive : styles.tabInactive}
+        >
+          {editingId === tab.id ? (
+            <input
+              autoFocus
+              style={styles.labelInput}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitEdit()
+                if (e.key === 'Escape') cancelEdit()
+                e.stopPropagation()
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span onDoubleClick={(e) => startEdit(tab.id, tab.label, e)}>
+              {tab.label}
+            </span>
+          )}
+          <span
+            title="Pop out to window"
+            onClick={(e) => { e.stopPropagation(); onPopout(tab.id) }}
+            style={{
+              fontSize: '13px',
+              color: theme.textMuted,
+              lineHeight: 1,
+              padding: '1px 3px',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              marginRight: '1px',
+              userSelect: 'none',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = theme.accent }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = theme.textMuted }}
+          >
+            ↗
+          </span>
+          <span
+            onClick={(e) => onCloseTab(tab.id, e)}
+            style={styles.closeBtn}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = theme.red }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = theme.textMuted }}
+          >
+            ✕
+          </span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+        <button onClick={() => onAddTab(pane)} style={styles.iconBtn} title="New shell">⌨</button>
+        <button
+          onClick={() => onLaunch('claude', 'Claude', pane)}
+          style={{ ...styles.iconBtn, fontSize: '10px', fontWeight: 700, color: theme.accent }}
+          title="Launch Claude Code"
+        >◆</button>
+        <button
+          onClick={() => onLaunch('codex', 'Codex', pane)}
+          style={{ ...styles.iconBtn, fontSize: '10px', fontWeight: 700, color: theme.green }}
+          title="Launch Codex"
+        >⬡</button>
+      </div>
+    </div>
+  )
 }
 
 export function Terminal(): JSX.Element {
-  const { open, tabs, activeTabId, toggle, addTab, closeTab, setActiveTab } = useTerminalStore()
+  const {
+    open, tabs, activeTabIdLeft, activeTabIdRight, splitEnabled,
+    toggle, addTab, closeTab, setActiveTab, renameTab, toggleSplit,
+  } = useTerminalStore()
   const projectPath = useStore((s) => s.projectPath)
   const theme = useTheme()
   const styles = makeStyles(theme)
   const [panelHeight, setPanelHeight] = useState(260)
+  const [splitRatio, setSplitRatio] = useState(0.5)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const vDragRef = useRef<{ x: number; ratio: number } | null>(null)
   const dragStartRef = useRef<{ y: number; h: number } | null>(null)
   const tabInstancesRef = useRef(new Map<string, TabInstance>())
 
+  const leftTabs = tabs.filter((t) => t.pane === 'left')
+  const rightTabs = tabs.filter((t) => t.pane === 'right')
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.ctrlKey && e.key === '`') {
-      e.preventDefault()
-      toggle()
-    }
+    if (e.ctrlKey && e.key === '`') { e.preventDefault(); toggle() }
   }, [toggle])
 
   useEffect(() => {
@@ -243,50 +381,61 @@ export function Terminal(): JSX.Element {
         })
       }, 50)
     }
-  }, [open, panelHeight])
+  }, [open, panelHeight, splitEnabled, splitRatio])
 
   useEffect(() => {
-    const api = pathlyTerminal()
+    const api = window.pathly?.terminal
     if (!api) return
-    const removeOnExit = api.onExit((tabId) => {
+    return api.onExit((tabId) => {
       const instance = tabInstancesRef.current.get(tabId)
-      if (instance) {
-        instance.xterm.write('\r\n[process exited]\r\n')
-      }
+      if (instance) instance.xterm.write('\r\n[process exited]\r\n')
     })
-    return removeOnExit
   }, [])
 
-  const handleLaunch = async (command: string | undefined, label: string): Promise<void> => {
+  const handleLaunch = async (command: string | undefined, label: string, pane: 'left' | 'right' = 'left'): Promise<void> => {
+    if (!open) toggle()
     const id = crypto.randomUUID()
-    addTab(id, label)
+    addTab(id, label, pane)
     try {
       await window.pathly?.terminal?.spawn(id, projectPath, command)
     } catch (err) {
       const instance = tabInstancesRef.current.get(id)
-      if (instance) {
-        instance.xterm.write(`\r\nError: could not start terminal — ${String(err)}\r\n`)
-      }
+      if (instance) instance.xterm.write(`\r\nError: could not start terminal — ${String(err)}\r\n`)
     }
-  }
-
-  const handleAddTab = (): void => {
-    void handleLaunch(undefined, `Shell ${tabs.length + 1}`)
   }
 
   const handleCloseTab = async (id: string, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation()
-    try {
-      await pathlyTerminal()?.kill(id)
-    } catch { /* PTY may already be dead */ }
+    try { await window.pathly?.terminal?.kill(id) } catch { /* PTY may already be dead */ }
     const instance = tabInstancesRef.current.get(id)
-    if (instance) {
-      instance.xterm.dispose()
-      tabInstancesRef.current.delete(id)
-    }
+    if (instance) { instance.xterm.dispose(); tabInstancesRef.current.delete(id) }
     closeTab(id)
   }
 
+  const handlePopout = async (id: string): Promise<void> => {
+    const tab = tabs.find((t) => t.id === id)
+    if (!tab) return
+    try {
+      await window.pathly?.terminal?.popout(id, tab.label)
+    } catch (err) {
+      console.error('popout failed', err)
+      return
+    }
+    // Remove from this window — PTY now belongs to popup
+    const instance = tabInstancesRef.current.get(id)
+    if (instance) { instance.xterm.dispose(); tabInstancesRef.current.delete(id) }
+    closeTab(id)
+  }
+
+  const handleToggleSplit = (): void => {
+    toggleSplit()
+    if (!splitEnabled) {
+      // Spawn a shell in right pane if none exist
+      void handleLaunch(undefined, 'Shell', 'right')
+    }
+  }
+
+  // Horizontal drag (panel height)
   const onDragMouseDown = (e: React.MouseEvent): void => {
     dragStartRef.current = { y: e.clientY, h: panelHeight }
     e.preventDefault()
@@ -294,12 +443,21 @@ export function Terminal(): JSX.Element {
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent): void => {
-      if (!dragStartRef.current) return
-      const delta = dragStartRef.current.y - e.clientY
-      const newH = Math.min(800, Math.max(80, dragStartRef.current.h + delta))
-      setPanelHeight(newH)
+      if (dragStartRef.current) {
+        const delta = dragStartRef.current.y - e.clientY
+        setPanelHeight(Math.min(800, Math.max(80, dragStartRef.current.h + delta)))
+      }
+      if (vDragRef.current && panelRef.current) {
+        const rect = panelRef.current.getBoundingClientRect()
+        const relX = e.clientX - rect.left
+        const ratio = Math.min(0.85, Math.max(0.15, relX / rect.width))
+        setSplitRatio(ratio)
+      }
     }
-    const onMouseUp = (): void => { dragStartRef.current = null }
+    const onMouseUp = (): void => {
+      dragStartRef.current = null
+      vDragRef.current = null
+    }
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
     return () => {
@@ -308,74 +466,119 @@ export function Terminal(): JSX.Element {
     }
   }, [])
 
-  return (
-    <div
-      style={{
-        ...styles.panel,
-        height: `${panelHeight}px`,
-        display: open ? 'flex' : 'none',
-      }}
-    >
-      {/* drag handle */}
-      <div
-        onMouseDown={onDragMouseDown}
-        style={styles.dragHandle}
+  const renderPane = (pane: 'left' | 'right', paneTabs: typeof tabs, activeId: string | null): JSX.Element => (
+    <div style={styles.pane}>
+      <PaneTabBar
+        pane={pane}
+        tabs={paneTabs}
+        activeTabId={activeId}
+        theme={theme}
+        styles={styles}
+        onSelectTab={setActiveTab}
+        onCloseTab={(id, e) => void handleCloseTab(id, e)}
+        onAddTab={(p) => void handleLaunch(undefined, `Shell ${tabs.length + 1}`, p)}
+        onLaunch={(cmd, label, p) => void handleLaunch(cmd, label, p)}
+        onPopout={(id) => void handlePopout(id)}
+        onRenameTab={renameTab}
       />
-
-      {/* tab bar */}
-      <div style={styles.tabBar}>
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={tab.id === activeTabId ? styles.tabActive : styles.tabInactive}
-          >
-            {tab.label}
-            <span
-              onClick={(e) => void handleCloseTab(tab.id, e)}
-              style={styles.closeBtn}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = theme.red }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = theme.textMuted }}
-            >
-              ✕
-            </span>
-          </div>
-        ))}
-        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, gap: '2px', paddingRight: '4px' }}>
-          <button
-            onClick={handleAddTab}
-            style={styles.addBtn}
-            title="New terminal (PowerShell)"
-          >⌨</button>
-          <button
-            onClick={() => void handleLaunch('claude', 'Claude')}
-            style={{ ...styles.addBtn, fontSize: '11px', fontWeight: 700, color: theme.accent }}
-            title="Launch Claude Code"
-          >◆</button>
-          <button
-            onClick={() => void handleLaunch('codex', 'Codex')}
-            style={{ ...styles.addBtn, fontSize: '11px', fontWeight: 700, color: theme.green }}
-            title="Launch Codex"
-          >⬡</button>
-        </div>
-      </div>
-
-      {/* xterm content area */}
       <div style={styles.contentArea}>
-        {tabs.length === 0 && (
-          <div style={styles.emptyHint}>
-            Press + to open a terminal
-          </div>
+        {paneTabs.length === 0 && (
+          <div style={styles.emptyHint}>Press + to open a terminal</div>
         )}
-        {tabs.map((tab) => (
+        {paneTabs.map((tab) => (
           <TerminalTabView
             key={tab.id}
             tabId={tab.id}
-            active={tab.id === activeTabId}
+            active={tab.id === activeId}
             tabInstancesRef={tabInstancesRef}
           />
         ))}
       </div>
+    </div>
+  )
+
+  return (
+    <div ref={panelRef} style={{ ...styles.panel, height: `${panelHeight}px`, display: open ? 'flex' : 'none' }}>
+      <div onMouseDown={onDragMouseDown} style={styles.dragHandle} />
+
+      {/* Toolbar: only shown when NOT split (split panes have their own tab bars) */}
+      {!splitEnabled && (
+        <PaneTabBar
+          pane="left"
+          tabs={leftTabs}
+          activeTabId={activeTabIdLeft}
+          theme={theme}
+          styles={{ ...styles, paneTabBar: styles.toolbar }}
+          onSelectTab={setActiveTab}
+          onCloseTab={(id, e) => void handleCloseTab(id, e)}
+          onAddTab={() => void handleLaunch(undefined, `Shell ${tabs.length + 1}`, 'left')}
+          onLaunch={(cmd, label) => void handleLaunch(cmd, label, 'left')}
+          onPopout={(id) => void handlePopout(id)}
+          onRenameTab={renameTab}
+        />
+      )}
+
+      {/* Split toggle button — always visible, floated right in the drag handle area */}
+      <div style={{ position: 'absolute', top: '6px', right: '8px', zIndex: 10 }}>
+        <button
+          onClick={handleToggleSplit}
+          title={splitEnabled ? 'Close split' : 'Split pane side-by-side'}
+          style={{
+            background: splitEnabled ? theme.accent : theme.bgSurface0,
+            border: `1px solid ${splitEnabled ? theme.accent : theme.bgSurface1}`,
+            cursor: 'pointer',
+            padding: '3px 6px',
+            borderRadius: '3px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+          }}
+        >
+          {/* Two vertical columns icon */}
+          <span style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+            <span style={{
+              width: '7px', height: '13px',
+              background: splitEnabled ? theme.bgBase : theme.textMuted,
+              borderRadius: '1px', display: 'inline-block',
+            }} />
+            <span style={{
+              width: '7px', height: '13px',
+              background: splitEnabled ? theme.bgBase : theme.textMuted,
+              borderRadius: '1px', display: 'inline-block',
+            }} />
+          </span>
+        </button>
+      </div>
+
+      {/* Content */}
+      {splitEnabled ? (
+        <div style={styles.splitArea}>
+          <div style={{ ...styles.pane, flex: splitRatio }}>
+            {renderPane('left', leftTabs, activeTabIdLeft)}
+          </div>
+          <div
+            style={styles.splitDivider}
+            onMouseDown={(e) => { vDragRef.current = { x: e.clientX, ratio: splitRatio }; e.preventDefault() }}
+          />
+          <div style={{ ...styles.pane, flex: 1 - splitRatio }}>
+            {renderPane('right', rightTabs, activeTabIdRight)}
+          </div>
+        </div>
+      ) : (
+        <div style={styles.contentArea}>
+          {leftTabs.length === 0 && (
+            <div style={styles.emptyHint}>Press + to open a terminal</div>
+          )}
+          {leftTabs.map((tab) => (
+            <TerminalTabView
+              key={tab.id}
+              tabId={tab.id}
+              active={tab.id === activeTabIdLeft}
+              tabInstancesRef={tabInstancesRef}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

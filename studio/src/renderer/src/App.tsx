@@ -1,4 +1,4 @@
-import { Component, useEffect } from 'react'
+import { Component, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useStore } from './store'
 import { HomeScreen } from './components/HomeScreen'
@@ -10,6 +10,8 @@ import { Monitor } from './components/Monitor'
 import { PlanBoard } from './components/PlanBoard'
 import { Settings } from './components/Settings'
 import { Terminal } from './components/Terminal'
+import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
+import { SetupScreen } from './components/SetupScreen'
 import { useTheme } from './useTheme'
 import { darkTheme, lightTheme } from './theme'
 
@@ -50,10 +52,30 @@ function MainPanel(): JSX.Element {
   )
 }
 
-export default function App(): JSX.Element {
+export default function App(): JSX.Element | null {
+  const params = new URLSearchParams(window.location.search)
+  const popoutTabId = params.get('terminal')
+  const popoutLabel = params.get('label') ?? 'Terminal'
+
+  if (popoutTabId) {
+    return <PopoutTerminal tabId={popoutTabId} label={popoutLabel} />
+  }
+
+  return <MainApp />
+}
+
+function MainApp(): JSX.Element | null {
   const projectPath = useStore((s) => s.projectPath)
   const theme = useStore((s) => s.theme)
   const t = useTheme()
+
+  const [setupDone, setSetupDone] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    window.pathly.setup.isNeeded().then((needed: boolean) => {
+      setSetupDone(!needed)
+    })
+  }, [])
 
   useEffect(() => {
     const resolved = theme === 'dark' ? darkTheme : lightTheme
@@ -71,6 +93,12 @@ export default function App(): JSX.Element {
     el.style.setProperty('--red', resolved.red)
     el.style.setProperty('--yellow', resolved.yellow)
   }, [theme])
+
+  if (setupDone === null) return null
+
+  if (!setupDone) {
+    return <SetupScreen onComplete={() => setSetupDone(true)} />
+  }
 
   if (projectPath === '') {
     return (

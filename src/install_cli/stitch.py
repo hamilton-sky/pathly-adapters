@@ -35,6 +35,18 @@ def stitch_skill(core_path: Path, meta_path: Path, *, flows_dest: Path | None = 
     if flows_dest is not None:
         body = body.replace("src/pathly_data/core/flows/", flows_dest.as_posix() + "/")
 
+    # Prepend YAML frontmatter — required by hosts like Codex that identify skills
+    # by reading the frontmatter block at the top of the skill file.
+    description = (
+        meta.get("description")
+        or meta.get("natural_language")
+        or meta.get("invocation")
+        or ""
+    )
+    frontmatter: dict = {"name": meta["skill"], "description": description}
+    fm_str = yaml.dump(frontmatter, default_flow_style=False, allow_unicode=True).strip()
+    body = f"---\n{fm_str}\n---\n\n{body}"
+
     return body
 
 

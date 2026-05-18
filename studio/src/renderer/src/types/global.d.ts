@@ -27,10 +27,16 @@ declare global {
       terminal: {
         spawn: (tabId: string, cwd: string, command?: string) => Promise<void>
         kill: (tabId: string) => Promise<void>
+        popout: (tabId: string, label: string) => Promise<void>
         write: (tabId: string, data: string) => void
         resize: (tabId: string, cols: number, rows: number) => Promise<void>
         onData: (tabId: string, cb: (data: string) => void) => () => void
         onExit: (cb: (tabId: string) => void) => () => void
+      }
+      setup: {
+        isNeeded: () => Promise<boolean>
+        run: () => Promise<{ ok: boolean; error?: string }>
+        onProgress: (cb: (msg: string) => void) => () => void
       }
     }
   }

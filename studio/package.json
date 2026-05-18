@@ -7,7 +7,11 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.web.json"
+    "typecheck": "tsc --noEmit -p tsconfig.web.json",
+    "prepare:resources": "node scripts/prepare-resources.mjs",
+    "build:win": "npm run prepare:resources && npm run build && electron-builder --win",
+    "build:mac": "npm run prepare:resources && npm run build && electron-builder --mac",
+    "build:linux": "npm run prepare:resources && npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -35,6 +39,7 @@
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.1",
     "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
     "electron-vite": "^2.0.0",
     "typescript": "^5.3.3",
     "vite": "^5.0.0"

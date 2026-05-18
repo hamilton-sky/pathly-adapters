@@ -7,6 +7,8 @@ import { registerShellHandlers } from './ipc/shell'
 import { registerTerminalHandlers, killAllPtys } from './ipc/terminal'
 import { spawn, ChildProcess } from 'child_process'
 import net from 'net'
+import { getPythonPath } from './python'
+import { registerSetupHandlers } from './setup'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -21,7 +23,7 @@ function isFsmRunning(): Promise<boolean> {
 }
 
 function startFsmServer(): void {
-  fsmServer = spawn('python', ['-m', 'pathly_orchestrator.http_server'], {
+  fsmServer = spawn(getPythonPath(), ['-m', 'pathly_orchestrator.http_server'], {
     env: { ...process.env },
     stdio: 'pipe'
   })
@@ -112,4 +114,5 @@ function registerIpcHandlers(win: BrowserWindow): void {
   registerMcpHandlers()
   registerShellHandlers(win)
   registerTerminalHandlers(win)
+  registerSetupHandlers()
 }

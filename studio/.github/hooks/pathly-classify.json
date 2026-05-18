@@ -1,0 +1,8 @@
+{
+  "event": "PostToolUse",
+  "command": {
+    "windows": "python C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\classify_feedback.py ",
+    "linux": "python3 C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\classify_feedback.py ",
+    "osx": "python3 C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\classify_feedback.py "
+  }
+}

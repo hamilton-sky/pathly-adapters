@@ -23,7 +23,7 @@ _CLAUDE_ENTRY: dict = {
 
 _CODEX_TOML_BLOCK = (
     f"\n[mcp_servers.{_SERVER_NAME}]\n"
-    'command = "python"\n'
+    f'command = "{sys.executable.replace(chr(92), chr(92)+chr(92))}"\n'
     'args = ["-m", "pathly_telemetry"]\n'
 )
 
@@ -75,11 +75,11 @@ def _install_claude(*, dry_run: bool) -> None:
         return
 
     servers: dict = cfg.setdefault("mcpServers", {})
-    if _SERVER_NAME in servers:
-        return  # already registered
+    if servers.get(_SERVER_NAME) == _CLAUDE_ENTRY:
+        return  # already up to date
 
     if dry_run:
-        print(f"  [dry-run] Would add MCP server '{_SERVER_NAME}' to {path}")
+        print(f"  [dry-run] Would add/update MCP server '{_SERVER_NAME}' in {path}")
         return
 
     servers[_SERVER_NAME] = _CLAUDE_ENTRY
@@ -110,18 +110,25 @@ def _uninstall_claude(*, dry_run: bool) -> None:
 
 
 def _install_codex(*, dry_run: bool) -> None:
+    import re as _re
+
     path = _CODEX_CONFIG
     content = _read_text(path)
     if content is None:
         return
 
     section_header = f"[mcp_servers.{_SERVER_NAME}]"
-    if section_header in content:
-        return  # already registered
+    expected_command = sys.executable.replace("\\", "\\\\")
+    if section_header in content and expected_command in content:
+        return  # already up to date
 
     if dry_run:
-        print(f"  [dry-run] Would add MCP server '{_SERVER_NAME}' to {path}")
+        print(f"  [dry-run] Would add/update MCP server '{_SERVER_NAME}' in {path}")
         return
+
+    if section_header in content:
+        pattern = rf"\n?\[mcp_servers\.{_re.escape(_SERVER_NAME)}\].*?(?=\n\[|\Z)"
+        content = _re.sub(pattern, "", content, flags=_re.DOTALL)
 
     path.write_text(content + _CODEX_TOML_BLOCK, encoding="utf-8")
     print(f"[codex] Registered MCP server '{_SERVER_NAME}' in config.toml")
@@ -172,11 +179,11 @@ def _install_fsm_claude(*, dry_run: bool) -> None:
         return
 
     servers: dict = cfg.setdefault("mcpServers", {})
-    if _FSM_SERVER_NAME in servers:
-        return  # already registered
+    if servers.get(_FSM_SERVER_NAME) == _FSM_CLAUDE_ENTRY:
+        return  # already up to date
 
     if dry_run:
-        print(f"  [dry-run] Would add MCP server '{_FSM_SERVER_NAME}' to {path}")
+        print(f"  [dry-run] Would add/update MCP server '{_FSM_SERVER_NAME}' in {path}")
         return
 
     servers[_FSM_SERVER_NAME] = _FSM_CLAUDE_ENTRY
@@ -204,18 +211,27 @@ def _uninstall_fsm_claude(*, dry_run: bool) -> None:
 
 
 def _install_fsm_codex(*, dry_run: bool) -> None:
+    import re as _re
+
     path = _CODEX_CONFIG
     content = _read_text(path)
     if content is None:
         return
 
     section_header = f"[mcp_servers.{_FSM_SERVER_NAME}]"
-    if section_header in content:
-        return  # already registered
+    expected_command = sys.executable.replace("\\", "\\\\")
+    # Already up to date when both the header and the correct command are present.
+    if section_header in content and expected_command in content:
+        return
 
     if dry_run:
-        print(f"  [dry-run] Would add MCP server '{_FSM_SERVER_NAME}' to {path}")
+        print(f"  [dry-run] Would add/update MCP server '{_FSM_SERVER_NAME}' in {path}")
         return
+
+    # Remove any existing (possibly stale) section before re-appending.
+    if section_header in content:
+        pattern = rf"\n?\[mcp_servers\.{_re.escape(_FSM_SERVER_NAME)}\].*?(?=\n\[|\Z)"
+        content = _re.sub(pattern, "", content, flags=_re.DOTALL)
 
     path.write_text(content + _FSM_CODEX_TOML_BLOCK, encoding="utf-8")
     print(f"[codex] Registered MCP server '{_FSM_SERVER_NAME}' in config.toml")

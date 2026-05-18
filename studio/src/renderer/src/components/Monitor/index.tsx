@@ -40,18 +40,13 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       color: t.textMuted,
       fontSize: '15px'
     },
-    sourceBadge: {
-      padding: '4px 12px',
-      fontSize: '12px',
-      flexShrink: 0
-    },
     header: {
       backgroundColor: t.bgSurface0,
       borderBottom: `1px solid ${t.bgSurface1}`,
       padding: '8px 12px',
       flexShrink: 0,
-      fontFamily: 'monospace',
-      fontSize: '12px',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontSize: '13px',
       lineHeight: '1.6',
       color: t.textSecondary
     },
@@ -77,23 +72,27 @@ function HeaderBar(): JSX.Element {
     ? truncate(fsmState.feature as string, 32)
     : activeTopic ? truncate(activeTopic, 32) : '—'
   const state = fsmState?.current ?? '—'
-  const conv = fsmState?.current_conversation != null
-    ? String(fsmState.current_conversation)
-    : '—'
+  const conv = fsmState?.conv != null
+    ? String(fsmState.conv)
+    : fsmState?.current_conversation != null
+      ? String(fsmState.current_conversation)
+      : '—'
 
   const lastAgentEvent = [...events].reverse().find((e) => e.type === 'AGENT_SPAWNED')
   const agent = lastAgentEvent?.agent ?? '—'
 
   return (
     <div style={styles.header}>
-      <div style={styles.headerTitle}>
-        Pathly&nbsp;&nbsp;·&nbsp;&nbsp;{flow}&nbsp;&nbsp;·&nbsp;&nbsp;{topic}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <div style={styles.headerTitle}>
+          Pathly&nbsp;&nbsp;·&nbsp;&nbsp;{flow}&nbsp;&nbsp;·&nbsp;&nbsp;{topic}
+        </div>
       </div>
       <div style={styles.headerRow}>
-        <span>State : {state}</span>
-        <span>Conv : {conv}</span>
+        <span><span style={{ color: t.textMuted }}>State</span>&nbsp;&nbsp;{state}</span>
+        <span><span style={{ color: t.textMuted }}>Conv</span>&nbsp;&nbsp;{conv}</span>
+        <span><span style={{ color: t.textMuted }}>Agent</span>&nbsp;&nbsp;{agent}</span>
       </div>
-      <div>Agent : {agent}</div>
     </div>
   )
 }
@@ -103,7 +102,6 @@ export function Monitor(): JSX.Element {
     projectPath,
     activeTopic,
     events,
-    monitorSource,
     setMonitorSource,
     setFsmState,
     setEvents,
@@ -225,14 +223,9 @@ export function Monitor(): JSX.Element {
     )
   }
 
-  const sourceBadge = monitorSource === 'sse'
-    ? <span style={{ ...styles.sourceBadge, color: t.green }}>● Live</span>
-    : <span style={{ ...styles.sourceBadge, color: t.textMuted }}>○ File watch</span>
-
   return (
     <div style={styles.panel}>
       <HeaderBar />
-      {sourceBadge}
       <FsmView />
       <EventLog />
     </div>

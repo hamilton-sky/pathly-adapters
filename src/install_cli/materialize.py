@@ -54,16 +54,16 @@ def deploy_codex_hooks(*, dry_run: bool = False) -> list[str]:
     config_toml = Path.home() / ".codex" / "config.toml"
     if config_toml.exists():
         content = config_toml.read_text(encoding="utf-8")
-        if "codex_hooks = true" not in content:
+        if "hooks = true" not in content:
             print(
                 "  [note] ~/.codex/config.toml exists but lacks "
-                "[features]\\ncodex_hooks = true — hooks may not fire.",
+                "[features]\\nhooks = true — hooks may not fire.",
                 file=sys.stderr,
             )
     else:
         print(
             "  [note] ~/.codex/config.toml not found — add "
-            "[features]\\ncodex_hooks = true to enable hooks.",
+            "[features]\\nhooks = true to enable hooks.",
             file=sys.stderr,
         )
 
@@ -171,21 +171,25 @@ def remove_copilot_hooks(dest: Path = None, *, dry_run: bool = False) -> list[st
 # ---------------------------------------------------------------------------
 
 def deploy_claude_hooks(*, dry_run: bool = False) -> list[str]:
-    """Write ~/.claude/settings.json with Pathly post_tool_call hook entries.
+    """Write ~/.claude/settings.json with Pathly PostToolUse hook entries.
 
-    Merges into any existing settings.json — only the 'hooks' key is touched.
+    Merges into any existing settings.json — only the 'hooks.PostToolUse' entry
+    is touched (Pathly commands are identified by a comment sentinel in the list).
     Returns list of paths that were (or would be) written.
     """
     settings_file = Path.home() / ".claude" / "settings.json"
-    pathly_hooks = {
-        "classify_feedback": {
-            "event": "post_tool_call",
-            "script": str(_hook_script_path("classify_feedback.py")),
-        },
-        "inject_feedback_ttl": {
-            "event": "post_tool_call",
-            "script": str(_hook_script_path("inject_feedback_ttl.py")),
-        },
+
+    # Forward slashes required: Claude Code runs hooks via sh (Git Bash) on
+    # Windows, which consumes backslashes.  Python on Windows accepts / equally.
+    classify_cmd = "python " + _hook_script_path("classify_feedback.py").as_posix()
+    ttl_cmd      = "python " + _hook_script_path("inject_feedback_ttl.py").as_posix()
+
+    pathly_hook_block = {
+        "_pathly": True,
+        "hooks": [
+            {"type": "command", "command": classify_cmd},
+            {"type": "command", "command": ttl_cmd},
+        ],
     }
 
     if dry_run:
@@ -198,12 +202,15 @@ def deploy_claude_hooks(*, dry_run: bool = False) -> list[str]:
         except (json.JSONDecodeError, OSError):
             existing = {}
 
-    # Initialize hooks dict if not present
-    if "hooks" not in existing:
-        existing["hooks"] = {}
+    hooks: dict = existing.setdefault("hooks", {})
+    post_tool_use: list = hooks.setdefault("PostToolUse", [])
 
-    # Merge pathly hooks into the hooks section
-    existing["hooks"].update(pathly_hooks)
+    # Remove any stale Pathly entries (keyed by "_pathly" sentinel or old format).
+    hooks.pop("classify_feedback", None)
+    hooks.pop("inject_feedback_ttl", None)
+    post_tool_use[:] = [e for e in post_tool_use if not e.get("_pathly")]
+
+    post_tool_use.append(pathly_hook_block)
 
     settings_file.parent.mkdir(parents=True, exist_ok=True)
     settings_file.write_text(json.dumps(existing, indent=2), encoding="utf-8")
@@ -212,7 +219,7 @@ def deploy_claude_hooks(*, dry_run: bool = False) -> list[str]:
 
 
 def remove_claude_hooks(*, dry_run: bool = False) -> list[str]:
-    """Remove the 'classify_feedback' and 'inject_feedback_ttl' keys from ~/.claude/settings.json.
+    """Remove Pathly hook entries from ~/.claude/settings.json.
 
     Returns list of paths affected.
     """
@@ -228,15 +235,19 @@ def remove_claude_hooks(*, dry_run: bool = False) -> list[str]:
     except (json.JSONDecodeError, OSError):
         return []
 
-    if "hooks" not in existing:
-        return []
+    hooks: dict = existing.get("hooks", {})
 
-    # Remove pathly hooks
-    existing["hooks"].pop("classify_feedback", None)
-    existing["hooks"].pop("inject_feedback_ttl", None)
+    # Remove old-style named entries.
+    hooks.pop("classify_feedback", None)
+    hooks.pop("inject_feedback_ttl", None)
 
-    # If hooks dict is now empty, remove it entirely
-    if not existing["hooks"]:
+    # Remove Pathly entry from PostToolUse list.
+    if "PostToolUse" in hooks:
+        hooks["PostToolUse"] = [e for e in hooks["PostToolUse"] if not e.get("_pathly")]
+        if not hooks["PostToolUse"]:
+            hooks.pop("PostToolUse")
+
+    if not hooks:
         existing.pop("hooks", None)
 
     settings_file.write_text(json.dumps(existing, indent=2), encoding="utf-8")
