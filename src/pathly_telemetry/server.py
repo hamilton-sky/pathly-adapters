@@ -72,7 +72,15 @@ def _read_message() -> dict | None:
                 return None  # EOF
             line = raw.decode("utf-8", errors="replace").strip()
             if not line:
-                break  # blank line ends headers
+                if not headers:
+                    continue  # skip leading blank lines
+                break
+            if line.startswith("{"):
+                try:
+                    return json.loads(line)
+                except json.JSONDecodeError:
+                    pass
+                return None
             if ":" in line:
                 key, _, val = line.partition(":")
                 headers[key.strip().lower()] = val.strip()

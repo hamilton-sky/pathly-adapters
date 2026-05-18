@@ -339,7 +339,17 @@ def _read_message() -> dict | None:
                 return None  # EOF
             line = raw.decode("utf-8", errors="replace").strip()
             if not line:
-                break  # blank line ends headers
+                # Blank line: check if we got Content-Length headers
+                if not headers:
+                    continue  # skip leading blank lines
+                break
+            # Fallback: if the first line is already JSON, parse it directly
+            if line.startswith("{"):
+                try:
+                    return json.loads(line)
+                except json.JSONDecodeError:
+                    pass
+                return None
             if ":" in line:
                 key, _, val = line.partition(":")
                 headers[key.strip().lower()] = val.strip()
@@ -440,13 +450,6 @@ def run() -> None:
 
 def main() -> None:
     import os, datetime, traceback
-    # On Windows, stdin/stdout are opened in text mode by the C runtime.
-    # Force binary mode so the Content-Length framing is not corrupted by CRLF translation.
-    if sys.platform == "win32":
-        import msvcrt
-        msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-
     log_path = os.path.join(os.path.expanduser("~"), ".claude", "pathly-fsm-startup.log")
     def _log(msg: str) -> None:
         try:
@@ -455,10 +458,12 @@ def main() -> None:
         except Exception:
             pass
 
-    # Patch _read_message and _send to trace each message
-    import pathly_orchestrator.mcp_server as _self
-    _orig_read = _self._read_message
-    _orig_send = _self._send
+    # Patch via globals() so run() (which shares this module's __dict__) picks it up.
+    # Using `import pathly_orchestrator.mcp_server` doesn't work when running as __main__
+    # because that gives a different module object than the one run() was defined in.
+    _g = globals()
+    _orig_read = _g["_read_message"]
+    _orig_send = _g["_send"]
     def _traced_read():
         msg = _orig_read()
         _log(f"recv: {msg.get('method') if msg else 'EOF'}")
@@ -466,8 +471,8 @@ def main() -> None:
     def _traced_send(obj):
         _log(f"send: id={obj.get('id')} result_keys={list(obj.get('result', {}).keys()) if isinstance(obj.get('result'), dict) else '?'}")
         _orig_send(obj)
-    _self._read_message = _traced_read
-    _self._send = _traced_send
+    _g["_read_message"] = _traced_read
+    _g["_send"] = _traced_send
 
     _log(f"startup pid={os.getpid()} cwd={os.getcwd()} stdin_isatty={sys.stdin.isatty()}")
     try:
