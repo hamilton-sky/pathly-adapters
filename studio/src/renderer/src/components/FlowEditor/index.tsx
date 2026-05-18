@@ -1,163 +1,36 @@
-import { useEffect, useRef, useState } from 'react'
-import * as jsYaml from 'js-yaml'
+import { useState } from 'react'
 import { useStore } from '../../store'
-import { readFile, writeFile } from '../../services/pathlyApi'
 import { useTheme } from '../../useTheme'
-import type { Theme } from '../../theme'
-import type { FlowYaml } from '../../types'
+import { makeFlowEditorStyles } from './FlowEditor.styles'
+import { useFlowFile } from './hooks/useFlowFile'
 import { VisualView } from './VisualView'
 import { YamlView } from './YamlView'
 
 type TabMode = 'visual' | 'yaml'
 
-function makeStyles(t: Theme): Record<string, React.CSSProperties> {
-  return {
-    panel: {
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: t.bgBase,
-      overflow: 'hidden'
-    },
-    toolbar: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      padding: '6px 12px',
-      backgroundColor: t.bgMantle,
-      borderBottom: `1px solid ${t.bgSurface0}`,
-      flexShrink: 0
-    },
-    tabs: {
-      display: 'flex',
-      gap: '4px'
-    },
-    tab: {
-      background: 'none',
-      border: `1px solid ${t.bgSurface1}`,
-      borderRadius: '4px',
-      color: t.textSecondary,
-      cursor: 'pointer',
-      padding: '3px 10px',
-      fontSize: '12px'
-    },
-    tabActive: {
-      background: t.bgSurface0,
-      border: `1px solid ${t.accent}`,
-      borderRadius: '4px',
-      color: t.accent,
-      cursor: 'pointer',
-      padding: '3px 10px',
-      fontSize: '12px'
-    },
-    error: {
-      color: t.red,
-      fontSize: '12px'
-    },
-    content: {
-      flex: 1,
-      display: 'flex',
-      overflow: 'hidden'
-    },
-    message: {
-      color: t.textMuted,
-      fontSize: '15px',
-      margin: 'auto'
-    }
-  }
-}
-
 export function FlowEditor(): JSX.Element {
   const { selectedItem, markDirty, clearDirty } = useStore()
   const t = useTheme()
-  const styles = makeStyles(t)
-  const [flowData, setFlowData] = useState<FlowYaml | null>(null)
-  const [rawYaml, setRawYaml] = useState('')
+  const styles = makeFlowEditorStyles(t)
   const [tab, setTab] = useState<TabMode>('visual')
-  const [loading, setLoading] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [yamlSyncContent, setYamlSyncContent] = useState<string | null>(null)
-  const prevTabRef = useRef<TabMode>('visual')
 
-  useEffect(() => {
-    if (!selectedItem) return
-    setLoading(true)
-    setSaveError(null)
-    setTab('visual')
-    prevTabRef.current = 'visual'
-    setYamlSyncContent(null)
-    readFile(selectedItem.path)
-      .then((content) => {
-        setRawYaml(content ?? '')
-        try {
-          const parsed = jsYaml.load(content ?? '') as FlowYaml
-          setFlowData(parsed)
-        } catch {
-          setFlowData(null)
-        }
-      })
-      .catch(() => {
-        setRawYaml('')
-        setFlowData(null)
-      })
-      .finally(() => setLoading(false))
-  }, [selectedItem?.path])
+  const {
+    flowData,
+    rawYaml,
+    loading,
+    saveError,
+    yamlSyncContent,
+    handleTabSwitch,
+    handleVisualChange,
+    handleYamlParsed,
+    handleYamlContentChange,
+    handleVisualSave,
+    handleYamlSave
+  } = useFlowFile(selectedItem, markDirty, clearDirty)
 
-  function handleTabSwitch(next: TabMode): void {
-    if (next === tab) return
-    if (next === 'yaml' && flowData) {
-      const serialized = jsYaml.dump(flowData, { lineWidth: 120 })
-      setRawYaml(serialized)
-      setYamlSyncContent(serialized)
-    } else if (next === 'visual' && rawYaml) {
-      try {
-        const parsed = jsYaml.load(rawYaml) as FlowYaml
-        setFlowData(parsed)
-        setYamlSyncContent(null)
-      } catch {
-        setSaveError('Fix YAML errors before switching to Visual view')
-        return
-      }
-    }
-    prevTabRef.current = tab
-    setTab(next)
-  }
-
-  function handleVisualChange(updated: FlowYaml): void {
-    setFlowData(updated)
-    if (selectedItem) markDirty(selectedItem.path)
-  }
-
-  function handleYamlParsed(parsed: FlowYaml): void {
-    setFlowData(parsed)
-  }
-
-  function handleYamlContentChange(): void {
-    if (selectedItem) markDirty(selectedItem.path)
-  }
-
-  async function handleVisualSave(): Promise<void> {
-    if (!selectedItem || !flowData) return
-    setSaveError(null)
-    const content = jsYaml.dump(flowData, { lineWidth: 120 })
-    try {
-      await writeFile(selectedItem.path, content)
-      clearDirty(selectedItem.path)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  async function handleYamlSave(content: string): Promise<void> {
-    if (!selectedItem) return
-    setSaveError(null)
-    try {
-      await writeFile(selectedItem.path, content)
-      setRawYaml(content)
-      clearDirty(selectedItem.path)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err))
-    }
+  function onTabClick(next: TabMode): void {
+    const resolved = handleTabSwitch(next, tab)
+    setTab(resolved)
   }
 
   if (loading) {
@@ -190,13 +63,13 @@ export function FlowEditor(): JSX.Element {
         <div style={styles.tabs}>
           <button
             style={tab === 'visual' ? styles.tabActive : styles.tab}
-            onClick={() => handleTabSwitch('visual')}
+            onClick={() => onTabClick('visual')}
           >
             Visual
           </button>
           <button
             style={tab === 'yaml' ? styles.tabActive : styles.tab}
-            onClick={() => handleTabSwitch('yaml')}
+            onClick={() => onTabClick('yaml')}
           >
             YAML
           </button>

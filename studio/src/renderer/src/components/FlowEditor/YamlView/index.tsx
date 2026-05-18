@@ -3,9 +3,9 @@ import { EditorView, basicSetup } from 'codemirror'
 import { yaml } from '@codemirror/lang-yaml'
 import { EditorState } from '@codemirror/state'
 import * as jsYaml from 'js-yaml'
-import { useTheme } from '../../useTheme'
-import type { Theme } from '../../theme'
-import type { FlowYaml } from '../../types'
+import { useTheme } from '../../../useTheme'
+import type { FlowYaml } from '../../../types'
+import { makeYamlViewStyles } from './YamlView.styles'
 
 interface Props {
   initialContent: string
@@ -15,63 +15,9 @@ interface Props {
   syncContent?: string | null
 }
 
-function makeStyles(t: Theme): Record<string, React.CSSProperties> {
-  return {
-    wrapper: {
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden'
-    },
-    errorBanner: {
-      backgroundColor: `${t.red}33`,
-      borderBottom: `1px solid ${t.red}`,
-      padding: '6px 12px',
-      flexShrink: 0
-    },
-    errorText: {
-      color: t.red,
-      fontSize: '12px',
-      fontFamily: 'monospace'
-    },
-    toolbar: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      padding: '6px 12px',
-      backgroundColor: t.bgMantle,
-      borderBottom: `1px solid ${t.bgSurface0}`,
-      flexShrink: 0
-    },
-    saveBtn: {
-      background: t.accent,
-      border: 'none',
-      borderRadius: '4px',
-      color: t.bgBase,
-      cursor: 'pointer',
-      padding: '4px 14px',
-      fontSize: '13px',
-      fontWeight: 600
-    },
-    saveBtnDisabled: {
-      background: t.bgSurface1,
-      border: 'none',
-      borderRadius: '4px',
-      color: t.textMuted,
-      cursor: 'not-allowed',
-      padding: '4px 14px',
-      fontSize: '13px',
-      fontWeight: 600
-    },
-    editor: {
-      flex: 1,
-      overflow: 'auto'
-    }
-  }
-}
-
 export function YamlView({ initialContent, onParsed, onDirty, onSave, syncContent }: Props): JSX.Element {
   const t = useTheme()
-  const styles = makeStyles(t)
+  const styles = makeYamlViewStyles(t)
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
