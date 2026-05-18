@@ -63,3 +63,11 @@
 {"type":"AGENT_DONE","agent":"retro","model":"claude-sonnet-4-6","result":"DONE","ts":"2026-05-18T12:28:56.557Z"}
 {"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "ts": "2026-05-18T12:29:04.285464"}
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":6,"result":"DONE","tokens_in":0,"tokens_out":0,"cost_usd":0,"tool_uses":23,"wall_seconds":196,"ts":"2026-05-19T00:00:00Z"}
+{"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":6,"result":"PASS","tokens_in":0,"tokens_out":0,"cost_usd":0,"tool_uses":6,"wall_seconds":47,"ts":"2026-05-19T00:00:00Z"}
+{"type":"IMPLEMENT_COMPLETE","ts":"2026-05-19T00:00:00Z"}
+{"type":"FILE_CREATED","file":"TEST_FAILURES.md","ts":"2026-05-19T00:00:00Z"}
+{"type":"FILE_DELETED","file":"TEST_FAILURES.md","ts":"2026-05-19T00:00:00Z"}
+{"type":"RETRY","key":"conv-6:TEST_FAILURES.md","ts":"2026-05-19T00:00:00Z"}
+{"type":"AGENT_DONE","agent":"tester","model":"claude-sonnet-4-6","conversation":6,"result":"PASS","tokens_in":0,"tokens_out":0,"cost_usd":0,"tool_uses":1,"wall_seconds":14,"ts":"2026-05-19T00:00:00Z"}
+{"type":"AGENT_DONE","agent":"quick","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":0,"tokens_out":0,"cost_usd":0,"tool_uses":2,"wall_seconds":7,"ts":"2026-05-19T00:00:00Z"}
+{"type":"STATE_TRANSITION","from":"RETRO","to":"DONE","ts":"2026-05-19T00:00:00Z"}

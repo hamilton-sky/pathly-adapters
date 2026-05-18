@@ -110,6 +110,16 @@ function registerIpcHandlers(win: BrowserWindow): void {
 
   ipcMain.handle('clipboard:read', () => clipboard.readText())
   ipcMain.handle('clipboard:write', (_event, text: string) => { clipboard.writeText(text) })
+  ipcMain.handle('clipboard:readImagePath', async () => {
+    const img = clipboard.readImage()
+    if (img.isEmpty()) return null
+    const os = await import('os')
+    const fsSync = await import('fs')
+    const { join } = await import('path')
+    const tmpPath = join(os.tmpdir(), `pathly-img-${Date.now()}.png`)
+    fsSync.writeFileSync(tmpPath, img.toPNG())
+    return tmpPath
+  })
 
   registerFsHandlers()
   registerWatcherHandlers(win)

@@ -132,7 +132,7 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
         {unknownKeys.map((k) => (
           <div key={k} className={styles.row}>
             <span className={styles.label}>{k}</span>
-            <span className={styles.unknownValue}>{String((values as Record<string, unknown>)[k])}</span>
+            <span className={styles.unknownValue}>{String((values as unknown as Record<string, unknown>)[k])}</span>
           </div>
         ))}
       </div>

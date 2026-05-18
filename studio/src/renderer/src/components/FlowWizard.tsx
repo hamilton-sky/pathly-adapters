@@ -44,19 +44,6 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       borderBottom: `1px solid ${t.bgSurface0}`,
       flexShrink: 0
     },
-    stepDot: (active: boolean, done: boolean): React.CSSProperties => ({
-      width: '28px',
-      height: '28px',
-      borderRadius: '50%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '13px',
-      fontWeight: 600,
-      backgroundColor: done ? t.green : active ? t.accent : t.bgSurface0,
-      color: done || active ? t.bgBase : t.textMuted,
-      flexShrink: 0
-    }),
     stepConnector: {
       flex: 1,
       height: '1px',
@@ -341,6 +328,22 @@ function generateYaml(
   return lines.join('\n')
 }
 
+function stepDotStyle(t: Theme, active: boolean, done: boolean): React.CSSProperties {
+  return {
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '13px',
+    fontWeight: 600,
+    backgroundColor: done ? t.green : active ? t.accent : t.bgSurface0,
+    color: done || active ? t.bgBase : t.textMuted,
+    flexShrink: 0
+  }
+}
+
 export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const { projectPath } = useStore()
   const t = useTheme()
@@ -467,9 +470,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
             <>
               <div
                 key={n}
-                style={typeof styles.stepDot === 'function'
-                  ? styles.stepDot(step === n, step > n)
-                  : {}}
+                style={stepDotStyle(t, step === n, step > n)}
               >
                 {step > n ? '✓' : n}
               </div>

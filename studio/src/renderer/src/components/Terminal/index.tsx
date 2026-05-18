@@ -240,9 +240,16 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
         if (sel) { clipWrite(sel); return false }
         return true
       }
-      // Ctrl+V → paste from clipboard
+      // Ctrl+V → paste from clipboard (image takes priority)
       if (event.ctrlKey && !event.shiftKey && event.key === 'v') {
-        clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
+        void (async () => {
+          const imgPath = await window.pathly?.clipboard?.readImagePath()
+          if (imgPath) {
+            void window.pathly?.terminal?.write(tabId, imgPath)
+          } else {
+            clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
+          }
+        })()
         return false
       }
       // Ctrl+Shift+C → copy selection (always, no SIGINT ambiguity)
@@ -251,9 +258,16 @@ function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProp
         if (sel) clipWrite(sel)
         return false
       }
-      // Ctrl+Shift+V → paste from clipboard
+      // Ctrl+Shift+V → paste from clipboard (image takes priority)
       if (event.ctrlKey && event.shiftKey && event.key === 'V') {
-        clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
+        void (async () => {
+          const imgPath = await window.pathly?.clipboard?.readImagePath()
+          if (imgPath) {
+            void window.pathly?.terminal?.write(tabId, imgPath)
+          } else {
+            clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
+          }
+        })()
         return false
       }
       return true

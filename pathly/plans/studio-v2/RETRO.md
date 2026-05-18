@@ -42,5 +42,21 @@
 
 ## Numbers
 
-- 7 conversations, 11 stories scoped, 9 delivered, 2 pending (S9, S11).
+- 7 conversations, 11 stories scoped, 11 delivered (S9 + S11 completed in follow-up Conv 6 pass).
 - Files touched across main, preload, renderer, and Python orchestrator layers.
+
+---
+
+## Conv 6 follow-up (2026-05-19)
+
+**S9 and S11 delivered and verified.**
+
+- EventLog.tsx: raw `JSON.stringify` per-event display with color-coding by type
+- runner.py: `tool_uses` count patched into AGENT_DONE events
+- TypeScript typecheck clean (ES2021 target, clipboard types, CSS module declarations)
+- FSM git automation workaround: CRLF warnings misread as hard errors — committed manually
+
+**Lessons extracted:**
+- Validate git CRLF/commit automation early, not at delivery
+- Lock TypeScript target/lib matrix at feature start to catch ES version mismatches in planning
+- Establish cosmetic acceptance criteria before coding to reduce review noise

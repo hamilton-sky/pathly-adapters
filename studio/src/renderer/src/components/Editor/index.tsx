@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import { readFile, writeFile } from '../../services/pathlyApi'
-import { ConfigForm, FrontmatterValues } from './ConfigForm'
+import type { FrontmatterValues } from '../../types'
+import { ConfigForm } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
 import styles from './index.module.css'
@@ -11,16 +12,16 @@ type TabMode = 'edit' | 'preview' | 'split'
 // ── Frontmatter parsing / serialization ────────────────────────────────────
 
 function parseFrontmatter(raw: string): { config: FrontmatterValues; body: string } {
-  if (!raw.startsWith('---')) return { config: {}, body: raw }
+  if (!raw.startsWith('---')) return { config: {} as FrontmatterValues, body: raw }
   const end = raw.indexOf('\n---', 3)
-  if (end === -1) return { config: {}, body: raw }
+  if (end === -1) return { config: {} as FrontmatterValues, body: raw }
   const config = parseSimpleYaml(raw.slice(4, end).trim())
   const body = raw.slice(end + 4).replace(/^\n/, '')
   return { config, body }
 }
 
 function parseSimpleYaml(text: string): FrontmatterValues {
-  const result: FrontmatterValues = {}
+  const result: Record<string, unknown> = {}
   const lines = text.split('\n')
   let i = 0
   while (i < lines.length) {
@@ -45,7 +46,7 @@ function parseSimpleYaml(text: string): FrontmatterValues {
     }
     i++
   }
-  return result
+  return result as unknown as FrontmatterValues
 }
 
 function serializeFrontmatter(config: FrontmatterValues): string {
@@ -67,7 +68,7 @@ function serializeFrontmatter(config: FrontmatterValues): string {
 export function Editor(): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
 
-  const [config, setConfig] = useState<FrontmatterValues>({})
+  const [config, setConfig] = useState<FrontmatterValues>({} as FrontmatterValues)
   const [body, setBody]     = useState('')
   const [tab, setTab]       = useState<TabMode>('edit')
   const [loading, setLoading]     = useState(false)
@@ -90,7 +91,7 @@ export function Editor(): JSX.Element {
         setConfig(parsed.config)
         setBody(parsed.body)
       })
-      .catch(() => { setConfig({}); setBody('') })
+      .catch(() => { setConfig({} as FrontmatterValues); setBody('') })
       .finally(() => setLoading(false))
   }, [selectedItem?.path])
 

@@ -57,7 +57,8 @@ contextBridge.exposeInMainWorld('pathly', {
   },
   clipboard: {
     read: (): Promise<string> => ipcRenderer.invoke('clipboard:read'),
-    write: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text)
+    write: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text),
+    readImagePath: (): Promise<string | null> => ipcRenderer.invoke('clipboard:readImagePath'),
   },
   setup: {
     isNeeded: (): Promise<boolean> => ipcRenderer.invoke('setup:isNeeded'),
@@ -106,6 +107,7 @@ declare global {
       clipboard: {
         read: () => Promise<string>
         write: (text: string) => Promise<void>
+        readImagePath: () => Promise<string | null>
       }
       setup: {
         isNeeded: () => Promise<boolean>

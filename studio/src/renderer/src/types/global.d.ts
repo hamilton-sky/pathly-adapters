@@ -38,6 +38,11 @@ declare global {
         run: () => Promise<{ ok: boolean; error?: string }>
         onProgress: (cb: (msg: string) => void) => () => void
       }
+      clipboard: {
+        read: () => Promise<string>
+        write: (text: string) => Promise<void>
+        readImagePath: () => Promise<string | null>
+      }
     }
   }
 }
