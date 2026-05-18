@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
-import { useTheme } from '../../useTheme'
+import { darkTheme } from '../../theme'
 import type { TabInstance } from './types'
 import { TerminalTabView } from './TerminalTabView'
 import { PaneTabBar } from './PaneTabBar'
@@ -13,7 +13,8 @@ export function Terminal(): JSX.Element {
     toggle, addTab, closeTab, setActiveTab, renameTab, toggleSplit,
   } = useTerminalStore()
   const projectPath = useStore((s) => s.projectPath)
-  const theme = useTheme()
+  // Terminal panel always uses dark theme — terminal stays dark regardless of app theme
+  const theme = darkTheme
   const [panelHeight, setPanelHeight] = useState(260)
   const [splitRatio, setSplitRatio] = useState(0.5)
   const panelRef = useRef<HTMLDivElement>(null)

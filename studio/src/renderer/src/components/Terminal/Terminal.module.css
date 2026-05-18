@@ -150,6 +150,13 @@
   color: var(--t-text-muted);
   line-height: 1;
   flex-shrink: 0;
+  outline: none;
+}
+
+.closeTabBtn:focus-visible {
+  outline: 1px solid var(--t-accent);
+  outline-offset: -2px;
+  border-radius: 2px;
 }
 
 .closeTabBtn:hover {
@@ -177,11 +184,18 @@
   height: 100%;
   line-height: 1;
   flex-shrink: 0;
+  outline: none;
 }
 
 .iconBtn:hover {
   color: var(--t-text);
   background: var(--t-surface0);
+}
+
+.iconBtn:focus-visible {
+  outline: 1px solid var(--t-accent);
+  outline-offset: -2px;
+  border-radius: 3px;
 }
 
 .iconBtnClaude {

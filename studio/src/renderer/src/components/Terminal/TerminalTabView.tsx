@@ -2,62 +2,35 @@ import { useEffect, useRef } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { TabInstance } from './types'
-import { useTheme } from '../../useTheme'
 import { darkTheme } from '../../theme'
-import type { Theme } from '../../theme'
 import styles from './Terminal.module.css'
 
-function xtermThemeFor(t: Theme, isDark: boolean): Record<string, string> {
-  if (isDark) {
-    return {
-      background:            t.bgMantle,
-      foreground:            t.textPrimary,
-      cursor:                t.accent,
-      cursorAccent:          t.bgMantle,
-      selectionBackground:   t.bgSurface1,
-      selectionForeground:   t.textPrimary,
-      black:                 t.bgSurface0,
-      red:                   t.red,
-      green:                 t.green,
-      yellow:                t.yellow,
-      blue:                  t.blue,
-      magenta:               t.accent,
-      cyan:                  '#67e8f9',
-      white:                 '#cdd6f4',
-      brightBlack:           t.textMuted,
-      brightRed:             '#fca5a5',
-      brightGreen:           '#86efac',
-      brightYellow:          '#fde68a',
-      brightBlue:            '#93c5fd',
-      brightMagenta:         '#c4b5fd',
-      brightCyan:            '#a5f3fc',
-      brightWhite:           '#f5f5ff',
-    }
-  } else {
-    return {
-      background:            t.bgMantle,
-      foreground:            t.textPrimary,
-      cursor:                t.accent,
-      cursorAccent:          t.bgMantle,
-      selectionBackground:   t.bgSurface1,
-      selectionForeground:   t.textPrimary,
-      black:                 '#1e1e3a',
-      red:                   t.red,
-      green:                 t.green,
-      yellow:                '#b45309',
-      blue:                  '#1d4ed8',
-      magenta:               t.accent,
-      cyan:                  '#0e7490',
-      white:                 t.textSecondary,
-      brightBlack:           t.textMuted,
-      brightRed:             '#ef4444',
-      brightGreen:           '#22c55e',
-      brightYellow:          t.yellow,
-      brightBlue:            t.blue,
-      brightMagenta:         '#9333ea',
-      brightCyan:            '#06b6d4',
-      brightWhite:           '#f5f5ff',
-    }
+// Terminal is always dark regardless of app theme (industry standard: VS Code, etc.)
+function xtermThemeFor(): Record<string, string> {
+  const t = darkTheme
+  return {
+    background:            t.bgMantle,
+    foreground:            t.textPrimary,
+    cursor:                t.accent,
+    cursorAccent:          t.bgMantle,
+    selectionBackground:   t.bgSurface1,
+    selectionForeground:   t.textPrimary,
+    black:                 t.bgSurface0,
+    red:                   t.red,
+    green:                 t.green,
+    yellow:                t.yellow,
+    blue:                  t.blue,
+    magenta:               t.accent,
+    cyan:                  '#67e8f9',
+    white:                 '#cdd6f4',
+    brightBlack:           t.textMuted,
+    brightRed:             '#fca5a5',
+    brightGreen:           '#86efac',
+    brightYellow:          '#fde68a',
+    brightBlue:            '#93c5fd',
+    brightMagenta:         '#c4b5fd',
+    brightCyan:            '#a5f3fc',
+    brightWhite:           '#f5f5ff',
   }
 }
 
@@ -69,13 +42,19 @@ interface TerminalTabViewProps {
 
 export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
-  const t = useTheme()
-  const isDark = t === darkTheme
+
+  // Force dark theme on any existing instance (e.g. created before dark-only change)
+  useEffect(() => {
+    const instance = tabInstancesRef.current.get(tabId)
+    if (instance) {
+      instance.xterm.options.theme = xtermThemeFor() as any
+    }
+  }, [tabId, tabInstancesRef])
 
   useEffect(() => {
     if (!tabInstancesRef.current.has(tabId)) {
       const xterm = new XTerm({
-        theme: xtermThemeFor(t, isDark) as any,
+        theme: xtermThemeFor() as any,
         fontSize: 14,
         fontFamily: "'Cascadia Code', 'Fira Mono', 'JetBrains Mono', monospace",
         cursorBlink: true,
@@ -111,13 +90,6 @@ export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabV
     }
   }, [tabId, tabInstancesRef])
 
-  // Update xterm theme when Pathly theme changes
-  useEffect(() => {
-    const instance = tabInstancesRef.current.get(tabId)
-    if (instance) {
-      instance.xterm.options.theme = xtermThemeFor(t, isDark) as any
-    }
-  }, [isDark, tabId, tabInstancesRef, t])
 
   useEffect(() => {
     const instance = tabInstancesRef.current.get(tabId)
