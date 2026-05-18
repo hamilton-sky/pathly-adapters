@@ -58,7 +58,9 @@ export function Monitor(): JSX.Element {
       try {
         const parsed = JSON.parse(content)
         setFsmState(parsed)
-        readFile(`${projectPath}/src/pathly_data/core/flows/${parsed.flow}.flow.yaml`)
+        const flowName = parsed.flow as string | undefined
+        if (!flowName) return
+        readFile(`${projectPath}/src/pathly_data/core/flows/${flowName}.flow.yaml`)
           .then((yaml) => {
             const match = yaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
             if (match) {

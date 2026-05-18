@@ -43,10 +43,13 @@ export interface FlowYaml {
 }
 
 export interface FsmState {
-  state: string
-  flow: string
-  engine: string
-  conv_count: number
+  current: string
+  flow?: string
+  feature?: string
+  rigor?: string
+  current_conversation?: number
+  updated_at?: string
+  [key: string]: unknown
 }
 
 export interface FsmEvent {

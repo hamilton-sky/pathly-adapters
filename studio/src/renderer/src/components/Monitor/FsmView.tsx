@@ -28,7 +28,7 @@ export function FsmView(): JSX.Element {
     document.head.appendChild(style)
   }, [])
 
-  const activeState = fsmState?.state ?? null
+  const activeState = fsmState?.current ?? null
   const isIdleOrNull = !activeState || activeState === 'IDLE'
   const activeIdx = isIdleOrNull ? -1 : PIPELINE.indexOf(activeState)
 
