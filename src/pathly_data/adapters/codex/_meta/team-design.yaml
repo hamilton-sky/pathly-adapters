@@ -1,0 +1,7 @@
+name: team/design
+description: "Design stage for the team pipeline — runs UI UX Pro Max design-system generation and writes DESIGN.md before the build stage begins."
+model: gpt-5.5
+filename: team/design.toml
+core_file: skills/team/design.md
+tools: [Read, Glob, Grep, Write, Bash]
+can_spawn: [quick]
