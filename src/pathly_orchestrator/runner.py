@@ -90,10 +90,17 @@ def invoke_agent(
     tool_uses = 0
     try:
         output = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
-        cost_usd   = float(output.get("cost_usd", output.get("total_cost_usd", 0.0)) or 0.0)
-        usage      = output.get("usage", {})
-        tokens_in  = int(usage.get("input_tokens", 0))
-        tokens_out = int(usage.get("output_tokens", 0))
+        # Try every field name Claude CLI has used across versions
+        cost_usd = float(
+            output.get("cost_usd")
+            or output.get("total_cost_usd")
+            or output.get("totalCost")
+            or output.get("total_cost")
+            or 0.0
+        )
+        usage = output.get("usage") or output.get("inputUsage") or {}
+        tokens_in  = int(usage.get("input_tokens", 0) or usage.get("inputTokens", 0))
+        tokens_out = int(usage.get("output_tokens", 0) or usage.get("outputTokens", 0))
         # Count tool_use content blocks across all messages in the conversation
         messages = output.get("messages", [])
         for msg in messages:
@@ -104,8 +111,12 @@ def invoke_agent(
         result_text = output.get("result", "")
         if result_text:
             print(result_text)
-    except (json.JSONDecodeError, ValueError):
-        pass  # non-JSON output — cost stays 0.0
+        # Diagnostic: warn when cost is missing so we know what fields to look for
+        if cost_usd == 0.0:
+            top_keys = [k for k in output if k not in ("result", "messages", "session_id")]
+            print(f"[runner] cost=0 — JSON top-level keys: {top_keys}", file=sys.stderr)
+    except (json.JSONDecodeError, ValueError) as exc:
+        print(f"[runner] failed to parse claude JSON output: {exc}", file=sys.stderr)
 
     # Patch the AGENT_DONE event the agent wrote with real numbers
     if storage_path:
