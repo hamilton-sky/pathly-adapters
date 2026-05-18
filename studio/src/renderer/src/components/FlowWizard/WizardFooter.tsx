@@ -7,6 +7,7 @@ interface WizardFooterProps {
   onNext: () => void
   onSave: () => void
   saving: boolean
+  nextDisabled?: boolean
   styles: Record<string, React.CSSProperties>
 }
 
@@ -17,9 +18,11 @@ export function WizardFooter({
   onNext,
   onSave,
   saving,
+  nextDisabled,
   styles
 }: WizardFooterProps): JSX.Element {
-  const saveNextStyle: React.CSSProperties = saving
+  const isNextDisabled = saving || !!nextDisabled
+  const saveNextStyle: React.CSSProperties = isNextDisabled
     ? { ...styles.nextBtn, opacity: 0.6, cursor: 'not-allowed' }
     : styles.nextBtn
 
@@ -31,7 +34,7 @@ export function WizardFooter({
           <button style={styles.backBtn} onClick={onBack}>← Back</button>
         )}
         {step < 5 ? (
-          <button style={saveNextStyle} onClick={onNext} disabled={saving}>
+          <button style={saveNextStyle} onClick={onNext} disabled={isNextDisabled}>
             Next →
           </button>
         ) : (

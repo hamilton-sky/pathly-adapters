@@ -29,8 +29,8 @@ No component may introduce a color, size, or motion value that does not trace ba
 | Token | Light value | Dark value | Notes |
 |---|---|---|---|
 | `--font-family-base` | `"Inter", system-ui, sans-serif` | same | Theme-independent |
-| `--font-size-base` | `15px` | same | Theme-independent |
-| `--focus-ring` | `2px solid var(--accent)` | same | Default to `--accent`; see Open Items |
+| `--font-size-base` | `14px` | same | Theme-independent. See ARCH-03 reconciliation below. |
+| `--focus-ring` | `2px solid var(--accent)` | same | MUST literally be the string `2px solid var(--accent)` — do not substitute the accent hex. See ARCH-02 reconciliation below. |
 | `--border` | `1px solid #c0c0d8` | `1px solid #3a3a58` | Derived from surface-adjacent palette |
 | `--transition-base` | `150ms ease-out` | same | Theme-independent |
 
@@ -44,6 +44,31 @@ No component may introduce a color, size, or motion value that does not trace ba
 ### Token injection
 
 Tokens are exposed as CSS custom properties on `:root` via the existing theme-switching mechanism. No changes to the switching mechanism itself.
+
+### Reconciliations from review feedback
+
+**ARCH-02 fix — `--focus-ring` must reference `--accent`, not its hex.**
+
+The `focusRing` field in both `darkTheme` and `lightTheme` in `studio/src/renderer/src/theme.ts` currently substitutes the accent hex (`#A78BFA` / `#7C3AED`) into the focus-ring string. This silently couples focus appearance to a snapshot of the accent color — if `--accent` is updated, the focus ring will diverge.
+
+Required change in `theme.ts`:
+```ts
+// darkTheme  (line ~41)
+focusRing: '2px solid var(--accent)',
+// lightTheme (line ~64)
+focusRing: '2px solid var(--accent)',
+```
+Because CSS custom-property values can reference other custom properties, the cascade resolves `var(--accent)` at usage time. The cross-theme rule (§5) is preserved: only `theme.ts` defines tokens, and references between tokens stay inside `theme.ts`.
+
+Verification: after the change, search the renderer source for the literal `#A78BFA` and `#7C3AED` in any non-`theme.ts` file — there must be zero hits. The two existing hits inside `focusRing` go away.
+
+**ARCH-03 fix — `--font-size-base` value is `14px`, not `15px`.**
+
+The implementation ships `14px`. This is the authoritative value the design has settled on: `14px` is the established Inter body size used elsewhere in the studio renderer, and bumping it to `15px` would cascade into row heights and wizard step layout in ways out of scope for a polish pass (see Risk row "Larger base font clips text").
+
+This document is the source of truth and is hereby updated to `14px`. No change to `theme.ts` is required for this violation; only the ARCH table value changes.
+
+If a future iteration wants `15px`, that is a separate feature with its own layout verification pass — not part of `studio-design-polish`.
 
 ---
 
@@ -81,8 +106,23 @@ Manual placement of woff2 binaries in source control increases repository size, 
 - Location: `studio/src/renderer/src/components/ui/FieldError.tsx`
 - Shared presentational component. Renders a single error string below a form field.
 - Props: `message?: string`. Renders nothing when `message` is undefined or empty.
-- Styled via its own CSS module (`FieldError.module.css`) using `--red` and `--font-size-base` tokens — no inline styles.
+- Styled via its own CSS module (`FieldError.module.css`) using `var(--red)` and `var(--font-size-sm)` tokens — no inline styles, no `useTheme()` call.
 - Used by `FlowWizard.tsx` only in this feature. Designed to be reusable by any future form component.
+
+**Fix guidance (ARCH-01):** The current implementation calls `useTheme()` and applies inline styles. This violates the "presentational leaf — no state, no context" contract in §5 and makes the component unrenderable outside a `ThemeProvider` (breaks isolated unit tests / Storybook). Required changes:
+
+1. Create `studio/src/renderer/src/components/ui/FieldError.module.css` with a single class, e.g.:
+   ```css
+   .root {
+     color: var(--red);
+     font-size: var(--font-size-sm);
+     margin-top: 4px;
+     display: block;
+   }
+   ```
+2. Rewrite `FieldError.tsx` to import the CSS module and apply `className={styles.root}` on the `<span>`. Remove the `useTheme` import entirely.
+3. The component must have zero React-context dependencies. Its only inputs are its props.
+4. Note on `--font-size-sm`: this token already exists in the rendered CSS variable set (used in the current inline style). It is not part of the five tokens added by §2; it is a pre-existing token consumed via `var()`. No new token is introduced.
 
 ---
 

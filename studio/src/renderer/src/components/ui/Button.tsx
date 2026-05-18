@@ -43,7 +43,7 @@ export function Button({
   } else {
     background = hovered && !disabled ? t.bgSurface0 : 'transparent'
     color = t.textSecondary
-    border = `1px solid ${t.bgSurface1}`
+    border = t.border
   }
 
   const baseStyle: React.CSSProperties = {
@@ -56,7 +56,7 @@ export function Button({
     borderRadius: '5px',
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? 0.5 : 1,
-    transition: 'background 0.12s, color 0.12s',
+    transition: 'background var(--transition-base), color var(--transition-base)',
     ...style,
   }
 

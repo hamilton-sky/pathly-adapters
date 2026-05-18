@@ -24,13 +24,13 @@ export function Input({
 
   const baseStyle: React.CSSProperties = {
     background: t.bgBase,
-    border: `1px solid ${focused ? t.accent : t.bgSurface0}`,
+    border: `1px solid ${focused ? t.accent : t.bgSurface1}`,
     borderRadius: '6px',
     color: t.textPrimary,
     padding: '5px 9px',
     fontSize: '12px',
     fontFamily: 'monospace',
-    transition: 'border-color 0.15s',
+    transition: 'border-color var(--transition-base)',
     width: '100%',
     boxSizing: 'border-box',
     ...style,

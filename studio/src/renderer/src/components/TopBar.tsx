@@ -86,6 +86,7 @@ export function TopBar(): JSX.Element {
         <div className={styles.center}>
           <select
             className={styles.topicSelect}
+            aria-label="Active topic"
             value={activeTopic?.startsWith('.archive/') ? '' : (activeTopic ?? '')}
             onChange={(e) => { setActiveTopic(e.target.value || null) }}
           >
@@ -94,6 +95,7 @@ export function TopBar(): JSX.Element {
           </select>
           <select
             className={styles.topicSelectArchive}
+            aria-label="Archived topic"
             value={activeTopic?.startsWith('.archive/') ? activeTopic : ''}
             onChange={(e) => { setActiveTopic(e.target.value || null) }}
           >

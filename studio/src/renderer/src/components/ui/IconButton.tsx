@@ -33,7 +33,7 @@ export function IconButton({
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? 0.5 : 1,
     flexShrink: 0,
-    transition: 'background 0.12s, color 0.12s',
+    transition: 'background var(--transition-base), color var(--transition-base)',
     padding: 0,
     ...style,
   }

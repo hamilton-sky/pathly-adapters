@@ -184,7 +184,7 @@
   padding: 3px 12px 3px 26px;
   font-size: 12px;
   text-align: left;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition: background var(--transition-base), color var(--transition-base), border-left-color var(--transition-base);
 }
 .itemRow:hover {
   background: var(--bg-surface0);
@@ -192,9 +192,11 @@
 }
 .itemRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
 .itemRowSelected {
-  background: var(--bg-surface0);
+  background: var(--bg-surface1);
   border-left-color: var(--accent);
   color: var(--accent);
+  font-weight: 600;
+  transition: background var(--transition-base), color var(--transition-base), border-left-color var(--transition-base);
 }
 
 .itemRowDeep { padding-left: 44px; }
@@ -233,7 +235,7 @@
   font-size: 12px;
   font-weight: 500;
   text-align: left;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition: background var(--transition-base), color var(--transition-base), border-left-color var(--transition-base);
 }
 .bottomRow:hover {
   background: var(--bg-surface0);
@@ -241,9 +243,10 @@
 }
 .bottomRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
 .bottomRowActive {
-  background: var(--bg-surface0);
+  background: var(--bg-surface1);
   border-left-color: var(--accent);
   color: var(--accent);
+  font-weight: 600;
 }
 
 .monitorDot {

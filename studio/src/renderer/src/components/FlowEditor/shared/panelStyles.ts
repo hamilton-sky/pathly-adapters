@@ -4,7 +4,7 @@ export function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
   return {
     panel: {
       backgroundColor: t.bgMantle,
-      borderLeft: `1px solid ${t.bgSurface0}`,
+      borderLeft: t.borderSubtle,
       padding: '12px',
       height: '100%',
       display: 'flex',
@@ -38,7 +38,7 @@ export function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
     },
     input: {
       backgroundColor: t.bgSurface0,
-      border: `1px solid ${t.bgSurface1}`,
+      border: t.border,
       borderRadius: '4px',
       color: t.textPrimary,
       fontSize: 'var(--font-size-sm)',
@@ -71,7 +71,7 @@ export function makePanelStyles(t: Theme): Record<string, React.CSSProperties> {
     },
     addBtn: {
       background: 'none',
-      border: `1px dashed ${t.bgSurface1}`,
+      border: `1px dashed ${t.bgSurface1}`, /* divider, not border token */
       borderRadius: '4px',
       color: t.blue,
       cursor: 'pointer',

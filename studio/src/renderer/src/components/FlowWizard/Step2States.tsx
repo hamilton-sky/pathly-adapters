@@ -5,7 +5,6 @@ interface Step2StatesProps {
   onUpdateState: (idx: number, value: string) => void
   onRemoveState: (idx: number) => void
   onAddState: () => void
-  error: string | null
   styles: Record<string, React.CSSProperties>
 }
 
@@ -14,7 +13,6 @@ export function Step2States({
   onUpdateState,
   onRemoveState,
   onAddState,
-  error,
   styles
 }: Step2StatesProps): JSX.Element {
   return (
@@ -44,7 +42,6 @@ export function Step2States({
         </div>
       ))}
       <button style={styles.addBtn} onClick={onAddState}>+ Add state</button>
-      {error && <div style={styles.error}>{error}</div>}
     </div>
   )
 }

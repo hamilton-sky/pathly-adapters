@@ -15,7 +15,7 @@ _Source: PO_NOTES.md — decomposed, not re-authored._
 ### Acceptance Criteria
 
 - AC-01-1: Inter font is loaded and applied as the primary font family across all Studio screens. Verified by inspecting `document.body` computed font-family in DevTools — it resolves to "Inter" before any system fallback.
-- AC-01-2: Base font size is 15px or 16px (configurable via token). Verified by inspecting a body-text element — computed `font-size` is ≥ 15px.
+- AC-01-2: Base font size is 14px or larger (configurable via token). Verified by inspecting a body-text element — computed `font-size` is ≥ 14px. (Architect resolved to 14px per ARCH-03 decision)
 - AC-01-3: Font loads offline (no network request to CDN at runtime). Verified by opening Studio in Electron with network disabled — Inter renders without fallback.
 - AC-01-4: A `--font-family-base` token and a `--font-size-base` token exist in `theme.ts` and are applied through `index.html` or a root CSS rule.
 - AC-01-5: No visible overflow or truncation regression in the Sidebar navigation items, property panel labels, or FlowWizard fields. Verified visually by stepping through all main screens.

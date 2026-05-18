@@ -97,6 +97,9 @@ function MainApp(): JSX.Element | null {
     el.style.setProperty('--font-size-sm', resolved.fontSizeSm)
     el.style.setProperty('--font-size-lg', resolved.fontSizeLg)
     el.style.setProperty('--focus-ring', resolved.focusRing)
+    el.style.setProperty('--border', resolved.border)
+    el.style.setProperty('--border-subtle', resolved.borderSubtle)
+    el.style.setProperty('--transition-base', resolved.transitionBase)
   }, [theme])
 
   if (setupDone === null) return null

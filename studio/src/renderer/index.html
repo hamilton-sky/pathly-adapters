@@ -10,6 +10,9 @@
       #root { height: 100vh; }
       .pathly-btn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
       .pathly-input:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) {
+        :root { --transition-base: 0ms; }
+      }
     </style>
   </head>
   <body>

@@ -2,6 +2,6 @@
 
 | Conv | Title | Status |
 |------|-------|--------|
-| 1 | Token Foundation + Typography + Focus | TODO |
-| 2 | Border + Motion + Sidebar | TODO |
-| 3 | FlowWizard Validation + Contrast Audit | TODO |
+| 1 | Token Foundation + Typography + Focus | DONE |
+| 2 | Border + Motion + Sidebar | DONE |
+| 3 | FlowWizard Validation + Contrast Audit | DONE |

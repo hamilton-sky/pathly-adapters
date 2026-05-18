@@ -262,6 +262,13 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       color: t.red,
       fontSize: 'var(--font-size-sm)',
       marginTop: '4px'
+    },
+    stepCounter: {
+      fontSize: 'var(--font-size-sm)',
+      color: t.textMuted,
+      display: 'block',
+      textAlign: 'center' as const,
+      paddingTop: '16px'
     }
   }
 }

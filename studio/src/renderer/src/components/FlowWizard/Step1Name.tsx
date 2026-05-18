@@ -5,7 +5,6 @@ interface Step1NameProps {
   description: string
   onFlowNameChange: (value: string) => void
   onDescriptionChange: (value: string) => void
-  error: string | null
   styles: Record<string, React.CSSProperties>
 }
 
@@ -14,7 +13,6 @@ export function Step1Name({
   description,
   onFlowNameChange,
   onDescriptionChange,
-  error,
   styles
 }: Step1NameProps): JSX.Element {
   return (
@@ -38,7 +36,6 @@ export function Step1Name({
         value={description}
         onChange={(e) => onDescriptionChange(e.target.value)}
       />
-      {error && <div style={styles.error}>{error}</div>}
     </div>
   )
 }

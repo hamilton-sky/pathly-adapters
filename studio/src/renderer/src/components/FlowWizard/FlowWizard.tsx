@@ -12,6 +12,8 @@ import { Step2States } from './Step2States'
 import { Step3Transitions } from './Step3Transitions'
 import { Step4Agents } from './Step4Agents'
 import { Step5Review } from './Step5Review'
+import { validateStep } from './FlowWizard.validation'
+import { FieldError } from '../ui'
 
 export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const { projectPath } = useStore()
@@ -25,8 +27,10 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const [transitions, setTransitions] = useState<Transition[]>([])
   const [agentMap, setAgentMap] = useState<Record<string, string>>({})
   const [storagePath, setStoragePath] = useState('pathly/plans/{topic}/')
-  const [error, setError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [stepErrors, setStepErrors] = useState<Record<number, Record<string, string>>>({})
+  const [touched, setTouched] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -35,6 +39,20 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  useEffect(() => {
+    if (touched[1]) {
+      const errors = validateStep(1, { flowName, states, transitions, agentMap })
+      setStepErrors((prev) => ({ ...prev, 1: errors }))
+    }
+  }, [flowName])
+
+  useEffect(() => {
+    if (touched[2]) {
+      const errors = validateStep(2, { flowName, states, transitions, agentMap })
+      setStepErrors((prev) => ({ ...prev, 2: errors }))
+    }
+  }, [states])
 
   function goToStep(next: number): void {
     if (next === 3 && step === 2) {
@@ -46,33 +64,22 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
         setTransitions(autoTransitions)
       }
     }
-    setError(null)
     setStep(next)
   }
 
   function handleNext(): void {
-    if (step === 1) {
-      if (!flowName.trim()) {
-        setError('Flow name is required')
-        return
-      }
-      if (!/^[a-zA-Z0-9-_]+$/.test(flowName.trim())) {
-        setError('Flow name must be alphanumeric with hyphens or underscores')
-        return
-      }
+    const values = { flowName, states, transitions, agentMap }
+    const errors = validateStep(step, values)
+    if (Object.keys(errors).length > 0) {
+      setStepErrors((prev) => ({ ...prev, [step]: errors }))
+      setTouched((prev) => ({ ...prev, [step]: true }))
+      return
     }
-    if (step === 2) {
-      const nonEmpty = states.filter((s) => s.trim())
-      if (nonEmpty.length < 2) {
-        setError('At least 2 states required')
-        return
-      }
-    }
+    setTouched((prev) => ({ ...prev, [step]: true }))
     goToStep(step + 1)
   }
 
   function handleBack(): void {
-    setError(null)
     setStep((s) => s - 1)
   }
 
@@ -117,7 +124,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
       await writeFile(filePath, yaml)
       onCreated(filePath)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setSaveError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
     }
@@ -135,31 +142,40 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     transitions
   )
 
+  const nextDisabled = touched[step] && Object.keys(stepErrors[step] ?? {}).length > 0
+
   return (
     <div style={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div style={styles.card}>
+        <span style={styles.stepCounter}>
+          Step {step} of 5
+        </span>
         <StepIndicator step={step} t={t} styles={styles} />
 
         <div style={styles.content}>
           {step === 1 && (
-            <Step1Name
-              flowName={flowName}
-              description={description}
-              onFlowNameChange={setFlowName}
-              onDescriptionChange={setDescription}
-              error={error}
-              styles={styles}
-            />
+            <>
+              <Step1Name
+                flowName={flowName}
+                description={description}
+                onFlowNameChange={setFlowName}
+                onDescriptionChange={setDescription}
+                styles={styles}
+              />
+              <FieldError message={stepErrors[1]?.name} />
+            </>
           )}
           {step === 2 && (
-            <Step2States
-              states={states}
-              onUpdateState={updateState}
-              onRemoveState={removeState}
-              onAddState={addState}
-              error={error}
-              styles={styles}
-            />
+            <>
+              <Step2States
+                states={states}
+                onUpdateState={updateState}
+                onRemoveState={removeState}
+                onAddState={addState}
+                styles={styles}
+              />
+              <FieldError message={stepErrors[2]?.states} />
+            </>
           )}
           {step === 3 && (
             <Step3Transitions
@@ -186,7 +202,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
               yamlPreview={yamlPreview}
               storagePath={storagePath}
               onStoragePathChange={setStoragePath}
-              error={error}
+              error={saveError}
               styles={styles}
             />
           )}
@@ -199,6 +215,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
           onNext={handleNext}
           onSave={handleSave}
           saving={saving}
+          nextDisabled={nextDisabled}
           styles={styles}
         />
       </div>

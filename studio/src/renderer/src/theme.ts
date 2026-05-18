@@ -16,6 +16,9 @@ export interface Theme {
   fontSizeSm: string
   fontSizeLg: string
   focusRing: string
+  border: string
+  borderSubtle: string
+  transitionBase: string
 }
 
 export const darkTheme: Theme = {
@@ -35,7 +38,10 @@ export const darkTheme: Theme = {
   fontSizeBase: '14px',
   fontSizeSm: '12px',
   fontSizeLg: '16px',
-  focusRing: '2px solid #A78BFA',
+  focusRing: '2px solid var(--accent)',
+  border: '1px solid #343452',
+  borderSubtle: '1px solid #252538',
+  transitionBase: '150ms ease-out',
 }
 
 export const lightTheme: Theme = {
@@ -55,5 +61,8 @@ export const lightTheme: Theme = {
   fontSizeBase: '14px',
   fontSizeSm: '12px',
   fontSizeLg: '16px',
-  focusRing: '2px solid #7C3AED',
+  focusRing: '2px solid var(--accent)',
+  border: '1px solid #c8c8e0',
+  borderSubtle: '1px solid #ddddf0',
+  transitionBase: '150ms ease-out',
 }
