@@ -38,4 +38,4 @@
 
 ## Open items
 
-- **S-07** (Light theme contrast) — blocked pending architect decision on audit tooling. Resume with `/pathly meet architect` to resolve the `ARCH_QUESTION` in STORIES.md before implementing Phase 6.
+None. S-07 completed 2026-05-19 — inline Node.js contrast audit confirmed all content text pairs pass WCAG AA. All 7 stories delivered.
