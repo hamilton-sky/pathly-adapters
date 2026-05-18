@@ -15,6 +15,16 @@ _SERVER_NAME = "pathly-telemetry"
 _CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
 _CODEX_CONFIG = Path.home() / ".codex" / "config.toml"
 
+
+def _toml_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _package_import_root() -> str:
+    """Return the directory that makes Pathly packages importable."""
+    return str(Path(__file__).resolve().parents[1])
+
+
 # The MCP server is run via  python -m pathly_telemetry
 _CLAUDE_ENTRY: dict = {
     "command": "python",
@@ -23,12 +33,13 @@ _CLAUDE_ENTRY: dict = {
 
 _CODEX_TOML_BLOCK = (
     f"\n[mcp_servers.{_SERVER_NAME}]\n"
-    f'command = "{sys.executable.replace(chr(92), chr(92)+chr(92))}"\n'
+    f'command = "{_toml_escape(sys.executable)}"\n'
     'args = ["-u", "-m", "pathly_telemetry"]\n'
     "startup_timeout_sec = 60\n"
     f"\n[mcp_servers.{_SERVER_NAME}.env]\n"
     'PYTHONUNBUFFERED = "1"\n'
     'PYTHONIOENCODING = "utf-8"\n'
+    f'PYTHONPATH = "{_toml_escape(_package_import_root())}"\n'
 )
 
 _FSM_SERVER_NAME = "pathly-fsm"
@@ -40,12 +51,13 @@ _FSM_CLAUDE_ENTRY: dict = {
 
 _FSM_CODEX_TOML_BLOCK = (
     f"\n[mcp_servers.{_FSM_SERVER_NAME}]\n"
-    f'command = "{sys.executable.replace(chr(92), chr(92)+chr(92))}"\n'
+    f'command = "{_toml_escape(sys.executable)}"\n'
     'args = ["-u", "-m", "pathly_orchestrator.mcp_server"]\n'
     "startup_timeout_sec = 60\n"
     f"\n[mcp_servers.{_FSM_SERVER_NAME}.env]\n"
     'PYTHONUNBUFFERED = "1"\n'
     'PYTHONIOENCODING = "utf-8"\n'
+    f'PYTHONPATH = "{_toml_escape(_package_import_root())}"\n'
 )
 
 

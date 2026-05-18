@@ -149,6 +149,19 @@ def test_install_adds_entry_codex(monkeypatch, tmp_path):
     assert f"[mcp_servers.{_SERVER_NAME}]" in content
 
 
+def test_install_codex_adds_pythonpath_for_mcp_imports(monkeypatch, tmp_path):
+    config = tmp_path / "config.toml"
+    config.write_text("", encoding="utf-8")
+    _patch_codex(monkeypatch, config)
+
+    install_mcp_config("codex")
+
+    content = config.read_text(encoding="utf-8")
+    assert 'PYTHONPATH = "' in content
+    assert "pathly-telemetry.env" in content
+    assert "pathly-fsm.env" in content
+
+
 def test_uninstall_removes_entry_codex(monkeypatch, tmp_path):
     config = tmp_path / "config.toml"
     config.write_text(
