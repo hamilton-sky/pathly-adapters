@@ -17,7 +17,7 @@ immediately when the condition is detected.
 # All events share these base fields:
 #   schema_version int — event schema version, currently 1
 #   type       str   — one of the TYPE constants below
-#   timestamp  str   — ISO-8601 UTC, e.g. "2026-05-11T10:30:00Z"
+#   ts         str   — ISO-8601 UTC, e.g. "2026-05-11T10:30:00Z"
 #
 # COMMAND — first event, written when /team-flow starts
 #   feature    str   — feature name, e.g. "security-fixes"
@@ -65,13 +65,13 @@ immediately when the condition is detected.
 
 # ── Example EVENTS.jsonl snippet ─────────────────────────────────────────────
 #
-# {"type":"COMMAND","feature":"security-fixes","rigor":"lite","entry":"plan","auto_flow":false,"timestamp":"2026-05-11T09:00:00Z"}
-# {"type":"AGENT_SPAWNED","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"role":"write 4 lite plan files","timestamp":"2026-05-11T09:00:05Z"}
-# {"type":"AGENT_DONE","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":20000,"tokens_out":5000,"cost_usd":0.0,"tool_uses":11,"wall_seconds":105,"timestamp":"2026-05-11T09:01:50Z"}
-# {"type":"STATE_TRANSITION","from_state":"PLANNING","to_state":"PLAN_DONE","timestamp":"2026-05-11T09:01:50Z"}
-# {"type":"AGENT_SPAWNED","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"role":"Conv 1 code fixes","timestamp":"2026-05-11T09:05:00Z"}
-# {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"result":"DONE","tokens_in":22000,"tokens_out":4000,"cost_usd":0.0,"tool_uses":23,"wall_seconds":85,"timestamp":"2026-05-11T09:06:25Z"}
-# {"type":"STATE_TRANSITION","from_state":"BUILDING_CONV_1","to_state":"REVIEWING_CONV_1","timestamp":"2026-05-11T09:06:25Z"}
+# {"type":"COMMAND","feature":"security-fixes","rigor":"lite","entry":"plan","auto_flow":false,"ts":"2026-05-11T09:00:00Z"}
+# {"type":"AGENT_SPAWNED","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"role":"write 4 lite plan files","ts":"2026-05-11T09:00:05Z"}
+# {"type":"AGENT_DONE","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":20000,"tokens_out":5000,"cost_usd":0.0,"tool_uses":11,"wall_seconds":105,"ts":"2026-05-11T09:01:50Z"}
+# {"type":"STATE_TRANSITION","from_state":"PLANNING","to_state":"PLAN_DONE","ts":"2026-05-11T09:01:50Z"}
+# {"type":"AGENT_SPAWNED","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"role":"Conv 1 code fixes","ts":"2026-05-11T09:05:00Z"}
+# {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"result":"DONE","tokens_in":22000,"tokens_out":4000,"cost_usd":0.0,"tool_uses":23,"wall_seconds":85,"ts":"2026-05-11T09:06:25Z"}
+# {"type":"STATE_TRANSITION","from_state":"BUILDING_CONV_1","to_state":"REVIEWING_CONV_1","ts":"2026-05-11T09:06:25Z"}
 
 CURRENT_SCHEMA_VERSION = 1
 

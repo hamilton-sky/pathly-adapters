@@ -1,3 +1,8 @@
 {"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-18T09:48:38.221898"}
 {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING", "ts": "2026-05-18T09:58:08.243155"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 12, "wall_seconds": 60, "ts": "2026-05-18T10:17:45Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-18T10:17:51.409456"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 8, "wall_seconds": 30, "ts": "2026-05-18T10:20:43Z"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-18T10:21:01Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-18T10:21:06.131109"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 15, "wall_seconds": 115, "ts": "2026-05-18T10:23:52Z"}

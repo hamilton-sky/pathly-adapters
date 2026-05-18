@@ -8,6 +8,34 @@ import { EventLog } from './EventLog'
 import type { FsmEvent } from '../../types'
 import { watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
 
+type FlowType = 'team' | 'debug' | 'explore'
+
+function getBasePath(flow: string | undefined): string {
+  switch (flow) {
+    case 'team': return 'pathly/plans/'
+    case 'debug': return 'pathly/debugs/'
+    case 'explore': return 'pathly/explorations/'
+    default:
+      if (flow !== undefined) {
+        console.warn(`[Monitor] Unknown flow type "${flow}", falling back to pathly/plans/`)
+      }
+      return 'pathly/plans/'
+  }
+}
+
+function getFlowYamlName(flow: string | undefined): string {
+  switch (flow as FlowType) {
+    case 'team': return 'team.flow.yaml'
+    case 'debug': return 'debug.flow.yaml'
+    case 'explore': return 'explore.flow.yaml'
+    default: return `${flow}.flow.yaml`
+  }
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + '…' : s
+}
+
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   return {
     panel: {
@@ -26,14 +54,67 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       padding: '4px 12px',
       fontSize: '12px',
       flexShrink: 0
+    },
+    header: {
+      backgroundColor: t.bgSurface0,
+      borderBottom: `1px solid ${t.bgSurface1}`,
+      padding: '8px 12px',
+      flexShrink: 0,
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      lineHeight: '1.6',
+      color: t.textSecondary
+    },
+    headerTitle: {
+      color: t.accent,
+      fontWeight: 600,
+      marginBottom: '2px'
+    },
+    headerRow: {
+      display: 'flex',
+      gap: '24px'
     }
   }
+}
+
+function HeaderBar(): JSX.Element {
+  const { fsmState, events } = useStore()
+  const t = useTheme()
+  const styles = makeStyles(t)
+
+  const flow = fsmState?.flow ?? '—'
+  const topic = fsmState?.feature
+    ? truncate(fsmState.feature, 32)
+    : '—'
+  const state = fsmState?.current ?? '—'
+  const conv = fsmState?.current_conversation != null
+    ? String(fsmState.current_conversation)
+    : '—'
+
+  const lastAgentEvent = [...events].reverse().find((e) => e.type === 'AGENT_SPAWNED')
+  const agent = lastAgentEvent
+    ? ((lastAgentEvent as FsmEvent & { agent?: string }).agent ?? '—')
+    : '—'
+
+  return (
+    <div style={styles.header}>
+      <div style={styles.headerTitle}>
+        Pathly&nbsp;&nbsp;·&nbsp;&nbsp;{flow}&nbsp;&nbsp;·&nbsp;&nbsp;{topic}
+      </div>
+      <div style={styles.headerRow}>
+        <span>State : {state}</span>
+        <span>Conv : {conv}</span>
+      </div>
+      <div>Agent : {agent}</div>
+    </div>
+  )
 }
 
 export function Monitor(): JSX.Element {
   const {
     projectPath,
     activeTopic,
+    fsmState,
     monitorSource,
     setMonitorSource,
     setFsmState,
@@ -50,7 +131,9 @@ export function Monitor(): JSX.Element {
       return
     }
 
-    const base = `${projectPath}/pathly/plans/${activeTopic}`
+    // Use flow from already-loaded fsmState if available, otherwise fall back to plans
+    const initialFlow = fsmState?.flow
+    const base = `${projectPath}/${getBasePath(initialFlow)}${activeTopic}`
 
     // STATE.json — initial read
     readFile(`${base}/STATE.json`).then((content) => {
@@ -60,7 +143,8 @@ export function Monitor(): JSX.Element {
         setFsmState(parsed)
         const flowName = parsed.flow as string | undefined
         if (!flowName) return
-        readFile(`${projectPath}/src/pathly_data/core/flows/${flowName}.flow.yaml`)
+        const yamlName = getFlowYamlName(flowName)
+        readFile(`${projectPath}/src/pathly_data/core/flows/${yamlName}`)
           .then((yaml) => {
             const cleanYaml = yaml.replace(/\r/g, '')
             const match = cleanYaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
@@ -139,6 +223,7 @@ export function Monitor(): JSX.Element {
 
   return (
     <div style={styles.panel}>
+      <HeaderBar />
       {sourceBadge}
       <FsmView />
       <EventLog />
