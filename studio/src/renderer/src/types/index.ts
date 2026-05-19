@@ -137,3 +137,11 @@ export interface TemplateFrontmatter {
 }
 
 export type FrontmatterValues = SkillFrontmatter | AgentFrontmatter | TemplateFrontmatter
+
+export type FlowExportTarget = 'pathly' | 'claude' | 'codex'
+
+export interface FlowExportRecord {
+  target: FlowExportTarget
+  path: string
+  at: Date
+}

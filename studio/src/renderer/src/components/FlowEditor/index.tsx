@@ -24,6 +24,7 @@ export function FlowEditor(): JSX.Element {
     handleVisualChange,
     handleYamlParsed,
     handleYamlContentChange,
+    handleYamlParseError,
     handleVisualSave,
     handleYamlSave
   } = useFlowFile(selectedItem, markDirty, clearDirty)
@@ -89,6 +90,7 @@ export function FlowEditor(): JSX.Element {
           <YamlView
             initialContent={rawYaml}
             onParsed={handleYamlParsed}
+            onParseError={handleYamlParseError}
             onDirty={handleYamlContentChange}
             onSave={handleYamlSave}
             syncContent={yamlSyncContent}

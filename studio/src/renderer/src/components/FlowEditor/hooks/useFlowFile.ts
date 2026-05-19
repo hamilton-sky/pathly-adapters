@@ -14,11 +14,13 @@ interface UseFlowFileReturn {
   rawYaml: string
   loading: boolean
   saveError: string | null
+  yamlParseError: string | null
   yamlSyncContent: string | null
   handleTabSwitch: (next: TabMode, currentTab: TabMode) => TabMode
   handleVisualChange: (updated: FlowYaml) => void
   handleYamlParsed: (parsed: FlowYaml) => void
   handleYamlContentChange: () => void
+  handleYamlParseError: (err: string | null) => void
   handleVisualSave: () => Promise<void>
   handleYamlSave: (content: string) => Promise<void>
 }
@@ -32,10 +34,15 @@ export function useFlowFile(
   const [rawYaml, setRawYaml] = useState('')
   const [loading, setLoading] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [yamlParseError, setYamlParseError] = useState<string | null>(null)
   const [yamlSyncContent, setYamlSyncContent] = useState<string | null>(null)
 
   const flowDataRef = useRef(flowData)
   useEffect(() => { flowDataRef.current = flowData }, [flowData])
+
+  // Preserved snapshot of the last successfully parsed flow so the visual graph
+  // stays intact while the user edits invalid YAML.
+  const lastValidFlowDataRef = useRef<FlowYaml | null>(null)
 
   const rawYamlRef = useRef(rawYaml)
   useEffect(() => { rawYamlRef.current = rawYaml }, [rawYaml])
@@ -44,13 +51,16 @@ export function useFlowFile(
     if (!selectedItem) return
     setLoading(true)
     setSaveError(null)
+    setYamlParseError(null)
     setYamlSyncContent(null)
+    lastValidFlowDataRef.current = null
     readFile(selectedItem.path)
       .then((content) => {
         setRawYaml(content ?? '')
         try {
           const parsed = jsYaml.load(content ?? '') as FlowYaml
           setFlowData(parsed)
+          lastValidFlowDataRef.current = parsed
         } catch {
           setFlowData(null)
         }
@@ -74,10 +84,21 @@ export function useFlowFile(
       try {
         const parsed = jsYaml.load(currentRawYaml) as FlowYaml
         setFlowData(parsed)
+        lastValidFlowDataRef.current = parsed
         setYamlSyncContent(null)
+        setYamlParseError(null)
       } catch {
-        setSaveError('Fix YAML errors before switching to Visual view')
-        return currentTab
+        // YAML is invalid — fall back to the last valid snapshot if available
+        // so the visual graph is not destroyed. A warning is shown in the toolbar.
+        const fallback = lastValidFlowDataRef.current
+        if (fallback) {
+          setFlowData(fallback)
+          setSaveError('YAML has errors — showing last valid graph. Fix YAML and switch back to sync.')
+        } else {
+          setSaveError('Fix YAML errors before switching to Visual view')
+          return currentTab
+        }
+        setYamlSyncContent(null)
       }
     }
     return next
@@ -90,6 +111,12 @@ export function useFlowFile(
 
   function handleYamlParsed(parsed: FlowYaml): void {
     setFlowData(parsed)
+    lastValidFlowDataRef.current = parsed
+    setYamlParseError(null)
+  }
+
+  function handleYamlParseError(err: string | null): void {
+    setYamlParseError(err)
   }
 
   function handleYamlContentChange(): void {
@@ -125,11 +152,13 @@ export function useFlowFile(
     rawYaml,
     loading,
     saveError,
+    yamlParseError,
     yamlSyncContent,
     handleTabSwitch,
     handleVisualChange,
     handleYamlParsed,
     handleYamlContentChange,
+    handleYamlParseError,
     handleVisualSave,
     handleYamlSave
   }

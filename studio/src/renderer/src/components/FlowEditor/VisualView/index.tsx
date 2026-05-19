@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import ReactFlow, { Background, Controls, ReactFlowProvider, useReactFlow } from 'reactflow'
 import 'reactflow/dist/style.css'
+import * as jsYaml from 'js-yaml'
 import { useTheme } from '../../../useTheme'
-import type { FlowYaml } from '../../../types'
+import type { FlowYaml, FlowExportTarget, FlowExportRecord } from '../../../types'
 import { PATHLY_DRAG_MIME } from '../../../types'
 import type { PathlyCanvasDragItem } from '../../../types'
 import { useFlowGraph } from '../hooks/useFlowGraph'
@@ -12,6 +13,8 @@ import { EdgePanel } from './EdgePanel'
 import { StateNode } from './StateNode'
 import { validateFlow } from '../utils/validateFlow'
 import { useProjectFiles } from '../../../hooks/useProjectFiles'
+import { useStore } from '../../../store'
+import { writeFile } from '../../../services/pathlyApi'
 
 interface Props {
   data: FlowYaml
@@ -43,12 +46,32 @@ function generateUniqueStateId(base: string, existing: string[]): string {
   return `${upper}_${i}`
 }
 
+const EXPORT_TARGET_LABELS: Record<FlowExportTarget, string> = {
+  pathly: 'Pathly package',
+  claude: 'Claude Code',
+  codex: 'Codex',
+}
+
+function resolveExportPath(target: FlowExportTarget, projectPath: string, flowName: string): string {
+  switch (target) {
+    case 'pathly': return `${projectPath}/src/pathly_data/core/flows/${flowName}.flow.yaml`
+    case 'claude': return `${projectPath}/.claude/pathly-flows/${flowName}.flow.yaml`
+    case 'codex':  return `${projectPath}/.codex/pathly-flows/${flowName}.flow.yaml`
+  }
+}
+
 function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
   const t = useTheme()
   const styles = makeVisualViewStyles(t)
   const [detail, setDetail] = useState<PanelDetail>(null)
   const { screenToFlowPosition } = useReactFlow()
   const { sections } = useProjectFiles()
+  const { projectPath, selectedItem } = useStore()
+
+  const [exportTarget, setExportTarget] = useState<FlowExportTarget>('pathly')
+  const [lastExport, setLastExport] = useState<FlowExportRecord | null>(null)
+  const [exportToast, setExportToast] = useState<string | null>(null)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
 
   // Build known behaviors list for validation
   const knownBehaviors = useMemo(() => {
@@ -132,11 +155,51 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
     void flowPos
   }
 
+  const hasExportErrors = validationIssues.some((i) => i.severity === 'error')
+  const hasExportWarnings = validationIssues.some((i) => i.severity === 'warning')
+
+  function getFlowName(): string {
+    if (selectedItem?.name) return selectedItem.name.replace(/\.flow\.yaml$/, '')
+    return data.flow ?? 'flow'
+  }
+
+  async function doExport(): Promise<void> {
+    if (!projectPath) return
+    const flowName = getFlowName()
+    const targetPath = resolveExportPath(exportTarget, projectPath, flowName)
+    const content = jsYaml.dump(data, { lineWidth: 120 })
+    try {
+      await writeFile(targetPath, content)
+      const record: FlowExportRecord = { target: exportTarget, path: targetPath, at: new Date() }
+      setLastExport(record)
+      setExportToast(`Exported to ${targetPath}`)
+      setTimeout(() => setExportToast(null), 4000)
+    } catch (err) {
+      setExportToast(`Export failed: ${err instanceof Error ? err.message : String(err)}`)
+      setTimeout(() => setExportToast(null), 5000)
+    }
+  }
+
+  function handleExportClick(): void {
+    if (hasExportErrors) return
+    if (hasExportWarnings) {
+      setShowConfirmModal(true)
+    } else {
+      void doExport()
+    }
+  }
+
+  function handleConfirmExport(): void {
+    setShowConfirmModal(false)
+    void doExport()
+  }
+
   const inspectorOpen = detail !== null
 
   return (
     <div style={styles.wrapper}>
       <div style={styles.toolbar}>
+        {/* Layout / authoring controls */}
         <button style={styles.saveBtn} onClick={onSave}>
           Save
         </button>
@@ -151,7 +214,112 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
         >
           + Add state
         </button>
+
+        {/* Divider between layout and export controls */}
+        <div style={{ width: 1, height: 20, background: t.bgSurface1, margin: '0 12px', alignSelf: 'center' }} />
+
+        {/* Export controls */}
+        <select
+          value={exportTarget}
+          onChange={(e) => setExportTarget(e.target.value as FlowExportTarget)}
+          style={{
+            background: t.bgSurface0,
+            color: t.textPrimary,
+            border: `1px solid ${t.bgSurface1}`,
+            borderRadius: 4,
+            padding: '3px 8px',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          {(Object.keys(EXPORT_TARGET_LABELS) as FlowExportTarget[]).map((k) => (
+            <option key={k} value={k}>{EXPORT_TARGET_LABELS[k]}</option>
+          ))}
+        </select>
+        <button
+          style={{
+            ...styles.saveBtn,
+            background: hasExportErrors ? t.bgSurface1 : '#8B5CF6',
+            color: hasExportErrors ? t.textMuted : '#fff',
+            cursor: hasExportErrors ? 'not-allowed' : 'pointer',
+            marginLeft: 8,
+          }}
+          onClick={handleExportClick}
+          disabled={hasExportErrors}
+          title={hasExportErrors ? 'Fix validation errors before exporting' : 'Export flow'}
+        >
+          Export
+        </button>
       </div>
+
+      {/* Last exported hint */}
+      {lastExport && (
+        <div style={{ padding: '2px 12px', fontSize: 11, color: t.textMuted, backgroundColor: t.bgMantle, borderBottom: `1px solid ${t.bgSurface0}`, flexShrink: 0 }}>
+          Last: {lastExport.path} ✓ {Math.round((Date.now() - lastExport.at.getTime()) / 60000) || '<1'}m ago
+        </div>
+      )}
+
+      {/* Export toast */}
+      {exportToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          background: t.bgSurface1,
+          color: t.textPrimary,
+          border: `1px solid ${t.bgSurface0}`,
+          borderRadius: 6,
+          padding: '8px 16px',
+          fontSize: 13,
+          zIndex: 60,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}>
+          {exportToast}
+          {lastExport && (
+            <button
+              style={{ background: 'none', border: 'none', color: t.accent, cursor: 'pointer', fontSize: 12 }}
+              onClick={() => { void navigator.clipboard.writeText(lastExport.path) }}
+            >
+              Copy path
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Warning confirmation modal */}
+      {showConfirmModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 100,
+        }}>
+          <div style={{
+            background: t.bgMantle, border: `1px solid ${t.bgSurface1}`, borderRadius: 8,
+            padding: 24, maxWidth: 400, width: '100%',
+          }}>
+            <p style={{ color: t.textPrimary, marginBottom: 16, fontSize: 14 }}>
+              This flow has validation warnings. Export anyway?
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                style={{ ...styles.saveBtn, background: t.bgSurface0, color: t.textMuted }}
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                style={{ ...styles.saveBtn, background: '#8B5CF6', color: '#fff' }}
+                onClick={handleConfirmExport}
+              >
+                Export anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={styles.body}>
         <div
           style={styles.canvas}

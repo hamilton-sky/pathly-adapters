@@ -10,12 +10,13 @@ import { makeYamlViewStyles } from './YamlView.styles'
 interface Props {
   initialContent: string
   onParsed: (data: FlowYaml) => void
+  onParseError?: (err: string | null) => void
   onDirty: () => void
   onSave: (content: string) => void
   syncContent?: string | null
 }
 
-export function YamlView({ initialContent, onParsed, onDirty, onSave, syncContent }: Props): JSX.Element {
+export function YamlView({ initialContent, onParsed, onParseError, onDirty, onSave, syncContent }: Props): JSX.Element {
   const t = useTheme()
   const styles = makeYamlViewStyles(t)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,9 +46,12 @@ export function YamlView({ initialContent, onParsed, onDirty, onSave, syncConten
             try {
               const parsed = jsYaml.load(content) as FlowYaml
               setParseError(null)
+              onParseError?.(null)
               onParsed(parsed)
             } catch (e) {
-              setParseError(e instanceof Error ? e.message : String(e))
+              const msg = e instanceof Error ? e.message : String(e)
+              setParseError(msg)
+              onParseError?.(msg)
             }
             onDirty()
           }
