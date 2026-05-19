@@ -1,6 +1,11 @@
 import type { Theme } from '../../../theme'
+import { Z } from '../zIndex'
 
 export function makeVisualViewStyles(t: Theme): Record<string, React.CSSProperties> {
+  const reducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
   return {
     wrapper: {
       flex: 1,
@@ -26,19 +31,27 @@ export function makeVisualViewStyles(t: Theme): Record<string, React.CSSProperti
       fontSize: '13px',
       fontWeight: 600
     },
+    body: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'row',
+      overflow: 'hidden'
+    },
     canvas: {
       flex: 1,
       position: 'relative' as const,
       overflow: 'hidden'
     },
-    detailPanel: {
-      position: 'absolute' as const,
-      top: 0,
-      right: 0,
-      bottom: 0,
-      width: '220px',
-      zIndex: 10,
-      overflowY: 'auto' as const
+    inspectorPane: {
+      width: '300px',
+      flexShrink: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      zIndex: Z.inspector,
+      backgroundColor: t.bgMantle,
+      borderLeft: `1px solid ${t.bgSurface1}`,
+      overflowY: 'auto' as const,
+      transition: reducedMotion ? 'none' : 'width 200ms ease-out'
     }
   }
 }

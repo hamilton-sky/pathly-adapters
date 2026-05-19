@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import ReactFlow, { Background, Controls, ReactFlowProvider, useReactFlow } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { useTheme } from '../../../useTheme'
@@ -10,6 +10,8 @@ import { makeVisualViewStyles } from './VisualView.styles'
 import { NodePanel } from './NodePanel'
 import { EdgePanel } from './EdgePanel'
 import { StateNode } from './StateNode'
+import { validateFlow } from '../utils/validateFlow'
+import { useProjectFiles } from '../../../hooks/useProjectFiles'
 
 interface Props {
   data: FlowYaml
@@ -46,6 +48,17 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
   const styles = makeVisualViewStyles(t)
   const [detail, setDetail] = useState<PanelDetail>(null)
   const { screenToFlowPosition } = useReactFlow()
+  const { sections } = useProjectFiles()
+
+  // Build known behaviors list for validation
+  const knownBehaviors = useMemo(() => {
+    const skills = sections.Skills.items.map((item) => item.name.replace(/\.[^.]+$/, ''))
+    const agents = sections.Agents.items.map((item) => item.name.replace(/\.[^.]+$/, ''))
+    return [...skills, ...agents]
+  }, [sections])
+
+  // Run validation on every render (pure function, cheap)
+  const validationIssues = useMemo(() => validateFlow(data, knownBehaviors), [data, knownBehaviors])
 
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onNodeClick, onEdgeClick, handleAgentChange, handleAddTransitionRule, handleAddTransitionAction, dataRef } = useFlowGraph(
     data,
@@ -54,6 +67,22 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
     (stateId) => setDetail({ type: 'node', stateId }),
     (edgeId, source, target) => setDetail({ type: 'edge', edgeId, source, target })
   )
+
+  // Inject validation issues into node data
+  const nodesWithIssues = useMemo(() => nodes.map((node) => {
+    const nodeIssues = validationIssues.filter((i) => i.scope === 'node' && i.key === node.id)
+    const baseData = node.data as Record<string, unknown>
+    return { ...node, data: { ...baseData, issues: nodeIssues.length > 0 ? nodeIssues : undefined } }
+  }), [nodes, validationIssues])
+
+  // Inject validation color into edges
+  const edgesWithValidation = useMemo(() => edges.map((edge) => {
+    const edgeKey = `${edge.source}->${edge.target}`
+    const edgeIssues = validationIssues.filter((i) => i.scope === 'edge' && i.key === edgeKey)
+    if (edgeIssues.length === 0) return edge
+    const hasError = edgeIssues.some((i) => i.severity === 'error')
+    return { ...edge, style: { ...edge.style, stroke: hasError ? t.red : t.yellow } }
+  }), [edges, validationIssues, t])
 
   const localData = dataRef.current
 
@@ -78,7 +107,6 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
     const d = dataRef.current
     const nameWithoutExt = payload.name.replace(/\.[^.]+$/, '')
 
-    // Check if drop landed on an existing state node
     const target = e.target as HTMLElement
     const stateNodeEl = target.closest('[data-id]') as HTMLElement | null
     const stateId = stateNodeEl?.dataset['id'] ?? null
@@ -92,7 +120,6 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
       return
     }
 
-    // Drop on empty canvas — create new state
     const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const newId = generateUniqueStateId(payload.name, d.states)
     const updated: FlowYaml = {
@@ -102,10 +129,10 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
       transitions: { ...d.transitions },
     }
     onChange(updated)
-    // flowPos is computed but canvas positions are UI-only — the node will be placed
-    // by React Flow layout on the next render. We store flowPos for future position persistence.
     void flowPos
   }
+
+  const inspectorOpen = detail !== null
 
   return (
     <div style={styles.wrapper}>
@@ -125,46 +152,51 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
           + Add state
         </button>
       </div>
-      <div
-        style={styles.canvas}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-      >
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          fitView
+      <div style={styles.body}>
+        <div
+          style={styles.canvas}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
         >
-          <Background color={t.bgSurface0} />
-          <Controls />
-        </ReactFlow>
+          <ReactFlow
+            nodes={nodesWithIssues}
+            edges={edgesWithValidation}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
+            fitView
+          >
+            <Background color={t.bgSurface0} />
+            <Controls />
+          </ReactFlow>
+        </div>
 
-        {detail && (
-          <div style={styles.detailPanel}>
-            {detail.type === 'node' && (
+        {inspectorOpen && (
+          <div style={styles.inspectorPane}>
+            {detail!.type === 'node' && (
               <NodePanel
-                stateId={detail.stateId}
+                stateId={(detail as NodeDetail).stateId}
                 data={localData}
                 onAgentChange={handleAgentChange}
                 onAddRule={handleAddTransitionRule}
                 onClose={() => setDetail(null)}
                 t={t}
+                issues={validationIssues}
               />
             )}
-            {detail.type === 'edge' && (
+            {detail!.type === 'edge' && (
               <EdgePanel
-                source={detail.source}
-                target={detail.target}
+                source={(detail as EdgeDetail).source}
+                target={(detail as EdgeDetail).target}
                 data={localData}
                 onAddAction={handleAddTransitionAction}
                 onClose={() => setDetail(null)}
                 t={t}
+                onDataChange={onChange}
+                issues={validationIssues}
               />
             )}
           </div>

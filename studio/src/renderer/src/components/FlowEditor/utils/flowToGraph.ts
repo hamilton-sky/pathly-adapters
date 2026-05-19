@@ -2,9 +2,12 @@ import type { Node, Edge } from 'reactflow'
 import type { Theme } from '../../../theme'
 import type { FlowYaml } from '../../../types'
 
+import type { FlowValidationIssue } from './validateFlow'
+
 export interface StateNodeData {
   state: string
   agent: string
+  issues?: FlowValidationIssue[]
 }
 
 // Nested transition_rules shape used by the real FSM:
