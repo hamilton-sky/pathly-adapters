@@ -410,25 +410,39 @@ Users organize flows with category folders inside the FLOWS section:
     ⚡ explore.flow.yaml     ← uncategorized at root
 ```
 
-### Monitor: display mode driven by flow YAML structure
+### Monitor: ALL flows use the FSM topology rail (correction)
 
-The monitor detects display mode from the YAML, not the sidebar section:
-- Many states + multiple agents in `agent_map` → **FSM topology rail**
-- 1-2 states + loops back to start (or explicit `flow_type: debug`) → **loop counter display**
+The "loop counter" concept was wrong. A debug flow like `debug.flow.yaml` is a real multi-state FSM — it has states like TESTING → BUILDING → REVIEWING → back to TESTING. That is not a single-state loop; it is a proper FSM that cycles. The FSM topology rail is correct for it.
 
-Loop counter display for debug/explore:
 ```
-+--------------------------------------------------------------+
-| Monitor  [ debug.flow.yaml ]      ● SSE live    iter 4 / ?  |
-+--------------------------------------------------------------+
-|  ↺ ─────────────── ↺  DEBUG LOOP · builder                  |
-|  iteration 4 · started 3m ago · waiting for: NOTES.md       |
-+--------------------------------------------------------------+
-| ✓ iter 1  fixed typo   40s                                  |
-| ✓ iter 2  added test   35s                                  |
-| ● iter 4  running                                           |
-+--------------------------------------------------------------+
+debug.flow.yaml states:
+  TESTING → BUILDING → REVIEWING → (loops back to TESTING if issues remain)
 ```
+
+**All flows — team, debug, explore — use the same FSM topology rail.** The differences are:
+- Fewer states (debug/explore typically have 3–4 vs team's 5–7)
+- The loop-back edge is more frequent and expected (the dot snaps back to TESTING when REVIEWING finds issues)
+- The flow file name in the monitor tab label tells the user which flow type they're watching
+
+The loop-back behavior on the rail is already handled by the Q3 design: the active dot snaps back to the earlier state when a loop-back transition fires. The execution trace below the rail records each visit chronologically, so TESTING visited twice shows as two rows.
+
+```
+Monitor  [ debug.flow.yaml ]      ● SSE live    cycle 3
+
+  ✓─────────────✗─────────────●
+TESTING     BUILDING      REVIEWING
+                ↑ active (3rd visit)   ↺ looped back from REVIEWING
+
+Execution trace:
+  ✓ TESTING    cycle 1   tester    2m ago
+  ✓ BUILDING   cycle 1   builder   1m ago
+  ✗ REVIEWING  cycle 1   reviewer  50s ago  → issues found, retry
+  ✓ TESTING    cycle 2   tester    40s ago
+  ✓ BUILDING   cycle 2   builder   25s ago
+  ● REVIEWING  cycle 2   reviewer  now
+```
+
+The monitor tab shows `cycle N` instead of `conv N` for debug/explore flows, since those flows loop rather than advance linearly. This is a label-only change — the rail and trace work identically.
 
 ---
 
@@ -550,7 +564,7 @@ When debug tab is selected:
 | **Context menu** | Per item type (section root / folder / skill+agent / flow) — see Q1 spec | Phase 6 |
 | **Empty section** | Two-line muted hint; no auto-collapse | Phase 6 |
 | **Debug/Explore sidebar** | All flows in FLOWS section; users organize with category folders — no separate sections | Phase 4 |
-| **Monitor mode detection** | From YAML structure or `flow_type` field, not sidebar section | studio-monitor-live plan |
+| **Monitor display** | All flows (team, debug, explore) use FSM topology rail + execution trace. Debug/explore show `cycle N` not `conv N`. Loop-back = dot snaps back on rail. | studio-monitor-live plan |
 | **Workspace section** | Nav-only rows (Plan, Monitor, Settings) — not filesystem, no drag | Phase 4 |
 | **Entry point** | Last-used flow + running banner if active | studio-monitor-live plan |
 | **Monitor live** | useEffect + EventSource, no re-render on each event | studio-monitor-live plan |
