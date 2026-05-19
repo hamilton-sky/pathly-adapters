@@ -1,20 +1,11 @@
-"""Pathly FSM MCP server.
-
-Uses the official MCP Python SDK for correct protocol handling.
-
-Run via:  pathly-fsm   or   python -m pathly_orchestrator.mcp_server
-"""
+"""Pathly FSM business logic — transport-independent."""
 from __future__ import annotations
 
-import asyncio
 import json
 from importlib.resources import files
 from pathlib import Path
 
 import yaml
-from mcp import types
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
 
 from pathly_orchestrator.fsm import (
     append_event,
@@ -24,8 +15,6 @@ from pathly_orchestrator.fsm import (
     run_transition_actions,
     write_state,
 )
-
-server = Server("pathly-fsm")
 
 
 # ── Private helpers ───────────────────────────────────────────────────────────
@@ -92,9 +81,9 @@ def _blocked_response(feedback: dict, state_info: dict) -> dict:
     }
 
 
-# ── Tool handlers ─────────────────────────────────────────────────────────────
+# ── Public API ────────────────────────────────────────────────────────────────
 
-def _next_action(args: dict) -> dict:
+def next_action(args: dict) -> dict:
     flow_name = args["flow"]
     topic = args["topic"]
     project_root = args["project_root"]
@@ -126,7 +115,7 @@ def _next_action(args: dict) -> dict:
     }
 
 
-def _complete_stage(args: dict) -> dict:
+def complete_stage(args: dict) -> dict:
     flow_name = args["flow"]
     topic = args["topic"]
     project_root = args["project_root"]
@@ -239,101 +228,3 @@ def _complete_stage(args: dict) -> dict:
         "instructions": instructions,
         "limits": state_info["limits"],
     }
-
-
-# ── MCP server (SDK-based) ────────────────────────────────────────────────────
-
-@server.list_tools()
-async def list_tools() -> list[types.Tool]:
-    return [
-        types.Tool(
-            name="next_action",
-            description=(
-                "Return the next action for the FSM: the current state, agent instructions, "
-                "and any blocked feedback that must be resolved first."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "flow": {
-                        "type": "string",
-                        "description": "Flow name (e.g. 'team'). Resolves to core/flows/<flow>.flow.yaml.",
-                    },
-                    "topic": {
-                        "type": "string",
-                        "description": "Feature or topic name (used to format storage_path).",
-                    },
-                    "project_root": {
-                        "type": "string",
-                        "description": "Absolute path to the project root directory.",
-                    },
-                },
-                "required": ["flow", "topic", "project_root"],
-            },
-        ),
-        types.Tool(
-            name="complete_stage",
-            description=(
-                "Advance the FSM to the next state after the current stage is done. "
-                "Handles decide-blocks, transition actions, and state persistence."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "flow": {"type": "string", "description": "Flow name (e.g. 'team')."},
-                    "topic": {"type": "string", "description": "Feature or topic name."},
-                    "project_root": {
-                        "type": "string",
-                        "description": "Absolute path to the project root directory.",
-                    },
-                    "decision": {
-                        "type": "string",
-                        "description": "Decision key chosen from a decide-block options dict (Call 2 only).",
-                    },
-                    "resolved_files": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Feedback filenames (with .md) that have been resolved and should be deleted.",
-                    },
-                },
-                "required": ["flow", "topic", "project_root"],
-            },
-        ),
-    ]
-
-
-@server.call_tool()
-async def call_tool(name: str, arguments: dict | None = None) -> list[types.TextContent]:
-    args = arguments or {}
-    if name == "next_action":
-        try:
-            result = _next_action(args)
-        except Exception as exc:
-            result = {"error": str(exc)}
-        return [types.TextContent(type="text", text=json.dumps(result))]
-
-    if name == "complete_stage":
-        try:
-            result = _complete_stage(args)
-        except Exception as exc:
-            result = {"error": str(exc)}
-        return [types.TextContent(type="text", text=json.dumps(result))]
-
-    raise ValueError(f"Unknown tool: {name}")
-
-
-async def _amain() -> None:
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options(),
-        )
-
-
-def main() -> None:
-    asyncio.run(_amain())
-
-
-if __name__ == "__main__":
-    main()

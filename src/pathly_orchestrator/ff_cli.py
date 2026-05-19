@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from pathly_orchestrator.mcp_server import _complete_stage, _next_action
+from pathly_orchestrator.fsm_ops import complete_stage, next_action
 
 
 _SCAN_ROOTS = [
@@ -94,7 +94,7 @@ def main() -> None:
 
     project_root = str(cwd)
 
-    next_result = _next_action({"flow": flow, "topic": topic, "project_root": project_root})
+    next_result = next_action({"flow": flow, "topic": topic, "project_root": project_root})
 
     if next_result.get("blocked"):
         print(f"Blocked: {next_result}")
@@ -116,7 +116,7 @@ def main() -> None:
     except Exception:
         pass
 
-    result = _complete_stage({"flow": flow, "topic": topic, "project_root": project_root})
+    result = complete_stage({"flow": flow, "topic": topic, "project_root": project_root})
 
     if result.get("decide"):
         print("FSM needs a routing decision:")
@@ -126,7 +126,7 @@ def main() -> None:
         opts = result.get("options", {})
         print(f"  Options: {', '.join(opts.keys())}")
         decision = input(f"  Your choice [{'/'.join(opts.keys())}]: ").strip()
-        result = _complete_stage(
+        result = complete_stage(
             {"flow": flow, "topic": topic, "project_root": project_root, "decision": decision}
         )
 

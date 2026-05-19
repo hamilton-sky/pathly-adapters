@@ -17,8 +17,8 @@ from pathly_orchestrator.runner import (
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-_NEXT_ACTION_PATH = "pathly_orchestrator.runner._next_action"
-_COMPLETE_STAGE_PATH = "pathly_orchestrator.runner._complete_stage"
+_NEXT_ACTION_PATH = "pathly_orchestrator.runner.next_action"
+_COMPLETE_STAGE_PATH = "pathly_orchestrator.runner.complete_stage"
 _INVOKE_AGENT_PATH = "pathly_orchestrator.runner.invoke_agent"
 
 

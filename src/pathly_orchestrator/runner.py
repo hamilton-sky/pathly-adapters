@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 from importlib.resources import files
 
-from pathly_orchestrator.mcp_server import _next_action, _complete_stage
+from pathly_orchestrator.fsm_ops import next_action, complete_stage
 
 
 def _storage_path(flow: str, project_root: str, topic: str) -> Path:
@@ -138,7 +138,7 @@ def handle_decide(flow: str, topic: str, project_root: str, response: dict) -> d
     chosen = input(f"Choice (default: {default}): ").strip()
     if not chosen or chosen not in response.get("options", {}):
         chosen = default
-    return _complete_stage({
+    return complete_stage({
         "flow": flow,
         "topic": topic,
         "project_root": project_root,
@@ -160,7 +160,7 @@ def resolve_stage(
     MAX_FEEDBACK_ROUNDS = 3
 
     while True:
-        result = _complete_stage({
+        result = complete_stage({
             "flow": flow,
             "topic": topic,
             "project_root": project_root,
@@ -221,7 +221,7 @@ def run_flow(
 
     while True:
         try:
-            response = _next_action({"flow": flow, "topic": topic, "project_root": project_root})
+            response = next_action({"flow": flow, "topic": topic, "project_root": project_root})
         except RuntimeError as exc:
             print(str(exc))
             return 1
