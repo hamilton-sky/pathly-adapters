@@ -1,7 +1,6 @@
 version: 1
 flow: team
-storage_path: "pathly/plans/{topic}/"
-
+storage_path: pathly/plans/{topic}/
 states:
   - STORMING
   - PLANNING
@@ -11,14 +10,11 @@ states:
   - TESTING
   - RETRO
   - DONE
-
 transitions:
   STORMING:
     - PLANNING
   PLANNING:
     - DESIGNING
-  DESIGNING:
-    - BUILDING
   BUILDING:
     - REVIEWING
   REVIEWING:
@@ -30,7 +26,8 @@ transitions:
   RETRO:
     - DONE
   DONE: []
-
+  DESIGNING:
+    - BUILDING
 agent_map:
   STORMING: team/discover
   PLANNING: team/plan
@@ -39,11 +36,6 @@ agent_map:
   REVIEWING: team/review
   TESTING: team/test
   RETRO: team/retro
-
-# Priority order is fixed: HUMAN_QUESTIONS > BLOCKED_ON_HUMAN > ARCH_FEEDBACK >
-# DESIGN_QUESTIONS > IMPL_QUESTIONS > REVIEW_FAILURES > TEST_FAILURES.
-# HUMAN_QUESTIONS and BLOCKED_ON_HUMAN both route to "human" — the skill surfaces
-# the file contents to the user and halts until the file is deleted.
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
@@ -52,15 +44,12 @@ feedback_routing:
   IMPL_QUESTIONS: planner
   REVIEW_FAILURES: builder
   TEST_FAILURES: builder
-
 transition_rules:
   PLANNING:
-    # Artifact gate: planner must produce IMPLEMENTATION_PLAN.md before DESIGNING
     on_artifact:
       IMPLEMENTATION_PLAN.md: DESIGNING
     default: PLANNING
   DESIGNING:
-    # Artifact gate: design agent must produce DESIGN.md before BUILDING
     on_artifact:
       DESIGN.md: BUILDING
     default: DESIGNING
@@ -75,10 +64,9 @@ transition_rules:
     on_artifact:
       TEST_FAILURES.md: TESTING
     default: RETRO
-
 transition_actions:
-  "BUILDING->REVIEWING":
+  BUILDING->REVIEWING:
     - skill: commit
-      message: "feat: complete building stage"
-  "RETRO->DONE":
+      message: 'feat: complete building stage'
+  RETRO->DONE:
     - skill: archive-artifacts
