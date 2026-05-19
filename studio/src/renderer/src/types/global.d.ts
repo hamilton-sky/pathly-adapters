@@ -9,6 +9,7 @@ declare global {
         list: (dir: string) => Promise<string[]>
         listDirs: (dir: string) => Promise<string[]>
         delete: (path: string) => Promise<void>
+        moveToParent: (filePath: string) => Promise<string>
         pickFolder: () => Promise<string | null>
       }
       shell: {

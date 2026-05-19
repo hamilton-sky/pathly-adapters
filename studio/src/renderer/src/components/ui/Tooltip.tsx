@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useTheme } from '../../useTheme'
 
@@ -18,23 +18,27 @@ export function Tooltip({
   delay = 400,
 }: TooltipProps): JSX.Element {
   const [visible, setVisible] = useState(false)
+  const [rawPos, setRawPos] = useState({ top: 0, left: 0 })
   const [pos, setPos] = useState({ top: 0, left: 0 })
+  const [resolvedPlacement, setResolvedPlacement] = useState(placement)
   const wrapRef = useRef<HTMLSpanElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const t = useTheme()
 
   function show(): void {
     timerRef.current = setTimeout(() => {
-      // display:contents has no box — read from the first rendered child instead
       const el = (wrapRef.current?.firstElementChild as HTMLElement | null) ?? wrapRef.current
       if (!el) return
       const r = el.getBoundingClientRect()
       const GAP = 7
-      let top: number, left: number
+      let top: number, left: number, rp = placement
       if (placement === 'bottom')     { top = r.bottom + GAP; left = r.left + r.width / 2 }
       else if (placement === 'left')  { top = r.top + r.height / 2; left = r.left - GAP }
       else if (placement === 'right') { top = r.top + r.height / 2; left = r.right + GAP }
-      else                            { top = r.top - GAP;    left = r.left + r.width / 2 }
+      else                            { top = r.top - GAP; left = r.left + r.width / 2; rp = 'top' }
+      setRawPos({ top, left })
+      setResolvedPlacement(rp)
       setPos({ top, left })
       setVisible(true)
     }, delay)
@@ -47,17 +51,50 @@ export function Tooltip({
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
+  // After the tooltip renders, measure it and clamp to viewport
+  useLayoutEffect(() => {
+    if (!visible || !tooltipRef.current) return
+    const el = tooltipRef.current
+    const r = el.getBoundingClientRect()
+    const PAD = 8
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    let { top, left } = rawPos
+    let rp = resolvedPlacement
+
+    if (rp === 'top' || rp === 'bottom') {
+      // Clamp horizontal: tooltip is center-anchored at left
+      const halfW = r.width / 2
+      if (left + halfW > vw - PAD) left = vw - PAD - halfW
+      if (left - halfW < PAD) left = PAD + halfW
+      // Flip top→bottom if it would go above viewport
+      if (rp === 'top' && top - r.height < PAD) {
+        const el2 = (wrapRef.current?.firstElementChild as HTMLElement | null) ?? wrapRef.current
+        if (el2) { const rb = el2.getBoundingClientRect(); top = rb.bottom + 7; rp = 'bottom' }
+      }
+      // Flip bottom→top if it would go below viewport
+      if (rp === 'bottom' && top + r.height > vh - PAD) {
+        const el2 = (wrapRef.current?.firstElementChild as HTMLElement | null) ?? wrapRef.current
+        if (el2) { const rb = el2.getBoundingClientRect(); top = rb.top - 7; rp = 'top' }
+      }
+    }
+
+    setResolvedPlacement(rp)
+    setPos({ top, left })
+  }, [visible, rawPos, resolvedPlacement])
+
   const transform =
-    placement === 'bottom' ? 'translate(-50%, 0)'                  :
-    placement === 'left'   ? 'translate(calc(-100% - 2px), -50%)' :
-    placement === 'right'  ? 'translate(2px, -50%)'               :
-                             'translate(-50%, calc(-100% - 2px))'
+    resolvedPlacement === 'bottom' ? 'translate(-50%, 0)'                  :
+    resolvedPlacement === 'left'   ? 'translate(calc(-100% - 2px), -50%)' :
+    resolvedPlacement === 'right'  ? 'translate(2px, -50%)'               :
+                                     'translate(-50%, calc(-100% - 2px))'
 
   return (
     <span ref={wrapRef} onMouseEnter={show} onMouseLeave={hide} style={{ display: 'contents' }}>
       {children}
       {visible && createPortal(
         <div
+          ref={tooltipRef}
           role="tooltip"
           style={{
             position: 'fixed',

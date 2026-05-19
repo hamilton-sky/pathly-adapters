@@ -72,4 +72,20 @@ export function registerFsHandlers(): void {
     if (!isPathSafe(filePath)) throw new Error('Path outside home directory is not allowed')
     return fs.promises.rm(filePath, { recursive: true, force: true })
   })
+
+  ipcMain.handle('fs:moveToParent', async (_event, filePath: string): Promise<string> => {
+    if (!isPathSafe(filePath)) throw new Error('Path outside home directory is not allowed')
+    const parentDir = path.dirname(path.dirname(filePath))
+    const fileName = path.basename(filePath)
+    const destPath = path.join(parentDir, fileName)
+    if (!isPathSafe(destPath)) throw new Error('Destination outside home directory is not allowed')
+    if (filePath === destPath) throw new Error('File is already at root of section')
+    const content = fs.readFileSync(filePath, 'utf-8')
+    const tmpPath = destPath + '.tmp'
+    fs.mkdirSync(path.dirname(destPath), { recursive: true })
+    fs.writeFileSync(tmpPath, content, 'utf-8')
+    fs.renameSync(tmpPath, destPath)
+    fs.rmSync(filePath, { force: true })
+    return destPath
+  })
 }

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, ChevronDown, Plus, FolderPlus, GripVertical, FolderOpen, Folder, FileText } from 'lucide-react'
+import { useEffect, useDeferredValue, useRef, useState } from 'react'
+import { ChevronRight, ChevronDown, Plus, FolderPlus, GripVertical, FolderOpen, Folder, FileText, BookOpen, ArrowLeft } from 'lucide-react'
 import { useStore } from '../store'
 import type { PathlyItem, PathlyItemType, PathlyCanvasDragItem, PathlyReorgDragItem } from '../types'
 import { PATHLY_DRAG_MIME } from '../types'
@@ -94,6 +94,7 @@ export function Sidebar(): JSX.Element {
 
   const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
@@ -316,261 +317,181 @@ export function Sidebar(): JSX.Element {
     } catch { /* ignore malformed payload */ }
   }
 
-  const lowerFilter = filter.toLowerCase()
+  const deferredFilter = useDeferredValue(filter)
+  const lowerFilter = deferredFilter.toLowerCase()
 
   return (
     <div className={styles.sidebar}>
       <div className={styles.filterRow}>
-        <input
-          className={styles.filterInput}
-          placeholder="Filter…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
+        <input className={styles.filterInput} placeholder={libraryOpen ? 'Search library…' : 'Filter…'} value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <button
+          className={`${styles.libraryBtn} ${libraryOpen ? styles.libraryBtnActive : ''}`}
+          onClick={() => { setLibraryOpen(v => !v); setFilter('') }}
+          title={libraryOpen ? 'Back to workspace' : 'Browse library'}
+        >
+          {libraryOpen ? <ArrowLeft size={13} /> : <BookOpen size={13} />}
+        </button>
       </div>
 
       <div className={styles.treeContainer}>
-        {/* Section A — Pathly: always visible */}
-        {PATHLY_SECTIONS.map((section) => {
-          const state = sections[section.label]
+        {/* Library mode — Flows / Skills / Agents / Templates (read-only) */}
+        {libraryOpen && (
+          <>
+            <div className={styles.libraryHeader}><BookOpen size={12} />Library</div>
+            {PATHLY_SECTIONS.map((section) => {
+              const state = sections[section.label]
 
-          if (section.type === 'template') {
-            if (state.subdirs === null) return null
-            const subdirs = state.subdirs ?? []
-            const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
-            if (!hasMatch) return null
-            return (
-              <div key={section.label}>
-                <div className={styles.sectionRow}>
-                  <button className={styles.sectionToggle} onClick={() => toggleSection(section.label)}>
-                    <span className={styles.chevron}>
-                      {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                    </span>
-                    {section.label}
-                  </button>
-                  <div className={styles.sectionActions}>
-                    <IconButton
-                      onClick={(e) => { void handleInlineCreate(section, e) }}
-                      title={`New ${section.label.slice(0, -1).toLowerCase()}`}
-                    >
-                      <Plus size={12} />
-                    </IconButton>
-                    <IconButton
-                      onClick={(e) => handleInlineCreateFolder(section, e)}
-                      title="New folder"
-                    >
-                      <FolderPlus size={12} />
-                    </IconButton>
-                  </div>
-                </div>
-                {state.open && (
-                  <div>
-                    {inlineCreate?.sectionLabel === section.label && (
-                      <InlineFolderInput
-                        onConfirm={async (name) => {
-                          if (name.trim()) {
-                            const clean = name.trim().replace(/[^a-zA-Z0-9_-]/g, '-')
-                            await window.pathly.fs.write(`${inlineCreate.parentDir}/${clean}/.gitkeep`, '')
-                            await loadItems()
-                          }
-                          setInlineCreate(null)
-                        }}
-                        onCancel={() => setInlineCreate(null)}
-                      />
-                    )}
-                    {subdirs.map((subdir, idx) => {
-                      const base = pathlyRoot || projectPath || ''
-                      const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
-                      if (filter && filteredFiles.length === 0) return null
-                      return (
-                        <div key={subdir.name}>
-                          <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
-                            <span className={styles.chevron}>
-                              {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                            </span>
-                            <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                            <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
-                            <div style={{ display: 'flex', gap: 2 }} onClick={(e) => e.stopPropagation()}>
-                              <IconButton onClick={(e) => handleSubdirCreateFile(section, subdir.name, e)} title={`New file in ${subdir.name}`}>
-                                <Plus size={11} />
-                              </IconButton>
-                              <IconButton onClick={(e) => handleSubdirCreateFolder(section, subdir.name, e)} title={`New folder in ${subdir.name}`}>
-                                <FolderPlus size={11} />
-                              </IconButton>
-                            </div>
-                          </button>
-                          {subdir.open && filteredFiles.map((item) => {
-                            const isDirty = dirtyItems.has(item.path)
-                            const isSelected = selectedItem?.path === item.path
-                            const itemDir = `${base}/${section.dir}/${subdir.name}`
-                            return (
-                              <button
-                                key={item.path}
-                                className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
-                                draggable
-                                onClick={() => handleItemClick(item)}
-                                onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
-                                onDragStart={(e) => handleItemDragStart(e, item, section)}
-                                title={item.path}
-                              >
-                                <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                                <span className={styles.itemName}>{item.name}</span>
-                                {isDirty && <span className={styles.dirtyDot}>●</span>}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          }
-
-          const subdirs = state.subdirs ?? []
-          const filtered = filter ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter)) : state.items
-          const hasSubdirMatch = filter ? subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter))) : true
-          if (filter && filtered.length === 0 && !hasSubdirMatch) return null
-          return (
-            <div key={section.label}>
-              <div className={styles.sectionRow}>
-                <button className={styles.sectionToggle} onClick={() => toggleSection(section.label)}>
-                  <span className={styles.chevron}>
-                    {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                  </span>
-                  {section.label}
-                </button>
-                <div className={styles.sectionActions}>
-                  <IconButton
-                    onClick={(e) => { void handleInlineCreate(section, e) }}
-                    title={`New ${section.label.slice(0, -1).toLowerCase()}`}
-                  >
-                    <Plus size={12} />
-                  </IconButton>
-                  <IconButton
-                    onClick={(e) => handleInlineCreateFolder(section, e)}
-                    title="New folder"
-                  >
-                    <FolderPlus size={12} />
-                  </IconButton>
-                </div>
-              </div>
-              {state.open && (
-                <div>
-                  {inlineCreate?.sectionLabel === section.label && (
-                    <InlineFolderInput
-                      onConfirm={async (name) => {
-                        if (name.trim()) {
-                          const clean = name.trim().replace(/[^a-zA-Z0-9_-]/g, '-')
-                          await window.pathly.fs.write(`${inlineCreate.parentDir}/${clean}/.gitkeep`, '')
-                          await loadItems()
-                        }
-                        setInlineCreate(null)
-                      }}
-                      onCancel={() => setInlineCreate(null)}
-                    />
-                  )}
-                  {subdirs.map((subdir, idx) => {
-                    const base = pathlyRoot || projectPath || ''
-                    const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
-                    if (filter && filteredFiles.length === 0) return null
-                    const folderPath = `${base}/${section.dir}/${subdir.name}`
-                    const folderSection = section.type === 'skill' ? 'skills' : section.type === 'agent' ? 'agents' : section.type === 'flow' ? 'flows' : 'templates'
-                    return (
-                      <div
-                        key={subdir.name}
-                        onDragOver={(e) => handleFolderDragOver(e, folderPath, folderSection)}
-                        onDragLeave={handleFolderDragLeave}
-                        onDrop={(e) => { void handleFolderDrop(e, folderSection, folderPath) }}
-                        style={dragOverPath === folderPath ? { borderLeft: '3px solid #8B5CF6' } : undefined}
-                      >
-                        <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
-                          <span className={styles.chevron}>
-                            {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                          </span>
-                          <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                          <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
-                          <div style={{ display: 'flex', gap: 2 }} onClick={(e) => e.stopPropagation()}>
-                            <IconButton onClick={(e) => handleSubdirCreateFile(section, subdir.name, e)} title={`New file in ${subdir.name}`}>
-                              <Plus size={11} />
-                            </IconButton>
-                            <IconButton onClick={(e) => handleSubdirCreateFolder(section, subdir.name, e)} title={`New folder in ${subdir.name}`}>
-                              <FolderPlus size={11} />
-                            </IconButton>
-                          </div>
-                        </button>
-                        {subdir.open && filteredFiles.map((item) => {
-                          const isDirty = dirtyItems.has(item.path)
-                          const isSelected = selectedItem?.path === item.path
-                          const itemDir = folderPath
-                          const isCanvasDraggable = section.type === 'skill' || section.type === 'agent'
+              if (section.type === 'template') {
+                if (state.subdirs === null) return null
+                const subdirs = state.subdirs ?? []
+                const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
+                if (!hasMatch) return null
+                return (
+                  <div key={section.label}>
+                    <div className={styles.sectionRow}>
+                      <button className={styles.sectionToggle} onClick={() => toggleSection(section.label)}>
+                        <span className={styles.chevron}>
+                          {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                        </span>
+                        {section.label}
+                      </button>
+                    </div>
+                    {state.open && (
+                      <div>
+                        {subdirs.map((subdir, idx) => {
+                          const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
+                          if (filter && filteredFiles.length === 0) return null
                           return (
-                            <button
-                              key={item.path}
-                              className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
-                              draggable
-                              onClick={() => handleItemClick(item)}
-                              onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
-                              onDragStart={(e) => handleItemDragStart(e, item, section)}
-                              title={item.path}
-                            >
-                              {isCanvasDraggable && (
-                                <span
-                                  className={styles.grip}
-                                  onPointerDown={handleGripPointerDown}
-                                  title="Drag to canvas"
-                                >
-                                  <GripVertical size={12} />
+                            <div key={subdir.name}>
+                              <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
+                                <span className={styles.chevron}>
+                                  {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                                 </span>
-                              )}
-                              <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                              <span className={styles.itemName}>{item.name}</span>
-                              {isDirty && <span className={styles.dirtyDot}>●</span>}
-                            </button>
+                                <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                                <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
+                              </button>
+                              {subdir.open && filteredFiles.map((item) => {
+                                const isSelected = selectedItem?.path === item.path
+                                return (
+                                  <button
+                                    key={item.path}
+                                    className={`${styles.systemItemRow} ${styles.systemItemRowDeep} ${isSelected ? styles.systemItemRowSelected : ''}`}
+                                    onClick={() => handleItemClick(item)}
+                                    title={item.path}
+                                  >
+                                    <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                    <span className={styles.itemName}>{item.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
                           )
                         })}
                       </div>
-                    )
-                  })}
-                  {filtered.map((item) => {
-                    const isDirty = dirtyItems.has(item.path)
-                    const isSelected = selectedItem?.path === item.path
-                    const itemDir = `${projectPath}/${section.dir}`
-                    const isCanvasDraggable = section.type === 'skill' || section.type === 'agent'
-                    return (
-                      <button
-                        key={item.path}
-                        className={`${styles.itemRow} ${isSelected ? styles.itemRowSelected : ''}`}
-                        draggable
-                        onClick={() => handleItemClick(item)}
-                        onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
-                        onDragStart={(e) => handleItemDragStart(e, item, section)}
-                        title={item.path}
-                      >
-                        {isCanvasDraggable && (
-                          <span
-                            className={styles.grip}
-                            onPointerDown={handleGripPointerDown}
-                            title="Drag to canvas"
-                          >
-                            <GripVertical size={12} />
-                          </span>
-                        )}
-                        <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span className={styles.itemName}>{item.name}</span>
-                        {isDirty && <span className={styles.dirtyDot}>●</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
+                    )}
+                  </div>
+                )
+              }
 
-        {/* Section B — Workspace: only when a project is open */}
-        {projectPath && (
+              const subdirs = state.subdirs ?? []
+              const filtered = filter ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter)) : state.items
+              const hasSubdirMatch = filter ? subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter))) : true
+              if (filter && filtered.length === 0 && !hasSubdirMatch) return null
+              return (
+                <div key={section.label}>
+                  <div className={styles.sectionRow}>
+                    <button className={styles.sectionToggle} onClick={() => toggleSection(section.label)}>
+                      <span className={styles.chevron}>
+                        {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                      </span>
+                      {section.label}
+                    </button>
+                  </div>
+                  {state.open && (
+                    <div>
+                      {subdirs.map((subdir, idx) => {
+                        const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
+                        if (filter && filteredFiles.length === 0) return null
+                        return (
+                          <div key={subdir.name}>
+                            <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
+                              <span className={styles.chevron}>
+                                {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                              </span>
+                              <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                              <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
+                            </button>
+                            {subdir.open && filteredFiles.map((item) => {
+                              const isSelected = selectedItem?.path === item.path
+                              const isCanvasDraggable = section.type === 'skill' || section.type === 'agent'
+                              return (
+                                <button
+                                  key={item.path}
+                                  className={`${styles.systemItemRow} ${styles.systemItemRowDeep} ${isSelected ? styles.systemItemRowSelected : ''}`}
+                                  draggable={isCanvasDraggable}
+                                  onClick={() => handleItemClick(item)}
+                                  onDragStart={isCanvasDraggable ? (e) => {
+                                    dragFromGripRef.current = true
+                                    handleItemDragStart(e, item, section)
+                                  } : undefined}
+                                  title={item.path}
+                                >
+                                  {isCanvasDraggable && (
+                                    <span
+                                      className={styles.grip}
+                                      onPointerDown={handleGripPointerDown}
+                                      title="Drag to canvas"
+                                    >
+                                      <GripVertical size={12} />
+                                    </span>
+                                  )}
+                                  <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                  <span className={styles.itemName}>{item.name}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                      {filtered.map((item) => {
+                        const isSelected = selectedItem?.path === item.path
+                        const isCanvasDraggable = section.type === 'skill' || section.type === 'agent'
+                        return (
+                          <button
+                            key={item.path}
+                            className={`${styles.systemItemRow} ${isSelected ? styles.systemItemRowSelected : ''}`}
+                            draggable={isCanvasDraggable}
+                            onClick={() => handleItemClick(item)}
+                            onDragStart={isCanvasDraggable ? (e) => {
+                              dragFromGripRef.current = true
+                              handleItemDragStart(e, item, section)
+                            } : undefined}
+                            title={item.path}
+                          >
+                            {isCanvasDraggable && (
+                              <span
+                                className={styles.grip}
+                                onPointerDown={handleGripPointerDown}
+                                title="Drag to canvas"
+                              >
+                                <GripVertical size={12} />
+                              </span>
+                            )}
+                            <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                            <span className={styles.itemName}>{item.name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </>
+        )}
+
+        {/* Section B — Workspace: only when a project is open and not in library mode */}
+        {!libraryOpen && projectPath && (
           <>
             <Separator label="Workspace" />
 
