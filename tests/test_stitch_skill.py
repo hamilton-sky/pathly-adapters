@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+import yaml
 
 from install_cli.stitch import stitch_skill
 
@@ -19,10 +20,16 @@ def skill_files(tmp_path):
     return core, meta
 
 
-def test_stitch_skill_returns_plain_body(skill_files):
+def test_stitch_skill_starts_with_frontmatter(skill_files):
     core, meta = skill_files
     result = stitch_skill(core, meta)
-    assert not result.startswith("---")
+    assert result.startswith("---\n")
+    _, frontmatter, body = result.split("---\n", 2)
+    assert yaml.safe_load(frontmatter) == {
+        "name": "go",
+        "description": "go, continue",
+    }
+    assert body.startswith("\n# go")
     assert "Skill body content here." in result
 
 
@@ -35,7 +42,9 @@ def test_stitch_skill_wrapper_used_when_set(tmp_path):
         encoding="utf-8",
     )
     result = stitch_skill(tmp_path / "nonexistent.md", meta)
-    assert result == "This is the wrapper content."
+    assert result.startswith("---\n")
+    assert "name: wrap" in result
+    assert "This is the wrapper content." in result
 
 
 def test_stitch_skill_strip_frontmatter(tmp_path):
@@ -50,6 +59,7 @@ def test_stitch_skill_strip_frontmatter(tmp_path):
     result = stitch_skill(core, meta)
     assert "key: val" not in result
     assert "Body." in result
+    assert result.startswith("---\n")
 
 
 def test_stitch_skill_no_strip_by_default(tmp_path):
@@ -64,6 +74,7 @@ def test_stitch_skill_no_strip_by_default(tmp_path):
     result = stitch_skill(core, meta)
     assert "key: val" in result
     assert "Body." in result
+    assert result.startswith("---\n")
 
 
 def test_stitch_skill_missing_required_fields_raises(tmp_path):
@@ -109,7 +120,7 @@ def test_stitch_skill_real_go_claude(tmp_path):
         pytest.skip("Actual skill files not found in this environment")
 
     result = stitch_skill(core_file, meta_file)
-    assert not result.startswith("---")
+    assert result.startswith("---\n")
     assert len(result) > 0
 
 
