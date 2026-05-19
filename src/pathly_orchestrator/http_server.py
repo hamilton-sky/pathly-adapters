@@ -28,6 +28,7 @@ except ImportError:
     sys.exit(1)
 
 from pathly_orchestrator.mcp_server import _next_action, _complete_stage
+from pathly_telemetry.storage import append_activity
 
 
 app = Flask(__name__)
@@ -125,6 +126,32 @@ def complete_stage_endpoint():
         return jsonify(result), 200
     except Exception as e:
         logging.exception("complete_stage error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
+@app.route('/record_activity', methods=['POST'])
+def record_activity_endpoint():
+    """Append an activity record to ~/.pathly/activity.jsonl."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        required = {"agent", "feature", "summary"}
+        missing = required - set(data.keys())
+        if missing:
+            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+
+        append_activity(
+            agent=data["agent"],
+            feature=data["feature"],
+            summary=data["summary"],
+            input_tokens=int(data.get("input_tokens", 0)),
+            output_tokens=int(data.get("output_tokens", 0)),
+        )
+        return jsonify({"status": "recorded"}), 200
+    except Exception as e:
+        logging.exception("record_activity error")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 

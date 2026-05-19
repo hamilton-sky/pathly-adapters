@@ -9,7 +9,6 @@ import yaml
 
 from .codex_plugin_config import install_codex_plugin, uninstall_codex_plugin
 from .detect import detect_hosts
-from .mcp_config import install_mcp_config, uninstall_mcp_config
 from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_flows_path, core_skills_path, core_templates_path, hooks_path
 from .stitch import stitch_agent, stitch_skill
 from .materialize import (
@@ -31,9 +30,12 @@ ALLOWED_HOSTS = {"claude", "codex", "copilot"}
 _TELEMETRY_FOOTER = """
 ---
 
-*Telemetry: when your task is complete, call the `record_activity` MCP tool with \
-your agent name, the feature you worked on, and a one-line summary of what you did. \
-Pass `input_tokens` and `output_tokens` if you have estimates (or leave them as 0).*
+*Telemetry: when your task is complete, run:*
+```bash
+curl -s -X POST http://127.0.0.1:8765/record_activity \
+  -H "Content-Type: application/json" \
+  -d '{"agent":"<your-agent-name>","feature":"<feature>","summary":"<one-line summary>","input_tokens":0,"output_tokens":0}'
+```
 """.strip()
 
 
@@ -218,8 +220,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             print(f"\n[{host}] Would write plugin files to {plugin_dest}:")
             for name in sorted(plugin_files):
                 print(f"  {plugin_dest / name}")
-        if telemetry_enabled:
-            install_mcp_config(host, dry_run=True)
         if host == "codex" and plugin_files:
             install_codex_plugin(plugin_files, dry_run=True)
         if host == "codex":
@@ -240,7 +240,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         return
 
     written_dests: list[Path] = []
-    mcp_registered = False
     codex_plugin_registered = False
     try:
         written = materialize(agent_files, dest, repair=repair, force=force, dry_run=False)
@@ -280,10 +279,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 written_dests.append(plugin_dest)
                 print(f"[{host}] Wrote {len(written)} plugin file(s) to {plugin_dest}")
 
-        if telemetry_enabled:
-            install_mcp_config(host, dry_run=False)
-            mcp_registered = True
-
         if host == "codex" and plugin_files:
             install_codex_plugin(plugin_files, dry_run=False)
             codex_plugin_registered = True
@@ -308,11 +303,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         for d in written_dests:
             try:
                 uninstall(d)
-            except Exception:
-                pass
-        if mcp_registered:
-            try:
-                uninstall_mcp_config(host, dry_run=False)
             except Exception:
                 pass
         if codex_plugin_registered:
@@ -342,8 +332,6 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
     install_cfg = _load_install_yaml(host)
     dest = Path(install_cfg["destination"]).expanduser()
 
-    if install_cfg.get("telemetry"):
-        uninstall_mcp_config(host, dry_run=dry_run)
     if host == "codex":
         uninstall_codex_plugin(dry_run=dry_run)
         removed_hooks = remove_codex_hooks(dry_run=dry_run)
