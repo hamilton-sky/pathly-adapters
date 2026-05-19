@@ -14,24 +14,24 @@ below or in Monitor.
 | Top Bar                                                                        |
 | [Project] [Flow: team.flow.yaml] [Target: Pathly]        [Watch] [Export]      |
 +----------------------+-----------------------------------------+---------------+
-| Library              | Visual Flow Canvas                      | Inspector     |
+| Library (tree)       | Visual Flow Canvas                      | Inspector     |
 |                      |                                         |               |
-| Filter...            |   +------------+      default           | Node: BUILDING|
+| 🔍 Filter...         |   +------------+      default           | Node: BUILDING|
 |                      |   | STORMING   | ---------------------> |               |
-| FLOWS                |   | planner    |                        | Identity      |
-|   team.flow.yaml     |   +------------+                        | Behavior      |
-|   debug.flow.yaml    |          |                              | Transitions   |
+| ▼ FLOWS              |   | planner    |                        | Identity      |
+|  ⚡team.flow.yaml ● |   +------------+                        | Behavior      |
+|  ⚡debug.flow.yaml   |          |                              | Transitions   |
 |                      |          | plan ready                   | Validation    |
-| SKILLS               |          v                              |               |
-|   review.md   ::     |   +------------+      pass              | Agent         |
-|   test.md     ::     |   | BUILDING   | --------------------+  | [builder v]   |
+| ▼ SKILLS             |          v                              |               |
+|  ⠿🔧review.md       |   +------------+      pass              | Agent         |
+|  ⠿🔧test.md         |   | BUILDING   | --------------------+  | [builder v]   |
 |                      |   | builder    |                     |  |               |
-| AGENTS               |   +------------+                     |  | + Add rule    |
-|   planner.md  ::     |          |                            |  |               |
-|   builder.md  ::     |          | needs fixes                |  +--------------+
-|                      |          v                            |
-| TEMPLATES            |   +------------+                      |
-|   feature-flow       |   | REVIEWING  | --------------------+
+| ▶ AGENTS             |   +------------+                     |  | + Add rule    |
+| ▶ TEMPLATES          |          |                            |  |               |
+|                      |          | needs fixes                |  +--------------+
+| WORKSPACE            |          v                            |
+|  📋 Plan             |   +------------+                      |
+|  📡 Monitor          |   | REVIEWING  | --------------------+
 |                      |   | reviewer   |
 +----------------------+---+------------+----------------------------------------+
 | Terminal / Monitor / Event Log                                                 |
@@ -40,44 +40,84 @@ below or in Monitor.
 
 ## Left Library
 
-Library rows are reusable workflow primitives. Clicking previews the item;
-dragging places or assigns it in the canvas.
+The sidebar is a **filesystem-mirroring tree**. Each section maps to a directory
+on disk. Users organize items with category folders. The tree reflects what is
+actually on disk — Studio does not invent sections or special-case flow types.
+
+Section → Directory mapping:
+- FLOWS      → `flows/`      (all .flow.yaml files — team, debug, explore, custom)
+- SKILLS     → `skills/`     (.md files + category folders)
+- AGENTS     → `agents/`     (.md files + category folders)
+- TEMPLATES  → `templates/`  (.md files + category folders)
+- WORKSPACE  → (navigation only, not a directory)
 
 ```text
-+----------------------+
-| Filter...            |
-+----------------------+
-| FLOWS              + |
-| > team.flow.yaml     |
-|   debug.flow.yaml    |
-|   explore.flow.yaml  |
-|                      |
-| SKILLS             + |
-|   :: review.md       |
-|   :: test.md         |
-|   :: write-docs.md   |
-|                      |
-| AGENTS             + |
-|   :: planner.md      |
-|   :: builder.md      |
-|   :: reviewer.md     |
-|                      |
-| TEMPLATES          + |
-|   :: feature-flow    |
-|   :: debug-flow      |
-|                      |
-| WORKSPACE            |
-|   Plan               |
-|   Monitor            |
-|   Settings           |
-+----------------------+
++--------------------------------------+
+| 🔍  Filter...                        |  ← global; collapses empty sections
++--------------------------------------+
+| ▼ FLOWS                    [⚡+][📁+] |  ← hover reveals: new flow / new folder
+|   ▼ 📁 team/                         |  ← category folder (user-created)
+|     ⚡ team.flow.yaml       ●        |  ← ● = currently running (cyan dot)
+|   ▼ 📁 debug/                        |
+|     ⚡ debug.flow.yaml               |
+|   ⚡ explore.flow.yaml               |  ← uncategorized flow at root
+|                                      |
+| ▼ SKILLS                   [🔧+][📁+] |
+|   ▼ 📁 writing/                      |  ← user category folder
+|     ⠿ 🔧 review.md                  |  ← ⠿ = canvas-drag grip (skills only)
+|     ⠿ 🔧 write-docs.md              |
+|   ⠿ 🔧 test.md                      |  ← uncategorized at root
+|                                      |
+| ▶ AGENTS                             |  ← collapsed
+|                                      |
+| ▶ TEMPLATES                          |  ← collapsed
+|                                      |
++--------------------------------------+
+| WORKSPACE                            |  ← nav section, not filesystem
+|   📋 Plan                            |
+|   📡 Monitor                         |
+|   ⚙  Settings                        |
++--------------------------------------+
 ```
+
+Row anatomy:
+
+```text
+Flow file:     [    ][⚡][  name.flow.yaml  ][●?]    no grip (not canvas-assignable)
+Skill/Agent:   [ ⠿ ][🔧][  name.md         ]        grip = canvas-drag handle
+Folder:        [    ][📁][  folder-name/    ][▸/▼]   no grip
+Workspace:     [    ][📋][  label           ]        no grip, no actions
+```
+
+Drag behaviors:
+
+- **⠿ grip drag** (skills/agents only): assigns the skill/agent to a canvas state node.
+  Cursor `grab` → `grabbing`. MIME `application/pathly-drag-item` with `dragType: 'canvas'`.
+- **Row body drag** (all file/folder items): reorganizes within the section (move into folder).
+  Same MIME key, `dragType: 'reorg'`. Drop handler rejects mismatched `section` values.
+- **Cross-section reorg**: rejected silently. Foreign sections show no highlight; cursor `not-allowed`.
+- **Drop target** (valid same-section folder): `border-left: 2px solid #8B5CF6` + 8% violet tint.
+
+Section header hover actions:
+
+- `[🔧+]` / `[⚡+]`: creates a new file of the section's type inline (ghost extension after cursor).
+- `[📁+]`: creates a new category folder inline.
+- Both appear only on hover, flush-right in the header row.
+
+Context menu (right-click any item):
+
+| Item type | Menu options |
+|---|---|
+| Section root | New file, New category |
+| Category folder | New file, New subcategory · Rename · Delete |
+| Skill/Agent file | Open preview · Rename, Move to… · Delete |
+| Flow file | Open in canvas, Open source (YAML) · Rename, Move to… · Delete |
 
 Recommended visual behavior:
 
 - Use compact rows, not large cards.
-- Use a small drag affordance such as `::` or a Lucide grip icon.
-- Use section icons later: graph/path for flows, tool/module for skills,
+- Use `GripVertical` (6-dot) Lucide icon for the canvas-drag grip on skills/agents.
+- Use domain icons per section: `Workflow` (cyan) for flows, `Wrench` for skills,
   actor/node for agents, blueprint for templates, state sheet for plan.
 - Keep advanced/internal rows collapsed until needed.
 

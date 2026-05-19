@@ -2,7 +2,7 @@
 
 ## Overview
 
-This feature makes Pathly Studio's visual flow editor the primary authoring surface. It repairs connected graph rendering from YAML, adds drag/drop for skills and agents, replaces basic panels with an inspector, validates the canonical flow model, and adds YAML preview/export flows for Pathly, Claude Code, and Codex.
+This feature makes Pathly Studio's visual flow editor the primary authoring surface. It rebuilds the sidebar as a filesystem-mirroring tree with full CRUD and dual-drag, repairs connected graph rendering from YAML, replaces basic panels with an inspector, validates the canonical flow model, and adds YAML preview/export flows for Pathly, Claude Code, and Codex.
 
 ## Layer Architecture
 
@@ -55,44 +55,226 @@ Keep node position layout deterministic (column layout `i * 220` is fine for now
 Tolerate transitions whose source or target is missing from `states` by skipping the edge and emitting a validation issue (Phase 11 surfaces it). Do not drop unknown YAML keys.
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 4: Add draggable library metadata <- Conversation: 2
+### Phase 4: Define filesystem-tree types and section model <- Conversation: 2
 
-**File:** `studio/src/renderer/src/types/index.ts` - MODIFY: add library item metadata types for draggable skills, agents, templates, and flows.
-**Done when:** UI code can distinguish item type, name, path, and behavior kind during a drag/drop event.
-**Delivers stories:** S3
+**File:** `studio/src/renderer/src/types/index.ts` - MODIFY: replace flat library item types with filesystem-tree node types and section-aware drag payload.
+**Done when:** UI code can represent tree nodes (file vs folder), section membership, and both drag modes in a type-safe way.
+**Delivers stories:** S3, S8
 **Depends on:** Conversation 1 completed.
-**Enables:** Sidebar drag/drop wiring.
+**Enables:** Phases 4b–6.
 **Details:**
-Keep types host-neutral. Do not encode export target behavior here.
 
-**Library section defaults (confirm before Conversation 2 implementation):**
+```ts
+// Sidebar section domains — the four managed directories
+type PathlySection = 'skills' | 'agents' | 'flows' | 'templates';
+
+// A node in the filesystem tree (file or category folder)
+interface PathlyTreeNode {
+  name: string;               // filename or folder name
+  type: 'file' | 'folder';
+  path: string[];             // path segments from section root
+  section: PathlySection;
+  children?: PathlyTreeNode[]; // present on folders once loaded
+  handle?: FileSystemHandle;  // Electron local FS handle
+}
+
+// Drag payload for canvas assignment (from ⠿ grip)
+interface PathlyCanvasDragItem {
+  dragType: 'canvas';
+  name: string;               // e.g. "review.md"
+  section: PathlySection;     // 'skills' | 'agents'
+  path: string[];
+}
+
+// Drag payload for tree reorg (from row body)
+interface PathlyReorgDragItem {
+  dragType: 'reorg';
+  name: string;
+  section: PathlySection;     // drop handlers reject mismatched sections
+  path: string[];
+  type: 'file' | 'folder';
+}
+
+type PathlyDragItem = PathlyCanvasDragItem | PathlyReorgDragItem;
+```
+
+Use MIME key `application/pathly-drag-item` for both drag types (differentiated by `dragType` field in the payload).
+
+**Section defaults:**
 - Default-open: Flows, Skills, Agents
 - Default-collapsed: Templates, Workspace
 
-These defaults reflect the authoring mental model: users reach for skills/agents/flows constantly, and templates/workspace are secondary reference material.
+**File type constraints per section:**
+- SKILLS / AGENTS / TEMPLATES → `.md` files
+- FLOWS → `.flow.yaml` files
+
+**Domain icons (Lucide):**
+
+| Section | Folder icon | File icon | File icon color |
+|---|---|---|---|
+| SKILLS | `Folder` violet | `Wrench` | `textMuted` |
+| AGENTS | `Folder` violet | `Bot` | `textMuted` |
+| FLOWS | `Folder` violet | `Workflow` | `runtime cyan #22D3EE` |
+| TEMPLATES | `Folder` violet | `FileText` | `textMuted` |
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 5: Switch library default to read-only preview <- Conversation: 2
+### Phase 4b: Rebuild Sidebar as filesystem-tree component <- Conversation: 2
 
-**File:** `studio/src/renderer/src/components/Editor/index.tsx` - MODIFY: when `selectedItem.type` is `skill`, `agent`, or `template`, initialize `tab` to `'preview'` and add a gated "Edit" affordance so a flow author does not accidentally land in edit mode.
-**File:** `studio/src/renderer/src/components/Sidebar.tsx` - MODIFY: keep `handleItemClick` behavior, but rely on the Editor's new default to surface a preview rather than an editor for skills, agents, and templates. Flows and workspace artifacts (debugs, explorations) continue to open their authoring surface on click.
-**Done when:** Clicking a skill, agent, or template from the sidebar opens the existing Editor in preview mode. Editing the source requires an explicit user action.
-**Delivers stories:** S8
+**File:** `studio/src/renderer/src/components/Sidebar.tsx` - REWRITE: replace the flat section list with a filesystem-mirroring tree using the ZakaMurai `Sidebar.js` / `TreeItem.js` pattern, adapted for Pathly's four domain sections.
+**File:** `studio/src/renderer/src/components/Sidebar.module.css` - MODIFY: add tree item styles, drop target highlight, drag ghost, grip icon, section header hover reveal.
+**Done when:** The sidebar shows Skills, Agents, Flows, Templates as collapsible trees that mirror the actual directory structure. Category folders expand/collapse. Global filter highlights matches and collapses empty sections.
+**Delivers stories:** S3, S8
 **Depends on:** Phase 4.
-**Enables:** Library items act as reuse primitives by default, satisfying the progressive disclosure design decision.
+**Enables:** CRUD (Phase 4c), context menus (Phase 4d), dual-drag (Phase 6).
 **Details:**
-Do not introduce a new preview panel. The existing `Editor` component already supports a `preview` tab via [Editor/index.tsx:134](../../studio/src/renderer/src/components/Editor/index.tsx#L134); the change is the default tab choice plus a small "Edit source" entry point (a button in the toolbar or a context menu item). Do not auto-save while previewing. Frontmatter (`ConfigForm`) is shown read-only in preview.
+
+Structure: four fixed section root nodes (SKILLS, AGENTS, FLOWS, TEMPLATES) plus a WORKSPACE nav block. Section roots cannot be renamed or deleted.
+
+Each section root loads its directory tree on mount and re-loads on `fs.version` change (same pattern as ZakaMurai's `useEffect` on `fs.files`). Use a `VirtualList` for performance if item counts exceed ~50.
+
+Tree item row layout:
+```
+[⠿ grip][domain icon][  name  ][chevron if folder]    [🔧+][📁+] on hover
+```
+
+Section header row layout:
+```
+[chevron][  SECTION LABEL  ]                           [🔧+][📁+] on hover
+```
+
+- Grip (`⠿`, `GripVertical`) is visible only on skill and agent file rows (not folders, not flows, not templates).
+- Section header `+` icons are hover-reveal only, flush-right.
+- Folder rows show expand/collapse chevron. File rows show no chevron.
+- Active flow indicator: cyan `●` dot on any `.flow.yaml` that is currently running (SSE signal). Read from monitor state.
+- Workspace section (Plan, Monitor, Settings): nav-link rows only — no grip, no `+` actions, no drag.
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 6: Wire sidebar drag/drop into the canvas <- Conversation: 2
+### Phase 4c: Add CRUD operations to sidebar tree <- Conversation: 2
 
-**File:** `studio/src/renderer/src/components/Sidebar.tsx` - MODIFY: add drag start data for skill and agent rows while preserving click-to-open behavior.
-**Done when:** Skills and agents can be dragged without breaking normal sidebar navigation.
+**File:** `studio/src/renderer/src/components/Sidebar.tsx` - MODIFY: implement create, rename, and delete handlers on the tree component.
+**Done when:** Users can create `.md` / `.flow.yaml` files, create category folders, rename via double-click, and delete with a confirmation dialog — all within their section.
 **Delivers stories:** S3
-**Depends on:** Phase 4.
-**Enables:** Canvas drop behavior.
+**Depends on:** Phase 4b.
+**Enables:** Full user control over library organization.
 **Details:**
-Use native HTML5 drag/drop. Add `draggable` and `onDragStart` to the existing `button.itemRow` elements for skill and agent rows only (not workspace plan rows or template rows in this conversation). Use a stable MIME key `application/pathly-library-item` and stringify a `PathlyLibraryDragItem` payload. Click-to-open behavior must remain on plain click; drag must require a movement threshold (browser default is acceptable). Set `dataTransfer.effectAllowed = 'copy'` and add a `cursor: grab` hover affordance via `Sidebar.module.css`.
+
+**Create file:**
+- Triggered by hover-reveal `[🔧+]` icon on section header or folder row.
+- Inline input row appears as a child of the selected folder (or section root if nothing selected).
+- Ghost extension shown after cursor: `.md` for skills/agents/templates, `.flow.yaml` for flows.
+- On `Enter`: append ghost extension if user has not typed one (stem-only input → auto-append). If user typed a wrong extension, show inline error `"Skills must be .md files"` and keep input open. Do not auto-rename.
+- On `Escape`: cancel, remove input row.
+
+**Create folder:**
+- Triggered by hover-reveal `[📁+]` icon.
+- Inline input appears at the same level as the icon source.
+- No extension ghost — folders have no extension.
+
+**Rename:**
+- Double-click on any non-root item name activates inline edit input in place.
+- `Enter` confirms, `Escape` cancels.
+- Cascade: update any open editor tabs whose path matches the old path (mirror ZakaMurai `handleRename` tab cascade).
+
+**Delete:**
+- Right-click → "Delete" (see Phase 4d context menu).
+- Confirmation dialog: "Delete 'writing/' and its 3 files? This cannot be undone." Dialog shows file count for folders; plain name for files.
+- On confirm: remove from tree, close any tabs whose path is under the deleted path.
+
+**Move (tree reorg):**
+- Drag-and-drop within section (Phase 6 wires the drag; this phase implements the drop handler).
+- After drop: update tree state and rename open tabs with the new path prefix (mirror ZakaMurai `handleDrop`).
+**Verify:** `cd studio; npm run typecheck`
+
+### Phase 4d: Add context menus to sidebar tree <- Conversation: 2
+
+**File:** `studio/src/renderer/src/components/SidebarContextMenu.tsx` - CREATE: right-click context menu component, rendered at cursor position, dismissed on outside click.
+**Done when:** Right-clicking any tree item opens a context menu with the correct actions for that item type.
+**Delivers stories:** S3, S8
+**Depends on:** Phase 4c.
+**Enables:** Discoverability of CRUD operations beyond hover icons.
+**Details:**
+
+Context menu items by item type:
+
+**Section root (e.g. SKILLS header):**
+```
+  🔧 New skill file
+  📁 New category
+```
+
+**Category folder:**
+```
+  🔧 New skill file      (label adapts: "New flow" for FLOWS)
+  📁 New subcategory
+  ─────────────
+  ✏  Rename
+  ─────────────
+  🗑  Delete
+```
+
+**Skill / Agent file:**
+```
+  👁  Open preview
+  ─────────────
+  ✏  Rename
+  →  Move to…           (submenu: category folders in section + "/ Root")
+  ─────────────
+  🗑  Delete
+```
+
+**Flow file:**
+```
+  ⚡ Open in canvas
+  👁  Open source (YAML)
+  ─────────────
+  ✏  Rename
+  →  Move to…
+  ─────────────
+  🗑  Delete
+```
+
+Menu styling: `bgSurface1 #252C36` background, 4px border radius, 1px `borderSubtle` border, 12px text. Destructive items (`Delete`) use `#EF4444` text. Dividers are 1px `borderSubtle` lines. Menu dismisses on outside click or `Escape`.
+**Verify:** `cd studio; npm run typecheck`
+
+### Phase 5: Wire click behavior for tree items <- Conversation: 2
+
+**File:** `studio/src/renderer/src/components/Editor/index.tsx` - MODIFY: when `selectedItem.type` is `skill`, `agent`, or `template`, initialize `tab` to `'preview'` and add a gated "Edit source" affordance.
+**Done when:** Clicking a skill, agent, or template file opens read-only preview. Clicking a flow file opens the visual canvas. Clicking a folder expands/collapses it.
+**Delivers stories:** S8
+**Depends on:** Phase 4b.
+**Enables:** Progressive disclosure — library items are reuse primitives by default.
+**Details:**
+Do not introduce a new preview panel. The existing `Editor` already supports a `preview` tab; the change is the default tab plus a small "Edit source" toolbar button. Do not auto-save while previewing. Frontmatter (`ConfigForm`) shown read-only in preview.
+
+Click behavior by item type:
+- **Skill / Agent / Template file**: open Editor in `preview` tab → "Edit source" button available in toolbar
+- **Flow file**: open visual canvas editor (existing behavior)
+- **Folder**: expand/collapse tree node — no editor opened
+- **Workspace items** (Plan, Monitor, Settings): navigate to that Studio panel
+**Verify:** `cd studio; npm run typecheck`
+
+### Phase 6: Wire dual-drag — canvas assign and tree reorg <- Conversation: 2
+
+**File:** `studio/src/renderer/src/components/Sidebar.tsx` - MODIFY: add two distinct drag behaviors to the tree component.
+**Done when:** Dragging from the `⠿` grip assigns a skill/agent to a canvas node. Dragging a row body moves the item within its section. Cross-section drops are rejected silently.
+**Delivers stories:** S3
+**Depends on:** Phase 4c.
+**Enables:** Canvas drop behavior (Phase 7) and within-section reorganization.
+**Details:**
+
+**Canvas drag (from `⠿` grip — skills and agents only):**
+- `onMouseDown` / `onPointerDown` on the grip element sets `dragType: 'canvas'` in a ref before the drag starts.
+- `onDragStart` on the row: if drag originated from grip, set payload `{ dragType: 'canvas', name, section, path }` on `dataTransfer` with MIME `application/pathly-drag-item`. Set `effectAllowed = 'copy'`.
+- Canvas drag ghost: violet `#8B5CF6` border, semi-transparent item chip.
+- This drag type is consumed by the canvas drop handler (Phase 7).
+
+**Tree reorg drag (from row body — all file/folder items):**
+- `onDragStart` on the row: if drag did NOT originate from grip, set payload `{ dragType: 'reorg', name, section, path, type }`. Set `effectAllowed = 'move'`.
+- Drop handler on folder rows: reject if `payload.dragType !== 'reorg'` OR `payload.section !== thisFolderSection`. Set `dropEffect = 'none'` for rejected drops → browser shows `not-allowed` cursor automatically.
+- Valid drop target (same-section folder): highlight with `border-left: 2px solid #8B5CF6` + `rgba(139,92,246,0.08)` background. No highlight on foreign sections — they are inert.
+- On successful drop: call `handleDrop` from Phase 4c (moves file, updates tree, cascades tab paths).
+
+**Cross-section constraint:** The drop handler checks `payload.section === dropTargetSection`. If they differ, return without calling `preventDefault()` — the browser's default drag rejection behavior (`not-allowed` cursor) applies. No red tint on foreign sections.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 7: Handle canvas drops <- Conversation: 2
@@ -283,20 +465,25 @@ Keep Electron IPC boundaries unchanged unless a missing capability blocks export
 
 - Canvas is the primary authoring model; wizard becomes a template starter.
 - YAML remains inspectable and editable, but it serializes from the canonical graph model.
+- The sidebar is a **filesystem-mirroring tree** per domain section. Each section maps to a real directory (`skills/`, `agents/`, `flows/`, `templates/`). Users organize with category folders; Studio reflects what is on disk.
+- All flows — team, debug, explore, custom — live in the FLOWS section. There are no special-cased flow types in the sidebar. Users create category folders to organize them.
+- Skills and agents have **two distinct drag modes**: `⠿` grip → canvas assign; row body → tree reorg within section. Cross-section reorg is rejected.
 - Skills, agents, and templates are exposed for **reuse by default**. Clicking such an item opens read-only preview; editing the source requires an explicit user action.
 - Export targets are adapters over one canonical flow model, not separate editors.
 
 ## Scope Exclusions
 
-The following are explicitly **out of scope** for this feature. Do not implement them in any of the four conversations.
+The following are explicitly **out of scope** for this feature. Do not implement them in any of the conversations.
 
 | Excluded | Why |
 |---|---|
-| VS Code-style file tree drag/drop (reorder, reparent, multi-select, cut/copy/paste) | The Pathly sidebar is a domain-aware library, not a generic FS tree. Tree-internal FS operations are a separate future feature (`studio-file-tree-ops`). |
-| Drag/drop from OS filesystem onto the canvas | Library is the only source of skills/agents/templates in this feature. |
-| State rename from the node inspector | Renaming a state requires cascading edits to `transitions`, `agent_map`, `transition_rules`, and `transition_actions`. Out of scope; YAML view remains the rename path. |
-| Persisting canvas node positions to YAML | Positions stay UI state. A future layout-persistence feature can revisit this. |
-| Editing skills, agents, or templates from inside the visual flow editor | The visual editor is for assembly. Editing source remains the existing Editor's job and now requires an explicit action. |
-| Redesigning Monitor, Terminal, TopBar, PlanBoard, Settings, HomeScreen, SetupScreen, or FlowWizard | These surfaces are stable. The wizard remains as "New Flow from Template" only. |
-| MCP runtime, Electron installer, or backend changes | This feature is renderer-side except for the optional `pathlyApi.ts` helper in Phase 14. |
-| Drag/drop on workspace plan rows, debug rows, or exploration rows | Workspace artifacts are not library primitives. Their click-to-open behavior stays unchanged. |
+| **Multi-select in sidebar** | Single-item drag/CRUD is sufficient. Multi-select is a future enhancement. |
+| **Cut/copy/paste in sidebar** | Context menu covers move-to. Clipboard operations are a future enhancement. |
+| **Cross-section move** | A skill cannot become an agent. Domain boundaries are enforced; cross-section ops are rejected silently. |
+| **Drag/drop from OS filesystem onto the canvas** | Library is the only source of skills/agents. OS filesystem drag is a separate future feature. |
+| **State rename from the node inspector** | Renaming a state requires cascading edits to `transitions`, `agent_map`, `transition_rules`, `transition_actions`. YAML view is the rename path. |
+| **Persisting canvas node positions to YAML** | Positions stay UI state only. A future layout-persistence feature can revisit this. |
+| **Editing skills/agents/templates from inside the visual flow editor** | The visual editor is for assembly. Editing source requires an explicit action in the existing Editor. |
+| **Redesigning Monitor, Terminal, TopBar, PlanBoard, Settings, HomeScreen, SetupScreen, FlowWizard** | These surfaces are stable. Monitor improvements are a separate `studio-monitor-live` plan. |
+| **MCP runtime, Electron installer, or backend changes** | This feature is renderer-side except for the optional `pathlyApi.ts` helper in Phase 14. |
+| **Workspace rows (Plan, Monitor, Settings) drag/CRUD** | Workspace items are navigation destinations, not library primitives. Click-to-navigate only. |
