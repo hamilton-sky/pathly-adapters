@@ -1,6 +1,6 @@
 # studio-visual-flow-builder - Progress
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Story Status
 
@@ -11,8 +11,8 @@
 | S3 | Users can drag skills and agents from the library | Conv 2 | DONE |
 | S4 | Clicking a node opens a real node inspector | Conv 3 | DONE |
 | S5 | Clicking an edge opens transition configuration | Conv 3 | DONE |
-| S6 | YAML preview remains synchronized and safe | Conv 4 | TODO |
-| S7 | Users can export approved flows | Conv 4 | TODO |
+| S6 | YAML preview remains synchronized and safe | Conv 4 | DONE |
+| S7 | Users can export approved flows | Conv 4 | DONE |
 
 ## Conversation Breakdown
 
@@ -21,7 +21,7 @@
 | 1 | 1-3 | S1, S2 | DONE | `cd studio; npm run typecheck` |
 | 2 | 4-7 | S3, S8 | DONE | `cd studio; npm run typecheck` |
 | 3 | 8-11 | S4, S5 | DONE | `cd studio; npm run typecheck` |
-| 4 | 12-14 | S6, S7 | TODO | `cd studio; npm run typecheck` |
+| 4 | 12-14 | S6, S7 | DONE | `cd studio; npm run typecheck` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 

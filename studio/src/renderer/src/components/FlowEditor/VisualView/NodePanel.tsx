@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import * as jsYaml from 'js-yaml'
 import type { Theme } from '../../../theme'
 import type { FlowYaml } from '../../../types'
 import type { FlowValidationIssue } from '../utils/validateFlow'
@@ -6,13 +7,14 @@ import { makePanelStyles } from '../shared/panelStyles'
 import { PanelHeader } from '../shared/PanelHeader'
 import { Z } from '../zIndex'
 import { useProjectFiles } from '../../../hooks/useProjectFiles'
+import { readFile } from '../../../services/pathlyApi'
 
 interface NodePanelProps {
   stateId: string
   data: FlowYaml
   onAgentChange: (stateId: string, value: string) => void
-  onAddRule: (source: string) => void
   onClose: () => void
+  onRemove: () => void
   t: Theme
   issues?: FlowValidationIssue[]
 }
@@ -22,7 +24,7 @@ interface BehaviorItem {
   kind: 'skill' | 'agent'
 }
 
-export function NodePanel({ stateId, data, onAgentChange, onClose, t, issues }: NodePanelProps): JSX.Element {
+export function NodePanel({ stateId, data, onAgentChange, onClose, onRemove, t, issues }: NodePanelProps): JSX.Element {
   const panelStyles = makePanelStyles(t)
   const { sections } = useProjectFiles()
 
@@ -36,6 +38,34 @@ export function NodePanel({ stateId, data, onAgentChange, onClose, t, issues }: 
 
   // Outgoing transitions for this state
   const outgoing = data.transitions[stateId] ?? []
+
+  // Required artifacts from assigned behavior frontmatter
+  const [requiredArtifacts, setRequiredArtifacts] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    setRequiredArtifacts(null)
+    if (!currentAgent) return
+    const allItems = [
+      ...sections.Skills.items,
+      ...sections.Agents.items,
+    ]
+    const item = allItems.find((i) => i.name.replace(/\.[^.]+$/, '') === currentAgent)
+    if (!item) return
+    readFile(item.path)
+      .then((content) => {
+        const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+        if (!fmMatch) return
+        const fm = jsYaml.load(fmMatch[1]) as Record<string, unknown> | null
+        if (!fm) return
+        const artifacts = fm['required_artifacts']
+        if (Array.isArray(artifacts) && artifacts.length > 0) {
+          setRequiredArtifacts(artifacts.map(String))
+        } else {
+          setRequiredArtifacts([])
+        }
+      })
+      .catch(() => { /* file unreadable — show nothing */ })
+  }, [currentAgent, sections])
 
   // Popover state
   const [popoverOpen, setPopoverOpen] = useState(false)
@@ -112,11 +142,29 @@ export function NodePanel({ stateId, data, onAgentChange, onClose, t, issues }: 
     item?.scrollIntoView({ block: 'nearest' })
   }, [activeIndex])
 
-  const nodeIssues = issues?.filter((i) => i.scope === 'node' && i.key === stateId) ?? []
+  const nodeIssues = issues?.filter((i) => i.target === 'node' && i.id === stateId) ?? []
 
   return (
-    <div style={panelStyles.panel}>
+    <div style={{ ...panelStyles.panel, overflowY: 'auto' }}>
       <PanelHeader title={stateId} onClose={onClose} t={t} />
+
+      {/* Remove button — always visible below header */}
+      <button
+        onClick={onRemove}
+        style={{
+          width: '100%',
+          padding: '5px 0',
+          background: 'none',
+          border: `1px solid ${t.red}`,
+          borderRadius: 4,
+          color: t.red,
+          fontSize: 12,
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        Remove from canvas
+      </button>
 
       {/* Identity — read-only */}
       <div>
@@ -232,6 +280,24 @@ export function NodePanel({ stateId, data, onAgentChange, onClose, t, issues }: 
         )}
       </div>
 
+      {/* Required artifacts */}
+      {requiredArtifacts !== null && (
+        <div>
+          <div style={panelStyles.label}>Required artifacts</div>
+          {requiredArtifacts.length === 0 ? (
+            <div style={{ fontSize: '12px', color: t.textMuted, padding: '4px 0', fontStyle: 'italic' }}>none</div>
+          ) : (
+            <ul style={{ listStyle: 'none', margin: 0, padding: '4px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {requiredArtifacts.map((artifact) => (
+                <li key={artifact} style={{ fontSize: '12px', color: t.textSecondary, padding: '2px 0' }}>
+                  {artifact}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Transition summary */}
       <div>
         <div style={panelStyles.label}>Outgoing transitions</div>
@@ -261,7 +327,7 @@ export function NodePanel({ stateId, data, onAgentChange, onClose, t, issues }: 
               key={i}
               style={{
                 fontSize: '11px',
-                color: issue.severity === 'error' ? t.red : t.yellow,
+                color: issue.level === 'error' ? t.red : t.yellow,
                 padding: '3px 0'
               }}
             >
@@ -270,6 +336,7 @@ export function NodePanel({ stateId, data, onAgentChange, onClose, t, issues }: 
           ))}
         </div>
       )}
+
     </div>
   )
 }

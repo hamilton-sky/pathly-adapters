@@ -6,7 +6,7 @@ export type { StateNodeData }
 
 export function StateNode({ data }: NodeProps<StateNodeData>): JSX.Element {
   const t = useTheme()
-  const hasError = data.issues?.some((i) => i.severity === 'error')
+  const hasError = data.issues?.some((i) => i.level === 'error')
   const hasWarning = data.issues && data.issues.length > 0
 
   const borderColor = hasError ? t.red : hasWarning ? t.yellow : t.bgSurface1
@@ -24,14 +24,49 @@ export function StateNode({ data }: NodeProps<StateNodeData>): JSX.Element {
         position: 'relative'
       }}
     >
+      {/* Left target handle (backward compat, no id) */}
       <Handle
         type="target"
         position={Position.Left}
         style={{ background: t.blue, width: 8, height: 8, border: 'none' }}
       />
+
+      {/* Top handles */}
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="top-src"
+        style={{ background: t.blue, width: 8, height: 8, border: 'none' }}
+      />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top-tgt"
+        style={{ background: t.blue, width: 8, height: 8, border: 'none', left: '30%' }}
+      />
+
+      {/* Bottom handles */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bot-src"
+        style={{ background: t.blue, width: 8, height: 8, border: 'none' }}
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="bot-tgt"
+        style={{ background: t.blue, width: 8, height: 8, border: 'none', left: '30%' }}
+      />
+
       <div style={{ fontWeight: 600, fontSize: '13px' }}>{data.state}</div>
       {data.agent && (
         <div style={{ fontSize: '11px', color: t.textSecondary, marginTop: '2px' }}>{data.agent}</div>
+      )}
+      {data.outgoingStates && data.outgoingStates.length > 0 && (
+        <div style={{ fontSize: '10px', color: t.textMuted, marginTop: 2 }}>
+          → {data.outgoingStates.join(', ')}
+        </div>
       )}
       {hasWarning && (
         <div
@@ -57,6 +92,8 @@ export function StateNode({ data }: NodeProps<StateNodeData>): JSX.Element {
           !
         </div>
       )}
+
+      {/* Right source handle (backward compat, no id) */}
       <Handle
         type="source"
         position={Position.Right}

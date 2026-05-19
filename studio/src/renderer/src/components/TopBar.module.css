@@ -9,6 +9,7 @@
   background: var(--bg-mantle);
   border-bottom: 1px solid var(--bg-surface0);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .backBtn {
@@ -20,6 +21,7 @@
   padding: 4px 10px;
   font-size: 12px;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: background 0.12s, color 0.12s;
 }
 .backBtn:hover { background: var(--bg-surface0); color: var(--text-primary); }
@@ -31,13 +33,17 @@
   color: var(--accent);
   letter-spacing: 0.03em;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .center {
   flex: 1;
   display: flex;
   justify-content: center;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .topicSelect {
@@ -50,6 +56,9 @@
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s;
+  max-width: 180px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 .topicSelect:focus { border-color: var(--accent); }
 .topicSelect:focus-visible { outline: 2px solid #89b4fa; outline-offset: 2px; }
@@ -64,6 +73,9 @@
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s;
+  max-width: 120px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 .topicSelectArchive:focus { border-color: var(--bg-surface1); }
 .topicSelectArchive:focus-visible { outline: 2px solid #89b4fa; outline-offset: 2px; }
@@ -73,6 +85,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .badgeLive {
@@ -161,4 +175,27 @@
 .logLine {
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.navBtn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 10px;
+  transition: var(--transition-base);
+  white-space: nowrap;
+}
+
+.navBtn:hover {
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
+.navBtnActive {
+  background: var(--bg-surface1);
+  border-color: var(--accent);
+  color: var(--text-primary);
 }

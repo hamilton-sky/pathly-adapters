@@ -1,4 +1,5 @@
 import type { Node, Edge } from 'reactflow'
+import { MarkerType } from 'reactflow'
 import type { Theme } from '../../../theme'
 import type { FlowYaml } from '../../../types'
 
@@ -8,6 +9,8 @@ export interface StateNodeData {
   state: string
   agent: string
   issues?: FlowValidationIssue[]
+  outgoingStates?: string[]
+  incomingStates?: string[]
 }
 
 // Nested transition_rules shape used by the real FSM:
@@ -59,13 +62,20 @@ function extractEdgeLabel(
 
 export function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node<StateNodeData>[]; edges: Edge[] } {
   const stateSet = new Set(data.states ?? [])
+  const transitionEntries = Object.entries(data.transitions ?? {})
 
-  const nodes: Node<StateNodeData>[] = (data.states ?? []).map((state, i) => ({
-    id: state,
-    type: 'stateNode',
-    position: { x: i * 220, y: 100 },
-    data: { state, agent: data.agent_map[state] ?? '' }
-  }))
+  const nodes: Node<StateNodeData>[] = (data.states ?? []).map((state, i) => {
+    const outgoingStates = data.transitions[state] ?? []
+    const incomingStates = transitionEntries
+      .filter(([, targets]) => targets.includes(state))
+      .map(([src]) => src)
+    return {
+      id: state,
+      type: 'stateNode',
+      position: { x: i * 220, y: 100 },
+      data: { state, agent: data.agent_map[state] ?? '', outgoingStates, incomingStates }
+    }
+  })
 
   const edges: Edge[] = []
   const rules = data.transition_rules as Record<string, unknown> | undefined
@@ -85,10 +95,20 @@ export function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node<StateNodeDa
         id: edgeId,
         source,
         target,
+        type: 'smoothstep',
+        animated: false,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: t.blue,
+          width: 16,
+          height: 16,
+        },
         label,
-        style: { stroke: t.blue },
+        style: { stroke: t.blue, strokeWidth: 1.5 },
         labelStyle: { fill: t.textSecondary, fontSize: '11px' },
-        labelBgStyle: { fill: t.bgMantle }
+        labelBgStyle: { fill: t.bgMantle, fillOpacity: 0.85 },
+        labelBgPadding: [4, 2] as [number, number],
+        labelBgBorderRadius: 3,
       })
     }
   }

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import ReactFlow, { Background, Controls, ReactFlowProvider, useReactFlow } from 'reactflow'
+import { useMemo, useRef, useState } from 'react'
+import ReactFlow, { Background, Controls, ReactFlowProvider, useReactFlow, addEdge, updateEdge } from 'reactflow'
+import type { Node, Edge, Connection } from 'reactflow'
 import 'reactflow/dist/style.css'
 import * as jsYaml from 'js-yaml'
 import { useTheme } from '../../../useTheme'
@@ -12,6 +13,8 @@ import { NodePanel } from './NodePanel'
 import { EdgePanel } from './EdgePanel'
 import { StateNode } from './StateNode'
 import { validateFlow } from '../utils/validateFlow'
+import { resolveExportPath } from '../utils/exportPaths'
+import { applyDagreLayout } from '../utils/autoLayout'
 import { useProjectFiles } from '../../../hooks/useProjectFiles'
 import { useStore } from '../../../store'
 import { writeFile } from '../../../services/pathlyApi'
@@ -47,28 +50,28 @@ function generateUniqueStateId(base: string, existing: string[]): string {
 }
 
 const EXPORT_TARGET_LABELS: Record<FlowExportTarget, string> = {
-  pathly: 'Pathly package',
-  claude: 'Claude Code',
+  'pathly-package': 'Pathly package',
+  'claude-code': 'Claude Code',
   codex: 'Codex',
 }
 
-function resolveExportPath(target: FlowExportTarget, projectPath: string, flowName: string): string {
-  switch (target) {
-    case 'pathly': return `${projectPath}/src/pathly_data/core/flows/${flowName}.flow.yaml`
-    case 'claude': return `${projectPath}/.claude/pathly-flows/${flowName}.flow.yaml`
-    case 'codex':  return `${projectPath}/.codex/pathly-flows/${flowName}.flow.yaml`
-  }
+const EXPORT_TARGET_DESCRIPTIONS: Record<FlowExportTarget, string> = {
+  'pathly-package': 'This will overwrite the flow in src/pathly_data/core/flows/. The orchestrator will use this flow immediately.',
+  'claude-code': 'This will write to .claude/pathly-flows/. Claude Code will pick up the flow on next session start.',
+  codex: 'This will write to .codex/pathly-flows/. Codex will pick up the flow on next session start.',
 }
 
 function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
   const t = useTheme()
   const styles = makeVisualViewStyles(t)
   const [detail, setDetail] = useState<PanelDetail>(null)
-  const { screenToFlowPosition } = useReactFlow()
+  const [nodeCtxMenu, setNodeCtxMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null)
+  const [edgeCtxMenu, setEdgeCtxMenu] = useState<{ x: number; y: number; source: string; target: string } | null>(null)
+  const { screenToFlowPosition, fitView } = useReactFlow()
   const { sections } = useProjectFiles()
   const { projectPath, selectedItem } = useStore()
 
-  const [exportTarget, setExportTarget] = useState<FlowExportTarget>('pathly')
+  const [exportTarget, setExportTarget] = useState<FlowExportTarget>('pathly-package')
   const [lastExport, setLastExport] = useState<FlowExportRecord | null>(null)
   const [exportToast, setExportToast] = useState<string | null>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -83,7 +86,7 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
   // Run validation on every render (pure function, cheap)
   const validationIssues = useMemo(() => validateFlow(data, knownBehaviors), [data, knownBehaviors])
 
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onNodeClick, onEdgeClick, handleAgentChange, handleAddTransitionRule, handleAddTransitionAction, dataRef } = useFlowGraph(
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onNodeClick, onEdgeClick, handleAgentChange, handleAddTransitionRule, handleAddTransitionAction, dataRef, setNodes, setEdges } = useFlowGraph(
     data,
     t,
     onChange,
@@ -91,9 +94,55 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
     (edgeId, source, target) => setDetail({ type: 'edge', edgeId, source, target })
   )
 
+  const edgeUpdateSuccessful = useRef(true)
+
+  function handleEdgeUpdateStart(): void {
+    edgeUpdateSuccessful.current = false
+  }
+
+  function handleEdgeUpdate(oldEdge: Edge, newConnection: Connection): void {
+    // Always mark successful — onEdgeUpdate only fires when dropped on a valid handle
+    edgeUpdateSuccessful.current = true
+    // Always update the visual edge first (restores position even if data unchanged)
+    setEdges((eds) => updateEdge(oldEdge, newConnection, eds))
+
+    const d = dataRef.current
+    const oldSource = oldEdge.source
+    const oldTarget = oldEdge.target
+    const newSource = newConnection.source ?? oldSource
+    const newTarget = newConnection.target ?? oldTarget
+
+    if (oldSource === newSource && oldTarget === newTarget) return
+
+    const newTransitions = { ...d.transitions }
+    if (newTransitions[oldSource]) {
+      newTransitions[oldSource] = newTransitions[oldSource].filter((t) => t !== oldTarget)
+      if (newTransitions[oldSource].length === 0) delete newTransitions[oldSource]
+    }
+    if (!newTransitions[newSource]) newTransitions[newSource] = []
+    if (!newTransitions[newSource].includes(newTarget)) {
+      newTransitions[newSource] = [...newTransitions[newSource], newTarget]
+    }
+    onChange({ ...d, transitions: newTransitions })
+  }
+
+  function handleEdgeUpdateEnd(_: MouseEvent | TouchEvent, edge: Edge): void {
+    if (!edgeUpdateSuccessful.current) {
+      const d = dataRef.current
+      const newTransitions = { ...d.transitions }
+      if (newTransitions[edge.source]) {
+        newTransitions[edge.source] = newTransitions[edge.source].filter((t) => t !== edge.target)
+        if (newTransitions[edge.source].length === 0) delete newTransitions[edge.source]
+      }
+      onChange({ ...d, transitions: newTransitions })
+      setEdges((eds) => eds.filter((e) => e.id !== edge.id))
+    }
+    edgeUpdateSuccessful.current = true
+  }
+
   // Inject validation issues into node data
   const nodesWithIssues = useMemo(() => nodes.map((node) => {
-    const nodeIssues = validationIssues.filter((i) => i.scope === 'node' && i.key === node.id)
+    const nodeIssues = validationIssues.filter((i) => i.target === 'node' && i.id === node.id)
     const baseData = node.data as Record<string, unknown>
     return { ...node, data: { ...baseData, issues: nodeIssues.length > 0 ? nodeIssues : undefined } }
   }), [nodes, validationIssues])
@@ -101,13 +150,122 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
   // Inject validation color into edges
   const edgesWithValidation = useMemo(() => edges.map((edge) => {
     const edgeKey = `${edge.source}->${edge.target}`
-    const edgeIssues = validationIssues.filter((i) => i.scope === 'edge' && i.key === edgeKey)
+    const edgeIssues = validationIssues.filter((i) => i.target === 'edge' && i.id === edgeKey)
     if (edgeIssues.length === 0) return edge
-    const hasError = edgeIssues.some((i) => i.severity === 'error')
+    const hasError = edgeIssues.some((i) => i.level === 'error')
     return { ...edge, style: { ...edge.style, stroke: hasError ? t.red : t.yellow } }
   }), [edges, validationIssues, t])
 
   const localData = dataRef.current
+
+  function handleNodesDelete(deletedNodes: Node[]): void {
+    const d = dataRef.current
+    const deletedIds = new Set(deletedNodes.map((n) => n.id))
+
+    const states = d.states.filter((s) => !deletedIds.has(s))
+
+    const transitions: Record<string, string[]> = {}
+    for (const [src, targets] of Object.entries(d.transitions)) {
+      if (deletedIds.has(src)) continue
+      const filtered = targets.filter((t) => !deletedIds.has(t))
+      transitions[src] = filtered
+    }
+
+    const agent_map: Record<string, string> = {}
+    for (const [k, v] of Object.entries(d.agent_map)) {
+      if (!deletedIds.has(k)) agent_map[k] = v
+    }
+
+    const transition_rules: Record<string, unknown> = {}
+    if (d.transition_rules) {
+      for (const [k, v] of Object.entries(d.transition_rules)) {
+        if (!deletedIds.has(k)) transition_rules[k] = v
+      }
+    }
+
+    const transition_actions: Record<string, unknown> = {}
+    if (d.transition_actions) {
+      for (const [k, v] of Object.entries(d.transition_actions as Record<string, unknown>)) {
+        const isRelated = [...deletedIds].some((id) => k.includes(id))
+        if (!isRelated) transition_actions[k] = v
+      }
+    }
+
+    const updated: FlowYaml = {
+      ...d,
+      states,
+      transitions,
+      agent_map,
+      ...(d.transition_rules ? { transition_rules } : {}),
+      ...(d.transition_actions ? { transition_actions } : {}),
+    }
+    onChange(updated)
+  }
+
+  function handleEdgesDelete(deletedEdges: Edge[]): void {
+    const d = dataRef.current
+    const newTransitions = { ...d.transitions }
+    for (const edge of deletedEdges) {
+      const { source, target } = edge
+      if (newTransitions[source]) {
+        newTransitions[source] = newTransitions[source].filter((t) => t !== target)
+        if (newTransitions[source].length === 0) delete newTransitions[source]
+      }
+    }
+    onChange({ ...d, transitions: newTransitions })
+  }
+
+  function removeEdge(source: string, target: string): void {
+    const d = dataRef.current
+    const newTransitions = { ...d.transitions }
+    if (newTransitions[source]) {
+      newTransitions[source] = newTransitions[source].filter((t) => t !== target)
+      if (newTransitions[source].length === 0) delete newTransitions[source]
+    }
+    onChange({ ...d, transitions: newTransitions })
+    setEdges((eds) => eds.filter((e) => !(e.source === source && e.target === target)))
+  }
+
+  function handleEdgeContextMenu(e: React.MouseEvent, edge: Edge): void {
+    e.preventDefault()
+    setEdgeCtxMenu({ x: e.clientX, y: e.clientY, source: edge.source, target: edge.target })
+  }
+
+  function handleNodeContextMenu(e: React.MouseEvent, node: Node): void {
+    e.preventDefault()
+    setNodeCtxMenu({ x: e.clientX, y: e.clientY, nodeId: node.id })
+  }
+
+  function removeState(stateId: string): void {
+    const d = dataRef.current
+    const newStates = d.states.filter((s) => s !== stateId)
+    const newTransitions: Record<string, string[]> = {}
+    for (const [src, targets] of Object.entries(d.transitions ?? {})) {
+      if (src === stateId) continue
+      const filtered = targets.filter((t) => t !== stateId)
+      if (filtered.length > 0) newTransitions[src] = filtered
+    }
+    const newAgentMap = { ...d.agent_map }
+    delete newAgentMap[stateId]
+    const newRules = { ...((d.transition_rules as Record<string, unknown> | undefined) ?? {}) }
+    delete newRules[stateId]
+    const newActions: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(d.transition_actions ?? {})) {
+      if (!k.startsWith(`${stateId}->`) && !k.endsWith(`->${stateId}`)) {
+        newActions[k] = v
+      }
+    }
+    onChange({
+      ...d,
+      states: newStates,
+      transitions: newTransitions,
+      agent_map: newAgentMap,
+      transition_rules: Object.keys(newRules).length > 0 ? newRules : undefined,
+      transition_actions: Object.keys(newActions).length > 0 ? newActions : undefined,
+    })
+    setNodes((nds) => nds.filter((n) => n.id !== stateId))
+    setEdges((eds) => eds.filter((e) => e.source !== stateId && e.target !== stateId))
+  }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
     if (e.dataTransfer.types.includes(PATHLY_DRAG_MIME)) {
@@ -155,8 +313,8 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
     void flowPos
   }
 
-  const hasExportErrors = validationIssues.some((i) => i.severity === 'error')
-  const hasExportWarnings = validationIssues.some((i) => i.severity === 'warning')
+  const hasExportErrors = validationIssues.some((i) => i.level === 'error')
+  const hasExportWarnings = validationIssues.some((i) => i.level === 'warning')
 
   function getFlowName(): string {
     if (selectedItem?.name) return selectedItem.name.replace(/\.flow\.yaml$/, '')
@@ -166,7 +324,7 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
   async function doExport(): Promise<void> {
     if (!projectPath) return
     const flowName = getFlowName()
-    const targetPath = resolveExportPath(exportTarget, projectPath, flowName)
+    const targetPath = resolveExportPath(exportTarget, { projectPath, flowName })
     const content = jsYaml.dump(data, { lineWidth: 120 })
     try {
       await writeFile(targetPath, content)
@@ -213,6 +371,19 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
           }}
         >
           + Add state
+        </button>
+        <button
+          style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}`, marginLeft: 8 }}
+          title="Auto-arrange nodes into a clean left-to-right layout"
+          onClick={() => {
+            setNodes((nds) => {
+              const laid = applyDagreLayout(nds, edges)
+              setTimeout(() => fitView({ duration: 300, padding: 0.15 }), 50)
+              return laid
+            })
+          }}
+        >
+          Auto-layout
         </button>
 
         {/* Divider between layout and export controls */}
@@ -299,8 +470,11 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
             background: t.bgMantle, border: `1px solid ${t.bgSurface1}`, borderRadius: 8,
             padding: 24, maxWidth: 400, width: '100%',
           }}>
-            <p style={{ color: t.textPrimary, marginBottom: 16, fontSize: 14 }}>
+            <p style={{ color: t.textPrimary, marginBottom: 8, fontSize: 14 }}>
               This flow has validation warnings. Export anyway?
+            </p>
+            <p style={{ color: t.textMuted, marginBottom: 16, fontSize: 12 }}>
+              {EXPORT_TARGET_DESCRIPTIONS[exportTarget]}
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
@@ -320,6 +494,84 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
         </div>
       )}
 
+      {nodeCtxMenu && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 39 }}
+            onClick={() => setNodeCtxMenu(null)}
+          />
+          <div style={{
+            position: 'fixed',
+            left: nodeCtxMenu.x,
+            top: nodeCtxMenu.y,
+            background: t.bgMantle,
+            border: `1px solid ${t.bgSurface1}`,
+            borderRadius: 6,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+            zIndex: 40,
+            minWidth: 160,
+            padding: '4px 0',
+          }}>
+            <button
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '6px 14px', background: 'none', border: 'none',
+                color: t.red, fontSize: 13, cursor: 'pointer',
+              }}
+              onClick={() => {
+                removeState(nodeCtxMenu.nodeId)
+                setNodeCtxMenu(null)
+                if (detail?.type === 'node' && (detail as NodeDetail).stateId === nodeCtxMenu.nodeId) {
+                  setDetail(null)
+                }
+              }}
+            >
+              Remove from canvas
+            </button>
+          </div>
+        </>
+      )}
+
+      {edgeCtxMenu && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 39 }}
+            onClick={() => setEdgeCtxMenu(null)}
+          />
+          <div style={{
+            position: 'fixed',
+            left: edgeCtxMenu.x,
+            top: edgeCtxMenu.y,
+            background: t.bgMantle,
+            border: `1px solid ${t.bgSurface1}`,
+            borderRadius: 6,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+            zIndex: 40,
+            minWidth: 180,
+            padding: '4px 0',
+          }}>
+            <button
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '6px 14px', background: 'none', border: 'none',
+                color: t.red, fontSize: 13, cursor: 'pointer',
+              }}
+              onClick={() => {
+                removeEdge(edgeCtxMenu.source, edgeCtxMenu.target)
+                setEdgeCtxMenu(null)
+                if (detail?.type === 'edge' &&
+                    (detail as EdgeDetail).source === edgeCtxMenu.source &&
+                    (detail as EdgeDetail).target === edgeCtxMenu.target) {
+                  setDetail(null)
+                }
+              }}
+            >
+              Delete connection
+            </button>
+          </div>
+        </>
+      )}
+
       <div style={styles.body}>
         <div
           style={styles.canvas}
@@ -335,6 +587,15 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
+            onNodesDelete={handleNodesDelete}
+            onEdgesDelete={handleEdgesDelete}
+            onNodeContextMenu={handleNodeContextMenu}
+            onEdgeContextMenu={handleEdgeContextMenu}
+            onEdgeUpdateStart={handleEdgeUpdateStart}
+            onEdgeUpdate={handleEdgeUpdate}
+            onEdgeUpdateEnd={handleEdgeUpdateEnd}
+            edgeUpdaterRadius={20}
+            deleteKeyCode={['Delete', 'Backspace']}
             fitView
           >
             <Background color={t.bgSurface0} />
@@ -349,8 +610,12 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
                 stateId={(detail as NodeDetail).stateId}
                 data={localData}
                 onAgentChange={handleAgentChange}
-                onAddRule={handleAddTransitionRule}
                 onClose={() => setDetail(null)}
+                onRemove={() => {
+                  const stateId = (detail as NodeDetail).stateId
+                  removeState(stateId)
+                  setDetail(null)
+                }}
                 t={t}
                 issues={validationIssues}
               />
@@ -362,6 +627,11 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
                 data={localData}
                 onAddAction={handleAddTransitionAction}
                 onClose={() => setDetail(null)}
+                onRemove={() => {
+                  const d = detail as EdgeDetail
+                  removeEdge(d.source, d.target)
+                  setDetail(null)
+                }}
                 t={t}
                 onDataChange={onChange}
                 issues={validationIssues}

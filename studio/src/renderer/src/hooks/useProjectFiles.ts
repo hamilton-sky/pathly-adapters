@@ -56,17 +56,41 @@ export function useProjectFiles(): {
             let files: PathlyItem[] = []
             try {
               const fileNames = await listDir(subdirPath)
-              files = fileNames.map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: section.type }))
+              files = fileNames
+                .filter((f) => f !== '.gitkeep')
+                .map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: section.type }))
             } catch { /* empty subdir */ }
             subdirs.push({ name: subdirName, open: false, files })
           }
           setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs } }))
         } else {
           const names = await listDir(dir)
-          const items: PathlyItem[] = names.map((name) => ({
-            name, path: `${dir}/${name}`, type: section.type,
-          }))
-          setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items } }))
+          let subdirs: TemplateSubdir[] = []
+          try {
+            const subdirNames = await listDirs(dir)
+            const subdirSet = new Set(subdirNames)
+            const fileNames = names.filter((n) => !subdirSet.has(n))
+            const items: PathlyItem[] = fileNames.map((name) => ({
+              name, path: `${dir}/${name}`, type: section.type,
+            }))
+            for (const subdirName of subdirNames) {
+              const subdirPath = `${dir}/${subdirName}`
+              let files: PathlyItem[] = []
+              try {
+                const subFiles = await listDir(subdirPath)
+                files = subFiles
+                  .filter((f) => f !== '.gitkeep')
+                  .map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: section.type }))
+              } catch { /* empty subdir */ }
+              subdirs.push({ name: subdirName, open: false, files })
+            }
+            setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items, subdirs } }))
+          } catch {
+            const items: PathlyItem[] = names.map((name) => ({
+              name, path: `${dir}/${name}`, type: section.type,
+            }))
+            setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items, subdirs } }))
+          }
         }
       } catch {
         if (section.type === 'template') {

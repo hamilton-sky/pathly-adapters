@@ -14,12 +14,14 @@ export function TopBar(): JSX.Element {
     publishing,
     publishLog,
     theme,
+    activePanel,
     setProjectPath,
     setActiveTopic,
     setPublishing,
     appendPublishLog,
     clearPublishLog,
     setTheme,
+    setActivePanel,
   } = useStore()
 
   const [activeTopics,   setActiveTopics]   = useState<string[]>([])
@@ -104,6 +106,29 @@ export function TopBar(): JSX.Element {
             <option value="">— archive —</option>
             {archivedTopics.map((t) => <option key={t} value={`.archive/${t}`}>{t}</option>)}
           </select>
+          <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexShrink: 0 }}>
+            <button
+              className={`${styles.navBtn} ${activePanel === 'flow' ? styles.navBtnActive : ''}`}
+              onClick={() => setActivePanel('flow')}
+              title="Open flow canvas"
+            >
+              ⊞ Canvas
+            </button>
+            <button
+              className={`${styles.navBtn} ${activePanel === 'plan' ? styles.navBtnActive : ''}`}
+              onClick={() => setActivePanel('plan')}
+              title="Open plan board"
+            >
+              ☰ Plan
+            </button>
+            <button
+              className={`${styles.navBtn} ${activePanel === 'monitor' ? styles.navBtnActive : ''}`}
+              onClick={() => setActivePanel('monitor')}
+              title="Open monitor"
+            >
+              ⬡ Monitor
+            </button>
+          </div>
         </div>
 
         <div className={styles.right}>

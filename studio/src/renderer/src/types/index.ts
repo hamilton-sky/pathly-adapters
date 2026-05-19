@@ -28,6 +28,7 @@ export interface PathlyReorgDragItem {
   section: PathlySection
   path: string[]
   type: 'file' | 'folder'
+  sourcePath: string
 }
 
 export type PathlyDragItem = PathlyCanvasDragItem | PathlyReorgDragItem
@@ -138,7 +139,7 @@ export interface TemplateFrontmatter {
 
 export type FrontmatterValues = SkillFrontmatter | AgentFrontmatter | TemplateFrontmatter
 
-export type FlowExportTarget = 'pathly' | 'claude' | 'codex'
+export type FlowExportTarget = 'pathly-package' | 'claude-code' | 'codex'
 
 export interface FlowExportRecord {
   target: FlowExportTarget

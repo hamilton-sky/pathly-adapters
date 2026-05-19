@@ -46,33 +46,36 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
     set({ adapters: active ? [...current, adapter] : current.filter((a) => a !== adapter) })
   }
 
-  const adapterChipsEl = hasAdapters(values) ? (
-    <div className={styles.adapterChips}>
-      {ADAPTER_OPTIONS.map((adapter) => {
-        const meta = ADAPTER_META[adapter]
-        const active = (values.adapters ?? []).includes(adapter)
-        return (
-          <div
-            key={adapter}
-            className={styles.chip}
-            style={chipVars(active, meta)}
-            onClick={() => toggleAdapter(adapter, !active)}
-            title={active ? `Remove ${adapter}` : `Add ${adapter}`}
-          >
-            <span className={styles.chipDot} />
-            {adapter}
-          </div>
-        )
-      })}
-    </div>
-  ) : null
+  function adapterChipsEl(readOnly: boolean): JSX.Element | null {
+    if (!hasAdapters(values)) return null
+    return (
+      <div className={styles.adapterChips}>
+        {ADAPTER_OPTIONS.map((adapter) => {
+          const meta = ADAPTER_META[adapter]
+          const active = (values.adapters ?? []).includes(adapter)
+          return (
+            <div
+              key={adapter}
+              className={styles.chip}
+              style={chipVars(active, meta)}
+              onClick={readOnly ? undefined : () => toggleAdapter(adapter, !active)}
+              title={readOnly ? adapter : (active ? `Remove ${adapter}` : `Add ${adapter}`)}
+            >
+              <span className={styles.chipDot} />
+              {adapter}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   if (compact) {
     return (
       <div className={styles.card}>
         <div className={styles.cardBodyCompact}>
           <span className={styles.nameValue}>{values.name || '—'}</span>
-          {adapterChipsEl}
+          {adapterChipsEl(true)}
         </div>
       </div>
     )
@@ -109,7 +112,7 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
         {hasAdapters(values) && (
           <div className={styles.row}>
             <span className={styles.label}>Adapters</span>
-            {adapterChipsEl}
+            {adapterChipsEl(false)}
           </div>
         )}
 

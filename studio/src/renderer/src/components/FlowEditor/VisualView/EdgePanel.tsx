@@ -39,12 +39,13 @@ interface EdgePanelProps {
   data: FlowYaml
   onAddAction: (source: string, target: string) => void
   onClose: () => void
+  onRemove: () => void
   t: Theme
   onDataChange?: (updated: FlowYaml) => void
   issues?: FlowValidationIssue[]
 }
 
-export function EdgePanel({ source, target, data, onAddAction, onClose, t, onDataChange, issues }: EdgePanelProps): JSX.Element {
+export function EdgePanel({ source, target, data, onAddAction, onClose, onRemove, t, onDataChange, issues }: EdgePanelProps): JSX.Element {
   const panelStyles = makePanelStyles(t)
   const actionKey = `${source}->${target}`
 
@@ -58,7 +59,7 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, t, onDat
     open: false, type: 'default', artifact: '', file: '', contains: '', question: '', optionLabel: 'approve'
   })
 
-  const edgeIssues = issues?.filter((i) => i.scope === 'edge' && i.key === actionKey) ?? []
+  const edgeIssues = issues?.filter((i) => i.target === 'edge' && i.id === actionKey) ?? []
 
   function updateRule(updated: StateRule): void {
     if (!onDataChange) return
@@ -155,14 +156,32 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, t, onDat
   }
 
   return (
-    <div style={panelStyles.panel}>
+    <div style={{ ...panelStyles.panel, overflowY: 'auto' }}>
       <PanelHeader title={`${source} → ${target}`} onClose={onClose} t={t} />
+
+      {/* Delete connection — always visible right below header */}
+      <button
+        onClick={onRemove}
+        style={{
+          width: '100%',
+          padding: '5px 0',
+          background: 'none',
+          border: `1px solid ${t.red}`,
+          borderRadius: 4,
+          color: t.red,
+          fontSize: 12,
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        Delete connection
+      </button>
 
       {/* Validation issues */}
       {edgeIssues.length > 0 && (
         <div role="alert" aria-live="polite">
           {edgeIssues.map((issue, i) => (
-            <div key={i} style={{ fontSize: '11px', color: issue.severity === 'error' ? t.red : t.yellow, padding: '2px 0' }}>
+            <div key={i} style={{ fontSize: '11px', color: issue.level === 'error' ? t.red : t.yellow, padding: '2px 0' }}>
               {issue.message}
             </div>
           ))}
@@ -351,6 +370,7 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, t, onDat
           )}
         </div>
       )}
+
     </div>
   )
 }

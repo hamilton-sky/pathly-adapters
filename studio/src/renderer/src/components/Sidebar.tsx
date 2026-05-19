@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ChevronRight, ChevronDown, Plus, GripVertical } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, FolderPlus, GripVertical } from 'lucide-react'
 import { useStore } from '../store'
 import type { PathlyItem, PathlyItemType, PathlyCanvasDragItem, PathlyReorgDragItem } from '../types'
 import { PATHLY_DRAG_MIME } from '../types'
@@ -51,6 +51,7 @@ interface ContextMenuState {
 export function Sidebar(): JSX.Element {
   const {
     projectPath,
+    pathlyRoot,
     activeTopic,
     sidebarCollapsed,
     setSidebarCollapsed,
@@ -104,24 +105,52 @@ export function Sidebar(): JSX.Element {
   }
 
   function handleNewItem(section: Section): void {
-    if (!projectPath) return
+    const base = pathlyRoot || projectPath
+    if (!base) return
     if (section.type === 'flow') {
       setShowFlowWizard(true)
     } else {
-      setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
+      setNewItemTarget({ type: section.type, dir: `${base}/${section.dir}` })
       setShowNewItemDialog(true)
     }
   }
 
   function handleInlineCreate(section: Section, e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation()
-    if (!projectPath) return
+    const base = pathlyRoot || projectPath
+    if (!base) return
     if (section.type === 'flow') {
       setShowFlowWizard(true)
     } else {
-      setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
+      setNewItemTarget({ type: section.type, dir: `${base}/${section.dir}` })
       setShowNewItemDialog(true)
     }
+  }
+
+  function handleInlineCreateFolder(section: Section, e: React.MouseEvent<HTMLButtonElement>): void {
+    e.stopPropagation()
+    const base = pathlyRoot || projectPath
+    if (!base) return
+    void handleCreateFolder(`${base}/${section.dir}`)
+  }
+
+  function handleSubdirCreateFile(section: Section, subdirName: string, e: React.MouseEvent<HTMLButtonElement>): void {
+    e.stopPropagation()
+    const base = pathlyRoot || projectPath
+    if (!base) return
+    if (section.type === 'flow') {
+      setShowFlowWizard(true)
+    } else {
+      setNewItemTarget({ type: section.type, dir: `${base}/${section.dir}/${subdirName}` })
+      setShowNewItemDialog(true)
+    }
+  }
+
+  function handleSubdirCreateFolder(section: Section, subdirName: string, e: React.MouseEvent<HTMLButtonElement>): void {
+    e.stopPropagation()
+    const base = pathlyRoot || projectPath
+    if (!base) return
+    void handleCreateFolder(`${base}/${section.dir}/${subdirName}`)
   }
 
   async function handleInlineCreatePlan(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
@@ -132,6 +161,19 @@ export function Sidebar(): JSX.Element {
     const trimmed = name.trim()
     await window.pathly.fs.write(`${projectPath}/pathly/plans/${trimmed}/STATE.json`, JSON.stringify({ current: 'INIT' }))
     await loadItems()
+  }
+
+  async function handleCreateFolder(baseDir: string): Promise<void> {
+    const name = window.prompt('Folder name:')
+    if (!name || !name.trim()) return
+    const trimmed = name.trim().replace(/[^a-zA-Z0-9_-]/g, '-')
+    if (!trimmed) return
+    try {
+      await window.pathly.fs.write(`${baseDir}/${trimmed}/.gitkeep`, '')
+      await loadItems()
+    } catch (err) {
+      console.error('Failed to create folder:', err)
+    }
   }
 
   function handleContextMenu(e: React.MouseEvent, item: PathlyItem, itemDir: string): void {
@@ -195,6 +237,7 @@ export function Sidebar(): JSX.Element {
         section: sectionName === 'skill' ? 'skills' : sectionName === 'agent' ? 'agents' : sectionName === 'flow' ? 'flows' : 'templates',
         path: pathSegments,
         type: 'file',
+        sourcePath: item.path,
       }
       e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
       e.dataTransfer.effectAllowed = 'move'
@@ -229,7 +272,7 @@ export function Sidebar(): JSX.Element {
     setDragOverPath(null)
   }
 
-  function handleFolderDrop(e: React.DragEvent, folderSection: string): void {
+  async function handleFolderDrop(e: React.DragEvent, folderSection: string, folderPath: string): Promise<void> {
     setDragOverPath(null)
     const raw = e.dataTransfer.getData(PATHLY_DRAG_MIME)
     if (!raw) return
@@ -238,7 +281,19 @@ export function Sidebar(): JSX.Element {
       if (payload.dragType !== 'reorg') return
       if (payload.section !== folderSection) return
       e.preventDefault()
-      // Tree reorg move logic can be wired here in a future phase (Phase 4c)
+      const reorgPayload = payload as PathlyReorgDragItem
+      const { sourcePath, name } = reorgPayload
+      if (!sourcePath) return
+      const destPath = `${folderPath}/${name}`
+      if (sourcePath === destPath) return
+      try {
+        const content = await window.pathly.fs.read(sourcePath)
+        await window.pathly.fs.write(destPath, content ?? '')
+        await window.pathly.fs.delete(sourcePath)
+        await loadItems()
+      } catch (err) {
+        console.error('Reorg move failed:', err)
+      }
     } catch { /* ignore malformed payload */ }
   }
 
@@ -272,19 +327,25 @@ export function Sidebar(): JSX.Element {
                     {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                   </span>
                   {section.label.toUpperCase()}
-                  {projectPath && (
+                  <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
                     <IconButton
-                      style={{ marginLeft: 'auto' }}
                       onClick={(e) => { void handleInlineCreate(section, e) }}
                       title={`New ${section.label.slice(0, -1).toLowerCase()}`}
                     >
                       <Plus size={12} />
                     </IconButton>
-                  )}
+                    <IconButton
+                      onClick={(e) => handleInlineCreateFolder(section, e)}
+                      title="New folder"
+                    >
+                      <FolderPlus size={12} />
+                    </IconButton>
+                  </div>
                 </button>
                 {state.open && (
                   <div>
                     {subdirs.map((subdir, idx) => {
+                      const base = pathlyRoot || projectPath || ''
                       const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
                       if (filter && filteredFiles.length === 0) return null
                       return (
@@ -293,12 +354,20 @@ export function Sidebar(): JSX.Element {
                             <span className={styles.chevron}>
                               {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                             </span>
-                            {subdir.name}/
+                            <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
+                            <div style={{ display: 'flex', gap: 2 }} onClick={(e) => e.stopPropagation()}>
+                              <IconButton onClick={(e) => handleSubdirCreateFile(section, subdir.name, e)} title={`New file in ${subdir.name}`}>
+                                <Plus size={11} />
+                              </IconButton>
+                              <IconButton onClick={(e) => handleSubdirCreateFolder(section, subdir.name, e)} title={`New folder in ${subdir.name}`}>
+                                <FolderPlus size={11} />
+                              </IconButton>
+                            </div>
                           </button>
                           {subdir.open && filteredFiles.map((item) => {
                             const isDirty = dirtyItems.has(item.path)
                             const isSelected = selectedItem?.path === item.path
-                            const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
+                            const itemDir = `${base}/${section.dir}/${subdir.name}`
                             return (
                               <button
                                 key={item.path}
@@ -317,17 +386,16 @@ export function Sidebar(): JSX.Element {
                         </div>
                       )
                     })}
-                    {!filter && (
-                      <button className={styles.newBtn} onClick={() => handleNewItem(section)}>+ new template</button>
-                    )}
                   </div>
                 )}
               </div>
             )
           }
 
+          const subdirs = state.subdirs ?? []
           const filtered = filter ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter)) : state.items
-          if (filter && filtered.length === 0) return null
+          const hasSubdirMatch = filter ? subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter))) : true
+          if (filter && filtered.length === 0 && !hasSubdirMatch) return null
           return (
             <div key={section.label}>
               <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
@@ -335,18 +403,83 @@ export function Sidebar(): JSX.Element {
                   {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                 </span>
                 {section.label.toUpperCase()}
-                {projectPath && (
+                <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
                   <IconButton
-                    style={{ marginLeft: 'auto' }}
                     onClick={(e) => { void handleInlineCreate(section, e) }}
                     title={`New ${section.label.slice(0, -1).toLowerCase()}`}
                   >
                     <Plus size={12} />
                   </IconButton>
-                )}
+                  <IconButton
+                    onClick={(e) => handleInlineCreateFolder(section, e)}
+                    title="New folder"
+                  >
+                    <FolderPlus size={12} />
+                  </IconButton>
+                </div>
               </button>
               {state.open && (
                 <div>
+                  {subdirs.map((subdir, idx) => {
+                    const base = pathlyRoot || projectPath || ''
+                    const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
+                    if (filter && filteredFiles.length === 0) return null
+                    const folderPath = `${base}/${section.dir}/${subdir.name}`
+                    const folderSection = section.type === 'skill' ? 'skills' : section.type === 'agent' ? 'agents' : section.type === 'flow' ? 'flows' : 'templates'
+                    return (
+                      <div
+                        key={subdir.name}
+                        onDragOver={(e) => handleFolderDragOver(e, folderPath, folderSection)}
+                        onDragLeave={handleFolderDragLeave}
+                        onDrop={(e) => { void handleFolderDrop(e, folderSection, folderPath) }}
+                        style={dragOverPath === folderPath ? { borderLeft: '3px solid #8B5CF6' } : undefined}
+                      >
+                        <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
+                          <span className={styles.chevron}>
+                            {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                          </span>
+                          <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
+                          <div style={{ display: 'flex', gap: 2 }} onClick={(e) => e.stopPropagation()}>
+                            <IconButton onClick={(e) => handleSubdirCreateFile(section, subdir.name, e)} title={`New file in ${subdir.name}`}>
+                              <Plus size={11} />
+                            </IconButton>
+                            <IconButton onClick={(e) => handleSubdirCreateFolder(section, subdir.name, e)} title={`New folder in ${subdir.name}`}>
+                              <FolderPlus size={11} />
+                            </IconButton>
+                          </div>
+                        </button>
+                        {subdir.open && filteredFiles.map((item) => {
+                          const isDirty = dirtyItems.has(item.path)
+                          const isSelected = selectedItem?.path === item.path
+                          const itemDir = folderPath
+                          const isCanvasDraggable = section.type === 'skill' || section.type === 'agent'
+                          return (
+                            <button
+                              key={item.path}
+                              className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
+                              draggable
+                              onClick={() => handleItemClick(item)}
+                              onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
+                              onDragStart={(e) => handleItemDragStart(e, item, section)}
+                              title={item.path}
+                            >
+                              {isCanvasDraggable && (
+                                <span
+                                  className={styles.grip}
+                                  onPointerDown={handleGripPointerDown}
+                                  title="Drag to canvas"
+                                >
+                                  <GripVertical size={12} />
+                                </span>
+                              )}
+                              <span className={styles.itemName}>{item.name}</span>
+                              {isDirty && <span className={styles.dirtyDot}>●</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
                   {filtered.map((item) => {
                     const isDirty = dirtyItems.has(item.path)
                     const isSelected = selectedItem?.path === item.path
@@ -376,9 +509,6 @@ export function Sidebar(): JSX.Element {
                       </button>
                     )
                   })}
-                  {!filter && (
-                    <button className={styles.newBtn} onClick={() => handleNewItem(section)}>+ new</button>
-                  )}
                 </div>
               )}
             </div>
@@ -480,11 +610,6 @@ export function Sidebar(): JSX.Element {
                           </div>
                         )
                       })}
-                      {!filter && (
-                        <button className={styles.newBtn} onClick={() => handleNewItem(section)}>
-                          {section.type === 'explore' ? '+ new exploration' : '+ new debug'}
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>

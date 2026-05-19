@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import { makeFlowEditorStyles } from './FlowEditor.styles'
 import { useFlowFile } from './hooks/useFlowFile'
 import { VisualView } from './VisualView'
 import { YamlView } from './YamlView'
+import { validateFlow } from './utils/validateFlow'
+import { useProjectFiles } from '../../hooks/useProjectFiles'
 
 type TabMode = 'visual' | 'yaml'
 
@@ -13,6 +15,7 @@ export function FlowEditor(): JSX.Element {
   const t = useTheme()
   const styles = makeFlowEditorStyles(t)
   const [tab, setTab] = useState<TabMode>('visual')
+  const { sections } = useProjectFiles()
 
   const {
     flowData,
@@ -28,6 +31,17 @@ export function FlowEditor(): JSX.Element {
     handleVisualSave,
     handleYamlSave
   } = useFlowFile(selectedItem, markDirty, clearDirty)
+
+  const knownBehaviors = useMemo(() => {
+    const skills = sections.Skills.items.map((item) => item.name.replace(/\.[^.]+$/, ''))
+    const agents = sections.Agents.items.map((item) => item.name.replace(/\.[^.]+$/, ''))
+    return [...skills, ...agents]
+  }, [sections])
+
+  const yamlValidationIssues = useMemo(
+    () => (flowData ? validateFlow(flowData, knownBehaviors) : []),
+    [flowData, knownBehaviors]
+  )
 
   function onTabClick(next: TabMode): void {
     const resolved = handleTabSwitch(next, tab)
@@ -94,6 +108,7 @@ export function FlowEditor(): JSX.Element {
             onDirty={handleYamlContentChange}
             onSave={handleYamlSave}
             syncContent={yamlSyncContent}
+            validationIssues={yamlValidationIssues}
           />
         )}
       </div>

@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import {
   addEdge,
   useNodesState,
   useEdgesState,
   type Connection,
   type NodeMouseHandler,
-  type EdgeMouseHandler
+  type EdgeMouseHandler,
+  type Node,
+  type Edge
 } from 'reactflow'
 import type { FlowYaml } from '../../../types'
 import type { Theme } from '../../../theme'
-import { flowToGraph } from '../utils/flowToGraph'
+import { flowToGraph, type StateNodeData } from '../utils/flowToGraph'
 
 interface UseFlowGraphReturn {
   nodes: ReturnType<typeof useNodesState>[0]
@@ -23,6 +26,8 @@ interface UseFlowGraphReturn {
   handleAddTransitionRule: (source: string) => void
   handleAddTransitionAction: (source: string, target: string) => void
   dataRef: React.MutableRefObject<FlowYaml>
+  setNodes: Dispatch<SetStateAction<Node<StateNodeData>[]>>
+  setEdges: Dispatch<SetStateAction<Edge[]>>
 }
 
 export function useFlowGraph(
@@ -119,6 +124,8 @@ export function useFlowGraph(
     handleAgentChange,
     handleAddTransitionRule,
     handleAddTransitionAction,
-    dataRef
+    dataRef,
+    setNodes,
+    setEdges
   }
 }
