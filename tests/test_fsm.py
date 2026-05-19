@@ -305,10 +305,11 @@ def test_run_transition_actions_git_commit(tmp_path):
         run_transition_actions(flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1)
 
     calls = mock_run.call_args_list
-    assert any(c == call(["git", "add", "-A"], cwd=str(tmp_path), capture_output=True, text=True) for c in calls)
+    assert any(c == call(["git", "add", "-A"], cwd=str(tmp_path), capture_output=True, text=True, timeout=30) for c in calls)
     assert any(
         c[0][0] == ["git", "commit", "-m", "feat: complete building stage"]
         and c[1].get("cwd") == str(tmp_path)
+        and c[1].get("timeout") == 30
         for c in calls
     )
 

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -166,7 +167,10 @@ def test_dry_run_real_codex_includes_plugin_manifest(capsys):
 # ---------------------------------------------------------------------------
 
 def _write_manifest(dest: Path, entries: dict) -> None:
-    manifest = {"files": entries}
+    manifest_hash = hashlib.sha256(
+        json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    manifest = {"_manifest_version": "1", "_manifest_hash": manifest_hash, "files": entries}
     (dest / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 

@@ -13,6 +13,7 @@ Environment variables:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
 import sys
@@ -94,12 +95,8 @@ def next_action_endpoint():
         result = _next_action(data)
         return jsonify(result), 200
     except Exception as e:
-        import traceback
-        return jsonify({
-            "error": str(e),
-            "type": type(e).__name__,
-            "traceback": traceback.format_exc()
-        }), 500
+        logging.exception("next_action error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
 @app.route('/complete_stage', methods=['POST'])
@@ -127,12 +124,8 @@ def complete_stage_endpoint():
         result = _complete_stage(data)
         return jsonify(result), 200
     except Exception as e:
-        import traceback
-        return jsonify({
-            "error": str(e),
-            "type": type(e).__name__,
-            "traceback": traceback.format_exc()
-        }), 500
+        logging.exception("complete_stage error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
 @app.route('/events/stream', methods=['GET'])
@@ -145,7 +138,12 @@ def events_stream():
     if not topic or not project_root:
         return jsonify({'error': 'topic and project_root are required'}), 400
 
-    key = (topic, project_root)
+    resolved_root = Path(project_root).resolve()
+    events_path = (resolved_root / 'pathly' / 'plans' / topic / 'EVENTS.jsonl').resolve()
+    if not events_path.is_relative_to(resolved_root):
+        return jsonify({"error": "Invalid project_root"}), 400
+
+    key = (topic, str(resolved_root))
     client_q: queue.Queue = queue.Queue(maxsize=100)
 
     with _lock:
@@ -171,6 +169,11 @@ def events_stream():
                 lst = _clients.get(key, [])
                 if client_q in lst:
                     lst.remove(client_q)
+                if not lst:
+                    stop_evt = _tailers.pop(key, None)
+                    if stop_evt is not None:
+                        stop_evt.set()
+                    _clients.pop(key, None)
 
     return Response(
         stream_with_context(generate()),

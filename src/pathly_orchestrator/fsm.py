@@ -12,7 +12,7 @@ import json
 import re
 import shutil
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -261,22 +261,30 @@ def run_transition_actions(
         if skill in ("commit", "git_commit"):
             message = action.get("message", f"chore: transition {prev_state}->{next_state}")
             try:
-                add_result = subprocess.run(
-                    ["git", "add", "-A"],
-                    cwd=str(project_root),
-                    capture_output=True,
-                    text=True,
-                )
+                try:
+                    add_result = subprocess.run(
+                        ["git", "add", "-A"],
+                        cwd=str(project_root),
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                except subprocess.TimeoutExpired:
+                    raise RuntimeError("git add timed out after 30 seconds")
                 if add_result.returncode != 0:
                     raise RuntimeError(
                         f"git add failed: {add_result.stderr}"
                     )
-                commit_result = subprocess.run(
-                    ["git", "commit", "-m", message],
-                    cwd=str(project_root),
-                    capture_output=True,
-                    text=True,
-                )
+                try:
+                    commit_result = subprocess.run(
+                        ["git", "commit", "-m", message],
+                        cwd=str(project_root),
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                except subprocess.TimeoutExpired:
+                    raise RuntimeError("git commit timed out after 30 seconds")
                 if commit_result.returncode != 0:
                     output = commit_result.stdout + commit_result.stderr
                     if "nothing to commit" in output or "nothing added to commit" in output:
@@ -351,7 +359,7 @@ def append_event(storage_path: Path, event: dict) -> None:
     storage_path.mkdir(parents=True, exist_ok=True)
     events_file = storage_path / "EVENTS.jsonl"
     event = dict(event)
-    event["ts"] = datetime.utcnow().isoformat()
+    event["ts"] = datetime.now(timezone.utc).isoformat()
     line = json.dumps(event) + "\n"
     with open(events_file, "a", encoding="utf-8") as f:
         f.write(line)

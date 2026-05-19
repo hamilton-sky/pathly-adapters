@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 from datetime import datetime, timezone
@@ -6,6 +7,10 @@ from pathlib import Path
 from .resources import hooks_path
 
 MANIFEST_NAME = ".pathly-manifest.json"
+
+
+def _hash_files_dict(files: dict) -> str:
+    return hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _hook_script_path(name: str) -> Path:
@@ -259,7 +264,13 @@ def _load_manifest(dest: Path) -> dict:
     manifest_path = dest / MANIFEST_NAME
     if manifest_path.exists():
         try:
-            return json.loads(manifest_path.read_text(encoding="utf-8"))
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if "_manifest_version" not in data:
+                raise ValueError("Manifest missing _manifest_version field")
+            files = data.get("files", {})
+            if data.get("_manifest_hash", "") != _hash_files_dict(files):
+                raise ValueError("Manifest hash mismatch — file may be corrupted or tampered")
+            return data
         except (json.JSONDecodeError, OSError):
             return {"files": {}}
     return {"files": {}}
@@ -267,6 +278,8 @@ def _load_manifest(dest: Path) -> dict:
 
 def _save_manifest(dest: Path, manifest: dict) -> None:
     dest.mkdir(parents=True, exist_ok=True)
+    manifest["_manifest_version"] = "1"
+    manifest["_manifest_hash"] = _hash_files_dict(manifest["files"])
     (dest / MANIFEST_NAME).write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
@@ -333,10 +346,13 @@ def materialize_flows(
     return materialize(files, dest, repair=True, force=force, dry_run=dry_run)
 
 
-def uninstall(dest: Path, *, dry_run: bool = False) -> list[str]:
+def uninstall(dest: Path, *, dry_run: bool = False, confirm_manifest: bool = False) -> list[str]:
     """Remove all Pathly-owned files from dest using the manifest.
 
     Returns list of filenames removed (or would-remove in dry_run).
+    If manifest entries are missing from disk and confirm_manifest is False,
+    prints a warning to stderr and aborts without deleting anything.
+    If confirm_manifest is True, missing entries are skipped and deletion proceeds.
     """
     manifest_path = dest / MANIFEST_NAME
     if not manifest_path.exists():
@@ -345,6 +361,7 @@ def uninstall(dest: Path, *, dry_run: bool = False) -> list[str]:
 
     manifest = _load_manifest(dest)
     removed: list[str] = []
+    missing: list[str] = []
 
     # Pass 1: validate all entries before touching the filesystem.
     # This prevents partial deletion when a manifest is tampered.
@@ -354,9 +371,22 @@ def uninstall(dest: Path, *, dry_run: bool = False) -> list[str]:
             raise ValueError(
                 f"Path traversal detected in manifest: {name!r} escapes destination {dest}"
             )
+        if not target.exists():
+            missing.append(name)
+
+    if missing and not confirm_manifest:
+        print(
+            f"  [warn] Aborting uninstall — the following manifest entries are not found on disk:\n"
+            + "\n".join(f"    {name}" for name in missing),
+            file=sys.stderr,
+        )
+        return []
 
     # Pass 2: all entries are clean — perform deletions.
+    missing_set = set(missing)
     for name in list(manifest["files"]):
+        if name in missing_set:
+            continue
         target = dest / name
         removed.append(name)
         if not dry_run:
