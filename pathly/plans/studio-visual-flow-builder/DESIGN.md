@@ -54,7 +54,7 @@ Bottom terminal / monitor panel
 ### Canvas
 
 - Use React Flow handles on every state node.
-- Edge labels should represent route reason: `default`, artifact name, feedback key, or action label.
+- Edge labels should represent route reason from the runtime schema: `default`, artifact name from `transition_rules[SOURCE].on_artifact`, content/decision route labels, feedback key, or action label.
 - Nodes must stay compact and scan-friendly.
 - Invalid nodes use a subtle warning badge, not oversized banners.
 - Pan, zoom, fit view, and lock controls should remain stable.
@@ -124,6 +124,9 @@ Required checks:
 
 - Every state exists in `states`.
 - Every transition source and target exists.
+- Every `transition_rules` source exists and uses the state-keyed runtime schema.
+- Every `transition_rules` target (`default`, `on_artifact`, `on_content.next`, `decide.options`) is listed in `transitions[source]`.
+- Every `transition_actions` key uses `SOURCE->TARGET` or `->TARGET` and points to known states/transitions.
 - Every non-terminal state has at least one outgoing transition.
 - Every referenced agent or skill exists or is marked external.
 - `DONE` or terminal states have no required outgoing transition.

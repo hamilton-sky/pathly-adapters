@@ -47,7 +47,12 @@ Use React Flow setters to rehydrate nodes and edges from `flowToGraph(data, t)` 
 **Depends on:** Phase 2.
 **Enables:** Drag/drop and inspector edits to write through the same model.
 **Details:**
-Keep node position layout deterministic (column layout `i * 220` is fine for now). Use stable edge ids of form `${source}__${target}` so the same edge across re-renders has the same id. Tolerate transitions whose source or target is missing from `states` by skipping the edge and emitting a validation issue (Phase 11 surfaces it). Do not drop unknown YAML keys.
+Keep node position layout deterministic (column layout `i * 220` is fine for now). Use stable edge ids of form `${source}__${target}` so the same edge across re-renders has the same id. Label edges from the runtime schema:
+- `transition_rules[source].default === target` -> `default`
+- `transition_rules[source].on_artifact[artifactName] === target` -> `artifactName`
+- `transition_rules[source].on_content[]` entries whose `next` is `target` -> their file/contains/regex summary
+- `transition_rules[source].decide.options[option] === target` -> the option label
+Tolerate transitions whose source or target is missing from `states` by skipping the edge and emitting a validation issue (Phase 11 surfaces it). Do not drop unknown YAML keys.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 4: Add draggable library metadata <- Conversation: 2
@@ -130,7 +135,26 @@ Use the docked inspector layout introduced in Phase 8. Implement the "Assigned b
 **Depends on:** Phase 9.
 **Enables:** Visual routing configuration.
 **Details:**
-Keep YAML structures compatible with existing `transition_actions` (`"SOURCE->TARGET": [{ skill, message }]`) and `transition_rules` (`{ artifact_name: { source: target } }`). Use existing `handleAddTransitionAction` and `handleAddTransitionRule` from `useFlowGraph` and extend with edit + delete. Avoid inventing a new flow schema.
+Keep YAML structures compatible with existing `transition_actions` (`"SOURCE->TARGET": [{ skill, message }]`) and the real runtime `transition_rules` schema:
+
+```yaml
+transition_rules:
+  SOURCE:
+    on_artifact:
+      ARTIFACT.md: TARGET
+    on_content:
+      - file: NOTES.md
+        contains: "ready"
+        next: TARGET
+    decide:
+      question: "Where next?"
+      options:
+        approve: TARGET
+      default: approve
+    default: TARGET
+```
+
+Do not use the older incorrect shape `{ artifact_name: { source: target } }`. The edge inspector should edit the rule object for the edge source state and ensure the chosen target is one of that source's declared `transitions[source]`. Use existing `handleAddTransitionAction` and `handleAddTransitionRule` from `useFlowGraph` only after updating them to this state-keyed schema; extend with edit + delete. Avoid inventing a new flow schema.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 11: Extract validation utility and surface issues <- Conversation: 3
@@ -143,7 +167,11 @@ Keep YAML structures compatible with existing `transition_actions` (`"SOURCE->TA
 **Depends on:** Phase 10.
 **Enables:** Safe YAML preview and export.
 **Details:**
-Run the validation checks listed in `DESIGN.md` (states exist, transitions reference real states, behavior references exist, non-terminal states have outgoing transitions, terminal states do not require outgoing). Keep messages short ("Target state DEPLOY missing", "Behavior commit not in library"). Do not use banners.
+Run the validation checks listed in `DESIGN.md` (states exist, transitions reference real states, behavior references exist, non-terminal states have outgoing transitions, terminal states do not require outgoing). Also validate runtime routing compatibility:
+- every `transition_rules` key is an existing state
+- every `default`, `on_artifact`, `on_content.next`, and `decide.options/default` target is listed in `transitions[source]`
+- every `transition_actions` key uses `SOURCE->TARGET` or `->TARGET` and points at known transitions/states
+Keep messages short ("Target state DEPLOY missing", "Behavior commit not in library"). Do not use banners.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 12: Harden YAML preview sync <- Conversation: 4
@@ -184,7 +212,7 @@ Disable the Export button while `validateFlow` returns errors. Warnings require 
 **Depends on:** Phase 13.
 **Enables:** Cleaner host-specific export behavior.
 **Details:**
-Keep Electron IPC boundaries unchanged unless a missing capability blocks export. If `window.pathly.fs.write` already mkdirs, this phase is a no-op and can be marked DONE without code changes.
+Keep Electron IPC boundaries unchanged unless a missing capability blocks export. The current main-process `fs:write` handler already calls `fs.mkdirSync(path.dirname(filePath), { recursive: true })`, so this phase is expected to be a no-op unless that behavior changes before implementation. Prefer reusing `writeFile(path, content)` from `pathlyApi.ts` directly for export writes.
 **Verify:** `cd studio; npm run typecheck`
 
 ## Prerequisites

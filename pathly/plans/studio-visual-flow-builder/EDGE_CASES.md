@@ -14,7 +14,7 @@
 - **Trigger:** User edits YAML into invalid syntax.
 - **Current behavior:** The parsed flow can become null or visual mode can be blocked without preserving prior context.
 - **Expected behavior:** Show parse error and keep last valid graph visible.
-- **Handled in:** Phase 10 / Conv 4.
+- **Handled in:** Phase 12 / Conv 4.
 
 ## Category 2: Invalid Flow References
 
@@ -22,13 +22,19 @@
 
 - **Trigger:** YAML contains a transition target not listed in `states`.
 - **Expected behavior:** Render recoverably when possible and show validation issue.
-- **Handled in:** Phase 3 and Phase 9.
+- **Handled in:** Phase 3 and Phase 11.
 
 ### EC-2.2: Behavior reference is missing
 
 - **Trigger:** `agent_map` references a skill or agent not found in the loaded library.
 - **Expected behavior:** Show a warning and allow explicit external/unknown status.
-- **Handled in:** Phase 7 and Phase 9.
+- **Handled in:** Phase 9 and Phase 11.
+
+### EC-2.3: Transition rules use the runtime state-keyed schema
+
+- **Trigger:** YAML contains `transition_rules` for a source state with `default`, `on_artifact`, `on_content`, or `decide` routing.
+- **Expected behavior:** Graph labels, edge inspector edits, and validation preserve the state-keyed shape (`transition_rules[SOURCE]`) and never rewrite it to an artifact-keyed shape.
+- **Handled in:** Phase 3, Phase 10, and Phase 11.
 
 ## Category 3: Drag/Drop Ambiguity
 
@@ -36,13 +42,13 @@
 
 - **Trigger:** User drops a skill or agent onto empty canvas.
 - **Expected behavior:** Create a new state node with a generated unique state id.
-- **Handled in:** Phase 6 / Conv 2.
+- **Handled in:** Phase 7 / Conv 2.
 
 ### EC-3.2: Drop lands on an existing node
 
 - **Trigger:** User drops a skill or agent over a node.
 - **Expected behavior:** Assign behavior to that state instead of creating a duplicate state.
-- **Handled in:** Phase 6 / Conv 2.
+- **Handled in:** Phase 7 / Conv 2.
 
 ## Category 4: Export Safety
 
@@ -50,13 +56,13 @@
 
 - **Trigger:** User exports to a host target that has no configured destination.
 - **Expected behavior:** Show an actionable error and do not silently write elsewhere.
-- **Handled in:** Phase 11 and Phase 12 / Conv 4.
+- **Handled in:** Phase 13 and Phase 14 / Conv 4.
 
 ### EC-4.2: Export with warnings
 
 - **Trigger:** Flow has non-fatal validation warnings.
 - **Expected behavior:** Require explicit user approval before export.
-- **Handled in:** Phase 11 / Conv 4.
+- **Handled in:** Phase 13 / Conv 4.
 
 ## Category 5: Library Reuse vs Edit Ambiguity
 

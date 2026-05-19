@@ -80,6 +80,41 @@ Canonical flow model
 
 ## Interface Design
 
+Use the existing runtime flow YAML schema as the source of truth. In particular, `transition_rules` is keyed by source state, not by artifact name:
+
+```ts
+interface FlowTransitionRule {
+  on_artifact?: Record<string, string>
+  on_content?: Array<{
+    file: string
+    contains?: string
+    regex?: string
+    next: string
+  }>
+  decide?: {
+    context_file?: string
+    question: string
+    options: Record<string, string>
+    default: string
+  }
+  default?: string
+}
+
+type TransitionRules = Record<string, FlowTransitionRule>
+```
+
+Example:
+
+```yaml
+transition_rules:
+  BUILDING:
+    on_artifact:
+      REVIEW_FAILURES.md: BUILDING
+    default: REVIEWING
+```
+
+The visual edge inspector must edit this state-keyed structure. Do not introduce or revive the incorrect artifact-keyed shape `{ artifact_name: { source: target } }`.
+
 Use a small drag payload:
 
 ```ts
