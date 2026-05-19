@@ -2,84 +2,196 @@
 > Pathly Studio · React + Electron + React Flow + CodeMirror
 > Stack: Developer Tool / IDE → Dark Mode primary, Flat Design, dense operational surface
 > Date: 2026-05-19
+> Updated: 2026-05-19 — Q1 and Q5 revised after filesystem-tree sidebar model adopted
 
 ---
 
-## Q1: Sidebar — Layout, Visual Style, and Section Behavior
+## Q1: Sidebar — Filesystem-Tree Model with Full CRUD
 
-### Recommendation
+### Mental model correction (supersedes original Q1)
 
-Keep the sidebar as a single scrollable column. Use **section headers with icon + label + count chip + collapse chevron + `+` action** on each row. Separate sections with 8px gap and a 1px `borderSubtle` divider, not a background fill.
+The sidebar is **not a static list of flat items** — it is a **filesystem-mirroring tree**, one per domain section. Each section maps directly to a directory on disk:
 
-Use the 6-dot grip icon (`⠿`, `GripVertical` in Lucide) instead of `::` — it reads as a drag affordance in any language and is smaller at small font sizes.
+| Section | Directory | File types |
+|---|---|---|
+| SKILLS | `skills/` | `.md` files + category folders |
+| AGENTS | `agents/` | `.md` files + category folders |
+| FLOWS | `flows/` | `.flow.yaml` files + category folders |
+| TEMPLATES | `templates/` | `.md` files + category folders |
+| WORKSPACE | (nav only) | Plan, Monitor, Settings — not filesystem |
 
-Item rows for draggable primitives (Skills, Agents): `grip | icon | name | type-badge`.
-Items in Workspace (Plan, Monitor, Settings): `icon | label` — no grip, no badge. These are navigation destinations, not library primitives. Make them visually quieter: no drag cursor, slightly more padding.
+Users can create files, create category folders, rename, delete, and drag items within their section. **No cross-section operations** — a skill cannot be moved into agents.
 
-Filter is **global** — one input at the top, collapses sections that have no hits. Per-section filters would fragment the scanning experience; the library is not large enough to need them.
-
-Skills and Agents: **no sub-groupings in MVP**. A type badge (`skill` / `agent`) on each row is sufficient. Tags can be added in a follow-up once users request them.
-
-### ASCII — Full Sidebar
-
-```
-+----------------------+
-| 🔍  Filter...        |   ← global, collapses empty sections
-+----------------------+
-| ⬡ FLOWS          2 ∨ |   ← icon | label | count | chevron
-|   debug.flow.yaml    |   ← no grip (not draggable), click = canvas load
-|   team.flow.yaml     |
-+- - - - - - - - - - - +   ← 1px borderSubtle + 8px gap
-| ⚙ SKILLS         4 ∨ |
-|  ⠿ ⚡ review.md  sk  |   ← grip | icon | name | badge
-|  ⠿ ⚡ test.md    sk  |
-|  ⠿ ⚡ write-doc  sk  |
-+- - - - - - - - - - - +
-| ◈ AGENTS          3 ∨ |
-|  ⠿ ◈ planner.md  ag  |
-|  ⠿ ◈ builder.md  ag  |
-|  ⠿ ◈ reviewer.md ag  |
-+- - - - - - - - - - - +
-| ▦ TEMPLATES       2 ∧ |   ← collapsed by default
-+- - - - - - - - - - - +
-| ≡ WORKSPACE          |   ← collapsed by default, nav items only
-|    Plan              |   ← no grip, no badge, lighter text
-|    Monitor           |
-|    Settings          |
-+----------------------+
-```
-
-### Row anatomy (detail)
-
-```
-Draggable:  [ ⠿ ][ icon ][ name.md          ][ sk ]
-            grip  type    file name            badge
-            6px   16px    flex-1               28px pill
-
-Nav only:   [      ][ icon ][ label            ]
-            no grip  type    name
-                     16px    flex-1
-```
+Reference implementation: ZakaMurai sidebar (`Sidebar.js` + `TreeItem.js`) — same author, same stack. The Pathly sidebar adapts this pattern with domain constraints.
 
 ### Section header anatomy
 
+Hover-reveal create actions. At rest: clean header. On hover: two action icons appear flush-right.
+
 ```
-[ icon ][ LABEL ][ count ]        [ + ][ ∨ ]
-  16px   11px     muted chip     add  collapse
-                  textMuted
+AT REST:
+  ▼ SKILLS
+
+ON HOVER:
+  ▼ SKILLS                    [🔧+] [📁+]
+                               new   new
+                               file  category
 ```
 
-### Behavior rules
+Icon per section (replaces generic file icon):
+- SKILLS: `Wrench` for new file
+- AGENTS: `Bot` for new file
+- FLOWS: `Workflow` (cyan) for new flow
+- TEMPLATES: `FileText` for new file
+- All sections: `Folder` for new category
 
-| Rule | Detail |
-|---|---|
-| Collapse state | Persisted to localStorage per section |
-| Section `+` button | Creates a new file of that type in the right directory |
-| Drag affordance | Only on Skills and Agents rows. Flows, Workspace are click-only. |
-| Item click | Skill/Agent → read-only preview in Editor. Flow → loads in canvas. Workspace → navigates. |
-| Filter match | Highlights matching text; sections with zero hits auto-collapse |
-| Empty section | Shows compact `+ add` inline, no large empty state illustration |
-| Active flow indicator | Cyan `●` dot on any flow that is currently running (see Q6) |
+The collapse chevron (`▸`/`▼`) is a separate click target from the label. Label text has no click behavior.
+
+### Row anatomy — the dual-drag problem
+
+Skills and Agents rows have **two drag behaviors that must be visually distinct**:
+
+1. **Canvas drag** (`⠿` grip): drag onto the React Flow canvas to assign behavior to a state node
+2. **Tree reorg drag** (row body): drag within the section to move into a category folder
+
+```
+SKILL ROW AT REST:
+  ⠿  🔧  review.md
+
+SKILL ROW ON HOVER:
+  ⠿  🔧  review.md              [🔧+] [📁+]
+  ↑                              ↑
+  canvas-drag grip               section create actions
+  always visible on skills/agents  hover-reveal only
+```
+
+- `⠿` grip: always visible on skill/agent rows. Color `textMuted #687588` at rest, violet `#8B5CF6` on grip-hover. Cursor `grab` → `grabbing`. Initiates **canvas drag**.
+- Row body: draggable attribute for **tree reorg drag only**. Cursor `move` during drag initiation.
+- FLOWS rows: no `⠿` grip (flows are not canvas-assignable). Row click = open flow in canvas editor. Row is still reorg-draggable within FLOWS section.
+
+### Drag constraints — cross-section behavior
+
+- When drag starts from `⠿` grip: `dragType = 'canvas'`. Tree reorg logic ignores it entirely. Canvas highlights as drop target.
+- When drag starts from row body: `dragType = 'reorg'`. Drag payload carries `sectionId`. Drop handlers reject payloads with mismatched `sectionId`.
+- Foreign sections during reorg drag: **no highlight, no red tint** — just inert. `cursor: not-allowed` from `dropEffect = 'none'`. Red would read as destructive; absence is the correct signal.
+- Valid drop targets within own section: folder rows show `border-left: 2px solid #8B5CF6` + `rgba(139,92,246,0.08)` background tint.
+
+### Inline create UX
+
+When "New skill file" is triggered inside a folder:
+- Inline input row appears as a child of that folder (or section root if no folder selected)
+- Input is empty; ghost text shows the section-appropriate extension after the cursor: `.md` or `.flow.yaml`
+- `Enter`: append ghost extension if user hasn't typed one → `review.md`
+- If user types extension themselves: ghost disappears, name used as-is
+- If user types wrong extension: inline error in `#EF4444` — "Skills must be .md files" — input stays open, no auto-rename
+- `Escape`: cancel, remove input row
+- Empty + `Enter`: no-op
+
+```
+INLINE INPUT (inside writing/ folder):
+  ▼ 📁 writing/
+    🔧 summarize.md
+    [ research_____    .md ]    ← cursor, ghost ext dim after bracket
+```
+
+### Domain icon map
+
+| Section | Folder icon | File icon | File icon color |
+|---|---|---|---|
+| SKILLS | `Folder` violet | `Wrench` | `textMuted #687588` |
+| AGENTS | `Folder` violet | `Bot` | `textMuted #687588` |
+| FLOWS | `Folder` violet | `Workflow` | `runtime #22D3EE` ← cyan signals runtime object |
+| TEMPLATES | `Folder` violet | `FileText` | `textMuted #687588` |
+
+Flow files use cyan because they are runtime objects (they execute on the canvas), not static content. This matches the cyan used elsewhere for runtime state.
+
+### Context menus (right-click)
+
+**Section root header:**
+```
+  🔧 New skill file
+  📁 New category
+```
+
+**Category folder:**
+```
+  🔧 New skill file
+  📁 New subcategory
+  ─────────────────
+  ✏  Rename
+  ─────────────────
+  🗑  Delete          ← always available; dialog shows file count
+```
+
+**Skill / Agent file:**
+```
+  👁  Open preview
+  ─────────────────
+  ✏  Rename
+  →  Move to…        ← submenu: categories in section + "/ Root"
+  ─────────────────
+  🗑  Delete
+```
+
+**Flow file:**
+```
+  ⚡ Open in canvas
+  👁  Open source (YAML)
+  ─────────────────
+  ✏  Rename
+  →  Move to…
+  ─────────────────
+  🗑  Delete
+```
+
+### Empty section state
+
+No auto-collapse. Two-line muted hint:
+
+```
+  ▼ SKILLS                    [🔧+] [📁+]
+    No skills yet
+    Click + to create one
+```
+
+### Full sidebar ASCII
+
+**At rest:**
+```
+┌──────────────────────────────────────┐
+│  🔍  Filter...                       │  ← global search
+├──────────────────────────────────────┤
+│  ▼ SKILLS                            │
+│    ▼ 📁 writing/                     │
+│      ⠿  🔧 summarize.md             │
+│      ⠿  🔧 rewrite.md               │
+│    ⠿  🔧 draft-email.md             │
+│                                      │
+│  ▶ AGENTS                            │
+│                                      │
+│  ▼ FLOWS                             │
+│    ⚡ team.flow.yaml                 │
+│    ⚡ debug.flow.yaml                │
+│                                      │
+│  ▶ TEMPLATES                         │
+│                                      │
+├──────────────────────────────────────┤
+│  WORKSPACE                           │
+│  📋 Plan                             │
+│  📡 Monitor                          │
+│  ⚙  Settings                         │
+└──────────────────────────────────────┘
+```
+
+**Drag reorg state** — `rewrite.md` being moved into `writing/`:
+```
+│  ▼ SKILLS                            │
+│    ▼ 📁 writing/  ◄─ drop target    │  ← violet left border + 8% violet bg
+│      ⠿  🔧 summarize.md             │
+│    [ghost: rewrite.md]               │  ← dragging
+│                                      │
+│  ▶ AGENTS                            │  ← inert, no highlight
+```
 
 ---
 
@@ -281,69 +393,42 @@ Avoid large marketing cards. Use compact rows (~52px tall) with a 3px left borde
 
 ---
 
-## Q5: Debug and Exploration — Sidebar + Monitor
+## Q5: Debug and Exploration — Sidebar and Monitor
 
-### Recommendation: YES — give them separate sidebar sections
+### Sidebar: all flows live in FLOWS section (corrected)
 
-Debug and Exploration are distinct workflow modes with different:
-- Duration (debug = short loop, explore = discovery sprint)
-- Agent count (debug = 1 agent, explore = 1 agent, team = N agents)
-- Artifacts (debug produces NOTES.md loops, explore produces FINDINGS.md)
+Debug and Explore flows are the same technical artifact as team flows — Pathly FSM YAMLs. The difference is convention, not structure. **No separate DEBUG / EXPLORE sidebar sections.**
 
-Mixing them under FLOWS creates confusion about what each item does when clicked.
-
-### Proposed sidebar structure
+Users organize flows with category folders inside the FLOWS section:
 
 ```
-+----------------------+
-| ⬡ FLOWS           2 ∨ |   team workflows (multi-agent FSM)
-|   team.flow.yaml     |
-|   custom.flow.yaml   |
-+- - - - - - - - - - - +
-| ⬡ DEBUG           1 ∨ |   Bug icon (Lucide: `Bug`)
-|   debug.flow.yaml  ● |   ← cyan dot = currently running
-+- - - - - - - - - - - +
-| ⬡ EXPLORE         1 ∨ |   Compass icon (Lucide: `Compass`)
-|   explore.flow.yaml  |
-+----------------------+
+  ▼ FLOWS
+    ▼ 📁 debug/
+      ⚡ debug.flow.yaml
+    ▼ 📁 team/
+      ⚡ team.flow.yaml
+    ⚡ explore.flow.yaml     ← uncategorized at root
 ```
 
-**Icon differentiation:**
-- FLOWS → `GitBranch` or `Workflow` (multi-node graph)
-- DEBUG → `Bug` (single-agent loop)
-- EXPLORE → `Compass` or `Search` (discovery)
+### Monitor: display mode driven by flow YAML structure
 
-These three modes map to distinctly different runtime behaviors and should be first-class citizens in the sidebar, not sub-items.
+The monitor detects display mode from the YAML, not the sidebar section:
+- Many states + multiple agents in `agent_map` → **FSM topology rail**
+- 1-2 states + loops back to start (or explicit `flow_type: debug`) → **loop counter display**
 
-### Monitor rail — debug vs team flow
-
-Debug sessions do NOT have a multi-state FSM rail. They loop on a single state. Use a **loop counter display** instead:
-
+Loop counter display for debug/explore:
 ```
 +--------------------------------------------------------------+
 | Monitor  [ debug.flow.yaml ]      ● SSE live    iter 4 / ?  |
 +--------------------------------------------------------------+
-|                                                              |
-|  ↺ ──────────────────────────── ↺                           |
-|     DEBUG LOOP · builder                                     |
-|     iteration 4 · started 3m ago                            |
-|     waiting for: NOTES.md                                    |
-|                                                              |
-+-------------------------------+------------------------------+
-| Loop history                  | Log                         |
-| ✓ iter 1  fixed typo  40s     | builder #4                  |
-| ✓ iter 2  added test  35s     | 00:02  AGENT_DONE           |
-| ✓ iter 3  refactor    28s     | 4.1k in  0.8k out  $0.008  |
-| ● iter 4  running             |                             |
-+-------------------------------+------------------------------+
+|  ↺ ─────────────── ↺  DEBUG LOOP · builder                  |
+|  iteration 4 · started 3m ago · waiting for: NOTES.md       |
++--------------------------------------------------------------+
+| ✓ iter 1  fixed typo   40s                                  |
+| ✓ iter 2  added test   35s                                  |
+| ● iter 4  running                                           |
++--------------------------------------------------------------+
 ```
-
-For explore sessions, use the same loop display with `EXPLORE` label and `Compass` icon.
-
-The **visual distinction** between flow types in the monitor:
-- Team flow: linear state rail (FSM topology)
-- Debug flow: loop spinner + iteration counter
-- Explore flow: loop spinner + iteration counter + "discoveries" count
 
 ---
 
@@ -456,13 +541,29 @@ When debug tab is selected:
 
 | Area | Decision | Target phase |
 |---|---|---|
-| Sidebar | 6-dot grip icon (GripVertical), global filter, separate DEBUG + EXPLORE sections | Phase 4–6 |
-| Sidebar | Workspace = nav-only rows (no grip, no badge) | Phase 4 |
-| Entry point | Last-used flow + running banner if active | Phase 8 (or new entry phase) |
-| Monitor live | useEffect + EventSource, no re-render on each event | Phase 12 |
-| Monitor rail | FSM topology rail; execution trace below; loop = counter not extended rail | Phase 12 |
-| Monitor tabs | Tabbed by flow; appears on first active session | Phase 12 |
-| CLI discovery | pid/lock file watcher; "+ N CLI session" discovery row | Post-MVP (flag for later) |
-| Plan cards | Compact 52px rows, 3px left status strip, left-to-right: status / title / meta / cost / open | Phase 8 (Plan section) |
-| Debug/Explore | Own sidebar sections with Bug/Compass icons; loop counter in monitor, not FSM rail | Phase 4 + Phase 12 |
-| Multi-flow | Monitor tabs; sidebar cyan dot `●` for running; `>_` badge for CLI-originated | Phase 12 |
+| **Sidebar model** | Filesystem-mirror tree per section (skills/, agents/, flows/, templates/) | Phase 4–6 |
+| **Sidebar CRUD** | Create file, create folder, rename (double-click inline), delete (dialog), move (drag within section) | Phase 4–6 — scope-expanding, see note |
+| **Dual drag** | `⠿` grip = canvas drag; row body = tree reorg drag within section only | Phase 6 |
+| **Cross-section drag** | Foreign sections inert (no tint, `not-allowed` cursor); `sectionId` on drag payload | Phase 6 |
+| **Domain icons** | Wrench/Bot/Workflow/FileText per section; standard Folder for categories; cyan for flow files | Phase 4 |
+| **Inline create** | Ghost extension after cursor; auto-append stem; warn on wrong extension | Phase 5–6 |
+| **Context menu** | Per item type (section root / folder / skill+agent / flow) — see Q1 spec | Phase 6 |
+| **Empty section** | Two-line muted hint; no auto-collapse | Phase 6 |
+| **Debug/Explore sidebar** | All flows in FLOWS section; users organize with category folders — no separate sections | Phase 4 |
+| **Monitor mode detection** | From YAML structure or `flow_type` field, not sidebar section | studio-monitor-live plan |
+| **Workspace section** | Nav-only rows (Plan, Monitor, Settings) — not filesystem, no drag | Phase 4 |
+| **Entry point** | Last-used flow + running banner if active | studio-monitor-live plan |
+| **Monitor live** | useEffect + EventSource, no re-render on each event | studio-monitor-live plan |
+| **Monitor rail** | FSM topology rail; execution trace below; loop = counter for debug/explore | studio-monitor-live plan |
+| **Monitor tabs** | Tabbed by flow; appears on first active session | studio-monitor-live plan |
+| **Plan cards** | Compact 52px rows, 3px left status strip | studio-monitor-live plan |
+| **Multi-flow** | Monitor tabs; cyan `●` for running; `>_` badge for CLI-originated | studio-monitor-live plan |
+| **CLI discovery** | pid/lock file watcher; "+ N CLI session" discovery row | Post-MVP |
+
+### Note on scope impact
+
+The filesystem-tree sidebar (CRUD + dual drag + context menu + inline create) is **significantly larger** than the original Phase 4–6 scope (which only covered drag metadata + canvas drop). This work needs either:
+- **2–3 additional phases in Conversation 2**, pushing Conversation 2 from 4 phases to 6–7
+- **Or a separate `studio-sidebar-tree` plan** (1–2 conversations) run before or after the flow builder
+
+Recommendation: add the phases to Conversation 2. The sidebar is a prerequisite for the canvas drag behavior anyway, and keeping it in the same plan avoids coordination overhead. See plan update needed in IMPLEMENTATION_PLAN.md.
