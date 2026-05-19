@@ -34,7 +34,7 @@ export function useProjectFiles(): {
 
   // Section A (Flows/Skills/Agents/Templates) loads from the pathly installation,
   // not the open workspace project.
-  const coreRoot = pathlyRoot || projectPath
+  const coreRoot = pathlyRoot
 
   const loadItems = useCallback(async (): Promise<void> => {
     for (const section of PATHLY_SECTIONS) {
