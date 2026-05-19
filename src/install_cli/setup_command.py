@@ -9,18 +9,12 @@ import yaml
 
 from .codex_plugin_config import install_codex_plugin, uninstall_codex_plugin
 from .detect import detect_hosts
-from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_flows_path, core_skills_path, core_templates_path, hooks_path
+from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_flows_path, core_skills_path, core_templates_path
 from .stitch import stitch_agent, stitch_skill
 from .materialize import (
     materialize,
     materialize_flows,
     uninstall,
-    deploy_codex_hooks,
-    remove_codex_hooks,
-    deploy_copilot_hooks,
-    remove_copilot_hooks,
-    deploy_claude_hooks,
-    remove_claude_hooks,
 )
 
 # Must stay in sync with detect_hosts() — any host returned by detect_hosts()
@@ -150,29 +144,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             rel = tmpl_file.relative_to(tmpl_root).as_posix()
             template_files[rel] = tmpl_file.read_text(encoding="utf-8")
 
-    hooks_cfg = install_cfg.get("hooks")
-    hook_files: dict[str, str] = {}
-    hooks_dest: Path | None = None
-    if hooks_cfg:
-        plugin_cfg_for_hooks = install_cfg.get("plugin")
-        if plugin_cfg_for_hooks:
-            hooks_dest = Path(plugin_cfg_for_hooks["destination"]).expanduser()
-        elif templates_dest:
-            hooks_dest = templates_dest.parent
-        else:
-            hooks_dest = Path(f"~/.{host}/plugins/pathly").expanduser()
-
-        hook_src_root = hooks_path()
-        for hook in hooks_cfg:
-            script = hook["script"]
-            script_path = Path(script)
-            if script_path.is_absolute() or ".." in script_path.parts:
-                raise ValueError(f"Invalid hook script path: {script!r}")
-            source = hook_src_root / script_path.name
-            if not source.exists():
-                raise FileNotFoundError(f"No hook source for {script!r}: {source}")
-            hook_files[script_path.as_posix()] = source.read_text(encoding="utf-8")
-
     plugin_cfg = install_cfg.get("plugin")
     plugin_files: dict[str, str] = {}
     plugin_dest: Path | None = None
@@ -195,8 +166,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 plugin_files[f"skills/{name}"] = content
             for name, content in template_files.items():
                 plugin_files[f"templates/{name}"] = content
-            for name, content in hook_files.items():
-                plugin_files[name] = content
 
     if dry_run:
         print(f"\n[{host}] Would write to {dest}:")
@@ -212,31 +181,12 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             print(f"\n[{host}] Would write templates to {templates_dest}:")
             for name in sorted(template_files):
                 print(f"  {templates_dest / name}")
-        if hooks_dest and hook_files:
-            print(f"\n[{host}] Would write hooks to {hooks_dest}:")
-            for name in sorted(hook_files):
-                print(f"  {hooks_dest / name}")
         if plugin_dest and plugin_files:
             print(f"\n[{host}] Would write plugin files to {plugin_dest}:")
             for name in sorted(plugin_files):
                 print(f"  {plugin_dest / name}")
         if host == "codex" and plugin_files:
             install_codex_plugin(plugin_files, dry_run=True)
-        if host == "codex":
-            hook_paths = deploy_codex_hooks(dry_run=True)
-            print(f"\n[{host}] Would write Codex hooks to:")
-            for p in hook_paths:
-                print(f"  {p}")
-        if host == "copilot":
-            hook_paths = deploy_copilot_hooks(dry_run=True)
-            print(f"\n[{host}] Would write Copilot hooks to:")
-            for p in hook_paths:
-                print(f"  {p}")
-        if host == "claude":
-            hook_paths = deploy_claude_hooks(dry_run=True)
-            print(f"\n[{host}] Would write Claude hooks to:")
-            for p in hook_paths:
-                print(f"  {p}")
         return
 
     written_dests: list[Path] = []
@@ -267,12 +217,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 written_dests.append(templates_dest)
                 print(f"[{host}] Wrote {len(written)} template(s) to {templates_dest}")
 
-        if hooks_dest and hook_files and hooks_dest != plugin_dest:
-            written = materialize(hook_files, hooks_dest, repair=repair, force=force, dry_run=False)
-            if written:
-                written_dests.append(hooks_dest)
-                print(f"[{host}] Wrote {len(written)} hook(s) to {hooks_dest}")
-
         if plugin_dest and plugin_files:
             written = materialize(plugin_files, plugin_dest, repair=repair, force=force, dry_run=False)
             if written:
@@ -282,21 +226,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         if host == "codex" and plugin_files:
             install_codex_plugin(plugin_files, dry_run=False)
             codex_plugin_registered = True
-
-        if host == "codex":
-            written_hooks = deploy_codex_hooks(dry_run=False)
-            if written_hooks:
-                print(f"[{host}] Wrote Codex hooks to {written_hooks[0]}")
-
-        if host == "copilot":
-            written_hooks = deploy_copilot_hooks(dry_run=False)
-            if written_hooks:
-                print(f"[{host}] Wrote Copilot hooks ({len(written_hooks)} file(s))")
-
-        if host == "claude":
-            written_hooks = deploy_claude_hooks(dry_run=False)
-            if written_hooks:
-                print(f"[{host}] Wrote Claude hooks to {written_hooks[0]}")
 
     except Exception:
         print(f"[{host}] Install failed — rolling back.", file=sys.stderr)
@@ -310,21 +239,6 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 uninstall_codex_plugin(dry_run=False)
             except Exception:
                 pass
-        if host == "codex":
-            try:
-                remove_codex_hooks(dry_run=False)
-            except Exception:
-                pass
-        if host == "copilot":
-            try:
-                remove_copilot_hooks(dry_run=False)
-            except Exception:
-                pass
-        if host == "claude":
-            try:
-                remove_claude_hooks(dry_run=False)
-            except Exception:
-                pass
         raise
 
 
@@ -334,23 +248,6 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
 
     if host == "codex":
         uninstall_codex_plugin(dry_run=dry_run)
-        removed_hooks = remove_codex_hooks(dry_run=dry_run)
-        if dry_run and removed_hooks:
-            print(f"\n[{host}] Would remove Codex hooks from {removed_hooks[0]}")
-        elif removed_hooks:
-            print(f"[{host}] Removed Codex hooks from {removed_hooks[0]}")
-    if host == "copilot":
-        removed_hooks = remove_copilot_hooks(dry_run=dry_run)
-        if dry_run and removed_hooks:
-            print(f"\n[{host}] Would remove Copilot hooks: {', '.join(removed_hooks)}")
-        elif removed_hooks:
-            print(f"[{host}] Removed Copilot hooks ({len(removed_hooks)} file(s))")
-    if host == "claude":
-        removed_hooks = remove_claude_hooks(dry_run=dry_run)
-        if dry_run and removed_hooks:
-            print(f"\n[{host}] Would remove Claude hooks from {removed_hooks[0]}")
-        elif removed_hooks:
-            print(f"[{host}] Removed Claude hooks from {removed_hooks[0]}")
 
     removed = uninstall(dest, dry_run=dry_run)
     if dry_run:
@@ -383,26 +280,6 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
                 print(f"  {templates_dest / name}")
         elif tmpl_removed:
             print(f"[{host}] Removed {len(tmpl_removed)} template(s) from {templates_dest}")
-
-    hooks_cfg = install_cfg.get("hooks")
-    if hooks_cfg:
-        plugin_cfg_for_hooks = install_cfg.get("plugin")
-        if plugin_cfg_for_hooks:
-            hooks_dest = Path(plugin_cfg_for_hooks["destination"]).expanduser()
-        elif templates_cfg:
-            hooks_dest = Path(templates_cfg["destination"]).expanduser().parent
-        else:
-            hooks_dest = Path(f"~/.{host}/plugins/pathly").expanduser()
-        plugin_cfg_for_uninstall = install_cfg.get("plugin")
-        plugin_dest_for_hooks = Path(plugin_cfg_for_uninstall["destination"]).expanduser() if plugin_cfg_for_uninstall else None
-        if hooks_dest != plugin_dest_for_hooks:
-            hook_removed = uninstall(hooks_dest, dry_run=dry_run)
-            if dry_run:
-                print(f"\n[{host}] Would remove {len(hook_removed)} hook(s) from {hooks_dest}:")
-                for name in sorted(hook_removed):
-                    print(f"  {hooks_dest / name}")
-            elif hook_removed:
-                print(f"[{host}] Removed {len(hook_removed)} hook(s) from {hooks_dest}")
 
     plugin_cfg = install_cfg.get("plugin")
     if plugin_cfg:
