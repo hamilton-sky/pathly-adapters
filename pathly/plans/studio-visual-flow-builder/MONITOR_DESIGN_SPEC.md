@@ -205,7 +205,7 @@ Load the **last-used flow in the canvas** (Option A). This is an operational IDE
 
 ```
 ╔══════════════════════════════════════════════════════════╗
-║  debug.flow.yaml is running  ●  conv 3 / BUILDING       ║
+║  debug.flow.yaml is running  ●  cycle 3 / BUILDING      ║
 ║  View in Monitor →                           [dismiss]  ║
 ╚══════════════════════════════════════════════════════════╝
 ```
@@ -476,13 +476,14 @@ Tab behavior:
 If a CLI session starts a flow that Studio doesn't know about, the sidebar must surface it. Approach:
 
 1. Studio watches the Pathly project directory for active session markers (a lock/pid file written by the CLI).
-2. When a new session is detected, the relevant sidebar section shows a **`+ 1 CLI session`** notification row:
+2. When a new session is detected, the FLOWS section shows a **`+ 1 CLI session`** notification row under the relevant folder (or at root if unknown):
 
 ```
 +----------------------+
-| ⬡ DEBUG           2 ∨ |
-|   debug.flow.yaml  ● |
-|   ▸ 1 CLI session    |   ← muted discovery row, click to adopt
+| ▼ FLOWS              |
+|   ▼ 📁 debug/        |
+|     ⚡ debug.flow.yaml ● |
+|     ▸ 1 CLI session    |   ← muted discovery row, click to adopt
 +----------------------+
 ```
 
@@ -493,9 +494,10 @@ If a CLI session starts a flow that Studio doesn't know about, the sidebar must 
 CLI-originated sessions get a `>_` terminal badge next to their name in the sidebar and in the monitor tab:
 
 ```
-| ⬡ DEBUG           2 ∨ |
-|   debug.flow.yaml  ● |         ← Studio-launched
-|   my-script  >_  ●  |         ← CLI-launched (terminal badge)
+| ▼ FLOWS              |
+|   ▼ 📁 debug/        |
+|     ⚡ debug.flow.yaml ● |   ← Studio-launched
+|     ⚡ my-script  >_  ● |   ← CLI-launched (terminal badge)
 ```
 
 In the monitor tab bar:
@@ -507,15 +509,17 @@ The `>_` badge means: "this session was not started from Studio; Studio is obser
 
 ### Sidebar with multiple active sessions
 
+All flows live in the single FLOWS section, organized by user-created category folders.
+
 ```
 +----------------------+
-| ⬡ FLOWS           2 ∨ |
-|   team.flow.yaml   ● |   ← running (cyan dot)
-|   custom.flow.yaml   |
-+- - - - - - - - - - - +
-| ⬡ DEBUG           2 ∨ |
-|   debug.flow.yaml  ● |   ← running
-|   explore.flow >_  ● |   ← CLI-launched, running
+| ▼ FLOWS              |
+|   ▼ 📁 team/         |
+|     ⚡ team.flow.yaml ● |   ← running (cyan dot)
+|   ▼ 📁 debug/        |
+|     ⚡ debug.flow.yaml ● |  ← running
+|     ⚡ explore.flow >_ ● |  ← CLI-launched, running
+|   ⚡ custom.flow.yaml   |
 +----------------------+
 ```
 
@@ -538,14 +542,16 @@ Cyan dot rules:
 └─────────────────────────────────────────┘
 ```
 
-When debug tab is selected:
+When debug tab is selected (same FSM topology rail — debug flows are real FSMs):
 ```
 ┌ team.flow.yaml ● ┐┌ debug.flow.yaml ● ┐
 │                                         │
-│  Debug loop:                            │
-│  ↺ ───────────────── ↺                 │
-│     iteration 7 · builder              │
-│     running for 12s                    │
+│  FSM Rail (debug):       cycle 7        │
+│  ●──────────✓────────────●              │
+│  TEST     BUILD       REVIEW            │
+│   ↑ active (7th visit)  ↺ looped back  │
+│                                         │
+│  tester #7 · running for 12s           │
 └─────────────────────────────────────────┘
 ```
 
@@ -568,7 +574,7 @@ When debug tab is selected:
 | **Workspace section** | Nav-only rows (Plan, Monitor, Settings) — not filesystem, no drag | Phase 4 |
 | **Entry point** | Last-used flow + running banner if active | studio-monitor-live plan |
 | **Monitor live** | useEffect + EventSource, no re-render on each event | studio-monitor-live plan |
-| **Monitor rail** | FSM topology rail; execution trace below; loop = counter for debug/explore | studio-monitor-live plan |
+| **Monitor rail** | FSM topology rail; execution trace below; loop-back = dot snaps back on rail; `cycle N` label for looping flows | studio-monitor-live plan |
 | **Monitor tabs** | Tabbed by flow; appears on first active session | studio-monitor-live plan |
 | **Plan cards** | Compact 52px rows, 3px left status strip | studio-monitor-live plan |
 | **Multi-flow** | Monitor tabs; cyan `●` for running; `>_` badge for CLI-originated | studio-monitor-live plan |
