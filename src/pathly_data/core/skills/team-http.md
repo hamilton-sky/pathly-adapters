@@ -1,7 +1,8 @@
-# team-mcp
+# team-http
 
-Runs the Pathly team pipeline via the FSM HTTP server.
+Runs the Pathly team pipeline via the FSM HTTP server (explicit HTTP-only mode).
 All FSM calls are delegated to the `fsm-call` skill.
+Use `/pathly team` instead for the standard entry point (HTTP-first with LLM fallback).
 
 Run for `$ARGUMENTS`.
 
@@ -21,7 +22,7 @@ Parse `$ARGUMENTS` (order doesn't matter):
 - If `FEATURE` contains spaces, newlines, tabs, or is longer than 50 characters: stop →
   ```
   Invalid feature name. Use a short slug, e.g. "fix-hooks" or "auth-refactor".
-  Re-run: /pathly-team-mcp <feature-name> [fast|lite|standard|strict]
+  Re-run: /pathly-team-http <feature-name> [fast|lite|standard|strict]
   ```
 
 ## Mode selection
@@ -63,7 +64,7 @@ After every `fsm-call` result, display the contextual menu before running any ag
 
 ```
 ─────────────────────────────────────────────────────────
-  Pathly  ·  team-mcp  ·  <FEATURE>
+  Pathly  ·  team-http  ·  <FEATURE>
   State : <current_state>    Conv : <conv>    Mode : <manual|auto-flow>
   Agent : <agent>
 ─────────────────────────────────────────────────────────

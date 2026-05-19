@@ -121,9 +121,9 @@ Fast mode:
 - Never combine `strict` with `fast`.
 
 Engine selection:
-- Default to `team` (LLM orchestrator) — always works, no dependencies.
-- Use `team-mcp` only if the user explicitly asks for the Python FSM / MCP engine.
-- Never auto-detect or silently fall back between engines.
+- Default to `team` — tries the HTTP FSM engine first, falls back to LLM automatically.
+- Use `team-http` only if the user explicitly asks for the HTTP FSM engine with no LLM fallback.
+- Never route to `team-http` unless the user specifically requests it.
 
 ---
 
@@ -207,7 +207,7 @@ team <feature> standard
 team <feature> strict
 team <feature> build
 team <feature> test
-team-mcp <feature> <rigor>   ← Python FSM engine (explicit request only)
+team-http <feature> <rigor>  ← HTTP FSM engine only (explicit request only)
 review
 retro <feature>
 ```

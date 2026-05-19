@@ -92,7 +92,7 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── status.md    ← cross-feature dashboard (CLI wrapper)
 │       │   │   ├── log.md       ← event timeline for active/named feature (CLI wrapper)
 │       │   │   ├── design.md    ← generate DESIGN.md visual spec (after plan, before build)
-│       │   │   ├── team-mcp.md  ← MCP FSM server wrapper (strict, no LLM fallback)
+│       │   │   ├── team-http.md ← HTTP FSM server wrapper (explicit HTTP-only, no LLM fallback)
 │       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
 │       │   │   ├── archive-artifacts.md ← transition-action skill (orchestrator only)
 │       │   │   └── team/        ← sub-skills for team pipeline phases (discover, plan, build, review, test, retro)

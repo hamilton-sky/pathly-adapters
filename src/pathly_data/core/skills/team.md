@@ -1,7 +1,8 @@
 # team
 
-LLM orchestrator for the full feature pipeline. Routes to the correct sub-skill
-via the YAML flow config. No MCP dependency — use `team-mcp` for the Python FSM engine.
+Unified entry point for the Pathly team pipeline.
+HTTP/FSM engine first (auto-starts the Python server via `fsm-call`); falls back to
+the LLM orchestrator if the server cannot start. Use `team-http` to force HTTP-only.
 
 Run for `$ARGUMENTS`.
 
@@ -60,7 +61,7 @@ Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
 ## Design system check
 
-Before spawning the orchestrator, check for `pathly/plans/<feature>/DESIGN.md`:
+Before spawning any engine, check for `pathly/plans/<feature>/DESIGN.md`:
 
 - **If it exists** → print: `Design system found: pathly/plans/<feature>/DESIGN.md ✓`
 - **If it does not exist** and `entryStage` is `discovery` or `build` → print:
@@ -69,32 +70,13 @@ Before spawning the orchestrator, check for `pathly/plans/<feature>/DESIGN.md`:
   If this feature includes UI work, run /pathly design first to generate a visual spec.
   (Skip this if the feature is backend-only.)
   ```
-  Do not block — continue to the orchestrator regardless of the user's choice.
-
----
-
-## LLM engine (orchestrator agent)
-
-Spawn the **orchestrator** agent with **exactly these 5 parameters and nothing else**:
-- flow_config: src/pathly_data/core/flows/team.flow.yaml
-- topic: [parsed feature name]
-- rigor: [parsed rigor]
-- autoFlow: [true/false]
-- entryStage: [parsed entryStage, default: discovery]
-
-**CRITICAL:** Pass ONLY the 5 parameters above. Do NOT include feature descriptions,
-file paths, implementation details, or conversation history. The FSM discovers all
-context through its own agents. Passing extra context bypasses the flow and breaks
-the pipeline.
-
-The orchestrator handles all FSM state recovery, routing, git commits, PROGRESS.md updates,
-and artifact archiving. Do not perform these actions in team.md.
+  Do not block — continue regardless of the user's choice.
 
 ---
 
 ## Nano mode
 
-If `mode = nano`, run inline — do not route to sub-skills.
+If `mode = nano`, run inline — do not route to any engine.
 
 **Step 1 — Ask for task:**
 ```
@@ -136,3 +118,164 @@ Do not write feedback files — report violations inline.
 **Step 5 — Fix cycle (max 1):** If violations found, spawn builder with the list. One pass only.
 If violations remain after 1 pass: stop, recommend upgrading to lite.
 If PASS: print `[Nano complete] [feature] done. Files changed: [list from git diff]`. Exit.
+
+---
+
+## Engine selection
+
+> Skip if `mode = nano` (handled above).
+
+Attempt a health check:
+
+```bash
+curl -s --max-time 2 http://127.0.0.1:8765/health
+```
+
+- Returns `{"status":"ok"}` → use **HTTP FSM engine** below.
+- Times out or fails → run in background:
+  ```bash
+  python -m pathly_orchestrator.http_server &
+  ```
+  Wait 2 seconds, retry health check once.
+  - Now returns `{"status":"ok"}` → use **HTTP FSM engine** below.
+  - Still unavailable → print:
+    ```
+    FSM server unavailable — falling back to LLM orchestrator.
+    To use the HTTP engine: run `python -m pathly_orchestrator.http_server` in a separate terminal.
+    ```
+    → use **LLM engine** below.
+
+---
+
+## HTTP FSM engine
+
+`PROJECT_ROOT` = absolute path to cwd at skill invocation.
+
+### Step 1 — Get next action
+
+Invoke the `fsm-call` skill with:
+```json
+{"action":"next_action","flow":"team","topic":"<FEATURE>","project_root":"<PROJECT_ROOT>"}
+```
+
+Receives one of:
+- `{current_state, agent, instructions, storage_path, limits}` — normal routing
+- `{blocked: true, target_agent: "human", file, instructions, limits}` — human must decide
+- `{blocked: true, target_agent: <agent>, file, instructions, limits}` — feedback to resolve
+
+### Step 2 — Display contextual menu
+
+After every `fsm-call` result, display the contextual menu before running any agent:
+
+```
+─────────────────────────────────────────────────────────
+  Pathly  ·  team  ·  <FEATURE>
+  State : <current_state>    Conv : <conv>    Mode : <manual|auto-flow>
+  Agent : <agent>
+─────────────────────────────────────────────────────────
+  Pipeline:
+    <states with ✓ for completed, [ ] for current, lowercase for future>
+─────────────────────────────────────────────────────────
+  <state-specific guidance from table below>
+─────────────────────────────────────────────────────────
+  Options:
+    [1] Proceed   — run <agent> now
+    [2] Pause     — save state and stop
+    [3] Status    — print STATE.json + last 10 events
+    [4] Switch    — jump to /debug or /explore instead
+─────────────────────────────────────────────────────────
+  Reply [1–4] or press Enter to proceed:
+```
+
+When blocked by feedback (not human):
+```
+    [1] Resolve   — run <agent> on <file> now
+    [2] View      — print <file> contents
+    [3] Escalate  — write HUMAN_QUESTIONS.md and halt
+    [4] Pause     — save state and stop
+```
+
+When `complete_stage` returns `{decide: true, ...}`: display Panel A, wait for reply,
+invoke `fsm-call` with `complete_stage` + `decision=<reply>`, display Panel B.
+
+**State-specific guidance:**
+
+| State | Guidance |
+|-------|----------|
+| STORMING | Architect discovers scope and risks. No implementation yet. |
+| PLANNING | Planner drafts IMPLEMENTATION_PLAN.md. Builder waits for it. |
+| BUILDING | Builder implements the plan. Reviewer runs automatically after. |
+| REVIEWING | Reviewer checks builder output. REVIEW_FAILURES.md blocks advance. |
+| TESTING | Tester validates. TEST_FAILURES.md loops back to builder. |
+| RETRO | Final retrospective. Topic closes when complete. |
+| DONE | Topic complete. Artifacts archived. |
+
+**Pipeline progress line:** Read EVENTS.jsonl STATE_TRANSITION entries.
+Current state is bracketed `[ STATE ]`. Completed states get `✓`. Future states are lowercase.
+
+If user chooses [2] Pause: call `pause` skill and stop.
+If user chooses [3]: print STATE.json + last 10 EVENTS.jsonl lines.
+If user chooses [4]: surface `/pathly team|debug|explore <FEATURE>` options.
+In auto-flow mode, default to [1] without asking. Note "auto-flow: proceeding".
+
+### Step 3 — Execute agent instructions
+
+Execute the instructions returned by the `next_action` result for the returned agent.
+
+Track per stage (reset each stage):
+- `needs_context_count = 0`
+- `feedback_round_count = 0`
+
+**NEEDS_CONTEXT loop:**
+1. `needs_context_count += 1`
+2. If `>= limits.needs_context_per_stage`: warn and halt.
+3. Else: call `scout-path`, feed summary back, resume.
+The FSM is NOT notified about NEEDS_CONTEXT cycles.
+
+### Step 4 — Complete the stage
+
+Invoke the `fsm-call` skill with:
+```json
+{"action":"complete_stage","flow":"team","topic":"<FEATURE>","project_root":"<PROJECT_ROOT>"}
+```
+Add `decision` or `resolved_files` fields when applicable.
+
+Receives one of:
+- `{next_state, agent, instructions, limits}` — advance
+- `{done: true}` — pipeline complete
+- `{blocked: true, target_agent: "human", file, instructions}` — human must decide
+- `{blocked: true, target_agent: <agent>, file, instructions}` — feedback to resolve
+- `{decide: true, question, context, options, default}` — Level 3 routing
+
+**Feedback resolution loop:**
+- `feedback_round_count += 1`
+- If `>= limits.feedback_rounds_per_stage`: write HUMAN_QUESTIONS.md, halt.
+- Else: spawn feedback agent, resolve, invoke `fsm-call` with `complete_stage` + `resolved_files=[file]`.
+- Python deletes the file. Do NOT delete files manually.
+- One file at a time.
+
+**Human-blocked:** Surface instructions to user. When user confirms, invoke `fsm-call` with
+`complete_stage` + `resolved_files=["HUMAN_QUESTIONS.md"]`.
+
+### Step 5 — Repeat
+
+Repeat Steps 1–4 until `done=true`.
+
+---
+
+## LLM engine (orchestrator agent)
+
+Spawn the **orchestrator** agent with **exactly these 5 parameters and nothing else**:
+- flow_config: src/pathly_data/core/flows/team.flow.yaml
+- topic: [parsed feature name]
+- rigor: [parsed rigor]
+- autoFlow: [true/false]
+- entryStage: [parsed entryStage, default: discovery]
+
+**CRITICAL:** Pass ONLY the 5 parameters above. Do NOT include feature descriptions,
+file paths, implementation details, or conversation history. The FSM discovers all
+context through its own agents. Passing extra context bypasses the flow and breaks
+the pipeline.
+
+The orchestrator handles all FSM state recovery, routing, git commits, PROGRESS.md updates,
+and artifact archiving. Do not perform these actions in team.md.

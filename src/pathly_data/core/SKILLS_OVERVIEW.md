@@ -1013,25 +1013,24 @@ design [feature]
 
 ---
 
-## 29. team-mcp — MCP FSM Server Wrapper
+## 29. team-http — HTTP FSM Server Wrapper
 
-Runs the full team pipeline via the Pathly Python FSM MCP server.
-Calls `mcp__pathly-fsm__next_action` and `mcp__pathly-fsm__complete_stage`
-directly. **Fails loudly if MCP server is not connected — no LLM fallback.**
-Use `/pathly team` for the standard LLM-driven flow.
+Runs the full team pipeline via the Pathly Python FSM HTTP server (explicit HTTP-only mode).
+All FSM calls delegated to `fsm-call`. **No LLM fallback — fails loudly if the server
+cannot start.** Use `/pathly team` for the standard entry point (HTTP-first with LLM fallback).
 
 ```
-team-mcp [feature] [rigor] [flags]
+team-http [feature] [rigor] [flags]
       │
       ▼
-  Validate MCP server is connected
-  (not connected → hard stop)
+  fsm-call: next_action (auto-starts server if needed)
+  (server unavailable → hard stop)
       │
       ▼
-  Call mcp__pathly-fsm__next_action
+  Execute stage agent
       │
       ▼
-  Execute stage → call mcp__pathly-fsm__complete_stage
+  fsm-call: complete_stage
       │
       ▼
   Repeat until DONE
@@ -1119,7 +1118,7 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
   (CLI wrapper)   ──►  status    ──►  all-feature dashboard
   (CLI wrapper)   ──►  log       ──►  event timeline
   plan done       ──►  design    ──►  DESIGN.md visual spec
-  (MCP strict)    ──►  team-mcp  ──►  full pipeline via FSM server
+  (HTTP strict)   ──►  team-http ──►  full pipeline via HTTP FSM server
   ─────────────────────────────────────────────────────
   TRANSITION ACTIONS (spawned by orchestrator, not users)
   BUILDING→REVIEWING──► commit   ──►  git commit
