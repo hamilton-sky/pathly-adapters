@@ -22,11 +22,13 @@ export function NodePanel({ stateId, data, onAgentChange, onAddRule, onClose, t 
   return (
     <div style={panelStyles.panel}>
       <PanelHeader title={stateId} onClose={onClose} t={t} />
-      <label style={panelStyles.label}>Agent</label>
+      <label htmlFor="node-agent-input" style={panelStyles.label}>Agent</label>
       <input
+        id="node-agent-input"
         style={panelStyles.input}
         value={data.agent_map[stateId] ?? ''}
         onChange={(e) => onAgentChange(stateId, e.target.value)}
+        placeholder="agent name"
       />
       <label style={panelStyles.label}>Transition Rules</label>
       {relevantRules.map(([artifact, mapping]) => (
