@@ -58,9 +58,10 @@ Wait for user input. Then route:
   `team.md` feature detection (read `pathly/plans/*/STATE.json` sorted by
   modification time, use the most recent feature whose state is not `IDLE` or
   `DONE`). Then:
-  1. Call next_action (HTTP POST or MCP tool) with `{flow, topic, project_root}`
-     where `flow` is the detected flow, `topic` is the feature name, and
-     `project_root` is the current working directory.
+  1. Invoke the `fsm-call` skill with:
+     ```json
+     {"action":"next_action","flow":"<flow>","topic":"<topic>","project_root":"<cwd>"}
+     ```
   2. Display the Scenario 1 panel using data from the next_action response:
      ```
      ─────────────────────────────────────────────────────────

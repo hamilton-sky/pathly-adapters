@@ -1,6 +1,3 @@
 skill: debug
 filename: pathly-debug/SKILL.md
 natural_language: "/pathly debug, debug bug, investigate issue, debug"
-variables:
-  FSM_NEXT_ACTION: "mcp_pathly-fsm.next_action"
-  FSM_COMPLETE_STAGE: "mcp_pathly-fsm.complete_stage"

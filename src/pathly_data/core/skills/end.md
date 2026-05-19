@@ -19,9 +19,10 @@ Look for a feature whose `PROGRESS.md` contains `status: IN PROGRESS` or `Status
 
 ## Step 2 — If a feature is in progress
 
-1. Call next_action (HTTP POST or MCP tool) with `{flow, topic, project_root}` where
-   `flow` is the detected flow, `topic` is the feature name, and `project_root` is
-   the current working directory.
+1. Invoke the `fsm-call` skill with:
+   ```json
+   {"action":"next_action","flow":"<flow>","topic":"<topic>","project_root":"<cwd>"}
+   ```
 
 2. Print the read-only summary panel using data from the next_action response.
    Check whether any `*.md` files exist in `plans/<feature>/feedback/`:

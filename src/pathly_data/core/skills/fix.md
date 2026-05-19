@@ -24,12 +24,12 @@ Resolve:
 
 ## Step 2 — Call next_action
 
-Call next_action with `{flow, topic, project_root}`.
+Invoke the `fsm-call` skill with:
+```json
+{"action":"next_action","flow":"<flow>","topic":"<topic>","project_root":"<project_root>"}
+```
 
-Preferred: use MCP tool `mcp__pathly-fsm__next_action` if available.
-Fallback: POST to `http://127.0.0.1:8765/next_action` with JSON body `{flow, topic, project_root}`.
-
-Store the result as `action`.
+Store the JSON result as `action`.
 
 ## Step 3 — If not blocked
 
@@ -73,12 +73,10 @@ a. Follow the instructions returned by `action` for the target agent.
    Spawn the appropriate agent (`action.target_agent`) with those instructions,
    passing the feedback file path `pathly/plans/<topic>/feedback/<file>` as context.
 
-b. After the agent completes: call complete_stage.
-
-   Preferred: use MCP tool `mcp__pathly-fsm__complete_stage` if available.
-   Fallback: POST to `http://127.0.0.1:8765/complete_stage` with JSON body
-   `{flow, topic, project_root, resolved_files: ["<file>"]}`.
-
+b. After the agent completes, invoke the `fsm-call` skill with:
+   ```json
+   {"action":"complete_stage","flow":"<flow>","topic":"<topic>","project_root":"<project_root>","resolved_files":["<file>"]}
+   ```
    Store result as `stage_result`.
 
 c. Handle `stage_result`:
@@ -98,7 +96,7 @@ c. Handle `stage_result`:
      ─────────────────────────────────────────────────────────────────
        Your answer:
      ```
-     Wait for user answer. Call complete_stage again with `{flow, topic, project_root, decision: <answer>}`.
+     Wait for user answer. Invoke `fsm-call` with `{"action":"complete_stage","flow":"<flow>","topic":"<topic>","project_root":"<project_root>","decision":"<answer>"}`.
      Handle that result with the same logic (blocked → loop, done → "Feature complete.", otherwise → show state).
 
    - If `stage_result.done` is true:

@@ -1,6 +1,3 @@
 skill: team
 filename: pathly-team/SKILL.md
 natural_language: "/pathly team, full pipeline, run team, team"
-variables:
-  FSM_NEXT_ACTION: "mcp_pathly-fsm.next_action"
-  FSM_COMPLETE_STAGE: "mcp_pathly-fsm.complete_stage"

@@ -68,19 +68,25 @@ Confirm the symptom is written before continuing.
 Determine which FSM engine to use. `PROJECT_ROOT` = cwd at skill invocation.
 
 - If called with `engine=llm` → go to **LLM engine** below.
-- If called with `engine=mcp` → go to **MCP engine** below.
-- Default (`auto`): try `{{FSM_NEXT_ACTION}}`; if unavailable → **LLM engine**.
+- Default (`auto`): invoke `fsm-call` skill (HTTP); if the server is unavailable → **LLM engine**.
 
-## MCP engine (Python FSM)
+## HTTP engine (Python FSM via fsm-call)
 
-Call FSM tool: `{{FSM_NEXT_ACTION}}(flow="debug", topic=SYMPTOM_NAME, project_root=PROJECT_ROOT)`
+Invoke the `fsm-call` skill with:
+```json
+{"action":"next_action","flow":"debug","topic":"<SYMPTOM_NAME>","project_root":"<PROJECT_ROOT>"}
+```
+
+If `fsm-call` reports the server unavailable → fall through to **LLM engine**.
 
 Display the contextual menu (same format as team.md — see CONTEXTUAL_MENU_UX.md Scenario 2 for
 the blocked variant). Use the debug guidance table from CONTEXTUAL_MENU_UX.md for state-specific
 lines.
 
-Execute the returned agent instructions. When complete, call:
-`{{FSM_COMPLETE_STAGE}}(flow="debug", topic=SYMPTOM_NAME, project_root=PROJECT_ROOT)`
+Execute the returned agent instructions. When complete, invoke the `fsm-call` skill with:
+```json
+{"action":"complete_stage","flow":"debug","topic":"<SYMPTOM_NAME>","project_root":"<PROJECT_ROOT>"}
+```
 
 Handle blocked, decide, and feedback cases using the same protocol as team.md.
 Repeat until `done=true`.

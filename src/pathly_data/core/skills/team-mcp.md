@@ -1,8 +1,7 @@
 # team-mcp
 
-Thin wrapper around the Pathly Python FSM MCP server.
-Calls `mcp__pathly-fsm__next_action` and `mcp__pathly-fsm__complete_stage` directly.
-**Fails loudly if the MCP server is not connected — no LLM fallback.**
+Runs the Pathly team pipeline via the FSM HTTP server.
+All FSM calls are delegated to the `fsm-call` skill.
 
 Run for `$ARGUMENTS`.
 
@@ -25,33 +24,6 @@ Parse `$ARGUMENTS` (order doesn't matter):
   Re-run: /pathly-team-mcp <feature-name> [fast|lite|standard|strict]
   ```
 
-### Guard — FSM connection check
-
-Before doing anything else, establish a connection to the FSM engine:
-
-**Step 1:** Try to call `mcp__pathly-fsm__next_action(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`.
-If the tool is available and responds, continue to Mode selection.
-
-**Step 2:** If MCP tool is unavailable (tool not found):
-1. Detect if HTTP server is running on port 8765: `curl -s http://127.0.0.1:8765/health`
-2. If HTTP server is running: Use HTTP endpoints. Set `use_http = true`.
-3. If HTTP server is not running:
-   - Try to start it: `python -m pathly_orchestrator.http_server` (background)
-   - Wait 2 seconds for startup
-   - Verify with health check; if it responds, set `use_http = true`
-   - If still unavailable after 2 seconds:
-     ```
-     FSM server not connected.
-     
-     To fix this, install pathly-orchestrator and start the HTTP server:
-       pip install pathly-orchestrator
-       python -m pathly_orchestrator.http_server   (run in another terminal)
-     
-     Or use the LLM engine instead:
-       /pathly-team <feature> [rigor]
-     ```
-     Stop.
-
 ## Mode selection
 
 If `fast` was parsed, set `autoFlow = true` and skip this step.
@@ -71,36 +43,14 @@ Wait for reply. Default to Manual if unclear. Store as `autoFlow`.
 
 ---
 
-## HTTP Endpoint Usage
-
-If `use_http = true`, replace all MCP tool calls with HTTP requests:
-
-**Via curl (for reference):**
-```bash
-curl -X POST http://127.0.0.1:8765/next_action \
-  -H "Content-Type: application/json" \
-  -d '{"flow":"team", "topic":"FEATURE", "project_root":"PROJECT_ROOT"}'
-
-curl -X POST http://127.0.0.1:8765/complete_stage \
-  -H "Content-Type: application/json" \
-  -d '{"flow":"team", "topic":"FEATURE", "project_root":"PROJECT_ROOT"}'
-```
-
-**In Claude Code:** Use the built-in HTTP request capabilities to POST to these endpoints
-and parse the JSON response the same way you would handle MCP tool responses.
-
----
-
 ## FSM engine loop
 
 ### Step 1 — Get next action
 
-If `use_http = false` (MCP available):
-  Call: `mcp__pathly-fsm__next_action(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
-
-If `use_http = true` (HTTP fallback):
-  Call: HTTP POST to `http://127.0.0.1:8765/next_action`
-  with body: `{"flow":"team", "topic":FEATURE, "project_root":PROJECT_ROOT}`
+Invoke the `fsm-call` skill with:
+```json
+{"action":"next_action","flow":"team","topic":"<FEATURE>","project_root":"<PROJECT_ROOT>"}
+```
 
 Receives one of:
 - `{current_state, agent, instructions, storage_path, limits}` — normal routing
@@ -109,8 +59,7 @@ Receives one of:
 
 ### Step 2 — Display contextual menu
 
-After every `mcp__pathly-fsm__next_action` or `mcp__pathly-fsm__complete_stage` call,
-display the contextual menu before running any agent:
+After every `fsm-call` result, display the contextual menu before running any agent:
 
 ```
 ─────────────────────────────────────────────────────────
@@ -141,7 +90,7 @@ When blocked by feedback (not human):
 ```
 
 When `complete_stage` returns `{decide: true, ...}`: display Panel A, wait for reply,
-call `mcp__pathly-fsm__complete_stage(..., decision=<reply>)`, display Panel B.
+invoke `fsm-call` with `complete_stage` + `decision=<reply>`, display Panel B.
 
 **State-specific guidance:**
 
@@ -165,7 +114,7 @@ In auto-flow mode, default to [1] without asking. Note "auto-flow: proceeding".
 
 ### Step 3 — Execute agent instructions
 
-Execute the instructions returned by `mcp__pathly-fsm__next_action` for the returned agent.
+Execute the instructions returned by the `next_action` result for the returned agent.
 
 Track per stage (reset each stage):
 - `needs_context_count = 0`
@@ -179,12 +128,11 @@ The FSM is NOT notified about NEEDS_CONTEXT cycles.
 
 ### Step 4 — Complete the stage
 
-If `use_http = false` (MCP available):
-  Call: `mcp__pathly-fsm__complete_stage(flow="team", topic=FEATURE, project_root=PROJECT_ROOT)`
-
-If `use_http = true` (HTTP fallback):
-  Call: HTTP POST to `http://127.0.0.1:8765/complete_stage`
-  with body: `{"flow":"team", "topic":FEATURE, "project_root":PROJECT_ROOT, ...other fields}`
+Invoke the `fsm-call` skill with:
+```json
+{"action":"complete_stage","flow":"team","topic":"<FEATURE>","project_root":"<PROJECT_ROOT>"}
+```
+Add `decision` or `resolved_files` fields when applicable.
 
 Receives one of:
 - `{next_state, agent, instructions, limits}` — advance
@@ -196,12 +144,12 @@ Receives one of:
 **Feedback resolution loop:**
 - `feedback_round_count += 1`
 - If `>= limits.feedback_rounds_per_stage`: write HUMAN_QUESTIONS.md, halt.
-- Else: spawn feedback agent, resolve, call `mcp__pathly-fsm__complete_stage(resolved_files=[file])`.
+- Else: spawn feedback agent, resolve, invoke `fsm-call` with `complete_stage` + `resolved_files=[file]`.
 - Python deletes the file. Do NOT delete files manually.
 - One file at a time.
 
-**Human-blocked:** Surface instructions to user. When user confirms, call
-`mcp__pathly-fsm__complete_stage(resolved_files=["HUMAN_QUESTIONS.md"])`.
+**Human-blocked:** Surface instructions to user. When user confirms, invoke `fsm-call` with
+`complete_stage` + `resolved_files=["HUMAN_QUESTIONS.md"]`.
 
 ### Step 5 — Repeat
 
