@@ -24,7 +24,7 @@ React components      ->  hooks/types/utils      ->  pathlyApi/fs writes
 **Depends on:** Existing React Flow setup.
 **Enables:** Canvas edge creation and edge inspector behavior.
 **Details:**
-Add `Handle` components from `reactflow`. Keep the node compact and consistent with current Studio styling. Handles should be visible enough for discovery but not dominate the node.
+Add `Handle` components from `reactflow`. Keep the node compact and consistent with current Studio styling. On node hover, show handles with a scale animation (0.8→1.0, 150ms ease-out) so they are discoverable without dominating the resting state. Consider a one-time tooltip on the first node: "Drag from dot to connect →".
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 2: Resync graph state when selected flow changes <- Conversation: 1
@@ -64,6 +64,12 @@ Tolerate transitions whose source or target is missing from `states` by skipping
 **Enables:** Sidebar drag/drop wiring.
 **Details:**
 Keep types host-neutral. Do not encode export target behavior here.
+
+**Library section defaults (confirm before Conversation 2 implementation):**
+- Default-open: Flows, Skills, Agents
+- Default-collapsed: Templates, Workspace
+
+These defaults reflect the authoring mental model: users reach for skills/agents/flows constantly, and templates/workspace are secondary reference material.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 5: Switch library default to read-only preview <- Conversation: 2
@@ -102,6 +108,28 @@ Wrap React Flow in a `<ReactFlowProvider>` so the drop handler can call `useReac
 - Otherwise, generate a unique uppercase state id from the item name (e.g. `commit.md` -> `COMMIT`, with `_2` suffix on collision), append to `states`, set `agent_map[newId]`, and place the new node at the converted drop coordinates.
 - Always call `onChange(updated)` so the selected file is marked dirty.
 Keep canvas position as UI state only; do not write positions to YAML in this feature.
+
+**Canvas toolbar `+` button:** Confirm that a bare "+ Add state" button exists in the canvas toolbar by Phase 7 (or Phase 1 at latest). If a user has no skills/agents to drag from the library, they must still be able to add a bare state node from the canvas directly. This button creates an unnamed state with a generated ID and no assigned behavior.
+**Verify:** `cd studio; npm run typecheck`
+
+### Phase 7b: Create z-index constants file <- Conversation: 3
+
+**File:** `studio/src/renderer/src/components/FlowEditor/zIndex.ts` - CREATE: export a single constants object with the full z-index scale used in the flow editor.
+**Done when:** All flow editor components import z-index values from this file rather than hardcoding them.
+**Delivers stories:** S4, S5
+**Depends on:** Conversation 2 completed.
+**Enables:** Phase 8 (inspector) and Phase 9 (behavior picker popover) to reference a canonical scale without collision.
+**Details:**
+```ts
+export const Z = {
+  canvas:    0,
+  inspector: 10,
+  popover:   40,
+  toast:     60,
+  modal:     100,
+} as const;
+```
+Do this before any other Conversation 3 phase. The behavior picker popover (z=40) must render above the inspector (z=10) but below toasts (z=60). Without a constants file this scale drifts during implementation.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 8: Convert inspector overlay into a docked third pane <- Conversation: 3
@@ -124,7 +152,11 @@ React Flow handles container resize automatically when inside a flex parent. App
 **Depends on:** Phase 8.
 **Enables:** Full no-YAML node authoring.
 **Details:**
-Use the docked inspector layout introduced in Phase 8. Implement the "Assigned behavior" picker as a popover from `DESIGN.md` (chip-style trigger -> searchable list with type filter; z-index 40). Source the list from `useProjectFiles().sections.Skills.items` and `sections.Agents.items`. Missing-on-disk references stay selected with a warning badge. State rename is **out of scope for this feature** to avoid touching `transitions`/`agent_map`/`transition_rules`/`transition_actions` cascade; show state id as read-only with a hint "Rename in YAML view for now."
+Use the docked inspector layout introduced in Phase 8. Implement the "Assigned behavior" picker as a popover from `DESIGN.md` (chip-style trigger -> searchable list with type filter; z-index 40 from `Z.popover` in `zIndex.ts`). Source the list from `useProjectFiles().sections.Skills.items` and `sections.Agents.items`. Missing-on-disk references stay selected with a warning badge. State rename is **out of scope for this feature** to avoid touching `transitions`/`agent_map`/`transition_rules`/`transition_actions` cascade; show state id as read-only with a hint "Rename in YAML view for now."
+
+**Keyboard trap (required):** The behavior picker popover must implement a full keyboard trap: `↑`/`↓` to navigate items, `Enter` to select, `Esc` to close and return focus to the chip trigger. Keyboard-only users cannot use the picker without this. Do not ship Phase 9 without verifying keyboard navigation works end-to-end.
+
+**onChange synchronization:** Inspector field `onChange` handlers must write to the graph model synchronously — no debounce. Debounce only CodeMirror YAML edits (Phase 12). If `onChange` is debounced here and the user presses `Ctrl+S` immediately after an inspector edit, the save captures stale model state.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 10: Replace edge panel with edge inspector <- Conversation: 3
@@ -155,6 +187,23 @@ transition_rules:
 ```
 
 Do not use the older incorrect shape `{ artifact_name: { source: target } }`. The edge inspector should edit the rule object for the edge source state and ensure the chosen target is one of that source's declared `transitions[source]`. Use existing `handleAddTransitionAction` and `handleAddTransitionRule` from `useFlowGraph` only after updating them to this state-keyed schema; extend with edit + delete. Avoid inventing a new flow schema.
+
+**Human-readable label mapping (required — do not expose raw YAML keys in the inspector UI):**
+
+| YAML key | Inspector label | Lucide icon |
+|---|---|---|
+| `default` | "Always continues to →" | `ArrowRight` |
+| `on_artifact` | "When artifact arrives:" | `FileCheck` |
+| `on_content` | "When file contains:" | `FileSearch` |
+| `decide` | "Human decision required:" | `GitFork` |
+| `transition_actions` | "Run before transitioning:" | `Zap` |
+
+Raw YAML key names (`on_artifact`, `decide`, etc.) must appear only in the YAML tab, never in the visual inspector. The label mapping lives in `EdgePanel.tsx` as a constants object.
+
+**Interaction pattern for conditions:**
+- Adding a condition: `+ Add condition` button at bottom of the conditions section → inline form (type selector → type-specific fields). Not a modal.
+- Removing a condition: `×` icon on the condition row + a brief undo toast.
+- Multiple conditions to the same target: show stacked; surface a validation warning if they could conflict.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 11: Extract validation utility and surface issues <- Conversation: 3
@@ -202,6 +251,15 @@ Use one canonical YAML serialization (`jsYaml.dump(flowData, { lineWidth: 120 })
 | Codex | `${projectPath}/.codex/pathly-flows/${flow}.flow.yaml` | Creates folder if missing. Mirrors the Claude Code convention for now. |
 
 Disable the Export button while `validateFlow` returns errors. Warnings require an explicit confirmation modal. Successful export shows a toast with a "Copy path" action.
+
+**Last-exported path hint:** Below the target dropdown + Export button, show the last-exported destination as a muted one-line status:
+```
+[Pathly package ▾]  [Export]
+Last: src/pathly_data/core/flows/debug.flow.yaml  ✓ 3m ago
+```
+Store this in component state (not persisted). Reset on flow file change. This gives users confidence the file landed where they expect without requiring them to navigate the filesystem.
+
+**Export button placement:** Keep a visible divider between layout controls (zoom/fit/lock) and authoring controls (validate/export) in the canvas toolbar. Export must not be visually buried next to zoom buttons.
 **Verify:** `cd studio; npm run typecheck`
 
 ### Phase 14: Add export helpers if needed <- Conversation: 4
