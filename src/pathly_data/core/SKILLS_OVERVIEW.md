@@ -1,6 +1,6 @@
 # Pathly Skills Overview
 
-22 user-facing skills plus 2 internal transition-action skills. Each lives in
+29 user-facing skills plus 2 internal transition-action skills. Each lives in
 `core/skills/`. Adapters translate them to host-native surfaces. This document
 is the authoritative reference.
 
@@ -889,6 +889,156 @@ scout-path is invoked by:
 
 ---
 
+## 23. fix — Open Feedback Resolver
+
+Resolves open feedback files for an active feature. Auto-detects the feature
+from `STATE.json` or accepts an explicit topic argument.
+
+```
+fix [feature]
+      │
+      ▼
+  Resolve TOPIC (arg or auto-detect from plans/)
+      │
+      ▼
+  Read feedback/ for open files
+  (priority: HUMAN_QUESTIONS > ARCH_FEEDBACK > DESIGN_QUESTIONS
+             > IMPL_QUESTIONS > REVIEW_FAILURES > TEST_FAILURES)
+      │
+      ▼
+  Spawn appropriate agent to resolve highest-priority file
+      │
+      ▼
+  Re-check feedback/ → repeat until clear or blocked
+```
+
+---
+
+## 24. ff — Fast-Forward FSM State
+
+Advances the FSM to the next state without running the current stage agent.
+Thin wrapper around the `pathly-ff` CLI command.
+
+```
+/pathly ff [feature]
+      │
+      ▼
+  pathly-ff $ARGUMENTS
+      │
+      ▼
+  Print output as returned
+  (command not found → "Run pathly-setup first")
+```
+
+---
+
+## 25. back — Roll Back FSM State
+
+Rolls back the FSM one state with user confirmation. Does not undo git commits.
+Thin wrapper around the `pathly-back` CLI command.
+
+```
+/pathly back [feature]
+      │
+      ▼
+  pathly-back $ARGUMENTS
+      │
+      ▼
+  Print output as returned
+  (command not found → "Run pathly-setup first")
+```
+
+---
+
+## 26. status — Cross-Feature Dashboard
+
+Shows all active Pathly flows and their current FSM state.
+Thin wrapper around the `pathly-status` CLI command.
+
+```
+/pathly status
+      │
+      ▼
+  pathly-status $ARGUMENTS
+      │
+      ▼
+  Print output as returned
+  (command not found → "Run pathly-setup first")
+```
+
+---
+
+## 27. log — FSM Event Timeline
+
+Shows a readable timeline of FSM events for the active or named feature.
+Thin wrapper around the `pathly-log` CLI command.
+
+```
+/pathly log [feature]
+      │
+      ▼
+  pathly-log $ARGUMENTS
+      │
+      ▼
+  Print output as returned
+  (command not found → "Run pathly-setup first")
+```
+
+---
+
+## 28. design — Visual Spec Generator
+
+Generates a `DESIGN.md` artifact that `build` uses as its visual spec.
+Runs **after plan, before build**. Detects the active feature and tech stack
+automatically, then invokes the designer agent to produce layout, component,
+and style decisions.
+
+```
+design [feature]
+      │
+      ▼
+  Detect active feature + tech stack
+  (package.json → react/next/vue/svelte/astro)
+      │
+      ▼
+  Spawn designer agent:
+  → generates DESIGN.md:
+    layout | components | colors
+    typography | interactions
+      │
+      ▼
+  Write plans/<feature>/DESIGN.md
+  "Next: /pathly build <feature>"
+```
+
+---
+
+## 29. team-mcp — MCP FSM Server Wrapper
+
+Runs the full team pipeline via the Pathly Python FSM MCP server.
+Calls `mcp__pathly-fsm__next_action` and `mcp__pathly-fsm__complete_stage`
+directly. **Fails loudly if MCP server is not connected — no LLM fallback.**
+Use `/pathly team` for the standard LLM-driven flow.
+
+```
+team-mcp [feature] [rigor] [flags]
+      │
+      ▼
+  Validate MCP server is connected
+  (not connected → hard stop)
+      │
+      ▼
+  Call mcp__pathly-fsm__next_action
+      │
+      ▼
+  Execute stage → call mcp__pathly-fsm__complete_stage
+      │
+      ▼
+  Repeat until DONE
+```
+
+---
+
 ## Transition-Action Skills (internal, orchestrator-only)
 
 These two skills are not user-facing. The orchestrator spawns them automatically
@@ -963,6 +1113,13 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
   feature work    ──►  po        ──►  PO_NOTES.md
   (by other skills)──► scout-    ──►  Scout Findings block
                        path
+  open feedback   ──►  fix       ──►  resolved feedback files
+  (CLI wrapper)   ──►  ff        ──►  FSM advanced one state
+  (CLI wrapper)   ──►  back      ──►  FSM rolled back one state
+  (CLI wrapper)   ──►  status    ──►  all-feature dashboard
+  (CLI wrapper)   ──►  log       ──►  event timeline
+  plan done       ──►  design    ──►  DESIGN.md visual spec
+  (MCP strict)    ──►  team-mcp  ──►  full pipeline via FSM server
   ─────────────────────────────────────────────────────
   TRANSITION ACTIONS (spawned by orchestrator, not users)
   BUILDING→REVIEWING──► commit   ──►  git commit
@@ -998,4 +1155,4 @@ Priority order (highest to lowest):
 
 ---
 
-_Generated 2026-05-14 — update this file after any core/skills/ change._
+_Generated 2026-05-19 — update this file after any core/skills/ change._

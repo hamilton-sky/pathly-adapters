@@ -23,8 +23,10 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax)
 │       │   │   ├── architect.md
 │       │   │   ├── builder.md
+│       │   │   ├── designer.md
 │       │   │   ├── director.md
 │       │   │   ├── explorer.md
+│       │   │   ├── human.md
 │       │   │   ├── orchestrator.md
 │       │   │   ├── planner.md
 │       │   │   ├── po.md
@@ -44,7 +46,7 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   │   ├── scout-path.md
 │       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
 │       │   │   ├── archive-artifacts.md  ← transition-action skill (orchestrator only)
-│       │   │   └── ...          (22 user-facing + 2 transition-action skills total)
+│       │   │   └── ...          (29 user-facing + 2 transition-action skills total)
 │       │   ├── flows/           ← Flow YAML definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
@@ -207,6 +209,7 @@ See [FLOW_DIAGRAM.md](FLOW_DIAGRAM.md) for the full command reference and deploy
 | `team` | `team.flow.yaml` | IDLE → STORMING → PLANNING → BUILDING → REVIEWING → TESTING → RETRO → DONE | Full feature pipeline |
 | `debug` | `debug.flow.yaml` | INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE | Bug investigation |
 | `explore` | `explore.flow.yaml` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE | Codebase exploration |
+| `test` | `test.flow.yaml` | STORMING → PLANNING → BUILDING → REVIEWING → TESTING → DONE | Lightweight build+test pipeline (no retro/archive) |
 
 Each flow YAML specifies: `states`, `transitions`, `agent_map`, `feedback_routing`, `transition_rules`, and `transition_actions`.
 

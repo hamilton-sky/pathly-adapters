@@ -50,8 +50,10 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax)
 │       │   │   ├── architect.md
 │       │   │   ├── builder.md
+│       │   │   ├── designer.md  ← UI/UX design spec generation (used by /design skill)
 │       │   │   ├── director.md
 │       │   │   ├── explorer.md  ← analyze/explore/conclude phases for /explore skill
+│       │   │   ├── human.md     ← blocks pipeline until user responds (HUMAN_QUESTIONS)
 │       │   │   ├── orchestrator.md
 │       │   │   ├── planner.md
 │       │   │   ├── po.md
@@ -84,10 +86,17 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── lessons.md
 │       │   │   ├── prd-import.md
 │       │   │   ├── help.md
+│       │   │   ├── fix.md       ← resolve open feedback files for active feature
+│       │   │   ├── ff.md        ← fast-forward FSM state (CLI wrapper)
+│       │   │   ├── back.md      ← roll back FSM one state (CLI wrapper)
+│       │   │   ├── status.md    ← cross-feature dashboard (CLI wrapper)
+│       │   │   ├── log.md       ← event timeline for active/named feature (CLI wrapper)
+│       │   │   ├── design.md    ← generate DESIGN.md visual spec (after plan, before build)
+│       │   │   ├── team-mcp.md  ← MCP FSM server wrapper (strict, no LLM fallback)
 │       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
 │       │   │   ├── archive-artifacts.md ← transition-action skill (orchestrator only)
 │       │   │   └── team/        ← sub-skills for team pipeline phases (discover, plan, build, review, test, retro)
-│       │   ├── flows/           ← FSM flow definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml)
+│       │   ├── flows/           ← FSM flow definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml, test.flow.yaml)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
@@ -148,13 +157,14 @@ package's internal resource API rather than repo-relative path assumptions.
 
 ## Flow YAMLs
 
-`src/pathly_data/core/flows/` contains the FSM definitions consumed by the orchestrator at runtime. There are three flows:
+`src/pathly_data/core/flows/` contains the FSM definitions consumed by the orchestrator at runtime. There are four flows:
 
 | Flow | File | Storage path | States |
 |---|---|---|---|
 | `team` | `team.flow.yaml` | `pathly/plans/{topic}/` | IDLE → STORMING → PLANNING → BUILDING → REVIEWING → TESTING → RETRO → DONE |
 | `debug` | `debug.flow.yaml` | `pathly/debugs/{topic}/` | INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE |
 | `explore` | `explore.flow.yaml` | `pathly/explorations/{topic}/` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE |
+| `test` | `test.flow.yaml` | `pathly/plans/{topic}/` | STORMING → PLANNING → BUILDING → REVIEWING → TESTING → DONE |
 
 Each YAML specifies: `version`, `flow`, `storage_path`, `states`, `transitions`, `agent_map`, `feedback_routing`, `transition_rules`, and `transition_actions`.
 

@@ -47,7 +47,7 @@ flowchart TD
 
 ```text
 ~/.claude/
-├── agents/                    ← 12 stitched behavioral contracts
+├── agents/                    ← 14 stitched behavioral contracts
 │   ├── builder.md
 │   ├── reviewer.md
 │   ├── architect.md
@@ -128,6 +128,13 @@ Command                   Purpose
 /pathly lessons           promote lessons from retros
 /pathly prd-import        import a PRD file
 /pathly help              state-aware menu
+/pathly fix               resolve open feedback for active feature
+/pathly ff                fast-forward FSM to next state (skips current stage agent)
+/pathly back              roll back FSM one state (with confirmation)
+/pathly status            cross-feature dashboard (all active flows + states)
+/pathly log               event timeline for active or named feature
+/pathly design            generate DESIGN.md visual spec (after plan, before build)
+/pathly team-mcp          run full pipeline via MCP FSM server (strict mode)
 ```
 
 *`/pathly verify` dispatches to `verify-state` (different stem from all other `/pathly <x>` → `<x>` pairs).
