@@ -2,14 +2,14 @@
 
 ## Overview
 
-Upgrades the Pathly Studio Monitor panel from its current working-but-minimal state to the full UX spec resolved in MONITOR_DESIGN_SPEC.md. The changes are renderer-only: three Monitor components (FsmView, EventLog/trace, Monitor index), the PlanBoard, and a minor canvas banner in VisualView. No backend, IPC, or store schema changes beyond adding multi-flow session tracking.
+Upgrades the Pathly Studio Monitor panel from its current working-but-minimal state to the full UX spec resolved in MONITOR_DESIGN_SPEC.md. The changes are renderer-only: three Monitor components (FsmView, Monitor index), PlanBoard, VisualView banner, and minor store additions. No backend or IPC changes beyond store fields. Monitor and canvas are mutually exclusive panels (`activePanel` in uiStore) — the plan works within this constraint.
 
 ## Layer Architecture
 
 ```
 Store (uiStore/projectStore)   →   Monitor components          →   Visual output
-activeSessions, monitorSource      FsmView (rail + trace)          Connected rail, sliding dot
-                                   Monitor/index (tabs, SSE)       Tab bar, live badge
+activePanel, activeFlowSessions    FsmView (rail + trace)          Connected rail, sliding dot
+monitorSource, activeMonitorTab    Monitor/index (tabs, SSE)       Tab bar, live badge
                                    PlanBoard (cards)               Pulsing cards, cost rows
                                    VisualView banner               Running-flow banner
 ```
@@ -19,21 +19,22 @@ activeSessions, monitorSource      FsmView (rail + trace)          Connected rai
 | Conv | Phases | Focus |
 |------|--------|-------|
 | 1 | 1, 2, 3 | FSM rail visual upgrade, execution trace, SSE badge |
-| 2 | 4, 5, 6 | Monitor tabs, running banner, plan card enhancements |
+| 2 | 4, 5, 6, 7 | Monitor tabs + SSE re-key, running banner, plan card enhancements, last-used flow |
 
 ## Phases
 
 ### Phase 1: Upgrade FsmView to connected rail with CSS dot   ← Conversation: 1
 
-**File:** `studio/src/renderer/src/components/Monitor/FsmView.tsx` — MODIFY: replace the box-list layout with a horizontal connected rail (thin line, state dots, sliding active dot via CSS transform).
+**File:** `studio/src/renderer/src/components/Monitor/FsmView.tsx` — MODIFY: replace box-list layout with a horizontal connected rail (thin 1px line, state dots, sliding active dot via CSS transform).
+**File:** `studio/src/renderer/src/theme.ts` — VERIFY/MODIFY: confirm `runtime` token exists (`#22D3EE`); add it if missing before any other phase uses it.
 
-**Done when:** The Monitor pipeline section shows a rail of dots connected by a line; the active dot slides to the current state (no JS animation loop, CSS `transition: transform 150ms ease-out`); loop-back re-positions the dot on the earlier state correctly.
+**Done when:** Pipeline section shows dots connected by a line; active dot slides (CSS `transition: transform 150ms ease-out`); loop-back re-positions correctly; `cycle N` / `conv N` label correct per flow type.
 
 **Delivers stories:** S1
 
 **Depends on:** Existing FsmView + pipelineStates from store.
 
-**Enables:** Phase 2 (trace below the rail), Phase 3 (source badge in same component).
+**Enables:** Phase 2 (trace below), Phase 3 (badge uses same `t.runtime`).
 
 **Details:**
 
@@ -45,12 +46,13 @@ PLANNING     BUILDING    REVIEWING    DONE
 ```
 
 - Container: `display: flex; align-items: center; position: relative;`
-- Rail line: absolutely positioned 1px horizontal line across the full rail width, `bgSurface1` color
+- Rail line: absolutely positioned 1px horizontal line, `bgSurface1` color
 - State dot: 10px circle. Completed: green fill. Active: cyan fill + `pathly-pulse` class. Future: muted outline.
-- Active dot marker: a separate absolutely-positioned cyan circle that moves via `transform: translateX` driven by a `useRef` on the active state index. Position = `(activeIdx / (total - 1)) * 100%` mapped to pixel offset. Use `requestAnimationFrame` once on mount to avoid paint-before-transition.
-- State label: below each dot, 11px muted text, uppercase.
-- `cycle N` vs `conv N` label: derive from `fsmState.flow`. If `flow === 'debug'` or `flow === 'explore'`, label reads `cycle N`. Otherwise `conv N`. Read conv number from `fsmState.conv ?? fsmState.current_conversation`.
-- Remove the "System active — STATE" status line; the rail replaces it.
+- Active dot marker: separate absolutely-positioned cyan circle, moves via `transform: translateX`. Position = `(activeIdx / (PIPELINE.length - 1)) * railWidthPx`. Use `useRef` on the rail container + `ResizeObserver` (or `useLayoutEffect`) to compute rail width. One `requestAnimationFrame` on mount to avoid paint-before-transition.
+- State labels: 11px muted text below each dot, uppercase.
+- `cycle N` vs `conv N`: if `fsmState.flow === 'debug' || fsmState.flow === 'explore'` → `cycle N`; else `conv N`. For unknown/custom flow names, default to `conv N`. Conv number from `fsmState.conv ?? fsmState.current_conversation`.
+- Remove existing "System active — STATE" status line entirely.
+- `activeIdx = PIPELINE.indexOf(fsmState.current ?? '')` — single-index lookup. Loop-back is automatic.
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -58,37 +60,44 @@ PLANNING     BUILDING    REVIEWING    DONE
 
 ### Phase 2: Add execution trace below the rail   ← Conversation: 1
 
-**File:** `studio/src/renderer/src/components/Monitor/FsmView.tsx` — MODIFY: add an `ExecutionTrace` sub-section below the rail that renders a chronological list of state visits.
+**File:** `studio/src/renderer/src/components/Monitor/FsmView.tsx` — MODIFY: add execution trace section below the rail.
+**File:** `studio/src/renderer/src/components/Monitor/utils.ts` — CREATE: `formatRelativeTime(ts: string): string` helper.
 
-**Done when:** The trace shows each STATE_TRANSITION event as a row; BUILDING visited twice shows two rows; active state row has a pulsing `●`; failed states (where a review found failures) show `✗`.
+**Done when:** Trace shows each STATE_TRANSITION as a row; BUILDING visited twice shows two rows; active row has pulsing `●`; failed rows show `✗`; `formatRelativeTime` works correctly.
 
 **Delivers stories:** S2
 
 **Depends on:** Phase 1.
 
-**Enables:** Full Q3 spec compliance — rail shows WHERE, trace shows HOW WE GOT HERE.
-
 **Details:**
 
-Trace derives from `events` (from store), filtering for `STATE_TRANSITION` type. Build a list of `{ state, fromState, idx, ts, agent, result }` entries from those events in order.
+`formatRelativeTime(ts)`: `now` if <60s ago, `Xm ago` if <60min, `Xh ago` otherwise.
 
-Determine `result` per entry:
-- Last transition away from a state: look at the next `STATE_TRANSITION`. If it went BACKWARDS (looped), mark the departed visit as `'looped'`. If the system moved to a state named `FIXING` or similar after a review, mark the REVIEWING visit as `'failed'`.
-- Simpler heuristic: a STATE_TRANSITION event whose `from` state is REVIEWING and `to` is not DONE/next-forward → mark as `failed`.
+Trace derives from `events` (store), filtering `type === 'STATE_TRANSITION'`. Build `VisitRow[]`:
+```ts
+interface VisitRow {
+  state: string
+  visitIndex: number   // nth visit to this state (for de-dupe display)
+  ts?: string
+  agent?: string
+  status: 'done' | 'active' | 'failed'
+}
+```
 
-Row layout (monospace 12px):
+**Failure detection — use `pipelineStates` order, not state names:**
+After a STATE_TRANSITION event, look at the next STATE_TRANSITION's `to` field. If `PIPELINE.indexOf(nextTo) < PIPELINE.indexOf(thisTo)` — i.e., the pipeline moved backward — mark `thisTo`'s visit as `'failed'`. This works for any flow topology without hardcoding state names.
+
+**Agent per row:** find the first `AGENT_SPAWNED` event with `ts > stateTransition.ts`. If none found, show `—`. Eventual-consistency is acceptable (may lag one frame).
+
+**EVENTS.jsonl / SSE race:** the initial `readFile` load can arrive after SSE has appended live events, overwriting them. This is a pre-existing bug. Do NOT try to fix it in this phase — just ensure the trace doesn't crash on reorder (sort rows by `ts` before rendering).
+
+Row layout (12px monospace):
 ```
   ✓  PLANNING    conv 1    planner    2h ago
-  ●  BUILDING    conv 2    builder    now         (pulsing cyan)
+  ●  BUILDING    conv 2    builder    now
 ```
 
-- Icon: `✓` green, `●` cyan pulse, `✗` red
-- State name: `textPrimary`
-- Conv/cycle label: `textMuted`
-- Agent: `textMuted`, read from the AGENT_SPAWNED event closest after the STATE_TRANSITION
-- Relative time: `formatRelativeTime(ts)` — "Xm ago" / "now" / "Xh ago"
-
-Empty state (no transitions yet): single muted line "Waiting for flow activity."
+Empty state: `<span style={{ color: t.textMuted }}>Waiting for flow activity.</span>`
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -96,43 +105,42 @@ Empty state (no transitions yet): single muted line "Waiting for flow activity."
 
 ### Phase 3: SSE live source badge in Monitor header   ← Conversation: 1
 
-**File:** `studio/src/renderer/src/components/Monitor/index.tsx` — MODIFY: surface the `monitorSource` store value as a small muted badge in the `HeaderBar`.
+**File:** `studio/src/renderer/src/components/Monitor/index.tsx` — MODIFY: surface `monitorSource` in `HeaderBar`; handle all states including `null`.
 
-**Done when:** The header shows `● live` (cyan dot) when SSE connected, `○ polling` when falling back to chokidar.
+**Done when:** Header shows `● live` (sse), `○ polling` (chokidar), or `—` (null/unavailable). No old `Source: SSE live` text remains.
 
 **Delivers stories:** S3
 
-**Depends on:** `monitorSource` already in store and set in Monitor useEffect.
-
-**Enables:** Debugging silent update failures without dev tools.
+**Depends on:** `monitorSource` in projectStore (type: `'mcp' | 'chokidar' | 'sse' | null`).
 
 **Details:**
 
-In `HeaderBar`, read `monitorSource` from `useStore()`. Render:
+In `HeaderBar`, read `monitorSource` via `useStore()`. Render flush-right:
 ```tsx
-<span style={{ fontSize: '11px', color: monitorSource === 'sse' ? t.runtime : t.textMuted }}>
-  {monitorSource === 'sse' ? '● live' : '○ polling'}
-</span>
+const badgeText = monitorSource === 'sse'
+  ? '● live'
+  : monitorSource === 'chokidar'
+    ? '○ polling'
+    : '—'
+const badgeColor = monitorSource === 'sse' ? t.runtime : t.textMuted
 ```
-Place it flush-right in the header title row. Use `t.runtime` (`#22D3EE`) for the live state. Size 11px, muted baseline.
+
+Remove any existing `Source:` text from the header. Size 11px. Use `t.runtime` (confirmed/added in Phase 1).
 
 **Verify:** `cd studio; npm run typecheck`
 
 ---
 
-### Phase 4: Multi-flow store + Monitor tab bar   ← Conversation: 2
+### Phase 4: Multi-flow store + Monitor tabs + SSE re-key   ← Conversation: 2
 
-**File:** `studio/src/renderer/src/store/uiStore.ts` — MODIFY: add `activeFlowSessions` (record of flowId → session info) and `activeMonitorTab` (current tab flow key).
+**File:** `studio/src/renderer/src/store/uiStore.ts` — MODIFY: add `activeFlowSessions`, `activeMonitorTab`, and setters.
+**File:** `studio/src/renderer/src/components/Monitor/index.tsx` — MODIFY: add tab bar + re-key SSE subscription when active tab changes.
 
-**File:** `studio/src/renderer/src/components/Monitor/index.tsx` — MODIFY: add tab bar above monitor content when `activeFlowSessions` has entries.
-
-**Done when:** When multiple flows are tracked, a tab bar appears above the rail; clicking a tab switches the monitor display; CLI-originated sessions show `>_`.
+**Done when:** When ≥2 Studio-launched sessions are tracked, a tab bar appears; switching tabs changes the SSE subscription topic; `◐` shown for paused sessions; no tab bar for 0 or 1 session.
 
 **Delivers stories:** S4
 
 **Depends on:** Conversation 1 complete.
-
-**Enables:** Full multi-flow monitoring without separate windows.
 
 **Details:**
 
@@ -140,33 +148,51 @@ Store additions to `uiStore.ts`:
 ```ts
 interface FlowSession {
   flowKey: string          // e.g. "team.flow.yaml"
-  topic: string
+  topic: string            // e.g. "studio-monitor-live"
   isRunning: boolean
-  isCli: boolean           // CLI-originated
+  isPaused: boolean        // waiting for artifact
+  isCli: false             // always false until Post-MVP — no CLI discovery yet
 }
-activeFlowSessions: Record<string, FlowSession>
-activeMonitorTab: string | null
+activeFlowSessions: Record<string, FlowSession>   // key = topic
+activeMonitorTab: string | null                    // key into activeFlowSessions
 setActiveFlowSessions: (s: Record<string, FlowSession>) => void
 setActiveMonitorTab: (tab: string | null) => void
 ```
 
-Monitor/index.tsx: when `Object.keys(activeFlowSessions).length > 1`, render a tab bar:
-```tsx
-<div style={tabBarStyle}>
-  {sessions.map(s => (
-    <button key={s.flowKey} onClick={() => setActiveMonitorTab(s.flowKey)}
-      style={{ borderBottom: isActive ? `2px solid ${t.runtime}` : 'none', ... }}>
-      {s.flowKey}
-      {s.isRunning && <span style={{ color: t.runtime }}>●</span>}
-      {s.isCli && <span style={{ color: t.textMuted }}>&gt;_</span>}
-    </button>
-  ))}
-</div>
+**Producer for `activeFlowSessions`** — Studio-session only (CLI discovery is Post-MVP):
+In `Monitor/index.tsx`'s existing `useEffect` (keyed on `activeTopic`), after STATE.json is parsed and `fsmState` is set, update `activeFlowSessions` to include the current topic as a session:
+```ts
+setActiveFlowSessions(prev => ({
+  ...prev,
+  [activeTopic]: {
+    flowKey: `${parsedState.flow ?? 'team'}.flow.yaml`,
+    topic: activeTopic,
+    isRunning: parsedState.current !== 'IDLE' && parsedState.current !== 'DONE',
+    isPaused: false,   // no pause signal yet
+    isCli: false
+  }
+}))
 ```
+Remove session from map when topic changes (cleanup in useEffect return).
 
-Overflow (>4 tabs): collect extras into a `...` button that opens a small dropdown.
+**Tab bar** — show when `Object.keys(activeFlowSessions).length >= 2`:
+```tsx
+{sessions.length >= 2 && (
+  <div style={tabBarStyle}>
+    {visibleSessions.map(s => (
+      <button key={s.topic} onClick={() => setActiveMonitorTab(s.topic)} ...>
+        {s.flowKey}
+        {s.isRunning && <span style={{ color: t.runtime }}>●</span>}
+        {s.isPaused && <span style={{ color: t.textMuted }}>◐</span>}
+      </button>
+    ))}
+    {overflow.length > 0 && <OverflowMenu sessions={overflow} />}
+  </div>
+)}
+```
+Cap visible tabs at 4; extras in `...` overflow dropdown.
 
-Current `activeTopic`-based logic remains the default single-session path. Tab selection sets `activeMonitorTab` which the Monitor reads in place of `activeTopic` when non-null.
+**SSE re-key** — this is non-trivial. The existing `useEffect` in Monitor/index.tsx (line 117) keys on `[activeTopic, projectPath, ...]`. When `activeMonitorTab` changes, the displayed topic must change too. Refactor: derive `effectiveTopic = activeMonitorTab ?? activeTopic` and use it as the SSE subscription key AND the `params` for `EventSource`. Add `activeMonitorTab` to the `useEffect` dependency array. The cleanup (`es.close()`, `removeListener()`) already runs on dep change, so SSE re-keys automatically.
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -174,32 +200,49 @@ Current `activeTopic`-based logic remains the default single-session path. Tab s
 
 ### Phase 5: Running-flow entry banner on canvas   ← Conversation: 2
 
-**File:** `studio/src/renderer/src/components/FlowEditor/VisualView/index.tsx` — MODIFY: add a non-blocking dismissible banner that appears when a flow is actively running.
+**File:** `studio/src/renderer/src/components/FlowEditor/VisualView/index.tsx` — MODIFY: add dismissible running-flow banner.
 
-**Done when:** When `fsmState.current` is not null/IDLE/DONE, the banner appears at top of canvas; "View in Monitor →" switches to Monitor tab; it auto-dismisses after 8s; `[dismiss]` closes immediately.
+**Done when:** Banner appears when one flow is running; "View in Monitor →" calls `setActivePanel('monitor')`; auto-dismisses after 8s; resets on new run; absent when multiple flows active.
 
 **Delivers stories:** S5
 
-**Depends on:** Phase 4 (Monitor tab switching).
-
-**Enables:** Passive awareness of running pipelines while working in the canvas.
+**Depends on:** `Z` constants in `FlowEditor/zIndex.ts` (Phase 7b of studio-visual-flow-builder). Confirm file exists before implementing.
 
 **Details:**
 
-Read `fsmState` and `activeTopic` from store. Derive `isRunning = fsmState.current && fsmState.current !== 'IDLE' && fsmState.current !== 'DONE'`.
+`isRunning`: `fsmState?.current && fsmState.current !== 'IDLE' && fsmState.current !== 'DONE'`
+`isMultiFlow`: `Object.keys(activeFlowSessions).length >= 2`
 
-Banner renders absolutely positioned at top of VisualView container (z-index from `Z.toast - 1 = 59`):
+Show banner only when `isRunning && !isMultiFlow`.
+When `isMultiFlow && isRunning`: call `setActivePanel('monitor')` automatically on mount (once per session open).
+
+Banner local state:
+```ts
+const [dismissed, setDismissed] = useState(false)
+const prevRunningRef = useRef(false)
+
+// Reset dismissed when a new run starts (IDLE/DONE → running)
+useEffect(() => {
+  if (isRunning && !prevRunningRef.current) setDismissed(false)
+  prevRunningRef.current = !!isRunning
+}, [isRunning])
+
+// Reset dismissed when topic changes
+useEffect(() => { setDismissed(false) }, [activeTopic])
+
+// Auto-dismiss
+useEffect(() => {
+  if (!isRunning || dismissed) return
+  const id = setTimeout(() => setDismissed(true), 8000)
+  return () => clearTimeout(id)
+}, [isRunning, dismissed])
 ```
-╔══════════════════════════════════════════╗
-║  team.flow.yaml is running ● conv 3 / BUILDING   [View in Monitor →]  [dismiss]  ║
-╚══════════════════════════════════════════╝
-```
 
-State: `const [dismissed, setDismissed] = useState(false)`. Reset `dismissed` when `activeTopic` changes. Auto-dismiss: `useEffect` with `setTimeout(8000)` that calls `setDismissed(true)`. Clear timeout on unmount.
+"View in Monitor →" button calls `setActivePanel('monitor')` from uiStore (NOT a new `bottomPanel` field — use the existing `activePanel` mechanism).
 
-"View in Monitor →" calls a store action to switch the active bottom-panel tab to Monitor (or sets a `bottomPanel: 'monitor'` store value — wire to whatever existing tab switching mechanism is in `App.tsx`/`TopBar.tsx`).
+Banner position: absolutely positioned at top of VisualView container. z-index: `Z.toast - 1` from `FlowEditor/zIndex.ts`.
 
-Banner color: `bgSurface1` background, 1px `runtime` border. Cyan `●` dot (`t.runtime`).
+Banner text: `{flowName} is running <span style={{color: t.runtime}}>●</span> {convLabel} / {fsmState.current}`
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -207,39 +250,83 @@ Banner color: `bgSurface1` background, 1px `runtime` border. Cyan `●` dot (`t.
 
 ### Phase 6: Plan conversation card enhancements   ← Conversation: 2
 
-**File:** `studio/src/renderer/src/components/PlanBoard.tsx` — MODIFY: upgrade conversation cards with pulsing active border, `✗` failure indicator, cost/token row, and relative timestamps.
+**File:** `studio/src/renderer/src/components/PlanBoard.tsx` — MODIFY: pulsing active border, failure indicator, cost/token row, hover/selected states, timestamps, phase range.
+**File:** `studio/src/renderer/src/types/index.ts` — MODIFY: extend `ConvRow` with `phases?: string`.
+**File:** `studio/src/renderer/src/hooks/usePlanConversations.ts` — MODIFY: parse phase range from PROGRESS.md and populate `ConvRow.phases`.
 
-**Done when:** Active conv card has a pulsing cyan left border; failed has red `✗`; cost row appears when events have AGENT_DONE cost data; cards are min 52px tall.
+**Done when:** Active card pulses cyan; failed shows red `✗`; cost row appears when data exists; hover shows `bgSurface1`; selected shows violet border; phase range shows if parsed.
 
 **Delivers stories:** S6
 
-**Depends on:** Existing PlanBoard + events loaded from EVENTS.jsonl.
+**Details:**
 
-**Enables:** Plan progress visibility without opening Event Log.
+**`ConvRow` extension** (`types/index.ts`):
+```ts
+interface ConvRow {
+  // existing fields ...
+  phases?: string   // e.g. "1–3"
+}
+```
+
+**`parseProgressMd` update** (`usePlanConversations.ts`): parse phase range from the Conv breakdown table (e.g., `| 1 | 1, 2, 3 |` → `phases: "1–3"`). Add to returned `ConvRow`.
+
+**Status determination**:
+- Active: `conv.status === 'IN_PROGRESS' || 'BUILDING' || 'REVIEWING'`
+- Failed: `conv.status === 'BLOCKED'`
+- Done: `conv.status === 'DONE'`
+
+**Cost per conv**: filter `events` (local state in PlanBoard) by `(e as EventEntry & { conversation?: number }).conversation === conv.num`. Sum `cost_usd`, `tokens_in`, `tokens_out` from `AGENT_DONE` entries. Confirm `conversation` field is present in EVENTS.jsonl (check one real file before implementing — if absent, omit cost row entirely rather than showing wrong data).
+
+**Active border pulse**: inject once via the same `styleInjectedRef` pattern as FsmView (avoid double-injection). Keyframes:
+```css
+@keyframes pathly-pulse-border {
+  0%, 100% { border-left-color: #22D3EE; }
+  50% { border-left-color: transparent; }
+}
+.pathly-pulse-border { animation: pathly-pulse-border 1.5s ease-in-out infinite; }
+```
+
+**Hover/selected**: manage `hoveredConv` and `selectedConv` state. On hover: `backgroundColor: t.bgSurface1`. On selected: `backgroundColor: t.bgSurface1` + violet left border (replace status border).
+
+**Card layout** (52px min-height):
+```
+  [icon] Conv N · Phase name          [status badge]
+         agents · Phase N–M · X ago
+         Xk in / Yk out · $Z          (if cost data)
+```
+
+**Verify:** `cd studio; npm run typecheck`
+
+---
+
+### Phase 7: Last-used flow on open + auto-open Monitor   ← Conversation: 2
+
+**File:** `studio/src/renderer/src/store/uiStore.ts` — MODIFY: persist `lastUsedFlowPath` to localStorage (or Electron `store`).
+**File:** `studio/src/renderer/src/App.tsx` — MODIFY: on mount, load last-used flow and conditionally switch panel to Monitor.
+
+**Done when:** Studio reopens to the last-used flow; if a flow is already running, Monitor panel opens automatically.
+
+**Delivers stories:** S7
+
+**Depends on:** Phase 4 (activeFlowSessions, fsmState available on mount).
 
 **Details:**
 
-Status determination per conv: cross-reference `conv.status` with EVENTS.jsonl:
-- Active: `conv.status === 'IN_PROGRESS'` or `conv.status === 'BUILDING'` or `conv.status === 'REVIEWING'`
-- Failed: `conv.status === 'BLOCKED'` or events contain a RETRY/FILE_DELETED for that conv number
-- Done: `conv.status === 'DONE'`
+`lastUsedFlowPath` in uiStore: persist to `localStorage` on change. On app mount, read it back and call the appropriate `setSelectedFlow` / open-file action.
 
-Active card: inject CSS animation class `pathly-pulse-border` (keyframes: border-color cycles from cyan → transparent → cyan, 1.5s). Or simpler: add the `pathly-pulse` class to the left border element. Keep the 3px width.
-
-Status icons in card:
-```
-  [✓ or ● or ○ or ✗]  Conv N · Phase title        [status badge]
-  agents · phase range · relative time
-  Xk in / Yk out · $Z                              (if cost data exists)
+On mount in `App.tsx`, after state hydration:
+```ts
+useEffect(() => {
+  if (fsmState?.current && fsmState.current !== 'IDLE' && fsmState.current !== 'DONE') {
+    setActivePanel('monitor')
+  }
+}, [])  // run once on mount only
 ```
 
-Relative time: compute from the most recent event `ts` for that conversation number. Format: "Xm ago" / "Xh ago" / "just now".
+Last-used flow: set `lastUsedFlowPath` in uiStore whenever the selected flow file changes (hook into the existing flow-open action). On mount, read from localStorage and dispatch to open it.
 
-Cost aggregation: filter `events` by `conversation === conv.num`, sum `cost_usd`, `tokens_in`, `tokens_out` from AGENT_DONE entries.
-
-Min-height: add `minHeight: '52px'` to the card container style.
-
-Phase range: PlanBoard already reads `ConvRow`; extend `ConvRow` to include `phases?: string` from the PROGRESS.md parser if available. Display as `Phase N–M` if present.
+**First launch**: `lastUsedFlowPath` is null → canvas shows empty state (existing behavior).
+**File deleted**: catch the readFile error and show empty state; clear `lastUsedFlowPath`.
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -247,14 +334,15 @@ Phase range: PlanBoard already reads `ConvRow`; extend `ConvRow` to include `pha
 
 ## Prerequisites
 
-- Conversation 1 (`studio-visual-flow-builder` Conv 1) must be complete — this plan does not change FlowEditor components beyond the banner in Phase 5.
-- Confirm `monitorSource` exists in `uiStore.ts` before implementing Phase 3.
-- Confirm `fsmState`, `events`, `pipelineStates` in store before implementing Phases 1–2.
+- `studio-visual-flow-builder` Phase 7b complete (`FlowEditor/zIndex.ts` must exist for Phase 5)
+- Confirm `t.runtime` in `theme.ts` before Phase 1 (add if missing)
+- Confirm `conversation` field presence in EVENTS.jsonl before Phase 6 cost filtering
 
 ## Key Decisions
 
-- Rail dot uses CSS `transform: translateX` on a ref-driven element — no full re-render on each transition event.
-- Execution trace is derived from `STATE_TRANSITION` events in the existing store; no new server data needed.
-- Multi-flow tabs add `activeFlowSessions` to uiStore; current single-topic path remains the default.
-- Running banner is canvas-local state (dismissed flag) that reads global `fsmState`; it does not write to store.
-- Plan cards aggregate cost from EVENTS.jsonl already loaded in PlanBoard — no extra IPC calls.
+- Monitor and canvas are mutually exclusive (`activePanel`). "View in Monitor →" calls `setActivePanel('monitor')` — no new `bottomPanel` field.
+- Multi-flow tabs key on `effectiveTopic = activeMonitorTab ?? activeTopic` and re-key the SSE subscription.
+- `activeFlowSessions` is populated by Monitor's own `useEffect` from Studio-launched sessions only. CLI discovery (pid/lock watcher) is Post-MVP.
+- `isCli` defaults to `false` always; the `>_` badge is deferred until Post-MVP.
+- Failure detection uses `pipelineStates` order (backward index = failed), never hardcoded state names.
+- Tab bar shows only for ≥2 active sessions; single-session path stays clean.
