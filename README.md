@@ -76,6 +76,26 @@ pathly-validate-flow <flow.yaml>    # validate a flow YAML against the FSM schem
 3. **Materialize** — writes stitched files to the host config location. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back.
 4. **Register Codex plugin** - for Codex installs, writes `~/.codex/pathly-marketplace`, enables `pathly@pathly-local`, and refreshes the marketplace through the Codex CLI when available.
 
+## FSM HTTP Server
+
+Pathly skills communicate with the Python FSM engine over HTTP, not MCP. The server runs locally on port 8765 and is auto-started by the `fsm-call` skill when needed — no manual setup required.
+
+```
+POST http://127.0.0.1:8765/next_action       ← get current state + agent instructions
+POST http://127.0.0.1:8765/complete_stage    ← advance FSM to next state
+POST http://127.0.0.1:8765/record_activity   ← write telemetry to ~/.pathly/activity.jsonl
+GET  http://127.0.0.1:8765/events/stream     ← SSE stream of EVENTS.jsonl (used by Studio)
+GET  http://127.0.0.1:8765/health            ← liveness check
+```
+
+Start it manually if needed:
+```bash
+pathly-fsm-http
+# or: python -m pathly_orchestrator.http_server
+```
+
+The `fsm-call` skill (shared by all FSM-using skills) handles health-check, auto-start, and the HTTP POST — skills never call the server directly.
+
 ## Development setup
 
 ```bash
@@ -114,7 +134,9 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Stable (2.8.0). Core install path (`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on failure. Copilot destination paths follow the VS Code Copilot agent spec and may require `--repair` after a VS Code update.
+Stable (2.9.0). Core install path (`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on failure. Copilot destination paths follow the VS Code Copilot agent spec and may require `--repair` after a VS Code update.
+
+**2.9.0 changes:** FSM and telemetry transport moved from MCP to HTTP. All skills now use the shared `fsm-call` skill which auto-starts the HTTP server. `mcp_config.py` removed; no MCP servers are registered during install.
 
 ## Known Limitations
 

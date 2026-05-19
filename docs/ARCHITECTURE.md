@@ -15,7 +15,6 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │   │   ├── stitch.py            ← Combines core/ + adapter _meta/ into deployable files
 │   │   ├── materialize.py       ← Writes output files to ~/.claude/, ~/.codex/, etc.
 │   │   ├── setup_command.py     ← Entry point for pathly-setup command
-│   │   ├── mcp_config.py
 │   │   ├── resources.py
 │   │   └── __main__.py
 │   └── pathly_data/
@@ -44,6 +43,7 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   │   ├── storm.md
 │       │   │   ├── po.md        ← product owner consultation
 │       │   │   ├── scout-path.md
+│       │   │   ├── fsm-call.md  ← internal utility: HTTP transport to FSM server (shared)
 │       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
 │       │   │   ├── archive-artifacts.md  ← transition-action skill (orchestrator only)
 │       │   │   └── ...          (29 user-facing + 2 transition-action skills total)
@@ -116,7 +116,7 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 | `src/install_cli/codex_plugin_config.py` | Codex local marketplace registration and plugin config |
 | `src/pathly_data/core/` | Source-of-truth agent contracts, skill logic, plan templates — never edited by install |
 | `src/pathly_data/adapters/` | Per-tool YAML metadata (`_meta/`) and plugin manifests |
-| `src/pathly_orchestrator/` | FSM event-log package. Implements `pathly-events`, `pathly-state`, and `pathly-validate-flow` CLI entry points. Loads and validates `*.flow.yaml` files. |
+| `src/pathly_orchestrator/` | FSM engine package. `http_server.py` exposes `/next_action`, `/complete_stage`, `/record_activity`, `/events/stream` over HTTP (port 8765). Also implements `pathly-events`, `pathly-state`, and `pathly-validate-flow` CLI entry points. |
 | `src/pathly_hooks/` | Hook scripts (`classify_feedback.py`, `inject_feedback_ttl.py`) deployed by install into host tool settings. |
 
 ## Host Detection
