@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { Columns2, X as XIcon } from 'lucide-react'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
+import { useTheme } from '../../useTheme'
 import type { TabInstance } from './types'
 import { TerminalTabView } from './TerminalTabView'
 import { PaneTabBar } from './PaneTabBar'
@@ -12,12 +14,26 @@ export function Terminal(): JSX.Element {
     toggle, addTab, closeTab, setActiveTab, renameTab, toggleSplit,
   } = useTerminalStore()
   const projectPath = useStore((s) => s.projectPath)
+  const theme = useTheme()
   const [panelHeight, setPanelHeight] = useState(260)
   const [splitRatio, setSplitRatio] = useState(0.5)
   const panelRef = useRef<HTMLDivElement>(null)
   const vDragRef = useRef<{ x: number; ratio: number } | null>(null)
   const dragStartRef = useRef<{ y: number; h: number } | null>(null)
   const tabInstancesRef = useRef(new Map<string, TabInstance>())
+
+  const themeVars = {
+    '--t-bg': theme.bgBase,
+    '--t-surface0': theme.bgSurface0,
+    '--t-surface1': theme.bgSurface1,
+    '--t-mantle': theme.bgMantle,
+    '--t-text': theme.textPrimary,
+    '--t-text-muted': theme.textMuted,
+    '--t-accent': theme.accent,
+    '--t-red': theme.red,
+    '--t-green': theme.green,
+    '--t-blue': theme.blue,
+  } as React.CSSProperties
 
   const leftTabs = tabs.filter((t) => t.pane === 'left')
   const rightTabs = tabs.filter((t) => t.pane === 'right')
@@ -141,7 +157,7 @@ export function Terminal(): JSX.Element {
     <div
       ref={panelRef}
       className={styles.panel}
-      style={{ height: `${panelHeight}px`, display: open ? 'flex' : 'none' }}
+      style={{ ...themeVars, height: `${panelHeight}px`, display: open ? 'flex' : 'none' }}
     >
       <div onMouseDown={onDragMouseDown} className={styles.dragHandle} />
 
@@ -162,13 +178,10 @@ export function Terminal(): JSX.Element {
           <div className={styles.toolbarActions}>
             {tabs.length >= 2 && (
               <button className={styles.splitIconBtn} onClick={toggleSplit} title="Split pane side-by-side">
-                <span className={styles.splitBar}>
-                  <span className={styles.splitBarPiece} />
-                  <span className={styles.splitBarPiece} />
-                </span>
+                <Columns2 size={13} />
               </button>
             )}
-            <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal">✕</button>
+            <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={13} /></button>
           </div>
         </div>
       )}
@@ -176,12 +189,9 @@ export function Terminal(): JSX.Element {
       {splitEnabled && (
         <div className={styles.splitHeader}>
           <button className={`${styles.splitIconBtn} ${styles.splitIconBtnActive}`} onClick={toggleSplit} title="Close split">
-            <span className={styles.splitBar}>
-              <span className={styles.splitBarPieceInverse} />
-              <span className={styles.splitBarPieceInverse} />
-            </span>
+            <Columns2 size={13} />
           </button>
-          <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal">✕</button>
+          <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={13} /></button>
         </div>
       )}
 
