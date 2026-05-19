@@ -1,5 +1,40 @@
 export type PathlyItemType = 'flow' | 'skill' | 'agent' | 'template' | 'debug' | 'explore'
 
+// Sidebar section domains — the four managed directories
+export type PathlySection = 'skills' | 'agents' | 'flows' | 'templates'
+
+// A node in the filesystem tree (file or category folder)
+export interface PathlyTreeNode {
+  name: string
+  type: 'file' | 'folder'
+  path: string[]
+  section: PathlySection
+  children?: PathlyTreeNode[]
+  handle?: FileSystemHandle
+}
+
+// Drag payload for canvas assignment (from ⠿ grip — skills and agents only)
+export interface PathlyCanvasDragItem {
+  dragType: 'canvas'
+  name: string
+  section: PathlySection
+  path: string[]
+}
+
+// Drag payload for tree reorg (from row body — all file/folder items)
+export interface PathlyReorgDragItem {
+  dragType: 'reorg'
+  name: string
+  section: PathlySection
+  path: string[]
+  type: 'file' | 'folder'
+}
+
+export type PathlyDragItem = PathlyCanvasDragItem | PathlyReorgDragItem
+
+// MIME key used for both drag types — differentiated by dragType field in payload
+export const PATHLY_DRAG_MIME = 'application/pathly-drag-item'
+
 export interface TemplateSubdir {
   name: string
   open: boolean

@@ -1,13 +1,13 @@
 # studio-visual-flow-builder - Progress
 
-## Status: NOT STARTED
+## Status: IN PROGRESS
 
 ## Story Status
 
 | Story | Title | Delivered by | Status |
 |-------|-------|--------------|--------|
-| S1 | Existing YAML renders as a connected graph | Conv 1 | TODO |
-| S2 | Visual graph changes update canonical YAML data | Conv 1 | TODO |
+| S1 | Existing YAML renders as a connected graph | Conv 1 | DONE |
+| S2 | Visual graph changes update canonical YAML data | Conv 1 | DONE |
 | S3 | Users can drag skills and agents from the library | Conv 2 | TODO |
 | S4 | Clicking a node opens a real node inspector | Conv 3 | TODO |
 | S5 | Clicking an edge opens transition configuration | Conv 3 | TODO |
@@ -18,7 +18,7 @@
 
 | Conv | Phases | Stories | Status | Verify |
 |------|--------|---------|--------|--------|
-| 1 | 1-3 | S1, S2 | TODO | `cd studio; npm run typecheck` |
+| 1 | 1-3 | S1, S2 | DONE | `cd studio; npm run typecheck` |
 | 2 | 4-7 | S3, S8 | TODO | `cd studio; npm run typecheck` |
 | 3 | 8-11 | S4, S5 | TODO | `cd studio; npm run typecheck` |
 | 4 | 12-14 | S6, S7 | TODO | `cd studio; npm run typecheck` |

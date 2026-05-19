@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { ChevronRight, ChevronDown, Plus } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ChevronRight, ChevronDown, Plus, GripVertical } from 'lucide-react'
 import { useStore } from '../store'
-import type { PathlyItem, PathlyItemType } from '../types'
+import type { PathlyItem, PathlyItemType, PathlyCanvasDragItem, PathlyReorgDragItem } from '../types'
+import { PATHLY_DRAG_MIME } from '../types'
 import { useProjectFiles } from '../hooks/useProjectFiles'
 import { usePlanConversations } from '../hooks/usePlanConversations'
 import { FlowWizard } from './FlowWizard'
@@ -69,6 +70,10 @@ export function Sidebar(): JSX.Element {
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [dragOverPath, setDragOverPath] = useState<string | null>(null)
+
+  // Tracks whether the current drag was initiated from the canvas grip (⠿)
+  const dragFromGripRef = useRef(false)
 
   if (sidebarCollapsed) {
     return (
@@ -170,6 +175,73 @@ export function Sidebar(): JSX.Element {
     }
   }
 
+  function handleItemDragStart(e: React.DragEvent, item: PathlyItem, section: Section): void {
+    const sectionName = section.type as 'skill' | 'agent' | 'flow' | 'template'
+    const pathSegments = item.path.split('/').slice(-1)
+
+    if (dragFromGripRef.current && (sectionName === 'skill' || sectionName === 'agent')) {
+      const payload: PathlyCanvasDragItem = {
+        dragType: 'canvas',
+        name: item.name,
+        section: sectionName === 'skill' ? 'skills' : 'agents',
+        path: pathSegments,
+      }
+      e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
+      e.dataTransfer.effectAllowed = 'copy'
+    } else {
+      const payload: PathlyReorgDragItem = {
+        dragType: 'reorg',
+        name: item.name,
+        section: sectionName === 'skill' ? 'skills' : sectionName === 'agent' ? 'agents' : sectionName === 'flow' ? 'flows' : 'templates',
+        path: pathSegments,
+        type: 'file',
+      }
+      e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
+      e.dataTransfer.effectAllowed = 'move'
+    }
+    dragFromGripRef.current = false
+  }
+
+  function handleGripPointerDown(): void {
+    dragFromGripRef.current = true
+  }
+
+  function handleFolderDragOver(e: React.DragEvent, folderPath: string, folderSection: string): void {
+    const raw = e.dataTransfer.getData(PATHLY_DRAG_MIME)
+    if (!raw) {
+      // During dragover, getData may be empty; allow but check type attr
+      const types = e.dataTransfer.types
+      if (!types.includes(PATHLY_DRAG_MIME)) return
+    }
+    try {
+      if (raw) {
+        const payload = JSON.parse(raw) as { dragType: string; section: string }
+        if (payload.dragType !== 'reorg') return
+        if (payload.section !== folderSection) return
+      }
+    } catch { return }
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverPath(folderPath)
+  }
+
+  function handleFolderDragLeave(): void {
+    setDragOverPath(null)
+  }
+
+  function handleFolderDrop(e: React.DragEvent, folderSection: string): void {
+    setDragOverPath(null)
+    const raw = e.dataTransfer.getData(PATHLY_DRAG_MIME)
+    if (!raw) return
+    try {
+      const payload = JSON.parse(raw) as { dragType: string; section: string }
+      if (payload.dragType !== 'reorg') return
+      if (payload.section !== folderSection) return
+      e.preventDefault()
+      // Tree reorg move logic can be wired here in a future phase (Phase 4c)
+    } catch { /* ignore malformed payload */ }
+  }
+
   const lowerFilter = filter.toLowerCase()
 
   return (
@@ -231,8 +303,10 @@ export function Sidebar(): JSX.Element {
                               <button
                                 key={item.path}
                                 className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
+                                draggable
                                 onClick={() => handleItemClick(item)}
                                 onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
+                                onDragStart={(e) => handleItemDragStart(e, item, section)}
                                 title={item.path}
                               >
                                 <span className={styles.itemName}>{item.name}</span>
@@ -277,14 +351,26 @@ export function Sidebar(): JSX.Element {
                     const isDirty = dirtyItems.has(item.path)
                     const isSelected = selectedItem?.path === item.path
                     const itemDir = `${projectPath}/${section.dir}`
+                    const isCanvasDraggable = section.type === 'skill' || section.type === 'agent'
                     return (
                       <button
                         key={item.path}
                         className={`${styles.itemRow} ${isSelected ? styles.itemRowSelected : ''}`}
+                        draggable
                         onClick={() => handleItemClick(item)}
                         onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
+                        onDragStart={(e) => handleItemDragStart(e, item, section)}
                         title={item.path}
                       >
+                        {isCanvasDraggable && (
+                          <span
+                            className={styles.grip}
+                            onPointerDown={handleGripPointerDown}
+                            title="Drag to canvas"
+                          >
+                            <GripVertical size={12} />
+                          </span>
+                        )}
                         <span className={styles.itemName}>{item.name}</span>
                         {isDirty && <span className={styles.dirtyDot}>●</span>}
                       </button>

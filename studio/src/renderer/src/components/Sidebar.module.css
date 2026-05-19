@@ -286,3 +286,23 @@
 }
 .newBtn:hover { opacity: 1; }
 .newBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
+
+/* ── Drag grip (⠿) — canvas assign handle for skill/agent rows ── */
+.grip {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  cursor: grab;
+  flex-shrink: 0;
+  margin-right: 4px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.itemRow:hover .grip { opacity: 0.7; }
+.grip:active { cursor: grabbing; }
+
+/* ── Drop target highlight for folder rows ── */
+.dropTarget {
+  border-left: 2px solid #8B5CF6 !important;
+  background: rgba(139, 92, 246, 0.08) !important;
+}

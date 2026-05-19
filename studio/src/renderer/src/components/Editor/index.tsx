@@ -77,12 +77,16 @@ export function Editor(): JSX.Element {
 
   const isDirty = selectedItem ? dirtyItems.has(selectedItem.path) : false
   const isSkillOrAgent = selectedItem?.type === 'skill' || selectedItem?.type === 'agent'
+  const isPreviewDefault = isSkillOrAgent || selectedItem?.type === 'template'
   const breadcrumb = selectedItem
     ? `${selectedItem.type.charAt(0).toUpperCase() + selectedItem.type.slice(1)}s / ${selectedItem.name}`
     : ''
 
   useEffect(() => {
     if (!selectedItem) return
+    const type = selectedItem.type
+    const defaultTab = (type === 'skill' || type === 'agent' || type === 'template') ? 'preview' : 'edit'
+    setTab(defaultTab)
     setLoading(true)
     setSaveError(null)
     readFile(selectedItem.path)
@@ -123,6 +127,7 @@ export function Editor(): JSX.Element {
   function handleBodyChange(v: string): void {
     setBody(v)
     if (selectedItem) markDirty(selectedItem.path)
+    if (tab === 'preview') return
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
     autoSaveRef.current = setTimeout(() => void performSave(v, config), 2000)
   }
@@ -151,6 +156,11 @@ export function Editor(): JSX.Element {
         <span className={styles.breadcrumb}>{breadcrumb}</span>
         <div className={styles.actions}>
           {saveError && <span className={styles.error}>{saveError}</span>}
+          {isPreviewDefault && tab === 'preview' && (
+            <button className={styles.tab} onClick={() => setTab('edit')}>
+              Edit source
+            </button>
+          )}
           <button
             className={`${styles.saveBtn} ${isDirty ? '' : styles.saveBtnClean}`}
             onClick={() => void performSave(body, config)}
@@ -160,8 +170,8 @@ export function Editor(): JSX.Element {
         </div>
       </div>
 
-      {/* Configuration card — only for skills/agents, compact in preview/split */}
-      {isSkillOrAgent && (
+      {/* Configuration card — only for skills/agents/templates, compact in preview/split */}
+      {isPreviewDefault && (
         <ConfigForm
           values={config}
           onChange={handleConfigChange}
