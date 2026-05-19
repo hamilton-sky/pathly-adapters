@@ -19,6 +19,7 @@
 | `EDGE_CASES.md` | Planner | Builder, Tester | Failure modes and risk scenarios |
 | `ARCHITECTURE_PROPOSAL.md` | Planner | Architect, Builder | Cross-layer decisions |
 | `FLOW_DIAGRAM.md` | Planner | Builder, Reviewer | Visual interaction and data flow |
+| `UI_ASCII_DIAGRAMS.md` | Designer | Builder, Reviewer | ASCII mockups for layout, canvas, inspectors, Monitor, validation, YAML, and export |
 
 ### Optional plan files
 
@@ -28,6 +29,7 @@
 | `EDGE_CASES.md` | yes | Canvas, YAML, validation, and export risks |
 | `HAPPY_FLOW.md` | yes | Ideal authoring journey |
 | `FLOW_DIAGRAM.md` | yes | Multi-component interaction diagram |
+| `UI_ASCII_DIAGRAMS.md` | yes | ASCII UI diagrams and component-level visual recommendations |
 
 ---
 

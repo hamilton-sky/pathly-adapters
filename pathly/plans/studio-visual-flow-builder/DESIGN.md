@@ -87,15 +87,71 @@ Bottom terminal / monitor panel
 
 ## Visual Language
 
-- Preserve the current Pathly Studio palette and dense tool layout.
+- Keep the dense tool layout, but move away from the current purple-heavy palette.
+- Pathly Studio should feel like a local workflow control surface: calm graphite base, precise path/network accents, and strong state colors.
+- Use violet as the Pathly brand accent for selected authored objects and primary actions, not as the dominant page color.
+- Use cyan/blue for live runtime activity, green for completed states, amber for waiting/review/warnings, and red for blocked/errors.
 - Avoid landing-page patterns, hero sections, large decorative gradients, and card-heavy marketing composition.
 - Use compact controls, visible focus states, and clear hover feedback.
 - Use Lucide icons for add, connect, validate, export, lock, fit view, and warnings.
+- Use path/network icon language for brand and navigation. Good icon candidates are `GitBranch`, `Route`, `Network`, `Workflow`, and `Waypoints`; avoid magic/wand AI metaphors.
 - Keep border radius at 4-6px for tool surfaces.
+
+## Proposed Pathly Palette
+
+This palette is the recommended direction for a later Studio-wide theme pass. For this feature, map these values through theme tokens rather than scattering raw hex values through components.
+
+### Dark Theme
+
+| Token | Hex | Use |
+|---|---:|---|
+| `bgBase` | `#101216` | Main application background |
+| `bgMantle` | `#0B0D11` | Top bar, sidebar, terminal shells |
+| `bgSurface0` | `#1A1F27` | Panels, canvas backing, event log surface |
+| `bgSurface1` | `#252C36` | Hover states, selected row backing, raised controls |
+| `borderSubtle` | `#2E3642` | Low-emphasis dividers and grid lines |
+| `textPrimary` | `#E7ECF3` | Primary text |
+| `textSecondary` | `#AAB6C5` | Secondary labels and metadata |
+| `textMuted` | `#687588` | Muted labels, inactive future states |
+| `accent` | `#8B5CF6` | Pathly identity, selected authored objects, primary action |
+| `runtime` | `#22D3EE` | Live/file-watch/SSE/runtime activity |
+| `blue` | `#38BDF8` | Active graph edge, current state, Codex-adjacent action |
+| `green` | `#22C55E` | Completed/pass states |
+| `yellow` | `#F59E0B` | Waiting, review, warning |
+| `red` | `#EF4444` | Blocked/error/destructive |
+
+### Light Theme
+
+| Token | Hex | Use |
+|---|---:|---|
+| `bgBase` | `#F7F9FC` | Main application background |
+| `bgMantle` | `#EEF2F7` | Top bar, sidebar, terminal shells |
+| `bgSurface0` | `#E3E8F0` | Panels, canvas backing, event log surface |
+| `bgSurface1` | `#D4DCE8` | Hover states, selected row backing, raised controls |
+| `borderSubtle` | `#C4CDD9` | Low-emphasis dividers and grid lines |
+| `textPrimary` | `#17202C` | Primary text |
+| `textSecondary` | `#455468` | Secondary labels and metadata |
+| `textMuted` | `#778397` | Muted labels, inactive future states |
+| `accent` | `#7C3AED` | Pathly identity, selected authored objects, primary action |
+| `runtime` | `#0891B2` | Live/file-watch/SSE/runtime activity |
+| `blue` | `#0284C7` | Active graph edge, current state, Codex-adjacent action |
+| `green` | `#16A34A` | Completed/pass states |
+| `yellow` | `#D97706` | Waiting, review, warning |
+| `red` | `#DC2626` | Blocked/error/destructive |
+
+### Palette Rules
+
+- Do not use violet for every active, live, and completed state; that makes the app read as one-note.
+- Completed flow history should be green but low-saturation or partially muted.
+- Current runtime activity should use cyan/blue, not violet, so users can distinguish "selected by me" from "running now".
+- Canvas nodes should use neutral surfaces with a small accent strip, handle, or edge color. Avoid fully saturated node backgrounds.
+- The Monitor state rail should use connected lines in muted neutral, with only the current segment receiving strong runtime color.
 
 ## Design Tokens And Accessibility
 
-Use only existing theme tokens from `useTheme` (`t.bgBase`, `t.bgSurface0`, `t.bgSurface1`, `t.bgMantle`, `t.accent`, `t.blue`, `t.green`, `t.textPrimary`, `t.textSecondary`, `t.textMuted`, `t.border`, `t.borderSubtle`). Do not introduce new hex literals.
+Use theme tokens from `useTheme` (`t.bgBase`, `t.bgSurface0`, `t.bgSurface1`, `t.bgMantle`, `t.accent`, `t.blue`, `t.green`, `t.red`, `t.yellow`, `t.textPrimary`, `t.textSecondary`, `t.textMuted`, `t.border`, `t.borderSubtle`). Do not introduce component-local hex literals.
+
+The proposed palette includes a `runtime` role. If `theme.ts` does not yet expose `runtime`, use `t.blue` for runtime indicators in this feature and add `runtime` during the later Studio-wide theme refresh.
 
 - Border radius: 4-6px for tool surfaces, 6px for cards and inspectors.
 - Spacing rhythm: 4 / 8 / 12 / 16 px. Inspector internal gap: 8px.
