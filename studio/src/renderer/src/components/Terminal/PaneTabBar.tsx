@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ExternalLink, X as XIcon } from 'lucide-react'
 import type { TerminalTab } from './types'
 import styles from './Terminal.module.css'
 
@@ -72,13 +73,13 @@ export function PaneTabBar({
             onClick={(e) => { e.stopPropagation(); onPopout(tab.id) }}
             className={styles.popoutBtn}
           >
-            ⬡ pop
+            <ExternalLink size={10} />
           </button>
           <button
             title="Close tab"
             onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
             className={styles.closeTabBtn}
-          >✕</button>
+          ><XIcon size={10} /></button>
         </div>
       ))}
       <div className={styles.actionGroup}>

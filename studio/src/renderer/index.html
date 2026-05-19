@@ -13,6 +13,12 @@
       @media (prefers-reduced-motion: reduce) {
         :root { --transition-base: 0ms; }
       }
+      /* ── Global thin scrollbars ── */
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--bg-surface1, #343452); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--text-muted, #5a5d8a); }
+      ::-webkit-scrollbar-corner { background: transparent; }
     </style>
   </head>
   <body>
