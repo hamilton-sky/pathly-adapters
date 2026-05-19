@@ -14,6 +14,16 @@ templates/flows           node/edge config           Claude Code/Codex
 React components      ->  hooks/types/utils      ->  pathlyApi/fs writes
 ```
 
+## Conversation Map
+
+| Conv | Phases | Focus |
+|------|--------|-------|
+| 1 | 1, 2, 3 | Graph rendering, resync, canonical model |
+| 2a | 4, 4b, 4c, 4d | Sidebar types, filesystem tree, CRUD, context menus |
+| 2b | 5, 6, 7 | Click behavior, dual-drag, canvas drop |
+| 3 | 7b, 8, 9, 10, 11 | z-index, docked inspector, node/edge panels, validation |
+| 4 | 12, 13, 14 | YAML sync hardening, export UI, helpers |
+
 ## Phases
 
 ### Phase 1: Restore connected graph rendering <- Conversation: 1
@@ -55,7 +65,7 @@ Keep node position layout deterministic (column layout `i * 220` is fine for now
 Tolerate transitions whose source or target is missing from `states` by skipping the edge and emitting a validation issue (Phase 11 surfaces it). Do not drop unknown YAML keys.
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 4: Define filesystem-tree types and section model <- Conversation: 2
+### Phase 4: Define filesystem-tree types and section model <- Conversation: 2a
 
 **File:** `studio/src/renderer/src/types/index.ts` - MODIFY: replace flat library item types with filesystem-tree node types and section-aware drag payload.
 **Done when:** UI code can represent tree nodes (file vs folder), section membership, and both drag modes in a type-safe way.
@@ -118,7 +128,7 @@ Use MIME key `application/pathly-drag-item` for both drag types (differentiated 
 | TEMPLATES | `Folder` violet | `FileText` | `textMuted` |
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 4b: Rebuild Sidebar as filesystem-tree component <- Conversation: 2
+### Phase 4b: Rebuild Sidebar as filesystem-tree component <- Conversation: 2a
 
 **File:** `studio/src/renderer/src/components/Sidebar.tsx` - REWRITE: replace the flat section list with a filesystem-mirroring tree using the ZakaMurai `Sidebar.js` / `TreeItem.js` pattern, adapted for Pathly's four domain sections.
 **File:** `studio/src/renderer/src/components/Sidebar.module.css` - MODIFY: add tree item styles, drop target highlight, drag ghost, grip icon, section header hover reveal.
@@ -149,7 +159,7 @@ Section header row layout:
 - Workspace section (Plan, Monitor, Settings): nav-link rows only — no grip, no `+` actions, no drag.
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 4c: Add CRUD operations to sidebar tree <- Conversation: 2
+### Phase 4c: Add CRUD operations to sidebar tree <- Conversation: 2a
 
 **File:** `studio/src/renderer/src/components/Sidebar.tsx` - MODIFY: implement create, rename, and delete handlers on the tree component.
 **Done when:** Users can create `.md` / `.flow.yaml` files, create category folders, rename via double-click, and delete with a confirmation dialog — all within their section.
@@ -185,7 +195,7 @@ Section header row layout:
 - After drop: update tree state and rename open tabs with the new path prefix (mirror ZakaMurai `handleDrop`).
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 4d: Add context menus to sidebar tree <- Conversation: 2
+### Phase 4d: Add context menus to sidebar tree <- Conversation: 2a
 
 **File:** `studio/src/renderer/src/components/SidebarContextMenu.tsx` - CREATE: right-click context menu component, rendered at cursor position, dismissed on outside click.
 **Done when:** Right-clicking any tree item opens a context menu with the correct actions for that item type.
@@ -236,12 +246,12 @@ Context menu items by item type:
 Menu styling: `bgSurface1 #252C36` background, 4px border radius, 1px `borderSubtle` border, 12px text. Destructive items (`Delete`) use `#EF4444` text. Dividers are 1px `borderSubtle` lines. Menu dismisses on outside click or `Escape`.
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 5: Wire click behavior for tree items <- Conversation: 2
+### Phase 5: Wire click behavior for tree items <- Conversation: 2b
 
 **File:** `studio/src/renderer/src/components/Editor/index.tsx` - MODIFY: when `selectedItem.type` is `skill`, `agent`, or `template`, initialize `tab` to `'preview'` and add a gated "Edit source" affordance.
 **Done when:** Clicking a skill, agent, or template file opens read-only preview. Clicking a flow file opens the visual canvas. Clicking a folder expands/collapses it.
 **Delivers stories:** S8
-**Depends on:** Phase 4b.
+**Depends on:** Conversation 2a completed.
 **Enables:** Progressive disclosure — library items are reuse primitives by default.
 **Details:**
 Do not introduce a new preview panel. The existing `Editor` already supports a `preview` tab; the change is the default tab plus a small "Edit source" toolbar button. Do not auto-save while previewing. Frontmatter (`ConfigForm`) shown read-only in preview.
@@ -253,7 +263,7 @@ Click behavior by item type:
 - **Workspace items** (Plan, Monitor, Settings): navigate to that Studio panel
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 6: Wire dual-drag — canvas assign and tree reorg <- Conversation: 2
+### Phase 6: Wire dual-drag — canvas assign and tree reorg <- Conversation: 2b
 
 **File:** `studio/src/renderer/src/components/Sidebar.tsx` - MODIFY: add two distinct drag behaviors to the tree component.
 **Done when:** Dragging from the `⠿` grip assigns a skill/agent to a canvas node. Dragging a row body moves the item within its section. Cross-section drops are rejected silently.
@@ -277,7 +287,7 @@ Click behavior by item type:
 **Cross-section constraint:** The drop handler checks `payload.section === dropTargetSection`. If they differ, return without calling `preventDefault()` — the browser's default drag rejection behavior (`not-allowed` cursor) applies. No red tint on foreign sections.
 **Verify:** `cd studio; npm run typecheck`
 
-### Phase 7: Handle canvas drops <- Conversation: 2
+### Phase 7: Handle canvas drops <- Conversation: 2b
 
 **File:** `studio/src/renderer/src/components/FlowEditor/VisualView/index.tsx` - MODIFY: accept dropped library items, assign them to an existing node when dropped over one, or create a new state when dropped on empty canvas.
 **Done when:** Dropping a skill or agent changes the flow data and marks the selected flow dirty.
@@ -299,7 +309,7 @@ Keep canvas position as UI state only; do not write positions to YAML in this fe
 **File:** `studio/src/renderer/src/components/FlowEditor/zIndex.ts` - CREATE: export a single constants object with the full z-index scale used in the flow editor.
 **Done when:** All flow editor components import z-index values from this file rather than hardcoding them.
 **Delivers stories:** S4, S5
-**Depends on:** Conversation 2 completed.
+**Depends on:** Conversation 2b completed.
 **Enables:** Phase 8 (inspector) and Phase 9 (behavior picker popover) to reference a canonical scale without collision.
 **Details:**
 ```ts
@@ -320,7 +330,7 @@ Do this before any other Conversation 3 phase. The behavior picker popover (z=40
 **File:** `studio/src/renderer/src/components/FlowEditor/VisualView/VisualView.styles.ts` - MODIFY: replace `detailPanel: { position: 'absolute', ... }` with a docked layout: canvas flex 1, inspector fixed 300px (from `DESIGN.md`).
 **Done when:** Opening the inspector reduces canvas width without remounting React Flow; closing returns it to full width.
 **Delivers stories:** S4, S5
-**Depends on:** Conversation 2 completed.
+**Depends on:** Conversation 2b completed.
 **Enables:** Phases 9 and 10 to assume a stable docked inspector surface.
 **Details:**
 React Flow handles container resize automatically when inside a flex parent. Apply `transition: width 200ms` only when `prefers-reduced-motion` is not set. Set the inspector container's `z-index` to 10 per the `DESIGN.md` scale.
