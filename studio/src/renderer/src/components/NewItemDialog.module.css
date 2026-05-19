@@ -85,6 +85,7 @@
   border: 1px solid var(--chip-border, var(--bg-surface1));
   background: var(--chip-bg, transparent);
   color: var(--chip-color, var(--text-muted));
+  -webkit-user-select: none;
   user-select: none;
   
   transition: opacity 0.15s;

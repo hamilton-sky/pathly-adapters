@@ -1,3 +1,4 @@
+import type React from 'react'
 import { Plus } from 'lucide-react'
 import type { ConvRow } from '../../types'
 import { IconButton } from '../ui'
