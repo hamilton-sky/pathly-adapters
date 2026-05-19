@@ -86,6 +86,7 @@
   background: var(--chip-bg, transparent);
   color: var(--chip-color, var(--text-muted));
   user-select: none;
+  
   transition: opacity 0.15s;
 }
 .chip:hover { opacity: 0.8; }

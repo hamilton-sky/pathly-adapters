@@ -377,6 +377,104 @@
   text-transform: uppercase;
 }
 
+/* ── Row hover actions (pencil + trash) ── */
+.rowActions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.1s;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.itemRow:hover .rowActions { opacity: 1; }
+.rowAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 3px;
+  transition: background 0.1s, color 0.1s;
+}
+.rowAction:hover { background: var(--bg-surface1); color: var(--text-primary); }
+.rowActionDelete:hover { color: var(--red); }
+
+/* ── Inline rename input ── */
+.renameInput {
+  flex: 1;
+  background: var(--bg-surface1);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-family: var(--font-family-base);
+  padding: 1px 5px;
+  outline: none;
+  min-width: 0;
+}
+
+/* ── Delete confirm modal ── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.modalBox {
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 22px 26px 18px;
+  min-width: 280px;
+  max-width: 360px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+.modalTitle {
+  color: var(--text-primary);
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+.modalSub {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0 0 18px;
+}
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.modalCancel {
+  background: var(--bg-surface0);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 14px;
+  transition: background 0.12s;
+}
+.modalCancel:hover { background: var(--bg-base); }
+.modalDelete {
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.35);
+  border-radius: 6px;
+  color: var(--red);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
+  transition: background 0.12s;
+}
+.modalDelete:hover { background: rgba(239,68,68,0.28); }
+
 /* ── System/library item rows (read-only, dimmed) ── */
 .systemItemRow {
   display: flex;
