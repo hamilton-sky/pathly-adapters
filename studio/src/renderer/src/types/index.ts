@@ -40,6 +40,8 @@ export interface FlowYaml {
   agent_map: Record<string, string>
   transition_rules?: Record<string, unknown>
   transition_actions?: Record<string, unknown>
+  storage_path?: string
+  feedback_routing?: Record<string, unknown>
 }
 
 export interface FsmState {

@@ -7,7 +7,56 @@ export interface StateNodeData {
   agent: string
 }
 
+// Nested transition_rules shape used by the real FSM:
+// transition_rules[source].default = target
+// transition_rules[source].on_artifact[artifactName] = target
+// transition_rules[source].on_content[] = { file, contains?, regex?, next: target }
+// transition_rules[source].decide = { question, options: { label: target }, default: label }
+interface StateRule {
+  default?: string
+  on_artifact?: Record<string, string>
+  on_content?: Array<{ file?: string; contains?: string; regex?: string; next: string }>
+  decide?: { question?: string; options?: Record<string, string>; default?: string }
+}
+
+function extractEdgeLabel(
+  rules: Record<string, unknown> | undefined,
+  source: string,
+  target: string
+): string {
+  if (!rules) return 'default'
+
+  const sourceRule = rules[source] as StateRule | undefined
+  if (!sourceRule) return 'default'
+
+  if (sourceRule.default === target) return 'default'
+
+  if (sourceRule.on_artifact) {
+    for (const [artifact, tgt] of Object.entries(sourceRule.on_artifact)) {
+      if (tgt === target) return artifact
+    }
+  }
+
+  if (sourceRule.on_content) {
+    for (const entry of sourceRule.on_content) {
+      if (entry.next === target) {
+        return entry.contains ?? entry.regex ?? entry.file ?? 'on_content'
+      }
+    }
+  }
+
+  if (sourceRule.decide?.options) {
+    for (const [option, tgt] of Object.entries(sourceRule.decide.options)) {
+      if (tgt === target) return option
+    }
+  }
+
+  return 'default'
+}
+
 export function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node<StateNodeData>[]; edges: Edge[] } {
+  const stateSet = new Set(data.states ?? [])
+
   const nodes: Node<StateNodeData>[] = (data.states ?? []).map((state, i) => ({
     id: state,
     type: 'stateNode',
@@ -16,20 +65,19 @@ export function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node<StateNodeDa
   }))
 
   const edges: Edge[] = []
-  let edgeIdx = 0
+  const rules = data.transition_rules as Record<string, unknown> | undefined
+
   for (const [source, targets] of Object.entries(data.transitions ?? {})) {
+    // Skip edges whose source state is not in states list
+    if (!stateSet.has(source)) continue
+
     for (const target of targets) {
-      const edgeId = `e-${edgeIdx++}`
-      const rules = data.transition_rules as Record<string, Record<string, string>> | undefined
-      let label = 'default'
-      if (rules) {
-        for (const [artifact, mapping] of Object.entries(rules)) {
-          if (Object.entries(mapping).some(([s, tgt]) => s === source && tgt === target)) {
-            label = artifact
-            break
-          }
-        }
-      }
+      // Skip edges whose target state is not in states list
+      if (!stateSet.has(target)) continue
+
+      const edgeId = `${source}__${target}`
+      const label = extractEdgeLabel(rules, source, target)
+
       edges.push({
         id: edgeId,
         source,

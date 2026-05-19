@@ -33,11 +33,22 @@ export function useFlowGraph(
   onEdgeClick: (edgeId: string, source: string, target: string) => void
 ): UseFlowGraphReturn {
   const { nodes: initNodes, edges: initEdges } = flowToGraph(data, t)
-  const [nodes, , onNodesChange] = useNodesState(initNodes)
+  const [nodes, setNodes, onNodesChange] = useNodesState(initNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges)
 
   const dataRef = useRef(data)
-  useEffect(() => { dataRef.current = data }, [data])
+  const flowIdRef = useRef(data.flow)
+
+  useEffect(() => {
+    dataRef.current = data
+    // Rebuild graph when the selected flow file changes (different flow identity)
+    if (data.flow !== flowIdRef.current) {
+      flowIdRef.current = data.flow
+      const { nodes: newNodes, edges: newEdges } = flowToGraph(data, t)
+      setNodes(newNodes)
+      setEdges(newEdges)
+    }
+  }, [data, t, setNodes, setEdges])
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -76,11 +87,11 @@ export function useFlowGraph(
 
   function handleAddTransitionRule(source: string): void {
     const d = dataRef.current
-    const rules = (d.transition_rules as Record<string, Record<string, string>> | undefined) ?? {}
-    const artifact = `artifact_${Date.now()}.md`
+    const rules = (d.transition_rules as Record<string, Record<string, unknown>> | undefined) ?? {}
+    const existing = (rules[source] as Record<string, unknown> | undefined) ?? {}
     const updated: FlowYaml = {
       ...d,
-      transition_rules: { ...rules, [artifact]: { [source]: '' } }
+      transition_rules: { ...rules, [source]: { ...existing, default: '' } }
     }
     onChange(updated)
   }
