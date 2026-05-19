@@ -121,7 +121,7 @@ function MainApp(): JSX.Element | null {
     <div style={{ ...appStyles.root, backgroundColor: t.bgBase, color: t.textPrimary }}>
       <TopBar />
       <div style={appStyles.body}>
-        <Sidebar />
+        <PanelErrorBoundary><Sidebar /></PanelErrorBoundary>
         <PanelErrorBoundary><MainPanel /></PanelErrorBoundary>
       </div>
       <PanelErrorBoundary><Terminal /></PanelErrorBoundary>

@@ -15,6 +15,20 @@ const WORKSPACE_SECTIONS = [
   { label: 'Explorations', type: 'explore' as const, dir: 'pathly/explorations' },
 ]
 
+const USER_LIBRARY_SECTIONS = [
+  { label: 'UserAgents',    type: 'agent'    as const, dir: 'agents'    },
+  { label: 'UserSkills',    type: 'skill'    as const, dir: 'skills'    },
+  { label: 'UserTemplates', type: 'template' as const, dir: 'templates' },
+  { label: 'UserFlows',     type: 'flow'     as const, dir: 'flows'     },
+]
+
+const WORKSPACE_USER_SECTIONS = [
+  { label: 'My Agents',    type: 'agent'    as const, dir: 'pathly/agents'    },
+  { label: 'My Skills',    type: 'skill'    as const, dir: 'pathly/skills'    },
+  { label: 'My Templates', type: 'template' as const, dir: 'pathly/templates' },
+  { label: 'My Flows',     type: 'flow'     as const, dir: 'pathly/flows'     },
+]
+
 const INITIAL_SECTIONS: Record<string, SectionState> = {
   Flows:        { items: [], open: false },
   Skills:       { items: [], open: false },
@@ -22,6 +36,72 @@ const INITIAL_SECTIONS: Record<string, SectionState> = {
   Templates:    { items: [], open: true  },
   Debugs:       { items: [], open: false },
   Explorations: { items: [], open: false },
+  UserAgents:    { items: [], open: false },
+  UserSkills:    { items: [], open: false },
+  UserTemplates: { items: [], open: false },
+  UserFlows:     { items: [], open: false },
+  'My Agents':    { items: [], open: false },
+  'My Skills':    { items: [], open: false },
+  'My Templates': { items: [], open: false },
+  'My Flows':     { items: [], open: false },
+}
+
+async function loadSubdirAwareSection(
+  dir: string,
+  type: 'flow' | 'skill' | 'agent' | 'template' | 'debug' | 'explore',
+): Promise<{ items: PathlyItem[]; subdirs: TemplateSubdir[] | null }> {
+  if (type === 'template') {
+    try {
+      const subdirNames = await listDirs(dir)
+      const subdirs: TemplateSubdir[] = []
+      for (const subdirName of subdirNames) {
+        const subdirPath = `${dir}/${subdirName}`
+        let files: PathlyItem[] = []
+        try {
+          const fileNames = await listDir(subdirPath)
+          files = fileNames
+            .filter((f) => f !== '.gitkeep')
+            .map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type }))
+        } catch { /* empty subdir */ }
+        subdirs.push({ name: subdirName, open: false, files })
+      }
+      return { items: [], subdirs }
+    } catch {
+      return { items: [], subdirs: null }
+    }
+  }
+
+  try {
+    const names = await listDir(dir)
+    try {
+      const subdirNames = await listDirs(dir)
+      const subdirSet = new Set(subdirNames)
+      const fileNames = names.filter((n) => !subdirSet.has(n))
+      const items: PathlyItem[] = fileNames.map((name) => ({
+        name, path: `${dir}/${name}`, type,
+      }))
+      const subdirs: TemplateSubdir[] = []
+      for (const subdirName of subdirNames) {
+        const subdirPath = `${dir}/${subdirName}`
+        let files: PathlyItem[] = []
+        try {
+          const subFiles = await listDir(subdirPath)
+          files = subFiles
+            .filter((f) => f !== '.gitkeep')
+            .map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type }))
+        } catch { /* empty subdir */ }
+        subdirs.push({ name: subdirName, open: false, files })
+      }
+      return { items, subdirs }
+    } catch {
+      const items: PathlyItem[] = names.map((name) => ({
+        name, path: `${dir}/${name}`, type,
+      }))
+      return { items, subdirs: [] }
+    }
+  } catch {
+    return { items: [], subdirs: null }
+  }
 }
 
 export function useProjectFiles(): {
@@ -29,7 +109,7 @@ export function useProjectFiles(): {
   setSections: React.Dispatch<React.SetStateAction<Record<string, SectionState>>>
   loadItems: () => Promise<void>
 } {
-  const { projectPath, pathlyRoot } = useStore()
+  const { projectPath, pathlyRoot, pathlyUserHome } = useStore()
   const [sections, setSections] = useState<Record<string, SectionState>>(INITIAL_SECTIONS)
 
   // Section A (Flows/Skills/Agents/Templates) loads from the pathly installation,
@@ -101,6 +181,18 @@ export function useProjectFiles(): {
       }
     }
 
+    // User library — global ~/.pathly sections
+    if (pathlyUserHome) {
+      for (const section of USER_LIBRARY_SECTIONS) {
+        const dir = `${pathlyUserHome}/${section.dir}`
+        const result = await loadSubdirAwareSection(dir, section.type)
+        setSections((prev) => ({
+          ...prev,
+          [section.label]: { ...prev[section.label], items: result.items, subdirs: result.subdirs ?? undefined },
+        }))
+      }
+    }
+
     if (!projectPath) return
 
     for (const section of WORKSPACE_SECTIONS) {
@@ -122,11 +214,21 @@ export function useProjectFiles(): {
         setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: null } }))
       }
     }
-  }, [coreRoot, projectPath])
+
+    // Workspace user sections — project-local authoring dirs
+    for (const section of WORKSPACE_USER_SECTIONS) {
+      const dir = `${projectPath}/${section.dir}`
+      const result = await loadSubdirAwareSection(dir, section.type)
+      setSections((prev) => ({
+        ...prev,
+        [section.label]: { ...prev[section.label], items: result.items, subdirs: result.subdirs ?? undefined },
+      }))
+    }
+  }, [coreRoot, projectPath, pathlyUserHome])
 
   useEffect(() => {
     void loadItems()
-  }, [coreRoot, projectPath, loadItems])
+  }, [coreRoot, projectPath, pathlyUserHome, loadItems])
 
   return { sections, setSections, loadItems }
 }

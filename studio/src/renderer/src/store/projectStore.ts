@@ -5,6 +5,7 @@ import type { PathlyItem, ProjectEntry, FsmState, FsmEvent } from '../types'
 export interface ProjectState {
   projectPath: string
   pathlyRoot: string
+  pathlyUserHome: string
   projects: ProjectEntry[]
   activeTopic: string | null
   selectedItem: PathlyItem | null
@@ -18,6 +19,7 @@ export interface ProjectState {
   routingEngine: 'python-mcp' | 'llm'
   setProjectPath: (p: string) => void
   setPathlyRoot: (p: string) => void
+  setPathlyUserHome: (p: string) => void
   setActiveTopic: (t: string | null) => void
   setSelectedItem: (item: PathlyItem | null) => void
   addProject: (p: ProjectEntry) => void
@@ -39,6 +41,7 @@ export const useProjectStore = create<ProjectState>()(
     (set) => ({
       projectPath: '',
       pathlyRoot: '',
+      pathlyUserHome: '',
       projects: [],
       activeTopic: null,
       selectedItem: null,
@@ -52,6 +55,7 @@ export const useProjectStore = create<ProjectState>()(
       routingEngine: 'llm',
       setProjectPath: (p) => set({ projectPath: p }),
       setPathlyRoot: (p) => set({ pathlyRoot: p }),
+      setPathlyUserHome: (p) => set({ pathlyUserHome: p }),
       setActiveTopic: (t) => set({ activeTopic: t }),
       setSelectedItem: (item) => set({ selectedItem: item }),
       addProject: (p) => set((s) => ({ projects: [...s.projects, p] })),

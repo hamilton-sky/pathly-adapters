@@ -88,4 +88,8 @@ export function registerFsHandlers(): void {
     fs.rmSync(filePath, { force: true })
     return destPath
   })
+
+  ipcMain.handle('fs:userHome', async (): Promise<string> => {
+    return path.join(app.getPath('home'), '.pathly')
+  })
 }

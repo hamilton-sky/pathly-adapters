@@ -11,6 +11,7 @@ declare global {
         delete: (path: string) => Promise<void>
         moveToParent: (filePath: string) => Promise<string>
         pickFolder: () => Promise<string | null>
+        userHome: () => Promise<string>
       }
       shell: {
         openWindow: (path: string) => Promise<void>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal, X, Moon, Sun } from 'lucide-react'
+import { Terminal, X, Moon, Sun, Menu } from 'lucide-react'
 import { useStore } from '../store'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
@@ -15,6 +15,7 @@ export function TopBar(): JSX.Element {
     publishLog,
     theme,
     activePanel,
+    sidebarCollapsed,
     setProjectPath,
     setActiveTopic,
     setPublishing,
@@ -22,6 +23,7 @@ export function TopBar(): JSX.Element {
     clearPublishLog,
     setTheme,
     setActivePanel,
+    setSidebarCollapsed,
   } = useStore()
 
   const [activeTopics,   setActiveTopics]   = useState<string[]>([])
@@ -83,31 +85,39 @@ export function TopBar(): JSX.Element {
   return (
     <>
       <div className={styles.bar}>
+        <IconButton onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? 'Open sidebar' : 'Close sidebar'} placement="bottom">
+          <Menu size={15} />
+        </IconButton>
+
         <Tooltip label="Back to projects" placement="bottom">
-          <button className={styles.backBtn} onClick={() => setProjectPath('')}>← Projects</button>
+          <button className={styles.backBtn} onClick={() => setProjectPath('')}>Projects</button>
         </Tooltip>
 
         <span className={styles.brand}>Pathly Studio</span>
 
         <div className={styles.center}>
-          <select
-            className={styles.topicSelect}
-            aria-label="Active topic"
-            value={activeTopic?.startsWith('.archive/') ? '' : (activeTopic ?? '')}
-            onChange={(e) => { setActiveTopic(e.target.value || null) }}
-          >
-            <option value="">— active topic —</option>
-            {activeTopics.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <select
-            className={styles.topicSelectArchive}
-            aria-label="Archived topic"
-            value={activeTopic?.startsWith('.archive/') ? activeTopic : ''}
-            onChange={(e) => { setActiveTopic(e.target.value || null) }}
-          >
-            <option value="">— archive —</option>
-            {archivedTopics.map((t) => <option key={t} value={`.archive/${t}`}>{t}</option>)}
-          </select>
+          <div className={styles.selectWrap}>
+            <select
+              className={styles.topicSelect}
+              aria-label="Active topic"
+              value={activeTopic?.startsWith('.archive/') ? '' : (activeTopic ?? '')}
+              onChange={(e) => { setActiveTopic(e.target.value || null) }}
+            >
+              <option value="">— active topic —</option>
+              {activeTopics.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className={styles.selectWrap}>
+            <select
+              className={styles.topicSelectArchive}
+              aria-label="Archived topic"
+              value={activeTopic?.startsWith('.archive/') ? activeTopic : ''}
+              onChange={(e) => { setActiveTopic(e.target.value || null) }}
+            >
+              <option value="">— archive —</option>
+              {archivedTopics.map((t) => <option key={t} value={`.archive/${t}`}>{t}</option>)}
+            </select>
+          </div>
           <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexShrink: 0 }}>
             <Tooltip label="Flow canvas" shortcut="Ctrl+1" placement="bottom">
               <button
@@ -149,7 +159,7 @@ export function TopBar(): JSX.Element {
           </IconButton>
           <Tooltip label="Push hooks to server" placement="bottom">
             <button className={styles.publishBtn} onClick={() => void handlePublish()} disabled={publishing}>
-              {publishing ? '…' : '↑ Publish'}
+              {publishing ? '…' : 'Publish'}
             </button>
           </Tooltip>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useDeferredValue, useRef, useState } from 'react'
-import { ChevronRight, ChevronDown, Plus, FolderPlus, GripVertical, FolderOpen, Folder, FileText, BookOpen, ArrowLeft } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, GripVertical, FolderOpen, Folder, FileText, BookOpen, ArrowLeft } from 'lucide-react'
 import { useStore } from '../store'
 import type { PathlyItem, PathlyItemType, PathlyCanvasDragItem, PathlyReorgDragItem } from '../types'
 import { PATHLY_DRAG_MIME } from '../types'
@@ -21,6 +21,24 @@ const PATHLY_SECTIONS: Section[] = [
   { label: 'Skills',    type: 'skill',    dir: 'src/pathly_data/core/skills'    },
   { label: 'Agents',    type: 'agent',    dir: 'src/pathly_data/core/agents'    },
   { label: 'Templates', type: 'template', dir: 'src/pathly_data/core/templates' },
+]
+
+const USER_LIBRARY_SECTIONS: Section[] = [
+  { label: 'UserAgents',    type: 'agent',    dir: 'agents'    },
+  { label: 'UserSkills',    type: 'skill',    dir: 'skills'    },
+  { label: 'UserTemplates', type: 'template', dir: 'templates' },
+  { label: 'UserFlows',     type: 'flow',     dir: 'flows'     },
+]
+
+const USER_LIBRARY_DISPLAY_LABELS: Record<string, string> = {
+  UserAgents: 'Agents', UserSkills: 'Skills', UserTemplates: 'Templates', UserFlows: 'Flows',
+}
+
+const WORKSPACE_USER_SECTIONS: Section[] = [
+  { label: 'My Agents',    type: 'agent',    dir: 'pathly/agents'    },
+  { label: 'My Skills',    type: 'skill',    dir: 'pathly/skills'    },
+  { label: 'My Templates', type: 'template', dir: 'pathly/templates' },
+  { label: 'My Flows',     type: 'flow',     dir: 'pathly/flows'     },
 ]
 
 const WORKSPACE_FILE_SECTIONS: Section[] = [
@@ -75,13 +93,14 @@ function InlineFolderInput({ onConfirm, onCancel }: {
   )
 }
 
-export function Sidebar(): JSX.Element {
+export function Sidebar(): JSX.Element | null {
   const {
     projectPath,
     pathlyRoot,
+    pathlyUserHome,
+    setPathlyUserHome,
     activeTopic,
     sidebarCollapsed,
-    setSidebarCollapsed,
     selectedItem,
     setSelectedItem,
     setActivePanel,
@@ -91,6 +110,13 @@ export function Sidebar(): JSX.Element {
 
   const { sections, setSections, loadItems } = useProjectFiles()
   const { planConvs } = usePlanConversations()
+
+  useEffect(() => {
+    if (pathlyUserHome) return
+    const fn = window.pathly.fs.userHome
+    if (typeof fn !== 'function') return
+    fn().then(setPathlyUserHome).catch(() => {})
+  }, [pathlyUserHome, setPathlyUserHome])
 
   const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
@@ -109,15 +135,10 @@ export function Sidebar(): JSX.Element {
   // Tracks whether the current drag was initiated from the canvas grip (⠿)
   const dragFromGripRef = useRef(false)
 
-  if (sidebarCollapsed) {
-    return (
-      <div className={styles.collapsed}>
-        <button className={styles.expandBtn} onClick={() => setSidebarCollapsed(false)} title="Expand sidebar">
-          <ChevronRight size={13} />
-        </button>
-      </div>
-    )
-  }
+  const deferredFilter = useDeferredValue(filter)
+  const lowerFilter = deferredFilter.toLowerCase()
+
+  if (sidebarCollapsed) return null
 
   function toggleSection(label: string): void {
     setSections((prev) => ({ ...prev, [label]: { ...prev[label], open: !prev[label].open } }))
@@ -144,6 +165,28 @@ export function Sidebar(): JSX.Element {
       setShowFlowWizard(true)
     } else {
       setNewItemTarget({ type: section.type, dir: `${base}/${section.dir}` })
+      setShowNewItemDialog(true)
+    }
+  }
+
+  function handleNewUserLibraryItem(section: Section, e: React.MouseEvent<HTMLButtonElement>): void {
+    e.stopPropagation()
+    if (!pathlyUserHome) return
+    if (section.type === 'flow') {
+      setShowFlowWizard(true)
+    } else {
+      setNewItemTarget({ type: section.type, dir: `${pathlyUserHome}/${section.dir}` })
+      setShowNewItemDialog(true)
+    }
+  }
+
+  function handleWorkspaceUserCreate(section: Section, e: React.MouseEvent<HTMLButtonElement>): void {
+    e.stopPropagation()
+    if (!projectPath) return
+    if (section.type === 'flow') {
+      setShowFlowWizard(true)
+    } else {
+      setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
       setShowNewItemDialog(true)
     }
   }
@@ -317,9 +360,6 @@ export function Sidebar(): JSX.Element {
     } catch { /* ignore malformed payload */ }
   }
 
-  const deferredFilter = useDeferredValue(filter)
-  const lowerFilter = deferredFilter.toLowerCase()
-
   return (
     <div className={styles.sidebar}>
       <div className={styles.filterRow}>
@@ -487,6 +527,162 @@ export function Sidebar(): JSX.Element {
                 </div>
               )
             })}
+
+            {/* MY LIBRARY — user's global ~/.pathly files */}
+            <div className={styles.libraryHeader} style={{ marginTop: 8 }}>MY LIBRARY</div>
+            {USER_LIBRARY_SECTIONS.map((section) => {
+              const stateKey = section.label
+              const displayLabel = USER_LIBRARY_DISPLAY_LABELS[stateKey] ?? stateKey
+              const state = sections[stateKey]
+              if (!state) return null
+
+              if (section.type === 'template') {
+                const subdirs = state.subdirs ?? []
+                const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
+                if (filter && !hasMatch) return null
+                return (
+                  <div key={stateKey}>
+                    <div className={styles.sectionRow}>
+                      <button className={styles.sectionToggle} onClick={() => toggleSection(stateKey)}>
+                        <span className={styles.chevron}>
+                          {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                        </span>
+                        {displayLabel}
+                      </button>
+                      <div className={styles.sectionActions}>
+                        <IconButton onClick={(e) => handleNewUserLibraryItem(section, e)} title={`New ${displayLabel.slice(0, -1).toLowerCase()}`}>
+                          <Plus size={12} />
+                        </IconButton>
+                      </div>
+                    </div>
+                    {state.open && (
+                      <div>
+                        {subdirs.map((subdir, idx) => {
+                          const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
+                          if (filter && filteredFiles.length === 0) return null
+                          return (
+                            <div key={subdir.name}>
+                              <button className={styles.subdirHeader} onClick={() => toggleSubdir(stateKey, idx)}>
+                                <span className={styles.chevron}>
+                                  {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                </span>
+                                <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                                <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
+                              </button>
+                              {subdir.open && filteredFiles.map((item) => {
+                                const isSelected = selectedItem?.path === item.path
+                                return (
+                                  <button
+                                    key={item.path}
+                                    className={`${styles.systemItemRow} ${styles.systemItemRowDeep} ${isSelected ? styles.systemItemRowSelected : ''}`}
+                                    onClick={() => handleItemClick(item)}
+                                    title={item.path}
+                                  >
+                                    <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                    <span className={styles.itemName}>{item.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
+              const subdirs = state.subdirs ?? []
+              const filtered = filter ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter)) : state.items
+              const hasSubdirMatch = filter ? subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter))) : true
+              if (filter && filtered.length === 0 && !hasSubdirMatch) return null
+              return (
+                <div key={stateKey}>
+                  <div className={styles.sectionRow}>
+                    <button className={styles.sectionToggle} onClick={() => toggleSection(stateKey)}>
+                      <span className={styles.chevron}>
+                        {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                      </span>
+                      {displayLabel}
+                    </button>
+                    <div className={styles.sectionActions}>
+                      <IconButton onClick={(e) => handleNewUserLibraryItem(section, e)} title={`New ${displayLabel.slice(0, -1).toLowerCase()}`}>
+                        <Plus size={12} />
+                      </IconButton>
+                    </div>
+                  </div>
+                  {state.open && (
+                    <div>
+                      {subdirs.map((subdir, idx) => {
+                        const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
+                        if (filter && filteredFiles.length === 0) return null
+                        return (
+                          <div key={subdir.name}>
+                            <button className={styles.subdirHeader} onClick={() => toggleSubdir(stateKey, idx)}>
+                              <span className={styles.chevron}>
+                                {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                              </span>
+                              <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                              <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
+                            </button>
+                            {subdir.open && filteredFiles.map((item) => {
+                              const isSelected = selectedItem?.path === item.path
+                              const isCanvasDraggable = section.type === 'skill' || section.type === 'agent'
+                              return (
+                                <button
+                                  key={item.path}
+                                  className={`${styles.systemItemRow} ${styles.systemItemRowDeep} ${isSelected ? styles.systemItemRowSelected : ''}`}
+                                  draggable={isCanvasDraggable}
+                                  onClick={() => handleItemClick(item)}
+                                  onDragStart={isCanvasDraggable ? (e) => {
+                                    dragFromGripRef.current = true
+                                    handleItemDragStart(e, item, section)
+                                  } : undefined}
+                                  title={item.path}
+                                >
+                                  {isCanvasDraggable && (
+                                    <span className={styles.grip} onPointerDown={handleGripPointerDown} title="Drag to canvas">
+                                      <GripVertical size={12} />
+                                    </span>
+                                  )}
+                                  <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                  <span className={styles.itemName}>{item.name}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                      {filtered.map((item) => {
+                        const isSelected = selectedItem?.path === item.path
+                        const isCanvasDraggable = section.type === 'skill' || section.type === 'agent'
+                        return (
+                          <button
+                            key={item.path}
+                            className={`${styles.systemItemRow} ${isSelected ? styles.systemItemRowSelected : ''}`}
+                            draggable={isCanvasDraggable}
+                            onClick={() => handleItemClick(item)}
+                            onDragStart={isCanvasDraggable ? (e) => {
+                              dragFromGripRef.current = true
+                              handleItemDragStart(e, item, section)
+                            } : undefined}
+                            title={item.path}
+                          >
+                            {isCanvasDraggable && (
+                              <span className={styles.grip} onPointerDown={handleGripPointerDown} title="Drag to canvas">
+                                <GripVertical size={12} />
+                              </span>
+                            )}
+                            <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                            <span className={styles.itemName}>{item.name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </>
         )}
 
@@ -494,6 +690,91 @@ export function Sidebar(): JSX.Element {
         {!libraryOpen && projectPath && (
           <>
             <Separator label="Workspace" />
+
+            {/* Project-local user authoring sections */}
+            {WORKSPACE_USER_SECTIONS.map((section) => {
+              const state = sections[section.label]
+              if (!state) return null
+              const subdirs = state.subdirs ?? []
+              const filteredItems = filter ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter)) : state.items
+              const hasSubdirMatch = filter ? subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter))) : true
+              if (filter && filteredItems.length === 0 && !hasSubdirMatch) return null
+              return (
+                <div key={section.label}>
+                  <div className={styles.sectionRow}>
+                    <button className={styles.sectionToggle} onClick={() => toggleSection(section.label)}>
+                      <span className={styles.chevron}>
+                        {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                      </span>
+                      {section.label}
+                    </button>
+                    <div className={styles.sectionActions}>
+                      <IconButton
+                        onClick={(e) => handleWorkspaceUserCreate(section, e)}
+                        title={`New ${section.label.toLowerCase()}`}
+                      >
+                        <Plus size={12} />
+                      </IconButton>
+                    </div>
+                  </div>
+                  {state.open && (
+                    <div>
+                      {subdirs.map((subdir, idx) => {
+                        const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
+                        if (filter && filteredFiles.length === 0) return null
+                        return (
+                          <div key={subdir.name}>
+                            <button className={styles.subdirHeader} onClick={() => toggleSubdir(section.label, idx)}>
+                              <span className={styles.chevron}>
+                                {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                              </span>
+                              <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                              {subdir.name}/
+                            </button>
+                            {subdir.open && filteredFiles.map((item) => {
+                              const isDirty = dirtyItems.has(item.path)
+                              const isSelected = selectedItem?.path === item.path
+                              const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
+                              return (
+                                <button
+                                  key={item.path}
+                                  className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
+                                  onClick={() => handleItemClick(item)}
+                                  onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
+                                  title={item.path}
+                                >
+                                  <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                  <span className={styles.itemName}>{item.name}</span>
+                                  {isDirty && <span className={styles.dirtyDot}>●</span>}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                      {filteredItems.map((item) => {
+                        const isDirty = dirtyItems.has(item.path)
+                        const isSelected = selectedItem?.path === item.path
+                        const itemDir = `${projectPath}/${section.dir}`
+                        return (
+                          <button
+                            key={item.path}
+                            className={`${styles.itemRow} ${isSelected ? styles.itemRowSelected : ''}`}
+                            onClick={() => handleItemClick(item)}
+                            onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
+                            title={item.path}
+                          >
+                            <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                            <span className={styles.itemName}>{item.name}</span>
+                            {isDirty && <span className={styles.dirtyDot}>●</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
 
             {/* Plan section */}
             <div className={styles.sectionRow}>
@@ -620,10 +901,6 @@ export function Sidebar(): JSX.Element {
         <div className={styles.divider} />
       </div>
 
-      <button className={styles.collapseBtn} onClick={() => setSidebarCollapsed(true)} title="Collapse sidebar">
-        <ChevronRight size={13} style={{ transform: 'rotate(180deg)' }} />
-      </button>
-
       {showFlowWizard && (
         <FlowWizard
           onClose={() => setShowFlowWizard(false)}
@@ -649,7 +926,7 @@ export function Sidebar(): JSX.Element {
           type={newItemTarget.type}
           dir={newItemTarget.dir}
           onClose={() => setShowNewItemDialog(false)}
-          onCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor') }}
+          onCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor'); void loadItems() }}
         />
       )}
 
