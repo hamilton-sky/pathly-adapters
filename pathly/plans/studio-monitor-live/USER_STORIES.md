@@ -4,6 +4,11 @@
 
 Pathly Studio has a working Monitor panel with SSE event streaming, an FsmView pipeline display, and a PlanBoard with conversation cards. The design spec (MONITOR_DESIGN_SPEC.md) has resolved all open UX questions and specifies a set of visual and functional upgrades: a connected FSM topology rail with a sliding dot, an execution trace below the rail, multi-flow monitor tabs, a running-flow entry banner, and richer plan conversation cards. This plan implements those spec decisions without touching the visual flow editor or sidebar (scope of `studio-visual-flow-builder`).
 
+See **DESIGN.md** for all token values, spacing, color constants, and accessibility specs.
+See **EDGE_CASES.md** for edge case handling per story.
+
+---
+
 ## Stories
 
 ### Story S1: FSM Topology Rail with Sliding Dot
@@ -11,17 +16,19 @@ Pathly Studio has a working Monitor panel with SSE event streaming, an FsmView p
 **As a** developer watching a Pathly pipeline, **I want** a horizontal connected rail that shows all FSM states as nodes with a dot that slides to the active state, **so that** I can instantly see where the pipeline is at a glance without reading text labels.
 
 **Acceptance Criteria:**
-- [ ] Rail renders as a horizontal flex row with a thin 1px line connecting state dots (not colored boxes)
-- [ ] Active dot slides to the current state via CSS `transform: translateX` (150ms ease-out, no JS animation loop, ref-driven)
-- [ ] Completed dots: green filled; active: cyan filled with pulse; future: muted outline
-- [ ] When a loop-back occurs the dot snaps back to the earlier state (activeIdx = `PIPELINE.indexOf(fsmState.current)` — single-index lookup, no history tracking)
-- [ ] Debug/explore flows show `cycle N`; team flows show `conv N` in the header (`fsmState.flow === 'debug' || fsmState.flow === 'explore'`)
-- [ ] `t.runtime` theme token (`#22D3EE`) is confirmed/added to `theme.ts` before use
+- [ ] `t.runtime: '#22D3EE'` (dark) and `t.runtime: '#0EA5E9'` (light) added to `Theme` interface and both theme objects in `theme.ts` — do this before any other change
+- [ ] `t.fontFamilyMono` added to `Theme` interface and both theme objects
+- [ ] Rail renders as a horizontal flex row with a 1px connecting line (`t.bgSurface1` color)
+- [ ] Active dot slides to current state via CSS `transform: translateX` using `t.transitionBase` (`150ms ease-out`) — ref-driven, no JS animation loop
+- [ ] Completed dots: `COMPLETED_GREEN = rgba(22,163,74,0.7)` — NOT `t.green` (bright lime)
+- [ ] Active dot: `t.runtime` cyan fill + `pathly-pulse` class
+- [ ] Future dots: `t.textMuted` stroke, transparent fill
+- [ ] Loop-back: dot snaps back to earlier state (single-index lookup on `PIPELINE.indexOf(fsmState.current)`)
+- [ ] `cycle N` label for `fsmState.flow === 'debug'` or `=== 'explore'`; `conv N` for all others including custom flow names
+- [ ] `@media (prefers-reduced-motion: reduce)` disables `pathly-pulse` animation and the dot CSS transition
+- [ ] Old "System active — STATE" status line removed
 
-**Edge Cases:**
-- State not found in PIPELINE array: dot stays at last known position
-- PIPELINE array empty: fall back to `['STORMING','PLANNING','BUILDING','REVIEWING','DONE']`
-- Custom flow names (not `team`/`debug`/`explore`): fall back to `conv N` label
+**Edge Cases:** EC-2.2, EC-2.3, EC-2.4 in EDGE_CASES.md
 
 **Delivered by:** Phase 1 → Conversation 1
 
@@ -32,19 +39,18 @@ Pathly Studio has a working Monitor panel with SSE event streaming, an FsmView p
 **As a** developer, **I want** a chronological execution trace below the rail, **so that** I can see every state visit in order — including loop re-visits — without losing history.
 
 **Acceptance Criteria:**
-- [ ] Trace renders below the rail as a scrollable list of rows
-- [ ] Each row: `icon | STATE | conv/cycle N | agent | relative time`
-- [ ] Status icons: `✓` completed (green), `●` active (cyan, pulsing), `✗` failed (red)
+- [ ] Trace renders below the rail in a scrollable container
+- [ ] Container has `role="log"` `aria-label="Execution trace"` `aria-live="polite"` `aria-atomic="false"`
+- [ ] Each row: `icon | STATE | conv/cycle N | agent | relative time` in `t.fontFamilyMono` 12px
+- [ ] Status icons: `✓` (`COMPLETED_GREEN`), `●` (`t.runtime`, pulsing), `✗` (`t.red`)
 - [ ] Loop re-visits appear as additional rows (BUILDING visited twice = two rows)
-- [ ] Trace reads from `STATE_TRANSITION` events in the store
-- [ ] Failure detection uses `pipelineStates` order (backward transition = failed), NOT hardcoded state names like "FIXING"
-- [ ] Empty state: single muted line "Waiting for flow activity."
-- [ ] `formatRelativeTime(ts)` helper created in Conv 1 ("now" <60s, "Xm ago", "Xh ago")
-- [ ] Agent per row derived from nearest AGENT_SPAWNED after the STATE_TRANSITION; eventual-consistency acceptable (may show previous agent for one frame)
+- [ ] Failure detection uses `pipelineStates` order (backward index = failed), NOT hardcoded state names
+- [ ] `formatRelativeTime(ts)` in `Monitor/utils.ts`: `<60s → 'now'`, `<60min → 'Xm ago'`, else `'Xh ago'`
+- [ ] Agent derived from nearest `AGENT_SPAWNED` after `STATE_TRANSITION`; shows `—` if none found
+- [ ] Rows sorted by `ts` before rendering (guards against EVENTS.jsonl/SSE race, EC-1.1)
+- [ ] Empty state: `"Waiting for flow activity."` in `t.textMuted` 13px centered
 
-**Edge Cases:**
-- EVENTS.jsonl initial load can race with live SSE appends (pre-existing bug); trace must not crash on reorder
-- No AGENT_SPAWNED found for a visit: show `—` for agent column
+**Edge Cases:** EC-1.1, EC-1.2, EC-1.3 in EDGE_CASES.md
 
 **Delivered by:** Phase 2 → Conversation 1
 
@@ -52,18 +58,16 @@ Pathly Studio has a working Monitor panel with SSE event streaming, an FsmView p
 
 ### Story S3: SSE Live Source Badge
 
-**As a** developer, **I want** a small live-source indicator in the Monitor header, **so that** I know immediately whether the monitor is receiving live SSE events or polling via file-watch.
+**As a** developer, **I want** a small live-source indicator in the Monitor header, **so that** I know whether the monitor is receiving live SSE events, polling, or not yet connected.
 
 **Acceptance Criteria:**
-- [ ] `● live` (cyan `t.runtime`, 11px) shown when `monitorSource === 'sse'`
-- [ ] `○ polling` (textMuted, 11px) shown when `monitorSource === 'chokidar'`
-- [ ] `—` (textMuted) shown when `monitorSource` is `null` (not yet connected)
-- [ ] Any existing `Source: SSE live` text label removed from the header
-- [ ] Badge visible in the Monitor header flush-right in the title row
+- [ ] `monitorSource === 'sse'` → `● live` in `t.runtime`, `t.fontSizeSm` (12px)
+- [ ] `monitorSource === 'chokidar'` → `○ polling` in `t.textMuted`, 12px
+- [ ] `monitorSource === null` → `—` in `t.textMuted`, 12px (does NOT show `○ polling`)
+- [ ] Any existing `Source: SSE live` or `Source:` label text removed from header
+- [ ] Badge rendered flush-right in the header title row
 
-**Edge Cases:**
-- SSE reconnects after failure: badge switches back to `● live`
-- `projectPath` missing: `monitorSource` stays null → badge shows `—`
+**Edge Cases:** EC-2.1 in EDGE_CASES.md
 
 **Delivered by:** Phase 3 → Conversation 1
 
@@ -71,21 +75,24 @@ Pathly Studio has a working Monitor panel with SSE event streaming, an FsmView p
 
 ### Story S4: Monitor Tabs for Concurrent Flows
 
-**As a** developer, **I want** a tab bar in the Monitor when multiple flows are active, **so that** I can watch and switch between concurrent pipelines without losing context.
+**As a** developer, **I want** a tab bar when multiple flows are active, **so that** I can watch and switch between concurrent pipelines.
 
 **Acceptance Criteria:**
-- [ ] Tab bar appears when **≥2** active Studio-launched sessions are tracked in `activeFlowSessions`
-- [ ] No tab bar when 0 or 1 session (single-flow stays clean; existing `activeTopic` path unchanged)
-- [ ] Each tab shows flow filename + cyan `●` when `isRunning: true`
-- [ ] `◐` (half-filled, muted) shown for paused/waiting sessions (`isPaused: true`)
-- [ ] Clicking a tab: sets `activeMonitorTab` AND re-keys the SSE subscription to that session's topic
-- [ ] >4 tabs: `...` overflow button opens a simple dropdown list
-- [ ] `isCli` field defaults to `false` in all sessions (CLI discovery is Post-MVP; no `>_` badge yet)
-- [ ] `activeFlowSessions` is populated from `activeTopic` + `fsmState` when a flow is running (Studio-launched sessions only)
+- [ ] Tab bar shown only when `Object.keys(activeFlowSessions).length >= 2`; hidden for 0 or 1 session
+- [ ] `activeFlowSessions` populated from Studio-launched sessions only (CLI discovery is Post-MVP)
+- [ ] Each tab: `role="tab"`, `aria-selected`, flow filename, cyan `●` when `isRunning`
+- [ ] Tab bar container: `role="tablist"`, `aria-label="Active flows"`
+- [ ] Keyboard: Arrow keys navigate between tabs; Tab key exits the tablist; Enter/Space selects
+- [ ] Only active tab has `tabIndex={0}`; all others have `tabIndex={-1}` (roving tabindex)
+- [ ] Active tab: `borderBottom: 2px solid t.runtime`, `color: t.textPrimary`, `backgroundColor: t.bgSurface0`
+- [ ] Inactive tab: `color: t.textMuted`, no underline
+- [ ] `●` dot has `aria-hidden="true"` (decorative — `aria-selected` conveys state)
+- [ ] >4 tabs: `...` overflow button opens dropdown
+- [ ] Tab switch updates `activeMonitorTab` AND re-keys SSE subscription (`effectiveTopic = activeMonitorTab ?? activeTopic`)
+- [ ] `isCli` always `false`; no `>_` badge rendered (Post-MVP)
+- [ ] `◐` paused indicator NOT implemented (no production signal for `isPaused`; deferred Post-MVP)
 
-**Edge Cases:**
-- Session ends: tab closes; monitor returns to remaining active session
-- No active sessions: tab bar hidden; Monitor shows "Select a topic" placeholder
+**Edge Cases:** EC-3.5, EC-4.1, EC-4.2, EC-4.3 in EDGE_CASES.md
 
 **Delivered by:** Phase 4 → Conversation 2
 
@@ -96,19 +103,21 @@ Pathly Studio has a working Monitor panel with SSE event streaming, an FsmView p
 **As a** developer, **I want** a non-blocking banner on the canvas when a flow is actively running, **so that** I don't miss an in-progress session when switching to the canvas view.
 
 **Acceptance Criteria:**
-- [ ] Banner shows when `fsmState.current` is non-null and not `IDLE`/`DONE` and only **one** flow is active
-- [ ] Banner content: `[flow.yaml] is running ● conv N / STATE  [View in Monitor →]  [dismiss]`
-- [ ] Cyan `●` dot (`t.runtime #22D3EE`) for the running indicator
-- [ ] `[View in Monitor →]` calls `setActivePanel('monitor')` — switches to Monitor view
-- [ ] Banner auto-dismisses after 8s if not interacted with
-- [ ] `[dismiss]` button closes it immediately
-- [ ] `dismissed` state resets when `activeTopic` changes OR when `fsmState.current` transitions from non-running → running again (re-show on new run)
-- [ ] When **multiple** flows are active: no banner; `setActivePanel('monitor')` is called automatically on load
-- [ ] Banner styled: `bgSurface1` background, 1px `t.runtime` border
-- [ ] z-index uses `Z.toast - 1` from `FlowEditor/zIndex.ts` (Phase 7b of studio-visual-flow-builder must be complete)
+- [ ] Banner shown only when `isRunning && !isMultiFlow`
+- [ ] When `isMultiFlow && isRunning`: `setActivePanel('monitor')` called automatically on mount (once)
+- [ ] Banner position: `top: 12px`, `left: 50%`, `transform: translateX(-50%)`, `maxWidth: 520px`, `borderRadius: 6px`, `padding: 10px 14px`
+- [ ] Style: `backgroundColor: t.bgSurface1`, `border: 1px solid t.runtime`
+- [ ] Content: `● {flowName} is running · {convLabel} / {fsmState.current}  [View in Monitor →]  [✕]`
+- [ ] `"View in Monitor →"` calls `setActivePanel('monitor')` — NOT a new store field
+- [ ] `"View in Monitor →"` has `aria-label="View running flow in Monitor panel"`
+- [ ] Banner wrapper has `role="status"` and `aria-live="assertive"`
+- [ ] Hover-to-pause: `onMouseEnter` clears 8s timer; `onMouseLeave` restarts it
+- [ ] `dismissed` state resets when `activeTopic` changes
+- [ ] `dismissed` state resets when `isRunning` transitions `false → true` (new run started)
+- [ ] z-index: `Z.toast - 1` from `FlowEditor/zIndex.ts` (prerequisite: Phase 7b of studio-visual-flow-builder)
+- [ ] Uses `t.transitionBase` token, not hardcoded `150ms`
 
-**Edge Cases:**
-- Flow stops and restarts: banner re-appears (dismissed flag resets on running→IDLE→running cycle)
+**Edge Cases:** EC-3.1, EC-3.2, EC-3.3 in EDGE_CASES.md
 
 **Delivered by:** Phase 5 → Conversation 2
 
@@ -116,23 +125,26 @@ Pathly Studio has a working Monitor panel with SSE event streaming, an FsmView p
 
 ### Story S6: Plan Conversation Cards Enhancement
 
-**As a** developer reviewing a plan, **I want** conversation cards that show active pulsing, failure indicators, cost data, hover/selected states, and timestamps, **so that** I can assess plan progress at a glance without opening the event log.
+**As a** developer reviewing a plan, **I want** conversation cards that show active pulsing, failure indicators, cost data, hover/selected states, and timestamps, **so that** I can assess plan progress at a glance.
 
 **Acceptance Criteria:**
-- [ ] Active card: pulsing cyan left border (3px, CSS animation, same `pathly-pulse` class pattern as FsmView)
-- [ ] Failed card: red `✗` icon and red left border (`#EF4444`)
-- [ ] Pending card: muted `○` outline border
-- [ ] Hover state: `bgSurface1` background fill (no border change)
-- [ ] Selected state: `bgSurface1` + accent violet left border (replaces status border)
-- [ ] Token/cost row shown when `EVENTS.jsonl` has `AGENT_DONE` events with `cost_usd` for that conv number
-- [ ] Cost filtered by `e.conversation === conv.num` (confirm `conversation` field is populated in EVENTS.jsonl)
-- [ ] Relative timestamp shown from most recent event `ts` for that conv
-- [ ] Phase range shown if `ConvRow.phases` is populated (requires `parseProgressMd` update)
+- [ ] `statusBorderColor` and `statusBgColor` in PlanBoard: replace `t.blue` with `t.runtime` for active statuses (IN_PROGRESS, REVIEWING, BUILDING) — leave `t.blue` in EventLog untouched
+- [ ] Active card: pulsing cyan left border via `pathly-pulse-border` keyframes (color-only pulse — width stays `3px` always)
+- [ ] `pathly-pulse-border` includes `@media (prefers-reduced-motion: reduce) { animation: none }`
+- [ ] Failed card: `t.red` left border + `✗` icon
+- [ ] Pending card: `t.textMuted` left border + `○` icon
+- [ ] Hover: `backgroundColor: t.bgSurface1` (no border change)
+- [ ] Selected: `backgroundColor: t.bgSurface1` + `t.accent` violet left border (replaces status border)
+- [ ] Card is interactive: `role="button"`, `tabIndex={0}`, `cursor: pointer`, Enter/Space triggers selection
+- [ ] Focus ring applied via `t.focusRing` on keyboard focus
+- [ ] Token/cost row: `Xk in / Yk out · $Z` in `t.fontFamilyMono` 12px; hidden if no `cost_usd` data
+- [ ] Cost filtered by `e.conversation === conv.num` on AGENT_DONE events (EC-2.6: if field absent, hide row)
+- [ ] Relative timestamp from most recent event `ts` via `formatRelativeTime` (imported from `Monitor/utils.ts`)
+- [ ] Phase range shown if `ConvRow.phases` populated (from updated `parseProgressMd`)
 - [ ] 52px min-height per card
+- [ ] `pathly-pulse-border` injected once via `styleInjectedRef` (same pattern as FsmView)
 
-**Edge Cases:**
-- No cost data: cost row hidden
-- Active conv with no events yet: pulsing border, no cost row
+**Edge Cases:** EC-2.6, EC-3.4 in EDGE_CASES.md
 
 **Delivered by:** Phase 6 → Conversation 2
 
@@ -140,16 +152,15 @@ Pathly Studio has a working Monitor panel with SSE event streaming, an FsmView p
 
 ### Story S7: Last-Used Flow on Studio Open + Auto-Open Monitor
 
-**As a** developer reopening Studio, **I want** the canvas to load the last-used flow automatically and the Monitor to open automatically if a flow is already running, **so that** I resume work immediately without navigating to find my in-progress session.
+**As a** developer reopening Studio, **I want** the canvas to load the last-used flow automatically and the Monitor to open automatically if a flow is already running.
 
 **Acceptance Criteria:**
-- [ ] On Studio open, the last-used flow file is loaded in the canvas (persisted across sessions)
-- [ ] If a flow is already actively running when Studio opens (`fsmState.current` not null/IDLE/DONE), `setActivePanel('monitor')` is called automatically
-- [ ] If no flow is running: canvas opens with last-used flow; no automatic panel switch
-- [ ] First-launch (no last-used flow): canvas shows empty state hint
+- [ ] `lastUsedFlowPath` persisted to `localStorage` key `'pathly:lastUsedFlowPath'`
+- [ ] On Studio open: if `lastUsedFlowPath` is set, load that flow file
+- [ ] If flow file is missing: catch error, clear `lastUsedFlowPath`, show empty canvas hint (EC-2.5)
+- [ ] If a flow is already running on open (`fsmState.current` not null/IDLE/DONE): `setActivePanel('monitor')` called once on mount
+- [ ] First launch (no stored path): canvas shows empty state hint
 
-**Edge Cases:**
-- Last-used flow file deleted since last session: canvas shows empty state hint
-- Multiple flows running on open: Monitor tab bar shown; canvas shows last-edited flow
+**Edge Cases:** EC-2.5 in EDGE_CASES.md
 
 **Delivered by:** Phase 7 → Conversation 2

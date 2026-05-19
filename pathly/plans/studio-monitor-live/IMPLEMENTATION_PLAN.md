@@ -26,33 +26,54 @@ monitorSource, activeMonitorTab    Monitor/index (tabs, SSE)       Tab bar, live
 ### Phase 1: Upgrade FsmView to connected rail with CSS dot   ← Conversation: 1
 
 **File:** `studio/src/renderer/src/components/Monitor/FsmView.tsx` — MODIFY: replace box-list layout with a horizontal connected rail (thin 1px line, state dots, sliding active dot via CSS transform).
-**File:** `studio/src/renderer/src/theme.ts` — VERIFY/MODIFY: confirm `runtime` token exists (`#22D3EE`); add it if missing before any other phase uses it.
+**File:** `studio/src/renderer/src/theme.ts` — MODIFY: add `runtime` and `fontFamilyMono` tokens to `Theme` interface and both theme objects. Do this first — all other phases depend on these tokens.
 
-**Done when:** Pipeline section shows dots connected by a line; active dot slides (CSS `transition: transform 150ms ease-out`); loop-back re-positions correctly; `cycle N` / `conv N` label correct per flow type.
+**Done when:** `theme.ts` has `runtime` and `fontFamilyMono`. Pipeline section shows dots connected by a line; active dot slides (CSS `transition: transform ${t.transitionBase}`); `COMPLETED_GREEN` constant used (not `t.green`); `prefers-reduced-motion` disables all animations; `cycle N` / `conv N` label correct per flow type.
 
 **Delivers stories:** S1
 
 **Depends on:** Existing FsmView + pipelineStates from store.
 
-**Enables:** Phase 2 (trace below), Phase 3 (badge uses same `t.runtime`).
+**Enables:** Phase 2 (trace below), Phase 3 (badge uses same `t.runtime`), Conv 2 (all phases use new tokens).
 
 **Details:**
 
-Rail layout:
-```
-  ●─────────────●────────────◯──────────◯
-PLANNING     BUILDING    REVIEWING    DONE
-                ↑ cyan dot (active)
+> See **DESIGN.md §1–§3** for exact CSS values, color constants, and animation spec.
+
+Token additions to `theme.ts`:
+```ts
+// Theme interface — add both:
+runtime: string        // live/active signal color
+fontFamilyMono: string // log/trace monospace font
+
+// darkTheme:  runtime: '#22D3EE',  fontFamilyMono: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace"
+// lightTheme: runtime: '#0EA5E9',  fontFamilyMono: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace"
 ```
 
-- Container: `display: flex; align-items: center; position: relative;`
-- Rail line: absolutely positioned 1px horizontal line, `bgSurface1` color
-- State dot: 10px circle. Completed: green fill. Active: cyan fill + `pathly-pulse` class. Future: muted outline.
-- Active dot marker: separate absolutely-positioned cyan circle, moves via `transform: translateX`. Position = `(activeIdx / (PIPELINE.length - 1)) * railWidthPx`. Use `useRef` on the rail container + `ResizeObserver` (or `useLayoutEffect`) to compute rail width. One `requestAnimationFrame` on mount to avoid paint-before-transition.
-- State labels: 11px muted text below each dot, uppercase.
-- `cycle N` vs `conv N`: if `fsmState.flow === 'debug' || fsmState.flow === 'explore'` → `cycle N`; else `conv N`. For unknown/custom flow names, default to `conv N`. Conv number from `fsmState.conv ?? fsmState.current_conversation`.
-- Remove existing "System active — STATE" status line entirely.
-- `activeIdx = PIPELINE.indexOf(fsmState.current ?? '')` — single-index lookup. Loop-back is automatic.
+Color constant at module scope in `FsmView.tsx` (do NOT use `t.green`):
+```ts
+const COMPLETED_GREEN = 'rgba(22, 163, 74, 0.7)'
+// Intentionally not t.green (#4ade80 lime) — spec requires muted forest green
+```
+
+Rail visual:
+- Rail line: `backgroundColor: t.bgSurface1` (#343452) — NOT `bgSurface0` (too faint at #252538)
+- Completed dot: `COMPLETED_GREEN` fill
+- Active dot: `t.runtime` fill + `pathly-pulse` class
+- Future dot: `t.textMuted` stroke (#5a5d8a), transparent fill — NOT `bgSurface0` (nearly invisible)
+- Sliding marker: `transform: translateX` driven by `useLayoutEffect` + `ResizeObserver` for rail width
+- Transition: `t.transitionBase` (`'150ms ease-out'`) — reuse token, do NOT hardcode
+
+`prefers-reduced-motion` — add to PULSE_CSS injection block (REQUIRED):
+```css
+@media (prefers-reduced-motion: reduce) {
+  .pathly-pulse { animation: none; }
+  .pathly-pulse-border { animation: none; }
+}
+/* Plus check window.matchMedia at runtime for the inline transition property */
+```
+
+Remove existing "System active — STATE" status line entirely.
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -63,33 +84,26 @@ PLANNING     BUILDING    REVIEWING    DONE
 **File:** `studio/src/renderer/src/components/Monitor/FsmView.tsx` — MODIFY: add execution trace section below the rail.
 **File:** `studio/src/renderer/src/components/Monitor/utils.ts` — CREATE: `formatRelativeTime(ts: string): string` helper.
 
-**Done when:** Trace shows each STATE_TRANSITION as a row; BUILDING visited twice shows two rows; active row has pulsing `●`; failed rows show `✗`; `formatRelativeTime` works correctly.
+**Done when:** Trace shows each STATE_TRANSITION as a row; BUILDING visited twice shows two rows; active row has pulsing `●`; failed rows show `✗`; trace container has `aria-live="polite"`; `formatRelativeTime` works correctly.
 
 **Delivers stories:** S2
 
-**Depends on:** Phase 1.
+**Depends on:** Phase 1 (requires `t.fontFamilyMono` and `COMPLETED_GREEN` constant).
 
 **Details:**
 
-`formatRelativeTime(ts)`: `now` if <60s ago, `Xm ago` if <60min, `Xh ago` otherwise.
+> See **DESIGN.md §4** for row color map and typography spec.
 
-Trace derives from `events` (store), filtering `type === 'STATE_TRANSITION'`. Build `VisitRow[]`:
-```ts
-interface VisitRow {
-  state: string
-  visitIndex: number   // nth visit to this state (for de-dupe display)
-  ts?: string
-  agent?: string
-  status: 'done' | 'active' | 'failed'
-}
+Trace container (accessibility required):
+```tsx
+<div role="log" aria-label="Execution trace" aria-live="polite" aria-atomic={false}>
 ```
 
-**Failure detection — use `pipelineStates` order, not state names:**
-After a STATE_TRANSITION event, look at the next STATE_TRANSITION's `to` field. If `PIPELINE.indexOf(nextTo) < PIPELINE.indexOf(thisTo)` — i.e., the pipeline moved backward — mark `thisTo`'s visit as `'failed'`. This works for any flow topology without hardcoding state names.
+Typography: `fontFamily: t.fontFamilyMono`, `fontSize: '12px'`, `lineHeight: '1.7'`, `whiteSpace: 'pre'`
 
-**Agent per row:** find the first `AGENT_SPAWNED` event with `ts > stateTransition.ts`. If none found, show `—`. Eventual-consistency is acceptable (may lag one frame).
+Failure detection: `PIPELINE.indexOf(nextTo) < PIPELINE.indexOf(thisTo)` → failed. Never hardcode state names.
 
-**EVENTS.jsonl / SSE race:** the initial `readFile` load can arrive after SSE has appended live events, overwriting them. This is a pre-existing bug. Do NOT try to fix it in this phase — just ensure the trace doesn't crash on reorder (sort rows by `ts` before rendering).
+Sort `VisitRow[]` by `ts` before rendering (EC-1.1 guard — EVENTS.jsonl/SSE race; do NOT fix the race, just sort).
 
 Row layout (12px monospace):
 ```
@@ -97,7 +111,7 @@ Row layout (12px monospace):
   ●  BUILDING    conv 2    builder    now
 ```
 
-Empty state: `<span style={{ color: t.textMuted }}>Waiting for flow activity.</span>`
+Empty state: `"Waiting for flow activity."` in `t.textMuted`, 13px, centered.
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -111,21 +125,19 @@ Empty state: `<span style={{ color: t.textMuted }}>Waiting for flow activity.</s
 
 **Delivers stories:** S3
 
-**Depends on:** `monitorSource` in projectStore (type: `'mcp' | 'chokidar' | 'sse' | null`).
+**Depends on:** `monitorSource` in projectStore (type: `'mcp' | 'chokidar' | 'sse' | null`). `t.runtime` from Phase 1.
 
 **Details:**
 
 In `HeaderBar`, read `monitorSource` via `useStore()`. Render flush-right:
 ```tsx
-const badgeText = monitorSource === 'sse'
-  ? '● live'
-  : monitorSource === 'chokidar'
-    ? '○ polling'
-    : '—'
+const badgeText = monitorSource === 'sse' ? '● live'
+  : monitorSource === 'chokidar' ? '○ polling' : '—'
 const badgeColor = monitorSource === 'sse' ? t.runtime : t.textMuted
 ```
 
-Remove any existing `Source:` text from the header. Size 11px. Use `t.runtime` (confirmed/added in Phase 1).
+Font size: `t.fontSizeSm` (12px) — NOT 11px (below readable floor for dark backgrounds).
+Remove any existing `Source:` text from the header. Use `t.runtime` from Phase 1 (`theme.ts`).
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -175,15 +187,22 @@ setActiveFlowSessions(prev => ({
 ```
 Remove session from map when topic changes (cleanup in useEffect return).
 
-**Tab bar** — show when `Object.keys(activeFlowSessions).length >= 2`:
+**Tab bar** — show when `Object.keys(activeFlowSessions).length >= 2` (see DESIGN.md §6 for all CSS values):
 ```tsx
 {sessions.length >= 2 && (
-  <div style={tabBarStyle}>
+  <div role="tablist" aria-label="Active flows" style={{ height: 32, ...tabBarStyle }}>
     {visibleSessions.map(s => (
-      <button key={s.topic} onClick={() => setActiveMonitorTab(s.topic)} ...>
+      <button
+        key={s.topic}
+        role="tab"
+        aria-selected={activeMonitorTab === s.topic}
+        tabIndex={activeMonitorTab === s.topic ? 0 : -1}
+        onClick={() => setActiveMonitorTab(s.topic)}
+        onKeyDown={handleTabKeyDown}  // Arrow keys navigate; Enter/Space select
+      >
         {s.flowKey}
-        {s.isRunning && <span style={{ color: t.runtime }}>●</span>}
-        {s.isPaused && <span style={{ color: t.textMuted }}>◐</span>}
+        {s.isRunning && <span className="pathly-pulse" aria-hidden="true" style={{ color: t.runtime, fontSize: '8px' }}>●</span>}
+        {/* ◐ paused indicator: DEFERRED POST-MVP — isPaused is always false */}
       </button>
     ))}
     {overflow.length > 0 && <OverflowMenu sessions={overflow} />}
@@ -191,6 +210,10 @@ Remove session from map when topic changes (cleanup in useEffect return).
 )}
 ```
 Cap visible tabs at 4; extras in `...` overflow dropdown.
+Active tab: `borderBottom: 2px solid t.runtime`, `color: t.textPrimary`, `backgroundColor: t.bgSurface0`.
+Inactive tab: `color: t.textMuted`, `borderBottom: 2px solid transparent`.
+Apply `t.focusRing` on `:focus-visible`.
+**DO NOT render `◐`** — `isPaused` is always `false`; the branch is deferred to Post-MVP.
 
 **SSE re-key** — this is non-trivial. The existing `useEffect` in Monitor/index.tsx (line 117) keys on `[activeTopic, projectPath, ...]`. When `activeMonitorTab` changes, the displayed topic must change too. Refactor: derive `effectiveTopic = activeMonitorTab ?? activeTopic` and use it as the SSE subscription key AND the `params` for `EventSource`. Add `activeMonitorTab` to the `useEffect` dependency array. The cleanup (`es.close()`, `removeListener()`) already runs on dep change, so SSE re-keys automatically.
 
@@ -216,33 +239,30 @@ Cap visible tabs at 4; extras in `...` overflow dropdown.
 Show banner only when `isRunning && !isMultiFlow`.
 When `isMultiFlow && isRunning`: call `setActivePanel('monitor')` automatically on mount (once per session open).
 
-Banner local state:
-```ts
-const [dismissed, setDismissed] = useState(false)
-const prevRunningRef = useRef(false)
+> See **DESIGN.md §7** for exact position, spacing, and accessibility markup.
 
-// Reset dismissed when a new run starts (IDLE/DONE → running)
-useEffect(() => {
-  if (isRunning && !prevRunningRef.current) setDismissed(false)
-  prevRunningRef.current = !!isRunning
-}, [isRunning])
-
-// Reset dismissed when topic changes
-useEffect(() => { setDismissed(false) }, [activeTopic])
-
-// Auto-dismiss
-useEffect(() => {
-  if (!isRunning || dismissed) return
-  const id = setTimeout(() => setDismissed(true), 8000)
-  return () => clearTimeout(id)
-}, [isRunning, dismissed])
+Banner position (exact values):
+```
+position: absolute, top: 12px, left: 50%, transform: translateX(-50%)
+maxWidth: 520px, width: calc(100% - 48px), borderRadius: 6px, padding: 10px 14px
+backgroundColor: t.bgSurface1, border: 1px solid t.runtime
 ```
 
-"View in Monitor →" button calls `setActivePanel('monitor')` from uiStore (NOT a new `bottomPanel` field — use the existing `activePanel` mechanism).
+Accessibility (required):
+```tsx
+<div role="status" aria-live="assertive" aria-label={`${flowName} is running in ${fsmState.current}`}>
+  <button onClick={() => setActivePanel('monitor')} aria-label="View running flow in Monitor panel">
+    View in Monitor →
+  </button>
+  <button onClick={() => setDismissed(true)} aria-label="Dismiss banner">✕</button>
+</div>
+```
 
-Banner position: absolutely positioned at top of VisualView container. z-index: `Z.toast - 1` from `FlowEditor/zIndex.ts`.
+Hover-to-pause auto-dismiss (required — EC-3.1): `onMouseEnter` clears the 8s timer; `onMouseLeave` restarts it.
 
-Banner text: `{flowName} is running <span style={{color: t.runtime}}>●</span> {convLabel} / {fsmState.current}`
+Dismissed state resets:
+- When `activeTopic` changes
+- When `isRunning` transitions `false → true` (EC-3.2 — track with `prevRunningRef`)
 
 **Verify:** `cd studio; npm run typecheck`
 
@@ -250,49 +270,52 @@ Banner text: `{flowName} is running <span style={{color: t.runtime}}>●</span> 
 
 ### Phase 6: Plan conversation card enhancements   ← Conversation: 2
 
-**File:** `studio/src/renderer/src/components/PlanBoard.tsx` — MODIFY: pulsing active border, failure indicator, cost/token row, hover/selected states, timestamps, phase range.
+**File:** `studio/src/renderer/src/components/PlanBoard.tsx` — MODIFY: active status colors, pulsing border, card interactivity, cost row, hover/selected states, timestamps, phase range.
 **File:** `studio/src/renderer/src/types/index.ts` — MODIFY: extend `ConvRow` with `phases?: string`.
 **File:** `studio/src/renderer/src/hooks/usePlanConversations.ts` — MODIFY: parse phase range from PROGRESS.md and populate `ConvRow.phases`.
 
-**Done when:** Active card pulses cyan; failed shows red `✗`; cost row appears when data exists; hover shows `bgSurface1`; selected shows violet border; phase range shows if parsed.
+**Done when:** Active card pulses cyan (color only, width stays 3px); `t.blue` replaced with `t.runtime` for active status; failed shows `t.red` + `✗`; cards are focusable `role="button"`; hover shows `bgSurface1`; selected shows violet border; cost row appears when data exists; all animations respect `prefers-reduced-motion`.
 
 **Delivers stories:** S6
 
 **Details:**
 
-**`ConvRow` extension** (`types/index.ts`):
-```ts
-interface ConvRow {
-  // existing fields ...
-  phases?: string   // e.g. "1–3"
-}
-```
+> See **DESIGN.md §8** for all card layout values, color constants, and interaction patterns.
 
-**`parseProgressMd` update** (`usePlanConversations.ts`): parse phase range from the Conv breakdown table (e.g., `| 1 | 1, 2, 3 |` → `phases: "1–3"`). Add to returned `ConvRow`.
+**FIRST — replace `t.blue` with `t.runtime` for active status** (EC: designers flagged this as critical):
+In `statusBorderColor` and `statusBgColor`: active statuses (IN_PROGRESS/REVIEWING/BUILDING) → `t.runtime`. Leave `t.blue` ONLY in EventLog `eventType` labels.
 
-**Status determination**:
-- Active: `conv.status === 'IN_PROGRESS' || 'BUILDING' || 'REVIEWING'`
-- Failed: `conv.status === 'BLOCKED'`
-- Done: `conv.status === 'DONE'`
-
-**Cost per conv**: filter `events` (local state in PlanBoard) by `(e as EventEntry & { conversation?: number }).conversation === conv.num`. Sum `cost_usd`, `tokens_in`, `tokens_out` from `AGENT_DONE` entries. Confirm `conversation` field is present in EVENTS.jsonl (check one real file before implementing — if absent, omit cost row entirely rather than showing wrong data).
-
-**Active border pulse**: inject once via the same `styleInjectedRef` pattern as FsmView (avoid double-injection). Keyframes:
+**Pulsing border — color only, width always 3px** (EC-3.4):
 ```css
 @keyframes pathly-pulse-border {
   0%, 100% { border-left-color: #22D3EE; }
-  50% { border-left-color: transparent; }
+  50% { border-left-color: rgba(34,211,238,0.15); }
 }
 .pathly-pulse-border { animation: pathly-pulse-border 1.5s ease-in-out infinite; }
+/* 1.5s: status heartbeat — intentional */
+@media (prefers-reduced-motion: reduce) { .pathly-pulse-border { animation: none; } }
 ```
+Inject once via `styleInjectedRef`. Card always has `borderLeft: '3px solid <color>'` — width never changes.
 
-**Hover/selected**: manage `hoveredConv` and `selectedConv` state. On hover: `backgroundColor: t.bgSurface1`. On selected: `backgroundColor: t.bgSurface1` + violet left border (replace status border).
+**Card interactivity** (required):
+```tsx
+<div role="button" tabIndex={0} aria-pressed={selectedConv === conv.num}
+  onClick={() => setSelectedConv(conv.num)}
+  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedConv(conv.num) }}
+  style={{ cursor: 'pointer' }}
+>
+```
+Apply `t.focusRing` on `:focus-visible`.
+
+**Hover/selected**: `hoveredConv` + `selectedConv` local state. Hover: `backgroundColor: t.bgSurface1`. Selected: `backgroundColor: t.bgSurface1` + `borderLeft: 3px solid t.accent` (violet replaces status border).
+
+**Cost per conv**: check one real EVENTS.jsonl file first (EC-2.6). Filter by `e.conversation === conv.num`. If field absent, hide cost row entirely.
 
 **Card layout** (52px min-height):
 ```
-  [icon] Conv N · Phase name          [status badge]
+  [icon] Conv N · Phase title               [status badge]
          agents · Phase N–M · X ago
-         Xk in / Yk out · $Z          (if cost data)
+         Xk in / Yk out · $Z                (if cost data; fontFamilyMono 12px)
 ```
 
 **Verify:** `cd studio; npm run typecheck`
