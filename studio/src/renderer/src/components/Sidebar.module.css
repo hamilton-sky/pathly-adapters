@@ -69,30 +69,47 @@
 .treeContainer::-webkit-scrollbar-thumb { background: var(--bg-surface1); border-radius: 2px; }
 
 /* ── Section headers ── */
-.sectionHeader {
+.sectionRow {
   display: flex;
   align-items: center;
-  width: 100%;
+  padding: 0 6px 0 0;
+  position: relative;
+}
+
+.sectionToggle {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 8px 12px 5px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
+  padding: 6px 4px 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-align: left;
   gap: 4px;
   transition: color 0.12s;
+  font-family: var(--font-family-base);
 }
-.sectionHeader:hover { color: var(--text-secondary); }
-.sectionHeader:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
+.sectionToggle:hover { color: var(--text-secondary); }
+.sectionToggle:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
+
+.sectionActions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+.sectionRow:hover .sectionActions { opacity: 1; }
 
 .sectionSub {
   color: var(--text-muted);
   font-weight: 400;
-  text-transform: none;
   letter-spacing: 0;
   margin-left: 4px;
   font-size: 10px;
@@ -113,13 +130,14 @@
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 3px 12px 3px 22px;
-  font-size: 12px;
+  padding: 3px 8px 3px 22px;
+  font-size: 12.5px;
   text-align: left;
-  gap: 3px;
+  gap: 6px;
   transition: color 0.1s;
+  font-family: var(--font-family-base);
 }
-.subdirHeader:hover { color: var(--text-primary); }
+.subdirHeader:hover { background: var(--bg-surface0); color: var(--text-primary); }
 .subdirHeader:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
 /* ── Plan / conversation rows ── */
@@ -166,7 +184,7 @@
 
 /* Status badge colours */
 .statusDone    { color: var(--green); }
-.statusActive  { color: var(--blue); }
+.statusActive  { color: var(--accent); }
 .statusBlocked { color: var(--red); }
 .statusDefault { color: var(--text-muted); }
 
@@ -174,29 +192,26 @@
 .itemRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   width: 100%;
   background: none;
   border: none;
   border-left: 2px solid transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 3px 12px 3px 26px;
-  font-size: 12px;
+  padding: 3px 8px 3px 28px;
+  font-size: 12.5px;
   text-align: left;
-  transition: background var(--transition-base), color var(--transition-base), border-left-color var(--transition-base);
+  gap: 6px;
+  transition: background 0.1s, color 0.1s;
+  font-family: var(--font-family-base);
 }
-.itemRow:hover {
-  background: var(--bg-surface0);
-  color: var(--text-primary);
-}
+.itemRow:hover { background: var(--bg-surface0); color: var(--text-primary); }
 .itemRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
 .itemRowSelected {
-  background: var(--bg-surface1);
+  background: var(--bg-surface0);
   border-left-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-  transition: background var(--transition-base), color var(--transition-base), border-left-color var(--transition-base);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .itemRowDeep { padding-left: 44px; }
@@ -213,6 +228,26 @@
   flex-shrink: 0;
   margin-left: 4px;
   font-size: 8px;
+}
+
+/* ── Inline create row ── */
+.inlineCreateRow {
+  display: flex;
+  align-items: center;
+  padding: 2px 8px 2px 28px;
+  gap: 6px;
+}
+.inlineCreateIcon { color: var(--accent); flex-shrink: 0; }
+.inlineCreateInput {
+  flex: 1;
+  background: var(--bg-surface0);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-family-base);
+  padding: 2px 6px;
+  outline: none;
 }
 
 /* ── Dividers + bottom rows ── */

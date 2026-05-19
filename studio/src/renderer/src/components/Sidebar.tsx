@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { ChevronRight, ChevronDown, Plus, FolderPlus, GripVertical } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronRight, ChevronDown, Plus, FolderPlus, GripVertical, FolderOpen, Folder, FileText } from 'lucide-react'
 import { useStore } from '../store'
 import type { PathlyItem, PathlyItemType, PathlyCanvasDragItem, PathlyReorgDragItem } from '../types'
 import { PATHLY_DRAG_MIME } from '../types'
@@ -48,6 +48,33 @@ interface ContextMenuState {
   itemDir: string
 }
 
+function InlineFolderInput({ onConfirm, onCancel }: {
+  onConfirm: (name: string) => void
+  onCancel: () => void
+}): JSX.Element {
+  const [value, setValue] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { inputRef.current?.focus() }, [])
+  return (
+    <div className={styles.inlineCreateRow}>
+      <FolderOpen size={13} className={styles.inlineCreateIcon} />
+      <input
+        ref={inputRef}
+        className={styles.inlineCreateInput}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); onConfirm(value) }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel() }
+        }}
+        onBlur={() => onConfirm(value)}
+        placeholder="folder name"
+        spellCheck={false}
+      />
+    </div>
+  )
+}
+
 export function Sidebar(): JSX.Element {
   const {
     projectPath,
@@ -72,6 +99,11 @@ export function Sidebar(): JSX.Element {
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [dragOverPath, setDragOverPath] = useState<string | null>(null)
+  const [inlineCreate, setInlineCreate] = useState<{
+    sectionLabel: string
+    parentDir: string
+    type: 'folder'
+  } | null>(null)
 
   // Tracks whether the current drag was initiated from the canvas grip (⠿)
   const dragFromGripRef = useRef(false)
@@ -131,7 +163,7 @@ export function Sidebar(): JSX.Element {
     e.stopPropagation()
     const base = pathlyRoot || projectPath
     if (!base) return
-    void handleCreateFolder(`${base}/${section.dir}`)
+    setInlineCreate({ sectionLabel: section.label, parentDir: `${base}/${section.dir}`, type: 'folder' })
   }
 
   function handleSubdirCreateFile(section: Section, subdirName: string, e: React.MouseEvent<HTMLButtonElement>): void {
@@ -150,7 +182,7 @@ export function Sidebar(): JSX.Element {
     e.stopPropagation()
     const base = pathlyRoot || projectPath
     if (!base) return
-    void handleCreateFolder(`${base}/${section.dir}/${subdirName}`)
+    setInlineCreate({ sectionLabel: section.label, parentDir: `${base}/${section.dir}/${subdirName}`, type: 'folder' })
   }
 
   async function handleInlineCreatePlan(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
@@ -161,19 +193,6 @@ export function Sidebar(): JSX.Element {
     const trimmed = name.trim()
     await window.pathly.fs.write(`${projectPath}/pathly/plans/${trimmed}/STATE.json`, JSON.stringify({ current: 'INIT' }))
     await loadItems()
-  }
-
-  async function handleCreateFolder(baseDir: string): Promise<void> {
-    const name = window.prompt('Folder name:')
-    if (!name || !name.trim()) return
-    const trimmed = name.trim().replace(/[^a-zA-Z0-9_-]/g, '-')
-    if (!trimmed) return
-    try {
-      await window.pathly.fs.write(`${baseDir}/${trimmed}/.gitkeep`, '')
-      await loadItems()
-    } catch (err) {
-      console.error('Failed to create folder:', err)
-    }
   }
 
   function handleContextMenu(e: React.MouseEvent, item: PathlyItem, itemDir: string): void {
@@ -322,12 +341,14 @@ export function Sidebar(): JSX.Element {
             if (!hasMatch) return null
             return (
               <div key={section.label}>
-                <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
-                  <span className={styles.chevron}>
-                    {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                  </span>
-                  {section.label.toUpperCase()}
-                  <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
+                <div className={styles.sectionRow}>
+                  <button className={styles.sectionToggle} onClick={() => toggleSection(section.label)}>
+                    <span className={styles.chevron}>
+                      {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                    </span>
+                    {section.label}
+                  </button>
+                  <div className={styles.sectionActions}>
                     <IconButton
                       onClick={(e) => { void handleInlineCreate(section, e) }}
                       title={`New ${section.label.slice(0, -1).toLowerCase()}`}
@@ -341,9 +362,22 @@ export function Sidebar(): JSX.Element {
                       <FolderPlus size={12} />
                     </IconButton>
                   </div>
-                </button>
+                </div>
                 {state.open && (
                   <div>
+                    {inlineCreate?.sectionLabel === section.label && (
+                      <InlineFolderInput
+                        onConfirm={async (name) => {
+                          if (name.trim()) {
+                            const clean = name.trim().replace(/[^a-zA-Z0-9_-]/g, '-')
+                            await window.pathly.fs.write(`${inlineCreate.parentDir}/${clean}/.gitkeep`, '')
+                            await loadItems()
+                          }
+                          setInlineCreate(null)
+                        }}
+                        onCancel={() => setInlineCreate(null)}
+                      />
+                    )}
                     {subdirs.map((subdir, idx) => {
                       const base = pathlyRoot || projectPath || ''
                       const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
@@ -354,6 +388,7 @@ export function Sidebar(): JSX.Element {
                             <span className={styles.chevron}>
                               {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                             </span>
+                            <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                             <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
                             <div style={{ display: 'flex', gap: 2 }} onClick={(e) => e.stopPropagation()}>
                               <IconButton onClick={(e) => handleSubdirCreateFile(section, subdir.name, e)} title={`New file in ${subdir.name}`}>
@@ -378,6 +413,7 @@ export function Sidebar(): JSX.Element {
                                 onDragStart={(e) => handleItemDragStart(e, item, section)}
                                 title={item.path}
                               >
+                                <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                                 <span className={styles.itemName}>{item.name}</span>
                                 {isDirty && <span className={styles.dirtyDot}>●</span>}
                               </button>
@@ -398,12 +434,14 @@ export function Sidebar(): JSX.Element {
           if (filter && filtered.length === 0 && !hasSubdirMatch) return null
           return (
             <div key={section.label}>
-              <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
-                <span className={styles.chevron}>
-                  {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                </span>
-                {section.label.toUpperCase()}
-                <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
+              <div className={styles.sectionRow}>
+                <button className={styles.sectionToggle} onClick={() => toggleSection(section.label)}>
+                  <span className={styles.chevron}>
+                    {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                  </span>
+                  {section.label}
+                </button>
+                <div className={styles.sectionActions}>
                   <IconButton
                     onClick={(e) => { void handleInlineCreate(section, e) }}
                     title={`New ${section.label.slice(0, -1).toLowerCase()}`}
@@ -417,9 +455,22 @@ export function Sidebar(): JSX.Element {
                     <FolderPlus size={12} />
                   </IconButton>
                 </div>
-              </button>
+              </div>
               {state.open && (
                 <div>
+                  {inlineCreate?.sectionLabel === section.label && (
+                    <InlineFolderInput
+                      onConfirm={async (name) => {
+                        if (name.trim()) {
+                          const clean = name.trim().replace(/[^a-zA-Z0-9_-]/g, '-')
+                          await window.pathly.fs.write(`${inlineCreate.parentDir}/${clean}/.gitkeep`, '')
+                          await loadItems()
+                        }
+                        setInlineCreate(null)
+                      }}
+                      onCancel={() => setInlineCreate(null)}
+                    />
+                  )}
                   {subdirs.map((subdir, idx) => {
                     const base = pathlyRoot || projectPath || ''
                     const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
@@ -438,6 +489,7 @@ export function Sidebar(): JSX.Element {
                           <span className={styles.chevron}>
                             {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                           </span>
+                          <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                           <span style={{ flex: 1, textAlign: 'left' }}>{subdir.name}/</span>
                           <div style={{ display: 'flex', gap: 2 }} onClick={(e) => e.stopPropagation()}>
                             <IconButton onClick={(e) => handleSubdirCreateFile(section, subdir.name, e)} title={`New file in ${subdir.name}`}>
@@ -472,6 +524,7 @@ export function Sidebar(): JSX.Element {
                                   <GripVertical size={12} />
                                 </span>
                               )}
+                              <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                               <span className={styles.itemName}>{item.name}</span>
                               {isDirty && <span className={styles.dirtyDot}>●</span>}
                             </button>
@@ -504,6 +557,7 @@ export function Sidebar(): JSX.Element {
                             <GripVertical size={12} />
                           </span>
                         )}
+                        <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                         <span className={styles.itemName}>{item.name}</span>
                         {isDirty && <span className={styles.dirtyDot}>●</span>}
                       </button>
@@ -521,20 +575,23 @@ export function Sidebar(): JSX.Element {
             <Separator label="Workspace" />
 
             {/* Plan section */}
-            <button className={styles.sectionHeader} onClick={() => setPlanOpen((v) => !v)}>
-              <span className={styles.chevron}>
-                {planOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-              </span>
-              PLAN
-              <span className={styles.sectionSub}>[{activeTopic ?? 'no topic'}]</span>
-              <IconButton
-                style={{ marginLeft: 'auto' }}
-                onClick={(e) => { void handleInlineCreatePlan(e) }}
-                title="New plan"
-              >
-                <Plus size={12} />
-              </IconButton>
-            </button>
+            <div className={styles.sectionRow}>
+              <button className={styles.sectionToggle} onClick={() => setPlanOpen((v) => !v)}>
+                <span className={styles.chevron}>
+                  {planOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                </span>
+                Plan
+                <span className={styles.sectionSub}>[{activeTopic ?? 'no topic'}]</span>
+              </button>
+              <div className={styles.sectionActions}>
+                <IconButton
+                  onClick={(e) => { void handleInlineCreatePlan(e) }}
+                  title="New plan"
+                >
+                  <Plus size={12} />
+                </IconButton>
+              </div>
+            </div>
             {planOpen && (
               <div>
                 {planConvs.length === 0 ? (
@@ -564,19 +621,22 @@ export function Sidebar(): JSX.Element {
               if (!hasMatch) return null
               return (
                 <div key={section.label}>
-                  <button className={styles.sectionHeader} onClick={() => toggleSection(section.label)}>
-                    <span className={styles.chevron}>
-                      {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                    </span>
-                    {section.label.toUpperCase()}
-                    <IconButton
-                      style={{ marginLeft: 'auto' }}
-                      onClick={(e) => { void handleInlineCreate(section, e) }}
-                      title={`New ${section.label.slice(0, -1).toLowerCase()}`}
-                    >
-                      <Plus size={12} />
-                    </IconButton>
-                  </button>
+                  <div className={styles.sectionRow}>
+                    <button className={styles.sectionToggle} onClick={() => toggleSection(section.label)}>
+                      <span className={styles.chevron}>
+                        {state.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                      </span>
+                      {section.label}
+                    </button>
+                    <div className={styles.sectionActions}>
+                      <IconButton
+                        onClick={(e) => { void handleInlineCreate(section, e) }}
+                        title={`New ${section.label.slice(0, -1).toLowerCase()}`}
+                      >
+                        <Plus size={12} />
+                      </IconButton>
+                    </div>
+                  </div>
                   {state.open && (
                     <div>
                       {subdirs.map((subdir, idx) => {
@@ -588,6 +648,7 @@ export function Sidebar(): JSX.Element {
                               <span className={styles.chevron}>
                                 {subdir.open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                               </span>
+                              <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                               {subdir.name}/
                             </button>
                             {subdir.open && filteredFiles.map((item) => {
@@ -602,6 +663,7 @@ export function Sidebar(): JSX.Element {
                                   onContextMenu={(e) => handleContextMenu(e, item, itemDir)}
                                   title={item.path}
                                 >
+                                  <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                                   <span className={styles.itemName}>{item.name}</span>
                                   {isDirty && <span className={styles.dirtyDot}>●</span>}
                                 </button>

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useTheme } from '../../useTheme'
+import { Tooltip } from './Tooltip'
 import styles from './ui.module.css'
 
 interface IconButtonProps {
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
   title: string
+  shortcut?: string
   children: React.ReactNode
   disabled?: boolean
   style?: React.CSSProperties
@@ -13,6 +15,7 @@ interface IconButtonProps {
 export function IconButton({
   onClick,
   title,
+  shortcut,
   children,
   disabled = false,
   style,
@@ -39,16 +42,18 @@ export function IconButton({
   }
 
   return (
-    <button
-      className={`pathly-btn ${styles.focusVisible}`}
-      style={baseStyle}
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {children}
-    </button>
+    <Tooltip label={title} shortcut={shortcut}>
+      <button
+        className={`pathly-btn ${styles.focusVisible}`}
+        style={baseStyle}
+        disabled={disabled}
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        aria-label={title}
+      >
+        {children}
+      </button>
+    </Tooltip>
   )
 }

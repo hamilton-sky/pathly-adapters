@@ -1,4 +1,5 @@
 import type { Theme } from '../../../theme'
+import { Tooltip } from '../../ui'
 import { makePanelStyles } from './panelStyles'
 
 interface PanelHeaderProps {
@@ -12,7 +13,9 @@ export function PanelHeader({ title, onClose, t }: PanelHeaderProps): JSX.Elemen
   return (
     <div style={panelStyles.header}>
       <span style={panelStyles.title}>{title}</span>
-      <button style={panelStyles.closeBtn} onClick={onClose}>x</button>
+      <Tooltip label="Close panel" shortcut="Esc" placement="left">
+        <button style={panelStyles.closeBtn} onClick={onClose} aria-label="Close panel">×</button>
+      </Tooltip>
     </div>
   )
 }

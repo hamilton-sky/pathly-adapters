@@ -1,5 +1,6 @@
 export { Button } from './Button'
 export { IconButton } from './IconButton'
+export { Tooltip } from './Tooltip'
 export { Input } from './Input'
 export { Badge } from './Badge'
 export { Separator } from './Separator'

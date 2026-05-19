@@ -18,6 +18,7 @@ import { applyDagreLayout } from '../utils/autoLayout'
 import { useProjectFiles } from '../../../hooks/useProjectFiles'
 import { useStore } from '../../../store'
 import { writeFile } from '../../../services/pathlyApi'
+import { Tooltip } from '../../ui'
 
 interface Props {
   data: FlowYaml
@@ -358,33 +359,38 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
     <div style={styles.wrapper}>
       <div style={styles.toolbar}>
         {/* Layout / authoring controls */}
-        <button style={styles.saveBtn} onClick={onSave}>
-          Save
-        </button>
-        <button
-          style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}`, marginLeft: 8 }}
-          onClick={() => {
-            const d = dataRef.current
-            const newId = generateUniqueStateId('STATE', d.states)
-            const updated: FlowYaml = { ...d, states: [...d.states, newId], transitions: { ...d.transitions } }
-            onChange(updated)
-          }}
-        >
-          + Add state
-        </button>
-        <button
-          style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}`, marginLeft: 8 }}
-          title="Auto-arrange nodes into a clean left-to-right layout"
-          onClick={() => {
-            setNodes((nds) => {
-              const laid = applyDagreLayout(nds, edges)
-              setTimeout(() => fitView({ duration: 300, padding: 0.15 }), 50)
-              return laid
-            })
-          }}
-        >
-          Auto-layout
-        </button>
+        <Tooltip label="Save flow YAML" shortcut="Ctrl+S" placement="bottom">
+          <button style={styles.saveBtn} onClick={onSave}>
+            Save
+          </button>
+        </Tooltip>
+        <Tooltip label="Add a new state node" placement="bottom">
+          <button
+            style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}`, marginLeft: 8 }}
+            onClick={() => {
+              const d = dataRef.current
+              const newId = generateUniqueStateId('STATE', d.states)
+              const updated: FlowYaml = { ...d, states: [...d.states, newId], transitions: { ...d.transitions } }
+              onChange(updated)
+            }}
+          >
+            + Add state
+          </button>
+        </Tooltip>
+        <Tooltip label="Auto-arrange nodes left-to-right" placement="bottom">
+          <button
+            style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}`, marginLeft: 8 }}
+            onClick={() => {
+              setNodes((nds) => {
+                const laid = applyDagreLayout(nds, edges)
+                setTimeout(() => fitView({ duration: 300, padding: 0.15 }), 50)
+                return laid
+              })
+            }}
+          >
+            Auto-layout
+          </button>
+        </Tooltip>
 
         {/* Divider between layout and export controls */}
         <div style={{ width: 1, height: 20, background: t.bgSurface1, margin: '0 12px', alignSelf: 'center' }} />
@@ -407,20 +413,24 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
             <option key={k} value={k}>{EXPORT_TARGET_LABELS[k]}</option>
           ))}
         </select>
-        <button
-          style={{
-            ...styles.saveBtn,
-            background: hasExportErrors ? t.bgSurface1 : '#8B5CF6',
-            color: hasExportErrors ? t.textMuted : '#fff',
-            cursor: hasExportErrors ? 'not-allowed' : 'pointer',
-            marginLeft: 8,
-          }}
-          onClick={handleExportClick}
-          disabled={hasExportErrors}
-          title={hasExportErrors ? 'Fix validation errors before exporting' : 'Export flow'}
+        <Tooltip
+          label={hasExportErrors ? 'Fix validation errors before exporting' : 'Export flow to YAML'}
+          placement="bottom"
         >
-          Export
-        </button>
+          <button
+            style={{
+              ...styles.saveBtn,
+              background: hasExportErrors ? t.bgSurface1 : t.accent,
+              color: hasExportErrors ? t.textMuted : t.bgBase,
+              cursor: hasExportErrors ? 'not-allowed' : 'pointer',
+              marginLeft: 8,
+            }}
+            onClick={handleExportClick}
+            disabled={hasExportErrors}
+          >
+            Export
+          </button>
+        </Tooltip>
       </div>
 
       {/* Last exported hint */}

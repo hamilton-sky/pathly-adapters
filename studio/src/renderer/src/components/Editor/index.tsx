@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import { readFile, writeFile } from '../../services/pathlyApi'
 import type { FrontmatterValues } from '../../types'
+import { Tooltip } from '../ui'
 import { ConfigForm } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
@@ -143,30 +144,43 @@ export function Editor(): JSX.Element {
       {/* Toolbar — always at top, matches UX diagram */}
       <div className={styles.toolbar}>
         <div className={styles.tabs}>
-          {tabs.map((t_) => (
-            <button
-              key={t_}
-              className={tab === t_ ? styles.tabActive : styles.tab}
-              onClick={() => setTab(t_)}
-            >
-              {t_ === 'split' ? '⊟ Split' : t_.charAt(0).toUpperCase() + t_.slice(1)}
-            </button>
-          ))}
+          {tabs.map((t_) => {
+            const tabLabels: Record<TabMode, { label: string; shortcut?: string }> = {
+              edit:    { label: 'Edit source' },
+              preview: { label: 'Preview markdown' },
+              split:   { label: 'Side-by-side view' },
+            }
+            const { label, shortcut } = tabLabels[t_]
+            return (
+              <Tooltip key={t_} label={label} shortcut={shortcut} placement="bottom">
+                <button
+                  className={tab === t_ ? styles.tabActive : styles.tab}
+                  onClick={() => setTab(t_)}
+                >
+                  {t_ === 'split' ? '⊟ Split' : t_.charAt(0).toUpperCase() + t_.slice(1)}
+                </button>
+              </Tooltip>
+            )
+          })}
         </div>
         <span className={styles.breadcrumb}>{breadcrumb}</span>
         <div className={styles.actions}>
           {saveError && <span className={styles.error}>{saveError}</span>}
           {isPreviewDefault && tab === 'preview' && (
-            <button className={styles.tab} onClick={() => setTab('edit')}>
-              Edit source
-            </button>
+            <Tooltip label="Edit raw source" placement="bottom">
+              <button className={styles.tab} onClick={() => setTab('edit')}>
+                Edit source
+              </button>
+            </Tooltip>
           )}
-          <button
-            className={`${styles.saveBtn} ${isDirty ? '' : styles.saveBtnClean}`}
-            onClick={() => void performSave(body, config)}
-          >
-            {isDirty ? 'Save ●' : 'Saved'}
-          </button>
+          <Tooltip label="Save file" shortcut="Ctrl+S" placement="bottom">
+            <button
+              className={`${styles.saveBtn} ${isDirty ? '' : styles.saveBtnClean}`}
+              onClick={() => void performSave(body, config)}
+            >
+              {isDirty ? 'Save ●' : 'Saved'}
+            </button>
+          </Tooltip>
         </div>
       </div>
 

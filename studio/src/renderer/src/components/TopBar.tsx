@@ -3,7 +3,7 @@ import { Terminal, X, Moon, Sun } from 'lucide-react'
 import { useStore } from '../store'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
-import { IconButton } from './ui'
+import { IconButton, Tooltip } from './ui'
 import styles from './TopBar.module.css'
 
 export function TopBar(): JSX.Element {
@@ -83,7 +83,9 @@ export function TopBar(): JSX.Element {
   return (
     <>
       <div className={styles.bar}>
-        <button className={styles.backBtn} onClick={() => setProjectPath('')}>← Projects</button>
+        <Tooltip label="Back to projects" placement="bottom">
+          <button className={styles.backBtn} onClick={() => setProjectPath('')}>← Projects</button>
+        </Tooltip>
 
         <span className={styles.brand}>Pathly Studio</span>
 
@@ -107,27 +109,30 @@ export function TopBar(): JSX.Element {
             {archivedTopics.map((t) => <option key={t} value={`.archive/${t}`}>{t}</option>)}
           </select>
           <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexShrink: 0 }}>
-            <button
-              className={`${styles.navBtn} ${activePanel === 'flow' ? styles.navBtnActive : ''}`}
-              onClick={() => setActivePanel('flow')}
-              title="Open flow canvas"
-            >
-              ⊞ Canvas
-            </button>
-            <button
-              className={`${styles.navBtn} ${activePanel === 'plan' ? styles.navBtnActive : ''}`}
-              onClick={() => setActivePanel('plan')}
-              title="Open plan board"
-            >
-              ☰ Plan
-            </button>
-            <button
-              className={`${styles.navBtn} ${activePanel === 'monitor' ? styles.navBtnActive : ''}`}
-              onClick={() => setActivePanel('monitor')}
-              title="Open monitor"
-            >
-              ⬡ Monitor
-            </button>
+            <Tooltip label="Flow canvas" shortcut="Ctrl+1" placement="bottom">
+              <button
+                className={`${styles.navBtn} ${activePanel === 'flow' ? styles.navBtnActive : ''}`}
+                onClick={() => setActivePanel('flow')}
+              >
+                ⊞ Canvas
+              </button>
+            </Tooltip>
+            <Tooltip label="Plan board" shortcut="Ctrl+2" placement="bottom">
+              <button
+                className={`${styles.navBtn} ${activePanel === 'plan' ? styles.navBtnActive : ''}`}
+                onClick={() => setActivePanel('plan')}
+              >
+                ☰ Plan
+              </button>
+            </Tooltip>
+            <Tooltip label="Live monitor" shortcut="Ctrl+3" placement="bottom">
+              <button
+                className={`${styles.navBtn} ${activePanel === 'monitor' ? styles.navBtnActive : ''}`}
+                onClick={() => setActivePanel('monitor')}
+              >
+                ⬡ Monitor
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -139,12 +144,14 @@ export function TopBar(): JSX.Element {
           >
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </IconButton>
-          <IconButton onClick={() => toggleTerminal()} title="Toggle terminal (Ctrl+`)">
+          <IconButton onClick={() => toggleTerminal()} title="Toggle terminal" shortcut="Ctrl+`">
             <Terminal size={14} />
           </IconButton>
-          <button className={styles.publishBtn} onClick={() => void handlePublish()} disabled={publishing}>
-            {publishing ? '…' : '↑ Publish'}
-          </button>
+          <Tooltip label="Push hooks to server" placement="bottom">
+            <button className={styles.publishBtn} onClick={() => void handlePublish()} disabled={publishing}>
+              {publishing ? '…' : '↑ Publish'}
+            </button>
+          </Tooltip>
         </div>
       </div>
 
