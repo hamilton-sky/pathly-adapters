@@ -142,11 +142,11 @@
   --text-muted:     #657b83;
 
   --accent:  #268bd2;
-  --blue:    #268bd2;
+  --blue:    #2aa198;
   --green:   #859900;
   --red:     #dc322f;
   --yellow:  #b58900;
-  --runtime: #2aa198;
+  --runtime: #6c71c4;
 
   --focus-ring:    2px solid #268bd2;
   --border:        1px solid #586e75;
@@ -169,7 +169,7 @@
   --bg-terminal: #1a1b23;
 
   --text-primary:   #f8f8f2;
-  --text-secondary: #d6d6d6;
+  --text-secondary: #b0b2c8;
   --text-muted:     #6272a4;
 
   --accent:  #bd93f9;
@@ -181,7 +181,7 @@
 
   --focus-ring:    2px solid #bd93f9;
   --border:        1px solid #44475a;
-  --border-subtle: 1px solid #44475a;
+  --border-subtle: 1px solid #383a4a;
 
   --accent-bg:       rgba(189, 147, 249, 0.13);
   --accent-bg-hover: rgba(189, 147, 249, 0.80);
@@ -205,10 +205,10 @@
 
   --accent:  #c4a7e7;
   --blue:    #9ccfd8;
-  --green:   #31748f;
+  --green:   #56a37a;
   --red:     #eb6f92;
   --yellow:  #f6c177;
-  --runtime: #9ccfd8;
+  --runtime: #ebbcba;
 
   --focus-ring:    2px solid #c4a7e7;
   --border:        1px solid #403d52;
@@ -231,15 +231,15 @@
   --bg-terminal: #f5efdc;
 
   --text-primary:   #002b36;
-  --text-secondary: #073642;
+  --text-secondary: #3a6270;
   --text-muted:     #93a1a1;
 
   --accent:  #268bd2;
-  --blue:    #268bd2;
+  --blue:    #2aa198;
   --green:   #859900;
   --red:     #dc322f;
   --yellow:  #b58900;
-  --runtime: #2aa198;
+  --runtime: #6c71c4;
 
   --focus-ring:    2px solid #268bd2;
   --border:        1px solid #cbc4b0;
@@ -318,9 +318,9 @@
 /* ─── Rosé Pine Dawn ────────────────────────────────────────── */
 [data-theme="rose-pine-dawn"] {
   --bg-base:     #faf4ed;
-  --bg-mantle:   #fffaf3;
-  --bg-surface0: #f2e9de;
-  --bg-surface1: #e4dfda;
+  --bg-mantle:   #f4ede6;
+  --bg-surface0: #ebe3d9;
+  --bg-surface1: #dfd9ce;
   --bg-terminal: #f0e8d8;
 
   --text-primary:   #575279;
@@ -330,20 +330,20 @@
   --accent:  #b4637a;
   --blue:    #56949f;
   --green:   #286983;
-  --red:     #b4637a;
+  --red:     #c0334a;
   --yellow:  #ea9d34;
-  --runtime: #56949f;
+  --runtime: #907aa9;
 
   --focus-ring:    2px solid #b4637a;
-  --border:        1px solid #e4dfda;
-  --border-subtle: 1px solid #f2e9de;
+  --border:        1px solid #dfd9ce;
+  --border-subtle: 1px solid #ebe3d9;
 
   --accent-bg:       rgba(180, 99, 122, 0.13);
   --accent-bg-hover: rgba(180, 99, 122, 0.80);
   --accent-border:   rgba(180, 99, 122, 0.40);
-  --red-bg:          rgba(180, 99, 122, 0.13);
-  --red-bg-hover:    rgba(180, 99, 122, 0.80);
-  --red-border:      rgba(180, 99, 122, 0.40);
+  --red-bg:          rgba(192, 51, 74, 0.13);
+  --red-bg-hover:    rgba(192, 51, 74, 0.80);
+  --red-border:      rgba(192, 51, 74, 0.40);
 }
 
 /* ─── Mint ──────────────────────────────────────────────────── */
@@ -358,20 +358,20 @@
   --text-secondary: #2d5040;
   --text-muted:     #7aaa8e;
 
-  --accent:  #0f7d52;
+  --accent:  #0891b2;
   --blue:    #1a6fa0;
   --green:   #0f7d52;
   --red:     #c0392b;
   --yellow:  #c07a00;
-  --runtime: #0891b2;
+  --runtime: #6366a8;
 
-  --focus-ring:    2px solid #0f7d52;
+  --focus-ring:    2px solid #0891b2;
   --border:        1px solid #bde0cc;
   --border-subtle: 1px solid #d4ede0;
 
-  --accent-bg:       rgba(15, 125, 82, 0.13);
-  --accent-bg-hover: rgba(15, 125, 82, 0.80);
-  --accent-border:   rgba(15, 125, 82, 0.40);
+  --accent-bg:       rgba(8, 145, 178, 0.13);
+  --accent-bg-hover: rgba(8, 145, 178, 0.80);
+  --accent-border:   rgba(8, 145, 178, 0.40);
   --red-bg:          rgba(192, 57, 43, 0.13);
   --red-bg-hover:    rgba(192, 57, 43, 0.80);
   --red-border:      rgba(192, 57, 43, 0.40);

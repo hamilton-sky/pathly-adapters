@@ -148,11 +148,11 @@ export const solarizedTheme: Theme = {
   textSecondary: '#eee8d5',
   textMuted: '#657b83',
   accent: '#268bd2',
-  blue: '#268bd2',
+  blue: '#2aa198',   // cyan — distinct from accent
   green: '#859900',
   red: '#dc322f',
   yellow: '#b58900',
-  runtime: '#2aa198',
+  runtime: '#6c71c4', // violet — distinct from cyan and blue
   fontFamilyBase: fontBase,
   fontFamilyMono: fontMono,
   fontSizeBase: fontSizes.base,
@@ -171,7 +171,7 @@ export const draculaTheme: Theme = {
   bgSurface1: '#6272a4',
   bgTerminal: '#1a1b23',
   textPrimary: '#f8f8f2',
-  textSecondary: '#d6d6d6',
+  textSecondary: '#b0b2c8', // lighter than textMuted #6272a4 — distinct hierarchy
   textMuted: '#6272a4',
   accent: '#bd93f9',
   blue: '#8be9fd',
@@ -186,7 +186,7 @@ export const draculaTheme: Theme = {
   fontSizeLg: fontSizes.lg,
   focusRing: '2px solid #bd93f9',
   border: '1px solid #44475a',
-  borderSubtle: '1px solid #44475a',
+  borderSubtle: '1px solid #383a4a', // darker than border — visually subtle
   transitionBase: transition,
 }
 
@@ -201,10 +201,10 @@ export const rosePineTheme: Theme = {
   textMuted: '#6e6a86',
   accent: '#c4a7e7',
   blue: '#9ccfd8',
-  green: '#31748f',
+  green: '#56a37a',  // brighter pine-green — legible on dark bg
   red: '#eb6f92',
   yellow: '#f6c177',
-  runtime: '#9ccfd8',
+  runtime: '#ebbcba', // rose — warm, distinct from foam blue
   fontFamilyBase: fontBase,
   fontFamilyMono: fontMono,
   fontSizeBase: fontSizes.base,
@@ -223,14 +223,14 @@ export const solarizedLightTheme: Theme = {
   bgSurface1: '#cbc4b0',
   bgTerminal: '#f5efdc',
   textPrimary: '#002b36',
-  textSecondary: '#073642',
+  textSecondary: '#3a6270', // lighter than textPrimary — distinct hierarchy
   textMuted: '#93a1a1',
   accent: '#268bd2',
-  blue: '#268bd2',
+  blue: '#2aa198',   // cyan — distinct from accent
   green: '#859900',
   red: '#dc322f',
   yellow: '#b58900',
-  runtime: '#2aa198',
+  runtime: '#6c71c4', // violet — distinct from cyan and blue
   fontFamilyBase: fontBase,
   fontFamilyMono: fontMono,
   fontSizeBase: fontSizes.base,
@@ -296,9 +296,9 @@ export const paperTheme: Theme = {
 
 export const rosePineDawnTheme: Theme = {
   bgBase: '#faf4ed',
-  bgMantle: '#fffaf3',
-  bgSurface0: '#f2e9de',
-  bgSurface1: '#e4dfda',
+  bgMantle: '#f4ede6',  // darker than bgBase — correct direction
+  bgSurface0: '#ebe3d9',
+  bgSurface1: '#dfd9ce',
   bgTerminal: '#f0e8d8',
   textPrimary: '#575279',
   textSecondary: '#6b6496',
@@ -306,9 +306,9 @@ export const rosePineDawnTheme: Theme = {
   accent: '#b4637a',
   blue: '#56949f',
   green: '#286983',
-  red: '#b4637a',
+  red: '#c0334a',    // deeper red — clearly alarming, distinct from accent
   yellow: '#ea9d34',
-  runtime: '#56949f',
+  runtime: '#907aa9', // plum — distinct from blue foam and accent rose
   fontFamilyBase: fontBase,
   fontFamilyMono: fontMono,
   fontSizeBase: fontSizes.base,
@@ -329,18 +329,18 @@ export const mintTheme: Theme = {
   textPrimary: '#1a3028',
   textSecondary: '#2d5040',
   textMuted: '#7aaa8e',
-  accent: '#0f7d52',
+  accent: '#0891b2',  // teal/cyan — distinct from green
   blue: '#1a6fa0',
   green: '#0f7d52',
   red: '#c0392b',
   yellow: '#c07a00',
-  runtime: '#0891b2',
+  runtime: '#6366a8', // muted indigo — distinct from teal accent and blue
   fontFamilyBase: fontBase,
   fontFamilyMono: fontMono,
   fontSizeBase: fontSizes.base,
   fontSizeSm: fontSizes.sm,
   fontSizeLg: fontSizes.lg,
-  focusRing: '2px solid #0f7d52',
+  focusRing: '2px solid #0891b2', // matches new accent
   border: '1px solid #bde0cc',
   borderSubtle: '1px solid #d4ede0',
   transitionBase: transition,
