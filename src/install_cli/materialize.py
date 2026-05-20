@@ -17,7 +17,8 @@ def _load_manifest(dest: Path) -> dict:
         try:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
             if "_manifest_version" not in data:
-                raise ValueError("Manifest missing _manifest_version field")
+                # Legacy manifest from an older install — treat as fresh.
+                return {"files": {}}
             files = data.get("files", {})
             if data.get("_manifest_hash", "") != _hash_files_dict(files):
                 raise ValueError("Manifest hash mismatch — file may be corrupted or tampered")
