@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { FileText, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useUiStore } from '../../store/uiStore'
 import type { PathlyItem } from '../../types'
 import { RenameInput } from './RenameInput'
+import { ContextMenu } from './ContextMenu'
 import styles from './Sidebar.module.css'
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
   onRenameCancel: () => void
   onStartRename?: () => void
   onStartDelete?: () => void
+  sidebarWidth?: number
 }
 
 export function WorkspaceItem({
@@ -34,25 +36,15 @@ export function WorkspaceItem({
   onRenameCancel,
   onStartRename,
   onStartDelete,
+  sidebarWidth,
 }: Props): JSX.Element {
   const { userLockedPaths, toggleUserLock } = useUiStore()
   const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const rowRef = useRef<HTMLDivElement>(null)
 
   const isUserLocked = userLockedPaths.has(item.path)
   // "actionable" = parent supplied at least one handler (not a system-protected file)
   const isActionable = Boolean(onStartRename ?? onStartDelete)
-
-  useEffect(() => {
-    if (!menuOpen) return
-    function onOutside(e: MouseEvent): void {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onOutside)
-    return () => document.removeEventListener('mousedown', onOutside)
-  }, [menuOpen])
 
   const cls = [
     styles.itemRow,
@@ -67,6 +59,7 @@ export function WorkspaceItem({
 
   return (
     <div
+      ref={rowRef}
       className={cls}
       onClick={() => { if (renamingPath !== item.path) onSelect() }}
       tabIndex={0}
@@ -111,35 +104,30 @@ export function WorkspaceItem({
                 <MoreHorizontal size={13} />
               </button>
 
-              {menuOpen && (
-                <div className={styles.itemMenu} ref={menuRef}>
+              {menuOpen && rowRef.current && (
+                <ContextMenu
+                  anchor={rowRef.current.getBoundingClientRect()}
+                  sidebarWidth={sidebarWidth ?? parseInt(localStorage.getItem('sidebar-width') ?? '240', 10)}
+                  onClose={() => setMenuOpen(false)}
+                >
                   {onStartRename && (
-                    <button
-                      className={styles.itemMenuItem}
-                      onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartRename) }}
-                    >
+                    <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartRename) }}>
                       <Pencil size={12} />
                       Rename
                     </button>
                   )}
                   {onStartDelete && (
-                    <button
-                      className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`}
-                      onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartDelete) }}
-                    >
+                    <button className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartDelete) }}>
                       <Trash2 size={12} />
                       Delete
                     </button>
                   )}
                   <div className={styles.itemMenuSep} />
-                  <button
-                    className={styles.itemMenuItem}
-                    onClick={(e) => { e.stopPropagation(); toggleUserLock(item.path); setMenuOpen(false) }}
-                  >
+                  <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); toggleUserLock(item.path); setMenuOpen(false) }}>
                     <Lock size={12} />
                     Lock file
                   </button>
-                </div>
+                </ContextMenu>
               )}
             </div>
           )}
