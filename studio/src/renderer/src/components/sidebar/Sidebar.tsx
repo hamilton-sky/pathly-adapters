@@ -256,6 +256,26 @@ export function Sidebar(): JSX.Element | null {
     await loadItems()
   }
 
+  async function handleDeleteCustomSection(sectionDir: string): Promise<void> {
+    if (!projectPath) return
+    const sectionPath = `${projectPath}/${sectionDir}`
+    try {
+      const items = await window.pathly.fs.list(sectionPath).catch(() => [] as string[])
+      for (const item of items) {
+        const itemPath = `${sectionPath}/${item}`
+        const subItems = await window.pathly.fs.list(itemPath).catch(() => [] as string[])
+        for (const sub of subItems) {
+          await window.pathly.fs.delete(`${itemPath}/${sub}`).catch(() => {})
+        }
+        await window.pathly.fs.delete(itemPath).catch(() => {})
+      }
+      await window.pathly.fs.delete(sectionPath).catch(() => {})
+    } catch (err) {
+      console.error('Delete section failed:', err)
+    }
+    await loadItems()
+  }
+
   async function handleDeletePlanFolder(folderPath: string): Promise<void> {
     try {
       const files = await window.pathly.fs.list(folderPath).catch(() => [] as string[])
@@ -467,6 +487,7 @@ export function Sidebar(): JSX.Element | null {
             onDeleteFolder={(folderPath) => { void handleDeleteFolder(folderPath) }}
             onMoveFolder={(src, tgt) => { void handleMoveFolder(src, tgt) }}
             onDeletePlanFolder={(folderPath) => { void handleDeletePlanFolder(folderPath) }}
+            onDeleteCustomSection={(dir) => { void handleDeleteCustomSection(dir) }}
             customWorkspaceSections={customWorkspaceSections}
           />
         )}
