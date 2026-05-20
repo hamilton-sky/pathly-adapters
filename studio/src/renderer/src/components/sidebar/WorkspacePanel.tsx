@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Plus, FolderPlus } from 'lucide-react'
 import type { PathlyItem, SectionState } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton, Separator } from '../ui'
@@ -28,6 +28,7 @@ interface Props {
   onActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
   onWorkspaceCreate: (section: Section, e: React.MouseEvent<HTMLButtonElement>) => void
   onInlineCreate: (section: Section, e: React.MouseEvent<HTMLButtonElement>) => void
+  onInlineCreateFolder: (section: Section, e: React.MouseEvent<HTMLButtonElement>) => void
   onNewPlan: (e: React.MouseEvent<HTMLButtonElement>) => void
   onRenameChange: (v: string) => void
   onRenameCommit: (item: PathlyItem, itemDir: string) => void
@@ -46,7 +47,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
     filter, lowerFilter, activeTopic, planFolders,
     renamingPath, renameValue,
     onSelect, onToggleSection, onToggleSubdir, onActivePanel,
-    onWorkspaceCreate, onInlineCreate, onNewPlan,
+    onWorkspaceCreate, onInlineCreate, onInlineCreateFolder, onNewPlan,
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
@@ -71,6 +72,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
               label={section.label}
               open={state.open}
               onToggle={() => onToggleSection(section.label)}
+              actionsLeft={
+                <IconButton
+                  onClick={(e) => onInlineCreateFolder(section, e)}
+                  title="New folder"
+                >
+                  <FolderPlus size={12} />
+                </IconButton>
+              }
               actions={
                 <IconButton
                   onClick={(e) => onWorkspaceCreate(section, e)}
@@ -178,6 +187,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
               label={section.label}
               open={state.open}
               onToggle={() => onToggleSection(section.label)}
+              actionsLeft={
+                <IconButton
+                  onClick={(e) => onInlineCreateFolder(section, e)}
+                  title="New folder"
+                >
+                  <FolderPlus size={12} />
+                </IconButton>
+              }
               actions={
                 <IconButton
                   onClick={(e) => onInlineCreate(section, e)}
