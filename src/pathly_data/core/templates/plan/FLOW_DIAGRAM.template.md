@@ -1,3 +1,6 @@
+---
+name: Flow Diagram
+---
 # [Feature Name] — Flow Diagram
 
 ## [Primary Flow Name, e.g. "Happy Path: setup workflow"]

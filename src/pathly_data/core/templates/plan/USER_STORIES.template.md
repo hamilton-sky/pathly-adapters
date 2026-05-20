@@ -1,3 +1,6 @@
+---
+name: User Stories
+---
 # [Feature Name] — User Stories
 
 ## Context

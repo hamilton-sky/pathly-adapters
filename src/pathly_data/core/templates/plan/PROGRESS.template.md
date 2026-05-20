@@ -1,3 +1,6 @@
+---
+name: Progress
+---
 # [Feature Name] — Progress
 
 ## Status: NOT STARTED

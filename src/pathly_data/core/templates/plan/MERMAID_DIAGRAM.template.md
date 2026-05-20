@@ -1,3 +1,6 @@
+---
+name: Mermaid Flow Diagram
+---
 # [Feature Name] — Mermaid Flow Diagram
 
 ## [Primary Flow Name, e.g. "Happy Path: setup workflow"]

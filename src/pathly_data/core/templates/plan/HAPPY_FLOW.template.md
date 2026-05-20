@@ -1,3 +1,6 @@
+---
+name: Happy Flow
+---
 # [Feature Name] — Happy Flow
 
 ## Overview

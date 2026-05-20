@@ -1,3 +1,6 @@
+---
+name: Feature Index
+---
 # [Feature Name] — Feature Index
 
 > **Read this first.** Every agent working on this feature should load this file before any other plan file.

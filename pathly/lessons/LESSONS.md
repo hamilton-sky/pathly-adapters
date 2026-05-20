@@ -1,3 +1,6 @@
+---
+
+---
 # LESSONS.md — Active
 
 _Last updated: 2026-05-11 | Sources: 1 feature (security-fixes)_

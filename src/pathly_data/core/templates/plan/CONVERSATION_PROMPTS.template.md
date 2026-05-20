@@ -1,3 +1,6 @@
+---
+name: Conversation Guide
+---
 # [Feature Name] — Conversation Guide
 
 Split into N conversations (max 4). Each produces runnable, testable code.

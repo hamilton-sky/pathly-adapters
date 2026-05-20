@@ -1,3 +1,6 @@
+---
+
+---
 # 02 — Token Usage: agent-architecture-refactor
 
 _Date: 2026-05-13 | Sourced from: plans/agent-architecture-refactor/EVENTS.jsonl_

@@ -1,3 +1,6 @@
+---
+name: Implementation Plan
+---
 # [Feature Name] — Implementation Plan
 
 ## Overview

@@ -1,3 +1,6 @@
+---
+name: Architecture Proposal
+---
 # [Feature Name] — Architecture Proposal
 
 ## Problem Statement

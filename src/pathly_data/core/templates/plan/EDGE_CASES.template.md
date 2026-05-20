@@ -1,3 +1,6 @@
+---
+name: Edge Cases
+---
 # [Feature Name] — Edge Cases
 
 ## Category 1: [Error type, e.g., Element Not Found]
