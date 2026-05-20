@@ -256,6 +256,22 @@ export function Sidebar(): JSX.Element | null {
     await loadItems()
   }
 
+  async function handleDeletePlanFolder(folderPath: string): Promise<void> {
+    try {
+      const files = await window.pathly.fs.list(folderPath).catch(() => [] as string[])
+      for (const fname of files) {
+        await window.pathly.fs.delete(`${folderPath}/${fname}`).catch(() => {})
+      }
+      await window.pathly.fs.delete(folderPath).catch(() => {})
+      const folderName = folderPath.split('/').pop() ?? ''
+      if (activeTopic === folderName) setActiveTopic(null)
+    } catch (err) {
+      console.error('Delete plan folder failed:', err)
+    }
+    await loadItems()
+    await loadPlanFiles()
+  }
+
   async function handleMoveFolder(sourcePath: string, targetSectionDir: string): Promise<void> {
     const folderName = sourcePath.split('/').pop() ?? ''
     if (!folderName) return
@@ -450,6 +466,7 @@ export function Sidebar(): JSX.Element | null {
             onRenameFolder={(oldPath, newName) => { void handleRenameFolder(oldPath, newName) }}
             onDeleteFolder={(folderPath) => { void handleDeleteFolder(folderPath) }}
             onMoveFolder={(src, tgt) => { void handleMoveFolder(src, tgt) }}
+            onDeletePlanFolder={(folderPath) => { void handleDeletePlanFolder(folderPath) }}
           />
         )}
 

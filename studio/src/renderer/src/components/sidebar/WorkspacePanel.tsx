@@ -49,6 +49,7 @@ interface Props {
   onRenameFolder?: (oldPath: string, newName: string) => void
   onDeleteFolder?: (folderPath: string) => void
   onMoveFolder?: (sourcePath: string, targetSectionDir: string) => void
+  onDeletePlanFolder?: (folderPath: string) => void
 }
 
 export function WorkspacePanel(props: Props): JSX.Element {
@@ -63,7 +64,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
-    onReorgDrop, onRenameFolder, onDeleteFolder, onMoveFolder,
+    onReorgDrop, onRenameFolder, onDeleteFolder, onMoveFolder, onDeletePlanFolder,
   } = props
 
   const { userLockedFolders, toggleFolderLock } = useUiStore()
@@ -108,6 +109,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
         onCreatePlanFile={onCreatePlanFile}
         onInlineCreateSubmit={onInlineCreateSubmit}
         onInlineCreateCancel={onInlineCreateCancel}
+        onDeletePlanFolder={onDeletePlanFolder}
         onSelect={onSelect}
         onRenameChange={onRenameChange}
         onRenameCommit={onRenameCommit}

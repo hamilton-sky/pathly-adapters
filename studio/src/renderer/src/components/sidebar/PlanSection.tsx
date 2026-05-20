@@ -1,4 +1,5 @@
-import { Folder, FolderOpen, FolderPlus, Lock, Plus } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Plus, Trash2 } from 'lucide-react'
 import type { PathlyItem } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton } from '../ui'
@@ -31,6 +32,7 @@ interface Props {
   onRenameCancel: () => void
   onStartRename: (item: PathlyItem, itemDir: string) => void
   onStartDelete: (item: PathlyItem) => void
+  onDeletePlanFolder?: (folderPath: string) => void
 }
 
 export function PlanSection({
@@ -56,7 +58,11 @@ export function PlanSection({
   onRenameCancel,
   onStartRename,
   onStartDelete,
+  onDeletePlanFolder,
 }: Props): JSX.Element {
+  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
   const visibleFolders = lowerFilter
     ? planFolders.filter((f) =>
         f.name.toLowerCase().includes(lowerFilter) ||
@@ -106,13 +112,16 @@ export function PlanSection({
 
             return (
               <div key={folder.name}>
-                <button
+                <div
                   className={`${styles.subdirHeader} ${isActive ? styles.itemRowSelected : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  title={folder.path}
                   onClick={() => {
                     onToggleFolder(folder.name)
                     onFolderClick(folder.name)
                   }}
-                  title={folder.path}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onToggleFolder(folder.name); onFolderClick(folder.name) } }}
                 >
                   {folder.open
                     ? <FolderOpen size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
@@ -133,7 +142,29 @@ export function PlanSection({
                       {badge}
                     </span>
                   )}
-                </button>
+                  {onDeletePlanFolder && (
+                    <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className={styles.rowAction}
+                        title="Actions"
+                        onClick={(e) => { e.stopPropagation(); setMenuOpenFor(v => v === folder.name ? null : folder.name) }}
+                      >
+                        <MoreHorizontal size={13} />
+                      </button>
+                      {menuOpenFor === folder.name && (
+                        <div className={styles.itemMenu} ref={menuRef}>
+                          <button
+                            className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`}
+                            onClick={(e) => { e.stopPropagation(); setMenuOpenFor(null); onDeletePlanFolder(folder.path) }}
+                          >
+                            <Trash2 size={12} />
+                            Delete folder
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {folder.open && (
                   <>
                     {inlineCreate?.target === 'plan-file' && folder.name === activeTopic && (
