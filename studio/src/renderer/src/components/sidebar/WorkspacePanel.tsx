@@ -46,6 +46,8 @@ interface Props {
   onToggleFolder: (name: string) => void
   onFolderClick: (name: string) => void
   onReorgDrop?: (sourcePath: string, targetDir: string, sectionId: string) => void
+  onRenameFolder?: (oldPath: string, newName: string) => void
+  onDeleteFolder?: (folderPath: string) => void
 }
 
 export function WorkspacePanel(props: Props): JSX.Element {
@@ -60,11 +62,13 @@ export function WorkspacePanel(props: Props): JSX.Element {
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
-    onReorgDrop,
+    onReorgDrop, onRenameFolder, onDeleteFolder,
   } = props
 
   const { userLockedFolders, toggleFolderLock } = useUiStore()
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
+  const [renamingFolderPath, setRenamingFolderPath] = useState<string | null>(null)
+  const [renamingFolderValue, setRenamingFolderValue] = useState('')
 
   return (
     <>
@@ -159,7 +163,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                       <SubdirRow
                         name={subdir.name}
                         open={subdir.open}
-                        onToggle={() => onToggleSubdir(section.label, idx)}
+                        onToggle={() => { if (renamingFolderPath !== folderKey) onToggleSubdir(section.label, idx) }}
                         isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
                         isUserLocked={userLockedFolders.has(folderKey)}
                         onToggleFolderLock={() => toggleFolderLock(folderKey)}
@@ -178,6 +182,24 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           } catch { /* ignore malformed payload */ }
                         }}
                         onDragLeave={() => setDragOverFolder(null)}
+                        renamingThis={renamingFolderPath === folderKey}
+                        renameValue={renamingFolderValue}
+                        onRenameChange={setRenamingFolderValue}
+                        onRenameCommit={() => {
+                          const v = renamingFolderValue
+                          setRenamingFolderPath(null)
+                          onRenameFolder?.(folderKey, v)
+                        }}
+                        onRenameCancel={() => setRenamingFolderPath(null)}
+                        onStartRenameFolder={() => {
+                          setRenamingFolderValue(subdir.name)
+                          setRenamingFolderPath(folderKey)
+                        }}
+                        onStartDeleteFolder={
+                          !userLockedFolders.has(folderKey)
+                            ? () => onDeleteFolder?.(folderKey)
+                            : undefined
+                        }
                       />
                       {subdir.open && filteredFiles.map((item) => (
                         <WorkspaceItem

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
-import { ChevronRight, ChevronDown, Folder, Lock, MoreHorizontal } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { RenameInput } from './RenameInput'
 import styles from './Sidebar.module.css'
 
 interface Props {
@@ -9,7 +10,13 @@ interface Props {
   isSystemFolder?: boolean
   isUserLocked?: boolean
   onToggleFolderLock?: () => void
-  onStartDeleteFolder?: () => void // wired in Conv 4
+  onStartDeleteFolder?: () => void
+  onStartRenameFolder?: () => void
+  renamingThis?: boolean
+  renameValue?: string
+  onRenameChange?: (v: string) => void
+  onRenameCommit?: () => void
+  onRenameCancel?: () => void
   folderPath?: string
   isDragOver?: boolean
   onDragOver?: (e: React.DragEvent) => void
@@ -25,6 +32,12 @@ export function SubdirRow({
   isUserLocked,
   onToggleFolderLock,
   onStartDeleteFolder,
+  onStartRenameFolder,
+  renamingThis,
+  renameValue,
+  onRenameChange,
+  onRenameCommit,
+  onRenameCancel,
   isDragOver,
   onDragOver,
   onDrop,
@@ -66,7 +79,17 @@ export function SubdirRow({
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
       </span>
       <Folder size={13} className={styles.subdirFolderIcon} />
-      <span className={styles.subdirLabel}>{name}/</span>
+
+      {renamingThis ? (
+        <RenameInput
+          value={renameValue ?? ''}
+          onChange={(v) => onRenameChange?.(v)}
+          onCommit={() => onRenameCommit?.()}
+          onCancel={() => onRenameCancel?.()}
+        />
+      ) : (
+        <span className={styles.subdirLabel}>{name}/</span>
+      )}
 
       {isSystemFolder ? (
         <div className={`${styles.rowActions} ${styles.rowActionsLocked}`}>
@@ -77,7 +100,7 @@ export function SubdirRow({
             <Lock size={11} />
           </span>
         </div>
-      ) : (
+      ) : !renamingThis ? (
         <div className={styles.rowActions}>
           {isUserLocked && (
             <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked — delete disabled">
@@ -94,6 +117,15 @@ export function SubdirRow({
 
           {menuOpen && (
             <div className={styles.itemMenu} ref={menuRef}>
+              {onStartRenameFolder && (
+                <button
+                  className={styles.itemMenuItem}
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onStartRenameFolder() }}
+                >
+                  <Pencil size={12} />
+                  Rename
+                </button>
+              )}
               <button
                 className={styles.itemMenuItem}
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onToggleFolderLock?.() }}
@@ -108,6 +140,7 @@ export function SubdirRow({
                     className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`}
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onStartDeleteFolder() }}
                   >
+                    <Trash2 size={12} />
                     Delete folder
                   </button>
                 </>
@@ -115,7 +148,7 @@ export function SubdirRow({
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

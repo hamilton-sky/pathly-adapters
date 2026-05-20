@@ -231,6 +231,44 @@ export function Sidebar(): JSX.Element | null {
     }
   }
 
+  async function handleRenameFolder(oldPath: string, newName: string): Promise<void> {
+    const trimmed = newName.trim()
+    if (!trimmed) return
+    const parentDir = oldPath.split('/').slice(0, -1).join('/')
+    const newPath = `${parentDir}/${trimmed}`
+    if (oldPath === newPath) return
+    try {
+      const files = await window.pathly.fs.list(oldPath).catch(() => [] as string[])
+      if (files.length === 0) {
+        await window.pathly.fs.write(`${newPath}/.gitkeep`, '')
+        await window.pathly.fs.delete(`${oldPath}/.gitkeep`).catch(() => {})
+      } else {
+        for (const fname of files) {
+          const content = await window.pathly.fs.read(`${oldPath}/${fname}`).catch(() => '')
+          await window.pathly.fs.write(`${newPath}/${fname}`, content ?? '')
+          await window.pathly.fs.delete(`${oldPath}/${fname}`)
+        }
+      }
+      await window.pathly.fs.delete(oldPath).catch(() => {})
+    } catch (err) {
+      console.error('Rename folder failed:', err)
+    }
+    await loadItems()
+  }
+
+  async function handleDeleteFolder(folderPath: string): Promise<void> {
+    try {
+      const files = await window.pathly.fs.list(folderPath).catch(() => [] as string[])
+      for (const fname of files) {
+        await window.pathly.fs.delete(`${folderPath}/${fname}`).catch(() => {})
+      }
+      await window.pathly.fs.delete(folderPath).catch(() => {})
+    } catch (err) {
+      console.error('Delete folder failed:', err)
+    }
+    await loadItems()
+  }
+
   async function doDelete(item: PathlyItem): Promise<void> {
     try {
       await window.pathly.fs.delete(item.path)
@@ -386,6 +424,8 @@ export function Sidebar(): JSX.Element | null {
             onToggleFolder={handleToggleFolder}
             onFolderClick={handleFolderClick}
             onReorgDrop={(src, tgt, sid) => { void handleReorgDrop(src, tgt, sid) }}
+            onRenameFolder={(oldPath, newName) => { void handleRenameFolder(oldPath, newName) }}
+            onDeleteFolder={(folderPath) => { void handleDeleteFolder(folderPath) }}
           />
         )}
 
