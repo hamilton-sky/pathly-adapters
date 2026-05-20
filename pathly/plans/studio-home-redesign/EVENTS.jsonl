@@ -1,3 +1,6 @@
+---
+
+---
 {"type":"STATE_TRANSITION","to":"STORMING"}
 {"type":"STATE_TRANSITION","to":"PLANNING"}
 {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "DESIGNING", "ts": "2026-05-20T12:18:16.168051+00:00"}
@@ -5,3 +8,6 @@
 {"type": "FILE_CREATED", "file": "DESIGN.md"}
 {"type": "STAGE_COMPLETE", "stage": "DESIGNING", "next": "BUILDING"}
 {"type": "STATE_TRANSITION", "from": "DESIGNING", "to": "BUILDING", "ts": "2026-05-20T12:18:31.253787+00:00"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-20T12:22:23.055443+00:00"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "ts": "2026-05-20T12:22:53.965594+00:00"}

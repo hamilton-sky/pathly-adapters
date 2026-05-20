@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Sun, Moon, LayoutGrid, List } from 'lucide-react'
+import { Sun, Moon, LayoutGrid, List, Star, FolderOpen } from 'lucide-react'
 import { useStore } from '../store'
 import { listDirs, listDir, readFile, pickFolder, openWindow } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
@@ -153,6 +153,15 @@ interface ProjectPlans {
   [projectPath: string]: PlanRow[]
 }
 
+function getCardAccent(plans: PlanRow[], t: Theme): string {
+  if (plans.some((p) => p.state.toUpperCase() === 'BLOCKED')) return t.red
+  if (plans.some((p) => {
+    const s = p.state.toUpperCase()
+    return s && s !== 'DONE' && s !== 'IDLE'
+  })) return t.accent
+  return t.bgSurface1
+}
+
 export function HomeScreen(): JSX.Element {
   const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic, setPathlyRoot, theme, setTheme } = useStore()
   const t = useTheme()
@@ -161,6 +170,7 @@ export function HomeScreen(): JSX.Element {
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null)
   const [hoveredOpen, setHoveredOpen] = useState<string | null>(null)
   const [hoveredRemove, setHoveredRemove] = useState<string | null>(null)
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(
     (localStorage.getItem('pathly-home-view') as 'grid' | 'list') ?? 'grid'
   )
@@ -227,6 +237,8 @@ export function HomeScreen(): JSX.Element {
   }, [projects.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sorted = [...projects].sort((a, b) => b.lastOpened - a.lastOpened)
+  const pinnedProjects = sorted.filter((p) => p.pinned)
+  const unpinnedProjects = sorted.filter((p) => !p.pinned)
 
   async function handleOpenFolder(): Promise<void> {
     const folderPath = await pickFolder()
@@ -243,6 +255,231 @@ export function HomeScreen(): JSX.Element {
       if (topicName) setActiveTopic(topicName)
       setProjectPath(project.path)
     }
+  }
+
+  function renderSectionLabel(label: string, animDelay: number): JSX.Element {
+    return (
+      <span style={{
+        fontSize: '11px',
+        fontWeight: 600,
+        color: t.textMuted,
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        fontFamily: t.fontFamilyBase,
+        animation: `fadeIn 350ms ease-out ${animDelay}ms both`
+      }}>
+        {label}
+      </span>
+    )
+  }
+
+  function renderCard(project: ProjectEntry, idx: number): JSX.Element {
+    const allPlans = projectPlans[project.path] ?? []
+    const plans = hideDone ? allPlans.filter((p) => p.state.toUpperCase() !== 'DONE') : allPlans
+    const isOpenHovered = hoveredOpen === project.path
+    const isRemoveHovered = hoveredRemove === project.path
+    const isCardHovered = hoveredCard === project.path
+    const accentColor = getCardAccent(allPlans, t)
+
+    return (
+      <div
+        key={project.path}
+        style={{
+          border: isCardHovered ? `1px solid ${t.accent}50` : `1px solid ${t.bgSurface0}`,
+          borderTop: isCardHovered ? `1px solid ${t.accent}50` : `3px solid ${accentColor}`,
+          borderRadius: '10px',
+          overflow: 'hidden',
+          backgroundColor: t.bgMantle,
+          boxShadow: isCardHovered ? `0 0 0 1px ${t.accent}20` : 'none',
+          transition: 'all 150ms ease-out',
+          animation: `fadeSlideUp 300ms ease-out ${80 + idx * 55}ms both`
+        }}
+        onMouseEnter={() => setHoveredCard(project.path)}
+        onMouseLeave={() => setHoveredCard(null)}
+      >
+        {/* Card header */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 16px',
+          borderBottom: plans.length > 0 ? `1px solid ${t.bgSurface0}` : 'none',
+          backgroundColor: t.bgBase
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', minWidth: 0 }}>
+            <span style={{
+              fontWeight: 600,
+              fontSize: '14px',
+              color: t.textPrimary,
+              flexShrink: 0,
+              fontFamily: t.fontFamilyBase
+            }}>
+              {project.name}
+            </span>
+            <span style={{
+              fontSize: '11px',
+              color: t.textMuted,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontFamily: t.fontFamilyMono
+            }}>
+              {project.path}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {/* Pin/star button */}
+            <button
+              aria-label={project.pinned ? 'Unpin project' : 'Pin project'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '4px',
+                opacity: project.pinned ? 1 : (isCardHovered ? 1 : 0),
+                transition: 'opacity 150ms',
+                color: project.pinned ? '#EAB308' : t.textMuted
+              }}
+              onClick={(e) => { e.stopPropagation(); updateProject(project.path, { pinned: !project.pinned }) }}
+            >
+              <Star
+                size={12}
+                fill={project.pinned ? '#EAB308' : 'none'}
+                color={project.pinned ? '#EAB308' : t.textMuted}
+              />
+            </button>
+
+            {/* Remove button */}
+            <button
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: isRemoveHovered ? `${t.red}15` : 'none',
+                border: `1px solid ${isRemoveHovered ? t.red : t.bgSurface0}`,
+                borderRadius: '6px',
+                color: isRemoveHovered ? t.red : t.textMuted,
+                cursor: 'pointer',
+                width: '28px',
+                height: '28px',
+                padding: 0,
+                opacity: isCardHovered ? 1 : 0,
+                transition: 'all 150ms ease-out, opacity 150ms'
+              }}
+              onClick={() => removeProject(project.path)}
+              onMouseEnter={() => setHoveredRemove(project.path)}
+              onMouseLeave={() => setHoveredRemove(null)}
+              aria-label={`Remove ${project.name} from list`}
+              title="Remove from list"
+            >
+              <IconClose />
+            </button>
+          </div>
+        </div>
+
+        {/* Topics section */}
+        {plans.length === 0 ? (
+          <div style={{
+            padding: '10px 16px',
+            fontSize: '12px',
+            color: t.textMuted,
+            fontStyle: 'italic',
+            fontFamily: t.fontFamilyBase
+          }}>
+            No active topics
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {plans.map((plan) => {
+              const key = `${plan.flowType}:${plan.name}`
+              const isHovered = hoveredPlan === key
+              const isBlocked = plan.state.toUpperCase() === 'BLOCKED'
+
+              return (
+                <div
+                  key={key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '7px 16px 7px 20px',
+                    borderBottom: `1px solid ${t.bgBase}`,
+                    borderLeft: `3px solid ${isBlocked ? t.red : isHovered ? t.accent : 'transparent'}`,
+                    cursor: 'pointer',
+                    backgroundColor: isHovered ? t.bgSurface0 : 'transparent',
+                    transition: 'all 150ms ease-out'
+                  }}
+                  onClick={(e) => handleOpen(project, plan.name, e)}
+                  title={`Open ${plan.name}`}
+                  onMouseEnter={() => setHoveredPlan(key)}
+                  onMouseLeave={() => setHoveredPlan(null)}
+                >
+                  <span style={{
+                    fontSize: '12px',
+                    color: isBlocked ? `${t.red}CC` : t.textSecondary,
+                    fontFamily: t.fontFamilyMono,
+                    transition: 'color 150ms ease-out'
+                  }}>
+                    {plan.name}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FlowTypeBadge flowType={plan.flowType} t={t} />
+                    <FsmBadge state={plan.state} t={t} />
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Card footer */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 16px',
+          borderTop: `1px solid ${t.bgSurface0}`
+        }}>
+          <span style={{
+            fontSize: '11px',
+            color: t.textMuted,
+            fontFamily: t.fontFamilyBase
+          }}>
+            {allPlans.length} topic{allPlans.length !== 1 ? 's' : ''} · {timeAgo(project.lastOpened)}
+          </span>
+
+          <button
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              background: isOpenHovered ? `${t.accent}18` : 'none',
+              border: `1px solid ${isOpenHovered ? t.accent : t.bgSurface1}`,
+              borderRadius: '6px',
+              color: isOpenHovered ? t.accent : t.textSecondary,
+              cursor: 'pointer',
+              padding: '4px 10px',
+              fontSize: '12px',
+              fontWeight: 500,
+              fontFamily: t.fontFamilyBase,
+              transition: 'all 150ms ease-out'
+            }}
+            onClick={(e) => handleOpen(project, undefined, e)}
+            onMouseEnter={() => setHoveredOpen(project.path)}
+            onMouseLeave={() => setHoveredOpen(null)}
+            title="Open project"
+          >
+            <IconArrow />
+            Open
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -382,16 +619,7 @@ export function HomeScreen(): JSX.Element {
           marginBottom: '4px',
           animation: 'fadeIn 350ms ease-out 60ms both'
         }}>
-          <span style={{
-            fontSize: '11px',
-            fontWeight: 600,
-            color: t.textMuted,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            fontFamily: t.fontFamilyBase
-          }}>
-            Recent Projects
-          </span>
+          {renderSectionLabel('Recent Projects', 60)}
           <button
             onClick={() => setHideDone((v) => !v)}
             style={{
@@ -412,190 +640,64 @@ export function HomeScreen(): JSX.Element {
           </button>
         </div>
 
-        <div style={viewMode === 'grid' ? {
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '14px',
-        } : {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}>
-
-        {sorted.length === 0 && (
+        {sorted.length === 0 ? (
+          /* Phase 7: Rich empty state */
           <div style={{
-            padding: '32px 24px',
-            textAlign: 'center',
-            color: t.textMuted,
-            border: `1px solid ${t.bgSurface0}`,
-            borderRadius: '10px',
-            fontSize: '13px',
-            fontFamily: t.fontFamilyBase,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '48px 32px',
             animation: 'fadeSlideUp 300ms ease-out both'
           }}>
-            No projects yet. Open a folder to get started.
+            <FolderOpen size={32} color={t.textMuted} />
+            <span style={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: t.textPrimary,
+              fontFamily: t.fontFamilyBase
+            }}>
+              No projects yet
+            </span>
+            <span style={{
+              fontSize: '12px',
+              color: t.textMuted,
+              fontFamily: t.fontFamilyBase
+            }}>
+              Open a folder to get started
+            </span>
+          </div>
+        ) : (
+          <div style={viewMode === 'grid' ? {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '14px',
+          } : {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}>
+            {pinnedProjects.length > 0 && (
+              <>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  {renderSectionLabel('Pinned', 0)}
+                </div>
+                {pinnedProjects.map((project, idx) => renderCard(project, idx))}
+                <div style={{
+                  gridColumn: '1 / -1',
+                  height: '1px',
+                  backgroundColor: t.bgSurface0,
+                  margin: '8px 0'
+                }} />
+                <div style={{ gridColumn: '1 / -1' }}>
+                  {renderSectionLabel('Recent Projects', 0)}
+                </div>
+                {unpinnedProjects.map((project, idx) => renderCard(project, pinnedProjects.length + idx))}
+              </>
+            )}
+            {pinnedProjects.length === 0 && sorted.map((project, idx) => renderCard(project, idx))}
           </div>
         )}
-
-        {sorted.map((project, idx) => {
-          const allPlans = projectPlans[project.path] ?? []
-          const plans = hideDone ? allPlans.filter((p) => p.state.toUpperCase() !== 'DONE') : allPlans
-          const isOpenHovered = hoveredOpen === project.path
-          const isRemoveHovered = hoveredRemove === project.path
-
-          return (
-            <div
-              key={project.path}
-              style={{
-                border: `1px solid ${t.bgSurface0}`,
-                borderRadius: '10px',
-                overflow: 'hidden',
-                backgroundColor: t.bgMantle,
-                animation: `fadeSlideUp 300ms ease-out ${80 + idx * 55}ms both`
-              }}
-            >
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderBottom: plans.length > 0 ? `1px solid ${t.bgSurface0}` : 'none',
-                backgroundColor: t.bgBase
-              }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', minWidth: 0 }}>
-                  <span style={{
-                    fontWeight: 600,
-                    fontSize: '14px',
-                    color: t.textPrimary,
-                    flexShrink: 0,
-                    fontFamily: t.fontFamilyBase
-                  }}>
-                    {project.name}
-                  </span>
-                  <span style={{
-                    fontSize: '11px',
-                    color: t.textMuted,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    fontFamily: t.fontFamilyMono
-                  }}>
-                    {project.path}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                  <span style={{ fontSize: '11px', color: t.textMuted, fontFamily: t.fontFamilyBase }}>
-                    {timeAgo(project.lastOpened)}
-                  </span>
-
-                  <button
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      background: isOpenHovered ? `${t.accent}18` : 'none',
-                      border: `1px solid ${isOpenHovered ? t.accent : t.bgSurface1}`,
-                      borderRadius: '6px',
-                      color: isOpenHovered ? t.accent : t.textSecondary,
-                      cursor: 'pointer',
-                      padding: '4px 10px',
-                      fontSize: '12px',
-                      fontWeight: 500,
-                      fontFamily: t.fontFamilyBase,
-                      transition: 'all 150ms ease-out'
-                    }}
-                    onClick={(e) => handleOpen(project, undefined, e)}
-                    onMouseEnter={() => setHoveredOpen(project.path)}
-                    onMouseLeave={() => setHoveredOpen(null)}
-                    title="Open project"
-                  >
-                    <IconArrow />
-                    Open
-                  </button>
-
-                  <button
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: isRemoveHovered ? `${t.red}15` : 'none',
-                      border: `1px solid ${isRemoveHovered ? t.red : t.bgSurface0}`,
-                      borderRadius: '6px',
-                      color: isRemoveHovered ? t.red : t.textMuted,
-                      cursor: 'pointer',
-                      width: '28px',
-                      height: '28px',
-                      padding: 0,
-                      transition: 'all 150ms ease-out'
-                    }}
-                    onClick={() => removeProject(project.path)}
-                    onMouseEnter={() => setHoveredRemove(project.path)}
-                    onMouseLeave={() => setHoveredRemove(null)}
-                    title="Remove from list"
-                  >
-                    <IconClose />
-                  </button>
-                </div>
-              </div>
-
-              {plans.length === 0 ? (
-                <div style={{
-                  padding: '10px 16px',
-                  fontSize: '12px',
-                  color: t.textMuted,
-                  fontStyle: 'italic',
-                  fontFamily: t.fontFamilyBase
-                }}>
-                  No active topics
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {plans.map((plan) => {
-                    const key = `${plan.flowType}:${plan.name}`
-                    const isHovered = hoveredPlan === key
-                    const isBlocked = plan.state.toUpperCase() === 'BLOCKED'
-
-                    return (
-                      <div
-                        key={key}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '7px 16px 7px 20px',
-                          borderBottom: `1px solid ${t.bgBase}`,
-                          borderLeft: `3px solid ${isBlocked ? t.red : isHovered ? t.accent : 'transparent'}`,
-                          cursor: 'pointer',
-                          backgroundColor: isHovered ? t.bgSurface0 : 'transparent',
-                          transition: 'all 150ms ease-out'
-                        }}
-                        onClick={(e) => handleOpen(project, plan.name, e)}
-                        title={`Open ${plan.name}`}
-                        onMouseEnter={() => setHoveredPlan(key)}
-                        onMouseLeave={() => setHoveredPlan(null)}
-                      >
-                        <span style={{
-                          fontSize: '12px',
-                          color: isBlocked ? `${t.red}CC` : t.textSecondary,
-                          fontFamily: t.fontFamilyMono,
-                          transition: 'color 150ms ease-out'
-                        }}>
-                          {plan.name}
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <FlowTypeBadge flowType={plan.flowType} t={t} />
-                          <FsmBadge state={plan.state} t={t} />
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
-        </div>
       </div>
 
       <button
