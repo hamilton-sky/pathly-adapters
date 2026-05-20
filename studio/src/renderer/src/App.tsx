@@ -13,7 +13,7 @@ import { Settings } from './components/Settings'
 import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
-import { darkTheme, lightTheme } from './theme'
+import { themes } from './theme'
 import appStyles from './App.module.css'
 
 class PanelErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
@@ -83,7 +83,7 @@ function MainApp(): JSX.Element | null {
   }, [])
 
   useEffect(() => {
-    const resolved = theme === 'dark' ? darkTheme : lightTheme
+    const resolved = themes[theme] ?? themes.dark
     document.documentElement.setAttribute('data-theme', theme)
     window.pathly?.window?.setTitleBarOverlay(resolved.bgMantle, resolved.textPrimary)
   }, [theme])

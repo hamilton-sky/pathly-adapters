@@ -1,7 +1,7 @@
 import { useStore } from './store'
-import { darkTheme, lightTheme } from './theme'
+import { themes } from './theme'
 
 export function useTheme() {
   const theme = useStore((s) => s.theme)
-  return theme === 'dark' ? darkTheme : lightTheme
+  return themes[theme] ?? themes.dark
 }

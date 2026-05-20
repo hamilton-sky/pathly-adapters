@@ -1,7 +1,58 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { useTheme } from '../useTheme'
-import type { Theme } from '../theme'
+import type { Theme, ThemeName } from '../theme'
+import { themes, paletteLabels } from '../theme'
+
+const DARK_PALETTES: ThemeName[] = ['dark', 'nord', 'mocha', 'solarized', 'dracula', 'rose-pine']
+const LIGHT_PALETTES: ThemeName[] = ['light', 'solarized-light', 'latte', 'paper', 'rose-pine-dawn', 'mint']
+
+function PaletteSwatch({ name, active, onClick }: { name: ThemeName; active: boolean; onClick: () => void }): JSX.Element {
+  const p = themes[name]
+  const label = paletteLabels[name]
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '8px',
+        borderRadius: '8px',
+        border: active ? `2px solid ${p.accent}` : '2px solid transparent',
+        backgroundColor: active ? `${p.accent}18` : 'transparent',
+        transition: '150ms ease-out',
+      }}
+    >
+      <div style={{
+        width: '64px',
+        height: '44px',
+        borderRadius: '6px',
+        overflow: 'hidden',
+        border: `1px solid ${p.bgSurface0}`,
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        <div style={{ flex: 1, backgroundColor: p.bgBase, display: 'flex', alignItems: 'center', padding: '4px 6px', gap: '4px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: p.accent }} />
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: p.green }} />
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: p.red }} />
+        </div>
+        <div style={{ height: '16px', backgroundColor: p.bgTerminal }} />
+      </div>
+      <span style={{
+        fontSize: '11px',
+        fontWeight: active ? 600 : 400,
+        color: active ? p.accent : p.textSecondary,
+        whiteSpace: 'nowrap',
+      }}>
+        {label}
+      </span>
+    </div>
+  )
+}
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   return {
@@ -40,6 +91,11 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       textTransform: 'uppercase' as const,
       letterSpacing: '0.05em',
       marginBottom: '16px'
+    },
+    swatchRow: {
+      display: 'flex',
+      gap: '8px',
+      flexWrap: 'wrap' as const,
     },
     radioGroup: {
       display: 'flex',
@@ -101,7 +157,7 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
 }
 
 export function Settings(): JSX.Element {
-  const { theme, setTheme, routingEngine, setRoutingEngine, mcpCommand, setMcpCommand } = useStore()
+  const { theme, preferredDark, preferredLight, setPreferredDark, setPreferredLight, routingEngine, setRoutingEngine, mcpCommand, setMcpCommand } = useStore()
   const t = useTheme()
   const styles = makeStyles(t)
   const [mcpInput, setMcpInput] = useState(mcpCommand)
@@ -111,24 +167,25 @@ export function Settings(): JSX.Element {
       <div style={styles.header}>Settings</div>
       <div style={styles.body}>
         <div style={styles.section}>
-          <div style={styles.sectionTitle}>Theme</div>
-          <div style={styles.radioGroup}>
-            <div
-              style={{ ...styles.radioCard, ...(theme === 'dark' ? styles.radioCardActive : {}) }}
-              onClick={() => setTheme('dark')}
-            >
-              <span style={{ ...styles.radioLabel, color: theme === 'dark' ? t.accent : t.textPrimary }}>
-                <span>{theme === 'dark' ? '●' : '○'}</span> Dark
-              </span>
-            </div>
-            <div
-              style={{ ...styles.radioCard, ...(theme === 'light' ? styles.radioCardActive : {}) }}
-              onClick={() => setTheme('light')}
-            >
-              <span style={{ ...styles.radioLabel, color: theme === 'light' ? t.accent : t.textPrimary }}>
-                <span>{theme === 'light' ? '●' : '○'}</span> Light
-              </span>
-            </div>
+          <div style={styles.sectionTitle}>Color Palette</div>
+          <div style={{ fontSize: '11px', color: t.textMuted, marginBottom: '4px' }}>
+            Select your preferred <strong>dark</strong> and <strong>light</strong> palette. The ☽/☀ toggle switches between them.
+          </div>
+          <div style={{ fontSize: '11px', color: t.textMuted, textTransform: 'uppercase' as const, letterSpacing: '0.06em', margin: '12px 0 6px' }}>
+            Dark — <span style={{ color: t.accent }}>{paletteLabels[preferredDark]}</span>
+          </div>
+          <div style={{ ...styles.swatchRow, marginBottom: '12px' }}>
+            {DARK_PALETTES.map((name) => (
+              <PaletteSwatch key={name} name={name} active={preferredDark === name} onClick={() => setPreferredDark(name)} />
+            ))}
+          </div>
+          <div style={{ fontSize: '11px', color: t.textMuted, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: '6px' }}>
+            Light — <span style={{ color: t.accent }}>{paletteLabels[preferredLight]}</span>
+          </div>
+          <div style={styles.swatchRow}>
+            {LIGHT_PALETTES.map((name) => (
+              <PaletteSwatch key={name} name={name} active={preferredLight === name} onClick={() => setPreferredLight(name)} />
+            ))}
           </div>
         </div>
 

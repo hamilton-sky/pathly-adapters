@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Terminal, X, Moon, Sun, Menu, LayoutGrid, List, Activity } from 'lucide-react'
 import { useStore } from '../store'
+import { isLightPalette } from '../theme'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
 import { IconButton, Tooltip } from './ui'
@@ -14,6 +15,8 @@ export function TopBar(): JSX.Element {
     publishing,
     publishLog,
     theme,
+    preferredDark,
+    preferredLight,
     activePanel,
     sidebarCollapsed,
     setProjectPath,
@@ -139,10 +142,10 @@ export function TopBar(): JSX.Element {
         <div className={styles.right}>
           {badge}
           <IconButton
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            onClick={() => setTheme(isLightPalette(theme) ? preferredDark : preferredLight)}
+            title={isLightPalette(theme) ? `Switch to dark (${preferredDark})` : `Switch to light (${preferredLight})`}
           >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            {isLightPalette(theme) ? <Moon size={14} /> : <Sun size={14} />}
           </IconButton>
           <IconButton onClick={() => toggleTerminal()} title="Toggle terminal" shortcut="Ctrl+`">
             <Terminal size={14} />

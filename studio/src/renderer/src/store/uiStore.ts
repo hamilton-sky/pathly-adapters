@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { FlowSession } from '../types'
+import type { ThemeName } from '../theme'
 
 function loadUserLockedPaths(): Set<string> {
   try {
@@ -26,7 +27,9 @@ export interface UiState {
   sidebarCollapsed: boolean
   activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings'
   dirtyItems: Set<string>
-  theme: 'dark' | 'light'
+  theme: ThemeName
+  preferredDark: ThemeName
+  preferredLight: ThemeName
   userLockedPaths: Set<string>
   userLockedFolders: Set<string>
   activeFlowSessions: Record<string, FlowSession>
@@ -36,7 +39,9 @@ export interface UiState {
   setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void
-  setTheme: (t: 'dark' | 'light') => void
+  setTheme: (t: ThemeName) => void
+  setPreferredDark: (t: ThemeName) => void
+  setPreferredLight: (t: ThemeName) => void
   toggleUserLock: (path: string) => void
   toggleFolderLock: (path: string) => void
   setActiveFlowSessions: (updater: (prev: Record<string, FlowSession>) => Record<string, FlowSession>) => void
@@ -51,6 +56,8 @@ export const useUiStore = create<UiState>()(
       activePanel: 'monitor',
       dirtyItems: new Set(),
       theme: 'dark',
+      preferredDark: 'dark',
+      preferredLight: 'light',
       userLockedPaths: loadUserLockedPaths(),
       userLockedFolders: loadUserLockedFolders(),
       activeFlowSessions: {},
@@ -66,6 +73,8 @@ export const useUiStore = create<UiState>()(
           return { dirtyItems: d }
         }),
       setTheme: (t) => set({ theme: t }),
+      setPreferredDark: (t) => set({ preferredDark: t, theme: t }),
+      setPreferredLight: (t) => set({ preferredLight: t, theme: t }),
       toggleUserLock: (path) =>
         set((s) => {
           const next = new Set(s.userLockedPaths)
@@ -98,7 +107,7 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'pathly-studio-ui',
-      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme }),
+      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme, preferredDark: s.preferredDark, preferredLight: s.preferredLight }),
     }
   )
 )

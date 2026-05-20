@@ -5,6 +5,7 @@ import { listDirs, listDir, readFile, pickFolder, openWindow } from '../services
 import { useTheme } from '../useTheme'
 import { Settings } from './Settings'
 import type { Theme } from '../theme'
+import { isLightPalette } from '../theme'
 import type { ProjectEntry } from '../types'
 
 const ANIMATIONS = `
@@ -164,7 +165,7 @@ function getCardAccent(plans: PlanRow[], t: Theme): string {
 }
 
 export function HomeScreen(): JSX.Element {
-  const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic, setPathlyRoot, theme, setTheme } = useStore()
+  const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic, setPathlyRoot, theme, setTheme, preferredDark, preferredLight } = useStore()
   const t = useTheme()
   const [projectPlans, setProjectPlans] = useState<ProjectPlans>({})
   const [hideDone, setHideDone] = useState(true)
@@ -567,9 +568,9 @@ export function HomeScreen(): JSX.Element {
           WebkitAppRegion: 'no-drag',
         } as React.CSSProperties}>
           <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={() => setTheme(isLightPalette(theme) ? preferredDark : preferredLight)}
+            title={isLightPalette(theme) ? 'Switch to dark mode' : 'Switch to light mode'}
+            aria-label={isLightPalette(theme) ? 'Switch to dark mode' : 'Switch to light mode'}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -586,7 +587,7 @@ export function HomeScreen(): JSX.Element {
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = t.bgSurface0 }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
           >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            {isLightPalette(theme) ? <Moon size={14} /> : <Sun size={14} />}
           </button>
         </div>
       </div>
