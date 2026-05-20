@@ -30,4 +30,9 @@ export const WORKSPACE_FILE_SECTIONS: Section[] = [
   { label: 'Explorations', type: 'explore', dir: 'pathly/explorations' },
 ]
 
-export const PROTECTED_FILENAMES = new Set(['STATE.json', 'EVENTS.jsonl', 'PROGRESS.md'])
+export const PROTECTED_FILENAMES = new Set([
+  'STATE.json',
+  'EVENTS.jsonl',
+  'PROGRESS.md',
+  'IMPLEMENTATION_PLAN.md',
+])

@@ -1,5 +1,4 @@
 import { useEffect, useDeferredValue, useRef, useState, useCallback } from 'react'
-import { ArrowLeft, BookOpen } from 'lucide-react'
 import { useStore } from '../../store'
 import type { PathlyItem, PathlyCanvasDragItem, PathlyReorgDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
@@ -79,7 +78,10 @@ export function Sidebar(): JSX.Element | null {
 
   const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
-  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem('pathly:sidebarTab') !== 'workspace' }
+    catch { return true }
+  })
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
@@ -243,8 +245,33 @@ export function Sidebar(): JSX.Element | null {
   void inlineCreate
   void dragOverPath
 
+  function switchTab(tab: 'library' | 'workspace'): void {
+    setLibraryOpen(tab === 'library')
+    setFilter('')
+    try { localStorage.setItem('pathly:sidebarTab', tab) } catch {}
+  }
+
   return (
     <div className={styles.sidebar} style={{ width: sidebarWidth }}>
+      <div className={styles.tabBar} role="tablist" aria-label="Sidebar view">
+        <button
+          role="tab"
+          aria-selected={libraryOpen}
+          className={`${styles.tab} ${libraryOpen ? styles.tabActive : ''}`}
+          onClick={() => switchTab('library')}
+        >
+          LIBRARY
+        </button>
+        <button
+          role="tab"
+          aria-selected={!libraryOpen}
+          className={`${styles.tab} ${!libraryOpen ? styles.tabActive : ''}`}
+          onClick={() => switchTab('workspace')}
+        >
+          WORKSPACE
+        </button>
+      </div>
+
       <div className={styles.filterRow}>
         <input
           className={styles.filterInput}
@@ -261,13 +288,6 @@ export function Sidebar(): JSX.Element | null {
             ×
           </button>
         )}
-        <button
-          className={`${styles.libraryBtn} ${libraryOpen ? styles.libraryBtnActive : ''}`}
-          onClick={() => { setLibraryOpen(v => !v); setFilter('') }}
-          title={libraryOpen ? 'Back to workspace' : 'Browse library'}
-        >
-          {libraryOpen ? <ArrowLeft size={13} /> : <BookOpen size={13} />}
-        </button>
       </div>
 
       <div className={styles.treeContainer}>

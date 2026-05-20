@@ -358,23 +358,45 @@
   background: rgba(139, 92, 246, 0.08) !important;
 }
 
-/* ── Library toggle button ── */
-.libraryBtn {
-  flex-shrink: 0;
+/* ── Library toggle button (kept for back-compat, hidden when tabs shown) ── */
+.libraryBtn { display: none; }
+.libraryBtnActive { display: none; }
+
+/* ── Tab bar: Library / Workspace ── */
+.tabBar {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--bg-surface0);
+}
+.tab {
+  flex: 1;
   background: none;
-  border: 1px solid var(--bg-surface1);
-  border-radius: 5px;
+  border: none;
+  border-bottom: 2px solid transparent;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 4px 6px;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 7px 4px 6px;
+  text-align: center;
+  transition: color 0.12s, border-bottom-color 0.12s;
+  font-family: var(--font-family-base);
 }
-.libraryBtn:hover { background: var(--bg-surface0); color: var(--text-secondary); border-color: var(--accent); }
-.libraryBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
-.libraryBtnActive { background: var(--bg-surface1); color: var(--accent); border-color: var(--accent); }
+.tab:hover { color: var(--text-secondary); }
+.tab:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
+.tabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Lock icon on managed workspace folders ── */
+.lockIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  opacity: 0.5;
+  margin-left: 4px;
+}
 
 /* ── Library panel header ── */
 .libraryHeader {

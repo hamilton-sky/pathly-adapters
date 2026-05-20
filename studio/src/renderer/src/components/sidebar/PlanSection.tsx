@@ -1,4 +1,4 @@
-import { Folder, FolderOpen, Plus } from 'lucide-react'
+import { Folder, FolderOpen, Lock, Plus } from 'lucide-react'
 import type { PathlyItem } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton } from '../ui'
@@ -99,6 +99,9 @@ export function PlanSection({
                   }
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {folder.name}
+                  </span>
+                  <span className={styles.lockIcon} title="Managed by Pathly — cannot be renamed or moved">
+                    <Lock size={10} />
                   </span>
                   {badge && (
                     <span
