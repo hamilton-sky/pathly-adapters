@@ -20,6 +20,15 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install test dependencies
+        run: pip install -e ".[dev]" pytest-cov
+
+      - name: Run tests
+        run: pytest
+
+      - name: Version sync check
+        run: python scripts/check_version_sync.py
+
       - name: Install build deps
         run: pip install build
 

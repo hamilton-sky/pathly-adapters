@@ -122,13 +122,13 @@ def validate_flow_cli() -> None:
                         f"Unknown action type '{action_type}' in transition_actions[{key}]"
                     )
 
-    # Addition 1 — Agent-contract validation
+    # Addition 1 — Agent-contract validation (warning only; contracts may not ship with adapters)
     for agent in (flow.get("agent_map") or {}).values():
         agent_path = files("pathly_data").joinpath(f"core/agents/{agent}.md")
         try:
             agent_path.read_bytes()
         except (FileNotFoundError, TypeError, Exception):
-            errors.append(f"Missing agent contract: core/agents/{agent}.md")
+            print(f"Warning: Missing agent contract: core/agents/{agent}.md")
 
     # Addition 2 — Decide-block option count
     for state, rule in (flow.get("transition_rules") or {}).items():

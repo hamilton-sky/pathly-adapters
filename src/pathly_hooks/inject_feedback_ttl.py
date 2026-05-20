@@ -65,7 +65,7 @@ def main() -> None:
         _log_skip("PATHLY_PROJECT_ROOT not set")
         sys.exit(0)
 
-    plans_dir = (Path(project_root_env) / "plans").resolve()
+    plans_dir = (Path(project_root_env) / "pathly" / "plans").resolve()
     resolved = Path(raw_path).resolve()
 
     if not resolved.is_relative_to(plans_dir):

@@ -46,8 +46,8 @@ def _run_hook(
 
 @pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
 def test_hook_rejects_path_outside_plans(hook, tmp_path):
-    plans_dir = tmp_path / "plans"
-    plans_dir.mkdir()
+    plans_dir = tmp_path / "pathly" / "plans"
+    plans_dir.mkdir(parents=True)
 
     evil_path = str(tmp_path / ".." / ".." / "etc" / "passwd")
     payload = {"file": evil_path}
@@ -66,8 +66,8 @@ def test_hook_rejects_path_outside_plans(hook, tmp_path):
 
 @pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
 def test_hook_accepts_valid_path(hook, tmp_path):
-    plans_dir = tmp_path / "plans"
-    plans_dir.mkdir()
+    plans_dir = tmp_path / "pathly" / "plans"
+    plans_dir.mkdir(parents=True)
     feedback_file = plans_dir / "feedback.md"
     feedback_file.write_text("# feedback\n", encoding="utf-8")
 
@@ -102,8 +102,8 @@ def test_hook_malformed_json(hook, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_hook_already_tagged_file(tmp_path):
-    plans_dir = tmp_path / "plans"
-    plans_dir.mkdir()
+    plans_dir = tmp_path / "pathly" / "plans"
+    plans_dir.mkdir(parents=True)
     feedback_file = plans_dir / "feedback.md"
     original_content = "---\nttl_hours: 48\n---\n# feedback\n"
     feedback_file.write_text(original_content, encoding="utf-8")
@@ -123,8 +123,8 @@ def test_hook_already_tagged_file(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_hook_missing_api_key(tmp_path):
-    plans_dir = tmp_path / "plans"
-    plans_dir.mkdir()
+    plans_dir = tmp_path / "pathly" / "plans"
+    plans_dir.mkdir(parents=True)
     feedback_file = plans_dir / "IMPL_QUESTIONS.md"
     feedback_file.write_text("- Is this a requirement?\n", encoding="utf-8")
 
@@ -144,8 +144,8 @@ def test_hook_missing_api_key(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_classify_feedback_uses_word_boundary_arch_keywords(tmp_path):
-    plans_dir = tmp_path / "plans"
-    plans_dir.mkdir()
+    plans_dir = tmp_path / "pathly" / "plans"
+    plans_dir.mkdir(parents=True)
     feedback_file = plans_dir / "IMPL_QUESTIONS.md"
     feedback_file.write_text(
         "- How long should the TTL be?\n"
@@ -177,7 +177,7 @@ def test_classify_feedback_uses_word_boundary_arch_keywords(tmp_path):
 
 @pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
 def test_hook_missing_project_root(hook, tmp_path):
-    payload = {"file": str(tmp_path / "plans" / "feedback.md")}
+    payload = {"file": str(tmp_path / "pathly" / "plans" / "feedback.md")}
 
     base_env = {k: v for k, v in os.environ.items()}
     base_env.pop("PATHLY_PROJECT_ROOT", None)

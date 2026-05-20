@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+logger = logging.getLogger("pathly.runner")
 
 import yaml
 from importlib.resources import files
@@ -115,13 +118,13 @@ def invoke_agent(
         result_text = output.get("result", "")
         if result_text:
             print(result_text)
-        # Diagnostic: always print telemetry so we can verify it's being captured
-        print(f"[runner] telemetry — cost=${cost_usd:.4f}  in={tokens_in}  out={tokens_out}  tools={tool_uses}  wall={wall_seconds}s", file=sys.stderr)
+        # Diagnostic: always log telemetry so we can verify it's being captured
+        logger.info("telemetry", extra={"cost_usd": cost_usd, "tokens_in": tokens_in, "tokens_out": tokens_out, "tool_uses": tool_uses, "wall_seconds": wall_seconds})
         if cost_usd == 0.0:
             top_keys = [k for k in output if k not in ("result", "messages", "session_id")]
-            print(f"[runner] cost=0 — JSON top-level keys: {top_keys}", file=sys.stderr)
+            logger.warning("cost=0 — JSON top-level keys: %s", top_keys)
     except (json.JSONDecodeError, ValueError) as exc:
-        print(f"[runner] failed to parse claude JSON output: {exc}", file=sys.stderr)
+        logger.warning("failed to parse claude JSON output: %s", exc)
 
     # Patch the AGENT_DONE event the agent wrote with real numbers
     if storage_path:

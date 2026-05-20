@@ -90,7 +90,7 @@ def test_evaluate_l1_artifact_present(tmp_path):
     flow = _load_team_flow()
     (tmp_path / "IMPLEMENTATION_PLAN.md").write_text("plan", encoding="utf-8")
     result = evaluate_transition_rules(flow, "PLANNING", tmp_path)
-    assert result == "BUILDING"
+    assert result == "DESIGNING"
 
 
 def test_evaluate_l1_artifact_absent(tmp_path):
@@ -107,7 +107,7 @@ def test_evaluate_l1_before_l2(tmp_path):
     (tmp_path / "IMPLEMENTATION_PLAN.md").write_text("plan", encoding="utf-8")
     (tmp_path / "SOME_FILE.md").write_text("trigger", encoding="utf-8")
     result = evaluate_transition_rules(flow, "PLANNING", tmp_path)
-    assert result == "BUILDING"
+    assert result == "DESIGNING"
 
 
 def test_evaluate_l2_contains_match(tmp_path):

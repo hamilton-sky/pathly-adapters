@@ -15,10 +15,14 @@ CLI usage (called by LLM via Bash or by the retro skill):
 
 from __future__ import annotations
 import json
+import logging
+import os
 import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger("pathly.eventlog")
 
 from pathly_orchestrator.state import valid_states, flow_transitions, VALID_STATES, TRANSITIONS
 
@@ -112,9 +116,17 @@ def write_state(storage_path: str, state: dict, flow: dict | None = None) -> Non
     path.parent.mkdir(parents=True, exist_ok=True)
     if "updated_at" not in state:
         state["updated_at"] = _now()
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
-        f.write("\n")
+    tmp_path = path.with_suffix(".tmp")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        tmp_path.replace(path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def read_events(storage_path: str) -> list[dict]:
@@ -133,15 +145,14 @@ def read_events(storage_path: str) -> list[dict]:
     for event in events:
         schema_version = event.get("schema_version")
         if schema_version is None:
-            print(
-                f"[warn] Event missing schema_version; assuming version {CURRENT_SCHEMA_VERSION}: {event}",
-                file=sys.stderr,
+            logger.warning(
+                "Event missing schema_version; assuming version %s: %s",
+                CURRENT_SCHEMA_VERSION, event,
             )
         elif schema_version > CURRENT_SCHEMA_VERSION:
-            print(
-                f"[warn] Event schema_version {schema_version} is newer than supported "
-                f"{CURRENT_SCHEMA_VERSION}; some fields may not be recognized: {event}",
-                file=sys.stderr,
+            logger.warning(
+                "Event schema_version %s is newer than supported %s; some fields may not be recognized: %s",
+                schema_version, CURRENT_SCHEMA_VERSION, event,
             )
     return events
 

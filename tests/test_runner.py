@@ -166,7 +166,7 @@ def test_resolve_stage_exceeds_max_feedback_rounds(tmp_path):
 
 def test_invoke_agent_timeout():
     mock_proc = MagicMock()
-    mock_proc.wait.side_effect = subprocess.TimeoutExpired(cmd="claude", timeout=1)
+    mock_proc.communicate.side_effect = subprocess.TimeoutExpired(cmd="claude", timeout=1)
     with patch("subprocess.Popen", return_value=mock_proc):
         with pytest.raises(RuntimeError, match="timed out"):
             invoke_agent("do stuff", "/proj", "claude-sonnet-4-6", timeout=1)
@@ -177,7 +177,8 @@ def test_invoke_agent_timeout():
 
 def test_invoke_agent_nonzero_exit():
     mock_proc = MagicMock()
-    mock_proc.wait.return_value = 1
+    mock_proc.communicate.return_value = (b'{}', None)
+    mock_proc.returncode = 1
     with patch("subprocess.Popen", return_value=mock_proc):
         with pytest.raises(RuntimeError, match="exited with code 1"):
             invoke_agent("do stuff", "/proj", "claude-sonnet-4-6")

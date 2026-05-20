@@ -12,6 +12,7 @@ Environment variables:
 """
 from __future__ import annotations
 
+import collections
 import json
 import logging
 import os
@@ -20,6 +21,7 @@ import re
 import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 
 try:
@@ -28,11 +30,95 @@ except ImportError:
     print("Error: Flask not installed. Install with: pip install flask", file=sys.stderr)
     sys.exit(1)
 
+from pathly_orchestrator.config import Settings
+from pathly_orchestrator.feature_flags import flags
 from pathly_orchestrator.fsm_ops import next_action, complete_stage
 from pathly_telemetry.storage import append_activity
 
 
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        log: dict = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%SZ"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            log["exc"] = self.formatException(record.exc_info)
+        extra = {k: v for k, v in record.__dict__.items()
+                 if k not in logging.LogRecord.__dict__ and not k.startswith("_")}
+        log.update(extra)
+        return json.dumps(log)
+
+
+def _setup_logging() -> None:
+    """Configure structured JSON logging."""
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(_JsonFormatter())
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+
+logger = logging.getLogger("pathly.http")
+
+_RATE_LIMIT_WINDOW = 60   # seconds
+_RATE_LIMIT_MAX = 120     # requests per window per IP
+_rate_counters: dict[str, collections.deque] = {}
+_rate_lock = threading.Lock()
+
+# Prometheus-format metrics
+_metrics: dict[str, int | float] = {
+    "pathly_requests_total": 0,
+    "pathly_requests_rate_limited_total": 0,
+    "pathly_request_errors_total": 0,
+    "pathly_sse_clients_active": 0,
+}
+_metrics_lock = threading.Lock()
+
+
+def _inc(key: str, amount: int | float = 1) -> None:
+    with _metrics_lock:
+        _metrics[key] = _metrics.get(key, 0) + amount
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """Return True if the request is allowed, False if rate limited."""
+    now = time.time()
+    cutoff = now - _RATE_LIMIT_WINDOW
+    with _rate_lock:
+        dq = _rate_counters.setdefault(ip, collections.deque())
+        while dq and dq[0] < cutoff:
+            dq.popleft()
+        if len(dq) >= _RATE_LIMIT_MAX:
+            return False
+        dq.append(now)
+        return True
+
+
 app = Flask(__name__)
+
+
+@app.before_request
+def _log_request():
+    if flags.rate_limiting and not _check_rate_limit(request.remote_addr or "unknown"):
+        _inc("pathly_requests_rate_limited_total")
+        return jsonify({"error": "Rate limit exceeded"}), 429
+    _inc("pathly_requests_total")
+    request_id = str(uuid.uuid4())[:8]
+    request.environ["REQUEST_ID"] = request_id
+    logger.info("request", extra={"request_id": request_id, "method": request.method, "path": request.path, "remote": request.remote_addr})
+
+
+@app.after_request
+def _log_response(response):
+    request_id = request.environ.get("REQUEST_ID", "")
+    logger.info("response", extra={"request_id": request_id, "status": response.status_code})
+    if response.status_code >= 500:
+        _inc("pathly_request_errors_total")
+    return response
 
 # SSE client registry: (topic, project_root) -> list of subscriber queues
 _clients: dict[tuple[str, str], list[queue.Queue]] = {}
@@ -64,14 +150,48 @@ def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
                             _broadcast(key, raw)
                     pos = f.tell()
         except Exception:
-            pass
+            logger.debug("tail_events error", exc_info=True)
         stop.wait(0.1)
 
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint."""
-    return jsonify({"status": "ok"}), 200
+    """Deep health check."""
+    checks: dict[str, object] = {
+        "status": "ok",
+        "server": "pathly-fsm-http",
+        "sse_clients": _metrics.get("pathly_sse_clients_active", 0),
+    }
+    project_root = os.environ.get("PATHLY_PROJECT_ROOT", "")
+    if project_root:
+        from pathlib import Path
+        root = Path(project_root)
+        checks["project_root_exists"] = root.exists()
+        checks["project_root_writable"] = os.access(project_root, os.W_OK)
+    return jsonify(checks), 200
+
+
+@app.route('/metrics', methods=['GET'])
+def metrics_endpoint():
+    """Prometheus text-format metrics endpoint."""
+    from flask import Response
+    with _metrics_lock:
+        snapshot = dict(_metrics)
+    lines = [
+        "# HELP pathly_requests_total Total HTTP requests received",
+        "# TYPE pathly_requests_total counter",
+        f"pathly_requests_total {snapshot.get('pathly_requests_total', 0)}",
+        "# HELP pathly_requests_rate_limited_total Requests rejected by rate limiter",
+        "# TYPE pathly_requests_rate_limited_total counter",
+        f"pathly_requests_rate_limited_total {snapshot.get('pathly_requests_rate_limited_total', 0)}",
+        "# HELP pathly_request_errors_total HTTP 5xx responses",
+        "# TYPE pathly_request_errors_total counter",
+        f"pathly_request_errors_total {snapshot.get('pathly_request_errors_total', 0)}",
+        "# HELP pathly_sse_clients_active Currently connected SSE clients",
+        "# TYPE pathly_sse_clients_active gauge",
+        f"pathly_sse_clients_active {snapshot.get('pathly_sse_clients_active', 0)}",
+    ]
+    return Response("\n".join(lines) + "\n", mimetype="text/plain; version=0.0.4")
 
 
 _ARCH_QUESTION = re.compile(r"\b(architect|architecture|architectural|design|approach|structure)\b", re.IGNORECASE)
@@ -126,7 +246,7 @@ def _process_feedback_file(path: Path) -> None:
         content = _classify_content(content)
         path.write_text(content, encoding="utf-8")
     except OSError:
-        pass
+        logger.warning("feedback file write failed: %s", path, exc_info=True)
 
 
 def _feedback_watcher(project_root: str, stop: threading.Event) -> None:
@@ -140,7 +260,7 @@ def _feedback_watcher(project_root: str, stop: threading.Event) -> None:
                     seen[md_file] = mtime
                     _process_feedback_file(md_file)
         except Exception:
-            pass
+            logger.warning("feedback watcher error", exc_info=True)
         stop.wait(2.0)
 
 
@@ -163,6 +283,10 @@ def next_action_endpoint():
         missing = required - set(data.keys())
         if missing:
             return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+
+        for field in ("flow", "topic", "project_root"):
+            if not isinstance(data.get(field), str) or not data[field].strip():
+                return jsonify({"error": f"Field '{field}' must be a non-empty string"}), 400
 
         result = next_action(data)
         return jsonify(result), 200
@@ -193,6 +317,10 @@ def complete_stage_endpoint():
         if missing:
             return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
 
+        for field in ("flow", "topic", "project_root"):
+            if not isinstance(data.get(field), str) or not data[field].strip():
+                return jsonify({"error": f"Field '{field}' must be a non-empty string"}), 400
+
         result = complete_stage(data)
         return jsonify(result), 200
     except Exception as e:
@@ -213,13 +341,22 @@ def record_activity_endpoint():
         if missing:
             return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
 
-        append_activity(
-            agent=data["agent"],
-            feature=data["feature"],
-            summary=data["summary"],
-            input_tokens=int(data.get("input_tokens", 0)),
-            output_tokens=int(data.get("output_tokens", 0)),
-        )
+        for field in ("agent", "feature", "summary"):
+            if not isinstance(data.get(field), str) or not data[field].strip():
+                return jsonify({"error": f"Field '{field}' must be a non-empty string"}), 400
+        for field in ("input_tokens", "output_tokens"):
+            val = data.get(field, 0)
+            if not isinstance(val, (int, float)) or val < 0:
+                return jsonify({"error": f"Field '{field}' must be a non-negative number"}), 400
+
+        if flags.telemetry:
+            append_activity(
+                agent=data["agent"],
+                feature=data["feature"],
+                summary=data["summary"],
+                input_tokens=int(data.get("input_tokens", 0)),
+                output_tokens=int(data.get("output_tokens", 0)),
+            )
         return jsonify({"status": "recorded"}), 200
     except Exception as e:
         logging.exception("record_activity error")
@@ -230,6 +367,9 @@ def record_activity_endpoint():
 def events_stream():
     """SSE endpoint: streams new EVENTS.jsonl lines to the Studio UI."""
     from flask import Response, stream_with_context
+
+    if not flags.sse_streaming:
+        return jsonify({"error": "SSE streaming is disabled"}), 503
 
     topic = request.args.get('topic', '')
     project_root = request.args.get('project_root', '')
@@ -246,6 +386,7 @@ def events_stream():
 
     with _lock:
         _clients.setdefault(key, []).append(client_q)
+        _inc("pathly_sse_clients_active")
         if key not in _tailers:
             stop = threading.Event()
             _tailers[key] = stop
@@ -267,6 +408,7 @@ def events_stream():
                 lst = _clients.get(key, [])
                 if client_q in lst:
                     lst.remove(client_q)
+                    _inc("pathly_sse_clients_active", -1)
                 if not lst:
                     stop_evt = _tailers.pop(key, None)
                     if stop_evt is not None:
@@ -279,25 +421,32 @@ def events_stream():
         headers={
             'Cache-Control': 'no-cache',
             'X-Accel-Buffering': 'no',
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': os.environ.get("PATHLY_CORS_ORIGIN", "null"),
         }
     )
 
 
 def main() -> None:
     """Start the HTTP server."""
-    port = int(os.environ.get("PATHLY_FSM_HTTP_PORT", "8765"))
-    host = os.environ.get("PATHLY_FSM_HTTP_HOST", "127.0.0.1")
+    _setup_logging()
 
-    print(f"Starting pathly-fsm HTTP server on {host}:{port}", file=sys.stderr)
-    print(f"  POST {host}:{port}/next_action", file=sys.stderr)
-    print(f"  POST {host}:{port}/complete_stage", file=sys.stderr)
-    print(f"  GET  {host}:{port}/health", file=sys.stderr)
-    print(f"  GET  {host}:{port}/events/stream?topic=TOPIC&project_root=PATH", file=sys.stderr)
+    settings = Settings.from_env()
+    port = settings.port
+    host = settings.host
 
-    project_root = os.environ.get("PATHLY_PROJECT_ROOT", "")
+    import pathly_orchestrator.http_server as _self
+    _self._RATE_LIMIT_MAX = settings.rate_limit_max
+    _self._RATE_LIMIT_WINDOW = settings.rate_limit_window
+
+    logger.info("Starting pathly-fsm HTTP server on %s:%s", host, port)
+    logger.info("  POST %s:%s/next_action", host, port)
+    logger.info("  POST %s:%s/complete_stage", host, port)
+    logger.info("  GET  %s:%s/health", host, port)
+    logger.info("  GET  %s:%s/events/stream?topic=TOPIC&project_root=PATH", host, port)
+
+    project_root = settings.project_root
     _watcher_stop = threading.Event()
-    if project_root:
+    if project_root and flags.feedback_watcher:
         threading.Thread(target=_feedback_watcher, args=(project_root, _watcher_stop), daemon=True).start()
 
     # Run Flask in non-debug mode, with warnings suppressed
