@@ -908,6 +908,7 @@ export function HomeScreen(): JSX.Element {
           )
         })()}
       </div>
+    </>}
     </div>
   )
 }
