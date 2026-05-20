@@ -33,11 +33,9 @@ Parse the `<usage>` block from quick's response:
 - `tool_uses`: the number after `tool_uses:` (0 if absent)
 - `duration_ms`: the number after `duration_ms:` (0 if absent)
 
-- Append `{"type": "AGENT_DONE", "agent": "quick", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <tool_uses>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
-
-Then invoke the `record-cost` skill with:
+Then invoke the `log-agent-done` skill with:
 ```json
-{"agent":"quick","feature":"<FEATURE>","summary":"Retro complete","conversation":0,"wall_seconds":<seconds>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
+{"agent":"quick","feature":"<FEATURE>","conversation":0,"result":"DONE","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
 ```
 
 **Generate pipeline-walkthrough files:**

@@ -1,5 +1,8 @@
 # record-cost
 
+> Note: for standard pipeline stages that write AGENT_DONE, use `log-agent-done` instead.
+> Use `record-cost` only when you need telemetry without an AGENT_DONE event.
+
 Internal utility — POSTs agent completion telemetry to the Pathly HTTP backend.
 Use this instead of the MCP `record_activity` tool.
 Called by stage skills (build, review, test) after writing AGENT_DONE to EVENTS.jsonl.

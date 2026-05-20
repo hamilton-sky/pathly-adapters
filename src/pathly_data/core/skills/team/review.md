@@ -146,14 +146,13 @@ After the reviewer agent completes (Phase 3), parse the `<usage>` block from its
 - `tool_uses`: the number after `tool_uses:` (0 if absent)
 - `duration_ms`: the number after `duration_ms:` (0 if absent)
 
-Compute wall_seconds: run `python -c "import time; print(int(time.time()) - REVIEW_START)"` using `REVIEW_START` from Phase 0 (used as fallback if duration_ms is 0).
-Append `{"type": "AGENT_DONE", "agent": "reviewer", "model": "<model>", "conversation": <N>, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": <tool_uses>, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
-Note: tokens/cost are 0 in Claude Code path; runner.py populates them when using `pathly-run` CLI.
+Compute wall_seconds fallback: run `python -c "import time; print(int(time.time()) - REVIEW_START)"` using `REVIEW_START` from Phase 0.
 
-Then invoke the `record-cost` skill with:
+Then invoke the `log-agent-done` skill with:
 ```json
-{"agent":"reviewer","feature":"<FEATURE>","summary":"Conv <N> review PASS","conversation":<N>,"wall_seconds":<computed>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
+{"agent":"reviewer","feature":"<FEATURE>","conversation":<N>,"result":"PASS","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
 ```
+(wall_seconds is the fallback computed from REVIEW_START; log-agent-done prefers duration_ms if > 0)
 
 ---
 

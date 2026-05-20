@@ -136,12 +136,12 @@ After the tester agent completes (Phase 3), parse the `<usage>` block from its r
 - `tool_uses`: the number after `tool_uses:` (0 if absent)
 - `duration_ms`: the number after `duration_ms:` (0 if absent)
 
-Compute wall_seconds from `TEST_START` (recorded in Phase 0 / Pre-gate section) as fallback if duration_ms is 0.
-Append `{"type": "AGENT_DONE", "agent": "tester", "model": "<model>", "conversation": 0, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": <tool_uses>, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to `plans/<feature>/EVENTS.jsonl`.
+Compute wall_seconds fallback: run `python -c "import time; print(int(time.time()) - TEST_START)"` using `TEST_START` from Phase 0.
 
-Then invoke the `record-cost` skill with:
+Then invoke the `log-agent-done` skill with:
 ```json
-{"agent":"tester","feature":"<FEATURE>","summary":"All acceptance tests pass","conversation":0,"wall_seconds":<computed>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
+{"agent":"tester","feature":"<FEATURE>","conversation":0,"result":"PASS","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
 ```
+(wall_seconds is the fallback computed from TEST_START; log-agent-done prefers duration_ms if > 0)
 
 Return. Orchestrator determines next state from transition_rules.

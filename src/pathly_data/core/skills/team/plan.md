@@ -182,13 +182,13 @@ If autoFlow: log human response "auto-advance".
 
 Transition state → BUILDING.
 
-Compute wall_seconds: run `python -c "import time; print(int(time.time()) - PLAN_START)"` (used as fallback if duration_ms is 0).
-Append `{"type": "AGENT_DONE", "agent": "planner", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": <tool_uses>, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to `plans/<feature>/EVENTS.jsonl`.
+Compute wall_seconds fallback: run `python -c "import time; print(int(time.time()) - PLAN_START)"` using `PLAN_START` from Stage 2.
 
-Then invoke the `record-cost` skill with:
+Then invoke the `log-agent-done` skill with:
 ```json
-{"agent":"planner","feature":"<FEATURE>","summary":"Planning complete","conversation":0,"wall_seconds":<computed>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
+{"agent":"planner","feature":"<FEATURE>","conversation":0,"result":"DONE","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
 ```
+(wall_seconds is the fallback computed from PLAN_START; log-agent-done prefers duration_ms if > 0)
 
 Route back to `team [FEATURE] [rigor] [autoFlow]`.
 

@@ -149,20 +149,18 @@ After the builder agent completes (Phase 3 — Implement), parse the `<usage>` b
 - `tool_uses`: the number after `tool_uses:` (0 if absent)
 - `duration_ms`: the number after `duration_ms:` (0 if absent)
 
-Compute wall_seconds: run `python -c "import time; print(int(time.time()) - BUILD_START)"` using `BUILD_START` from Step 4.5 (used as fallback if duration_ms is 0).
+Compute wall_seconds fallback: run `python -c "import time; print(int(time.time()) - BUILD_START)"` using `BUILD_START` from Step 4.5.
 
 Append to `plans/<feature>/EVENTS.jsonl`:
 ```
-{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": <tool_uses>, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "<iso-timestamp>"}
 ```
 
-Note: tokens/cost are 0 in the Claude Code path; runner.py populates them automatically when running via `pathly-run` CLI.
-
-Then invoke the `record-cost` skill with:
+Then invoke the `log-agent-done` skill with:
 ```json
-{"agent":"builder","feature":"<feature>","summary":"Conv <N> build complete","conversation":<N>,"wall_seconds":<computed>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
+{"agent":"builder","feature":"<feature>","conversation":<N>,"result":"DONE","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
 ```
+(wall_seconds is the fallback computed from BUILD_START; log-agent-done prefers duration_ms if > 0)
 
 Do not invoke any other skill. The orchestrator reads STATE.json and decides what comes next.
 

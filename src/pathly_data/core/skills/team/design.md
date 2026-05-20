@@ -80,14 +80,10 @@ Append to `pathly/plans/<feature>/EVENTS.jsonl`:
 ```
 
 Compute wall_seconds: run `python -c "import time; print(int(time.time()) - DESIGN_START)"`.
-Append to `pathly/plans/<feature>/EVENTS.jsonl`:
-```json
-{"type": "AGENT_DONE", "agent": "designer", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}
-```
 
-Then invoke the `record-cost` skill with:
+Then invoke the `log-agent-done` skill with:
 ```json
-{"agent":"designer","feature":"<FEATURE>","summary":"Design system generated","conversation":0,"wall_seconds":<computed>,"total_tokens":0,"tool_uses":0,"duration_ms":0}
+{"agent":"designer","feature":"<FEATURE>","conversation":0,"result":"DONE","total_tokens":0,"tool_uses":0,"duration_ms":0,"wall_seconds":<computed>}
 ```
 
 Write `pathly/plans/<feature>/STATE.json`:
