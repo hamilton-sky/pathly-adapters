@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FolderPlus, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { FilePlus, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { PathlyItem, SectionState, PathlyReorgDragItem, PathlyFolderDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
@@ -52,6 +52,7 @@ interface Props {
   onMoveFolder?: (sourcePath: string, targetSectionDir: string) => void
   onDeletePlanFolder?: (folderPath: string) => void
   onDeleteCustomSection?: (sectionDir: string) => void
+  onInlineCreateFileInFolder?: (folderPath: string) => void
   customWorkspaceSections?: Section[]
 }
 
@@ -68,7 +69,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
     onReorgDrop, onRenameFolder, onDeleteFolder, onMoveFolder, onDeletePlanFolder,
-    onDeleteCustomSection, customWorkspaceSections = [],
+    onDeleteCustomSection, onInlineCreateFileInFolder, customWorkspaceSections = [],
   } = props
 
   const { userLockedFolders, toggleFolderLock } = useUiStore()
@@ -76,6 +77,21 @@ export function WorkspacePanel(props: Props): JSX.Element {
   const [dragOverSection, setDragOverSection] = useState<string | null>(null)
   const [renamingFolderPath, setRenamingFolderPath] = useState<string | null>(null)
   const [renamingFolderValue, setRenamingFolderValue] = useState('')
+  const [customSectionMenuOpen, setCustomSectionMenuOpen] = useState<string | null>(null)
+  const customSectionMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!customSectionMenuOpen) return
+    function onOutside(e: MouseEvent): void {
+      if (customSectionMenuRef.current && !customSectionMenuRef.current.contains(e.target as Node)) {
+        setCustomSectionMenuOpen(null)
+      }
+    }
+    function onEsc(e: KeyboardEvent): void { if (e.key === 'Escape') setCustomSectionMenuOpen(null) }
+    document.addEventListener('mousedown', onOutside)
+    document.addEventListener('keydown', onEsc)
+    return () => { document.removeEventListener('mousedown', onOutside); document.removeEventListener('keydown', onEsc) }
+  }, [customSectionMenuOpen])
 
   return (
     <>
@@ -233,6 +249,10 @@ export function WorkspacePanel(props: Props): JSX.Element {
                             ? () => onDeleteFolder?.(folderKey)
                             : undefined
                         }
+                        onCreateFileInFolder={() => {
+                          if (!subdir.open) onToggleSubdir(section.label, idx)
+                          onInlineCreateFileInFolder?.(folderKey)
+                        }}
                         onFolderDragStart={(e) => {
                           const payload: PathlyFolderDragItem = {
                             dragType: 'reorg-folder',
@@ -244,6 +264,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           e.dataTransfer.effectAllowed = 'move'
                         }}
                       />
+                      {subdir.open && inlineCreate?.target === folderKey && (
+                        <InlineCreateInput
+                          type="file"
+                          deep
+                          onCommit={onInlineCreateSubmit}
+                          onCancel={onInlineCreateCancel}
+                        />
+                      )}
                       {subdir.open && filteredFiles.map((item) => (
                         <WorkspaceItem
                           key={item.path}
@@ -286,20 +314,48 @@ export function WorkspacePanel(props: Props): JSX.Element {
               label={section.label}
               open={state.open}
               onToggle={() => onToggleSection(section.label)}
-              actionsLeft={
-                <IconButton onClick={(e) => onInlineCreateFolder(section, e)} title="New folder">
-                  <FolderPlus size={12} />
-                </IconButton>
-              }
+              alwaysShowActions
               actions={
-                <>
-                  <IconButton onClick={(e) => onInlineCreateFile(section, e)} title="New file">
-                    <Plus size={12} />
-                  </IconButton>
-                  <IconButton onClick={() => onDeleteCustomSection?.(section.dir)} title="Delete this section folder">
-                    <Trash2 size={12} />
-                  </IconButton>
-                </>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {userLockedFolders.has(sectionTargetDir) && (
+                    <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked">
+                      <Lock size={11} />
+                    </span>
+                  )}
+                  <button
+                    className={styles.rowAction}
+                    title="Actions"
+                    onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(v => v === section.label ? null : section.label) }}
+                  >
+                    <MoreHorizontal size={13} />
+                  </button>
+                  {customSectionMenuOpen === section.label && (
+                    <div className={styles.itemMenu} ref={customSectionMenuRef}>
+                      <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); onInlineCreateFolder(section, e) }}>
+                        <FolderPlus size={12} />
+                        New folder
+                      </button>
+                      <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); onInlineCreateFile(section, e) }}>
+                        <FilePlus size={12} />
+                        New file
+                      </button>
+                      <div className={styles.itemMenuSep} />
+                      <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); toggleFolderLock(sectionTargetDir) }}>
+                        <Lock size={12} />
+                        {userLockedFolders.has(sectionTargetDir) ? 'Unlock section' : 'Lock section'}
+                      </button>
+                      {!userLockedFolders.has(sectionTargetDir) && (
+                        <>
+                          <div className={styles.itemMenuSep} />
+                          <button className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); onDeleteCustomSection?.(section.dir) }}>
+                            <Trash2 size={12} />
+                            Delete section
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               }
             />
             {state.open && (
@@ -311,6 +367,25 @@ export function WorkspacePanel(props: Props): JSX.Element {
                     onCancel={onInlineCreateCancel}
                   />
                 )}
+                {(state.items ?? []).filter(item => item.name !== '.gitkeep').map((item) => (
+                  <WorkspaceItem
+                    key={item.path}
+                    item={item}
+                    itemDir={sectionTargetDir}
+                    isSelected={selectedItem?.path === item.path}
+                    isDirty={dirtyItems.has(item.path)}
+                    renamingPath={renamingPath}
+                    renameValue={renameValue}
+                    onSelect={() => onSelect(item)}
+                    onRenameChange={onRenameChange}
+                    onRenameCommit={() => onRenameCommit(item, sectionTargetDir)}
+                    onRenameCancel={onRenameCancel}
+                    onStartRename={() => onStartRename(item, sectionTargetDir)}
+                    onStartDelete={() => onStartDelete(item)}
+                    sectionId={section.type}
+                    isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
+                  />
+                ))}
                 {subdirs.map((subdir, idx) => {
                   const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
                   if (filter && filteredFiles.length === 0) return null
@@ -336,12 +411,24 @@ export function WorkspacePanel(props: Props): JSX.Element {
                         onRenameCancel={() => setRenamingFolderPath(null)}
                         onStartRenameFolder={() => { setRenamingFolderValue(subdir.name); setRenamingFolderPath(folderKey) }}
                         onStartDeleteFolder={!userLockedFolders.has(folderKey) ? () => onDeleteFolder?.(folderKey) : undefined}
+                        onCreateFileInFolder={() => {
+                          if (!subdir.open) onToggleSubdir(section.label, idx)
+                          onInlineCreateFileInFolder?.(folderKey)
+                        }}
                         onFolderDragStart={(e) => {
                           const payload = { dragType: 'reorg-folder', name: subdir.name, sourcePath: folderKey, sectionDir: sectionTargetDir }
                           e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
                           e.dataTransfer.effectAllowed = 'move'
                         }}
                       />
+                      {subdir.open && inlineCreate?.target === folderKey && (
+                        <InlineCreateInput
+                          type="file"
+                          deep
+                          onCommit={onInlineCreateSubmit}
+                          onCancel={onInlineCreateCancel}
+                        />
+                      )}
                       {subdir.open && filteredFiles.map((item) => (
                         <WorkspaceItem
                           key={item.path}

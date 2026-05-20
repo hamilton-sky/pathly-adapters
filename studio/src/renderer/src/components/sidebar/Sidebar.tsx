@@ -89,6 +89,7 @@ export function Sidebar(): JSX.Element | null {
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [renameValue, setRenameValue]   = useState('')
   const [confirmDelete, setConfirmDelete] = useState<PathlyItem | null>(null)
+  const [confirmDeleteSection, setConfirmDeleteSection] = useState<{ dir: string; name: string } | null>(null)
   const [dragOverPath, setDragOverPath] = useState<string | null>(null)
   const [inlineCreate, setInlineCreate] = useState<{
     target: string   // 'workspace-root' | 'plan-folder' | 'plan-file' | section label
@@ -145,6 +146,10 @@ export function Sidebar(): JSX.Element | null {
     e.stopPropagation()
     if (!projectPath) return
     setInlineCreate({ target: section.dir, parentDir: `${projectPath}/${section.dir}`, type: 'folder' })
+  }
+
+  function handleInlineCreateFileInFolder(folderPath: string): void {
+    setInlineCreate({ target: folderPath, parentDir: folderPath, type: 'file' })
   }
 
   function handleCreateTopLevelFolder(e: React.MouseEvent<HTMLButtonElement>): void {
@@ -256,7 +261,12 @@ export function Sidebar(): JSX.Element | null {
     await loadItems()
   }
 
-  async function handleDeleteCustomSection(sectionDir: string): Promise<void> {
+  function handleDeleteCustomSection(sectionDir: string): void {
+    const name = sectionDir.split('/').pop() ?? sectionDir
+    setConfirmDeleteSection({ dir: sectionDir, name })
+  }
+
+  async function doDeleteCustomSection(sectionDir: string): Promise<void> {
     if (!projectPath) return
     const sectionPath = `${projectPath}/${sectionDir}`
     try {
@@ -273,6 +283,7 @@ export function Sidebar(): JSX.Element | null {
     } catch (err) {
       console.error('Delete section failed:', err)
     }
+    setConfirmDeleteSection(null)
     await loadItems()
   }
 
@@ -488,6 +499,7 @@ export function Sidebar(): JSX.Element | null {
             onMoveFolder={(src, tgt) => { void handleMoveFolder(src, tgt) }}
             onDeletePlanFolder={(folderPath) => { void handleDeletePlanFolder(folderPath) }}
             onDeleteCustomSection={(dir) => { void handleDeleteCustomSection(dir) }}
+            onInlineCreateFileInFolder={handleInlineCreateFileInFolder}
             customWorkspaceSections={customWorkspaceSections}
           />
         )}
@@ -548,6 +560,13 @@ export function Sidebar(): JSX.Element | null {
           item={confirmDelete}
           onCancel={() => setConfirmDelete(null)}
           onConfirm={() => void doDelete(confirmDelete)}
+        />
+      )}
+      {confirmDeleteSection && (
+        <DeleteConfirmModal
+          item={{ name: confirmDeleteSection.name, path: confirmDeleteSection.dir, type: 'explore' }}
+          onCancel={() => setConfirmDeleteSection(null)}
+          onConfirm={() => void doDeleteCustomSection(confirmDeleteSection.dir)}
         />
       )}
     </div>

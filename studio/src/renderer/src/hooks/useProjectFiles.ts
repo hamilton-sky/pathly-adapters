@@ -231,25 +231,11 @@ export function useProjectFiles(): {
         const label = dirName.charAt(0).toUpperCase() + dirName.slice(1)
         const dir = `pathly/${dirName}`
         discovered.push({ label, type: 'explore', dir })
-        try {
-          const sectionPath = `${projectPath}/${dir}`
-          const subdirNames = await listDirs(sectionPath)
-          const subdirs: TemplateSubdir[] = []
-          for (const subdirName of subdirNames) {
-            const subdirPath = `${sectionPath}/${subdirName}`
-            let files: PathlyItem[] = []
-            try {
-              const fileNames = await listDir(subdirPath)
-              files = fileNames
-                .filter((f) => f !== '.gitkeep')
-                .map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: 'explore' as const }))
-            } catch { /* empty */ }
-            subdirs.push({ name: subdirName, open: false, files })
-          }
-          setSections((prev) => ({ ...prev, [label]: { open: prev[label]?.open ?? true, items: [], subdirs } }))
-        } catch {
-          setSections((prev) => ({ ...prev, [label]: { open: prev[label]?.open ?? true, items: [], subdirs: null } }))
-        }
+        const result = await loadSubdirAwareSection(`${projectPath}/${dir}`, 'explore')
+        setSections((prev) => ({
+          ...prev,
+          [label]: { open: prev[label]?.open ?? true, items: result.items, subdirs: result.subdirs ?? undefined },
+        }))
       }
       setCustomWorkspaceSections(discovered)
     } catch { /* pathly/ root not found */ }

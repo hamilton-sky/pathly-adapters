@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { ChevronRight, ChevronDown, Folder, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, FilePlus, Folder, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { RenameInput } from './RenameInput'
 import styles from './Sidebar.module.css'
 
@@ -12,6 +12,7 @@ interface Props {
   onToggleFolderLock?: () => void
   onStartDeleteFolder?: () => void
   onStartRenameFolder?: () => void
+  onCreateFileInFolder?: () => void
   onFolderDragStart?: (e: React.DragEvent) => void
   renamingThis?: boolean
   renameValue?: string
@@ -34,6 +35,7 @@ export function SubdirRow({
   onToggleFolderLock,
   onStartDeleteFolder,
   onStartRenameFolder,
+  onCreateFileInFolder,
   onFolderDragStart,
   renamingThis,
   renameValue,
@@ -126,6 +128,15 @@ export function SubdirRow({
 
           {menuOpen && (
             <div className={styles.itemMenu} ref={menuRef}>
+              {onCreateFileInFolder && (
+                <button
+                  className={styles.itemMenuItem}
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onCreateFileInFolder() }}
+                >
+                  <FilePlus size={12} />
+                  New file
+                </button>
+              )}
               {onStartRenameFolder && (
                 <button
                   className={styles.itemMenuItem}

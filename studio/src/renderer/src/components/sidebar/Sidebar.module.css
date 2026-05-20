@@ -143,6 +143,7 @@
   flex-shrink: 0;
 }
 .sectionRow:hover .sectionActions { opacity: 1; }
+.sectionActionsAlwaysOn { opacity: 1; }
 
 .sectionSub {
   color: var(--text-muted);
