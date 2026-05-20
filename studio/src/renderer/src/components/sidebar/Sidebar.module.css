@@ -206,6 +206,7 @@
 
 /* ── File item rows ── */
 .itemRow {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
@@ -411,7 +412,7 @@
   text-transform: uppercase;
 }
 
-/* ── Row hover actions (pencil + trash) ── */
+/* ── Row hover actions — ⋯ button + lock toggle ── */
 .rowActions {
   display: flex;
   gap: 2px;
@@ -423,6 +424,9 @@
 }
 .itemRow:hover .rowActions { opacity: 1; }
 .systemItemRow:hover .rowActions { opacity: 1; }
+/* always show lock icon even without hover */
+.rowActionsLocked { opacity: 1; }
+
 .rowAction {
   display: flex;
   align-items: center;
@@ -437,6 +441,50 @@
 }
 .rowAction:hover { background: var(--bg-surface1); color: var(--text-primary); }
 .rowActionDelete:hover { color: var(--red); }
+.rowActionLock { color: var(--accent); opacity: 0.8; }
+.rowActionLock:hover { background: var(--bg-surface1); opacity: 1; color: var(--accent); }
+
+/* ── Item context menu popover ── */
+.itemMenu {
+  position: absolute;
+  right: 4px;
+  top: calc(100% + 2px);
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  min-width: 130px;
+  padding: 4px 0;
+  animation: menuFadeIn 0.08s ease-out;
+}
+@keyframes menuFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.itemMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-family-base);
+  transition: background 0.08s, color 0.08s;
+}
+.itemMenuItem:hover { background: var(--bg-surface0); color: var(--text-primary); }
+.itemMenuItemDelete:hover { color: var(--red); }
+.itemMenuSep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 3px 0;
+}
 
 /* ── Inline rename input ── */
 .renameInput {
