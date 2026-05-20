@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Plus, Trash2 } from 'lucide-react'
 import type { PathlyItem } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
@@ -6,6 +6,7 @@ import { IconButton } from '../ui'
 import { SectionHeader } from './SectionHeader'
 import { WorkspaceItem } from './WorkspaceItem'
 import { InlineCreateInput } from './InlineCreateInput'
+import { ContextMenu } from './ContextMenu'
 import { PROTECTED_FILENAMES } from './constants'
 import styles from './Sidebar.module.css'
 
@@ -61,7 +62,8 @@ export function PlanSection({
   onDeletePlanFolder,
 }: Props): JSX.Element {
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null)
+  const sidebarWidth = parseInt(localStorage.getItem('sidebar-width') ?? '240', 10)
 
   const visibleFolders = lowerFilter
     ? planFolders.filter((f) =>
@@ -147,12 +149,21 @@ export function PlanSection({
                       <button
                         className={styles.rowAction}
                         title="Actions"
-                        onClick={(e) => { e.stopPropagation(); setMenuOpenFor(v => v === folder.name ? null : folder.name) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const next = menuOpenFor === folder.name ? null : folder.name
+                          setMenuOpenFor(next)
+                          if (next) setMenuAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())
+                        }}
                       >
                         <MoreHorizontal size={13} />
                       </button>
-                      {menuOpenFor === folder.name && (
-                        <div className={styles.itemMenu} ref={menuRef}>
+                      {menuOpenFor === folder.name && menuAnchor && (
+                        <ContextMenu
+                          anchor={menuAnchor}
+                          sidebarWidth={sidebarWidth}
+                          onClose={() => setMenuOpenFor(null)}
+                        >
                           <button
                             className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`}
                             onClick={(e) => { e.stopPropagation(); setMenuOpenFor(null); onDeletePlanFolder(folder.path) }}
@@ -160,7 +171,7 @@ export function PlanSection({
                             <Trash2 size={12} />
                             Delete folder
                           </button>
-                        </div>
+                        </ContextMenu>
                       )}
                     </div>
                   )}

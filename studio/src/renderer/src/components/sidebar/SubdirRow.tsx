@@ -1,6 +1,7 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ChevronRight, ChevronDown, FilePlus, Folder, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { RenameInput } from './RenameInput'
+import { ContextMenu } from './ContextMenu'
 import styles from './Sidebar.module.css'
 
 interface Props {
@@ -48,28 +49,13 @@ export function SubdirRow({
   onDragLeave,
 }: Props): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const rowRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!menuOpen) return
-    function onOutside(e: MouseEvent): void {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    function onEscape(e: KeyboardEvent): void {
-      if (e.key === 'Escape') setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onOutside)
-    document.addEventListener('keydown', onEscape)
-    return () => {
-      document.removeEventListener('mousedown', onOutside)
-      document.removeEventListener('keydown', onEscape)
-    }
-  }, [menuOpen])
+  const sidebarWidth = parseInt(localStorage.getItem('sidebar-width') ?? '240', 10)
 
   return (
     <div
+      ref={rowRef}
       className={`${styles.subdirHeader}${isDragOver ? ` ${styles.subdirRowDragOver}` : ''}`}
       draggable={!isSystemFolder && !renamingThis && Boolean(onFolderDragStart)}
       onClick={onToggle}
@@ -126,8 +112,12 @@ export function SubdirRow({
             <MoreHorizontal size={13} />
           </button>
 
-          {menuOpen && (
-            <div className={styles.itemMenu} ref={menuRef}>
+          {menuOpen && rowRef.current && (
+            <ContextMenu
+              anchor={rowRef.current.getBoundingClientRect()}
+              sidebarWidth={sidebarWidth}
+              onClose={() => setMenuOpen(false)}
+            >
               {onCreateFileInFolder && (
                 <button
                   className={styles.itemMenuItem}
@@ -165,7 +155,7 @@ export function SubdirRow({
                   </button>
                 </>
               )}
-            </div>
+            </ContextMenu>
           )}
         </div>
       ) : null}

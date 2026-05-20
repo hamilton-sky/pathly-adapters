@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { FilePlus, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { PathlyItem, SectionState, PathlyReorgDragItem, PathlyFolderDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
@@ -9,6 +9,7 @@ import { SubdirRow } from './SubdirRow'
 import { WorkspaceItem } from './WorkspaceItem'
 import { PlanSection } from './PlanSection'
 import { InlineCreateInput } from './InlineCreateInput'
+import { ContextMenu } from './ContextMenu'
 import { WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from './constants'
 import type { Section } from './types'
 import { useUiStore } from '../../store/uiStore'
@@ -78,20 +79,8 @@ export function WorkspacePanel(props: Props): JSX.Element {
   const [renamingFolderPath, setRenamingFolderPath] = useState<string | null>(null)
   const [renamingFolderValue, setRenamingFolderValue] = useState('')
   const [customSectionMenuOpen, setCustomSectionMenuOpen] = useState<string | null>(null)
-  const customSectionMenuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!customSectionMenuOpen) return
-    function onOutside(e: MouseEvent): void {
-      if (customSectionMenuRef.current && !customSectionMenuRef.current.contains(e.target as Node)) {
-        setCustomSectionMenuOpen(null)
-      }
-    }
-    function onEsc(e: KeyboardEvent): void { if (e.key === 'Escape') setCustomSectionMenuOpen(null) }
-    document.addEventListener('mousedown', onOutside)
-    document.addEventListener('keydown', onEsc)
-    return () => { document.removeEventListener('mousedown', onOutside); document.removeEventListener('keydown', onEsc) }
-  }, [customSectionMenuOpen])
+  const [customSectionMenuAnchor, setCustomSectionMenuAnchor] = useState<DOMRect | null>(null)
+  const sidebarWidth = parseInt(localStorage.getItem('sidebar-width') ?? '240', 10)
 
   return (
     <>
@@ -325,12 +314,21 @@ export function WorkspacePanel(props: Props): JSX.Element {
                   <button
                     className={styles.rowAction}
                     title="Actions"
-                    onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(v => v === section.label ? null : section.label) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const next = customSectionMenuOpen === section.label ? null : section.label
+                      setCustomSectionMenuOpen(next)
+                      if (next) setCustomSectionMenuAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())
+                    }}
                   >
                     <MoreHorizontal size={13} />
                   </button>
-                  {customSectionMenuOpen === section.label && (
-                    <div className={styles.itemMenu} ref={customSectionMenuRef}>
+                  {customSectionMenuOpen === section.label && customSectionMenuAnchor && (
+                    <ContextMenu
+                      anchor={customSectionMenuAnchor}
+                      sidebarWidth={sidebarWidth}
+                      onClose={() => setCustomSectionMenuOpen(null)}
+                    >
                       <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); onInlineCreateFolder(section, e) }}>
                         <FolderPlus size={12} />
                         New folder
@@ -353,7 +351,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           </button>
                         </>
                       )}
-                    </div>
+                    </ContextMenu>
                   )}
                 </div>
               }
