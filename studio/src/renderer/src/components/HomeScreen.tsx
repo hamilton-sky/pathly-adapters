@@ -174,6 +174,8 @@ export function HomeScreen(): JSX.Element {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(
     (localStorage.getItem('pathly-home-view') as 'grid' | 'list') ?? 'grid'
   )
+  const INITIAL_VISIBLE = 6
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
 
   function handleViewMode(mode: 'grid' | 'list'): void {
     localStorage.setItem('pathly-home-view', mode)
@@ -488,7 +490,8 @@ export function HomeScreen(): JSX.Element {
       flexDirection: 'column',
       alignItems: 'center',
       padding: '48px 24px 64px',
-      minHeight: '100vh',
+      height: '100vh',
+      overflowY: 'auto',
       backgroundColor: t.bgBase,
       color: t.textPrimary,
       fontFamily: t.fontFamilyBase
@@ -507,7 +510,7 @@ export function HomeScreen(): JSX.Element {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'flex-end',
-        paddingRight: '8px',
+        paddingRight: '155px',
         boxSizing: 'border-box',
       } as React.CSSProperties}>
         <div style={{
@@ -520,6 +523,7 @@ export function HomeScreen(): JSX.Element {
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -537,48 +541,6 @@ export function HomeScreen(): JSX.Element {
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
           >
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-          <button
-            onClick={() => handleViewMode('grid')}
-            title="Grid view"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              border: 'none',
-              background: 'none',
-              color: viewMode === 'grid' ? t.accent : t.textMuted,
-              cursor: 'pointer',
-              transition: 'background 150ms ease-out',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = t.bgSurface0 }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
-          >
-            <LayoutGrid size={14} />
-          </button>
-          <button
-            onClick={() => handleViewMode('list')}
-            title="List view"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              border: 'none',
-              background: 'none',
-              color: viewMode === 'list' ? t.accent : t.textMuted,
-              cursor: 'pointer',
-              transition: 'background 150ms ease-out',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = t.bgSurface0 }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
-          >
-            <List size={14} />
           </button>
         </div>
       </div>
@@ -599,7 +561,7 @@ export function HomeScreen(): JSX.Element {
         fontSize: '14px',
         fontWeight: 400,
         color: t.textMuted,
-        marginBottom: '36px',
+        marginBottom: '32px',
         animation: 'fadeIn 400ms ease-out both'
       }}>
         Welcome back. Pick up where you left off.
@@ -620,24 +582,81 @@ export function HomeScreen(): JSX.Element {
           animation: 'fadeIn 350ms ease-out 60ms both'
         }}>
           {renderSectionLabel('Recent Projects', 60)}
-          <button
-            onClick={() => setHideDone((v) => !v)}
-            style={{
-              background: 'none',
-              border: `1px solid ${hideDone ? t.accent : t.bgSurface1}`,
-              borderRadius: '5px',
-              color: hideDone ? t.accent : t.textMuted,
-              cursor: 'pointer',
-              fontSize: '11px',
-              fontWeight: 500,
-              padding: '3px 10px',
-              fontFamily: t.fontFamilyBase,
-              transition: 'all 150ms ease-out',
-              letterSpacing: '0.02em'
-            }}
-          >
-            {hideDone ? 'Show all' : 'Hide done'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {/* + New project CTA */}
+            <button
+              onClick={handleOpenFolder}
+              title="Open project folder"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                background: 'none',
+                border: `1px solid ${t.accent}`,
+                borderRadius: '5px',
+                color: t.accent,
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '3px 10px',
+                fontFamily: t.fontFamilyBase,
+                transition: 'all 150ms ease-out',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = `${t.accent}15` }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+            >
+              + New project
+            </button>
+            {/* View toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <button
+                onClick={() => handleViewMode('grid')}
+                title="Grid view"
+                aria-label="Grid view"
+                aria-pressed={viewMode === 'grid'}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '26px', height: '26px', borderRadius: '5px', border: 'none',
+                  background: viewMode === 'grid' ? `${t.accent}18` : 'none',
+                  color: viewMode === 'grid' ? t.accent : t.textMuted,
+                  cursor: 'pointer', transition: 'all 150ms ease-out',
+                }}
+              >
+                <LayoutGrid size={13} />
+              </button>
+              <button
+                onClick={() => handleViewMode('list')}
+                title="List view"
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '26px', height: '26px', borderRadius: '5px', border: 'none',
+                  background: viewMode === 'list' ? `${t.accent}18` : 'none',
+                  color: viewMode === 'list' ? t.accent : t.textMuted,
+                  cursor: 'pointer', transition: 'all 150ms ease-out',
+                }}
+              >
+                <List size={13} />
+              </button>
+            </div>
+            <button
+              onClick={() => setHideDone((v) => !v)}
+              style={{
+                background: 'none',
+                border: `1px solid ${hideDone ? t.accent : t.bgSurface1}`,
+                borderRadius: '5px',
+                color: hideDone ? t.accent : t.textMuted,
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '3px 10px',
+                fontFamily: t.fontFamilyBase,
+                transition: 'all 150ms ease-out',
+                letterSpacing: '0.02em'
+              }}
+            >
+              {hideDone ? 'Show all' : 'Hide done'}
+            </button>
+          </div>
         </div>
 
         {sorted.length === 0 ? (
@@ -646,6 +665,7 @@ export function HomeScreen(): JSX.Element {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            textAlign: 'center',
             gap: '8px',
             padding: '48px 32px',
             animation: 'fadeSlideUp 300ms ease-out both'
@@ -667,69 +687,75 @@ export function HomeScreen(): JSX.Element {
               Open a folder to get started
             </span>
           </div>
-        ) : (
-          <div style={viewMode === 'grid' ? {
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '14px',
-          } : {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}>
-            {pinnedProjects.length > 0 && (
-              <>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  {renderSectionLabel('Pinned', 0)}
-                </div>
-                {pinnedProjects.map((project, idx) => renderCard(project, idx))}
-                <div style={{
-                  gridColumn: '1 / -1',
-                  height: '1px',
-                  backgroundColor: t.bgSurface0,
-                  margin: '8px 0'
-                }} />
-                <div style={{ gridColumn: '1 / -1' }}>
-                  {renderSectionLabel('Recent Projects', 0)}
-                </div>
-                {unpinnedProjects.map((project, idx) => renderCard(project, pinnedProjects.length + idx))}
-              </>
-            )}
-            {pinnedProjects.length === 0 && sorted.map((project, idx) => renderCard(project, idx))}
-          </div>
-        )}
-      </div>
+        ) : (() => {
+          const visiblePinned = pinnedProjects
+          const visibleUnpinned = unpinnedProjects.slice(0, Math.max(0, visibleCount - pinnedProjects.length))
+          const hiddenCount = unpinnedProjects.length - visibleUnpinned.length
+          return (
+            <>
+              <div style={viewMode === 'grid' ? {
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '14px',
+              } : {
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}>
+                {pinnedProjects.length > 0 && (
+                  <>
+                    <div style={viewMode === 'grid' ? { gridColumn: '1 / -1' } : {}}>
+                      {renderSectionLabel('Pinned', 0)}
+                    </div>
+                    {visiblePinned.map((project, idx) => renderCard(project, idx))}
+                    <div style={{
+                      ...(viewMode === 'grid' ? { gridColumn: '1 / -1' } : {}),
+                      height: '1px',
+                      backgroundColor: t.bgSurface0,
+                      margin: '8px 0'
+                    }} />
+                    <div style={viewMode === 'grid' ? { gridColumn: '1 / -1' } : {}}>
+                      {renderSectionLabel('Recent', 0)}
+                    </div>
+                  </>
+                )}
+                {(pinnedProjects.length > 0 ? visibleUnpinned : sorted.slice(0, visibleCount))
+                  .map((project, idx) => renderCard(project, pinnedProjects.length + idx))}
+              </div>
 
-      <button
-        style={{
-          marginTop: '28px',
-          padding: '9px 22px',
-          background: 'none',
-          border: `1px solid ${t.accent}`,
-          borderRadius: '8px',
-          color: t.accent,
-          cursor: 'pointer',
-          fontSize: '13px',
-          fontWeight: 500,
-          fontFamily: t.fontFamilyBase,
-          transition: 'all 150ms ease-out',
-          letterSpacing: '0.01em',
-          animation: `fadeIn 350ms ease-out ${80 + sorted.length * 55 + 60}ms both`
-        }}
-        onClick={handleOpenFolder}
-        onMouseEnter={(e) => {
-          const el = e.currentTarget
-          el.style.background = `${t.accent}15`
-          el.style.boxShadow = `0 0 16px ${t.accent}30`
-        }}
-        onMouseLeave={(e) => {
-          const el = e.currentTarget
-          el.style.background = 'none'
-          el.style.boxShadow = 'none'
-        }}
-      >
-        + Open project folder
-      </button>
+              {hiddenCount > 0 && (
+                <button
+                  onClick={() => setVisibleCount((n) => n + 6)}
+                  style={{
+                    marginTop: '8px',
+                    alignSelf: 'center',
+                    background: 'none',
+                    border: `1px solid ${t.bgSurface1}`,
+                    borderRadius: '6px',
+                    color: t.textMuted,
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    padding: '6px 18px',
+                    fontFamily: t.fontFamilyBase,
+                    transition: 'all 150ms ease-out',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = t.accent
+                    ;(e.currentTarget as HTMLButtonElement).style.color = t.accent
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = t.bgSurface1
+                    ;(e.currentTarget as HTMLButtonElement).style.color = t.textMuted
+                  }}
+                >
+                  Show {hiddenCount} more
+                </button>
+              )}
+            </>
+          )
+        })()}
+      </div>
     </div>
   )
 }
