@@ -35,4 +35,5 @@ export const PROTECTED_FILENAMES = new Set([
   'EVENTS.jsonl',
   'PROGRESS.md',
   'IMPLEMENTATION_PLAN.md',
+  'CONVERSATION_PROMPTS.md',
 ])

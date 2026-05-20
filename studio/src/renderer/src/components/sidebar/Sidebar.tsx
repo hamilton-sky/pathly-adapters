@@ -26,6 +26,7 @@ export function Sidebar(): JSX.Element | null {
     setActivePanel,
     dirtyItems,
     activePanel,
+    setLastUsedFlowPath,
   } = useStore()
 
   const { sections, setSections, loadItems } = useProjectFiles()
@@ -90,9 +91,9 @@ export function Sidebar(): JSX.Element | null {
   const [confirmDelete, setConfirmDelete] = useState<PathlyItem | null>(null)
   const [dragOverPath, setDragOverPath] = useState<string | null>(null)
   const [inlineCreate, setInlineCreate] = useState<{
-    sectionLabel: string
+    target: string   // 'workspace-root' | 'plan-folder' | 'plan-file' | section label
     parentDir: string
-    type: 'folder'
+    type: 'file' | 'folder'
   } | null>(null)
 
   const dragFromGripRef = useRef(false)
@@ -118,6 +119,9 @@ export function Sidebar(): JSX.Element | null {
   function handleItemClick(item: PathlyItem): void {
     setSelectedItem(item)
     setActivePanel(item.type === 'flow' ? 'flow' : 'editor')
+    if (item.type === 'flow') {
+      setLastUsedFlowPath(item.path)
+    }
   }
 
   function handleNewUserLibraryItem(section: Section, e: React.MouseEvent<HTMLButtonElement>): void {
@@ -126,57 +130,69 @@ export function Sidebar(): JSX.Element | null {
     if (section.type === 'flow') {
       setShowFlowWizard(true)
     } else {
-      setNewItemTarget({ type: section.type, dir: `${pathlyUserHome}/${section.dir}` })
+      setNewItemTarget({ type: section.type as 'skill' | 'agent' | 'template' | 'debug' | 'explore', dir: `${pathlyUserHome}/${section.dir}` })
       setShowNewItemDialog(true)
     }
   }
 
-  async function handleInlineCreateFile(section: { dir: string }, e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
-    e.stopPropagation()
-    const base = projectPath
-    if (!base) return
-    const name = window.prompt('File name:')
-    if (!name?.trim()) return
-    await window.pathly.fs.write(`${base}/${section.dir}/${name.trim()}`, '')
-    await loadItems()
-  }
-
-  async function handleInlineCreateFolder(section: { dir: string }, e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
-    e.stopPropagation()
-    const base = section.dir ? `${projectPath}/${section.dir}` : projectPath
-    if (!base) return
-    const name = window.prompt('Folder name:')
-    if (!name?.trim()) return
-    await window.pathly.fs.write(`${base}/${name.trim()}/.gitkeep`, '')
-    await loadItems()
-  }
-
-  async function handleCreateTopLevelFolder(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
+  function handleInlineCreateFile(section: { dir: string }, e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation()
     if (!projectPath) return
-    const name = window.prompt('Folder name:')
-    if (!name?.trim()) return
-    await window.pathly.fs.write(`${projectPath}/pathly/${name.trim()}/.gitkeep`, '')
-    await loadItems()
+    setInlineCreate({ target: section.dir, parentDir: `${projectPath}/${section.dir}`, type: 'file' })
   }
 
-  async function handleInlineCreatePlan(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
+  function handleInlineCreateFolder(section: { dir: string }, e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation()
     if (!projectPath) return
-    const name = window.prompt('Plan name:')
-    if (!name?.trim()) return
-    await window.pathly.fs.write(`${projectPath}/pathly/plans/${name.trim()}/STATE.json`, JSON.stringify({ current: 'INIT' }))
-    await loadItems()
-    await loadPlanFiles()
+    setInlineCreate({ target: section.dir, parentDir: `${projectPath}/${section.dir}`, type: 'folder' })
   }
 
-  async function handleCreatePlanFile(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
+  function handleCreateTopLevelFolder(e: React.MouseEvent<HTMLButtonElement>): void {
+    e.stopPropagation()
+    if (!projectPath) return
+    setInlineCreate({ target: 'workspace-root', parentDir: `${projectPath}/pathly`, type: 'folder' })
+  }
+
+  function handleInlineCreatePlan(e: React.MouseEvent<HTMLButtonElement>): void {
+    e.stopPropagation()
+    if (!projectPath) return
+    setInlineCreate({ target: 'plan-folder', parentDir: `${projectPath}/pathly/plans`, type: 'folder' })
+  }
+
+  function handleCreatePlanFile(e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation()
     if (!projectPath || !activeTopic) return
-    const name = window.prompt('File name:')
-    if (!name?.trim()) return
-    await window.pathly.fs.write(`${projectPath}/pathly/plans/${activeTopic}/${name.trim()}`, '')
-    await loadPlanFiles()
+    setInlineCreate({ target: 'plan-file', parentDir: `${projectPath}/pathly/plans/${activeTopic}`, type: 'file' })
+  }
+
+  async function handleInlineCreateSubmit(name: string): Promise<void> {
+    if (!inlineCreate) return
+    const trimmed = name.trim()
+    setInlineCreate(null)
+    if (!trimmed) return
+    const { target, parentDir, type } = inlineCreate
+    try {
+      if (target === 'plan-folder') {
+        await window.pathly.fs.write(`${parentDir}/${trimmed}/STATE.json`, JSON.stringify({ current: 'INIT' }))
+        await loadItems()
+        await loadPlanFiles()
+      } else if (target === 'plan-file') {
+        await window.pathly.fs.write(`${parentDir}/${trimmed}`, '')
+        await loadPlanFiles()
+      } else if (type === 'folder') {
+        await window.pathly.fs.write(`${parentDir}/${trimmed}/.gitkeep`, '')
+        await loadItems()
+      } else {
+        await window.pathly.fs.write(`${parentDir}/${trimmed}`, '')
+        await loadItems()
+      }
+    } catch (err) {
+      console.error('Create failed:', err)
+    }
+  }
+
+  function handleInlineCreateCancel(): void {
+    setInlineCreate(null)
   }
 
   function handleToggleFolder(name: string): void {
@@ -255,8 +271,6 @@ export function Sidebar(): JSX.Element | null {
     dragFromGripRef.current = false
   }
 
-  // suppress unused warning — inlineCreate and dragOverPath are set but not yet rendered here
-  void inlineCreate
   void dragOverPath
 
   async function handleReorgDrop(sourcePath: string, targetDir: string, _sectionId: string): Promise<void> {
@@ -350,15 +364,18 @@ export function Sidebar(): JSX.Element | null {
             planFolders={planFolders}
             renamingPath={renamingPath}
             renameValue={renameValue}
+            inlineCreate={inlineCreate}
             onSelect={handleItemClick}
             onToggleSection={toggleSection}
             onToggleSubdir={toggleSubdir}
             onActivePanel={(p) => setActivePanel(p)}
-            onCreateTopLevelFolder={(e) => { void handleCreateTopLevelFolder(e) }}
-            onInlineCreateFile={(section, e) => { void handleInlineCreateFile(section, e) }}
-            onInlineCreateFolder={(section, e) => { void handleInlineCreateFolder(section, e) }}
-            onNewPlan={(e) => { void handleInlineCreatePlan(e) }}
-            onCreatePlanFile={(e) => { void handleCreatePlanFile(e) }}
+            onCreateTopLevelFolder={handleCreateTopLevelFolder}
+            onInlineCreateFile={handleInlineCreateFile}
+            onInlineCreateFolder={handleInlineCreateFolder}
+            onNewPlan={handleInlineCreatePlan}
+            onCreatePlanFile={handleCreatePlanFile}
+            onInlineCreateSubmit={(name) => { void handleInlineCreateSubmit(name) }}
+            onInlineCreateCancel={handleInlineCreateCancel}
             onRenameChange={setRenameValue}
             onRenameCommit={(item, itemDir) => { void commitRename(item, itemDir) }}
             onRenameCancel={() => setRenamingPath(null)}
@@ -408,6 +425,7 @@ export function Sidebar(): JSX.Element | null {
                 }
                 setSelectedItem(item)
                 setActivePanel('flow')
+                setLastUsedFlowPath(filePath)
               }
             })
           }}

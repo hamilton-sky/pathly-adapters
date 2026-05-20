@@ -4,6 +4,7 @@ import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton } from '../ui'
 import { SectionHeader } from './SectionHeader'
 import { WorkspaceItem } from './WorkspaceItem'
+import { InlineCreateInput } from './InlineCreateInput'
 import { PROTECTED_FILENAMES } from './constants'
 import styles from './Sidebar.module.css'
 
@@ -16,11 +17,14 @@ interface Props {
   renamingPath: string | null
   renameValue: string
   planOpen: boolean
+  inlineCreate: { target: string; parentDir: string; type: 'file' | 'folder' } | null
   onTogglePlan: () => void
   onToggleFolder: (name: string) => void
   onFolderClick: (name: string) => void
   onNewPlan: (e: React.MouseEvent<HTMLButtonElement>) => void
   onCreatePlanFile: (e: React.MouseEvent<HTMLButtonElement>) => void
+  onInlineCreateSubmit: (name: string) => void
+  onInlineCreateCancel: () => void
   onSelect: (item: PathlyItem) => void
   onRenameChange: (v: string) => void
   onRenameCommit: (item: PathlyItem, itemDir: string) => void
@@ -38,11 +42,14 @@ export function PlanSection({
   renamingPath,
   renameValue,
   planOpen,
+  inlineCreate,
   onTogglePlan,
   onToggleFolder,
   onFolderClick,
   onNewPlan,
   onCreatePlanFile,
+  onInlineCreateSubmit,
+  onInlineCreateCancel,
   onSelect,
   onRenameChange,
   onRenameCommit,
@@ -77,7 +84,14 @@ export function PlanSection({
       />
       {planOpen && (
         <div>
-          {visibleFolders.length === 0 && (
+          {inlineCreate?.target === 'plan-folder' && (
+            <InlineCreateInput
+              type="folder"
+              onCommit={onInlineCreateSubmit}
+              onCancel={onInlineCreateCancel}
+            />
+          )}
+          {visibleFolders.length === 0 && !inlineCreate && (
             <div className={styles.convEmpty}>No plans</div>
           )}
           {visibleFolders.map((folder) => {
@@ -120,27 +134,40 @@ export function PlanSection({
                     </span>
                   )}
                 </button>
-                {folder.open && filteredFiles.map((file) => {
-                  const isProtected = PROTECTED_FILENAMES.has(file.name)
-                  return (
-                    <WorkspaceItem
-                      key={file.path}
-                      item={file}
-                      itemDir={folder.path}
-                      isSelected={selectedItem?.path === file.path}
-                      isDirty={dirtyItems.has(file.path)}
-                      deep
-                      renamingPath={renamingPath}
-                      renameValue={renameValue}
-                      onSelect={() => onSelect(file)}
-                      onRenameChange={onRenameChange}
-                      onRenameCommit={() => onRenameCommit(file, folder.path)}
-                      onRenameCancel={onRenameCancel}
-                      onStartRename={isProtected ? undefined : () => onStartRename(file, folder.path)}
-                      onStartDelete={isProtected ? undefined : () => onStartDelete(file)}
-                    />
-                  )
-                })}
+                {folder.open && (
+                  <>
+                    {inlineCreate?.target === 'plan-file' && folder.name === activeTopic && (
+                      <InlineCreateInput
+                        type="file"
+                        deep
+                        onCommit={onInlineCreateSubmit}
+                        onCancel={onInlineCreateCancel}
+                      />
+                    )}
+                    {filteredFiles.map((file) => {
+                      const isProtected = PROTECTED_FILENAMES.has(file.name)
+                      return (
+                        <WorkspaceItem
+                          key={file.path}
+                          item={file}
+                          itemDir={folder.path}
+                          isSelected={selectedItem?.path === file.path}
+                          isDirty={dirtyItems.has(file.path)}
+                          deep
+                          renamingPath={renamingPath}
+                          renameValue={renameValue}
+                          sectionId="plan"
+                          onSelect={() => onSelect(file)}
+                          onRenameChange={onRenameChange}
+                          onRenameCommit={() => onRenameCommit(file, folder.path)}
+                          onRenameCancel={onRenameCancel}
+                          onStartRename={isProtected ? undefined : () => onStartRename(file, folder.path)}
+                          onStartDelete={isProtected ? undefined : () => onStartDelete(file)}
+                        />
+                      )
+                    })}
+                  </>
+                )}
               </div>
             )
           })}

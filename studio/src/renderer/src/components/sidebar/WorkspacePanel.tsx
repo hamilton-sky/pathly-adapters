@@ -8,6 +8,7 @@ import { SectionHeader } from './SectionHeader'
 import { SubdirRow } from './SubdirRow'
 import { WorkspaceItem } from './WorkspaceItem'
 import { PlanSection } from './PlanSection'
+import { InlineCreateInput } from './InlineCreateInput'
 import { WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from './constants'
 import { useUiStore } from '../../store/uiStore'
 import styles from './Sidebar.module.css'
@@ -23,6 +24,7 @@ interface Props {
   planFolders: PlanFolder[]
   renamingPath: string | null
   renameValue: string
+  inlineCreate: { target: string; parentDir: string; type: 'file' | 'folder' } | null
   onSelect: (item: PathlyItem) => void
   onToggleSection: (label: string) => void
   onToggleSubdir: (label: string, idx: number) => void
@@ -32,6 +34,8 @@ interface Props {
   onInlineCreateFile: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
   onInlineCreateFolder: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
   onNewPlan: (e: React.MouseEvent<HTMLButtonElement>) => void
+  onInlineCreateSubmit: (name: string) => void
+  onInlineCreateCancel: () => void
   onRenameChange: (v: string) => void
   onRenameCommit: (item: PathlyItem, itemDir: string) => void
   onRenameCancel: () => void
@@ -48,10 +52,11 @@ export function WorkspacePanel(props: Props): JSX.Element {
   const {
     sections, projectPath, selectedItem, dirtyItems,
     filter, lowerFilter, activeTopic, planFolders,
-    renamingPath, renameValue,
+    renamingPath, renameValue, inlineCreate,
     onSelect, onToggleSection, onToggleSubdir,
     onCreateTopLevelFolder, onCreatePlanFile,
     onInlineCreateFile, onInlineCreateFolder, onNewPlan,
+    onInlineCreateSubmit, onInlineCreateCancel,
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
@@ -72,6 +77,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
         </div>
       </div>
 
+      {inlineCreate?.target === 'workspace-root' && (
+        <InlineCreateInput
+          type={inlineCreate.type}
+          onCommit={onInlineCreateSubmit}
+          onCancel={onInlineCreateCancel}
+        />
+      )}
+
       <PlanSection
         planFolders={planFolders}
         selectedItem={selectedItem}
@@ -81,11 +94,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
         renamingPath={renamingPath}
         renameValue={renameValue}
         planOpen={planOpen}
+        inlineCreate={inlineCreate}
         onTogglePlan={onTogglePlan}
         onToggleFolder={onToggleFolder}
         onFolderClick={onFolderClick}
         onNewPlan={onNewPlan}
         onCreatePlanFile={onCreatePlanFile}
+        onInlineCreateSubmit={onInlineCreateSubmit}
+        onInlineCreateCancel={onInlineCreateCancel}
         onSelect={onSelect}
         onRenameChange={onRenameChange}
         onRenameCommit={onRenameCommit}
@@ -126,6 +142,13 @@ export function WorkspacePanel(props: Props): JSX.Element {
             />
             {state.open && (
               <div>
+                {inlineCreate?.target === section.dir && (
+                  <InlineCreateInput
+                    type={inlineCreate.type}
+                    onCommit={onInlineCreateSubmit}
+                    onCancel={onInlineCreateCancel}
+                  />
+                )}
                 {subdirs.map((subdir, idx) => {
                   const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
                   if (filter && filteredFiles.length === 0) return null
@@ -150,7 +173,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           try {
                             const payload = JSON.parse(raw) as PathlyReorgDragItem
                             if (payload.dragType !== 'reorg') return
-                            if (payload.section !== section.type) return
+                            if ((payload.section as string) !== (section.type as string)) return
                             onReorgDrop?.(payload.sourcePath, `${projectPath}/${section.dir}/${subdir.name}`, section.type)
                           } catch { /* ignore malformed payload */ }
                         }}
