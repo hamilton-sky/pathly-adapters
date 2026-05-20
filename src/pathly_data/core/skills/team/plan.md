@@ -161,6 +161,11 @@ Ensure every phase references which stories it fulfills.
 After creating the selected rigor's plan files, list them as a summary.
 ```
 
+After planner completes, parse the `<usage>` block from its response:
+- `total_tokens`: the number after `total_tokens:` (0 if absent)
+- `tool_uses`: the number after `tool_uses:` (0 if absent)
+- `duration_ms`: the number after `duration_ms:` (0 if absent)
+
 After planner completes — run the **rigor escalator** (below).
 
 If not autoFlow — pause:
@@ -177,12 +182,12 @@ If autoFlow: log human response "auto-advance".
 
 Transition state → BUILDING.
 
-Compute wall_seconds: run `python -c "import time; print(int(time.time()) - PLAN_START)"`.
-Append `{"type": "AGENT_DONE", "agent": "planner", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to `plans/<feature>/EVENTS.jsonl`.
+Compute wall_seconds: run `python -c "import time; print(int(time.time()) - PLAN_START)"` (used as fallback if duration_ms is 0).
+Append `{"type": "AGENT_DONE", "agent": "planner", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": <tool_uses>, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to `plans/<feature>/EVENTS.jsonl`.
 
 Then invoke the `record-cost` skill with:
 ```json
-{"agent":"planner","feature":"<FEATURE>","summary":"Planning complete","conversation":0,"wall_seconds":<computed>}
+{"agent":"planner","feature":"<FEATURE>","summary":"Planning complete","conversation":0,"wall_seconds":<computed>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
 ```
 
 Route back to `team [FEATURE] [rigor] [autoFlow]`.

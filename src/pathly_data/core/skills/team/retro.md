@@ -27,11 +27,17 @@ Do not write files; quick is read-only. The retro skill/orchestrator writes RETR
 After quick completes:
 - Write `plans/[feature]/RETRO.md` with the summary provided.
 - Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or plans/).
-- Append `{"type": "AGENT_DONE", "agent": "quick", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+
+Parse the `<usage>` block from quick's response:
+- `total_tokens`: the number after `total_tokens:` (0 if absent)
+- `tool_uses`: the number after `tool_uses:` (0 if absent)
+- `duration_ms`: the number after `duration_ms:` (0 if absent)
+
+- Append `{"type": "AGENT_DONE", "agent": "quick", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <tool_uses>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
 
 Then invoke the `record-cost` skill with:
 ```json
-{"agent":"quick","feature":"<FEATURE>","summary":"Retro complete","conversation":0,"wall_seconds":<seconds>}
+{"agent":"quick","feature":"<FEATURE>","summary":"Retro complete","conversation":0,"wall_seconds":<seconds>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
 ```
 
 **Generate pipeline-walkthrough files:**

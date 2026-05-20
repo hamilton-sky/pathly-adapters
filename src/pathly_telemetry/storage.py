@@ -17,6 +17,7 @@ def append_activity(
     wall_seconds: int = 0,
     tool_uses: int = 0,
     cost_usd: float = 0.0,
+    total_tokens: int = 0,
 ) -> None:
     ACTIVITY_FILE.parent.mkdir(parents=True, exist_ok=True)
     entry = {
@@ -29,6 +30,7 @@ def append_activity(
         "wall_seconds": wall_seconds,
         "tool_uses": tool_uses,
         "cost_usd": cost_usd,
+        "total_tokens": total_tokens,
     }
     with open(ACTIVITY_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")

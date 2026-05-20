@@ -87,7 +87,7 @@ Append to `pathly/plans/<feature>/EVENTS.jsonl`:
 
 Then invoke the `record-cost` skill with:
 ```json
-{"agent":"designer","feature":"<FEATURE>","summary":"Design system generated","conversation":0,"wall_seconds":<computed>}
+{"agent":"designer","feature":"<FEATURE>","summary":"Design system generated","conversation":0,"wall_seconds":<computed>,"total_tokens":0,"tool_uses":0,"duration_ms":0}
 ```
 
 Write `pathly/plans/<feature>/STATE.json`:

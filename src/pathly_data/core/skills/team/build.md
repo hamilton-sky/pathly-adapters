@@ -127,13 +127,19 @@ Both files can exist simultaneously. Route one at a time using the priority orde
 ## Transition to review
 
 After Phase 3 completes with no blocking feedback files:
-Compute wall_seconds: run `python -c "import time; print(int(time.time()) - BUILD_START)"` using `BUILD_START` from Phase 2.5.
-Append `{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+
+After the builder agent completes (Phase 3), parse the `<usage>` block from its response:
+- `total_tokens`: the number after `total_tokens:` (0 if absent)
+- `tool_uses`: the number after `tool_uses:` (0 if absent)
+- `duration_ms`: the number after `duration_ms:` (0 if absent)
+
+Compute wall_seconds: run `python -c "import time; print(int(time.time()) - BUILD_START)"` using `BUILD_START` from Phase 2.5 (used as fallback if duration_ms is 0).
+Append `{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": <tool_uses>, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
 Note: tokens/cost are 0 in Claude Code path; runner.py populates them when using `pathly-run` CLI.
 
 Then invoke the `record-cost` skill with:
 ```json
-{"agent":"builder","feature":"<FEATURE>","summary":"Conv <N> build complete","conversation":<N>,"wall_seconds":<computed>}
+{"agent":"builder","feature":"<FEATURE>","summary":"Conv <N> build complete","conversation":<N>,"wall_seconds":<computed>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
 ```
 
 Return. Orchestrator determines next state from transition_rules.

@@ -352,9 +352,18 @@ def record_activity_endpoint():
             val = data.get(field, 0)
             if not isinstance(val, int) or val < 0:
                 return jsonify({"error": f"Field '{field}' must be a non-negative integer"}), 400
+        for field in ("total_tokens", "duration_ms"):
+            val = data.get(field, 0)
+            if not isinstance(val, int) or val < 0:
+                return jsonify({"error": f"Field '{field}' must be a non-negative integer"}), 400
         cost_usd_val = data.get("cost_usd", 0.0)
         if not isinstance(cost_usd_val, (int, float)) or cost_usd_val < 0:
             return jsonify({"error": "Field 'cost_usd' must be a non-negative number"}), 400
+
+        wall_seconds = int(data.get("wall_seconds", 0))
+        duration_ms = int(data.get("duration_ms", 0))
+        if wall_seconds == 0 and duration_ms > 0:
+            wall_seconds = duration_ms // 1000
 
         if flags.telemetry:
             append_activity(
@@ -363,9 +372,10 @@ def record_activity_endpoint():
                 summary=data["summary"],
                 input_tokens=int(data.get("input_tokens", 0)),
                 output_tokens=int(data.get("output_tokens", 0)),
-                wall_seconds=int(data.get("wall_seconds", 0)),
+                wall_seconds=wall_seconds,
                 tool_uses=int(data.get("tool_uses", 0)),
                 cost_usd=float(data.get("cost_usd", 0.0)),
+                total_tokens=int(data.get("total_tokens", 0)),
             )
         return jsonify({"status": "recorded"}), 200
     except Exception as e:

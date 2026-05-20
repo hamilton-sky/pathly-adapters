@@ -13,6 +13,8 @@ Called by stage skills (build, review, test) after writing AGENT_DONE to EVENTS.
 - `conversation` (optional): conversation number (integer), default 0
 - `wall_seconds` (optional): elapsed wall-clock seconds (integer), default 0
 - `tool_uses` (optional): number of tool calls made (integer), default 0
+- `total_tokens` (optional): total token count from `<usage>` block, default 0
+- `duration_ms` (optional): duration in milliseconds from `<usage>` block, default 0 (converted to wall_seconds by backend if wall_seconds is 0)
 
 ## Step 1 — Parse arguments
 
@@ -43,7 +45,7 @@ If it fails or times out:
 ```bash
 curl -s -X POST http://127.0.0.1:8765/record_activity \
   -H "Content-Type: application/json" \
-  -d '{"agent":"<agent>","feature":"<feature>","summary":"<summary>","conversation":<conversation>,"wall_seconds":<wall_seconds>,"tool_uses":<tool_uses>,"input_tokens":0,"output_tokens":0,"cost_usd":0}'
+  -d '{"agent":"<agent>","feature":"<feature>","summary":"<summary>","conversation":<conversation>,"wall_seconds":<wall_seconds>,"tool_uses":<tool_uses>,"total_tokens":<total_tokens>,"input_tokens":0,"output_tokens":0,"cost_usd":0}'
 ```
 
 If the response contains `"status":"recorded"`: print nothing (silent success).
