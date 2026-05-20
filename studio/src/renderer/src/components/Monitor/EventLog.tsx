@@ -4,18 +4,18 @@ import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
 import type { FsmEvent } from '../../types'
 
-function eventColor(ev: FsmEvent, t: Theme): string {
+function eventColor(ev: FsmEvent, _t: Theme): string {
   switch (ev.type) {
-    case 'STATE_TRANSITION': return t.accent
+    case 'STATE_TRANSITION': return '#5b47c7'   // indigo — readable on cream
     case 'AGENT_DONE':
-      if (ev.result === 'PASS') return t.green
-      if (ev.result === 'DONE') return t.blue
-      return t.textSecondary
-    case 'FILE_CREATED': return t.yellow
-    case 'FILE_DELETED': return t.yellow
-    case 'RETRY': return t.red
-    case 'HUMAN_RESPONSE': return t.textMuted
-    default: return t.textSecondary
+      if (ev.result === 'PASS') return '#16a34a' // green
+      if (ev.result === 'DONE') return '#2563eb' // blue
+      return '#64748b'
+    case 'FILE_CREATED': return '#92400e'        // amber-dark
+    case 'FILE_DELETED': return '#92400e'
+    case 'RETRY': return '#b91c1c'              // red-dark
+    case 'HUMAN_RESPONSE': return '#78716c'     // warm-gray
+    default: return '#475569'
   }
 }
 
@@ -97,13 +97,13 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
     log: {
       flex: 1,
       overflowY: 'auto' as const,
-      backgroundColor: t.bgMantle,
+      backgroundColor: '#f5f0e8',
       borderRadius: '4px',
-      border: `1px solid ${t.bgSurface0}`,
+      border: `1px solid #e0d8cc`,
       padding: '8px',
     },
     empty: {
-      color: t.bgSurface1,
+      color: '#b8b0a4',
       fontSize: '13px',
       textAlign: 'center' as const,
       marginTop: '120px',
@@ -112,20 +112,20 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       display: 'flex',
       gap: '20px',
       padding: '6px 8px',
-      borderTop: `1px solid ${t.bgSurface0}`,
-      backgroundColor: t.bgMantle,
+      borderTop: `1px solid #e0d8cc`,
+      backgroundColor: '#ede8de',
       borderRadius: '0 0 4px 4px',
       flexShrink: 0,
     },
     totalsLabel: {
       fontSize: '12px',
       fontFamily: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace",
-      color: t.textMuted,
+      color: '#78716c',
     },
     totalsValue: {
       fontSize: '12px',
       fontFamily: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace",
-      color: t.textSecondary,
+      color: '#44403c',
     },
   }
 }

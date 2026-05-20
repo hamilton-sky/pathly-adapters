@@ -2,3 +2,11 @@
 
 ---
 {"type": "STATE_TRANSITION", "to": "STORMING", "ts": "2026-05-19T15:48:59.180037"}
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-20T14:45:53.246491+00:00"}
+{"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-20T14:46:00.000000"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "ts": "2026-05-20T14:50:00.000000"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-20T14:50:01.000000"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "ts": "2026-05-20T15:30:00.000000"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-20T15:30:01.000000"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "ts": "2026-05-20T16:00:00.000000"}
+{"type": "STATE_TRANSITION", "to": "TESTING", "ts": "2026-05-20T16:00:01.000000"}
