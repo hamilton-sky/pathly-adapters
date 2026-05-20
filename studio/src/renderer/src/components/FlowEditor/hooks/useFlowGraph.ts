@@ -69,14 +69,25 @@ export function useFlowGraph(
     stateIdsRef.current = nextIds
 
     if (hasStateChange) {
+      // Snapshot and delete pending positions OUTSIDE the updater so the updater
+      // is a pure function. React 18 StrictMode invokes updaters twice; a side
+      // effect inside would cause the second call to miss the pending position.
+      const pendingSnapshot = new Map<string, { x: number; y: number }>()
+      for (const state of nextIds) {
+        if (!prevIds.has(state)) {
+          const pos = pendingPositionsRef.current.get(state)
+          if (pos) {
+            pendingSnapshot.set(state, pos)
+            pendingPositionsRef.current.delete(state)
+          }
+        }
+      }
       setNodes((currentNodes) => {
         const posMap = new Map(currentNodes.map((n) => [n.id, n.position]))
         const maxX = currentNodes.length > 0 ? Math.max(...currentNodes.map((n) => n.position.x)) : -220
         const transitionEntries = Object.entries(data.transitions ?? {})
         return (data.states ?? []).map((state, i) => {
-          const pending = pendingPositionsRef.current.get(state)
-          if (pending) pendingPositionsRef.current.delete(state)
-          const pos = pending ?? posMap.get(state) ?? { x: maxX + 220, y: 100 }
+          const pos = pendingSnapshot.get(state) ?? posMap.get(state) ?? { x: maxX + 220, y: 100 }
           const outgoingStates = data.transitions[state] ?? []
           const incomingStates = transitionEntries
             .filter(([, targets]) => targets.includes(state))

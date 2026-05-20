@@ -24,9 +24,9 @@ transitions:
 agent_map:
   INVESTIGATING: scout
   REPRODUCING: tester
-  ROOT_CAUSE_FOUND: builder
+  ROOT_CAUSE_FOUND: README_routing
   FIXING: builder
-  VERIFYING: reviewer
+  VERIFYING: review
 feedback_routing:
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
