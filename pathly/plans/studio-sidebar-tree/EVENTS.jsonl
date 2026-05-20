@@ -12,3 +12,9 @@
 {"type":"HUMAN_RESPONSE","value":"auto-advance"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-20T12:52:32.442028+00:00"}
 {"type":"AGENT_DONE","agent":"builder","conversation":2,"result":"DONE","ts":"2026-05-20T13:00:00Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-20T12:58:06.232502+00:00"}
+{"type":"AGENT_DONE","agent":"reviewer","conversation":2,"result":"PASS","ts":"2026-05-20T13:05:00Z"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-20T13:00:00.458881+00:00"}
+{"type":"AGENT_DONE","agent":"reviewer","conversation":3,"result":"PASS","ts":"2026-05-20T13:15:00Z"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}
