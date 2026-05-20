@@ -617,3 +617,25 @@
   transition: color 0.1s;
 }
 .filterClear:hover { color: var(--text-primary); }
+
+/* ── Context menu portal (draggable, fixed-position) ── */
+.contextMenuPortal {
+  position: fixed;
+  z-index: 500;
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  min-width: 130px;
+  padding: 4px 0;
+  animation: menuFadeIn 0.08s ease-out;
+}
+.menuDragHandle {
+  cursor: move;
+  padding: 3px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  user-select: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: right;
+}
