@@ -6,7 +6,6 @@ interface Props {
   name: string
   open: boolean
   onToggle: () => void
-  depth?: number
   isSystemFolder?: boolean
   isUserLocked?: boolean
   onToggleFolderLock?: () => void
@@ -32,8 +31,15 @@ export function SubdirRow({
         setMenuOpen(false)
       }
     }
+    function onEscape(e: KeyboardEvent): void {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
     document.addEventListener('mousedown', onOutside)
-    return () => document.removeEventListener('mousedown', onOutside)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('mousedown', onOutside)
+      document.removeEventListener('keydown', onEscape)
+    }
   }, [menuOpen])
 
   return (
@@ -47,11 +53,11 @@ export function SubdirRow({
       <span className={styles.chevron}>
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
       </span>
-      <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-      <span style={{ flex: 1, textAlign: 'left' }}>{name}/</span>
+      <Folder size={13} className={styles.subdirFolderIcon} />
+      <span className={styles.subdirLabel}>{name}/</span>
 
       {isSystemFolder && (
-        <div className={styles.rowActionsLocked}>
+        <div className={`${styles.rowActions} ${styles.rowActionsLocked}`}>
           <span
             className={styles.rowAction}
             style={{ opacity: 0.4 }}
@@ -63,7 +69,7 @@ export function SubdirRow({
       )}
 
       {isUserLocked && !isSystemFolder && (
-        <div className={styles.rowActionsLocked}>
+        <div className={`${styles.rowActions} ${styles.rowActionsLocked}`}>
           <button
             className={`${styles.rowAction} ${styles.rowActionLock}`}
             title="Locked — click to unlock"

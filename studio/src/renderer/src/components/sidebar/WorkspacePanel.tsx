@@ -88,6 +88,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                   const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
                   return (
                     <div key={subdir.name}>
+                      {/* onStartDeleteFolder wired in Conv 4 */}
                       <SubdirRow
                         name={subdir.name}
                         open={subdir.open}
@@ -194,6 +195,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                   const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
                   return (
                     <div key={subdir.name}>
+                      {/* onStartDeleteFolder wired in Conv 4 */}
                       <SubdirRow
                         name={subdir.name}
                         open={subdir.open}
