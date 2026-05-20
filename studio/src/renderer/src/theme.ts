@@ -65,7 +65,7 @@ export const lightTheme: Theme = {
   bgMantle: '#F0F9FF',
   bgSurface0: '#E2E8F0',
   bgSurface1: '#CBD5E1',
-  bgTerminal: '#f5f0e8',
+  bgTerminal: '#edf2f7',
   textPrimary: '#0F172A',
   textSecondary: '#334155',
   textMuted: '#64748B',
