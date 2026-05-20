@@ -154,6 +154,18 @@ export function Sidebar(): JSX.Element | null {
     }
   }
 
+  async function handleInlineCreateFolder(section: Section, e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
+    e.stopPropagation()
+    const base = section.dir ? `${pathlyRoot || projectPath}/${section.dir}` : (pathlyRoot || projectPath)
+    if (!base) return
+    const name = window.prompt('Folder name:')
+    if (!name?.trim()) return
+    const folderName = name.trim()
+    // No mkdir API — write a placeholder file to create the directory implicitly
+    await window.pathly.fs.write(`${base}/${folderName}/.gitkeep`, '')
+    await loadItems()
+  }
+
   async function handleInlineCreatePlan(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
     e.stopPropagation()
     if (!projectPath) return
@@ -331,6 +343,7 @@ export function Sidebar(): JSX.Element | null {
             onActivePanel={(p) => setActivePanel(p)}
             onWorkspaceCreate={handleWorkspaceUserCreate}
             onInlineCreate={handleInlineCreate}
+            onInlineCreateFolder={(section, e) => { void handleInlineCreateFolder(section, e) }}
             onNewPlan={(e) => { void handleInlineCreatePlan(e) }}
             onRenameChange={setRenameValue}
             onRenameCommit={(item, itemDir) => { void commitRename(item, itemDir) }}

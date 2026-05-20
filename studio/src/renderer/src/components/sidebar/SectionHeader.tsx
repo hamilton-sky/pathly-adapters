@@ -5,11 +5,12 @@ interface Props {
   label: string
   open: boolean
   onToggle: () => void
+  actionsLeft?: React.ReactNode
   actions?: React.ReactNode
   sub?: string
 }
 
-export function SectionHeader({ label, open, onToggle, actions, sub }: Props): JSX.Element {
+export function SectionHeader({ label, open, onToggle, actionsLeft, actions, sub }: Props): JSX.Element {
   return (
     <div className={styles.sectionRow}>
       <button className={styles.sectionToggle} onClick={onToggle}>
@@ -19,7 +20,12 @@ export function SectionHeader({ label, open, onToggle, actions, sub }: Props): J
         {label}
         {sub && <span className={styles.sectionSub}>{sub}</span>}
       </button>
-      {actions && <div className={styles.sectionActions}>{actions}</div>}
+      {(actionsLeft || actions) && (
+        <div className={styles.sectionActions}>
+          {actionsLeft}
+          {actions}
+        </div>
+      )}
     </div>
   )
 }
