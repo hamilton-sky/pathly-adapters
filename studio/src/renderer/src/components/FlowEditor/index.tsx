@@ -32,10 +32,20 @@ export function FlowEditor(): JSX.Element {
     handleYamlSave
   } = useFlowFile(selectedItem, markDirty, clearDirty)
 
+  function sectionAllItems(key: string): string[] {
+    const s = sections[key]
+    if (!s) return []
+    return [
+      ...(s.items ?? []),
+      ...(s.subdirs ?? []).flatMap((sd) => sd.files ?? []),
+    ].map((item) => item.name.replace(/\.[^.]+$/, ''))
+  }
+
   const knownBehaviors = useMemo(() => {
-    const skills = sections.Skills.items.map((item) => item.name.replace(/\.[^.]+$/, ''))
-    const agents = sections.Agents.items.map((item) => item.name.replace(/\.[^.]+$/, ''))
-    return [...skills, ...agents]
+    const skills = ['Skills', 'UserSkills', 'My Skills'].flatMap(sectionAllItems)
+    const agents = ['Agents', 'UserAgents', 'My Agents'].flatMap(sectionAllItems)
+    return [...new Set([...skills, ...agents])]
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections])
 
   const yamlValidationIssues = useMemo(
@@ -74,30 +84,19 @@ export function FlowEditor(): JSX.Element {
 
   return (
     <div style={styles.panel}>
-      <div style={styles.toolbar}>
-        <div style={styles.tabs}>
-          <button
-            style={tab === 'visual' ? styles.tabActive : styles.tab}
-            onClick={() => onTabClick('visual')}
-          >
-            Visual
-          </button>
-          <button
-            style={tab === 'yaml' ? styles.tabActive : styles.tab}
-            onClick={() => onTabClick('yaml')}
-          >
-            YAML
-          </button>
+      {saveError && (
+        <div style={{ padding: '4px 12px', backgroundColor: `${t.red}22`, borderBottom: `1px solid ${t.red}`, flexShrink: 0 }}>
+          <span style={styles.error}>{saveError}</span>
         </div>
-        {saveError && <span style={styles.error}>{saveError}</span>}
-      </div>
-
+      )}
       <div style={styles.content}>
         {tab === 'visual' && (
           <VisualView
             data={flowData}
             onChange={handleVisualChange}
             onSave={handleVisualSave}
+            tab={tab}
+            onTabClick={onTabClick}
           />
         )}
         {tab === 'yaml' && (
@@ -109,6 +108,8 @@ export function FlowEditor(): JSX.Element {
             onSave={handleYamlSave}
             syncContent={yamlSyncContent}
             validationIssues={yamlValidationIssues}
+            tab={tab}
+            onTabClick={onTabClick}
           />
         )}
       </div>

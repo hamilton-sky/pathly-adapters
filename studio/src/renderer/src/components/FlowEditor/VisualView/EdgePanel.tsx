@@ -59,6 +59,24 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, onRemove
     open: false, type: 'default', artifact: '', file: '', contains: '', question: '', optionLabel: 'approve'
   })
 
+  const [editingActionIdx, setEditingActionIdx] = useState<number | null>(null)
+  const [editSkill, setEditSkill] = useState('')
+  const [editMessage, setEditMessage] = useState('')
+
+  function startEditAction(idx: number): void {
+    setEditingActionIdx(idx)
+    setEditSkill(actionList[idx].skill)
+    setEditMessage(actionList[idx].message)
+  }
+
+  function commitEditAction(): void {
+    if (editingActionIdx === null || !onDataChange) return
+    const newList = [...actionList]
+    newList[editingActionIdx] = { skill: editSkill.trim(), message: editMessage.trim() }
+    onDataChange({ ...data, transition_actions: { ...actions, [actionKey]: newList } })
+    setEditingActionIdx(null)
+  }
+
   const edgeIssues = issues?.filter((i) => i.target === 'edge' && i.id === actionKey) ?? []
 
   function updateRule(updated: StateRule): void {
@@ -260,15 +278,38 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, onRemove
           <div style={{ fontSize: '12px', color: t.textMuted }}>None</div>
         ) : (
           actionList.map((action, i) => (
-            <div key={i} style={condRowStyle}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                <span style={{ color: t.green, fontSize: '11px' }}>{action.skill || '(skill)'}</span>
-                <span style={{ color: t.textSecondary, fontSize: '11px' }}>{action.message || '(message)'}</span>
+            editingActionIdx === i ? (
+              <div key={i} style={{ ...condRowStyle, flexDirection: 'column', gap: 4 }}>
+                <input
+                  value={editSkill}
+                  onChange={(e) => setEditSkill(e.target.value)}
+                  placeholder="skill or agent name"
+                  autoFocus
+                  style={{ ...panelStyles.input, width: '100%', boxSizing: 'border-box' }}
+                />
+                <input
+                  value={editMessage}
+                  onChange={(e) => setEditMessage(e.target.value)}
+                  placeholder="message…"
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitEditAction(); if (e.key === 'Escape') setEditingActionIdx(null) }}
+                  style={{ ...panelStyles.input, width: '100%', boxSizing: 'border-box' }}
+                />
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                  <button style={{ ...removeBtnStyle, color: t.textMuted }} onClick={() => setEditingActionIdx(null)}>Cancel</button>
+                  <button style={{ ...removeBtnStyle, color: t.accent }} onClick={commitEditAction}>Save</button>
+                </div>
               </div>
-              {onDataChange && (
-                <button style={removeBtnStyle} onClick={() => removeAction(i)} title="Remove">×</button>
-              )}
-            </div>
+            ) : (
+              <div key={i} style={{ ...condRowStyle, cursor: onDataChange ? 'pointer' : 'default' }} onClick={() => onDataChange && startEditAction(i)}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                  <span style={{ color: action.skill ? t.green : t.textMuted, fontSize: '11px' }}>{action.skill || '(skill)'}</span>
+                  <span style={{ color: t.textSecondary, fontSize: '11px' }}>{action.message || '(message)'}</span>
+                </div>
+                {onDataChange && (
+                  <button style={removeBtnStyle} onClick={(e) => { e.stopPropagation(); removeAction(i) }} title="Remove">×</button>
+                )}
+              </div>
+            )
           ))
         )}
         <button style={panelStyles.addBtn} onClick={() => onAddAction(source, target)}>

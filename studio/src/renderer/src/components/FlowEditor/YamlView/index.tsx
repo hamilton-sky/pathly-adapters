@@ -7,6 +7,7 @@ import { useTheme } from '../../../useTheme'
 import type { FlowYaml } from '../../../types'
 import type { FlowValidationIssue } from '../utils/validateFlow'
 import { makeYamlViewStyles } from './YamlView.styles'
+import { Tooltip } from '../../ui'
 
 interface Props {
   initialContent: string
@@ -16,9 +17,11 @@ interface Props {
   onSave: (content: string) => void
   syncContent?: string | null
   validationIssues?: FlowValidationIssue[]
+  tab: 'visual' | 'yaml'
+  onTabClick: (t: 'visual' | 'yaml') => void
 }
 
-export function YamlView({ initialContent, onParsed, onParseError, onDirty, onSave, syncContent, validationIssues }: Props): JSX.Element {
+export function YamlView({ initialContent, onParsed, onParseError, onDirty, onSave, syncContent, validationIssues, tab, onTabClick }: Props): JSX.Element {
   const t = useTheme()
   const styles = makeYamlViewStyles(t)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -110,6 +113,13 @@ export function YamlView({ initialContent, onParsed, onParseError, onDirty, onSa
         </div>
       )}
       <div style={styles.toolbar}>
+        <Tooltip label="Visual canvas editor" placement="bottom">
+          <button style={tab === 'visual' ? styles.tabActive : styles.tab} onClick={() => onTabClick('visual')}>Visual</button>
+        </Tooltip>
+        <Tooltip label="YAML source editor" placement="bottom">
+          <button style={tab === 'yaml' ? styles.tabActive : styles.tab} onClick={() => onTabClick('yaml')}>YAML</button>
+        </Tooltip>
+        <div style={{ width: 1, height: 20, background: t.bgSurface1, margin: '0 6px', alignSelf: 'center' }} />
         <button
           style={parseError ? styles.saveBtnDisabled : styles.saveBtn}
           onClick={handleSave}

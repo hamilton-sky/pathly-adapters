@@ -15,11 +15,30 @@ export function makeVisualViewStyles(t: Theme): Record<string, React.CSSProperti
     },
     toolbar: {
       display: 'flex',
-      justifyContent: 'flex-end',
+      alignItems: 'center',
+      gap: '6px',
       padding: '6px 12px',
       backgroundColor: t.bgMantle,
       borderBottom: `1px solid ${t.bgSurface0}`,
       flexShrink: 0
+    },
+    tab: {
+      background: 'none',
+      border: `1px solid ${t.bgSurface1}`,
+      borderRadius: '4px',
+      color: t.textSecondary,
+      cursor: 'pointer',
+      padding: '3px 10px',
+      fontSize: '12px'
+    },
+    tabActive: {
+      background: t.bgSurface0,
+      border: `1px solid ${t.accent}`,
+      borderRadius: '4px',
+      color: t.accent,
+      cursor: 'pointer',
+      padding: '3px 10px',
+      fontSize: '12px'
     },
     saveBtn: {
       background: t.accent,

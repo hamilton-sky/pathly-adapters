@@ -8,6 +8,7 @@ import type { FlowValidationIssue } from './validateFlow'
 export interface StateNodeData {
   state: string
   agent: string
+  isStart?: boolean
   issues?: FlowValidationIssue[]
   outgoingStates?: string[]
   incomingStates?: string[]

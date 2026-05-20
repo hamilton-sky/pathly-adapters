@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useCallback } from 'react'
 import ReactFlow, { Background, Controls, ReactFlowProvider, useReactFlow, addEdge, updateEdge } from 'reactflow'
 import type { Node, Edge, Connection } from 'reactflow'
 import 'reactflow/dist/style.css'
@@ -12,6 +12,7 @@ import { makeVisualViewStyles } from './VisualView.styles'
 import { NodePanel } from './NodePanel'
 import { EdgePanel } from './EdgePanel'
 import { StateNode } from './StateNode'
+import type { StateNodeData } from '../utils/flowToGraph'
 import { validateFlow } from '../utils/validateFlow'
 import { resolveExportPath } from '../utils/exportPaths'
 import { applyDagreLayout } from '../utils/autoLayout'
@@ -24,6 +25,8 @@ interface Props {
   data: FlowYaml
   onChange: (updated: FlowYaml) => void
   onSave: () => void
+  tab: 'visual' | 'yaml'
+  onTabClick: (t: 'visual' | 'yaml') => void
 }
 
 interface NodeDetail {
@@ -62,7 +65,7 @@ const EXPORT_TARGET_DESCRIPTIONS: Record<FlowExportTarget, string> = {
   codex: 'This will write to .codex/pathly-flows/. Codex will pick up the flow on next session start.',
 }
 
-function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
+function VisualViewInner({ data, onChange, onSave, tab, onTabClick }: Props): JSX.Element {
   const t = useTheme()
   const styles = makeVisualViewStyles(t)
   const [detail, setDetail] = useState<PanelDetail>(null)
@@ -72,16 +75,25 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
   const { sections } = useProjectFiles()
   const { projectPath, selectedItem } = useStore()
 
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const pendingPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+
   const [exportTarget, setExportTarget] = useState<FlowExportTarget>('pathly-package')
   const [lastExport, setLastExport] = useState<FlowExportRecord | null>(null)
   const [exportToast, setExportToast] = useState<string | null>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
 
-  // Build known behaviors list for validation
+  // Build known behaviors list for validation — core + user global + project-local, including subdirs
   const knownBehaviors = useMemo(() => {
-    const skills = sections.Skills.items.map((item) => item.name.replace(/\.[^.]+$/, ''))
-    const agents = sections.Agents.items.map((item) => item.name.replace(/\.[^.]+$/, ''))
-    return [...skills, ...agents]
+    const all = (s: import('../../../types').SectionState | undefined) => [
+      ...(s?.items ?? []),
+      ...(s?.subdirs ?? []).flatMap((sd) => sd.files ?? []),
+    ]
+    const names = [
+      ...['Skills', 'UserSkills', 'My Skills'].flatMap((k) => all(sections[k]).map((i) => i.name.replace(/\.[^.]+$/, ''))),
+      ...['Agents', 'UserAgents', 'My Agents'].flatMap((k) => all(sections[k]).map((i) => i.name.replace(/\.[^.]+$/, ''))),
+    ]
+    return [...new Set(names)]
   }, [sections])
 
   // Run validation on every render (pure function, cheap)
@@ -92,7 +104,8 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
     t,
     onChange,
     (stateId) => setDetail({ type: 'node', stateId }),
-    (edgeId, source, target) => setDetail({ type: 'edge', edgeId, source, target })
+    (edgeId, source, target) => setDetail({ type: 'edge', edgeId, source, target }),
+    pendingPositionsRef
   )
 
   const edgeUpdateSuccessful = useRef(true)
@@ -141,12 +154,13 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
     edgeUpdateSuccessful.current = true
   }
 
-  // Inject validation issues into node data
+  // Inject validation issues + isStart into node data
   const nodesWithIssues = useMemo(() => nodes.map((node) => {
     const nodeIssues = validationIssues.filter((i) => i.target === 'node' && i.id === node.id)
     const baseData = node.data as Record<string, unknown>
-    return { ...node, data: { ...baseData, issues: nodeIssues.length > 0 ? nodeIssues : undefined } }
-  }), [nodes, validationIssues])
+    const isStart = data.states[0] === node.id
+    return { ...node, data: { ...baseData, issues: nodeIssues.length > 0 ? nodeIssues : undefined, isStart } }
+  }), [nodes, validationIssues, data.states])
 
   // Inject validation color into edges
   const edgesWithValidation = useMemo(() => edges.map((edge) => {
@@ -223,9 +237,62 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
       newTransitions[source] = newTransitions[source].filter((t) => t !== target)
       if (newTransitions[source].length === 0) delete newTransitions[source]
     }
-    onChange({ ...d, transitions: newTransitions })
+    const actionKey = `${source}->${target}`
+    const newActions = { ...((d.transition_actions as Record<string, unknown>) ?? {}) }
+    delete newActions[actionKey]
+    onChange({
+      ...d,
+      transitions: newTransitions,
+      transition_actions: Object.keys(newActions).length > 0 ? newActions : undefined,
+    })
     setEdges((eds) => eds.filter((e) => !(e.source === source && e.target === target)))
   }
+
+  const handleRenameState = useCallback((oldId: string, newId: string): void => {
+    const d = dataRef.current
+    const states = d.states.map((s) => s === oldId ? newId : s)
+    const transitions: Record<string, string[]> = {}
+    for (const [src, targets] of Object.entries(d.transitions ?? {})) {
+      transitions[src === oldId ? newId : src] = targets.map((t) => t === oldId ? newId : t)
+    }
+    const agent_map: Record<string, string> = {}
+    for (const [k, v] of Object.entries(d.agent_map ?? {})) {
+      agent_map[k === oldId ? newId : k] = v
+    }
+    const transition_rules: Record<string, unknown> = {}
+    if (d.transition_rules) {
+      for (const [k, v] of Object.entries(d.transition_rules as Record<string, unknown>)) {
+        transition_rules[k === oldId ? newId : k] = v
+      }
+    }
+    const transition_actions: Record<string, unknown> = {}
+    if (d.transition_actions) {
+      for (const [k, v] of Object.entries(d.transition_actions as Record<string, unknown>)) {
+        const newKey = k.split('->').map((part) => part === oldId ? newId : part).join('->')
+        transition_actions[newKey] = v
+      }
+    }
+    onChange({
+      ...d,
+      states,
+      transitions,
+      agent_map,
+      ...(d.transition_rules ? { transition_rules } : {}),
+      ...(d.transition_actions ? { transition_actions } : {}),
+    })
+    setNodes((nds) => nds.map((n): Node<StateNodeData> => n.id !== oldId ? n : {
+      ...n,
+      id: newId,
+      data: { ...n.data, state: newId },
+    }))
+    setEdges((eds) => eds.map((e) => ({
+      ...e,
+      ...(e.source === oldId ? { source: newId } : {}),
+      ...(e.target === oldId ? { target: newId } : {}),
+      id: `${e.source === oldId ? newId : e.source}__${e.target === oldId ? newId : e.target}`,
+    })))
+    setDetail({ type: 'node', stateId: newId })
+  }, [dataRef, onChange, setNodes, setEdges])
 
   function handleEdgeContextMenu(e: React.MouseEvent, edge: Edge): void {
     e.preventDefault()
@@ -304,14 +371,13 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
 
     const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const newId = generateUniqueStateId(payload.name, d.states)
-    const updated: FlowYaml = {
+    pendingPositionsRef.current.set(newId, flowPos)
+    onChange({
       ...d,
       states: [...d.states, newId],
       agent_map: { ...d.agent_map, [newId]: nameWithoutExt },
       transitions: { ...d.transitions },
-    }
-    onChange(updated)
-    void flowPos
+    })
   }
 
   const hasExportErrors = validationIssues.some((i) => i.level === 'error')
@@ -358,20 +424,31 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
   return (
     <div style={styles.wrapper}>
       <div style={styles.toolbar}>
-        {/* Layout / authoring controls */}
+        {/* Tab switcher */}
+        <Tooltip label="Visual canvas editor" placement="bottom">
+          <button style={tab === 'visual' ? styles.tabActive : styles.tab} onClick={() => onTabClick('visual')}>Visual</button>
+        </Tooltip>
+        <Tooltip label="YAML source editor" placement="bottom">
+          <button style={tab === 'yaml' ? styles.tabActive : styles.tab} onClick={() => onTabClick('yaml')}>YAML</button>
+        </Tooltip>
+
+        <div style={{ width: 1, height: 20, background: t.bgSurface1, margin: '0 6px', alignSelf: 'center' }} />
+
+        {/* Authoring actions */}
         <Tooltip label="Save flow YAML" shortcut="Ctrl+S" placement="bottom">
-          <button style={styles.saveBtn} onClick={onSave}>
-            Save
-          </button>
+          <button style={styles.saveBtn} onClick={onSave}>Save</button>
         </Tooltip>
         <Tooltip label="Add a new state node" placement="bottom">
           <button
-            style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}`, marginLeft: 8 }}
+            style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}` }}
             onClick={() => {
               const d = dataRef.current
               const newId = generateUniqueStateId('STATE', d.states)
-              const updated: FlowYaml = { ...d, states: [...d.states, newId], transitions: { ...d.transitions } }
-              onChange(updated)
+              const rect = canvasRef.current?.getBoundingClientRect()
+              if (rect) {
+                pendingPositionsRef.current.set(newId, screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }))
+              }
+              onChange({ ...d, states: [...d.states, newId], transitions: { ...d.transitions } })
             }}
           >
             + Add state
@@ -379,7 +456,7 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
         </Tooltip>
         <Tooltip label="Auto-arrange nodes left-to-right" placement="bottom">
           <button
-            style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}`, marginLeft: 8 }}
+            style={{ ...styles.saveBtn, background: 'transparent', color: t.textMuted, border: `1px solid ${t.bgSurface1}` }}
             onClick={() => {
               setNodes((nds) => {
                 const laid = applyDagreLayout(nds, edges)
@@ -392,10 +469,9 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
           </button>
         </Tooltip>
 
-        {/* Divider between layout and export controls */}
-        <div style={{ width: 1, height: 20, background: t.bgSurface1, margin: '0 12px', alignSelf: 'center' }} />
+        {/* Push publish controls to the right */}
+        <div style={{ flex: 1 }} />
 
-        {/* Export controls */}
         <select
           value={exportTarget}
           onChange={(e) => setExportTarget(e.target.value as FlowExportTarget)}
@@ -414,7 +490,7 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
           ))}
         </select>
         <Tooltip
-          label={hasExportErrors ? 'Fix validation errors before exporting' : 'Export flow to YAML'}
+          label={hasExportErrors ? 'Fix validation errors before publishing' : 'Publish flow to YAML'}
           placement="bottom"
         >
           <button
@@ -423,12 +499,11 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
               background: hasExportErrors ? t.bgSurface1 : t.accent,
               color: hasExportErrors ? t.textMuted : t.bgBase,
               cursor: hasExportErrors ? 'not-allowed' : 'pointer',
-              marginLeft: 8,
             }}
             onClick={handleExportClick}
             disabled={hasExportErrors}
           >
-            Export
+            Publish
           </button>
         </Tooltip>
       </div>
@@ -481,7 +556,7 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
             padding: 24, maxWidth: 400, width: '100%',
           }}>
             <p style={{ color: t.textPrimary, marginBottom: 8, fontSize: 14 }}>
-              This flow has validation warnings. Export anyway?
+              This flow has validation warnings. Publish anyway?
             </p>
             <p style={{ color: t.textMuted, marginBottom: 16, fontSize: 12 }}>
               {EXPORT_TARGET_DESCRIPTIONS[exportTarget]}
@@ -497,7 +572,7 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
                 style={{ ...styles.saveBtn, background: '#8B5CF6', color: '#fff' }}
                 onClick={handleConfirmExport}
               >
-                Export anyway
+                Publish anyway
               </button>
             </div>
           </div>
@@ -584,10 +659,41 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
 
       <div style={styles.body}>
         <div
-          style={styles.canvas}
+          ref={canvasRef}
+          style={{ ...styles.canvas, position: 'relative' }}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
+          {nodesWithIssues.length === 0 && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}>
+              <div style={{
+                border: `2px dashed ${t.bgSurface1}`,
+                borderRadius: 12,
+                padding: '24px 32px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <div style={{ fontSize: 13, color: t.textMuted }}>
+                  Drag an agent from the library to start
+                </div>
+                <div style={{ fontSize: 11, color: t.textMuted }}>
+                  or click <strong style={{ color: t.textSecondary }}>+ Add state</strong> in the toolbar
+                </div>
+              </div>
+            </div>
+          )}
           <ReactFlow
             nodes={nodesWithIssues}
             edges={edgesWithValidation}
@@ -620,6 +726,7 @@ function VisualViewInner({ data, onChange, onSave }: Props): JSX.Element {
                 stateId={(detail as NodeDetail).stateId}
                 data={localData}
                 onAgentChange={handleAgentChange}
+                onRename={handleRenameState}
                 onClose={() => setDetail(null)}
                 onRemove={() => {
                   const stateId = (detail as NodeDetail).stateId
@@ -661,3 +768,5 @@ export function VisualView(props: Props): JSX.Element {
     </ReactFlowProvider>
   )
 }
+
+export type { Props as VisualViewProps }

@@ -59,6 +59,28 @@ export function StateNode({ data }: NodeProps<StateNodeData>): JSX.Element {
         style={{ background: t.blue, width: 8, height: 8, border: 'none', left: '30%' }}
       />
 
+      {data.isStart && (
+        <div
+          title="Start state"
+          style={{
+            position: 'absolute',
+            top: -8,
+            left: -8,
+            width: 16,
+            height: 16,
+            borderRadius: '50%',
+            backgroundColor: t.accent,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '9px',
+            color: '#fff',
+            fontWeight: 700,
+          }}
+        >
+          ▶
+        </div>
+      )}
       <div style={{ fontWeight: 600, fontSize: '13px' }}>{data.state}</div>
       {data.agent && (
         <div style={{ fontSize: '11px', color: t.textSecondary, marginTop: '2px' }}>{data.agent}</div>

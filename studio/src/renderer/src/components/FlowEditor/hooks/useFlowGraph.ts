@@ -35,7 +35,8 @@ export function useFlowGraph(
   t: Theme,
   onChange: (updated: FlowYaml) => void,
   onNodeClick: (stateId: string) => void,
-  onEdgeClick: (edgeId: string, source: string, target: string) => void
+  onEdgeClick: (edgeId: string, source: string, target: string) => void,
+  pendingPositionsRef: React.MutableRefObject<Map<string, { x: number; y: number }>>
 ): UseFlowGraphReturn {
   const { nodes: initNodes, edges: initEdges } = flowToGraph(data, t)
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes)
@@ -72,8 +73,10 @@ export function useFlowGraph(
         const posMap = new Map(currentNodes.map((n) => [n.id, n.position]))
         const maxX = currentNodes.length > 0 ? Math.max(...currentNodes.map((n) => n.position.x)) : -220
         const transitionEntries = Object.entries(data.transitions ?? {})
-        return (data.states ?? []).map((state) => {
-          const pos = posMap.get(state) ?? { x: maxX + 220, y: 100 }
+        return (data.states ?? []).map((state, i) => {
+          const pending = pendingPositionsRef.current.get(state)
+          if (pending) pendingPositionsRef.current.delete(state)
+          const pos = pending ?? posMap.get(state) ?? { x: maxX + 220, y: 100 }
           const outgoingStates = data.transitions[state] ?? []
           const incomingStates = transitionEntries
             .filter(([, targets]) => targets.includes(state))
@@ -82,7 +85,7 @@ export function useFlowGraph(
             id: state,
             type: 'stateNode' as const,
             position: pos,
-            data: { state, agent: data.agent_map[state] ?? '', outgoingStates, incomingStates },
+            data: { state, agent: data.agent_map[state] ?? '', isStart: i === 0, outgoingStates, incomingStates },
           }
         })
       })
