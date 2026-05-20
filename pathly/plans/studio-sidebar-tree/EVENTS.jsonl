@@ -1,0 +1,7 @@
+{"type":"STATE_TRANSITION","to":"STORMING"}
+{"type":"HUMAN_RESPONSE","value":"skip-discovery-plan-exists"}
+{"type":"STATE_TRANSITION","to":"PLANNING"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "DESIGNING", "ts": "2026-05-20T12:19:33.118957+00:00"}
+{"type": "FILE_CREATED", "file": "DESIGN.md"}
+{"type": "STAGE_COMPLETE", "stage": "DESIGNING", "next": "BUILDING"}
+{"type": "STATE_TRANSITION", "from": "DESIGNING", "to": "BUILDING", "ts": "2026-05-20T12:20:15.908466+00:00"}

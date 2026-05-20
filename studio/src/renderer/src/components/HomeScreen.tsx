@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Sun, Moon, LayoutGrid, List } from 'lucide-react'
 import { useStore } from '../store'
 import { listDirs, listDir, readFile, pickFolder, openWindow } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
@@ -153,13 +154,21 @@ interface ProjectPlans {
 }
 
 export function HomeScreen(): JSX.Element {
-  const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic, setPathlyRoot } = useStore()
+  const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic, setPathlyRoot, theme, setTheme } = useStore()
   const t = useTheme()
   const [projectPlans, setProjectPlans] = useState<ProjectPlans>({})
   const [hideDone, setHideDone] = useState(true)
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null)
   const [hoveredOpen, setHoveredOpen] = useState<string | null>(null)
   const [hoveredRemove, setHoveredRemove] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(
+    (localStorage.getItem('pathly-home-view') as 'grid' | 'list') ?? 'grid'
+  )
+
+  function handleViewMode(mode: 'grid' | 'list'): void {
+    localStorage.setItem('pathly-home-view', mode)
+    setViewMode(mode)
+  }
 
   useEffect(() => {
     const ROOTS: Array<{ subdir: string; flowType: 'team' | 'debug' | 'explore' }> = [
@@ -258,13 +267,90 @@ export function HomeScreen(): JSX.Element {
         WebkitAppRegion: 'drag',
         zIndex: 9999,
         flexShrink: 0,
-      } as React.CSSProperties} />
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        paddingRight: '8px',
+        boxSizing: 'border-box',
+      } as React.CSSProperties}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          WebkitAppRegion: 'no-drag',
+          pointerEvents: 'all',
+        } as React.CSSProperties}>
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'none',
+              color: t.textMuted,
+              cursor: 'pointer',
+              transition: 'background 150ms ease-out',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = t.bgSurface0 }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+          <button
+            onClick={() => handleViewMode('grid')}
+            title="Grid view"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'none',
+              color: viewMode === 'grid' ? t.accent : t.textMuted,
+              cursor: 'pointer',
+              transition: 'background 150ms ease-out',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = t.bgSurface0 }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
+          >
+            <LayoutGrid size={14} />
+          </button>
+          <button
+            onClick={() => handleViewMode('list')}
+            title="List view"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'none',
+              color: viewMode === 'list' ? t.accent : t.textMuted,
+              cursor: 'pointer',
+              transition: 'background 150ms ease-out',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = t.bgSurface0 }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
+          >
+            <List size={14} />
+          </button>
+        </div>
+      </div>
       <style>{ANIMATIONS}</style>
 
       <h1 style={{
         fontSize: '26px',
         fontWeight: 700,
-        marginBottom: '36px',
+        marginBottom: '8px',
         color: t.accent,
         fontFamily: t.fontFamilyBase,
         letterSpacing: '-0.02em',
@@ -272,10 +358,19 @@ export function HomeScreen(): JSX.Element {
       }}>
         Pathly Studio
       </h1>
+      <p style={{
+        fontSize: '14px',
+        fontWeight: 400,
+        color: t.textMuted,
+        marginBottom: '36px',
+        animation: 'fadeIn 400ms ease-out both'
+      }}>
+        Welcome back. Pick up where you left off.
+      </p>
 
       <div style={{
         width: '100%',
-        maxWidth: '820px',
+        maxWidth: '1100px',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px'
@@ -316,6 +411,16 @@ export function HomeScreen(): JSX.Element {
             {hideDone ? 'Show all' : 'Hide done'}
           </button>
         </div>
+
+        <div style={viewMode === 'grid' ? {
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: '14px',
+        } : {
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+        }}>
 
         {sorted.length === 0 && (
           <div style={{
@@ -490,6 +595,7 @@ export function HomeScreen(): JSX.Element {
             </div>
           )
         })}
+        </div>
       </div>
 
       <button

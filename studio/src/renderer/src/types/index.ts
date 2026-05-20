@@ -66,6 +66,7 @@ export interface ProjectEntry {
   lastOpened: number
   activeTopic?: string
   fsmState?: string
+  pinned?: boolean
 }
 
 export interface FlowYaml {
