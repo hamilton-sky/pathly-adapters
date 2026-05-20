@@ -10,3 +10,5 @@
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-20T15:30:01.000000"}
 {"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "ts": "2026-05-20T16:00:00.000000"}
 {"type": "STATE_TRANSITION", "to": "TESTING", "ts": "2026-05-20T16:00:01.000000"}
+{"type": "AGENT_DONE", "agent": "tester", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "ts": "2026-05-20T18:00:00.000000"}
+{"type": "STATE_TRANSITION", "to": "DONE", "ts": "2026-05-20T18:00:01.000000"}

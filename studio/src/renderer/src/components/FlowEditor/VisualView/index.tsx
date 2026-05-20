@@ -41,7 +41,7 @@ function RunningBanner({ flowName, stateName }: { flowName: string; stateName: s
 
   return (
     <div
-      role="alert"
+      role="status"
       aria-live="assertive"
       aria-label={`${flowName} pipeline is running in ${stateName}`}
       onMouseEnter={clearTimer}

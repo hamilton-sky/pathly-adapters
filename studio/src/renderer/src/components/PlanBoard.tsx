@@ -63,7 +63,7 @@ const PULSE_BORDER_CSS = `
   0%, 100% { border-left-color: ${ACTIVE_CYAN}; }
   50%       { border-left-color: rgba(6,182,212,0.15); }
 }
-.pathly-pulse-border { border-left-color: ${ACTIVE_CYAN}; }
+.pathly-pulse-border { animation: none; border-left-color: ${ACTIVE_CYAN}; }
 @media (prefers-reduced-motion: no-preference) {
   .pathly-pulse-border { animation: pathly-pulse-border 1.5s ease-in-out infinite; }
 }
