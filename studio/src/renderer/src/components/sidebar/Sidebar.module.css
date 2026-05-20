@@ -62,7 +62,6 @@
 }
 .filterInput::placeholder { color: var(--text-muted); }
 .filterInput:focus { border-color: var(--accent); }
-.filterInput:focus-visible { outline: 2px solid #89b4fa; outline-offset: 2px; }
 
 .treeContainer {
   flex: 1;
@@ -388,6 +387,7 @@
   margin-left: auto;
 }
 .itemRow:hover .rowActions { opacity: 1; }
+.systemItemRow:hover .rowActions { opacity: 1; }
 .rowAction {
   display: flex;
   align-items: center;
@@ -499,3 +499,25 @@
   color: var(--text-secondary);
 }
 .systemItemRowDeep { padding-left: 44px; }
+
+.planBadge {
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.filterClear {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: color 0.1s;
+}
+.filterClear:hover { color: var(--text-primary); }

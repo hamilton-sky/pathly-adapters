@@ -4,7 +4,7 @@ import { useStore } from '../../store'
 import type { PathlyItem, PathlyCanvasDragItem, PathlyReorgDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import { useProjectFiles } from '../../hooks/useProjectFiles'
-import { usePlanConversations } from '../../hooks/usePlanConversations'
+import { usePlanFiles } from '../../hooks/usePlanFiles'
 import { FlowWizard } from '../FlowWizard'
 import { NewItemDialog } from '../NewItemDialog'
 import { DeleteConfirmModal } from './DeleteConfirmModal'
@@ -20,6 +20,7 @@ export function Sidebar(): JSX.Element | null {
     pathlyUserHome,
     setPathlyUserHome,
     activeTopic,
+    setActiveTopic,
     sidebarCollapsed,
     selectedItem,
     setSelectedItem,
@@ -29,7 +30,7 @@ export function Sidebar(): JSX.Element | null {
   } = useStore()
 
   const { sections, setSections, loadItems } = useProjectFiles()
-  const { planConvs } = usePlanConversations()
+  const { planFolders, setPlanFolders, loadPlanFiles } = usePlanFiles()
 
   useEffect(() => {
     if (pathlyUserHome) return
@@ -121,6 +122,16 @@ export function Sidebar(): JSX.Element | null {
     const trimmed = name.trim()
     await window.pathly.fs.write(`${projectPath}/pathly/plans/${trimmed}/STATE.json`, JSON.stringify({ current: 'INIT' }))
     await loadItems()
+    await loadPlanFiles()
+  }
+
+  function handleToggleFolder(name: string): void {
+    setPlanFolders((prev) => prev.map((f) => f.name === name ? { ...f, open: !f.open } : f))
+  }
+
+  function handleFolderClick(name: string): void {
+    setActiveTopic(name)
+    setActivePanel('plan')
   }
 
   function startRename(item: PathlyItem, _itemDir: string): void {
@@ -203,6 +214,15 @@ export function Sidebar(): JSX.Element | null {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
+        {filter && (
+          <button
+            className={styles.filterClear}
+            onClick={() => setFilter('')}
+            title="Clear filter"
+          >
+            ×
+          </button>
+        )}
         <button
           className={`${styles.libraryBtn} ${libraryOpen ? styles.libraryBtnActive : ''}`}
           onClick={() => { setLibraryOpen(v => !v); setFilter('') }}
@@ -219,12 +239,19 @@ export function Sidebar(): JSX.Element | null {
             selectedItem={selectedItem}
             filter={filter}
             lowerFilter={lowerFilter}
+            renamingPath={renamingPath}
+            renameValue={renameValue}
             onSelect={handleItemClick}
             onToggleSection={toggleSection}
             onToggleSubdir={toggleSubdir}
             onNewUserLibraryItem={handleNewUserLibraryItem}
             dragFromGripRef={dragFromGripRef}
             onDragStart={handleItemDragStart}
+            onStartRename={startRename}
+            onStartDelete={setConfirmDelete}
+            onRenameChange={setRenameValue}
+            onRenameCommit={(item, itemDir) => { void commitRename(item, itemDir) }}
+            onRenameCancel={() => setRenamingPath(null)}
           />
         )}
 
@@ -237,7 +264,7 @@ export function Sidebar(): JSX.Element | null {
             filter={filter}
             lowerFilter={lowerFilter}
             activeTopic={activeTopic}
-            planConvs={planConvs}
+            planFolders={planFolders}
             renamingPath={renamingPath}
             renameValue={renameValue}
             onSelect={handleItemClick}
@@ -254,6 +281,8 @@ export function Sidebar(): JSX.Element | null {
             onStartDelete={setConfirmDelete}
             planOpen={planOpen}
             onTogglePlan={() => setPlanOpen((v) => !v)}
+            onToggleFolder={handleToggleFolder}
+            onFolderClick={handleFolderClick}
           />
         )}
 

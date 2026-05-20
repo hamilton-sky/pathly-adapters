@@ -1,4 +1,4 @@
-export type PathlyItemType = 'flow' | 'skill' | 'agent' | 'template' | 'debug' | 'explore'
+export type PathlyItemType = 'flow' | 'skill' | 'agent' | 'template' | 'debug' | 'explore' | 'plan'
 
 // Sidebar section domains — the four managed directories
 export type PathlySection = 'skills' | 'agents' | 'flows' | 'templates'

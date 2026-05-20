@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react'
-import type { PathlyItem, SectionState, ConvRow } from '../../types'
+import type { PathlyItem, SectionState } from '../../types'
+import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton, Separator } from '../ui'
 import { SectionHeader } from './SectionHeader'
 import { SubdirRow } from './SubdirRow'
@@ -17,7 +18,7 @@ interface Props {
   filter: string
   lowerFilter: string
   activeTopic: string | null
-  planConvs: ConvRow[]
+  planFolders: PlanFolder[]
   renamingPath: string | null
   renameValue: string
   onSelect: (item: PathlyItem) => void
@@ -34,18 +35,20 @@ interface Props {
   onStartDelete: (item: PathlyItem) => void
   planOpen: boolean
   onTogglePlan: () => void
+  onToggleFolder: (name: string) => void
+  onFolderClick: (name: string) => void
 }
 
 export function WorkspacePanel(props: Props): JSX.Element {
   const {
     sections, projectPath, selectedItem, dirtyItems,
-    filter, lowerFilter, activeTopic, planConvs,
+    filter, lowerFilter, activeTopic, planFolders,
     renamingPath, renameValue,
     onSelect, onToggleSection, onToggleSubdir, onActivePanel,
     onWorkspaceCreate, onInlineCreate, onNewPlan,
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
-    planOpen, onTogglePlan,
+    planOpen, onTogglePlan, onToggleFolder, onFolderClick,
   } = props
 
   return (
@@ -135,12 +138,24 @@ export function WorkspacePanel(props: Props): JSX.Element {
       })}
 
       <PlanSection
-        planConvs={planConvs}
-        open={planOpen}
+        planFolders={planFolders}
+        selectedItem={selectedItem}
+        dirtyItems={dirtyItems}
+        lowerFilter={lowerFilter}
         activeTopic={activeTopic}
-        onToggle={onTogglePlan}
+        renamingPath={renamingPath}
+        renameValue={renameValue}
+        planOpen={planOpen}
+        onTogglePlan={onTogglePlan}
+        onToggleFolder={onToggleFolder}
+        onFolderClick={onFolderClick}
         onNewPlan={onNewPlan}
-        onActivePanel={onActivePanel}
+        onSelect={onSelect}
+        onRenameChange={onRenameChange}
+        onRenameCommit={onRenameCommit}
+        onRenameCancel={onRenameCancel}
+        onStartRename={onStartRename}
+        onStartDelete={onStartDelete}
       />
 
       {WORKSPACE_FILE_SECTIONS.map((section) => {

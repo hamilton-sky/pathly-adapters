@@ -1,64 +1,139 @@
-import type React from 'react'
-import { Plus } from 'lucide-react'
-import type { ConvRow } from '../../types'
+import { Folder, FolderOpen, Plus } from 'lucide-react'
+import type { PathlyItem } from '../../types'
+import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton } from '../ui'
 import { SectionHeader } from './SectionHeader'
+import { WorkspaceItem } from './WorkspaceItem'
+import { PROTECTED_FILENAMES } from './constants'
 import styles from './Sidebar.module.css'
 
-function convStatusClass(status: string): string {
-  if (status === 'DONE') return styles.statusDone
-  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return styles.statusActive
-  if (status === 'BLOCKED') return styles.statusBlocked
-  return styles.statusDefault
-}
-
-function convIcon(status: string): string {
-  if (status === 'DONE') return '✓'
-  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return '●'
-  return '○'
-}
-
 interface Props {
-  planConvs: ConvRow[]
-  open: boolean
+  planFolders: PlanFolder[]
+  selectedItem: PathlyItem | null
+  dirtyItems: Set<string>
+  lowerFilter: string
   activeTopic: string | null
-  onToggle: () => void
+  renamingPath: string | null
+  renameValue: string
+  planOpen: boolean
+  onTogglePlan: () => void
+  onToggleFolder: (name: string) => void
+  onFolderClick: (name: string) => void
   onNewPlan: (e: React.MouseEvent<HTMLButtonElement>) => void
-  onActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
+  onSelect: (item: PathlyItem) => void
+  onRenameChange: (v: string) => void
+  onRenameCommit: (item: PathlyItem, itemDir: string) => void
+  onRenameCancel: () => void
+  onStartRename: (item: PathlyItem, itemDir: string) => void
+  onStartDelete: (item: PathlyItem) => void
 }
 
-export function PlanSection({ planConvs, open, activeTopic, onToggle, onNewPlan, onActivePanel }: Props): JSX.Element {
+export function PlanSection({
+  planFolders,
+  selectedItem,
+  dirtyItems,
+  lowerFilter,
+  activeTopic,
+  renamingPath,
+  renameValue,
+  planOpen,
+  onTogglePlan,
+  onToggleFolder,
+  onFolderClick,
+  onNewPlan,
+  onSelect,
+  onRenameChange,
+  onRenameCommit,
+  onRenameCancel,
+  onStartRename,
+  onStartDelete,
+}: Props): JSX.Element {
+  const visibleFolders = lowerFilter
+    ? planFolders.filter((f) =>
+        f.name.toLowerCase().includes(lowerFilter) ||
+        f.files.some((file) => file.name.toLowerCase().includes(lowerFilter))
+      )
+    : planFolders
+
   return (
     <>
       <SectionHeader
         label="Plan"
-        open={open}
-        onToggle={onToggle}
-        sub={`[${activeTopic ?? 'no topic'}]`}
+        open={planOpen}
+        onToggle={onTogglePlan}
+        sub={activeTopic ? `[${activeTopic}]` : undefined}
         actions={
           <IconButton onClick={onNewPlan} title="New plan">
             <Plus size={12} />
           </IconButton>
         }
       />
-      {open && (
+      {planOpen && (
         <div>
-          {planConvs.length === 0 ? (
-            <div className={styles.convEmpty}>No conversations</div>
-          ) : (
-            planConvs.map((conv) => {
-              const cls = convStatusClass(conv.status)
-              return (
-                <button key={conv.num} className={styles.convRow} onClick={() => onActivePanel('plan')}>
-                  <span className={`${cls} ${styles.convStatus}`} style={{ marginRight: 6, flexShrink: 0 }}>
-                    {convIcon(conv.status)}
-                  </span>
-                  <span className={styles.convLabel}>Conv {conv.num} — {conv.title}</span>
-                  <span className={`${styles.convStatus} ${cls}`}>{conv.status}</span>
-                </button>
-              )
-            })
+          {visibleFolders.length === 0 && (
+            <div className={styles.convEmpty}>No plans</div>
           )}
+          {visibleFolders.map((folder) => {
+            const isActive = folder.name === activeTopic
+            const badge = folder.convTotal > 0
+              ? `${folder.convDone}/${folder.convTotal}✓`
+              : null
+
+            const filteredFiles = lowerFilter
+              ? folder.files.filter((f) => f.name.toLowerCase().includes(lowerFilter))
+              : folder.files
+
+            return (
+              <div key={folder.name}>
+                <button
+                  className={`${styles.subdirHeader} ${isActive ? styles.itemRowSelected : ''}`}
+                  onClick={() => {
+                    onToggleFolder(folder.name)
+                    onFolderClick(folder.name)
+                  }}
+                  title={folder.path}
+                >
+                  {folder.open
+                    ? <FolderOpen size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                    : <Folder size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  }
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {folder.name}
+                  </span>
+                  {badge && (
+                    <span
+                      className={styles.planBadge}
+                      style={{ color: folder.convDone === folder.convTotal ? 'var(--green)' : 'var(--text-muted)' }}
+                      title={`${folder.convDone} of ${folder.convTotal} conversations done`}
+                    >
+                      {badge}
+                    </span>
+                  )}
+                </button>
+                {folder.open && filteredFiles.map((file) => {
+                  const isProtected = PROTECTED_FILENAMES.has(file.name)
+                  return (
+                    <WorkspaceItem
+                      key={file.path}
+                      item={file}
+                      itemDir={folder.path}
+                      isSelected={selectedItem?.path === file.path}
+                      isDirty={dirtyItems.has(file.path)}
+                      deep
+                      renamingPath={renamingPath}
+                      renameValue={renameValue}
+                      onSelect={() => onSelect(file)}
+                      onRenameChange={onRenameChange}
+                      onRenameCommit={() => onRenameCommit(file, folder.path)}
+                      onRenameCancel={onRenameCancel}
+                      onStartRename={isProtected ? undefined : () => onStartRename(file, folder.path)}
+                      onStartDelete={isProtected ? undefined : () => onStartDelete(file)}
+                    />
+                  )
+                })}
+              </div>
+            )
+          })}
         </div>
       )}
     </>

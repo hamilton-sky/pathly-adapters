@@ -15,8 +15,8 @@ interface Props {
   onRenameChange: (v: string) => void
   onRenameCommit: () => void
   onRenameCancel: () => void
-  onStartRename: () => void
-  onStartDelete: () => void
+  onStartRename?: () => void
+  onStartDelete?: () => void
 }
 
 export function WorkspaceItem({
@@ -59,22 +59,28 @@ export function WorkspaceItem({
         <>
           <span className={styles.itemName}>{item.name}</span>
           {isDirty && <span className={styles.dirtyDot}>●</span>}
-          <div className={styles.rowActions}>
-            <button
-              className={styles.rowAction}
-              title="Rename"
-              onClick={(e) => { e.stopPropagation(); onStartRename() }}
-            >
-              <Pencil size={11} />
-            </button>
-            <button
-              className={`${styles.rowAction} ${styles.rowActionDelete}`}
-              title="Delete"
-              onClick={(e) => { e.stopPropagation(); onStartDelete() }}
-            >
-              <Trash2 size={11} />
-            </button>
-          </div>
+          {(onStartRename || onStartDelete) && (
+            <div className={styles.rowActions}>
+              {onStartRename && (
+                <button
+                  className={styles.rowAction}
+                  title="Rename"
+                  onClick={(e) => { e.stopPropagation(); onStartRename() }}
+                >
+                  <Pencil size={11} />
+                </button>
+              )}
+              {onStartDelete && (
+                <button
+                  className={`${styles.rowAction} ${styles.rowActionDelete}`}
+                  title="Delete"
+                  onClick={(e) => { e.stopPropagation(); onStartDelete() }}
+                >
+                  <Trash2 size={11} />
+                </button>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

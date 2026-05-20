@@ -13,12 +13,19 @@ interface Props {
   selectedItem: PathlyItem | null
   filter: string
   lowerFilter: string
+  renamingPath: string | null
+  renameValue: string
   onSelect: (item: PathlyItem) => void
   onToggleSection: (label: string) => void
   onToggleSubdir: (label: string, idx: number) => void
   onNewUserLibraryItem: (section: Section, e: React.MouseEvent<HTMLButtonElement>) => void
   dragFromGripRef: React.MutableRefObject<boolean>
   onDragStart: (e: React.DragEvent, item: PathlyItem, section: Section) => void
+  onStartRename: (item: PathlyItem, itemDir: string) => void
+  onStartDelete: (item: PathlyItem) => void
+  onRenameChange: (v: string) => void
+  onRenameCommit: (item: PathlyItem, itemDir: string) => void
+  onRenameCancel: () => void
 }
 
 function renderSection(
@@ -28,8 +35,9 @@ function renderSection(
   state: SectionState,
   props: Props,
   showAddButton: boolean,
+  writable: boolean = false,
 ): JSX.Element | null {
-  const { filter, lowerFilter, selectedItem, onToggleSection, onToggleSubdir, onSelect, onDragStart, onNewUserLibraryItem, dragFromGripRef } = props
+  const { filter, lowerFilter, selectedItem, onToggleSection, onToggleSubdir, onSelect, onDragStart, onNewUserLibraryItem, dragFromGripRef, onStartRename, onStartDelete, renamingPath, renameValue, onRenameChange, onRenameCommit, onRenameCancel } = props
 
   if (section.type === 'template') {
     if (state.subdirs === null) return null
@@ -60,16 +68,26 @@ function renderSection(
                     open={subdir.open}
                     onToggle={() => onToggleSubdir(stateKey, idx)}
                   />
-                  {subdir.open && filteredFiles.map((item) => (
-                    <LibraryItem
-                      key={item.path}
-                      item={item}
-                      isSelected={selectedItem?.path === item.path}
-                      isCanvasDraggable={false}
-                      deep
-                      onSelect={() => onSelect(item)}
-                    />
-                  ))}
+                  {subdir.open && filteredFiles.map((item) => {
+                    const itemDir = item.path.substring(0, item.path.lastIndexOf('/'))
+                    return (
+                      <LibraryItem
+                        key={item.path}
+                        item={item}
+                        isSelected={selectedItem?.path === item.path}
+                        isCanvasDraggable={false}
+                        deep
+                        onSelect={() => onSelect(item)}
+                        onStartRename={writable ? () => onStartRename(item, itemDir) : undefined}
+                        onStartDelete={writable ? () => onStartDelete(item) : undefined}
+                        renamingPath={writable ? renamingPath : undefined}
+                        renameValue={renameValue}
+                        onRenameChange={writable ? onRenameChange : undefined}
+                        onRenameCommit={writable ? () => onRenameCommit(item, itemDir) : undefined}
+                        onRenameCancel={writable ? onRenameCancel : undefined}
+                      />
+                    )
+                  })}
                 </div>
               )
             })}
@@ -110,39 +128,59 @@ function renderSection(
                   open={subdir.open}
                   onToggle={() => onToggleSubdir(stateKey, idx)}
                 />
-                {subdir.open && filteredFiles.map((item) => (
-                  <LibraryItem
-                    key={item.path}
-                    item={item}
-                    isSelected={selectedItem?.path === item.path}
-                    isCanvasDraggable={isCanvasDraggable}
-                    deep
-                    onSelect={() => onSelect(item)}
-                    onDragStart={isCanvasDraggable ? (e) => {
-                      dragFromGripRef.current = true
-                      onDragStart(e, item, section)
-                    } : undefined}
-                    onGripPointerDown={isCanvasDraggable ? () => { dragFromGripRef.current = true } : undefined}
-                  />
-                ))}
+                {subdir.open && filteredFiles.map((item) => {
+                  const itemDir = item.path.substring(0, item.path.lastIndexOf('/'))
+                  return (
+                    <LibraryItem
+                      key={item.path}
+                      item={item}
+                      isSelected={selectedItem?.path === item.path}
+                      isCanvasDraggable={isCanvasDraggable}
+                      deep
+                      onSelect={() => onSelect(item)}
+                      onDragStart={isCanvasDraggable ? (e) => {
+                        dragFromGripRef.current = true
+                        onDragStart(e, item, section)
+                      } : undefined}
+                      onGripPointerDown={isCanvasDraggable ? () => { dragFromGripRef.current = true } : undefined}
+                      onStartRename={writable ? () => onStartRename(item, itemDir) : undefined}
+                      onStartDelete={writable ? () => onStartDelete(item) : undefined}
+                      renamingPath={writable ? renamingPath : undefined}
+                      renameValue={renameValue}
+                      onRenameChange={writable ? onRenameChange : undefined}
+                      onRenameCommit={writable ? () => onRenameCommit(item, itemDir) : undefined}
+                      onRenameCancel={writable ? onRenameCancel : undefined}
+                    />
+                  )
+                })}
               </div>
             )
           })}
-          {filtered.map((item) => (
-            <LibraryItem
-              key={item.path}
-              item={item}
-              isSelected={selectedItem?.path === item.path}
-              isCanvasDraggable={isCanvasDraggable}
-              deep={false}
-              onSelect={() => onSelect(item)}
-              onDragStart={isCanvasDraggable ? (e) => {
-                dragFromGripRef.current = true
-                onDragStart(e, item, section)
-              } : undefined}
-              onGripPointerDown={isCanvasDraggable ? () => { dragFromGripRef.current = true } : undefined}
-            />
-          ))}
+          {filtered.map((item) => {
+            const itemDir = item.path.substring(0, item.path.lastIndexOf('/'))
+            return (
+              <LibraryItem
+                key={item.path}
+                item={item}
+                isSelected={selectedItem?.path === item.path}
+                isCanvasDraggable={isCanvasDraggable}
+                deep={false}
+                onSelect={() => onSelect(item)}
+                onDragStart={isCanvasDraggable ? (e) => {
+                  dragFromGripRef.current = true
+                  onDragStart(e, item, section)
+                } : undefined}
+                onGripPointerDown={isCanvasDraggable ? () => { dragFromGripRef.current = true } : undefined}
+                onStartRename={writable ? () => onStartRename(item, itemDir) : undefined}
+                onStartDelete={writable ? () => onStartDelete(item) : undefined}
+                renamingPath={writable ? renamingPath : undefined}
+                renameValue={renameValue}
+                onRenameChange={writable ? onRenameChange : undefined}
+                onRenameCommit={writable ? () => onRenameCommit(item, itemDir) : undefined}
+                onRenameCancel={writable ? onRenameCancel : undefined}
+              />
+            )
+          })}
         </div>
       )}
     </div>
@@ -166,7 +204,7 @@ export function LibraryPanel(props: Props): JSX.Element {
         const displayLabel = USER_LIBRARY_DISPLAY_LABELS[stateKey] ?? stateKey
         const state = sections[stateKey]
         if (!state) return null
-        return renderSection(section, stateKey, displayLabel, state, props, true)
+        return renderSection(section, stateKey, displayLabel, state, props, true, true)
       })}
     </>
   )

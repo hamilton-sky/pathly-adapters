@@ -29,3 +29,5 @@ export const WORKSPACE_FILE_SECTIONS: Section[] = [
   { label: 'Debugs',       type: 'debug',   dir: 'pathly/debugs'       },
   { label: 'Explorations', type: 'explore', dir: 'pathly/explorations' },
 ]
+
+export const PROTECTED_FILENAMES = new Set(['STATE.json', 'EVENTS.jsonl', 'PROGRESS.md'])

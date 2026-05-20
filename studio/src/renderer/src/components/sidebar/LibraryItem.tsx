@@ -1,5 +1,6 @@
-import { FileText, GripVertical } from 'lucide-react'
+import { FileText, GripVertical, Pencil, Trash2 } from 'lucide-react'
 import type { PathlyItem } from '../../types'
+import { RenameInput } from './RenameInput'
 import styles from './Sidebar.module.css'
 
 interface Props {
@@ -10,9 +11,17 @@ interface Props {
   onSelect: () => void
   onDragStart?: (e: React.DragEvent) => void
   onGripPointerDown?: () => void
+  onStartRename?: () => void
+  onStartDelete?: () => void
+  renamingPath?: string | null
+  renameValue?: string
+  onRenameChange?: (v: string) => void
+  onRenameCommit?: () => void
+  onRenameCancel?: () => void
 }
 
-export function LibraryItem({ item, isSelected, isCanvasDraggable, deep, onSelect, onDragStart, onGripPointerDown }: Props): JSX.Element {
+export function LibraryItem({ item, isSelected, isCanvasDraggable, deep, onSelect, onDragStart, onGripPointerDown, onStartRename, onStartDelete, renamingPath, renameValue, onRenameChange, onRenameCommit, onRenameCancel }: Props): JSX.Element {
+  const isRenaming = renamingPath === item.path
   const cls = [
     styles.systemItemRow,
     deep ? styles.systemItemRowDeep : '',
@@ -20,12 +29,14 @@ export function LibraryItem({ item, isSelected, isCanvasDraggable, deep, onSelec
   ].filter(Boolean).join(' ')
 
   return (
-    <button
+    <div
       className={cls}
-      draggable={isCanvasDraggable}
-      onClick={onSelect}
+      draggable={isCanvasDraggable && !isRenaming}
+      onClick={() => { if (!isRenaming) onSelect() }}
       onDragStart={onDragStart}
       title={item.path}
+      tabIndex={0}
+      onKeyDown={(e) => { if (!isRenaming && (e.key === 'Enter' || e.key === ' ')) onSelect() }}
     >
       {isCanvasDraggable && (
         <span
@@ -37,7 +48,40 @@ export function LibraryItem({ item, isSelected, isCanvasDraggable, deep, onSelec
         </span>
       )}
       <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-      <span className={styles.itemName}>{item.name}</span>
-    </button>
+      {isRenaming && onRenameChange && onRenameCommit && onRenameCancel ? (
+        <RenameInput
+          value={renameValue ?? ''}
+          onChange={onRenameChange}
+          onCommit={onRenameCommit}
+          onCancel={onRenameCancel}
+        />
+      ) : (
+        <>
+          <span className={styles.itemName}>{item.name}</span>
+          {(onStartRename || onStartDelete) && (
+            <div className={styles.rowActions}>
+              {onStartRename && (
+                <button
+                  className={styles.rowAction}
+                  title="Rename"
+                  onClick={(e) => { e.stopPropagation(); onStartRename() }}
+                >
+                  <Pencil size={11} />
+                </button>
+              )}
+              {onStartDelete && (
+                <button
+                  className={`${styles.rowAction} ${styles.rowActionDelete}`}
+                  title="Delete"
+                  onClick={(e) => { e.stopPropagation(); onStartDelete() }}
+                >
+                  <Trash2 size={11} />
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   )
 }
