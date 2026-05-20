@@ -31,6 +31,7 @@ pathly-design = "pathly_data.core.design.cli:main"
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = ["-p", "no:cacheprovider"]
+markers = ["slow: marks tests as slow (E2E installs)"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
