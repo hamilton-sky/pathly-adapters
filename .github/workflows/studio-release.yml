@@ -14,13 +14,13 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            script: build:win
+            eb_flag: --win
             artifact: studio/dist/*.exe
           - os: macos-latest
-            script: build:mac
+            eb_flag: --mac
             artifact: studio/dist/*.dmg
           - os: ubuntu-latest
-            script: build:linux
+            eb_flag: --linux
             artifact: studio/dist/*.AppImage
 
     runs-on: ${{ matrix.os }}
@@ -49,11 +49,20 @@ jobs:
 
       - name: Install Node deps
         working-directory: studio
-        run: npm ci
+        run: npm install
 
-      - name: Build Studio installer
+      - name: Prepare resources (bundle Python + wheel)
         working-directory: studio
-        run: npm run ${{ matrix.script }}
+        run: node scripts/prepare-resources.mjs
+        continue-on-error: true
+
+      - name: Build renderer
+        working-directory: studio
+        run: npm run build
+
+      - name: Package installer
+        working-directory: studio
+        run: npx electron-builder ${{ matrix.eb_flag }}
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
