@@ -257,6 +257,17 @@ export function Sidebar(): JSX.Element | null {
   void inlineCreate
   void dragOverPath
 
+  async function handleReorgDrop(sourcePath: string, targetDir: string, _sectionId: string): Promise<void> {
+    const fileName = sourcePath.split('/').pop() ?? ''
+    if (!fileName) return
+    const targetPath = `${targetDir}/${fileName}`
+    if (sourcePath === targetPath) return
+    const content = await window.pathly.fs.read(sourcePath).catch(() => '')
+    await window.pathly.fs.write(targetPath, content ?? '')
+    await window.pathly.fs.delete(sourcePath)
+    await loadItems()
+  }
+
   function switchTab(tab: 'library' | 'workspace'): void {
     setLibraryOpen(tab === 'library')
     setFilter('')
@@ -354,6 +365,7 @@ export function Sidebar(): JSX.Element | null {
             onTogglePlan={() => setPlanOpen((v) => !v)}
             onToggleFolder={handleToggleFolder}
             onFolderClick={handleFolderClick}
+            onReorgDrop={(src, tgt, sid) => { void handleReorgDrop(src, tgt, sid) }}
           />
         )}
 

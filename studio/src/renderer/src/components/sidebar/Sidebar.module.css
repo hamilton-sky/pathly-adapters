@@ -639,3 +639,14 @@
   font-size: 10px;
   text-align: right;
 }
+
+/* ── Drag-and-drop reorg ── */
+.draggableItem {
+  cursor: grab;
+}
+
+.subdirRowDragOver {
+  background: var(--accent, rgba(100,200,255,0.12));
+  outline: 1px dashed var(--accent, #7ec8e3);
+  outline-offset: -1px;
+}

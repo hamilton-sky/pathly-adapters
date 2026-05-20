@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Plus, FolderPlus } from 'lucide-react'
-import type { PathlyItem, SectionState } from '../../types'
+import type { PathlyItem, SectionState, PathlyReorgDragItem } from '../../types'
+import { PATHLY_DRAG_MIME } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton, Separator } from '../ui'
 import { SectionHeader } from './SectionHeader'
@@ -39,6 +41,7 @@ interface Props {
   onTogglePlan: () => void
   onToggleFolder: (name: string) => void
   onFolderClick: (name: string) => void
+  onReorgDrop?: (sourcePath: string, targetDir: string, sectionId: string) => void
 }
 
 export function WorkspacePanel(props: Props): JSX.Element {
@@ -51,9 +54,11 @@ export function WorkspacePanel(props: Props): JSX.Element {
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
+    onReorgDrop,
   } = props
 
   const { userLockedFolders, toggleFolderLock } = useUiStore()
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
 
   return (
     <>
@@ -105,6 +110,22 @@ export function WorkspacePanel(props: Props): JSX.Element {
                         isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
                         isUserLocked={userLockedFolders.has(`${projectPath}/${section.dir}/${subdir.name}`)}
                         onToggleFolderLock={() => toggleFolderLock(`${projectPath}/${section.dir}/${subdir.name}`)}
+                        folderPath={`${projectPath}/${section.dir}/${subdir.name}`}
+                        isDragOver={dragOverFolder === `${projectPath}/${section.dir}/${subdir.name}`}
+                        onDragOver={() => setDragOverFolder(`${projectPath}/${section.dir}/${subdir.name}`)}
+                        onDrop={(e) => {
+                          setDragOverFolder(null)
+                          const raw = e.dataTransfer.getData(PATHLY_DRAG_MIME)
+                          if (!raw) return
+                          try {
+                            const payload = JSON.parse(raw) as PathlyReorgDragItem
+                            if (payload.dragType !== 'reorg') return
+                            if (payload.section !== section.type) return
+                            const targetDir = `${projectPath}/${section.dir}/${subdir.name}`
+                            onReorgDrop?.(payload.sourcePath, targetDir, section.type)
+                          } catch { /* ignore malformed payload */ }
+                        }}
+                        onDragLeave={() => setDragOverFolder(null)}
                       />
                       {filteredFiles.map((item) => (
                         <WorkspaceItem
@@ -122,6 +143,8 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           onRenameCancel={onRenameCancel}
                           onStartRename={() => onStartRename(item, itemDir)}
                           onStartDelete={() => onStartDelete(item)}
+                          sectionId={section.type}
+                          isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
                         />
                       ))}
                     </div>
@@ -144,6 +167,8 @@ export function WorkspacePanel(props: Props): JSX.Element {
                       onRenameCancel={onRenameCancel}
                       onStartRename={() => onStartRename(item, itemDir)}
                       onStartDelete={() => onStartDelete(item)}
+                      sectionId={section.type}
+                      isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
                     />
                   )
                 })}
@@ -220,6 +245,22 @@ export function WorkspacePanel(props: Props): JSX.Element {
                         isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
                         isUserLocked={userLockedFolders.has(`${projectPath}/${section.dir}/${subdir.name}`)}
                         onToggleFolderLock={() => toggleFolderLock(`${projectPath}/${section.dir}/${subdir.name}`)}
+                        folderPath={`${projectPath}/${section.dir}/${subdir.name}`}
+                        isDragOver={dragOverFolder === `${projectPath}/${section.dir}/${subdir.name}`}
+                        onDragOver={() => setDragOverFolder(`${projectPath}/${section.dir}/${subdir.name}`)}
+                        onDrop={(e) => {
+                          setDragOverFolder(null)
+                          const raw = e.dataTransfer.getData(PATHLY_DRAG_MIME)
+                          if (!raw) return
+                          try {
+                            const payload = JSON.parse(raw) as PathlyReorgDragItem
+                            if (payload.dragType !== 'reorg') return
+                            if (payload.section !== section.type) return
+                            const targetDir = `${projectPath}/${section.dir}/${subdir.name}`
+                            onReorgDrop?.(payload.sourcePath, targetDir, section.type)
+                          } catch { /* ignore malformed payload */ }
+                        }}
+                        onDragLeave={() => setDragOverFolder(null)}
                       />
                       {subdir.open && filteredFiles.map((item) => {
                         const isDirty = dirtyItems.has(item.path)

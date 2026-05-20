@@ -10,6 +10,11 @@ interface Props {
   isUserLocked?: boolean
   onToggleFolderLock?: () => void
   onStartDeleteFolder?: () => void // wired in Conv 4
+  folderPath?: string
+  isDragOver?: boolean
+  onDragOver?: (e: React.DragEvent) => void
+  onDrop?: (e: React.DragEvent) => void
+  onDragLeave?: () => void
 }
 
 export function SubdirRow({
@@ -20,6 +25,10 @@ export function SubdirRow({
   isUserLocked,
   onToggleFolderLock,
   onStartDeleteFolder,
+  isDragOver,
+  onDragOver,
+  onDrop,
+  onDragLeave,
 }: Props): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -44,11 +53,14 @@ export function SubdirRow({
 
   return (
     <div
-      className={styles.subdirHeader}
+      className={`${styles.subdirHeader}${isDragOver ? ` ${styles.subdirRowDragOver}` : ''}`}
       onClick={onToggle}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle() }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver?.(e) }}
+      onDrop={(e) => { e.preventDefault(); onDrop?.(e) }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) onDragLeave?.() }}
     >
       <span className={styles.chevron}>
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
