@@ -1,8 +1,8 @@
 import { useId } from 'react'
-import type { Theme } from '../../../theme'
+import clsx from 'clsx'
 import type { FlowYaml } from '../../../types'
 import type { FlowValidationIssue } from '../utils/validateFlow'
-import { makePanelStyles } from '../shared/panelStyles'
+import s from '../shared/panel.module.css'
 import { PanelHeader } from '../shared/PanelHeader'
 import { useRenameState } from './hooks/useRenameState'
 import { useBehaviorList } from './hooks/useBehaviorList'
@@ -16,12 +16,10 @@ interface NodePanelProps {
   onRename?: (oldId: string, newId: string) => void
   onClose: () => void
   onRemove: () => void
-  t: Theme
   issues?: FlowValidationIssue[]
 }
 
-export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onRemove, t, issues }: NodePanelProps): JSX.Element {
-  const ps = makePanelStyles(t)
+export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onRemove, issues }: NodePanelProps): JSX.Element {
   const renameInputId = useId()
 
   const currentAgent = data.agent_map[stateId] ?? ''
@@ -41,17 +39,17 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
   const nodeIssues = issues?.filter((i) => i.target === 'node' && i.id === stateId) ?? []
 
   return (
-    <div style={ps.panelScrollable}>
-      <PanelHeader title={stateId} onClose={onClose} t={t} />
+    <div className={s.panelScrollable}>
+      <PanelHeader title={stateId} onClose={onClose} />
 
-      <button onClick={onRemove} style={ps.dangerBtn}>
+      <button onClick={onRemove} className={s.dangerBtn}>
         Remove from canvas
       </button>
 
       <div>
-        <label htmlFor={renameInputId} style={ps.label}>State ID</label>
+        <label htmlFor={renameInputId} className={s.label}>State ID</label>
         {renaming ? (
-          <div style={ps.renameRow}>
+          <div className={s.renameRow}>
             <input
               id={renameInputId}
               ref={renameInputRef}
@@ -62,43 +60,43 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
                 if (e.key === 'Enter') commitRename()
                 if (e.key === 'Escape') { setRenaming(false); setRenameValue(stateId) }
               }}
-              style={ps.renameInput}
+              className={s.renameInput}
             />
-            <button onMouseDown={(e) => { e.preventDefault(); commitRename() }} style={ps.renameConfirmBtn}>
+            <button onMouseDown={(e) => { e.preventDefault(); commitRename() }} className={s.renameConfirmBtn}>
               ✓
             </button>
           </div>
         ) : (
           <div
-            style={onRename ? ps.stateIdDisplayEditable : ps.stateIdDisplay}
+            className={clsx(s.stateIdDisplay, onRename && s.stateIdDisplayEditable)}
             onClick={() => onRename && setRenaming(true)}
             title={onRename ? 'Click to rename' : undefined}
           >
-            <span style={ps.stateIdText}>{stateId}</span>
-            {onRename && <span style={ps.editHint}>✎</span>}
+            <span className={s.stateIdText}>{stateId}</span>
+            {onRename && <span className={s.editHint}>✎</span>}
           </div>
         )}
       </div>
 
-      <div style={ps.behaviorSection}>
-        <div style={ps.label}>Assigned behavior</div>
+      <div className={s.behaviorSection}>
+        <div className={s.label}>Assigned behavior</div>
 
         {currentAgent ? (
-          <div style={ps.agentChipRow}>
-            <span style={inLibrary ? ps.agentChip : ps.agentChipWarn}>
-              {!inLibrary && <span style={ps.agentWarnIcon} title="Not found in library">⚠</span>}
+          <div className={s.agentChipRow}>
+            <span className={clsx(s.agentChip, !inLibrary && s.agentChipWarn)}>
+              {!inLibrary && <span className={s.agentWarnIcon} title="Not found in library">⚠</span>}
               {currentAgent}
             </span>
             <button
               onClick={() => onAgentChange(stateId, '')}
               title="Clear assignment"
-              style={ps.agentClearBtn}
+              className={s.agentClearBtn}
             >
               ×
             </button>
           </div>
         ) : (
-          <div style={ps.noAssigned}>None assigned</div>
+          <div className={s.noAssigned}>None assigned</div>
         )}
 
         <input
@@ -107,32 +105,34 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleSearchKeyDown}
           placeholder="Search behaviors…"
-          style={ps.searchInput}
+          className={s.searchInput}
         />
 
-        <ul ref={listRef} role="listbox" aria-label="Available behaviors" style={ps.behaviorList}>
+        <ul ref={listRef} role="listbox" aria-label="Available behaviors" className={s.behaviorList}>
           {filtered.length === 0 && (
-            <li role="option" aria-selected={false} style={ps.noAssigned}>No matches</li>
+            <li role="option" aria-selected="false" className={clsx(s.behaviorItem, s.noAssigned)}>No matches</li>
           )}
           {filtered.map((b, idx) => {
             const isActive = b.name === currentAgent
             const isHighlighted = idx === activeIndex
-            const itemStyle = isHighlighted
-              ? (isActive ? ps.behaviorItemHighlightedActive : ps.behaviorItemHighlighted)
-              : (isActive ? ps.behaviorItemDefaultActive : ps.behaviorItemDefault)
             return (
               <li
+              
                 key={b.name}
                 role="option"
-                aria-selected={isActive}
+                aria-selected={isActive ? 'true' : 'false'}
                 onClick={() => onAgentChange(stateId, b.name)}
-                style={itemStyle}
+                className={clsx(
+                  s.behaviorItem,
+                  isHighlighted && s.behaviorItemHighlighted,
+                  isActive && s.behaviorItemActive,
+                )}
               >
-                <span style={b.kind === 'skill' ? ps.behaviorKindBadgeSkill : ps.behaviorKindBadgeAgent}>
+                <span className={clsx(s.behaviorKindBadge, b.kind === 'skill' ? s.behaviorKindBadgeSkill : s.behaviorKindBadgeAgent)}>
                   {b.kind === 'skill' ? 'SKILL' : 'AGENT'}
                 </span>
-                <span style={ps.behaviorItemLabel}>{b.name}</span>
-                {isActive && <span style={ps.behaviorCheckmark}>✓</span>}
+                <span className={s.behaviorItemLabel}>{b.name}</span>
+                {isActive && <span className={s.behaviorCheckmark}>✓</span>}
               </li>
             )
           })}
@@ -141,13 +141,13 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
 
       {requiredArtifacts !== null && (
         <div>
-          <div style={ps.label}>Required artifacts</div>
+          <div className={s.label}>Required artifacts</div>
           {requiredArtifacts.length === 0 ? (
-            <div style={ps.artifactNone}>none</div>
+            <div className={s.artifactNone}>none</div>
           ) : (
-            <ul style={ps.artifactList}>
+            <ul className={s.artifactList}>
               {requiredArtifacts.map((artifact) => (
-                <li key={artifact} style={ps.artifactItem}>{artifact}</li>
+                <li key={artifact} className={s.artifactItem}>{artifact}</li>
               ))}
             </ul>
           )}
@@ -155,15 +155,15 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
       )}
 
       <div>
-        <div style={ps.label}>Outgoing transitions</div>
+        <div className={s.label}>Outgoing transitions</div>
         {outgoing.length === 0 ? (
-          <div style={ps.noAssigned}>None</div>
+          <div className={s.noAssigned}>None</div>
         ) : (
-          <ul style={ps.outgoingList}>
+          <ul className={s.outgoingList}>
             {outgoing.map((tgt) => (
-              <li key={tgt} style={ps.outgoingItem}>
-                <span style={ps.outgoingArrow}>→</span>
-                <span style={ps.outgoingTarget}>{tgt}</span>
+              <li key={tgt} className={s.outgoingItem}>
+                <span className={s.outgoingArrow}>→</span>
+                <span className={s.outgoingTarget}>{tgt}</span>
               </li>
             ))}
           </ul>
@@ -172,9 +172,9 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
 
       {nodeIssues.length > 0 && (
         <div role="alert" aria-live="polite">
-          <div style={ps.label}>Validation</div>
+          <div className={s.label}>Validation</div>
           {nodeIssues.map((issue, i) => (
-            <div key={i} style={issue.level === 'error' ? ps.validationError : ps.validationWarning}>
+            <div key={i} className={issue.level === 'error' ? s.validationError : s.validationWarning}>
               {issue.message}
             </div>
           ))}

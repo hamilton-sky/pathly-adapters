@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { useTheme } from '../../useTheme'
-import styles from './ui.module.css'
+import clsx from 'clsx'
+import styles from './Button.module.css'
+import uiStyles from './ui.module.css'
 
 type Variant = 'primary' | 'ghost' | 'destructive'
 type Size = 'sm' | 'md'
@@ -22,52 +22,12 @@ export function Button({
   children,
   style,
 }: ButtonProps): JSX.Element {
-  const t = useTheme()
-  const [hovered, setHovered] = useState(false)
-
-  const padding = size === 'sm' ? '4px 10px' : '6px 14px'
-  const fontSize = size === 'sm' ? '12px' : '13px'
-
-  let background: string
-  let color: string
-  let border: string
-
-  if (variant === 'primary') {
-    background = hovered && !disabled ? t.accent + 'cc' : t.accent + '22'
-    color = t.accent
-    border = `1px solid ${t.accent}66`
-  } else if (variant === 'destructive') {
-    background = hovered && !disabled ? t.red + 'cc' : t.red + '22'
-    color = t.red
-    border = `1px solid ${t.red}66`
-  } else {
-    background = hovered && !disabled ? t.bgSurface0 : 'transparent'
-    color = t.textSecondary
-    border = t.border
-  }
-
-  const baseStyle: React.CSSProperties = {
-    padding,
-    fontSize,
-    fontFamily: 'monospace',
-    background,
-    color,
-    border,
-    borderRadius: '5px',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.5 : 1,
-    transition: 'background var(--transition-base), color var(--transition-base)',
-    ...style,
-  }
-
   return (
     <button
-      className={`pathly-btn ${styles.focusVisible}`}
-      style={baseStyle}
+      className={clsx('pathly-btn', styles.btn, styles[variant], styles[size], uiStyles.focusVisible)}
+      style={style}
       disabled={disabled}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {children}
     </button>

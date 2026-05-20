@@ -1,5 +1,5 @@
-import type { Theme } from '../../../../theme'
-import { makePanelStyles } from '../../shared/panelStyles'
+import clsx from 'clsx'
+import s from '../../shared/panel.module.css'
 import type { AddConditionState, ConditionType } from '../hooks/useTransitionConditions'
 
 const CONDITION_LABELS: Record<string, { label: string }> = {
@@ -14,21 +14,18 @@ interface AddConditionFormProps {
   setAddCond: React.Dispatch<React.SetStateAction<AddConditionState>>
   onSubmit: () => void
   onCancel: () => void
-  t: Theme
 }
 
-export function AddConditionForm({ addCond, setAddCond, onSubmit, onCancel, t }: AddConditionFormProps): JSX.Element {
-  const ps = makePanelStyles(t)
-
+export function AddConditionForm({ addCond, setAddCond, onSubmit, onCancel }: AddConditionFormProps): JSX.Element {
   return (
-    <div style={ps.conditionBox}>
-      <div style={ps.condFormRow}>
+    <div className={s.conditionBox}>
+      <div className={s.condFormRow}>
         <select
           aria-label="Condition type"
           title="Condition type"
           value={addCond.type}
-          onChange={(e) => setAddCond((s) => ({ ...s, type: e.target.value as ConditionType }))}
-          style={ps.condSelectStyle}
+          onChange={(e) => setAddCond((prev) => ({ ...prev, type: e.target.value as ConditionType }))}
+          className={s.condSelectStyle}
         >
           <option value="default">{CONDITION_LABELS.default.label}</option>
           <option value="on_artifact">{CONDITION_LABELS.on_artifact.label}</option>
@@ -40,9 +37,9 @@ export function AddConditionForm({ addCond, setAddCond, onSubmit, onCancel, t }:
       {addCond.type === 'on_artifact' && (
         <input
           value={addCond.artifact}
-          onChange={(e) => setAddCond((s) => ({ ...s, artifact: e.target.value }))}
+          onChange={(e) => setAddCond((prev) => ({ ...prev, artifact: e.target.value }))}
           placeholder="artifact.md"
-          style={{ ...ps.input, width: '100%', marginBottom: '6px', boxSizing: 'border-box' }}
+          className={clsx(s.input, s.mb6)}
         />
       )}
 
@@ -50,15 +47,15 @@ export function AddConditionForm({ addCond, setAddCond, onSubmit, onCancel, t }:
         <>
           <input
             value={addCond.file}
-            onChange={(e) => setAddCond((s) => ({ ...s, file: e.target.value }))}
+            onChange={(e) => setAddCond((prev) => ({ ...prev, file: e.target.value }))}
             placeholder="file.md"
-            style={{ ...ps.input, width: '100%', marginBottom: '4px', boxSizing: 'border-box' }}
+            className={clsx(s.input, s.mb4)}
           />
           <input
             value={addCond.contains}
-            onChange={(e) => setAddCond((s) => ({ ...s, contains: e.target.value }))}
+            onChange={(e) => setAddCond((prev) => ({ ...prev, contains: e.target.value }))}
             placeholder="contains text…"
-            style={{ ...ps.input, width: '100%', marginBottom: '6px', boxSizing: 'border-box' }}
+            className={clsx(s.input, s.mb6)}
           />
         </>
       )}
@@ -67,24 +64,24 @@ export function AddConditionForm({ addCond, setAddCond, onSubmit, onCancel, t }:
         <>
           <input
             value={addCond.question}
-            onChange={(e) => setAddCond((s) => ({ ...s, question: e.target.value }))}
+            onChange={(e) => setAddCond((prev) => ({ ...prev, question: e.target.value }))}
             placeholder="Question for human?"
-            style={{ ...ps.input, width: '100%', marginBottom: '4px', boxSizing: 'border-box' }}
+            className={clsx(s.input, s.mb4)}
           />
           <input
             value={addCond.optionLabel}
-            onChange={(e) => setAddCond((s) => ({ ...s, optionLabel: e.target.value }))}
+            onChange={(e) => setAddCond((prev) => ({ ...prev, optionLabel: e.target.value }))}
             placeholder="Option label (e.g. approve)"
-            style={{ ...ps.input, width: '100%', marginBottom: '6px', boxSizing: 'border-box' }}
+            className={clsx(s.input, s.mb6)}
           />
         </>
       )}
 
-      <div style={ps.condFormActions}>
-        <button style={{ ...ps.addBtn, marginTop: 0 }} onClick={onCancel}>
+      <div className={s.condFormActions}>
+        <button className={clsx(s.addBtn, s.addBtnFlush)} onClick={onCancel}>
           Cancel
         </button>
-        <button style={{ ...ps.addBtn, marginTop: 0, color: t.accent, borderColor: t.accent }} onClick={onSubmit}>
+        <button className={clsx(s.addBtn, s.addBtnFlush, s.addBtnAccent)} onClick={onSubmit}>
           Add
         </button>
       </div>

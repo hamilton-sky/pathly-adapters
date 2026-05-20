@@ -46,7 +46,6 @@ export function InspectorPane({
           onRename={onRename}
           onClose={onClose}
           onRemove={() => { onRemoveNode(detail.stateId); onClose() }}
-          t={t}
           issues={validationIssues}
         />
       )}
@@ -58,7 +57,6 @@ export function InspectorPane({
           onAddAction={onAddAction}
           onClose={onClose}
           onRemove={() => { onRemoveEdge(detail.source, detail.target); onClose() }}
-          t={t}
           onDataChange={onDataChange}
           issues={validationIssues}
         />

@@ -1,0 +1,479 @@
+/* ─── Panel shell ───────────────────────────────────────────── */
+.panel {
+  background-color: var(--bg-mantle);
+  border-left: var(--border-subtle);
+  padding: 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panelScrollable {
+  background-color: var(--bg-mantle);
+  border-left: var(--border-subtle);
+  padding: 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+/* ─── Header ────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  color: var(--accent);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  padding: 0 4px;
+  transition: color var(--transition-base);
+}
+.closeBtn:hover { color: var(--text-primary); }
+
+/* ─── Typography helpers ────────────────────────────────────── */
+.label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.noAssigned {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ─── Inputs ────────────────────────────────────────────────── */
+.input {
+  background-color: var(--bg-surface0);
+  border: var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  padding: 4px 6px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color var(--transition-base);
+}
+.input:focus { border-color: var(--accent); }
+
+.mb4 { margin-bottom: 4px; }
+.mb6 { margin-bottom: 6px; }
+
+.searchInput {
+  background-color: var(--bg-surface0);
+  border: var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  padding: 4px 6px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color var(--transition-base);
+}
+.searchInput:focus { border-color: var(--accent); }
+
+.renameInput {
+  background-color: var(--bg-surface0);
+  border: var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  padding: 4px 6px;
+  outline: none;
+  flex: 1;
+  font-family: var(--font-family-mono);
+  transition: border-color var(--transition-base);
+}
+.renameInput:focus { border-color: var(--accent); }
+
+/* ─── Buttons ───────────────────────────────────────────────── */
+.dangerBtn {
+  width: 100%;
+  padding: 5px 0;
+  background: none;
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  color: var(--red);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--transition-base);
+}
+.dangerBtn:hover { background-color: var(--red-bg); }
+
+.addBtn {
+  background: none;
+  border: 1px dashed var(--bg-surface1);
+  border-radius: 4px;
+  color: var(--blue);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: 4px 8px;
+  margin-top: 4px;
+  transition: border-color var(--transition-base);
+}
+.addBtn:hover { border-color: var(--blue); }
+
+.addBtnFlush { margin-top: 0; }
+
+.addBtnAccent {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.renameConfirmBtn {
+  background: none;
+  border: 1px dashed var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: 3px 8px;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: color var(--transition-base);
+}
+.removeBtn:hover { color: var(--text-primary); }
+
+.cancelEditBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.saveEditBtn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.agentClearBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color var(--transition-base);
+}
+.agentClearBtn:hover { color: var(--text-primary); }
+
+/* ─── State ID row ──────────────────────────────────────────── */
+.stateIdDisplay {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.stateIdDisplayEditable {
+  cursor: text;
+}
+
+.stateIdText {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.editHint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.renameRow {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+/* ─── Agent chip ────────────────────────────────────────────── */
+.agentChipRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agentChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 12px;
+  font-size: 12px;
+  padding: 3px 10px;
+  color: var(--text-primary);
+}
+
+.agentChipWarn {
+  border-color: var(--yellow);
+}
+
+.agentWarnIcon {
+  color: var(--yellow);
+  font-size: 10px;
+}
+
+/* ─── Behavior list ─────────────────────────────────────────── */
+.behaviorSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.behaviorList {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 4px;
+  background-color: var(--bg-surface0);
+}
+
+.behaviorItem {
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: transparent;
+  color: var(--text-primary);
+  border-left: 2px solid transparent;
+  transition: background-color var(--transition-base);
+}
+.behaviorItem:hover { background-color: var(--bg-surface1); }
+
+.behaviorItemHighlighted { background-color: var(--bg-surface1); }
+.behaviorItemActive      { border-left-color: var(--accent); }
+
+.behaviorItemLabel { flex: 1; }
+
+.behaviorKindBadge {
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 34px;
+  letter-spacing: 0.04em;
+}
+.behaviorKindBadgeSkill { color: var(--green); }
+.behaviorKindBadgeAgent { color: var(--blue); }
+
+.behaviorCheckmark {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+/* ─── Artifacts / outgoing ──────────────────────────────────── */
+.artifactNone {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.artifactList {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.artifactItem {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.outgoingList {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.outgoingItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.outgoingArrow  { color: var(--text-muted); }
+.outgoingTarget { color: var(--blue); }
+
+/* ─── Validation ────────────────────────────────────────────── */
+.validationError {
+  font-size: 11px;
+  color: var(--red);
+  padding: 3px 0;
+}
+
+.validationWarning {
+  font-size: 11px;
+  color: var(--yellow);
+  padding: 3px 0;
+}
+
+/* ─── Rule row (EdgePanel) ──────────────────────────────────── */
+.ruleRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+}
+
+.ruleArtifact {
+  color: var(--green);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.ruleArrow  { color: var(--text-muted); }
+.ruleTarget { color: var(--blue); font-size: 11px; }
+
+/* ─── EdgePanel sections ────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.condRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 12px;
+  background-color: var(--bg-surface0);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.conditionBox {
+  background-color: var(--bg-surface0);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.condFormRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.condFormActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.condSelectStyle {
+  flex: 1;
+  background-color: var(--bg-surface1);
+  border: var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 4px;
+}
+
+.condTarget   { color: var(--blue); }
+.condArtifact { color: var(--green); }
+.condText     { color: var(--text-secondary); font-size: 11px; }
+
+.actionEditRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 12px;
+  background-color: var(--bg-surface0);
+  border-radius: 4px;
+  padding: 6px 8px;
+  flex-direction: column;
+}
+
+.actionDisplayRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 12px;
+  background-color: var(--bg-surface0);
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: background-color var(--transition-base);
+}
+.actionDisplayRow:hover { background-color: var(--bg-surface1); }
+
+.actionDisplayRowReadOnly {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 12px;
+  background-color: var(--bg-surface0);
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: default;
+}
+
+.actionEditActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.actionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+}
+
+.actionSkillActive { color: var(--green); font-size: 11px; }
+.actionSkillEmpty  { color: var(--text-muted); font-size: 11px; }
+.actionMsg         { color: var(--text-secondary); font-size: 11px; }

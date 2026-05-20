@@ -1,0 +1,124 @@
+.preview {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 32px;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 15px;
+  line-height: 1.75;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Headings ─────────────────────────────── */
+.preview :global(h1) {
+  font-size: 1.75em; font-weight: 700;
+  margin: 0 0 0.6em;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--bg-surface1);
+  padding-bottom: 0.3em;
+}
+.preview :global(h2) {
+  font-size: 1.3em; font-weight: 700;
+  margin: 1.8em 0 0.5em;
+  color: var(--text-primary);
+}
+.preview :global(h3) {
+  font-size: 1.1em; font-weight: 600;
+  margin: 1.4em 0 0.4em;
+  color: var(--text-primary);
+}
+.preview :global(h4),
+.preview :global(h5),
+.preview :global(h6) {
+  font-weight: 600;
+  margin: 1em 0 0.3em;
+  color: var(--text-secondary);
+}
+
+/* ── Body text ────────────────────────────── */
+.preview :global(p)  { margin: 0 0 1em; }
+.preview :global(ul),
+.preview :global(ol) { margin: 0 0 1em; padding-left: 1.6em; }
+.preview :global(li) { margin-bottom: 0.3em; }
+
+.preview :global(strong) { font-weight: 700; color: var(--text-primary); }
+.preview :global(em)     { font-style: italic; }
+
+.preview :global(a) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.preview :global(a:hover) { opacity: 0.8; }
+
+.preview :global(hr) {
+  border: none;
+  border-top: 1px solid var(--bg-surface1);
+  margin: 2em 0;
+}
+
+/* ── Code ─────────────────────────────────── */
+.preview :global(code) {
+  font-family: var(--font-family-mono);
+  font-size: 0.875em;
+  background: var(--bg-surface0);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  color: var(--accent);
+}
+
+.preview :global(pre) {
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 6px;
+  padding: 14px 18px;
+  overflow-x: auto;           /* ← fixes the cutoff */
+  margin: 0 0 1.2em;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.preview :global(pre code) {
+  background: none;
+  padding: 0;
+  color: var(--text-primary);
+  font-size: inherit;
+  border-radius: 0;
+}
+
+/* ── Blockquote ───────────────────────────── */
+.preview :global(blockquote) {
+  border-left: 3px solid var(--accent);
+  margin: 1.2em 0;
+  padding: 0.6em 1.2em;
+  background: var(--bg-surface0);
+  border-radius: 0 6px 6px 0;
+  color: var(--text-secondary);
+}
+.preview :global(blockquote p) { margin: 0; }
+
+/* ── Table ────────────────────────────────── */
+.preview :global(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 1.2em;
+  font-size: 14px;
+}
+.preview :global(th),
+.preview :global(td) {
+  border: 1px solid var(--bg-surface1);
+  padding: 7px 14px;
+  text-align: left;
+}
+.preview :global(th) {
+  background: var(--bg-surface0);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.preview :global(tr:nth-child(even) td) {
+  background: var(--bg-mantle);
+}

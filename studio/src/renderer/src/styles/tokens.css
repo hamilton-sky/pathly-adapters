@@ -1,0 +1,67 @@
+/* ─── Dark theme (default) ─────────────────────────────────── */
+:root {
+  --font-family-base: 'Geist', 'Inter', system-ui, sans-serif;
+  --font-family-mono: 'Geist Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-size-base: 14px;
+  --font-size-sm: 12px;
+  --font-size-lg: 16px;
+  --transition-base: 150ms ease-out;
+
+  --bg-base:     #111827;
+  --bg-mantle:   #0B0F1A;
+  --bg-surface0: #1E2433;
+  --bg-surface1: #283044;
+
+  --text-primary:   #E2E8F0;
+  --text-secondary: #94A3B8;
+  --text-muted:     #64748B;
+
+  --accent:  #38BDF8;
+  --blue:    #60A5FA;
+  --green:   #34D399;
+  --red:     #f87171;
+  --yellow:  #FCD34D;
+  --runtime: #2DD4BF;
+
+  --focus-ring:    2px solid #38BDF8;
+  --border:        1px solid #283044;
+  --border-subtle: 1px solid #1E2433;
+
+  /* Pre-computed alpha variants (avoids color-mix for compat) */
+  --accent-bg:       rgba(56, 189, 248, 0.13);
+  --accent-bg-hover: rgba(56, 189, 248, 0.80);
+  --accent-border:   rgba(56, 189, 248, 0.40);
+  --red-bg:          rgba(248, 113, 113, 0.13);
+  --red-bg-hover:    rgba(248, 113, 113, 0.80);
+  --red-border:      rgba(248, 113, 113, 0.40);
+}
+
+/* ─── Light theme overrides ────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:     #F8FAFC;
+  --bg-mantle:   #F0F9FF;
+  --bg-surface0: #E2E8F0;
+  --bg-surface1: #CBD5E1;
+
+  --text-primary:   #0F172A;
+  --text-secondary: #334155;
+  --text-muted:     #64748B;
+
+  --accent:  #0369A1;
+  --blue:    #1D4ED8;
+  --green:   #047857;
+  --red:     #dc2626;
+  --yellow:  #B45309;
+  --runtime: #0F766E;
+
+  --focus-ring:    2px solid #0369A1;
+  --border:        1px solid #CBD5E1;
+  --border-subtle: 1px solid #E2E8F0;
+
+  --accent-bg:       rgba(3, 105, 161, 0.13);
+  --accent-bg-hover: rgba(3, 105, 161, 0.80);
+  --accent-border:   rgba(3, 105, 161, 0.40);
+  --red-bg:          rgba(220, 38, 38, 0.13);
+  --red-bg-hover:    rgba(220, 38, 38, 0.80);
+  --red-border:      rgba(220, 38, 38, 0.40);
+}

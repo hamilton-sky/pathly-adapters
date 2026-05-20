@@ -1,7 +1,6 @@
 /* Sidebar.module.css — all layout/style, uses CSS custom props from App.tsx */
 
 .sidebar {
-  width: 240px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -9,7 +8,21 @@
   border-right: 1px solid var(--bg-surface0);
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
+
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s;
+}
+.resizeHandle:hover { background: var(--accent); opacity: 0.4; }
 
 .collapsed {
   width: 36px;
@@ -56,7 +69,7 @@
   border-radius: 6px;
   color: var(--text-primary);
   padding: 5px 9px;
-  font-size: 12px;
+  font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
 }
@@ -89,7 +102,7 @@
   color: var(--text-muted);
   cursor: pointer;
   padding: 6px 4px 6px 10px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-align: left;
@@ -154,7 +167,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   padding: 3px 12px 3px 22px;
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
   transition: background 0.1s, color 0.1s;
 }
@@ -180,7 +193,7 @@
 
 .convEmpty {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   padding: 4px 24px;
   font-style: italic;
 }
@@ -202,7 +215,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   padding: 3px 8px 3px 28px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   text-align: left;
   gap: 6px;
   transition: background 0.1s, color 0.1s;
@@ -270,7 +283,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   text-align: left;
   transition: background var(--transition-base), color var(--transition-base), border-left-color var(--transition-base);
@@ -410,7 +423,7 @@
   border: 1px solid var(--accent);
   border-radius: 4px;
   color: var(--text-primary);
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-family: var(--font-family-base);
   padding: 1px 5px;
   outline: none;
@@ -486,7 +499,7 @@
   color: var(--text-muted);
   cursor: pointer;
   padding: 3px 8px 3px 28px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   text-align: left;
   gap: 6px;
   transition: background 0.1s, color 0.1s;
