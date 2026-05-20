@@ -43,16 +43,54 @@ export function useFlowGraph(
 
   const dataRef = useRef(data)
   const flowIdRef = useRef(data.flow)
+  const stateIdsRef = useRef(new Set(data.states ?? []))
 
   useEffect(() => {
     dataRef.current = data
-    // Rebuild graph when the selected flow file changes (different flow identity)
+
+    // Full rebuild when the selected flow file changes (different flow identity)
     if (data.flow !== flowIdRef.current) {
       flowIdRef.current = data.flow
+      stateIdsRef.current = new Set(data.states ?? [])
       const { nodes: newNodes, edges: newEdges } = flowToGraph(data, t)
       setNodes(newNodes)
       setEdges(newEdges)
+      return
     }
+
+    // Sync nodes when states are added or removed (e.g. "+ Add state", drag-drop)
+    const prevIds = stateIdsRef.current
+    const nextIds = new Set(data.states ?? [])
+    const hasStateChange =
+      [...nextIds].some((id) => !prevIds.has(id)) ||
+      [...prevIds].some((id) => !nextIds.has(id))
+
+    stateIdsRef.current = nextIds
+
+    if (hasStateChange) {
+      setNodes((currentNodes) => {
+        const posMap = new Map(currentNodes.map((n) => [n.id, n.position]))
+        const maxX = currentNodes.length > 0 ? Math.max(...currentNodes.map((n) => n.position.x)) : -220
+        const transitionEntries = Object.entries(data.transitions ?? {})
+        return (data.states ?? []).map((state) => {
+          const pos = posMap.get(state) ?? { x: maxX + 220, y: 100 }
+          const outgoingStates = data.transitions[state] ?? []
+          const incomingStates = transitionEntries
+            .filter(([, targets]) => targets.includes(state))
+            .map(([src]) => src)
+          return {
+            id: state,
+            type: 'stateNode' as const,
+            position: pos,
+            data: { state, agent: data.agent_map[state] ?? '', outgoingStates, incomingStates },
+          }
+        })
+      })
+    }
+
+    // Always sync edges (handles transition changes without state set changes)
+    const { edges: newEdges } = flowToGraph(data, t)
+    setEdges(newEdges)
   }, [data, t, setNodes, setEdges])
 
   const handleConnect = useCallback(

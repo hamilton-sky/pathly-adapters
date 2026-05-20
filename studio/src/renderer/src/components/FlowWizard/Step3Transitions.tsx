@@ -7,7 +7,6 @@ interface Step3TransitionsProps {
   onUpdateTransition: (idx: number, patch: Partial<Transition>) => void
   onRemoveTransition: (idx: number) => void
   onAddTransition: () => void
-  states: string[]
   styles: Record<string, React.CSSProperties>
 }
 
@@ -28,6 +27,7 @@ export function Step3Transitions({
           <select
             style={styles.select}
             value={tr.from}
+            aria-label="From state"
             onChange={(e) => onUpdateTransition(idx, { from: e.target.value })}
           >
             {validStates.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -36,6 +36,7 @@ export function Step3Transitions({
           <select
             style={styles.select}
             value={tr.to}
+            aria-label="To state"
             onChange={(e) => onUpdateTransition(idx, { to: e.target.value })}
           >
             {validStates.map((s) => <option key={s} value={s}>{s}</option>)}

@@ -184,7 +184,6 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
               onUpdateTransition={updateTransition}
               onRemoveTransition={removeTransition}
               onAddTransition={addTransition}
-              states={states}
               styles={styles}
             />
           )}

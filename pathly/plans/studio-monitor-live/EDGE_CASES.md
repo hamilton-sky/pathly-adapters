@@ -17,8 +17,8 @@
 ### EC-1.3: `formatRelativeTime` computed at render time, not event time
 - **Trigger**: A cached component does not re-render; old events show "now" indefinitely.
 - **Current behavior**: Relative time is stale if the component doesn't re-render.
-- **Expected behavior**: Trace re-renders at minimum on each new event (store subscription handles this).
-- **Handled in**: Phase 2 — no explicit fix; re-render on event append is sufficient.
+- **Expected behavior**: Timestamps auto-refresh every 30 seconds regardless of new events.
+- **Handled in**: Phase 2 — `useInterval` 30s tick forces re-render of the trace; relative times stay fresh.
 
 ---
 
@@ -124,10 +124,41 @@
 
 ---
 
+---
+
+## Category 5: SSE and Infrastructure
+
+### EC-5.1: `EventSource.onerror` fires for both transient and fatal errors
+- **Trigger**: Network hiccup (recoverable) vs. server closed connection (fatal) both trigger `onerror`.
+- **Current behavior**: Both scenarios would incorrectly set `monitorSource = null` and show `—`.
+- **Expected behavior**: Transient errors (`readyState === CONNECTING`) leave the badge as-is; browser is auto-reconnecting. Only `readyState === CLOSED` (fatal) sets `monitorSource = null`.
+- **Handled in**: Phase 3 — `onerror` handler branches on `es.readyState`.
+
+### EC-5.2: localStorage throws in sandboxed context
+- **Trigger**: Electron `BrowserWindow` with strict sandboxing, or storage quota exceeded, or corrupted user profile.
+- **Current behavior**: Unguarded `localStorage.getItem/setItem` throws; app crashes on mount.
+- **Expected behavior**: Silently fall back to empty state; canvas shows empty hint.
+- **Handled in**: Phase 4 — all localStorage reads/writes wrapped in `try/catch`.
+
+### EC-5.3: `fsmState.waitingFor` never clears (perpetual blocked state)
+- **Trigger**: FSM emits a `waitingFor` value but the artifact never arrives and the flow is not running.
+- **Current behavior**: Amber banner would show indefinitely even after the flow ends.
+- **Expected behavior**: Amber banner hidden when `fsmState.current === 'DONE'` or `'IDLE'`, regardless of `waitingFor` value.
+- **Handled in**: Phase 7 — banner condition: `isBlocked && isRunning` (not just `isBlocked`).
+
+### EC-5.4: CSP blocks runtime `<style>` injection for `@keyframes`
+- **Trigger**: Electron `BrowserWindow` has a strict Content Security Policy with `style-src` not including `'unsafe-inline'`.
+- **Current behavior**: `document.createElement('style')` injection for `pathly-pulse` and `pathly-pulse-border` keyframes is silently blocked; animations never fire.
+- **Expected behavior**: Animations fail silently (base state is no animation anyway — opt-in pattern means no visual regression). No console errors.
+- **Handled in**: Phase 1/6 — the opt-in motion pattern means failure = no motion = acceptable. But: confirm CSP allows `'unsafe-inline'` for style, or move keyframes to a static CSS file if blocked.
+
+---
+
 ## Known Limitations
 
-- **CLI session discovery is Post-MVP.** `isCli` is always `false`. The `>_` badge will not render. Sessions started from the terminal are not detected; `activeFlowSessions` is Studio-launched only.
-- **`isPaused` is always `false`.** The `◐` half-filled tab indicator is deferred — no production signal sets `isPaused: true`. The rendering branch is not implemented in this plan.
-- **EVENTS.jsonl / SSE race is pre-existing.** The initial file load can overwrite live events. This is a known bug not introduced by this plan; fixing it requires a merge strategy that is out of scope.
+- **CLI session discovery is Post-MVP.** Sessions started from the terminal are not detected.
+- **`isPaused` is always `false`.** The `◐` half-filled tab indicator is deferred — no production signal sets `isPaused: true`.
+- **Monitor tabs (S4) deferred.** Not implemented until production data shows concurrent-flow usage.
+- **Stop/cancel and error drill-down absent.** Real product gaps; planned for follow-on feature after Conv 2 ships.
+- **EVENTS.jsonl / SSE race is pre-existing.** The initial file load can overwrite live events. Fixing it requires a merge strategy that is out of scope.
 - **Failure detection is heuristic.** The "backward transition = failed" rule works for standard team flows but may produce false positives on custom flows with intentional backward edges.
-- **`formatRelativeTime` does not auto-refresh.** Relative times are computed at render time. A row showing "2m ago" will not update to "3m ago" unless a new event triggers a re-render.

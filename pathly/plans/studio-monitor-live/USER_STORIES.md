@@ -18,14 +18,19 @@ See **EDGE_CASES.md** for edge case handling per story.
 **Acceptance Criteria:**
 - [ ] `t.runtime: '#22D3EE'` (dark) and `t.runtime: '#0EA5E9'` (light) added to `Theme` interface and both theme objects in `theme.ts` — do this before any other change
 - [ ] `t.fontFamilyMono` added to `Theme` interface and both theme objects
-- [ ] Rail renders as a horizontal flex row with a 1px connecting line (`t.bgSurface1` color)
+- [ ] Module-scope constants in `FsmView.tsx`: `COMPLETED_GREEN = '#16A34A'` (solid, NOT rgba — rgba fails WCAG 3:1), `ACTIVE_CYAN = '#06B6D4'`, `BLOCKED_AMBER = '#FBBF24'`
+- [ ] Rail renders as a horizontal flex row with a **2px** connecting line, split into done-segment (`COMPLETED_GREEN`) and pending-segment (`t.bgSurface1`)
+- [ ] Rail container has `role="progressbar"` + `aria-valuenow` + `aria-valuemin` + `aria-valuemax` + `aria-label`
+- [ ] Each dot has `role="img"` + `aria-label="STATE: completed/active/pending"`
+- [ ] Completed dots: `COMPLETED_GREEN` solid fill (filled circle)
+- [ ] Active dot: ring + inner dot via `border + box-shadow` using `ACTIVE_CYAN` (shape encoding — not color-only)
+- [ ] Future dots: `t.textMuted` stroke, transparent fill (hollow ring)
 - [ ] Active dot slides to current state via CSS `transform: translateX` using `t.transitionBase` (`150ms ease-out`) — ref-driven, no JS animation loop
-- [ ] Completed dots: `COMPLETED_GREEN = rgba(22,163,74,0.7)` — NOT `t.green` (bright lime)
-- [ ] Active dot: `t.runtime` cyan fill + `pathly-pulse` class
-- [ ] Future dots: `t.textMuted` stroke, transparent fill
-- [ ] Loop-back: dot snaps back to earlier state (single-index lookup on `PIPELINE.indexOf(fsmState.current)`)
-- [ ] `cycle N` label for `fsmState.flow === 'debug'` or `=== 'explore'`; `conv N` for all others including custom flow names
-- [ ] `@media (prefers-reduced-motion: reduce)` disables `pathly-pulse` animation and the dot CSS transition
+- [ ] **First position** calculated in `useLayoutEffect` synchronously on mount (before ResizeObserver fires) — no one-frame flash
+- [ ] Loop-back: dot snaps back to earlier state (index lookup on `PIPELINE.indexOf(fsmState.current)`)
+- [ ] `cycle N` label for `fsmState.flow === 'debug'` or `=== 'explore'`; `conv N` for all others
+- [ ] `pathly-pulse` uses **opt-in** motion: base = `animation: none`; add 2-cycle entrance under `prefers-reduced-motion: no-preference`
+- [ ] Sliding dot: instant opacity crossfade (not translateX) when `prefers-reduced-motion: reduce`
 - [ ] Old "System active — STATE" status line removed
 
 **Edge Cases:** EC-2.2, EC-2.3, EC-2.4 in EDGE_CASES.md
@@ -40,14 +45,19 @@ See **EDGE_CASES.md** for edge case handling per story.
 
 **Acceptance Criteria:**
 - [ ] Trace renders below the rail in a scrollable container
-- [ ] Container has `role="log"` `aria-label="Execution trace"` `aria-live="polite"` `aria-atomic="false"`
-- [ ] Each row: `icon | STATE | conv/cycle N | agent | relative time` in `t.fontFamilyMono` 12px
-- [ ] Status icons: `✓` (`COMPLETED_GREEN`), `●` (`t.runtime`, pulsing), `✗` (`t.red`)
+- [ ] Container has `role="log"` `aria-label="Execution trace"` `aria-live="polite"` `aria-atomic="false"` `tabIndex={0}`
+- [ ] Row typography hierarchy: state name = 12px weight-600 `t.textPrimary`; conv/agent/timestamp = 11px weight-400 `t.textMuted`
+- [ ] Status icons: `✓` (`COMPLETED_GREEN`), `●` (`ACTIVE_CYAN`, 2-cycle entrance pulse), `✗` (`t.red`)
 - [ ] Loop re-visits appear as additional rows (BUILDING visited twice = two rows)
 - [ ] Failure detection uses `pipelineStates` order (backward index = failed), NOT hardcoded state names
 - [ ] `formatRelativeTime(ts)` in `Monitor/utils.ts`: `<60s → 'now'`, `<60min → 'Xm ago'`, else `'Xh ago'`
+- [ ] `useInterval` 30s refresh forces relative timestamp re-render (stale "2m ago" problem)
 - [ ] Agent derived from nearest `AGENT_SPAWNED` after `STATE_TRANSITION`; shows `—` if none found
 - [ ] Rows sorted by `ts` before rendering (guards against EVENTS.jsonl/SSE race, EC-1.1)
+- [ ] `React.memo` on `VisitRow` with stable key (`ts + from + to`)
+- [ ] Insertion sort into already-sorted array (not full `.sort()` on every render)
+- [ ] Auto-scroll to latest entry; pauses when user scrolls up; `"↓ scroll to latest"` affordance visible when paused
+- [ ] `aria-live` writes debounced 300ms to prevent screen reader flooding on SSE bursts
 - [ ] Empty state: `"Waiting for flow activity."` in `t.textMuted` 13px centered
 
 **Edge Cases:** EC-1.1, EC-1.2, EC-1.3 in EDGE_CASES.md
@@ -61,9 +71,12 @@ See **EDGE_CASES.md** for edge case handling per story.
 **As a** developer, **I want** a small live-source indicator in the Monitor header, **so that** I know whether the monitor is receiving live SSE events, polling, or not yet connected.
 
 **Acceptance Criteria:**
-- [ ] `monitorSource === 'sse'` → `● live` in `t.runtime`, `t.fontSizeSm` (12px)
+- [ ] `monitorSource === 'sse'` → `● live` in `t.runtime`, 12px
 - [ ] `monitorSource === 'chokidar'` → `○ polling` in `t.textMuted`, 12px
 - [ ] `monitorSource === null` → `—` in `t.textMuted`, 12px (does NOT show `○ polling`)
+- [ ] Badge has `role="status"` + `aria-live="polite"` + `aria-atomic="true"` with accessible `aria-label`
+- [ ] `●` and `○` glyphs wrapped in `aria-hidden="true"`; `aria-label` carries the text alternative
+- [ ] `es.onerror` wired: `readyState === CLOSED` → set `null`; `readyState === CONNECTING` → leave badge as-is
 - [ ] Any existing `Source: SSE live` or `Source:` label text removed from header
 - [ ] Badge rendered flush-right in the header title row
 
@@ -128,9 +141,9 @@ See **EDGE_CASES.md** for edge case handling per story.
 **As a** developer reviewing a plan, **I want** conversation cards that show active pulsing, failure indicators, cost data, hover/selected states, and timestamps, **so that** I can assess plan progress at a glance.
 
 **Acceptance Criteria:**
-- [ ] `statusBorderColor` and `statusBgColor` in PlanBoard: replace `t.blue` with `t.runtime` for active statuses (IN_PROGRESS, REVIEWING, BUILDING) — leave `t.blue` in EventLog untouched
-- [ ] Active card: pulsing cyan left border via `pathly-pulse-border` keyframes (color-only pulse — width stays `3px` always)
-- [ ] `pathly-pulse-border` includes `@media (prefers-reduced-motion: reduce) { animation: none }`
+- [ ] `statusBorderColor` and `statusBgColor` in PlanBoard: replace `t.blue` with `ACTIVE_CYAN` for active statuses (IN_PROGRESS, REVIEWING, BUILDING) — leave `t.blue` in EventLog untouched
+- [ ] Active card: 2-cycle entrance pulse via `pathly-pulse-border` (color-only, width stays `3px` always); class removed after `animationend` so re-activation re-triggers
+- [ ] `pathly-pulse-border` uses opt-in pattern: base = `animation: none`; add under `prefers-reduced-motion: no-preference`
 - [ ] Failed card: `t.red` left border + `✗` icon
 - [ ] Pending card: `t.textMuted` left border + `○` icon
 - [ ] Hover: `backgroundColor: t.bgSurface1` (no border change)
@@ -141,7 +154,8 @@ See **EDGE_CASES.md** for edge case handling per story.
 - [ ] Cost filtered by `e.conversation === conv.num` on AGENT_DONE events (EC-2.6: if field absent, hide row)
 - [ ] Relative timestamp from most recent event `ts` via `formatRelativeTime` (imported from `Monitor/utils.ts`)
 - [ ] Phase range shown if `ConvRow.phases` populated (from updated `parseProgressMd`)
-- [ ] 52px min-height per card
+- [ ] 52px min-height per card; error-state cards expand to 72px
+- [ ] Cost row uses `font-variant-numeric: tabular-nums` for column-aligned values
 - [ ] `pathly-pulse-border` injected once via `styleInjectedRef` (same pattern as FsmView)
 
 **Edge Cases:** EC-2.6, EC-3.4 in EDGE_CASES.md
@@ -156,6 +170,7 @@ See **EDGE_CASES.md** for edge case handling per story.
 
 **Acceptance Criteria:**
 - [ ] `lastUsedFlowPath` persisted to `localStorage` key `'pathly:lastUsedFlowPath'`
+- [ ] ALL localStorage reads/writes wrapped in `try/catch` (can throw in sandboxed Electron contexts)
 - [ ] On Studio open: if `lastUsedFlowPath` is set, load that flow file
 - [ ] If flow file is missing: catch error, clear `lastUsedFlowPath`, show empty canvas hint (EC-2.5)
 - [ ] If a flow is already running on open (`fsmState.current` not null/IDLE/DONE): `setActivePanel('monitor')` called once on mount
@@ -163,4 +178,52 @@ See **EDGE_CASES.md** for edge case handling per story.
 
 **Edge Cases:** EC-2.5 in EDGE_CASES.md
 
+**Delivered by:** Phase 4 → Conversation 1 (moved from Conv 2)
+
+---
+
+### Story S8: Blocked/Waiting State Amber Banner
+
+**As a** developer monitoring a running pipeline, **I want** a clear visual indicator when an agent is blocked waiting for an artifact, **so that** I know why progress has stalled without having to scan the trace log.
+
+**Acceptance Criteria:**
+- [ ] Amber callout band renders between FSM rail and execution trace when `fsmState.waitingFor` is set
+- [ ] Band shows: amber dot + agent name + artifact name + elapsed wait time since `fsmState.blockedSince`
+- [ ] Colors: `BLOCKED_AMBER = '#FBBF24'` for dot and border; `rgba(251,191,36,0.08)` for background
+- [ ] Band has `role="status"` + `aria-live="polite"` + accessible `aria-label`
+- [ ] Band clears immediately when `fsmState.waitingFor` becomes null/undefined
+- [ ] Only one blocked banner at a time (no stacking)
+- [ ] If `fsmState.waitingFor` field is absent in current FSM version: band does not render; add TODO comment
+
+**Edge Cases:** EC-5.3 in EDGE_CASES.md
+
 **Delivered by:** Phase 7 → Conversation 2
+
+---
+
+### Story S9: Flow-Level Total Cost + Elapsed Time in Header
+
+**As a** developer watching an AI pipeline, **I want** to see the total cost and elapsed time of the current flow run in the Monitor header, **so that** I can assess whether to let it continue or stop it.
+
+**Acceptance Criteria:**
+- [ ] Monitor header shows `$X.XX total` when AGENT_DONE events have `cost_usd` field
+- [ ] Monitor header shows `⏱ Xm Xs` elapsed since first STATE_TRANSITION event
+- [ ] Both are hidden if no cost/time data is available
+- [ ] Both use `font-variant-numeric: tabular-nums`
+- [ ] Elapsed time refreshes via `useInterval` 30s tick (same tick as trace timestamps)
+- [ ] If `cost_usd` absent from events: cost display hidden entirely (same guard as S6)
+
+**Delivered by:** Phase 8 → Conversation 2
+
+---
+
+## Deferred (Post-MVP — Explicitly Out of Scope)
+
+These gaps were identified in the PO review (2026-05-20) and are real product needs. They are not in this plan:
+
+| Story | Gap | Notes |
+|---|---|---|
+| **Stop/Cancel flow** | No way to halt a running flow from Studio | Highest-priority follow-on |
+| **Error detail drill-down** | `✗` in trace shows failure but no error message | Critical for debugging; pair with stop/cancel |
+| **Monitor tabs (S4)** | Multi-flow monitoring | Implement when production data shows concurrent-flow usage |
+| **Completed-flow history** | Flow completed while Monitor closed — history not persisted | Depends on event store design |
