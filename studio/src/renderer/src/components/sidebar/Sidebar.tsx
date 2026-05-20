@@ -279,19 +279,19 @@ export function Sidebar(): JSX.Element | null {
       <div className={styles.tabBar} role="tablist" aria-label="Sidebar view">
         <button
           role="tab"
-          aria-selected={libraryOpen}
-          className={`${styles.tab} ${libraryOpen ? styles.tabActive : ''}`}
-          onClick={() => switchTab('library')}
-        >
-          LIBRARY
-        </button>
-        <button
-          role="tab"
           aria-selected={!libraryOpen}
           className={`${styles.tab} ${!libraryOpen ? styles.tabActive : ''}`}
           onClick={() => switchTab('workspace')}
         >
           WORKSPACE
+        </button>
+        <button
+          role="tab"
+          aria-selected={libraryOpen}
+          className={`${styles.tab} ${libraryOpen ? styles.tabActive : ''}`}
+          onClick={() => switchTab('library')}
+        >
+          LIBRARY
         </button>
       </div>
 
