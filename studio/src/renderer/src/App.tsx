@@ -1,6 +1,7 @@
 import { Component, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useStore } from './store'
+import { readFile } from './services/pathlyApi'
 import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/sidebar'
 import { Editor } from './components/Editor'
@@ -67,6 +68,11 @@ export default function App(): JSX.Element | null {
 function MainApp(): JSX.Element | null {
   const projectPath = useStore((s) => s.projectPath)
   const theme = useStore((s) => s.theme)
+  const fsmState = useStore((s) => s.fsmState)
+  const setActivePanel = useStore((s) => s.setActivePanel)
+  const lastUsedFlowPath = useStore((s) => s.lastUsedFlowPath)
+  const setLastUsedFlowPath = useStore((s) => s.setLastUsedFlowPath)
+  const setSelectedItem = useStore((s) => s.setSelectedItem)
 
   const [setupDone, setSetupDone] = useState<boolean | null>(null)
 
@@ -81,6 +87,31 @@ function MainApp(): JSX.Element | null {
     document.documentElement.setAttribute('data-theme', theme)
     window.pathly?.window?.setTitleBarOverlay(resolved.bgMantle, resolved.textPrimary)
   }, [theme])
+
+  // Auto-open Monitor if a flow is already running on mount (EC-2.5 handled via catch)
+  useEffect(() => {
+    const isRunning = fsmState?.current && fsmState.current !== 'IDLE' && fsmState.current !== 'DONE'
+
+    if (isRunning) {
+      setActivePanel('monitor')
+    }
+
+    if (lastUsedFlowPath && !isRunning) {
+      readFile(lastUsedFlowPath)
+        .then(() => {
+          setSelectedItem({
+            name: lastUsedFlowPath.split('/').pop() ?? lastUsedFlowPath,
+            path: lastUsedFlowPath,
+            type: 'flow'
+          })
+          setActivePanel('flow')
+        })
+        .catch(() => {
+          // File deleted — clear stored path and show empty state (EC-2.5)
+          setLastUsedFlowPath(null)
+        })
+    }
+  }, []) // run once on mount only
 
   if (setupDone === null) return null
 

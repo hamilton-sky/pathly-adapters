@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { readFile } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
 import type { Theme } from '../theme'
 import type { ConvRow } from '../types'
 import { parseProgressMd } from '../hooks/usePlanConversations'
+import { formatRelativeTime } from './Monitor/utils'
 
 interface EventEntry {
   type: string
@@ -13,22 +14,26 @@ interface EventEntry {
   result?: string
   to?: string
   cost_usd?: number
+  tokens_in?: number
+  tokens_out?: number
   wall_seconds?: number
   timestamp?: string
   ts?: string
 }
 
+const COMPLETED_GREEN = '#16A34A'
+const ACTIVE_CYAN = '#06B6D4'
 
 function fsmStateColor(state: string, t: Theme): string {
   if (state === 'DONE') return t.green
-  if (state === 'BUILDING' || state === 'REVIEWING') return t.blue
+  if (state === 'BUILDING' || state === 'REVIEWING') return t.runtime
   if (state === 'BLOCKED') return t.red
   return t.textMuted
 }
 
 function statusBorderColor(status: string, t: Theme): string {
-  if (status === 'DONE') return t.green
-  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return t.blue
+  if (status === 'DONE') return COMPLETED_GREEN
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return ACTIVE_CYAN
   if (status === 'BLOCKED') return t.red
   return t.textMuted
 }
@@ -36,10 +41,33 @@ function statusBorderColor(status: string, t: Theme): string {
 function statusBgColor(status: string): string {
   if (status === 'DONE') return 'rgba(166,227,161,0.05)'
   if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING')
-    return 'rgba(137,180,250,0.05)'
+    return 'rgba(34,211,238,0.05)'
   if (status === 'BLOCKED') return 'rgba(243,139,168,0.05)'
   return 'rgba(108,112,134,0.05)'
 }
+
+function statusIcon(status: string, t: Theme): { icon: string; color: string } {
+  if (status === 'DONE') return { icon: '✓', color: COMPLETED_GREEN }
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING')
+    return { icon: '●', color: ACTIVE_CYAN }
+  if (status === 'BLOCKED') return { icon: '✗', color: t.red }
+  return { icon: '○', color: t.textMuted }
+}
+
+function isActiveStatus(status: string): boolean {
+  return status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING'
+}
+
+const PULSE_BORDER_CSS = `
+@keyframes pathly-pulse-border {
+  0%, 100% { border-left-color: ${ACTIVE_CYAN}; }
+  50%       { border-left-color: rgba(6,182,212,0.15); }
+}
+.pathly-pulse-border { border-left-color: ${ACTIVE_CYAN}; }
+@media (prefers-reduced-motion: no-preference) {
+  .pathly-pulse-border { animation: pathly-pulse-border 1.5s ease-in-out infinite; }
+}
+`
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   return {
@@ -88,66 +116,8 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
     },
     card: {
       borderRadius: '6px',
-      overflow: 'hidden'
-    },
-    cardHeader: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      width: '100%',
-      background: 'none',
-      border: 'none',
-      color: t.textPrimary,
-      cursor: 'pointer',
-      padding: '10px 14px',
-      textAlign: 'left' as const
-    },
-    cardHeaderLeft: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-      flex: 1,
-      overflow: 'hidden'
-    },
-    cardTitle: {
-      fontSize: '14px',
-      color: t.textPrimary,
       overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap' as const,
-      flex: 1
-    },
-    eventCount: {
-      fontSize: '11px',
-      color: t.textMuted,
-      flexShrink: 0,
-      marginLeft: '8px'
-    },
-    cardHeaderRight: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '10px',
-      flexShrink: 0
-    },
-    statusBadge: {
-      fontSize: '11px',
-      fontWeight: 600,
-      textTransform: 'uppercase' as const
-    },
-    chevron: {
-      fontSize: '10px',
-      color: t.textMuted
-    },
-    eventLog: {
-      padding: '0 14px 10px 14px',
-      display: 'flex',
-      flexDirection: 'column' as const,
-      gap: '4px'
-    },
-    noEvents: {
-      fontSize: '12px',
-      color: t.textMuted,
-      fontStyle: 'italic'
+      minHeight: '52px'
     },
     eventRow: {
       display: 'flex',
@@ -197,6 +167,139 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   }
 }
 
+interface ConvCardProps {
+  conv: ConvRow
+  events: EventEntry[]
+  isSelected: boolean
+  isHovered: boolean
+  onSelect: () => void
+  onHoverEnter: () => void
+  onHoverLeave: () => void
+  t: Theme
+}
+
+function ConvCard({ conv, events, isSelected, isHovered, onSelect, onHoverEnter, onHoverLeave, t }: ConvCardProps): JSX.Element {
+  const active = isActiveStatus(conv.status)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const styleInjectedRef = useRef(false)
+
+  // Inject pulse-border CSS once
+  useEffect(() => {
+    if (styleInjectedRef.current) return
+    styleInjectedRef.current = true
+    try {
+      const el = document.createElement('style')
+      el.textContent = PULSE_BORDER_CSS
+      el.setAttribute('data-pathly-pulse-border', '1')
+      if (!document.querySelector('[data-pathly-pulse-border]')) {
+        document.head.appendChild(el)
+      }
+    } catch { /* CSP may block — base state has no animation, so this is safe to fail */ }
+  }, [])
+
+  // Apply/remove pulse class on active status
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    if (active) {
+      el.classList.add('pathly-pulse-border')
+      function onAnimEnd(): void { el?.classList.remove('pathly-pulse-border') }
+      el.addEventListener('animationend', onAnimEnd, { once: true })
+      return () => { el.removeEventListener('animationend', onAnimEnd) }
+    }
+    return undefined
+  }, [active, conv.status])
+
+  // Compute cost for this conversation (sum all AGENT_DONE events for this conv num)
+  const agentDoneEvents = events.filter(
+    (e) => e.type === 'AGENT_DONE' && e.conversation === conv.num
+  )
+  const hasCostData = agentDoneEvents.some((e) => e.cost_usd !== undefined)
+  const totalCost = agentDoneEvents.reduce((sum, e) => sum + (e.cost_usd ?? 0), 0)
+  const totalTokensIn = agentDoneEvents.reduce((sum, e) => sum + (e.tokens_in ?? 0), 0)
+  const totalTokensOut = agentDoneEvents.reduce((sum, e) => sum + (e.tokens_out ?? 0), 0)
+
+  // Latest AGENT_DONE timestamp for relative time
+  const latestEvent = agentDoneEvents.length > 0
+    ? agentDoneEvents[agentDoneEvents.length - 1]
+    : null
+  const latestTs = latestEvent?.ts ?? latestEvent?.timestamp ?? null
+
+  const { icon, color: iconColor } = statusIcon(conv.status, t)
+
+  const borderColor = isSelected
+    ? t.accent
+    : statusBorderColor(conv.status, t)
+  const bgColor = isHovered || isSelected
+    ? t.bgSurface1
+    : statusBgColor(conv.status)
+
+  return (
+    <div
+      ref={cardRef}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
+      style={{
+        borderRadius: '6px',
+        overflow: 'hidden',
+        minHeight: '52px',
+        borderLeft: `3px solid ${borderColor}`,
+        backgroundColor: bgColor,
+        cursor: 'pointer',
+        outline: 'none'
+      }}
+    >
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '10px 14px',
+        gap: '8px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1, overflow: 'hidden' }}>
+          <span style={{ color: iconColor, fontWeight: 700, flexShrink: 0, fontSize: '14px' }}>
+            {icon}
+          </span>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div style={{ fontSize: '14px', color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Conv {conv.num} · {conv.title}
+            </div>
+            <div style={{ fontSize: '12px', color: t.textMuted, fontFamily: t.fontFamilyMono, marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {conv.phases && <span>Phase {conv.phases}</span>}
+              {latestTs && <span>{formatRelativeTime(latestTs)}</span>}
+            </div>
+            {hasCostData && (
+              <div style={{
+                fontSize: '12px',
+                color: t.textMuted,
+                fontFamily: t.fontFamilyMono,
+                fontVariantNumeric: 'tabular-nums',
+                marginTop: '2px'
+              }}>
+                {(totalTokensIn / 1000).toFixed(1)}k in / {(totalTokensOut / 1000).toFixed(1)}k out · ${totalCost.toFixed(3)}
+              </div>
+            )}
+          </div>
+        </div>
+        <span style={{
+          fontSize: '11px',
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          color: borderColor,
+          flexShrink: 0
+        }}>
+          {conv.status}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function PlanBoard(): JSX.Element {
   const { projectPath, activeTopic } = useStore()
   const t = useTheme()
@@ -206,6 +309,8 @@ export function PlanBoard(): JSX.Element {
   const [convs, setConvs] = useState<ConvRow[]>([])
   const [events, setEvents] = useState<EventEntry[]>([])
   const [noProgress, setNoProgress] = useState(false)
+  const [selectedConv, setSelectedConv] = useState<number | null>(null)
+  const [hoveredConv, setHoveredConv] = useState<number | null>(null)
 
   useEffect(() => {
     if (!projectPath || !activeTopic) {
@@ -294,33 +399,19 @@ export function PlanBoard(): JSX.Element {
       </div>
 
       <div style={styles.cardList}>
-        {convs.map((conv) => {
-          const borderColor = statusBorderColor(conv.status, t)
-          const bgColor = statusBgColor(conv.status)
-
-          return (
-            <div
-              key={conv.num}
-              style={{
-                ...styles.card,
-                borderLeft: `3px solid ${borderColor}`,
-                backgroundColor: bgColor
-              }}
-            >
-              <div style={styles.cardHeader}>
-                <div style={styles.cardHeaderLeft}>
-                  <span style={{ color: borderColor, marginRight: '8px', fontWeight: 700 }}>
-                    {conv.status === 'DONE' ? '✓' : conv.num}
-                  </span>
-                  <span style={styles.cardTitle}>{conv.title}</span>
-                </div>
-                <div style={styles.cardHeaderRight}>
-                  <span style={{ ...styles.statusBadge, color: borderColor }}>{conv.status}</span>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {convs.map((conv) => (
+          <ConvCard
+            key={conv.num}
+            conv={conv}
+            events={events}
+            isSelected={selectedConv === conv.num}
+            isHovered={hoveredConv === conv.num}
+            onSelect={() => setSelectedConv(conv.num === selectedConv ? null : conv.num)}
+            onHoverEnter={() => setHoveredConv(conv.num)}
+            onHoverLeave={() => setHoveredConv(null)}
+            t={t}
+          />
+        ))}
       </div>
 
       {events.length > 0 && (

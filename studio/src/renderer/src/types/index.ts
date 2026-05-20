@@ -52,6 +52,7 @@ export interface ConvRow {
   num: number
   title: string
   status: string
+  phases?: string
 }
 
 export interface PathlyItem {
@@ -139,6 +140,14 @@ export interface TemplateFrontmatter {
 }
 
 export type FrontmatterValues = SkillFrontmatter | AgentFrontmatter | TemplateFrontmatter
+
+export interface FlowSession {
+  flowKey: string
+  topic: string
+  isRunning: boolean
+  isPaused: boolean
+  isCli: false
+}
 
 export type FlowExportTarget = 'pathly-package' | 'claude-code' | 'codex'
 

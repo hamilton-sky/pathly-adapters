@@ -15,6 +15,7 @@ export function parseProgressMd(md: string): ConvRow[] {
   let headerParsed = false
   let titleColIdx = 1
   let statusColIdx = 3
+  let phasesColIdx = -1
 
   const hasBreakdownSection = lines.some((l) =>
     l.trim().startsWith('## Conversation Breakdown')
@@ -47,6 +48,10 @@ export function parseProgressMd(md: string): ConvRow[] {
       for (let i = parts.length - 1; i >= 1; i--) {
         if (parts[i].toLowerCase() === 'status') { statusColIdx = i; break }
       }
+      // Find phases column: column named 'phases'
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i].toLowerCase() === 'phases') { phasesColIdx = i; break }
+      }
       continue
     }
 
@@ -54,7 +59,8 @@ export function parseProgressMd(md: string): ConvRow[] {
     const num = parseInt(parts[0], 10)
     if (isNaN(num)) continue
     const status = parts[statusColIdx] ?? parts[parts.length - 1] ?? ''
-    rows.push({ num, title: parts[titleColIdx] ?? '', status: status.toUpperCase() })
+    const phases = phasesColIdx >= 0 ? (parts[phasesColIdx] ?? undefined) : undefined
+    rows.push({ num, title: parts[titleColIdx] ?? '', status: status.toUpperCase(), phases })
   }
   return rows
 }

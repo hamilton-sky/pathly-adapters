@@ -1,589 +1,434 @@
-# UX Review — Open Questions
-> Pathly Studio · React + Electron + React Flow + CodeMirror
-> Stack: Developer Tool / IDE → Dark Mode primary, Flat Design, dense operational surface
-> Date: 2026-05-19
-> Updated: 2026-05-19 — Q1 and Q5 revised after filesystem-tree sidebar model adopted
+# Design Review — FSM Pipeline Rail (FsmView.tsx)
+
+> Feature: studio-monitor-live · Phase 1
+> Component: `studio/src/renderer/src/components/Monitor/FsmView.tsx`
+> Reviewed: 2026-05-20
+> Verdict: FAIL — 4 bugs requiring code fixes before ship
 
 ---
 
-## Q1: Sidebar — Filesystem-Tree Model with Full CRUD
+## Issues
 
-### Mental model correction (supersedes original Q1)
-
-The sidebar is **not a static list of flat items** — it is a **filesystem-mirroring tree**, one per domain section. Each section maps directly to a directory on disk:
-
-| Section | Directory | File types |
-|---|---|---|
-| SKILLS | `skills/` | `.md` files + category folders |
-| AGENTS | `agents/` | `.md` files + category folders |
-| FLOWS | `flows/` | `.flow.yaml` files + category folders |
-| TEMPLATES | `templates/` | `.md` files + category folders |
-| WORKSPACE | (nav only) | Plan, Monitor, Settings — not filesystem |
-
-Users can create files, create category folders, rename, delete, and drag items within their section. **No cross-section operations** — a skill cannot be moved into agents.
-
-Reference implementation: ZakaMurai sidebar (`Sidebar.js` + `TreeItem.js`) — same author, same stack. The Pathly sidebar adapts this pattern with domain constraints.
-
-### Section header anatomy
-
-Hover-reveal create actions. At rest: clean header. On hover: two action icons appear flush-right.
-
-```
-AT REST:
-  ▼ SKILLS
-
-ON HOVER:
-  ▼ SKILLS                    [🔧+] [📁+]
-                               new   new
-                               file  category
-```
-
-Icon per section (replaces generic file icon):
-- SKILLS: `Wrench` for new file
-- AGENTS: `Bot` for new file
-- FLOWS: `Workflow` (cyan) for new flow
-- TEMPLATES: `FileText` for new file
-- All sections: `Folder` for new category
-
-The collapse chevron (`▸`/`▼`) is a separate click target from the label. Label text has no click behavior.
-
-### Row anatomy — the dual-drag problem
-
-Skills and Agents rows have **two drag behaviors that must be visually distinct**:
-
-1. **Canvas drag** (`⠿` grip): drag onto the React Flow canvas to assign behavior to a state node
-2. **Tree reorg drag** (row body): drag within the section to move into a category folder
-
-```
-SKILL ROW AT REST:
-  ⠿  🔧  review.md
-
-SKILL ROW ON HOVER:
-  ⠿  🔧  review.md              [🔧+] [📁+]
-  ↑                              ↑
-  canvas-drag grip               section create actions
-  always visible on skills/agents  hover-reveal only
-```
-
-- `⠿` grip: always visible on skill/agent rows. Color `textMuted #687588` at rest, violet `#8B5CF6` on grip-hover. Cursor `grab` → `grabbing`. Initiates **canvas drag**.
-- Row body: draggable attribute for **tree reorg drag only**. Cursor `move` during drag initiation.
-- FLOWS rows: no `⠿` grip (flows are not canvas-assignable). Row click = open flow in canvas editor. Row is still reorg-draggable within FLOWS section.
-
-### Drag constraints — cross-section behavior
-
-- When drag starts from `⠿` grip: `dragType = 'canvas'`. Tree reorg logic ignores it entirely. Canvas highlights as drop target.
-- When drag starts from row body: `dragType = 'reorg'`. Drag payload carries `sectionId`. Drop handlers reject payloads with mismatched `sectionId`.
-- Foreign sections during reorg drag: **no highlight, no red tint** — just inert. `cursor: not-allowed` from `dropEffect = 'none'`. Red would read as destructive; absence is the correct signal.
-- Valid drop targets within own section: folder rows show `border-left: 2px solid #8B5CF6` + `rgba(139,92,246,0.08)` background tint.
-
-### Inline create UX
-
-When "New skill file" is triggered inside a folder:
-- Inline input row appears as a child of that folder (or section root if no folder selected)
-- Input is empty; ghost text shows the section-appropriate extension after the cursor: `.md` or `.flow.yaml`
-- `Enter`: append ghost extension if user hasn't typed one → `review.md`
-- If user types extension themselves: ghost disappears, name used as-is
-- If user types wrong extension: inline error in `#EF4444` — "Skills must be .md files" — input stays open, no auto-rename
-- `Escape`: cancel, remove input row
-- Empty + `Enter`: no-op
-
-```
-INLINE INPUT (inside writing/ folder):
-  ▼ 📁 writing/
-    🔧 summarize.md
-    [ research_____    .md ]    ← cursor, ghost ext dim after bracket
-```
-
-### Domain icon map
-
-| Section | Folder icon | File icon | File icon color |
+| # | Rule | Location | Severity |
 |---|---|---|---|
-| SKILLS | `Folder` violet | `Wrench` | `textMuted #687588` |
-| AGENTS | `Folder` violet | `Bot` | `textMuted #687588` |
-| FLOWS | `Folder` violet | `Workflow` | `runtime #22D3EE` ← cyan signals runtime object |
-| TEMPLATES | `Folder` violet | `FileText` | `textMuted #687588` |
-
-Flow files use cyan because they are runtime objects (they execute on the canvas), not static content. This matches the cyan used elsewhere for runtime state.
-
-### Context menus (right-click)
-
-**Section root header:**
-```
-  🔧 New skill file
-  📁 New category
-```
-
-**Category folder:**
-```
-  🔧 New skill file
-  📁 New subcategory
-  ─────────────────
-  ✏  Rename
-  ─────────────────
-  🗑  Delete          ← always available; dialog shows file count
-```
-
-**Skill / Agent file:**
-```
-  👁  Open preview
-  ─────────────────
-  ✏  Rename
-  →  Move to…        ← submenu: categories in section + "/ Root"
-  ─────────────────
-  🗑  Delete
-```
-
-**Flow file:**
-```
-  ⚡ Open in canvas
-  👁  Open source (YAML)
-  ─────────────────
-  ✏  Rename
-  →  Move to…
-  ─────────────────
-  🗑  Delete
-```
-
-### Empty section state
-
-No auto-collapse. Two-line muted hint:
-
-```
-  ▼ SKILLS                    [🔧+] [📁+]
-    No skills yet
-    Click + to create one
-```
-
-### Full sidebar ASCII
-
-**At rest:**
-```
-┌──────────────────────────────────────┐
-│  🔍  Filter...                       │  ← global search
-├──────────────────────────────────────┤
-│  ▼ SKILLS                            │
-│    ▼ 📁 writing/                     │
-│      ⠿  🔧 summarize.md             │
-│      ⠿  🔧 rewrite.md               │
-│    ⠿  🔧 draft-email.md             │
-│                                      │
-│  ▶ AGENTS                            │
-│                                      │
-│  ▼ FLOWS                             │
-│    ⚡ team.flow.yaml                 │
-│    ⚡ debug.flow.yaml                │
-│                                      │
-│  ▶ TEMPLATES                         │
-│                                      │
-├──────────────────────────────────────┤
-│  WORKSPACE                           │
-│  📋 Plan                             │
-│  📡 Monitor                          │
-│  ⚙  Settings                         │
-└──────────────────────────────────────┘
-```
-
-**Drag reorg state** — `rewrite.md` being moved into `writing/`:
-```
-│  ▼ SKILLS                            │
-│    ▼ 📁 writing/  ◄─ drop target    │  ← violet left border + 8% violet bg
-│      ⠿  🔧 summarize.md             │
-│    [ghost: rewrite.md]               │  ← dragging
-│                                      │
-│  ▶ AGENTS                            │  ← inert, no highlight
-```
+| 1 | STORMING label renders as "- STORMING" — leading dash visible | `convLabel` logic, line 251 | Critical |
+| 2 | Double-dot on active state — sliding marker and active ring dot both visible simultaneously | Lines 362–448 | Critical |
+| 3 | `COMPLETED_GREEN` uses rgba alpha — fails WCAG AA contrast on dark bg | Line 8 | Major |
+| 4 | Active dot ring math is unsatisfiable — `border: 2px` + `boxShadow: inset 0 0 0 3px` on a 10px element overflows | Lines 378–382 | Major |
+| 5 | Label truncation with `maxWidth: 64px` — inadequate for 8-state rail on narrow monitor panel | Lines 415–421 | Minor |
+| 6 | Rail line segments use percentage width against container that includes 16px horizontal padding on each side — done segment bleeds past first dot | Lines 319–349 | Minor |
 
 ---
 
-## Q2: Entry Point — What Should Open First
+## Issue Analysis
 
-### Recommendation: **Option A + D hybrid**
+### Issue 1 — STORMING label shows "- STORMING" (Critical)
 
-Load the **last-used flow in the canvas** (Option A). This is an operational IDE — users return to work in progress, not to browse. A home screen (Option C) is a marketing pattern and adds a click for no benefit.
-
-**If a flow is already actively running when Studio opens**, automatically show the Monitor tab in the bottom panel and display a non-blocking banner on the canvas:
-
+**Root cause:** Line 251 reads:
+```ts
+const convLabel = isDebugOrExplore ? 'cycle' : 'conv'
 ```
-╔══════════════════════════════════════════════════════════╗
-║  debug.flow.yaml is running  ●  cycle 3 / BUILDING      ║
-║  View in Monitor →                           [dismiss]  ║
-╚══════════════════════════════════════════════════════════╝
+This assigns `convLabel` correctly, but the rendered label in the state name row (`{state}`) is the raw pipeline state string, not `convLabel`. The leading dash is coming from `t.transitionBase` being concatenated somewhere else, OR — more likely — `pipelineStates` is being populated from the store with a value that already contains `"- STORMING"` as a string (e.g. from a YAML parser that renders a list item `- STORMING` without stripping the dash).
+
+**Confirmed path:** The `PIPELINE` fallback on line 170–172 uses clean string literals. If `pipelineStates` from the store is populated by parsing a YAML sequence like:
+```yaml
+states:
+  - STORMING
+  - PLANNING
 ```
+...and the parser returns `['- STORMING', '- PLANNING', ...]` (raw YAML scalar with dash prefix), the dash renders verbatim as the label text AND as the `aria-label`.
 
-This banner:
-- Uses `runtime` cyan color (`#22D3EE`) for the `●` dot
-- Auto-dismisses after 8s if the user doesn't interact
-- Clicking "View in Monitor →" switches the bottom panel to the Monitor tab
-
-### Decision table
-
-| Scenario | Entry state |
-|---|---|
-| No active flows, last flow exists | Canvas with last-used flow loaded |
-| No active flows, first launch | Canvas with empty state hint |
-| Flow actively running | Canvas with last flow + running banner + Monitor auto-opened |
-| Multiple flows running | Monitor tab shown; canvas shows last-edited flow |
-
----
-
-## Q3: Monitor — Live Updates and Visual Design
-
-### Architecture fix (technical)
-
-The Monitor should subscribe to SSE/file-watcher events via `useEffect` with a cleanup function, NOT rely on re-renders:
+**Fix:** Strip leading `"- "` from every pipeline state string at the point of consumption. Add a normalizer when reading from the store:
 
 ```ts
-useEffect(() => {
-  const source = new EventSource('/api/flow-events');
-  source.onmessage = (e) => dispatch(handleEvent(JSON.parse(e.data)));
-  return () => source.close();
-}, [flowId]);
+// Line 169 — replace:
+const PIPELINE = pipelineStates.length > 0
+  ? pipelineStates
+  : ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'DONE']
+
+// With:
+const PIPELINE = (pipelineStates.length > 0 ? pipelineStates : ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'DONE'])
+  .map((s) => s.replace(/^[-\s]+/, '').trim())
 ```
 
-The state rail must not re-mount on every event — only update the active node position. Use a ref-driven rail animation (CSS transition on `transform: translateX`), not a full re-render.
-
-### Rail update behavior
-
-When a transition fires:
-1. The active dot slides along the rail (150ms ease-out CSS transform — no JS animation loop).
-2. The previous state node changes color: active cyan → completed green (muted, `#16A34A` at 70% opacity).
-3. The event is appended to the log below.
-
-No full re-render. No flash. The rail is an SVG or a flex row of positioned elements — the dot moves, the nodes recolor in place.
-
-### Loop / rework handling
-
-**Do NOT try to show loops on the linear rail.** Loops break linear rail metaphors. Instead:
-
-- The **rail shows the FSM topology** (fixed set of states from the YAML, left to right).
-- The **execution trace** below the rail is a chronological list: each line is one state visit. When BUILDING is visited twice, it appears as two separate rows.
-- The active dot on the rail snaps back to the earlier node when a loop occurs. This is correct — the rail shows WHERE we are now, not the full path history.
-
-```
-FSM topology (rail):
-  ●─────────────●────────────●──────────●──────────●
-PLANNING    BUILDING    REVIEWING    FIXING     DONE
-                ↑ active (2nd visit)
-
-Execution trace (log, below):
-  ✓  PLANNING    conv 1    planner    2m ago
-  ✓  BUILDING    conv 2    builder    1m ago
-  ✗  REVIEWING   conv 3    reviewer   40s ago   → failed
-  ✓  FIXING      conv 4    builder    20s ago
-  ●  BUILDING    conv 5    builder    now        running
-```
-
-### ASCII — Monitor states
-
-**(a) Empty state**
-```
-+---------------------------------------------------------------+
-| Monitor                                    ○ No active flow  |
-+---------------------------------------------------------------+
-|                                                               |
-|   ○ · · · · · · · · · ○                                      |
-|                                                               |
-|   Waiting for flow activity.                                  |
-|   Start a flow with  pathly run team.flow.yaml               |
-|   or open an existing session from the sidebar.              |
-|                                                               |
-+---------------------------------------------------------------+
-```
-
-**(b) Active flow mid-run**
-```
-+---------------------------------------------------------------+
-| Monitor  [ team.flow.yaml ]        ● SSE live    conv 3 / 5  |
-+---------------------------------------------------------------+
-|                                                               |
-|  ✓──────────✓────────────●──────────○──────────○             |
-| PLAN     BUILD        REVIEW     FIX         DONE            |
-|                          ↑                                   |
-|              builder #3  ●  running                          |
-|              waiting for: REVIEW_FAILURES.md                 |
-+-------------------------------+-------------------------------+
-| Execution trace               | Agent log                    |
-| ✓ PLANNING   conv 1  1h ago   | builder #3                   |
-| ✓ BUILDING   conv 2  45m ago  | 00:10  AGENT_DONE            |
-| ● REVIEWING  conv 3  now      | 13.2k in  2.1k out  $0.03   |
-+-------------------------------+-------------------------------+
-```
-
-**(c) Loop / rework state**
-```
-+---------------------------------------------------------------+
-| Monitor  [ team.flow.yaml ]        ● SSE live    conv 5 / 5  |
-+---------------------------------------------------------------+
-|                                                               |
-|  ✓──────────●────────────✗──────────✓                        |
-| PLAN     BUILD        REVIEW      FIX          (DONE)        |
-|              ↑ active (2nd visit)   ↺ reworked               |
-|                                                               |
-+---------------------------------------------------------------+
-| ✓ PLANNING   conv 1                                           |
-| ✓ BUILDING   conv 2   (1st)                                   |
-| ✗ REVIEWING  conv 3   → failed, back to FIXING                |
-| ✓ FIXING     conv 4                                           |
-| ● BUILDING   conv 5   (2nd visit)  ← now                     |
-+---------------------------------------------------------------+
-```
-
-### Source label
-
-Keep it — but very small and muted (`textMuted`, 11px). Rename from `Source: SSE live` to just `● live` (cyan dot) or `○ polling`. It's diagnostic information that saves a lot of confusion when something isn't updating. Hide it by default in a future pass; for now keep it visible.
+This is a defensive strip — it costs nothing if the data is already clean, and it fixes both the label display and the `PIPELINE.indexOf()` failure detection logic which would also be broken by the dash prefix.
 
 ---
 
-## Q4: Plan Section — Conversation Cards
+### Issue 2 — Double dot at active state (Critical)
 
-### Recommendation: compact list-row cards with left status strip
+**Root cause:** Two independent elements are rendered at the same position:
 
-Avoid large marketing cards. Use compact rows (~52px tall) with a 3px left border strip as the primary status indicator. This matches the graphite IDE aesthetic and fits more conversations in view without scrolling.
+1. The **static active dot** (lines 374–382) — a 10px circle with `border: 2px solid ACTIVE_CYAN` and `boxShadow: inset 0 0 0 3px ACTIVE_CYAN`, rendered as part of the flex row of state dots. It has `zIndex: 1` (via the parent wrapper on line 358).
 
-### Status encoding
+2. The **sliding marker** (lines 431–448) — a 12px solid ACTIVE_CYAN circle, absolutely positioned with `zIndex: 2`.
 
-| Status | Border color | Dot | Text treatment |
-|---|---|---|---|
-| Completed | `green #16A34A` (muted) | `✓` | `textSecondary`, normal weight |
-| Active | `runtime #22D3EE` | `●` pulsing | `textPrimary`, medium weight |
-| Pending | `borderSubtle` | `○` | `textMuted`, normal weight |
-| Failed | `red #EF4444` | `✗` | `textPrimary`, red tint |
+Both are visible. The sliding marker sits on top of the ring dot but does not cover it fully because:
+- Sliding marker: 12px solid cyan circle
+- Ring dot: 10px with 2px cyan border + inset shadow = appears as 10px cyan ring with cyan inner fill
 
-### ASCII — 3 conversation cards
+At `REVIEWING` (or any active state), the ring dot is rendered AND the sliding marker overlaps it — producing two visually distinct overlapping cyan shapes.
 
+**Fix: Hide the static ring dot when it is the active state.** The sliding marker IS the active state indicator. The static dot for the active state should be replaced with a neutral pending-style dot so the sliding marker reads cleanly above it:
+
+```ts
+// Lines 362–390 — change isCurrent dot style:
+// OLD:
+: isCurrent
+? {
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    backgroundColor: 'transparent',
+    border: `2px solid ${ACTIVE_CYAN}`,
+    boxShadow: `inset 0 0 0 3px ${ACTIVE_CYAN}`,
+    flexShrink: 0,
+  }
+
+// NEW:
+: isCurrent
+? {
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    backgroundColor: 'transparent',
+    border: `1px solid ${t.textMuted}`,  // neutral — sliding marker is the active signal
+    flexShrink: 0,
+  }
 ```
-+----------------------------------------------------------+
-|                                                          |
-|  ║ ✓  Conv 1 · Restore graph rendering          done     |
-|  ║    planner + builder · Phase 1–3 · 2h ago             |
-|  ║    18.4k in / 3.1k out · $0.047              [open]   |
-|                                                          |
-+----------------------------------------------------------+
-|                                                          |
-|  ║ ●  Conv 3 · Docked inspector + inspectors   active   |
-|  ║    builder · Phase 8–10 · running now                 |
-|  ║    12.1k in / 1.8k out · $0.031              [open]   |
-|  (pulsing cyan left border)                              |
-+----------------------------------------------------------+
-|                                                          |
-|  ║ ○  Conv 4 · YAML sync + export UI           pending  |
-|  ║    Phase 12–14 · not started                          |
-|  ║                                              [open]   |
-|                                                          |
-+----------------------------------------------------------+
+
+The sliding marker (12px solid cyan, `zIndex: 2`) provides the active indicator. The 10px ring beneath it serves as a neutral anchor point. The 2px size difference ensures the marker slightly overhangs, covering the ring while the marker is present.
+
+**Alternative (if the pulse animation on the dot is required by spec):** Render the ring dot with `opacity: 0` on the active state and rely entirely on the sliding marker for the active signal. This is simpler and removes the overlap entirely:
+
+```ts
+: isCurrent
+? {
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    backgroundColor: 'transparent',
+    border: `1px solid transparent`,
+    flexShrink: 0,
+    opacity: 0,  // hidden — sliding marker owns this position
+  }
 ```
 
-### Card fields
-
-| Field | Source | Display |
-|---|---|---|
-| Number + title | Plan metadata | `Conv N · Phase name` |
-| Status | Plan progress state | Left border color + icon |
-| Agent(s) | Conversation participants | Small muted label |
-| Phase range | Which phases this conv covers | `Phase N–M` |
-| Timestamp | Last activity | Relative time |
-| Token cost | Accumulated cost | `Xk in / Yk out · $Z` |
-| Open button | Navigation | Right-aligned, ghost button |
-
-### Hover / selected states
-
-- Hover: `bgSurface1` background fill, no border change
-- Selected: `bgSurface1` + accent violet left border (replaces status border while selected)
-- Never expand cards into a large accordion in the plan list — keep them scannable
+Recommended approach: use the `border: 1px solid t.textMuted` version (first option). Invisible dots create gaps in the flex row that can shift spacing. A neutral dot maintains layout stability.
 
 ---
 
-## Q5: Debug and Exploration — Sidebar and Monitor
+### Issue 3 — COMPLETED_GREEN fails WCAG contrast (Major)
 
-### Sidebar: all flows live in FLOWS section (corrected)
+**Root cause:** Line 8 uses `rgba(22, 163, 74, 0.7)` — alpha-blended green on `bgBase=#0e0e1a`. The DESIGN.md spec explicitly flags this as a WCAG failure and requires the solid value.
 
-Debug and Explore flows are the same technical artifact as team flows — Pathly FSM YAMLs. The difference is convention, not structure. **No separate DEBUG / EXPLORE sidebar sections.**
+**Actual rendered color:** `rgba(22,163,74,0.7)` on `#0e0e1a` composes to approximately `#106130` — a very dark green that falls below the 3:1 contrast ratio required for non-text UI elements (WCAG 1.4.11).
 
-Users organize flows with category folders inside the FLOWS section:
+**Fix:** Line 8 — replace with the solid value specified in DESIGN.md §2:
 
-```
-  ▼ FLOWS
-    ▼ 📁 debug/
-      ⚡ debug.flow.yaml
-    ▼ 📁 team/
-      ⚡ team.flow.yaml
-    ⚡ explore.flow.yaml     ← uncategorized at root
-```
+```ts
+// OLD:
+const COMPLETED_GREEN = 'rgba(22, 163, 74, 0.7)'
 
-### Monitor: ALL flows use the FSM topology rail (correction)
-
-The "loop counter" concept was wrong. A debug flow like `debug.flow.yaml` is a real multi-state FSM — it has states like TESTING → BUILDING → REVIEWING → back to TESTING. That is not a single-state loop; it is a proper FSM that cycles. The FSM topology rail is correct for it.
-
-```
-debug.flow.yaml states:
-  TESTING → BUILDING → REVIEWING → (loops back to TESTING if issues remain)
+// NEW:
+const COMPLETED_GREEN = '#16A34A'
+// Intentionally not t.green (#4ade80 — lime) and not rgba — alpha-blended version fails WCAG 3:1 on dark bg
 ```
 
-**All flows — team, debug, explore — use the same FSM topology rail.** The differences are:
-- Fewer states (debug/explore typically have 3–4 vs team's 5–7)
-- The loop-back edge is more frequent and expected (the dot snaps back to TESTING when REVIEWING finds issues)
-- The flow file name in the monitor tab label tells the user which flow type they're watching
-
-The loop-back behavior on the rail is already handled by the Q3 design: the active dot snaps back to the earlier state when a loop-back transition fires. The execution trace below the rail records each visit chronologically, so TESTING visited twice shows as two rows.
-
-```
-Monitor  [ debug.flow.yaml ]      ● SSE live    cycle 3
-
-  ✓─────────────✗─────────────●
-TESTING     BUILDING      REVIEWING
-                ↑ active (3rd visit)   ↺ looped back from REVIEWING
-
-Execution trace:
-  ✓ TESTING    cycle 1   tester    2m ago
-  ✓ BUILDING   cycle 1   builder   1m ago
-  ✗ REVIEWING  cycle 1   reviewer  50s ago  → issues found, retry
-  ✓ TESTING    cycle 2   tester    40s ago
-  ✓ BUILDING   cycle 2   builder   25s ago
-  ● REVIEWING  cycle 2   reviewer  now
-```
-
-The monitor tab shows `cycle N` instead of `conv N` for debug/explore flows, since those flows loop rather than advance linearly. This is a label-only change — the rail and trace work identically.
+`#16A34A` on `#0e0e1a` achieves approximately 4.1:1 contrast — passes WCAG AA for UI components.
 
 ---
 
-## Q6: Multiple Concurrent Flows
+### Issue 4 — Active dot ring math produces visual artifact (Major)
 
-### Recommendation: Tabbed monitor + sidebar activity badges
+**Root cause:** The active dot style (lines 378–382) applies:
+- `width: 10, height: 10`
+- `border: 2px solid ACTIVE_CYAN` — this ring consumes 2px on each side inward from the element boundary
+- `boxShadow: inset 0 0 0 3px ACTIVE_CYAN` — this inset shadow draws 3px inward from the element boundary
 
-This is the hardest problem. The right answer for an operational IDE is **tabs in the Monitor panel**, NOT split view (too cramped) and NOT single-flow-only (loses important runtime info).
+The inset shadow (3px) is larger than the remaining inner space after the border (10px - 2*2px = 6px interior, so 3px shadow fills half the interior). On a 10px dot: the border takes up 4px of width (2px per side), leaving a 6px interior. The inset shadow at 3px spread fills a 6px-diameter inner circle — which appears as a solid filled circle inside the border ring, producing a bullseye effect rather than a clean filled circle.
 
-### Monitor with tabs
+Additionally, the spec intent from DESIGN.md §3 was to create a "ring with inner dot" for shape encoding, but since the sliding marker now serves as the active indicator (Issue 2 fix), the bullseye style on the underlying dot is doubly redundant.
 
-```
-+--------------------------------------------------------------+
-| ┌ team.flow.yaml ●  ┐┌ debug.flow.yaml ● ┐                  |
-| │ (active tab)      ││                   │                  |
-| └────────────────────┘└───────────────────┘                  |
-+--------------------------------------------------------------+
-| (content of active tab — full-width rail or loop display)   |
-+--------------------------------------------------------------+
-```
+**Fix:** With Issue 2 resolved (active static dot becomes a neutral muted ring), this style problem is eliminated. If the ring-with-inner-dot is retained as a fallback for reduced-motion contexts, use consistent math:
 
-Tab behavior:
-- Each running flow gets a tab
-- Tabs show flow name + a cyan `●` dot when running
-- Clicking the sidebar flow item also switches to its monitor tab
-- Non-running flows have no tab (tabs appear only for active sessions)
-- Max ~4 tabs before overflow → `...` overflow menu
-
-### CLI-originated flow discovery
-
-If a CLI session starts a flow that Studio doesn't know about, the sidebar must surface it. Approach:
-
-1. Studio watches the Pathly project directory for active session markers (a lock/pid file written by the CLI).
-2. When a new session is detected, the FLOWS section shows a **`+ 1 CLI session`** notification row under the relevant folder (or at root if unknown):
-
-```
-+----------------------+
-| ▼ FLOWS              |
-|   ▼ 📁 debug/        |
-|     ⚡ debug.flow.yaml ● |
-|     ▸ 1 CLI session    |   ← muted discovery row, click to adopt
-+----------------------+
+```ts
+// Ring + inner dot on a 10px element — correct math:
+// border: 1.5px → leaves 7px interior → inset shadow 2px → 3px center gap remains
+{
+  width: 10,
+  height: 10,
+  borderRadius: '50%',
+  backgroundColor: 'transparent',
+  border: `1.5px solid ${ACTIVE_CYAN}`,
+  boxShadow: `inset 0 0 0 2px ${ACTIVE_CYAN}`,  // fills inner 6px leaving 1px gap ring
+  flexShrink: 0,
+}
 ```
 
-3. Clicking "1 CLI session" attaches Studio to that session and opens a monitor tab for it.
+For a 10px element: 10px total − 3px (1.5×2 border) = 7px inner diameter. Inset 2px spread = 4px diameter center fill, leaving a 1.5px gap ring. This renders as a clean ring-with-center-dot at this size.
 
-### Visual language for CLI-originated flows
+---
 
-CLI-originated sessions get a `>_` terminal badge next to their name in the sidebar and in the monitor tab:
+### Issue 5 — Label truncation at 8 states on narrow panels (Minor)
+
+**Root cause:** `maxWidth: 64px` with 10px uppercase text and `letterSpacing: 0.05em`. Longest labels: STORMING (8 chars), DESIGNING (9 chars), REVIEWING (9 chars), BUILDING (8 chars). At 10px uppercase with Inter, approximately 7px per character (tracking-adjusted) — REVIEWING measures ~70px, DESIGNING ~73px. Both exceed `maxWidth: 64px` and will ellipsis-truncate to `REVIEWIN…` and `DESIGNIN…`.
+
+The 8-state rail with 16px padding on each side:
+- Available width per slot: `(containerWidth - 32px) / 8`
+- At a typical 280px monitor panel: `(280 - 32) / 8 = 31px per slot`
+- Labels are centered and overflow clipped — a 64px maxWidth means labels visually exceed their allocated slot and overlap neighbors
+
+**Fix:** Two-part solution:
+
+**Part A — Reduce font to 9px and tighten tracking:**
+```ts
+fontSize: '9px',
+letterSpacing: '0.03em',
+```
+At 9px, REVIEWING measures approximately 59px — fits within 64px without truncation.
+
+**Part B — Implement the compact mode already specified in DESIGN.md §3:**
+```ts
+// When pipelineStates.length > 6, only show active label; others are dots only
+const showLabel = pipelineStates.length <= 6 || isCurrent
+```
+For 8-state pipelines, this eliminates the truncation problem entirely by only rendering the active state name (e.g. "REVIEWING") while all other dots are label-free. A centered count line below the rail reads: `"3 done · 4 remaining"` at 10px `t.textMuted`.
+
+The compact mode is the correct fix at 8 states. Part A (9px font) is a band-aid for 6-state pipelines on narrower panels.
+
+---
+
+### Issue 6 — Rail line segment positioning bleeds past dot boundaries (Minor)
+
+**Root cause:** Lines 319–349. The done segment is positioned:
+```ts
+left: '16px',
+width: `${doneSegmentPct}%`,
+```
+The percentage is computed as `(activeIdx / (total-1)) * 100`. But this percentage is of the container's full width (including the 16px padding on each side). The rail dots are positioned in a flex row with `justifyContent: 'space-between'` — the first dot left edge is at `16px` and the last dot right edge is at `containerWidth - 16px`.
+
+The done segment's right edge therefore extends past the center of the active dot — it reaches the percentage of the full container width, not the percentage of the dot-span width.
+
+**Fix:** Rail lines should span from first dot center to last dot center, then be split at the active dot center. The span width is `containerWidth - 32px - 10px` (padding both sides minus the first dot width). The split point is `(activeIdx / (total-1)) * (containerWidth - 42px)`.
+
+This is already how `dotOffsetPx` is computed (line 242: `15 + (activeIdx / (total - 1)) * (railWidth - 42)`). Apply the same formula to the line segments using absolute pixel positioning driven by `railWidth`:
+
+```ts
+// Replace percentage-based line segments with pixel-based:
+// First dot center: railPadding + dotRadius = 16 + 5 = 21px
+// Last dot center: railWidth - railPadding - dotRadius = railWidth - 21px
+// Active dot center: dotOffsetPx + 6 (half of 12px sliding marker)
+
+const lineStart = 21  // px from left of container
+const lineEnd = railWidth - 21  // px from left of container
+const lineSplit = dotOffsetPx + 6  // center of active sliding marker
+
+// Done segment
+{ left: lineStart, width: lineSplit - lineStart }
+
+// Pending segment
+{ left: lineSplit, width: lineEnd - lineSplit }
+```
+
+This requires `railWidth > 0` — already guarded by `dotReady` state. Show neither segment until `dotReady` is true.
+
+---
+
+## Recommendations
+
+**Priority order — fix in this sequence:**
+
+1. **Fix Issue 3 first** (5 min) — change the constant. No layout risk. Unblocks WCAG AA before anything else.
+
+2. **Fix Issue 1 next** (10 min) — add the `.map(s => s.replace(/^[-\s]+/, '').trim())` normalizer. No visual change if data is already clean; fixes the visible bug if data has dashes.
+
+3. **Fix Issue 2** (15 min) — change the active dot style to `border: 1px solid t.textMuted` (neutral). The sliding marker takes over as the sole active indicator. Verify visually that the 12px marker is centered over the 10px neutral dot.
+
+4. **Fix Issue 4** (resolved by Issue 2 fix — no additional code needed unless ring-dot is retained for reduced-motion fallback).
+
+5. **Fix Issue 6** (20 min) — switch rail line segments from percentage to pixel math using `railWidth`. Gated behind `dotReady` already.
+
+6. **Fix Issue 5 last** (30 min) — implement the compact mode (labels only for active state when `pipelineStates.length > 6`). This is additive new behavior, lower risk, lower urgency than the above.
+
+---
+
+## Before / After Sketch
+
+### BEFORE — Current broken state (REVIEWING active, 8-state rail)
 
 ```
-| ▼ FLOWS              |
-|   ▼ 📁 debug/        |
-|     ⚡ debug.flow.yaml ● |   ← Studio-launched
-|     ⚡ my-script  >_  ● |   ← CLI-launched (terminal badge)
+Container width: 280px
+Padding: 16px each side
+
+             ← 16px →                                               ← 16px →
+             |                                                       |
+[dot][dot][dot][dot][CYANring+CYANfill][dot][dot][dot]   ← static dots
+                         ↑
+                   (cyan ring with cyan inset fill — bullseye)
+                   (12px cyan marker ALSO here — two cyan shapes overlap)
+
+Rail line: done segment % of FULL container width — bleeds ~4px past dots
+
+Labels (10px uppercase):
+STORM- | PLANN- | DESIGN- | BUILD- | REVIEWIN… | TESTIN… | RETRO | DONE
+                                        ↑ truncated                ↑ truncated
+
+First label: "- STORMING" (dash visible, overflows container left)
 ```
 
-In the monitor tab bar:
-```
-┌ team.flow.yaml ● ┐┌ debug >_ ● ┐
-```
-
-The `>_` badge means: "this session was not started from Studio; Studio is observing it."
-
-### Sidebar with multiple active sessions
-
-All flows live in the single FLOWS section, organized by user-created category folders.
+### AFTER — Fixed state
 
 ```
-+----------------------+
-| ▼ FLOWS              |
-|   ▼ 📁 team/         |
-|     ⚡ team.flow.yaml ● |   ← running (cyan dot)
-|   ▼ 📁 debug/        |
-|     ⚡ debug.flow.yaml ● |  ← running
-|     ⚡ explore.flow >_ ● |  ← CLI-launched, running
-|   ⚡ custom.flow.yaml   |
-+----------------------+
+Container width: 280px
+Padding: 16px each side
+Rail line: pixel-math, dot-center to dot-center
+
+             ← 21px center of first dot →                ← 21px from right edge →
+             |                                                       |
+[grn][grn][grn][grn][ neu ][ neu ][ neu ][ neu ]   ← static dots
+                        ↑
+                   neutral muted ring (10px, 1px border textMuted)
+                        ↑
+                   12px solid cyan sliding marker (zIndex: 2) — single active indicator
+                   no double-dot
+
+Rail line: done (green, pixel-exact) ──────── | ──── pending (bgSurface1)
+           left: 21px              split at    right: railWidth - 21px
+                                   active dot center
+
+Labels (compact mode, 8 states):
+  ○  ○  ○  ○  ●  ○  ○  ○        ← dots only for non-active states
+               REVIEWING         ← label only for active state (centered, 10px)
+                  ↑
+           3 done · 4 remaining  ← count line below rail, t.textMuted, 10px, centered
+
+No dash prefix. No truncation. No double dot.
 ```
 
-Cyan dot rules:
-- `●` (solid cyan) = actively running right now
-- `◐` (half-filled) = paused / waiting for artifact
-- `○` (empty) = not running
-
-### Two concurrent flows in monitor (team + debug)
+### Dot state legend (after fix)
 
 ```
-┌ team.flow.yaml ● ┐┌ debug.flow.yaml ● ┐
-│                                         │
-│  FSM Rail (team):                       │
-│  ✓───────✓───────●───────○───────○      │
-│  PLAN  BUILD  REVIEW  FIX   DONE        │
-│                  ↑ reviewer #2          │
-│                                         │
-│  [switch to debug tab]                  │
-└─────────────────────────────────────────┘
+Completed:  ● solid #16A34A (10px)
+Active:     ○ 1px border t.textMuted (10px) + 12px cyan sliding marker above (zIndex:2)
+Pending:    ○ 1px border t.textMuted (10px)
 ```
 
-When debug tab is selected (same FSM topology rail — debug flows are real FSMs):
+The completed dot and the pending/active dot are visually distinct: filled green vs hollow muted ring. The sliding marker at `zIndex: 2` makes the active position unambiguous without needing a separate ring style on the static dot.
+
+---
+
+## Inline Style Snippets (React, copy-ready)
+
+### Corrected COMPLETED_GREEN constant
+```ts
+const COMPLETED_GREEN = '#16A34A'
 ```
-┌ team.flow.yaml ● ┐┌ debug.flow.yaml ● ┐
-│                                         │
-│  FSM Rail (debug):       cycle 7        │
-│  ●──────────✓────────────●              │
-│  TEST     BUILD       REVIEW            │
-│   ↑ active (7th visit)  ↺ looped back  │
-│                                         │
-│  tester #7 · running for 12s           │
-└─────────────────────────────────────────┘
+
+### Corrected pipeline state normalizer
+```ts
+const PIPELINE = (pipelineStates.length > 0
+  ? pipelineStates
+  : ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'DONE']
+).map((s) => s.replace(/^[-\s]+/, '').trim())
+```
+
+### Corrected active dot style (static — neutral, not bullseye)
+```ts
+// isCurrent dot — neutral ring, sliding marker owns the active signal
+{
+  width: 10,
+  height: 10,
+  borderRadius: '50%',
+  backgroundColor: 'transparent',
+  border: `1px solid ${t.textMuted}`,
+  flexShrink: 0,
+}
+```
+
+### Corrected rail line segments (pixel math)
+```ts
+// Requires: railWidth > 0 and dotReady === true
+const lineStart = 21  // first dot center (16px padding + 5px dot radius)
+const lineEnd = railWidth - 21  // last dot center from left
+const activeDotCenter = dotOffsetPx + 6  // center of 12px sliding marker
+
+// Done segment (only render when activeIdx > 0)
+{
+  position: 'absolute',
+  top: '50%',
+  left: `${lineStart}px`,
+  width: `${activeDotCenter - lineStart}px`,
+  height: '2px',
+  borderRadius: '1px',
+  backgroundColor: COMPLETED_GREEN,
+  transform: 'translateY(-50%)',
+  pointerEvents: 'none',
+}
+
+// Pending segment
+{
+  position: 'absolute',
+  top: '50%',
+  left: `${activeDotCenter}px`,
+  width: `${lineEnd - activeDotCenter}px`,
+  height: '2px',
+  borderRadius: '1px',
+  backgroundColor: t.bgSurface1,
+  transform: 'translateY(-50%)',
+  pointerEvents: 'none',
+}
+```
+
+### Compact mode label rendering
+```ts
+// Add above the label div in the PIPELINE.map:
+const showLabel = PIPELINE.length <= 6 || isCurrent
+
+// Wrap label in conditional:
+{showLabel && (
+  <div style={{
+    fontSize: '10px',
+    fontFamily: t.fontFamilyBase,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginTop: '6px',
+    textAlign: 'center',
+    maxWidth: '64px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: labelColor,
+    fontWeight: isCurrent ? 600 : 400,
+  }}>
+    {state}
+  </div>
+)}
+
+// Add below the dot row, when PIPELINE.length > 6:
+{PIPELINE.length > 6 && activeIdx >= 0 && (
+  <div style={{
+    fontSize: '10px',
+    color: t.textMuted,
+    textAlign: 'center',
+    marginTop: '4px',
+    letterSpacing: '0.02em',
+  }}>
+    {activeIdx} done · {PIPELINE.length - activeIdx - 1} remaining
+  </div>
+)}
 ```
 
 ---
 
-## Summary — Decisions to Capture in IMPLEMENTATION_PLAN
+## Verdict
 
-| Area | Decision | Target phase |
-|---|---|---|
-| **Sidebar model** | Filesystem-mirror tree per section (skills/, agents/, flows/, templates/) | Phase 4–6 |
-| **Sidebar CRUD** | Create file, create folder, rename (double-click inline), delete (dialog), move (drag within section) | Phase 4–6 — scope-expanding, see note |
-| **Dual drag** | `⠿` grip = canvas drag; row body = tree reorg drag within section only | Phase 6 |
-| **Cross-section drag** | Foreign sections inert (no tint, `not-allowed` cursor); `sectionId` on drag payload | Phase 6 |
-| **Domain icons** | Wrench/Bot/Workflow/FileText per section; standard Folder for categories; cyan for flow files | Phase 4 |
-| **Inline create** | Ghost extension after cursor; auto-append stem; warn on wrong extension | Phase 5–6 |
-| **Context menu** | Per item type (section root / folder / skill+agent / flow) — see Q1 spec | Phase 6 |
-| **Empty section** | Two-line muted hint; no auto-collapse | Phase 6 |
-| **Debug/Explore sidebar** | All flows in FLOWS section; users organize with category folders — no separate sections | Phase 4 |
-| **Monitor display** | All flows (team, debug, explore) use FSM topology rail + execution trace. Debug/explore show `cycle N` not `conv N`. Loop-back = dot snaps back on rail. | studio-monitor-live plan |
-| **Workspace section** | Nav-only rows (Plan, Monitor, Settings) — not filesystem, no drag | Phase 4 |
-| **Entry point** | Last-used flow + running banner if active | studio-monitor-live plan |
-| **Monitor live** | useEffect + EventSource, no re-render on each event | studio-monitor-live plan |
-| **Monitor rail** | FSM topology rail; execution trace below; loop-back = dot snaps back on rail; `cycle N` label for looping flows | studio-monitor-live plan |
-| **Monitor tabs** | Tabbed by flow; appears on first active session | studio-monitor-live plan |
-| **Plan cards** | Compact 52px rows, 3px left status strip | studio-monitor-live plan |
-| **Multi-flow** | Monitor tabs; cyan `●` for running; `>_` badge for CLI-originated | studio-monitor-live plan |
-| **CLI discovery** | pid/lock file watcher; "+ N CLI session" discovery row | Post-MVP |
+FAIL
 
-### Note on scope impact
+4 issues require code changes before this component ships:
+- Issue 1 (dash prefix) — data normalization bug, visible to all users
+- Issue 2 (double dot) — overlapping indicators, visual regression vs spec
+- Issue 3 (rgba green) — WCAG AA contrast failure
+- Issue 4 (ring math) — resolved by Issue 2 fix
 
-The filesystem-tree sidebar (CRUD + dual drag + context menu + inline create) is **significantly larger** than the original Phase 4–6 scope (which only covered drag metadata + canvas drop). This work needs either:
-- **2–3 additional phases in Conversation 2**, pushing Conversation 2 from 4 phases to 6–7
-- **Or a separate `studio-sidebar-tree` plan** (1–2 conversations) run before or after the flow builder
-
-Recommendation: add the phases to Conversation 2. The sidebar is a prerequisite for the canvas drag behavior anyway, and keeping it in the same plan avoids coordination overhead. See plan update needed in IMPLEMENTATION_PLAN.md.
+Issues 5 and 6 are pre-ship recommended but not blockers for a narrow panel at 6 states or fewer.
