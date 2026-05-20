@@ -9,7 +9,7 @@ interface Props {
   isSystemFolder?: boolean
   isUserLocked?: boolean
   onToggleFolderLock?: () => void
-  onStartDeleteFolder?: () => void
+  onStartDeleteFolder?: () => void // wired in Conv 4
 }
 
 export function SubdirRow({
@@ -59,8 +59,7 @@ export function SubdirRow({
       {isSystemFolder && (
         <div className={`${styles.rowActions} ${styles.rowActionsLocked}`}>
           <span
-            className={styles.rowAction}
-            style={{ opacity: 0.4 }}
+            className={`${styles.rowAction} ${styles.systemLockIcon}`}
             title="Managed by Pathly"
           >
             <Lock size={11} />

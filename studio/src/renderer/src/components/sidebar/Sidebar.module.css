@@ -436,6 +436,9 @@
   flex: 1;
   text-align: left;
 }
+.systemLockIcon {
+  opacity: 0.4;
+}
 
 .rowAction {
   display: flex;
