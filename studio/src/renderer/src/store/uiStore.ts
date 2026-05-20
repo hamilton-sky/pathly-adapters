@@ -8,18 +8,27 @@ function loadUserLockedPaths(): Set<string> {
   } catch { return new Set() }
 }
 
+function loadUserLockedFolders(): Set<string> {
+  try {
+    const saved = localStorage.getItem('pathly:userLockedFolders')
+    return new Set(saved ? (JSON.parse(saved) as string[]) : [])
+  } catch { return new Set() }
+}
+
 export interface UiState {
   sidebarCollapsed: boolean
   activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings'
   dirtyItems: Set<string>
   theme: 'dark' | 'light'
   userLockedPaths: Set<string>
+  userLockedFolders: Set<string>
   setSidebarCollapsed: (v: boolean) => void
   setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void
   setTheme: (t: 'dark' | 'light') => void
   toggleUserLock: (path: string) => void
+  toggleFolderLock: (path: string) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -30,6 +39,7 @@ export const useUiStore = create<UiState>()(
       dirtyItems: new Set(),
       theme: 'dark',
       userLockedPaths: loadUserLockedPaths(),
+      userLockedFolders: loadUserLockedFolders(),
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setActivePanel: (p) => set({ activePanel: p }),
       markDirty: (path) => set((s) => ({ dirtyItems: new Set([...s.dirtyItems, path]) })),
@@ -47,6 +57,14 @@ export const useUiStore = create<UiState>()(
           else next.add(path)
           try { localStorage.setItem('pathly:userLockedPaths', JSON.stringify([...next])) } catch {}
           return { userLockedPaths: next }
+        }),
+      toggleFolderLock: (path) =>
+        set((s) => {
+          const next = new Set(s.userLockedFolders)
+          if (next.has(path)) next.delete(path)
+          else next.add(path)
+          try { localStorage.setItem('pathly:userLockedFolders', JSON.stringify([...next])) } catch {}
+          return { userLockedFolders: next }
         }),
     }),
     {

@@ -1,4 +1,5 @@
-import { ChevronRight, ChevronDown, Folder } from 'lucide-react'
+import { useRef, useEffect, useState } from 'react'
+import { ChevronRight, ChevronDown, Folder, Lock, MoreHorizontal } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
 interface Props {
@@ -6,16 +7,107 @@ interface Props {
   open: boolean
   onToggle: () => void
   depth?: number
+  isSystemFolder?: boolean
+  isUserLocked?: boolean
+  onToggleFolderLock?: () => void
+  onStartDeleteFolder?: () => void
 }
 
-export function SubdirRow({ name, open, onToggle }: Props): JSX.Element {
+export function SubdirRow({
+  name,
+  open,
+  onToggle,
+  isSystemFolder,
+  isUserLocked,
+  onToggleFolderLock,
+  onStartDeleteFolder,
+}: Props): JSX.Element {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onOutside(e: MouseEvent): void {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onOutside)
+    return () => document.removeEventListener('mousedown', onOutside)
+  }, [menuOpen])
+
   return (
-    <button className={styles.subdirHeader} onClick={onToggle}>
+    <div
+      className={styles.subdirHeader}
+      onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle() }}
+    >
       <span className={styles.chevron}>
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
       </span>
       <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
       <span style={{ flex: 1, textAlign: 'left' }}>{name}/</span>
-    </button>
+
+      {isSystemFolder && (
+        <div className={styles.rowActionsLocked}>
+          <span
+            className={styles.rowAction}
+            style={{ opacity: 0.4 }}
+            title="Managed by Pathly"
+          >
+            <Lock size={11} />
+          </span>
+        </div>
+      )}
+
+      {isUserLocked && !isSystemFolder && (
+        <div className={styles.rowActionsLocked}>
+          <button
+            className={`${styles.rowAction} ${styles.rowActionLock}`}
+            title="Locked — click to unlock"
+            onClick={(e) => { e.stopPropagation(); onToggleFolderLock?.() }}
+          >
+            <Lock size={11} />
+          </button>
+        </div>
+      )}
+
+      {!isSystemFolder && !isUserLocked && (
+        <div className={styles.rowActions}>
+          <button
+            className={styles.rowAction}
+            title="Actions"
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
+          >
+            <MoreHorizontal size={13} />
+          </button>
+
+          {menuOpen && (
+            <div className={styles.itemMenu} ref={menuRef}>
+              <button
+                className={styles.itemMenuItem}
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onToggleFolderLock?.() }}
+              >
+                <Lock size={12} />
+                Lock folder
+              </button>
+              {onStartDeleteFolder && (
+                <>
+                  <div className={styles.itemMenuSep} />
+                  <button
+                    className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`}
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onStartDeleteFolder() }}
+                  >
+                    Delete folder
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

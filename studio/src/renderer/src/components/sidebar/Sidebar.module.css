@@ -424,6 +424,7 @@
 }
 .itemRow:hover .rowActions { opacity: 1; }
 .systemItemRow:hover .rowActions { opacity: 1; }
+.subdirHeader:hover .rowActions { opacity: 1; }
 /* always show lock icon even without hover */
 .rowActionsLocked { opacity: 1; }
 
