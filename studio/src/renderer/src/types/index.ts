@@ -31,7 +31,15 @@ export interface PathlyReorgDragItem {
   sourcePath: string
 }
 
-export type PathlyDragItem = PathlyCanvasDragItem | PathlyReorgDragItem
+// Drag payload for moving an entire folder between workspace sections
+export interface PathlyFolderDragItem {
+  dragType: 'reorg-folder'
+  name: string
+  sourcePath: string  // absolute path of the folder
+  sectionDir: string  // absolute path of the source section dir
+}
+
+export type PathlyDragItem = PathlyCanvasDragItem | PathlyReorgDragItem | PathlyFolderDragItem
 
 // MIME key used for both drag types — differentiated by dragType field in payload
 export const PATHLY_DRAG_MIME = 'application/pathly-drag-item'

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { ChevronRight, ChevronDown, Folder, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { RenameInput } from './RenameInput'
 import styles from './Sidebar.module.css'
 
@@ -12,6 +12,7 @@ interface Props {
   onToggleFolderLock?: () => void
   onStartDeleteFolder?: () => void
   onStartRenameFolder?: () => void
+  onFolderDragStart?: (e: React.DragEvent) => void
   renamingThis?: boolean
   renameValue?: string
   onRenameChange?: (v: string) => void
@@ -33,6 +34,7 @@ export function SubdirRow({
   onToggleFolderLock,
   onStartDeleteFolder,
   onStartRenameFolder,
+  onFolderDragStart,
   renamingThis,
   renameValue,
   onRenameChange,
@@ -67,10 +69,12 @@ export function SubdirRow({
   return (
     <div
       className={`${styles.subdirHeader}${isDragOver ? ` ${styles.subdirRowDragOver}` : ''}`}
+      draggable={!isSystemFolder && !renamingThis && Boolean(onFolderDragStart)}
       onClick={onToggle}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle() }}
+      onDragStart={(e) => { if (!isSystemFolder && !renamingThis) onFolderDragStart?.(e) }}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver?.(e) }}
       onDrop={(e) => { e.preventDefault(); onDrop?.(e) }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) onDragLeave?.() }}
@@ -105,6 +109,11 @@ export function SubdirRow({
           {isUserLocked && (
             <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked — delete disabled">
               <Lock size={11} />
+            </span>
+          )}
+          {onFolderDragStart && (
+            <span className={`${styles.rowAction} ${styles.grip}`} title="Drag to move folder">
+              <GripVertical size={12} />
             </span>
           )}
           <button

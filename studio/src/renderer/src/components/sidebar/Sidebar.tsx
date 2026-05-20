@@ -256,6 +256,29 @@ export function Sidebar(): JSX.Element | null {
     await loadItems()
   }
 
+  async function handleMoveFolder(sourcePath: string, targetSectionDir: string): Promise<void> {
+    const folderName = sourcePath.split('/').pop() ?? ''
+    if (!folderName) return
+    const targetPath = `${targetSectionDir}/${folderName}`
+    if (sourcePath === targetPath) return
+    try {
+      const files = await window.pathly.fs.list(sourcePath).catch(() => [] as string[])
+      if (files.length === 0) {
+        await window.pathly.fs.write(`${targetPath}/.gitkeep`, '')
+      } else {
+        for (const fname of files) {
+          const content = await window.pathly.fs.read(`${sourcePath}/${fname}`).catch(() => '')
+          await window.pathly.fs.write(`${targetPath}/${fname}`, content ?? '')
+          await window.pathly.fs.delete(`${sourcePath}/${fname}`)
+        }
+      }
+      await window.pathly.fs.delete(sourcePath).catch(() => {})
+    } catch (err) {
+      console.error('Move folder failed:', err)
+    }
+    await loadItems()
+  }
+
   async function handleDeleteFolder(folderPath: string): Promise<void> {
     try {
       const files = await window.pathly.fs.list(folderPath).catch(() => [] as string[])
@@ -426,6 +449,7 @@ export function Sidebar(): JSX.Element | null {
             onReorgDrop={(src, tgt, sid) => { void handleReorgDrop(src, tgt, sid) }}
             onRenameFolder={(oldPath, newName) => { void handleRenameFolder(oldPath, newName) }}
             onDeleteFolder={(folderPath) => { void handleDeleteFolder(folderPath) }}
+            onMoveFolder={(src, tgt) => { void handleMoveFolder(src, tgt) }}
           />
         )}
 

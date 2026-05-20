@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FolderPlus, Plus } from 'lucide-react'
-import type { PathlyItem, SectionState, PathlyReorgDragItem } from '../../types'
+import type { PathlyItem, SectionState, PathlyReorgDragItem, PathlyFolderDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton } from '../ui'
@@ -48,6 +48,7 @@ interface Props {
   onReorgDrop?: (sourcePath: string, targetDir: string, sectionId: string) => void
   onRenameFolder?: (oldPath: string, newName: string) => void
   onDeleteFolder?: (folderPath: string) => void
+  onMoveFolder?: (sourcePath: string, targetSectionDir: string) => void
 }
 
 export function WorkspacePanel(props: Props): JSX.Element {
@@ -62,11 +63,12 @@ export function WorkspacePanel(props: Props): JSX.Element {
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
-    onReorgDrop, onRenameFolder, onDeleteFolder,
+    onReorgDrop, onRenameFolder, onDeleteFolder, onMoveFolder,
   } = props
 
   const { userLockedFolders, toggleFolderLock } = useUiStore()
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
+  const [dragOverSection, setDragOverSection] = useState<string | null>(null)
   const [renamingFolderPath, setRenamingFolderPath] = useState<string | null>(null)
   const [renamingFolderValue, setRenamingFolderValue] = useState('')
 
@@ -121,8 +123,33 @@ export function WorkspacePanel(props: Props): JSX.Element {
         const subdirs = state.subdirs ?? []
         const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
         if (!hasMatch) return null
+        const sectionTargetDir = `${projectPath}/${section.dir}`
         return (
-          <div key={section.label}>
+          <div
+            key={section.label}
+            className={dragOverSection === section.label ? styles.subdirRowDragOver : undefined}
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes(PATHLY_DRAG_MIME)) {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setDragOverSection(section.label)
+              }
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverSection(null)
+            }}
+            onDrop={(e) => {
+              setDragOverSection(null)
+              const raw = e.dataTransfer.getData(PATHLY_DRAG_MIME)
+              if (!raw) return
+              try {
+                const payload = JSON.parse(raw) as PathlyFolderDragItem
+                if (payload.dragType !== 'reorg-folder') return
+                if (payload.sectionDir === sectionTargetDir) return
+                onMoveFolder?.(payload.sourcePath, sectionTargetDir)
+              } catch { /* ignore */ }
+            }}
+          >
             <SectionHeader
               label={section.label}
               open={state.open}
@@ -200,6 +227,16 @@ export function WorkspacePanel(props: Props): JSX.Element {
                             ? () => onDeleteFolder?.(folderKey)
                             : undefined
                         }
+                        onFolderDragStart={(e) => {
+                          const payload: PathlyFolderDragItem = {
+                            dragType: 'reorg-folder',
+                            name: subdir.name,
+                            sourcePath: folderKey,
+                            sectionDir: sectionTargetDir,
+                          }
+                          e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
+                          e.dataTransfer.effectAllowed = 'move'
+                        }}
                       />
                       {subdir.open && filteredFiles.map((item) => (
                         <WorkspaceItem
