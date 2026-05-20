@@ -93,6 +93,8 @@ Transition state → PLANNING. Fall through to Stage 2.
 
 ## Stage 2 — Plan
 
+Record start time: run `python -c "import time; print(int(time.time()))"` and note as `PLAN_START`.
+
 ### PO Phase — Requirements
 
 Before planner analysis, check whether `plans/<feature>/PO_NOTES.md` exists.
@@ -174,6 +176,15 @@ Reply 'go' to start implementation, or 'stop' to pause here.
 If autoFlow: log human response "auto-advance".
 
 Transition state → BUILDING.
+
+Compute wall_seconds: run `python -c "import time; print(int(time.time()) - PLAN_START)"`.
+Append `{"type": "AGENT_DONE", "agent": "planner", "model": "<model>", "conversation": 0, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to `plans/<feature>/EVENTS.jsonl`.
+
+Then invoke the `record-cost` skill with:
+```json
+{"agent":"planner","feature":"<FEATURE>","summary":"Planning complete","conversation":0,"wall_seconds":<computed>}
+```
+
 Route back to `team [FEATURE] [rigor] [autoFlow]`.
 
 ---

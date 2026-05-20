@@ -13,6 +13,10 @@ State snapshots are written to `plans/<feature>/STATE.json`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>"}`.
 - **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>"}`.
 
+## Phase 0 — Record test start time
+
+Run: `python -c "import time; print(int(time.time()))"` and note the integer as `TEST_START`.
+
 ## Pre-gate
 
 Read `plans/<feature>/PROGRESS.md`. Check every conversation row in the Conversation Breakdown table.
@@ -124,5 +128,15 @@ If autoFlow: log human response "auto-advance".
 **Write-or-delete transition artifact:**
 - If tests still failing after fix loop: TEST_FAILURES.md already exists — keep it.
 - If all tests pass: delete `<storage_path>/feedback/TEST_FAILURES.md` if it exists.
+
+## Record completion
+
+Compute wall_seconds from `TEST_START` (recorded in Phase 0 / Pre-gate section).
+Append `{"type": "AGENT_DONE", "agent": "tester", "model": "<model>", "conversation": 0, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to `plans/<feature>/EVENTS.jsonl`.
+
+Then invoke the `record-cost` skill with:
+```json
+{"agent":"tester","feature":"<FEATURE>","summary":"All acceptance tests pass","conversation":0,"wall_seconds":<computed>}
+```
 
 Return. Orchestrator determines next state from transition_rules.
