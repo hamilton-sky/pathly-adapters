@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('pathly', {
+  window: {
+    setTitleBarOverlay: (color: string, symbolColor: string): Promise<void> =>
+      ipcRenderer.invoke('window:setTitleBarOverlay', { color, symbolColor }),
+  },
   fs: {
     read: (path: string): Promise<string> => ipcRenderer.invoke('fs:read', path),
     write: (path: string, content: string): Promise<void> =>

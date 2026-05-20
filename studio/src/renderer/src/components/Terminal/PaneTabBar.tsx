@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ExternalLink, X as XIcon } from 'lucide-react'
 import type { TerminalTab } from './types'
+import { Tooltip } from '../ui'
+import { ClaudeIcon, CodexIcon } from './BrandIcons'
 import styles from './Terminal.module.css'
 
 interface PaneTabBarProps {
@@ -14,6 +16,12 @@ interface PaneTabBarProps {
   onLaunch: (cmd: string | undefined, label: string, pane: 'left' | 'right') => void
   onPopout: (id: string) => void
   onRenameTab: (id: string, label: string) => void
+}
+
+function TabBrandIcon({ kind }: { kind?: TerminalTab['kind'] }): JSX.Element | null {
+  if (kind === 'claude') return <ClaudeIcon size={13} />
+  if (kind === 'codex')  return <CodexIcon  size={13} />
+  return null
 }
 
 export function PaneTabBar({
@@ -46,6 +54,16 @@ export function PaneTabBar({
           onClick={() => onSelectTab(tab.id)}
           className={`${styles.tab} ${tab.id === activeTabId ? styles.tabActive : styles.tabInactive}`}
         >
+          <span
+            className={`${styles.statusDot} ${
+              tab.status === 'running' ? styles.statusRunning :
+              tab.status === 'error'   ? styles.statusError :
+              tab.status === 'done'    ? styles.statusDone :
+              styles.statusIdle
+            }`}
+            aria-label={`Status: ${tab.status ?? 'idle'}`}
+          />
+          <TabBrandIcon kind={tab.kind} />
           {editingId === tab.id ? (
             <input
               autoFocus
@@ -77,23 +95,34 @@ export function PaneTabBar({
           </button>
           <button
             title="Close tab"
+            aria-label="Close tab"
             onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
             className={styles.closeTabBtn}
           ><XIcon size={10} /></button>
         </div>
       ))}
       <div className={styles.actionGroup}>
-        <button onClick={() => onAddTab(pane)} className={styles.iconBtn} title="New shell">+ Shell</button>
-        <button
-          onClick={() => onLaunch('claude', 'Claude', pane)}
-          className={`${styles.iconBtn} ${styles.iconBtnClaude}`}
-          title="Launch Claude Code"
-        >Claude</button>
-        <button
-          onClick={() => onLaunch('codex', 'Codex', pane)}
-          className={`${styles.iconBtn} ${styles.iconBtnCodex}`}
-          title="Launch Codex"
-        >Codex</button>
+        <Tooltip label="New shell tab" shortcut="Ctrl+Shift+S" placement="top">
+          <button onClick={() => onAddTab(pane)} className={styles.iconBtn}>+ Shell</button>
+        </Tooltip>
+        <Tooltip label="Launch Claude Code" shortcut="Ctrl+Shift+C" placement="top">
+          <button
+            onClick={() => onLaunch('claude', 'Claude', pane)}
+            className={`${styles.iconBtn} ${styles.iconBtnClaude}`}
+          >
+            <ClaudeIcon size={12} />
+            Claude
+          </button>
+        </Tooltip>
+        <Tooltip label="Launch OpenAI Codex" shortcut="Ctrl+Shift+X" placement="top">
+          <button
+            onClick={() => onLaunch('codex', 'Codex', pane)}
+            className={`${styles.iconBtn} ${styles.iconBtnCodex}`}
+          >
+            <CodexIcon size={12} />
+            Codex
+          </button>
+        </Tooltip>
       </div>
     </div>
   )

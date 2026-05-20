@@ -4,6 +4,8 @@ export interface TerminalTab {
   id: string
   label: string
   pane: 'left' | 'right'
+  kind?: 'shell' | 'claude' | 'codex'
+  status?: 'idle' | 'running' | 'error' | 'done'
 }
 
 export interface TerminalState {
@@ -13,7 +15,7 @@ export interface TerminalState {
   activeTabIdRight: string | null
   splitEnabled: boolean
   toggle(): void
-  addTab(id: string, label: string, pane?: 'left' | 'right'): void
+  addTab(id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind']): void
   closeTab(id: string): void
   setActiveTab(id: string): void
   renameTab(id: string, label: string): void
@@ -29,9 +31,9 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
 
   toggle: () => set((s) => ({ open: !s.open })),
 
-  addTab: (id, label, pane = 'left') =>
+  addTab: (id, label, pane = 'left', kind) =>
     set((s) => {
-      const tab: TerminalTab = { id, label, pane }
+      const tab: TerminalTab = { id, label, pane, kind }
       const update: Partial<TerminalState> = { tabs: [...s.tabs, tab] }
       if (pane === 'left') update.activeTabIdLeft = id
       else update.activeTabIdRight = id

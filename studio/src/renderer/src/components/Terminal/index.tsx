@@ -76,7 +76,8 @@ export function Terminal(): JSX.Element {
   const handleLaunch = async (command: string | undefined, label: string, pane: 'left' | 'right' = 'left'): Promise<void> => {
     if (!open) toggle()
     const id = crypto.randomUUID()
-    addTab(id, label, pane)
+    const kind = command === 'claude' ? 'claude' : command === 'codex' ? 'codex' : 'shell'
+    addTab(id, label, pane, kind)
     try {
       await window.pathly?.terminal?.spawn(id, projectPath, command)
     } catch (err) {

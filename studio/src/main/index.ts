@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, clipboard } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu } from 'electron'
 import { join } from 'path'
 import { registerFsHandlers } from './ipc/fs'
 import { registerWatcherHandlers } from './ipc/watcher'
@@ -40,6 +40,12 @@ function createWindow(projectPath?: string): BrowserWindow {
     width: 1280,
     height: 800,
     title: 'Pathly Studio',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#0B0F1A',       // darkTheme.bgMantle
+      symbolColor: '#E2E8F0', // darkTheme.textPrimary
+      height: 36,
+    },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -47,6 +53,7 @@ function createWindow(projectPath?: string): BrowserWindow {
       sandbox: false
     }
   })
+  Menu.setApplicationMenu(null)
 
   if (isDev) {
     const devServerUrl = process.env['ELECTRON_RENDERER_URL'] ?? 'http://localhost:5173'
@@ -106,6 +113,10 @@ function registerIpcHandlers(win: BrowserWindow): void {
 
   ipcMain.handle('shell:openWindow', async (_event, projectPath: string) => {
     createWindow(projectPath)
+  })
+
+  ipcMain.handle('window:setTitleBarOverlay', (_e, opts: { color: string; symbolColor: string }) => {
+    win.setTitleBarOverlay({ ...opts, height: 36 })
   })
 
   ipcMain.handle('clipboard:read', () => clipboard.readText())

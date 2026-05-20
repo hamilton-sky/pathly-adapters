@@ -100,6 +100,9 @@ function MainApp(): JSX.Element | null {
     el.style.setProperty('--border', resolved.border)
     el.style.setProperty('--border-subtle', resolved.borderSubtle)
     el.style.setProperty('--transition-base', resolved.transitionBase)
+
+    // Keep the native titlebar overlay in sync with the active theme
+    window.pathly?.window?.setTitleBarOverlay(resolved.bgMantle, resolved.textPrimary)
   }, [theme])
 
   if (setupDone === null) return null

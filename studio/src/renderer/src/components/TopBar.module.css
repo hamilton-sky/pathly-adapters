@@ -5,11 +5,21 @@
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  height: 46px;
+  padding-right: 154px; /* reserve space for native Win11 min/max/close overlay (3×46px + margin) */
+  height: 36px;
   background: var(--bg-mantle);
   border-bottom: 1px solid var(--bg-surface0);
   flex-shrink: 0;
   overflow: hidden;
+  -webkit-app-region: drag;
+}
+
+/* Every interactive element inside the bar must opt out of dragging */
+.bar button,
+.bar select,
+.bar input,
+.bar a {
+  -webkit-app-region: no-drag;
 }
 
 .backBtn {
@@ -27,14 +37,6 @@
 .backBtn:hover { background: var(--bg-surface0); color: var(--text-primary); }
 .backBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
 
-.brand {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent);
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
 
 .center {
   flex: 1;
@@ -117,15 +119,15 @@
 }
 
 .badgeLive {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--green);
-  white-space: nowrap;
+  cursor: default;
 }
 
 .badgeWatch {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
-  white-space: nowrap;
+  cursor: default;
 }
 
 .terminalBtn {
@@ -148,7 +150,7 @@
   border-radius: 5px;
   color: #fff;
   cursor: pointer;
-  padding: 4px 14px;
+  padding: 2px 12px;
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
@@ -206,23 +208,33 @@
 
 .navBtn {
   background: transparent;
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
-  padding: 3px 10px;
-  transition: var(--transition-base);
+  font-weight: 500;
+  padding: 0 14px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 120ms ease-out, border-color 120ms ease-out;
   white-space: nowrap;
 }
 
 .navBtn:hover {
-  background: var(--bg-surface1);
   color: var(--text-primary);
 }
 
 .navBtnActive {
-  background: var(--bg-surface1);
-  border-color: var(--accent);
   color: var(--text-primary);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.navBtn:focus-visible {
+  outline: 2px solid var(--accent, #89b4fa);
+  outline-offset: -2px;
 }

@@ -247,6 +247,18 @@ export function HomeScreen(): JSX.Element {
       color: t.textPrimary,
       fontFamily: t.fontFamilyBase
     }}>
+      {/* Drag strip — matches titleBarOverlay color so the top feels seamless */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '36px',
+        background: t.bgMantle,
+        WebkitAppRegion: 'drag',
+        zIndex: 9999,
+        flexShrink: 0,
+      } as React.CSSProperties} />
       <style>{ANIMATIONS}</style>
 
       <h1 style={{

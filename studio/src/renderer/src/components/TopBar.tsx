@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal, X, Moon, Sun, Menu } from 'lucide-react'
+import { Terminal, X, Moon, Sun, Menu, LayoutGrid, List, Activity } from 'lucide-react'
 import { useStore } from '../store'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
@@ -27,7 +27,6 @@ export function TopBar(): JSX.Element {
   } = useStore()
 
   const [activeTopics,   setActiveTopics]   = useState<string[]>([])
-  const [archivedTopics, setArchivedTopics] = useState<string[]>([])
   const [showLog, setShowLog] = useState(false)
   const logEndRef = useRef<HTMLDivElement>(null)
   const removeListenerRef = useRef<(() => void) | null>(null)
@@ -38,9 +37,8 @@ export function TopBar(): JSX.Element {
     async function loadTopics(): Promise<void> {
       try {
         const plansBase = projectPath + '/pathly/plans'
-        const [planActive, planArchived, debugTopics, exploreTopics] = await Promise.all([
+        const [planActive, debugTopics, exploreTopics] = await Promise.all([
           listDirs(plansBase).catch(() => [] as string[]),
-          listDirs(plansBase + '/.archive').catch(() => [] as string[]),
           listDirs(projectPath + '/pathly/debugs').catch(() => [] as string[]),
           listDirs(projectPath + '/pathly/explorations').catch(() => [] as string[]),
         ])
@@ -48,7 +46,6 @@ export function TopBar(): JSX.Element {
           const planNames = planActive.filter((e) => e !== '.archive')
           const extra = [...debugTopics, ...exploreTopics].filter((t) => !planNames.includes(t))
           setActiveTopics([...planNames, ...extra])
-          setArchivedTopics(planArchived)
         }
       } catch { /* directory may not exist yet */ }
     }
@@ -78,9 +75,12 @@ export function TopBar(): JSX.Element {
 
   const { toggle: toggleTerminal } = useTerminalStore()
 
-  const badge = monitorSource === 'sse'
-    ? <span className={styles.badgeLive}>● SSE live</span>
-    : <span className={styles.badgeWatch}>○ File watch</span>
+  const badgeLabel = monitorSource === 'sse' ? 'SSE live' : 'File watch'
+  const badge = (
+    <Tooltip label={badgeLabel} placement="bottom">
+      <span className={monitorSource === 'sse' ? styles.badgeLive : styles.badgeWatch}>●</span>
+    </Tooltip>
+  )
 
   return (
     <>
@@ -92,8 +92,6 @@ export function TopBar(): JSX.Element {
         <Tooltip label="Back to projects" placement="bottom">
           <button className={styles.backBtn} onClick={() => setProjectPath('')}>Projects</button>
         </Tooltip>
-
-        <span className={styles.brand}>Pathly Studio</span>
 
         <div className={styles.center}>
           <div className={styles.selectWrap}>
@@ -107,24 +105,14 @@ export function TopBar(): JSX.Element {
               {activeTopics.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          <div className={styles.selectWrap}>
-            <select
-              className={styles.topicSelectArchive}
-              aria-label="Archived topic"
-              value={activeTopic?.startsWith('.archive/') ? activeTopic : ''}
-              onChange={(e) => { setActiveTopic(e.target.value || null) }}
-            >
-              <option value="">— archive —</option>
-              {archivedTopics.map((t) => <option key={t} value={`.archive/${t}`}>{t}</option>)}
-            </select>
-          </div>
           <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexShrink: 0 }}>
             <Tooltip label="Flow canvas" shortcut="Ctrl+1" placement="bottom">
               <button
                 className={`${styles.navBtn} ${activePanel === 'flow' ? styles.navBtnActive : ''}`}
                 onClick={() => setActivePanel('flow')}
               >
-                ⊞ Canvas
+                <LayoutGrid size={13} />
+                Canvas
               </button>
             </Tooltip>
             <Tooltip label="Plan board" shortcut="Ctrl+2" placement="bottom">
@@ -132,7 +120,8 @@ export function TopBar(): JSX.Element {
                 className={`${styles.navBtn} ${activePanel === 'plan' ? styles.navBtnActive : ''}`}
                 onClick={() => setActivePanel('plan')}
               >
-                ☰ Plan
+                <List size={13} />
+                Plan
               </button>
             </Tooltip>
             <Tooltip label="Live monitor" shortcut="Ctrl+3" placement="bottom">
@@ -140,7 +129,8 @@ export function TopBar(): JSX.Element {
                 className={`${styles.navBtn} ${activePanel === 'monitor' ? styles.navBtnActive : ''}`}
                 onClick={() => setActivePanel('monitor')}
               >
-                ⬡ Monitor
+                <Activity size={13} />
+                Monitor
               </button>
             </Tooltip>
           </div>
