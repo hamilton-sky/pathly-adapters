@@ -498,36 +498,73 @@ export function HomeScreen(): JSX.Element {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      padding: '86px 24px 64px',
+      padding: '56px 24px 64px',
       height: '100vh',
       overflowY: 'auto',
       backgroundColor: t.bgBase,
       color: t.textPrimary,
       fontFamily: t.fontFamilyBase
     }}>
-      {/* Drag strip — matches titleBarOverlay color so the top feels seamless */}
+      {/* Combined header — drag region with tabs + dark mode toggle */}
       <div style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
-        height: '36px',
+        height: '40px',
         background: t.bgMantle,
+        borderBottom: `1px solid ${t.bgSurface0}`,
         WebkitAppRegion: 'drag',
         zIndex: 9999,
-        flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'flex-end',
         paddingRight: '155px',
         boxSizing: 'border-box',
       } as React.CSSProperties}>
+        {/* Tabs — no-drag so clicks register */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '4px',
+          height: '100%',
           WebkitAppRegion: 'no-drag',
-          pointerEvents: 'all',
+        } as React.CSSProperties}>
+          {(['projects', 'getting-started', 'settings'] as const).map((tab) => {
+            const label = tab === 'projects' ? 'Projects' : tab === 'getting-started' ? 'Getting Started' : 'Settings'
+            const isActive = activeTab === tab
+            return (
+              <button
+                key={tab}
+                onClick={() => handleTab(tab)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  height: '40px',
+                  padding: '0 16px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: isActive ? `2px solid ${t.accent}` : '2px solid transparent',
+                  color: isActive ? t.textPrimary : t.textMuted,
+                  fontSize: '12px',
+                  fontWeight: isActive ? 600 : 400,
+                  fontFamily: t.fontFamilyBase,
+                  cursor: 'pointer',
+                  transition: 'color 150ms ease-out, border-color 150ms ease-out',
+                  letterSpacing: '0.01em',
+                }}
+                onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = t.textSecondary }}
+                onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = t.textMuted }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        {/* Dark mode toggle — pushed to right, no-drag */}
+        <div style={{
+          marginLeft: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          WebkitAppRegion: 'no-drag',
         } as React.CSSProperties}>
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -552,54 +589,6 @@ export function HomeScreen(): JSX.Element {
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
         </div>
-      </div>
-
-      {/* Tab bar */}
-      <div style={{
-        position: 'fixed',
-        top: '36px',
-        left: 0,
-        right: 0,
-        height: '34px',
-        background: t.bgMantle,
-        borderBottom: `1px solid ${t.bgSurface0}`,
-        display: 'flex',
-        alignItems: 'center',
-        paddingLeft: '16px',
-        gap: '2px',
-        zIndex: 9998,
-        WebkitAppRegion: 'no-drag',
-      } as React.CSSProperties}>
-        {(['projects', 'getting-started', 'settings'] as const).map((tab) => {
-          const label = tab === 'projects' ? 'Projects' : tab === 'getting-started' ? 'Getting Started' : 'Settings'
-          const isActive = activeTab === tab
-          return (
-            <button
-              key={tab}
-              onClick={() => handleTab(tab)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                height: '34px',
-                padding: '0 14px',
-                background: 'none',
-                border: 'none',
-                borderBottom: isActive ? `2px solid ${t.accent}` : '2px solid transparent',
-                color: isActive ? t.textPrimary : t.textMuted,
-                fontSize: '12px',
-                fontWeight: isActive ? 600 : 400,
-                fontFamily: t.fontFamilyBase,
-                cursor: 'pointer',
-                transition: 'color 150ms ease-out, border-color 150ms ease-out',
-                letterSpacing: '0.01em',
-              }}
-              onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = t.textSecondary }}
-              onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = t.textMuted }}
-            >
-              {label}
-            </button>
-          )
-        })}
       </div>
 
       <style>{ANIMATIONS}</style>
