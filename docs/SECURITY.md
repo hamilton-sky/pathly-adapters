@@ -3,7 +3,7 @@
 This document records the security/reliability posture for pathly-adapters and
 the remaining hardening work before a production-ready label.
 
-Current status: public beta candidate (core install path stable at 2.9.2).
+Current status: public beta candidate (core install path stable at 2.10.0).
 
 The adapter architecture has good safety properties: thin adapters, an explicit
 stitch pipeline, dry-run support, a Pathly-owned-file manifest, and atomic
