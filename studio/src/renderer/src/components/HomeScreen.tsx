@@ -3,6 +3,7 @@ import { Sun, Moon, LayoutGrid, List, Star, FolderOpen } from 'lucide-react'
 import { useStore } from '../store'
 import { listDirs, listDir, readFile, pickFolder, openWindow } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
+import { Settings } from './Settings'
 import type { Theme } from '../theme'
 import type { ProjectEntry } from '../types'
 
@@ -174,8 +175,16 @@ export function HomeScreen(): JSX.Element {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(
     (localStorage.getItem('pathly-home-view') as 'grid' | 'list') ?? 'grid'
   )
+  const [activeTab, setActiveTab] = useState<'projects' | 'getting-started' | 'settings'>(
+    (localStorage.getItem('pathly-home-tab') as 'projects' | 'getting-started' | 'settings') ?? 'projects'
+  )
   const INITIAL_VISIBLE = 6
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
+
+  function handleTab(tab: 'projects' | 'getting-started' | 'settings'): void {
+    localStorage.setItem('pathly-home-tab', tab)
+    setActiveTab(tab)
+  }
 
   function handleViewMode(mode: 'grid' | 'list'): void {
     localStorage.setItem('pathly-home-view', mode)
@@ -489,7 +498,7 @@ export function HomeScreen(): JSX.Element {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      padding: '48px 24px 64px',
+      padding: '86px 24px 64px',
       height: '100vh',
       overflowY: 'auto',
       backgroundColor: t.bgBase,
@@ -544,7 +553,150 @@ export function HomeScreen(): JSX.Element {
           </button>
         </div>
       </div>
+
+      {/* Tab bar */}
+      <div style={{
+        position: 'fixed',
+        top: '36px',
+        left: 0,
+        right: 0,
+        height: '34px',
+        background: t.bgMantle,
+        borderBottom: `1px solid ${t.bgSurface0}`,
+        display: 'flex',
+        alignItems: 'center',
+        paddingLeft: '16px',
+        gap: '2px',
+        zIndex: 9998,
+        WebkitAppRegion: 'no-drag',
+      } as React.CSSProperties}>
+        {(['projects', 'getting-started', 'settings'] as const).map((tab) => {
+          const label = tab === 'projects' ? 'Projects' : tab === 'getting-started' ? 'Getting Started' : 'Settings'
+          const isActive = activeTab === tab
+          return (
+            <button
+              key={tab}
+              onClick={() => handleTab(tab)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                height: '34px',
+                padding: '0 14px',
+                background: 'none',
+                border: 'none',
+                borderBottom: isActive ? `2px solid ${t.accent}` : '2px solid transparent',
+                color: isActive ? t.textPrimary : t.textMuted,
+                fontSize: '12px',
+                fontWeight: isActive ? 600 : 400,
+                fontFamily: t.fontFamilyBase,
+                cursor: 'pointer',
+                transition: 'color 150ms ease-out, border-color 150ms ease-out',
+                letterSpacing: '0.01em',
+              }}
+              onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = t.textSecondary }}
+              onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = t.textMuted }}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
       <style>{ANIMATIONS}</style>
+
+      {activeTab === 'settings' && (
+        <div style={{ width: '100%', maxWidth: '1100px' }}>
+          <Settings />
+        </div>
+      )}
+
+      {activeTab === 'getting-started' && (
+        <div style={{
+          width: '100%',
+          maxWidth: '720px',
+          animation: 'fadeSlideUp 300ms ease-out both',
+        }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: t.textPrimary, marginBottom: '6px', fontFamily: t.fontFamilyBase }}>
+            Getting Started with Pathly Studio
+          </h2>
+          <p style={{ fontSize: '13px', color: t.textMuted, marginBottom: '28px', fontFamily: t.fontFamilyBase }}>
+            A quick overview of how the workspace is structured.
+          </p>
+          {[
+            {
+              step: '1',
+              title: 'Open a project folder',
+              desc: 'Click "+ New project" on the Projects tab and pick a folder that contains a pathly.json or has a pathly/ directory. Pathly will discover all plans and flows inside.',
+            },
+            {
+              step: '2',
+              title: 'Create flows in the sidebar',
+              desc: 'Once a project is open, use the sidebar to create agent flows (YAML), editor files, or plan boards. The sidebar tree mirrors your project structure.',
+            },
+            {
+              step: '3',
+              title: 'Run flows with Monitor',
+              desc: 'Select a flow and click Run, or open the Monitor panel (bottom nav) to watch live output and agent logs as your pipeline executes.',
+            },
+            {
+              step: '4',
+              title: 'Track work with the Plan Board',
+              desc: 'Open any plan folder from the sidebar to see the Kanban-style board. Conversations move from TODO → IN PROGRESS → DONE as you build.',
+            },
+          ].map(({ step, title, desc }) => (
+            <div key={step} style={{
+              display: 'flex',
+              gap: '16px',
+              marginBottom: '20px',
+              padding: '16px',
+              background: t.bgSurface0,
+              borderRadius: '10px',
+              border: `1px solid ${t.bgSurface1}`,
+            }}>
+              <div style={{
+                flexShrink: 0,
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: `${t.accent}20`,
+                border: `1px solid ${t.accent}40`,
+                color: t.accent,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700,
+                fontFamily: t.fontFamilyBase,
+              }}>
+                {step}
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: t.textPrimary, marginBottom: '4px', fontFamily: t.fontFamilyBase }}>{title}</div>
+                <div style={{ fontSize: '12px', color: t.textMuted, lineHeight: 1.6, fontFamily: t.fontFamilyBase }}>{desc}</div>
+              </div>
+            </div>
+          ))}
+          <button
+            onClick={() => handleTab('projects')}
+            style={{
+              marginTop: '8px',
+              padding: '8px 20px',
+              background: t.accent,
+              border: 'none',
+              borderRadius: '7px',
+              color: '#fff',
+              fontSize: '12px',
+              fontWeight: 600,
+              fontFamily: t.fontFamilyBase,
+              cursor: 'pointer',
+            }}
+          >
+            Go to Projects →
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'projects' && <>
 
       <h1 style={{
         fontSize: '26px',
