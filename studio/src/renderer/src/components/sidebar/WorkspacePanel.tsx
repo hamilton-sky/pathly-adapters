@@ -28,7 +28,8 @@ interface Props {
   onToggleSubdir: (label: string, idx: number) => void
   onActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
   onCreateTopLevelFolder: (e: React.MouseEvent<HTMLButtonElement>) => void
-  onInlineCreate: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
+  onCreatePlanFile: (e: React.MouseEvent<HTMLButtonElement>) => void
+  onInlineCreateFile: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
   onInlineCreateFolder: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
   onNewPlan: (e: React.MouseEvent<HTMLButtonElement>) => void
   onRenameChange: (v: string) => void
@@ -49,7 +50,8 @@ export function WorkspacePanel(props: Props): JSX.Element {
     filter, lowerFilter, activeTopic, planFolders,
     renamingPath, renameValue,
     onSelect, onToggleSection, onToggleSubdir,
-    onCreateTopLevelFolder, onInlineCreate, onInlineCreateFolder, onNewPlan,
+    onCreateTopLevelFolder, onCreatePlanFile,
+    onInlineCreateFile, onInlineCreateFolder, onNewPlan,
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
@@ -63,9 +65,11 @@ export function WorkspacePanel(props: Props): JSX.Element {
     <>
       <div className={styles.workspaceHeader}>
         <span className={styles.workspaceHeaderLabel}>WORKSPACE</span>
-        <IconButton onClick={onCreateTopLevelFolder} title="New folder in workspace root">
-          <FolderPlus size={12} />
-        </IconButton>
+        <div className={styles.workspaceHeaderActions}>
+          <IconButton onClick={onCreateTopLevelFolder} title="New folder in workspace root">
+            <FolderPlus size={12} />
+          </IconButton>
+        </div>
       </div>
 
       <PlanSection
@@ -81,6 +85,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
         onToggleFolder={onToggleFolder}
         onFolderClick={onFolderClick}
         onNewPlan={onNewPlan}
+        onCreatePlanFile={onCreatePlanFile}
         onSelect={onSelect}
         onRenameChange={onRenameChange}
         onRenameCommit={onRenameCommit}
@@ -112,8 +117,8 @@ export function WorkspacePanel(props: Props): JSX.Element {
               }
               actions={
                 <IconButton
-                  onClick={(e) => onInlineCreate(section, e)}
-                  title={`New ${section.label.slice(0, -1).toLowerCase()}`}
+                  onClick={(e) => onInlineCreateFile(section, e)}
+                  title="New file"
                 >
                   <Plus size={12} />
                 </IconButton>

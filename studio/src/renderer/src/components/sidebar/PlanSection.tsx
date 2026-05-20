@@ -1,4 +1,4 @@
-import { Folder, FolderOpen, Lock, Plus } from 'lucide-react'
+import { Folder, FolderOpen, FolderPlus, Lock, Plus } from 'lucide-react'
 import type { PathlyItem } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
 import { IconButton } from '../ui'
@@ -20,6 +20,7 @@ interface Props {
   onToggleFolder: (name: string) => void
   onFolderClick: (name: string) => void
   onNewPlan: (e: React.MouseEvent<HTMLButtonElement>) => void
+  onCreatePlanFile: (e: React.MouseEvent<HTMLButtonElement>) => void
   onSelect: (item: PathlyItem) => void
   onRenameChange: (v: string) => void
   onRenameCommit: (item: PathlyItem, itemDir: string) => void
@@ -41,6 +42,7 @@ export function PlanSection({
   onToggleFolder,
   onFolderClick,
   onNewPlan,
+  onCreatePlanFile,
   onSelect,
   onRenameChange,
   onRenameCommit,
@@ -62,8 +64,13 @@ export function PlanSection({
         open={planOpen}
         onToggle={onTogglePlan}
         sub={activeTopic ? `[${activeTopic}]` : undefined}
+        actionsLeft={
+          <IconButton onClick={onNewPlan} title="New plan folder">
+            <FolderPlus size={12} />
+          </IconButton>
+        }
         actions={
-          <IconButton onClick={onNewPlan} title="New plan">
+          <IconButton onClick={onCreatePlanFile} title="New file in active plan" disabled={!activeTopic}>
             <Plus size={12} />
           </IconButton>
         }

@@ -88,16 +88,22 @@
 .workspaceHeader {
   display: flex;
   align-items: center;
-  padding: 6px 8px 6px 12px;
-  gap: 4px;
+  padding: 4px 6px 4px 10px;
 }
 .workspaceHeaderLabel {
   flex: 1;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
 }
+.workspaceHeaderActions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.workspaceHeader:hover .workspaceHeaderActions { opacity: 1; }
 
 /* ── Section headers ── */
 .sectionRow {
