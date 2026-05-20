@@ -18,3 +18,7 @@
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-20T13:00:00.458881+00:00"}
 {"type":"AGENT_DONE","agent":"reviewer","conversation":3,"result":"PASS","ts":"2026-05-20T13:15:00Z"}
 {"type":"HUMAN_RESPONSE","value":"auto-advance"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-20T13:05:46.902800+00:00"}
+{"type":"STATE_TRANSITION","to":"BUILDING","ts":"2026-05-20T13:20:00Z"}
+{"type":"AGENT_DONE","agent":"reviewer","conversation":4,"result":"PASS","ts":"2026-05-20T13:30:00Z"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}

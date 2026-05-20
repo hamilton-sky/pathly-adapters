@@ -1,6 +1,6 @@
 # studio-sidebar-tree — Progress
 
-## Status: IN PROGRESS (Conv 1 DONE)
+## Status: ALL CONVERSATIONS DONE — awaiting test
 
 ## Story Status
 
@@ -10,7 +10,7 @@
 | S2 | User folder lock | Conv 1 | DONE |
 | S3 | Draggable context menu portal | Conv 2 | DONE |
 | S4 | Dual create buttons | Conv 3 | DONE |
-| S5 | Drag-and-drop reorg | Conv 4 | TODO |
+| S5 | Drag-and-drop reorg | Conv 4 | DONE |
 
 ## Conversation Breakdown
 
@@ -19,7 +19,7 @@
 | 1 | 1–3 | S1, S2 | DONE | `cd studio && npx tsc --noEmit` |
 | 2 | 4–5 | S3 | DONE | `cd studio && npx tsc --noEmit` |
 | 3 | 6–7 | S4 | DONE | `cd studio && npx tsc --noEmit` |
-| 4 | 8–10 | S5 | TODO | `cd studio && npx tsc --noEmit` |
+| 4 | 8–10 | S5 | DONE | `cd studio && npx tsc --noEmit` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 
@@ -34,9 +34,9 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 2 | Phase 5 | `sidebar/WorkspaceItem.tsx` | Replace inline popover with ContextMenu portal | ⋯ opens portal at sidebar right edge, all actions work | DONE |
 | 3 | Phase 6 | `sidebar/SectionHeader.tsx` | Dual action slots (actionsLeft + actionsRight) | Two ReactNode slots render side-by-side without breaking Library | DONE |
 | 3 | Phase 7 | `sidebar/WorkspacePanel.tsx` + `LibraryPanel.tsx` | Pass dual buttons to Workspace, keep single for Library | Workspace shows FolderPlus + FilePlus; Library unchanged | DONE |
-| 4 | Phase 8 | `sidebar/WorkspaceItem.tsx` | Add draggable + PayloadReorgDragItem | Non-protected files draggable; protected files not draggable | TODO |
-| 4 | Phase 9 | `sidebar/SubdirRow.tsx` | Add drop target + highlight | Drag-over shows highlight; onDrop called | TODO |
-| 4 | Phase 10 | `sidebar/WorkspacePanel.tsx` + `Sidebar.tsx` | Wire drop handler + fs move | File moves on disk; sidebar refreshes | TODO |
+| 4 | Phase 8 | `sidebar/WorkspaceItem.tsx` | Add draggable + PayloadReorgDragItem | Non-protected files draggable; protected files not draggable | DONE |
+| 4 | Phase 9 | `sidebar/SubdirRow.tsx` | Add drop target + highlight | Drag-over shows highlight; onDrop called | DONE |
+| 4 | Phase 10 | `sidebar/WorkspacePanel.tsx` + `Sidebar.tsx` | Wire drop handler + fs move | File moves on disk; sidebar refreshes | DONE |
 
 ## Prerequisites
 
