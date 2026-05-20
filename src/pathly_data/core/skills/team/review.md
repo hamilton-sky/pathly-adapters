@@ -36,6 +36,10 @@ State snapshots are written to `plans/<feature>/STATE.json`.
 
 ---
 
+## Phase 0 — Record review start time
+
+Run: `python -c "import time; print(int(time.time()))"` and note the printed integer as `REVIEW_START`.
+
 ## Phase 1 — Analyze
 
 **Spawn** `reviewer` with `phase: analyze`:
@@ -137,7 +141,9 @@ git diff HEAD -- . ":(exclude)plans/"
 
 ### If no feedback files — PASS
 
-Append `{"type": "AGENT_DONE", "agent": "reviewer", "model": "<model>", "conversation": <N>, "result": "PASS", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+Compute wall_seconds: run `python -c "import time; print(int(time.time()) - REVIEW_START)"` using `REVIEW_START` from Phase 0.
+Append `{"type": "AGENT_DONE", "agent": "reviewer", "model": "<model>", "conversation": <N>, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+Note: tokens/cost are 0 in Claude Code path; runner.py populates them when using `pathly-run` CLI.
 
 ---
 

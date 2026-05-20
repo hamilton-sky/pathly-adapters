@@ -79,6 +79,10 @@ Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
 
 Use the returned compressed summary as Scout Findings.
 
+### Phase 2.5 — Record build start time
+
+Run: `python -c "import time; print(int(time.time()))"` and note the printed integer as `BUILD_START`.
+
 ### Phase 3 — Implement
 
 **Spawn** `builder` with `phase: implement`:
@@ -123,6 +127,8 @@ Both files can exist simultaneously. Route one at a time using the priority orde
 ## Transition to review
 
 After Phase 3 completes with no blocking feedback files:
-Append `{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+Compute wall_seconds: run `python -c "import time; print(int(time.time()) - BUILD_START)"` using `BUILD_START` from Phase 2.5.
+Append `{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+Note: tokens/cost are 0 in Claude Code path; runner.py populates them when using `pathly-run` CLI.
 
 Return. Orchestrator determines next state from transition_rules.

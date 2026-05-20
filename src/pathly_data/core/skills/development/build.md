@@ -98,6 +98,10 @@ Report to the user before starting:
 - Verify: [command]
 ```
 
+## Step 4.5: Record build start time
+
+Run: `python -c "import time; print(int(time.time()))"` and note the printed integer as `BUILD_START`.
+
 ## Step 5: Implement
 
 Execute exactly what the conversation prompt specifies:
@@ -140,11 +144,15 @@ Write `plans/<feature>/STATE.json`:
 {"current": "REVIEWING", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
 ```
 
+Compute wall_seconds: run `python -c "import time; print(int(time.time()) - BUILD_START)"` using `BUILD_START` from Step 4.5.
+
 Append to `plans/<feature>/EVENTS.jsonl`:
 ```
-{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": <count>, "tokens_out": <count>, "cost_usd": <cost>, "tool_uses": <count>, "wall_seconds": <seconds>, "ts": "<iso-timestamp>"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "<iso-timestamp>"}
 ```
+
+Note: tokens/cost are 0 in the Claude Code path; runner.py populates them automatically when running via `pathly-run` CLI.
 
 Do not invoke any other skill. The orchestrator reads STATE.json and decides what comes next.
 
