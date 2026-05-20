@@ -131,4 +131,9 @@ Compute wall_seconds: run `python -c "import time; print(int(time.time()) - BUIL
 Append `{"type": "AGENT_DONE", "agent": "builder", "model": "<model>", "conversation": <N>, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
 Note: tokens/cost are 0 in Claude Code path; runner.py populates them when using `pathly-run` CLI.
 
+Then invoke the `record-cost` skill with:
+```json
+{"agent":"builder","feature":"<FEATURE>","summary":"Conv <N> build complete","conversation":<N>,"wall_seconds":<computed>}
+```
+
 Return. Orchestrator determines next state from transition_rules.

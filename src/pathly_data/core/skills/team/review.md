@@ -145,6 +145,11 @@ Compute wall_seconds: run `python -c "import time; print(int(time.time()) - REVI
 Append `{"type": "AGENT_DONE", "agent": "reviewer", "model": "<model>", "conversation": <N>, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": <computed>, "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
 Note: tokens/cost are 0 in Claude Code path; runner.py populates them when using `pathly-run` CLI.
 
+Then invoke the `record-cost` skill with:
+```json
+{"agent":"reviewer","feature":"<FEATURE>","summary":"Conv <N> review PASS","conversation":<N>,"wall_seconds":<computed>}
+```
+
 ---
 
 ## Advance

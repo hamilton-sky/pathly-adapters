@@ -105,6 +105,24 @@ def test_record_activity_negative_tokens_rejected(client):
     assert r.status_code == 400
 
 
+def test_record_activity_with_wall_seconds(client):
+    c, _ = client
+    r = c.post(
+        "/record_activity",
+        json={"agent": "builder", "feature": "my-feature", "summary": "done", "wall_seconds": 42, "tool_uses": 5},
+    )
+    assert r.status_code == 200
+
+
+def test_record_activity_invalid_wall_seconds(client):
+    c, _ = client
+    r = c.post(
+        "/record_activity",
+        json={"agent": "a", "feature": "f", "summary": "s", "wall_seconds": -1},
+    )
+    assert r.status_code == 400
+
+
 def test_events_stream_missing_params(client):
     c, _ = client
     r = c.get("/events/stream")
