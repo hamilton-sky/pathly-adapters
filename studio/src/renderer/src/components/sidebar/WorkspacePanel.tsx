@@ -6,8 +6,9 @@ import { SectionHeader } from './SectionHeader'
 import { SubdirRow } from './SubdirRow'
 import { WorkspaceItem } from './WorkspaceItem'
 import { PlanSection } from './PlanSection'
-import { WORKSPACE_USER_SECTIONS, WORKSPACE_FILE_SECTIONS } from './constants'
+import { WORKSPACE_USER_SECTIONS, WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from './constants'
 import type { Section } from './types'
+import { useUiStore } from '../../store/uiStore'
 import styles from './Sidebar.module.css'
 
 interface Props {
@@ -51,6 +52,8 @@ export function WorkspacePanel(props: Props): JSX.Element {
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
   } = props
 
+  const { userLockedFolders, toggleFolderLock } = useUiStore()
+
   return (
     <>
       <Separator label="Workspace" />
@@ -85,10 +88,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
                   const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
                   return (
                     <div key={subdir.name}>
+                      {/* onStartDeleteFolder wired in Conv 4 */}
                       <SubdirRow
                         name={subdir.name}
                         open={subdir.open}
                         onToggle={() => onToggleSubdir(section.label, idx)}
+                        isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
+                        isUserLocked={userLockedFolders.has(`${projectPath}/${section.dir}/${subdir.name}`)}
+                        onToggleFolderLock={() => toggleFolderLock(`${projectPath}/${section.dir}/${subdir.name}`)}
                       />
                       {filteredFiles.map((item) => (
                         <WorkspaceItem
@@ -188,10 +195,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
                   const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
                   return (
                     <div key={subdir.name}>
+                      {/* onStartDeleteFolder wired in Conv 4 */}
                       <SubdirRow
                         name={subdir.name}
                         open={subdir.open}
                         onToggle={() => onToggleSubdir(section.label, idx)}
+                        isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
+                        isUserLocked={userLockedFolders.has(`${projectPath}/${section.dir}/${subdir.name}`)}
+                        onToggleFolderLock={() => toggleFolderLock(`${projectPath}/${section.dir}/${subdir.name}`)}
                       />
                       {subdir.open && filteredFiles.map((item) => {
                         const isDirty = dirtyItems.has(item.path)

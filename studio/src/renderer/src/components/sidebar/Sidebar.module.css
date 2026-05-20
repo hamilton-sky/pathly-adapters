@@ -424,8 +424,21 @@
 }
 .itemRow:hover .rowActions { opacity: 1; }
 .systemItemRow:hover .rowActions { opacity: 1; }
+.subdirHeader:hover .rowActions { opacity: 1; }
 /* always show lock icon even without hover */
 .rowActionsLocked { opacity: 1; }
+
+.subdirFolderIcon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.subdirLabel {
+  flex: 1;
+  text-align: left;
+}
+.systemLockIcon {
+  opacity: 0.4;
+}
 
 .rowAction {
   display: flex;
@@ -453,7 +466,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 7px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  z-index: 100;
+  z-index: 500;
   min-width: 130px;
   padding: 4px 0;
   animation: menuFadeIn 0.08s ease-out;
