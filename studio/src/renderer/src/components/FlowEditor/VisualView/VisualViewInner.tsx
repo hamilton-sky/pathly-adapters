@@ -71,8 +71,8 @@ export function VisualViewInner({ data, onChange, onSave, tab, onTabClick }: Pro
   const { validationIssues, nodesWithIssues, edgesWithValidation, hasErrors, hasWarnings } =
     useFlowValidation({ data, knownBehaviors, nodes, edges, t })
 
-  const { removeState, removeEdge, handleRenameState, handleNodesDelete, handleEdgesDelete } =
-    useFlowMutations({ dataRef, onChange, setNodes, setEdges, setDetail })
+  const { removeState, removeEdge, duplicateState, handleRenameState, handleNodesDelete, handleEdgesDelete } =
+    useFlowMutations({ dataRef, onChange, setNodes, setEdges, setDetail, pendingPositionsRef })
 
   const {
     exportTarget, setExportTarget,
@@ -142,6 +142,10 @@ export function VisualViewInner({ data, onChange, onSave, tab, onTabClick }: Pro
             removeState(nodeId)
             setNodeCtxMenu(null)
             if (detail?.type === 'node' && detail.stateId === nodeId) setDetail(null)
+          }}
+          onDuplicate={(nodeId) => {
+            const srcNode = nodes.find((n) => n.id === nodeId)
+            if (srcNode) duplicateState(nodeId, srcNode.position)
           }}
           t={t}
         />

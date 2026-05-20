@@ -4,6 +4,7 @@ import type { Node, Edge } from 'reactflow'
 import type { FlowYaml } from '../../../../types'
 import type { StateNodeData } from '../../utils/flowToGraph'
 import type { PanelDetail } from '../constants'
+import { generateUniqueStateId } from '../utils/generateUniqueStateId'
 
 interface UseFlowMutationsArgs {
   dataRef: React.MutableRefObject<FlowYaml>
@@ -11,6 +12,7 @@ interface UseFlowMutationsArgs {
   setNodes: Dispatch<SetStateAction<Node<StateNodeData>[]>>
   setEdges: Dispatch<SetStateAction<Edge[]>>
   setDetail: Dispatch<SetStateAction<PanelDetail>>
+  pendingPositionsRef: React.MutableRefObject<Map<string, { x: number; y: number }>>
 }
 
 export function useFlowMutations({
@@ -19,6 +21,7 @@ export function useFlowMutations({
   setNodes,
   setEdges,
   setDetail,
+  pendingPositionsRef,
 }: UseFlowMutationsArgs) {
   function removeState(stateId: string): void {
     const d = dataRef.current
@@ -182,9 +185,25 @@ export function useFlowMutations({
     onChange({ ...d, transitions: newTransitions })
   }
 
+  function duplicateState(stateId: string, sourcePosition: { x: number; y: number }): void {
+    const d = dataRef.current
+    const newId = generateUniqueStateId(stateId, d.states)
+    // Place duplicate offset slightly below-right of the original.
+    pendingPositionsRef.current.set(newId, { x: sourcePosition.x + 120, y: sourcePosition.y + 80 })
+    const newAgentMap = { ...d.agent_map }
+    if (d.agent_map[stateId]) newAgentMap[newId] = d.agent_map[stateId]
+    onChange({
+      ...d,
+      states: [...d.states, newId],
+      agent_map: newAgentMap,
+      transitions: { ...d.transitions },
+    })
+  }
+
   return {
     removeState,
     removeEdge,
+    duplicateState,
     handleRenameState,
     handleNodesDelete,
     handleEdgesDelete,
