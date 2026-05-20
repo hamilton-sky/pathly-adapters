@@ -29,7 +29,7 @@ export function Sidebar(): JSX.Element | null {
     setLastUsedFlowPath,
   } = useStore()
 
-  const { sections, setSections, loadItems } = useProjectFiles()
+  const { sections, setSections, loadItems, customWorkspaceSections } = useProjectFiles()
   const { planFolders, setPlanFolders, loadPlanFiles } = usePlanFiles()
 
   useEffect(() => {
@@ -467,6 +467,7 @@ export function Sidebar(): JSX.Element | null {
             onDeleteFolder={(folderPath) => { void handleDeleteFolder(folderPath) }}
             onMoveFolder={(src, tgt) => { void handleMoveFolder(src, tgt) }}
             onDeletePlanFolder={(folderPath) => { void handleDeletePlanFolder(folderPath) }}
+            customWorkspaceSections={customWorkspaceSections}
           />
         )}
 

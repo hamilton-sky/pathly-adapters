@@ -10,6 +10,7 @@ import { WorkspaceItem } from './WorkspaceItem'
 import { PlanSection } from './PlanSection'
 import { InlineCreateInput } from './InlineCreateInput'
 import { WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from './constants'
+import type { Section } from './types'
 import { useUiStore } from '../../store/uiStore'
 import styles from './Sidebar.module.css'
 
@@ -50,6 +51,7 @@ interface Props {
   onDeleteFolder?: (folderPath: string) => void
   onMoveFolder?: (sourcePath: string, targetSectionDir: string) => void
   onDeletePlanFolder?: (folderPath: string) => void
+  customWorkspaceSections?: Section[]
 }
 
 export function WorkspacePanel(props: Props): JSX.Element {
@@ -65,6 +67,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
     onReorgDrop, onRenameFolder, onDeleteFolder, onMoveFolder, onDeletePlanFolder,
+    customWorkspaceSections = [],
   } = props
 
   const { userLockedFolders, toggleFolderLock } = useUiStore()
@@ -236,6 +239,99 @@ export function WorkspacePanel(props: Props): JSX.Element {
                             sourcePath: folderKey,
                             sectionDir: sectionTargetDir,
                           }
+                          e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
+                          e.dataTransfer.effectAllowed = 'move'
+                        }}
+                      />
+                      {subdir.open && filteredFiles.map((item) => (
+                        <WorkspaceItem
+                          key={item.path}
+                          item={item}
+                          itemDir={itemDir}
+                          isSelected={selectedItem?.path === item.path}
+                          isDirty={dirtyItems.has(item.path)}
+                          deep
+                          renamingPath={renamingPath}
+                          renameValue={renameValue}
+                          onSelect={() => onSelect(item)}
+                          onRenameChange={onRenameChange}
+                          onRenameCommit={() => onRenameCommit(item, itemDir)}
+                          onRenameCancel={onRenameCancel}
+                          onStartRename={() => onStartRename(item, itemDir)}
+                          onStartDelete={() => onStartDelete(item)}
+                          sectionId={section.type}
+                          isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
+                        />
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {customWorkspaceSections.map((section) => {
+        const state = sections[section.label]
+        if (!state) return null
+        const subdirs = state.subdirs ?? []
+        const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
+        if (!hasMatch && filter) return null
+        const sectionTargetDir = `${projectPath}/${section.dir}`
+        return (
+          <div key={section.label}>
+            <SectionHeader
+              label={section.label}
+              open={state.open}
+              onToggle={() => onToggleSection(section.label)}
+              actionsLeft={
+                <IconButton onClick={(e) => onInlineCreateFolder(section, e)} title="New folder">
+                  <FolderPlus size={12} />
+                </IconButton>
+              }
+              actions={
+                <IconButton onClick={(e) => onInlineCreateFile(section, e)} title="New file">
+                  <Plus size={12} />
+                </IconButton>
+              }
+            />
+            {state.open && (
+              <div>
+                {inlineCreate?.target === section.dir && (
+                  <InlineCreateInput
+                    type={inlineCreate.type}
+                    onCommit={onInlineCreateSubmit}
+                    onCancel={onInlineCreateCancel}
+                  />
+                )}
+                {subdirs.map((subdir, idx) => {
+                  const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
+                  if (filter && filteredFiles.length === 0) return null
+                  const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
+                  const folderKey = itemDir
+                  return (
+                    <div key={subdir.name}>
+                      <SubdirRow
+                        name={subdir.name}
+                        open={subdir.open}
+                        onToggle={() => { if (renamingFolderPath !== folderKey) onToggleSubdir(section.label, idx) }}
+                        isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
+                        isUserLocked={userLockedFolders.has(folderKey)}
+                        onToggleFolderLock={() => toggleFolderLock(folderKey)}
+                        isDragOver={dragOverFolder === folderKey}
+                        onDragOver={() => setDragOverFolder(folderKey)}
+                        onDrop={(e) => { setDragOverFolder(null); e.dataTransfer.getData(PATHLY_DRAG_MIME) }}
+                        onDragLeave={() => setDragOverFolder(null)}
+                        renamingThis={renamingFolderPath === folderKey}
+                        renameValue={renamingFolderValue}
+                        onRenameChange={setRenamingFolderValue}
+                        onRenameCommit={() => { const v = renamingFolderValue; setRenamingFolderPath(null); onRenameFolder?.(folderKey, v) }}
+                        onRenameCancel={() => setRenamingFolderPath(null)}
+                        onStartRenameFolder={() => { setRenamingFolderValue(subdir.name); setRenamingFolderPath(folderKey) }}
+                        onStartDeleteFolder={!userLockedFolders.has(folderKey) ? () => onDeleteFolder?.(folderKey) : undefined}
+                        onFolderDragStart={(e) => {
+                          const payload = { dragType: 'reorg-folder', name: subdir.name, sourcePath: folderKey, sectionDir: sectionTargetDir }
                           e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
                           e.dataTransfer.effectAllowed = 'move'
                         }}

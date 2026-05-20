@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { listDir, listDirs } from '../services/pathlyApi'
 import type { PathlyItem, SectionState, TemplateSubdir } from '../types'
+import type { Section } from '../components/sidebar/types'
 
 const PATHLY_SECTIONS = [
   { label: 'Flows',     type: 'flow'     as const, dir: 'src/pathly_data/core/flows'     },
@@ -104,13 +105,17 @@ async function loadSubdirAwareSection(
   }
 }
 
+const KNOWN_PATHLY_DIRS = new Set(['debugs', 'explorations', 'plans', 'agents', 'skills', 'templates', 'flows'])
+
 export function useProjectFiles(): {
   sections: Record<string, SectionState>
   setSections: React.Dispatch<React.SetStateAction<Record<string, SectionState>>>
   loadItems: () => Promise<void>
+  customWorkspaceSections: Section[]
 } {
   const { projectPath, pathlyRoot, pathlyUserHome } = useStore()
   const [sections, setSections] = useState<Record<string, SectionState>>(INITIAL_SECTIONS)
+  const [customWorkspaceSections, setCustomWorkspaceSections] = useState<Section[]>([])
 
   // Section A (Flows/Skills/Agents/Templates) loads from the pathly installation,
   // not the open workspace project.
@@ -205,7 +210,9 @@ export function useProjectFiles(): {
           let files: PathlyItem[] = []
           try {
             const fileNames = await listDir(subdirPath)
-            files = fileNames.map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: section.type }))
+            files = fileNames
+              .filter((f) => f !== '.gitkeep')
+              .map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: section.type }))
           } catch { /* empty subdir */ }
           subdirs.push({ name: subdirName, open: false, files })
         }
@@ -214,6 +221,38 @@ export function useProjectFiles(): {
         setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: null } }))
       }
     }
+
+    // Discover any custom folders at pathly/ root (not in known dirs)
+    try {
+      const pathlyRootDirs = await listDirs(`${projectPath}/pathly`).catch(() => [] as string[])
+      const customDirs = pathlyRootDirs.filter((d) => !KNOWN_PATHLY_DIRS.has(d))
+      const discovered: Section[] = []
+      for (const dirName of customDirs) {
+        const label = dirName.charAt(0).toUpperCase() + dirName.slice(1)
+        const dir = `pathly/${dirName}`
+        discovered.push({ label, type: 'explore', dir })
+        try {
+          const sectionPath = `${projectPath}/${dir}`
+          const subdirNames = await listDirs(sectionPath)
+          const subdirs: TemplateSubdir[] = []
+          for (const subdirName of subdirNames) {
+            const subdirPath = `${sectionPath}/${subdirName}`
+            let files: PathlyItem[] = []
+            try {
+              const fileNames = await listDir(subdirPath)
+              files = fileNames
+                .filter((f) => f !== '.gitkeep')
+                .map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: 'explore' as const }))
+            } catch { /* empty */ }
+            subdirs.push({ name: subdirName, open: false, files })
+          }
+          setSections((prev) => ({ ...prev, [label]: { open: prev[label]?.open ?? true, items: [], subdirs } }))
+        } catch {
+          setSections((prev) => ({ ...prev, [label]: { open: prev[label]?.open ?? true, items: [], subdirs: null } }))
+        }
+      }
+      setCustomWorkspaceSections(discovered)
+    } catch { /* pathly/ root not found */ }
 
     // Workspace user sections — project-local authoring dirs
     for (const section of WORKSPACE_USER_SECTIONS) {
@@ -230,5 +269,5 @@ export function useProjectFiles(): {
     void loadItems()
   }, [coreRoot, projectPath, pathlyUserHome, loadItems])
 
-  return { sections, setSections, loadItems }
+  return { sections, setSections, loadItems, customWorkspaceSections }
 }
