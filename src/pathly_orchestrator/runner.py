@@ -99,7 +99,11 @@ def invoke_agent(
             or 0.0
         )
         usage = output.get("usage") or output.get("inputUsage") or {}
-        tokens_in  = int(usage.get("input_tokens", 0) or usage.get("inputTokens", 0))
+        tokens_in  = int(
+            (usage.get("input_tokens") or usage.get("inputTokens") or 0)
+            + (usage.get("cache_read_input_tokens") or 0)
+            + (usage.get("cache_creation_input_tokens") or 0)
+        )
         tokens_out = int(usage.get("output_tokens", 0) or usage.get("outputTokens", 0))
         # Count tool_use content blocks across all messages in the conversation
         messages = output.get("messages", [])
@@ -111,7 +115,8 @@ def invoke_agent(
         result_text = output.get("result", "")
         if result_text:
             print(result_text)
-        # Diagnostic: warn when cost is missing so we know what fields to look for
+        # Diagnostic: always print telemetry so we can verify it's being captured
+        print(f"[runner] telemetry — cost=${cost_usd:.4f}  in={tokens_in}  out={tokens_out}  tools={tool_uses}  wall={wall_seconds}s", file=sys.stderr)
         if cost_usd == 0.0:
             top_keys = [k for k in output if k not in ("result", "messages", "session_id")]
             print(f"[runner] cost=0 — JSON top-level keys: {top_keys}", file=sys.stderr)
