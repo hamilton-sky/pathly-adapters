@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { FileText, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useUiStore } from '../../store/uiStore'
-import type { PathlyItem } from '../../types'
+import type { PathlyItem, PathlyReorgDragItem, PathlySection } from '../../types'
+import { PATHLY_DRAG_MIME } from '../../types'
 import { RenameInput } from './RenameInput'
 import { ContextMenu } from './ContextMenu'
 import styles from './Sidebar.module.css'
@@ -21,6 +22,8 @@ interface Props {
   onStartRename?: () => void
   onStartDelete?: () => void
   sidebarWidth?: number
+  sectionId?: string
+  isProtectedFile?: boolean
 }
 
 export function WorkspaceItem({
@@ -37,6 +40,8 @@ export function WorkspaceItem({
   onStartRename,
   onStartDelete,
   sidebarWidth,
+  sectionId,
+  isProtectedFile,
 }: Props): JSX.Element {
   const { userLockedPaths, toggleUserLock } = useUiStore()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -50,6 +55,7 @@ export function WorkspaceItem({
     styles.itemRow,
     deep ? styles.itemRowDeep : '',
     isSelected ? styles.itemRowSelected : '',
+    !isProtectedFile ? styles.draggableItem : '',
   ].filter(Boolean).join(' ')
 
   function handleMenuAction(action: () => void): void {
@@ -61,6 +67,20 @@ export function WorkspaceItem({
     <div
       ref={rowRef}
       className={cls}
+      draggable={!isProtectedFile && renamingPath !== item.path}
+      onDragStart={(e) => {
+        if (isProtectedFile) { e.preventDefault(); return }
+        const payload: PathlyReorgDragItem = {
+          dragType: 'reorg',
+          name: item.name,
+          section: (sectionId ?? 'skills') as PathlySection,
+          path: [item.name],
+          type: 'file',
+          sourcePath: item.path,
+        }
+        e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
+        e.dataTransfer.effectAllowed = 'move'
+      }}
       onClick={() => { if (renamingPath !== item.path) onSelect() }}
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect() }}
