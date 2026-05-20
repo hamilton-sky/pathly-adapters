@@ -1,15 +1,14 @@
 import { useState } from 'react'
-import { Plus, FolderPlus } from 'lucide-react'
+import { FolderPlus, Plus } from 'lucide-react'
 import type { PathlyItem, SectionState, PathlyReorgDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
-import { IconButton, Separator } from '../ui'
+import { IconButton } from '../ui'
 import { SectionHeader } from './SectionHeader'
 import { SubdirRow } from './SubdirRow'
 import { WorkspaceItem } from './WorkspaceItem'
 import { PlanSection } from './PlanSection'
-import { WORKSPACE_USER_SECTIONS, WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from './constants'
-import type { Section } from './types'
+import { WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from './constants'
 import { useUiStore } from '../../store/uiStore'
 import styles from './Sidebar.module.css'
 
@@ -28,9 +27,9 @@ interface Props {
   onToggleSection: (label: string) => void
   onToggleSubdir: (label: string, idx: number) => void
   onActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
-  onWorkspaceCreate: (section: Section, e: React.MouseEvent<HTMLButtonElement>) => void
-  onInlineCreate: (section: Section, e: React.MouseEvent<HTMLButtonElement>) => void
-  onInlineCreateFolder: (section: Section, e: React.MouseEvent<HTMLButtonElement>) => void
+  onCreateTopLevelFolder: (e: React.MouseEvent<HTMLButtonElement>) => void
+  onInlineCreate: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
+  onInlineCreateFolder: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
   onNewPlan: (e: React.MouseEvent<HTMLButtonElement>) => void
   onRenameChange: (v: string) => void
   onRenameCommit: (item: PathlyItem, itemDir: string) => void
@@ -49,8 +48,8 @@ export function WorkspacePanel(props: Props): JSX.Element {
     sections, projectPath, selectedItem, dirtyItems,
     filter, lowerFilter, activeTopic, planFolders,
     renamingPath, renameValue,
-    onSelect, onToggleSection, onToggleSubdir, onActivePanel,
-    onWorkspaceCreate, onInlineCreate, onInlineCreateFolder, onNewPlan,
+    onSelect, onToggleSection, onToggleSubdir,
+    onCreateTopLevelFolder, onInlineCreate, onInlineCreateFolder, onNewPlan,
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
@@ -62,121 +61,12 @@ export function WorkspacePanel(props: Props): JSX.Element {
 
   return (
     <>
-      <Separator label="Workspace" />
-
-      {WORKSPACE_USER_SECTIONS.map((section) => {
-        const state = sections[section.label]
-        if (!state) return null
-        const subdirs = state.subdirs ?? []
-        const filteredItems = filter ? state.items.filter((item) => item.name.toLowerCase().includes(lowerFilter)) : state.items
-        const hasSubdirMatch = filter ? subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter))) : true
-        if (filter && filteredItems.length === 0 && !hasSubdirMatch) return null
-        return (
-          <div key={section.label}>
-            <SectionHeader
-              label={section.label}
-              open={state.open}
-              onToggle={() => onToggleSection(section.label)}
-              actionsLeft={
-                <IconButton
-                  onClick={(e) => onInlineCreateFolder(section, e)}
-                  title="New folder"
-                >
-                  <FolderPlus size={12} />
-                </IconButton>
-              }
-              actions={
-                <IconButton
-                  onClick={(e) => onWorkspaceCreate(section, e)}
-                  title={`New ${section.label.toLowerCase()}`}
-                >
-                  <Plus size={12} />
-                </IconButton>
-              }
-            />
-            {state.open && (
-              <div>
-                {subdirs.map((subdir, idx) => {
-                  const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
-                  if (filter && filteredFiles.length === 0) return null
-                  const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
-                  return (
-                    <div key={subdir.name}>
-                      {/* onStartDeleteFolder wired in Conv 4 */}
-                      <SubdirRow
-                        name={subdir.name}
-                        open={subdir.open}
-                        onToggle={() => onToggleSubdir(section.label, idx)}
-                        isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
-                        isUserLocked={userLockedFolders.has(`${projectPath}/${section.dir}/${subdir.name}`)}
-                        onToggleFolderLock={() => toggleFolderLock(`${projectPath}/${section.dir}/${subdir.name}`)}
-                        folderPath={`${projectPath}/${section.dir}/${subdir.name}`}
-                        isDragOver={dragOverFolder === `${projectPath}/${section.dir}/${subdir.name}`}
-                        onDragOver={() => setDragOverFolder(`${projectPath}/${section.dir}/${subdir.name}`)}
-                        onDrop={(e) => {
-                          setDragOverFolder(null)
-                          const raw = e.dataTransfer.getData(PATHLY_DRAG_MIME)
-                          if (!raw) return
-                          try {
-                            const payload = JSON.parse(raw) as PathlyReorgDragItem
-                            if (payload.dragType !== 'reorg') return
-                            if (payload.section !== section.type) return
-                            const targetDir = `${projectPath}/${section.dir}/${subdir.name}`
-                            onReorgDrop?.(payload.sourcePath, targetDir, section.type)
-                          } catch { /* ignore malformed payload */ }
-                        }}
-                        onDragLeave={() => setDragOverFolder(null)}
-                      />
-                      {filteredFiles.map((item) => (
-                        <WorkspaceItem
-                          key={item.path}
-                          item={item}
-                          itemDir={itemDir}
-                          isSelected={selectedItem?.path === item.path}
-                          isDirty={dirtyItems.has(item.path)}
-                          deep
-                          renamingPath={renamingPath}
-                          renameValue={renameValue}
-                          onSelect={() => onSelect(item)}
-                          onRenameChange={onRenameChange}
-                          onRenameCommit={() => onRenameCommit(item, itemDir)}
-                          onRenameCancel={onRenameCancel}
-                          onStartRename={() => onStartRename(item, itemDir)}
-                          onStartDelete={() => onStartDelete(item)}
-                          sectionId={section.type}
-                          isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
-                        />
-                      ))}
-                    </div>
-                  )
-                })}
-                {filteredItems.map((item) => {
-                  const itemDir = `${projectPath}/${section.dir}`
-                  return (
-                    <WorkspaceItem
-                      key={item.path}
-                      item={item}
-                      itemDir={itemDir}
-                      isSelected={selectedItem?.path === item.path}
-                      isDirty={dirtyItems.has(item.path)}
-                      renamingPath={renamingPath}
-                      renameValue={renameValue}
-                      onSelect={() => onSelect(item)}
-                      onRenameChange={onRenameChange}
-                      onRenameCommit={() => onRenameCommit(item, itemDir)}
-                      onRenameCancel={onRenameCancel}
-                      onStartRename={() => onStartRename(item, itemDir)}
-                      onStartDelete={() => onStartDelete(item)}
-                      sectionId={section.type}
-                      isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
-                    />
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )
-      })}
+      <div className={styles.workspaceHeader}>
+        <span className={styles.workspaceHeaderLabel}>WORKSPACE</span>
+        <IconButton onClick={onCreateTopLevelFolder} title="New folder in workspace root">
+          <FolderPlus size={12} />
+        </IconButton>
+      </div>
 
       <PlanSection
         planFolders={planFolders}
@@ -235,19 +125,19 @@ export function WorkspacePanel(props: Props): JSX.Element {
                   const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
                   if (filter && filteredFiles.length === 0) return null
                   const itemDir = `${projectPath}/${section.dir}/${subdir.name}`
+                  const folderKey = `${projectPath}/${section.dir}/${subdir.name}`
                   return (
                     <div key={subdir.name}>
-                      {/* onStartDeleteFolder wired in Conv 4 */}
                       <SubdirRow
                         name={subdir.name}
                         open={subdir.open}
                         onToggle={() => onToggleSubdir(section.label, idx)}
                         isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
-                        isUserLocked={userLockedFolders.has(`${projectPath}/${section.dir}/${subdir.name}`)}
-                        onToggleFolderLock={() => toggleFolderLock(`${projectPath}/${section.dir}/${subdir.name}`)}
-                        folderPath={`${projectPath}/${section.dir}/${subdir.name}`}
-                        isDragOver={dragOverFolder === `${projectPath}/${section.dir}/${subdir.name}`}
-                        onDragOver={() => setDragOverFolder(`${projectPath}/${section.dir}/${subdir.name}`)}
+                        isUserLocked={userLockedFolders.has(folderKey)}
+                        onToggleFolderLock={() => toggleFolderLock(folderKey)}
+                        folderPath={folderKey}
+                        isDragOver={dragOverFolder === folderKey}
+                        onDragOver={() => setDragOverFolder(folderKey)}
                         onDrop={(e) => {
                           setDragOverFolder(null)
                           const raw = e.dataTransfer.getData(PATHLY_DRAG_MIME)
@@ -256,27 +146,31 @@ export function WorkspacePanel(props: Props): JSX.Element {
                             const payload = JSON.parse(raw) as PathlyReorgDragItem
                             if (payload.dragType !== 'reorg') return
                             if (payload.section !== section.type) return
-                            const targetDir = `${projectPath}/${section.dir}/${subdir.name}`
-                            onReorgDrop?.(payload.sourcePath, targetDir, section.type)
+                            onReorgDrop?.(payload.sourcePath, `${projectPath}/${section.dir}/${subdir.name}`, section.type)
                           } catch { /* ignore malformed payload */ }
                         }}
                         onDragLeave={() => setDragOverFolder(null)}
                       />
-                      {subdir.open && filteredFiles.map((item) => {
-                        const isDirty = dirtyItems.has(item.path)
-                        const isSelected = selectedItem?.path === item.path
-                        return (
-                          <button
-                            key={item.path}
-                            className={`${styles.itemRow} ${styles.itemRowDeep} ${isSelected ? styles.itemRowSelected : ''}`}
-                            onClick={() => onSelect(item)}
-                            title={item.path}
-                          >
-                            <span className={styles.itemName}>{item.name}</span>
-                            {isDirty && <span className={styles.dirtyDot}>●</span>}
-                          </button>
-                        )
-                      })}
+                      {subdir.open && filteredFiles.map((item) => (
+                        <WorkspaceItem
+                          key={item.path}
+                          item={item}
+                          itemDir={itemDir}
+                          isSelected={selectedItem?.path === item.path}
+                          isDirty={dirtyItems.has(item.path)}
+                          deep
+                          renamingPath={renamingPath}
+                          renameValue={renameValue}
+                          onSelect={() => onSelect(item)}
+                          onRenameChange={onRenameChange}
+                          onRenameCommit={() => onRenameCommit(item, itemDir)}
+                          onRenameCancel={onRenameCancel}
+                          onStartRename={() => onStartRename(item, itemDir)}
+                          onStartDelete={() => onStartDelete(item)}
+                          sectionId={section.type}
+                          isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
+                        />
+                      ))}
                     </div>
                   )
                 })}

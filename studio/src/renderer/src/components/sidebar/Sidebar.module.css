@@ -84,6 +84,21 @@
 .treeContainer::-webkit-scrollbar-track { background: transparent; }
 .treeContainer::-webkit-scrollbar-thumb { background: var(--bg-surface1); border-radius: 2px; }
 
+/* ── Workspace root header ── */
+.workspaceHeader {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px 6px 12px;
+  gap: 4px;
+}
+.workspaceHeaderLabel {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
 /* ── Section headers ── */
 .sectionRow {
   display: flex;
@@ -428,6 +443,8 @@
 .subdirHeader:hover .rowActions { opacity: 1; }
 /* always show lock icon even without hover */
 .rowActionsLocked { opacity: 1; }
+/* lock badge inside rowActions is always visible */
+.rowActions .rowActionLock { opacity: 1; }
 
 .subdirFolderIcon {
   color: var(--accent);

@@ -100,22 +100,13 @@ export function WorkspaceItem({
           <span className={styles.itemName}>{item.name}</span>
           {isDirty && <span className={styles.dirtyDot}>●</span>}
 
-          {/* User-locked: show clickable lock to unlock */}
-          {isActionable && isUserLocked && (
-            <div className={`${styles.rowActions} ${styles.rowActionsLocked}`}>
-              <button
-                className={`${styles.rowAction} ${styles.rowActionLock}`}
-                title="Locked — click to unlock"
-                onClick={(e) => { e.stopPropagation(); toggleUserLock(item.path) }}
-              >
-                <Lock size={11} />
-              </button>
-            </div>
-          )}
-
-          {/* Normal: show ⋯ on hover → popover */}
-          {isActionable && !isUserLocked && (
+          {isActionable && (
             <div className={styles.rowActions}>
+              {isUserLocked && (
+                <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked — delete disabled">
+                  <Lock size={11} />
+                </span>
+              )}
               <button
                 className={styles.rowAction}
                 title="Actions"
@@ -136,7 +127,7 @@ export function WorkspaceItem({
                       Rename
                     </button>
                   )}
-                  {onStartDelete && (
+                  {!isUserLocked && onStartDelete && (
                     <button className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartDelete) }}>
                       <Trash2 size={12} />
                       Delete
@@ -145,7 +136,7 @@ export function WorkspaceItem({
                   <div className={styles.itemMenuSep} />
                   <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); toggleUserLock(item.path); setMenuOpen(false) }}>
                     <Lock size={12} />
-                    Lock file
+                    {isUserLocked ? 'Unlock file' : 'Lock file'}
                   </button>
                 </ContextMenu>
               )}

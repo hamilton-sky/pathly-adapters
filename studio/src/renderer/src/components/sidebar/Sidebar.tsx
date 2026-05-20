@@ -131,17 +131,6 @@ export function Sidebar(): JSX.Element | null {
     }
   }
 
-  function handleWorkspaceUserCreate(section: Section, e: React.MouseEvent<HTMLButtonElement>): void {
-    e.stopPropagation()
-    if (!projectPath) return
-    if (section.type === 'flow') {
-      setShowFlowWizard(true)
-    } else {
-      setNewItemTarget({ type: section.type, dir: `${projectPath}/${section.dir}` })
-      setShowNewItemDialog(true)
-    }
-  }
-
   function handleInlineCreate(section: Section, e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation()
     const base = pathlyRoot || projectPath
@@ -154,15 +143,23 @@ export function Sidebar(): JSX.Element | null {
     }
   }
 
-  async function handleInlineCreateFolder(section: Section, e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
+  async function handleInlineCreateFolder(section: { dir: string }, e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
     e.stopPropagation()
     const base = section.dir ? `${pathlyRoot || projectPath}/${section.dir}` : (pathlyRoot || projectPath)
     if (!base) return
     const name = window.prompt('Folder name:')
     if (!name?.trim()) return
-    const folderName = name.trim()
-    // No mkdir API — write a placeholder file to create the directory implicitly
-    await window.pathly.fs.write(`${base}/${folderName}/.gitkeep`, '')
+    await window.pathly.fs.write(`${base}/${name.trim()}/.gitkeep`, '')
+    await loadItems()
+  }
+
+  async function handleCreateTopLevelFolder(e: React.MouseEvent<HTMLButtonElement>): Promise<void> {
+    e.stopPropagation()
+    const base = pathlyRoot || projectPath
+    if (!base) return
+    const name = window.prompt('Folder name:')
+    if (!name?.trim()) return
+    await window.pathly.fs.write(`${base}/pathly/${name.trim()}/.gitkeep`, '')
     await loadItems()
   }
 
@@ -352,7 +349,7 @@ export function Sidebar(): JSX.Element | null {
             onToggleSection={toggleSection}
             onToggleSubdir={toggleSubdir}
             onActivePanel={(p) => setActivePanel(p)}
-            onWorkspaceCreate={handleWorkspaceUserCreate}
+            onCreateTopLevelFolder={(e) => { void handleCreateTopLevelFolder(e) }}
             onInlineCreate={handleInlineCreate}
             onInlineCreateFolder={(section, e) => { void handleInlineCreateFolder(section, e) }}
             onNewPlan={(e) => { void handleInlineCreatePlan(e) }}

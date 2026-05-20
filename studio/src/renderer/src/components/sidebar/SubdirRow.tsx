@@ -68,7 +68,7 @@ export function SubdirRow({
       <Folder size={13} className={styles.subdirFolderIcon} />
       <span className={styles.subdirLabel}>{name}/</span>
 
-      {isSystemFolder && (
+      {isSystemFolder ? (
         <div className={`${styles.rowActions} ${styles.rowActionsLocked}`}>
           <span
             className={`${styles.rowAction} ${styles.systemLockIcon}`}
@@ -77,22 +77,13 @@ export function SubdirRow({
             <Lock size={11} />
           </span>
         </div>
-      )}
-
-      {isUserLocked && !isSystemFolder && (
-        <div className={`${styles.rowActions} ${styles.rowActionsLocked}`}>
-          <button
-            className={`${styles.rowAction} ${styles.rowActionLock}`}
-            title="Locked — click to unlock"
-            onClick={(e) => { e.stopPropagation(); onToggleFolderLock?.() }}
-          >
-            <Lock size={11} />
-          </button>
-        </div>
-      )}
-
-      {!isSystemFolder && !isUserLocked && (
+      ) : (
         <div className={styles.rowActions}>
+          {isUserLocked && (
+            <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked — delete disabled">
+              <Lock size={11} />
+            </span>
+          )}
           <button
             className={styles.rowAction}
             title="Actions"
@@ -108,9 +99,9 @@ export function SubdirRow({
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onToggleFolderLock?.() }}
               >
                 <Lock size={12} />
-                Lock folder
+                {isUserLocked ? 'Unlock folder' : 'Lock folder'}
               </button>
-              {onStartDeleteFolder && (
+              {!isUserLocked && onStartDeleteFolder && (
                 <>
                   <div className={styles.itemMenuSep} />
                   <button
