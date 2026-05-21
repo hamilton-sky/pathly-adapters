@@ -51,6 +51,10 @@ jobs:
         working-directory: studio
         run: npm install
 
+      - name: Ensure resource directories exist
+        working-directory: studio
+        run: node -e "const fs=require('fs'); fs.mkdirSync('resources/python',{recursive:true}); fs.mkdirSync('resources/wheels',{recursive:true});"
+
       - name: Prepare resources (bundle Python + wheel)
         working-directory: studio
         run: node scripts/prepare-resources.mjs
