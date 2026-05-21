@@ -10,6 +10,7 @@ Environment variables:
   PATHLY_FSM_HTTP_HOST: Host to bind to (default 127.0.0.1)
   PATHLY_PROJECT_ROOT: If set, enables feedback file watcher on that project root
 """
+
 from __future__ import annotations
 
 import collections
@@ -27,7 +28,9 @@ from pathlib import Path
 try:
     from flask import Flask, request, jsonify
 except ImportError:
-    print("Error: Flask not installed. Install with: pip install flask", file=sys.stderr)
+    print(
+        "Error: Flask not installed. Install with: pip install flask", file=sys.stderr
+    )
     sys.exit(1)
 
 from pathly_orchestrator.config import Settings
@@ -46,8 +49,11 @@ class _JsonFormatter(logging.Formatter):
         }
         if record.exc_info:
             log["exc"] = self.formatException(record.exc_info)
-        extra = {k: v for k, v in record.__dict__.items()
-                 if k not in logging.LogRecord.__dict__ and not k.startswith("_")}
+        extra = {
+            k: v
+            for k, v in record.__dict__.items()
+            if k not in logging.LogRecord.__dict__ and not k.startswith("_")
+        }
         log.update(extra)
         return json.dumps(log)
 
@@ -64,8 +70,8 @@ def _setup_logging() -> None:
 
 logger = logging.getLogger("pathly.http")
 
-_RATE_LIMIT_WINDOW = 60   # seconds
-_RATE_LIMIT_MAX = 120     # requests per window per IP
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_MAX = 120  # requests per window per IP
 _rate_counters: dict[str, collections.deque] = {}
 _rate_lock = threading.Lock()
 
@@ -109,16 +115,27 @@ def _log_request():
     _inc("pathly_requests_total")
     request_id = str(uuid.uuid4())[:8]
     request.environ["REQUEST_ID"] = request_id
-    logger.info("request", extra={"request_id": request_id, "method": request.method, "path": request.path, "remote": request.remote_addr})
+    logger.info(
+        "request",
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.path,
+            "remote": request.remote_addr,
+        },
+    )
 
 
 @app.after_request
 def _log_response(response):
     request_id = request.environ.get("REQUEST_ID", "")
-    logger.info("response", extra={"request_id": request_id, "status": response.status_code})
+    logger.info(
+        "response", extra={"request_id": request_id, "status": response.status_code}
+    )
     if response.status_code >= 500:
         _inc("pathly_request_errors_total")
     return response
+
 
 # SSE client registry: (topic, project_root) -> list of subscriber queues
 _clients: dict[tuple[str, str], list[queue.Queue]] = {}
@@ -137,12 +154,12 @@ def _broadcast(key: tuple[str, str], line: str) -> None:
 
 def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
     topic, project_root = key
-    path = Path(project_root) / 'pathly' / 'plans' / topic / 'EVENTS.jsonl'
+    path = Path(project_root) / "pathly" / "plans" / topic / "EVENTS.jsonl"
     pos = 0
     while not stop.is_set():
         try:
             if path.exists():
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(path, "r", encoding="utf-8") as f:
                     f.seek(pos)
                     for raw in f:
                         raw = raw.strip()
@@ -154,7 +171,7 @@ def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
         stop.wait(0.1)
 
 
-@app.route('/health', methods=['GET'])
+@app.route("/health", methods=["GET"])
 def health():
     """Deep health check."""
     checks: dict[str, object] = {
@@ -165,16 +182,18 @@ def health():
     project_root = os.environ.get("PATHLY_PROJECT_ROOT", "")
     if project_root:
         from pathlib import Path
+
         root = Path(project_root)
         checks["project_root_exists"] = root.exists()
         checks["project_root_writable"] = os.access(project_root, os.W_OK)
     return jsonify(checks), 200
 
 
-@app.route('/metrics', methods=['GET'])
+@app.route("/metrics", methods=["GET"])
 def metrics_endpoint():
     """Prometheus text-format metrics endpoint."""
     from flask import Response
+
     with _metrics_lock:
         snapshot = dict(_metrics)
     lines = [
@@ -194,7 +213,10 @@ def metrics_endpoint():
     return Response("\n".join(lines) + "\n", mimetype="text/plain; version=0.0.4")
 
 
-_ARCH_QUESTION = re.compile(r"\b(architect|architecture|architectural|design|approach|structure)\b", re.IGNORECASE)
+_ARCH_QUESTION = re.compile(
+    r"\b(architect|architecture|architectural|design|approach|structure)\b",
+    re.IGNORECASE,
+)
 _TTL_KEY = "ttl_hours"
 _TTL_LINE = "ttl_hours: 48"
 _FENCE = "---"
@@ -205,7 +227,11 @@ def _classify_content(content: str) -> str:
     tagged = []
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("- ") and not stripped.startswith("- [REQ]") and not stripped.startswith("- [ARCH]"):
+        if (
+            stripped.startswith("- ")
+            and not stripped.startswith("- [REQ]")
+            and not stripped.startswith("- [ARCH]")
+        ):
             question_text = stripped[2:]
             if _ARCH_QUESTION.search(question_text):
                 tagged.append(f"- [ARCH] {stripped[2:]}")
@@ -264,7 +290,7 @@ def _feedback_watcher(project_root: str, stop: threading.Event) -> None:
         stop.wait(2.0)
 
 
-@app.route('/next_action', methods=['POST'])
+@app.route("/next_action", methods=["POST"])
 def next_action_endpoint():
     """Call next_action FSM function.
 
@@ -282,11 +308,17 @@ def next_action_endpoint():
         required = {"flow", "topic", "project_root"}
         missing = required - set(data.keys())
         if missing:
-            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+            return (
+                jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}),
+                400,
+            )
 
         for field in ("flow", "topic", "project_root"):
             if not isinstance(data.get(field), str) or not data[field].strip():
-                return jsonify({"error": f"Field '{field}' must be a non-empty string"}), 400
+                return (
+                    jsonify({"error": f"Field '{field}' must be a non-empty string"}),
+                    400,
+                )
 
         result = next_action(data)
         return jsonify(result), 200
@@ -295,7 +327,7 @@ def next_action_endpoint():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
-@app.route('/complete_stage', methods=['POST'])
+@app.route("/complete_stage", methods=["POST"])
 def complete_stage_endpoint():
     """Call complete_stage FSM function.
 
@@ -315,11 +347,17 @@ def complete_stage_endpoint():
         required = {"flow", "topic", "project_root"}
         missing = required - set(data.keys())
         if missing:
-            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+            return (
+                jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}),
+                400,
+            )
 
         for field in ("flow", "topic", "project_root"):
             if not isinstance(data.get(field), str) or not data[field].strip():
-                return jsonify({"error": f"Field '{field}' must be a non-empty string"}), 400
+                return (
+                    jsonify({"error": f"Field '{field}' must be a non-empty string"}),
+                    400,
+                )
 
         result = complete_stage(data)
         return jsonify(result), 200
@@ -328,7 +366,7 @@ def complete_stage_endpoint():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
-@app.route('/record_activity', methods=['POST'])
+@app.route("/record_activity", methods=["POST"])
 def record_activity_endpoint():
     """Append an activity record to ~/.pathly/activity.jsonl."""
     try:
@@ -339,26 +377,50 @@ def record_activity_endpoint():
         required = {"agent", "feature", "summary"}
         missing = required - set(data.keys())
         if missing:
-            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+            return (
+                jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}),
+                400,
+            )
 
         for field in ("agent", "feature", "summary"):
             if not isinstance(data.get(field), str) or not data[field].strip():
-                return jsonify({"error": f"Field '{field}' must be a non-empty string"}), 400
+                return (
+                    jsonify({"error": f"Field '{field}' must be a non-empty string"}),
+                    400,
+                )
         for field in ("input_tokens", "output_tokens"):
             val = data.get(field, 0)
             if not isinstance(val, (int, float)) or val < 0:
-                return jsonify({"error": f"Field '{field}' must be a non-negative number"}), 400
+                return (
+                    jsonify(
+                        {"error": f"Field '{field}' must be a non-negative number"}
+                    ),
+                    400,
+                )
         for field in ("wall_seconds", "tool_uses"):
             val = data.get(field, 0)
             if not isinstance(val, int) or val < 0:
-                return jsonify({"error": f"Field '{field}' must be a non-negative integer"}), 400
+                return (
+                    jsonify(
+                        {"error": f"Field '{field}' must be a non-negative integer"}
+                    ),
+                    400,
+                )
         for field in ("total_tokens", "duration_ms"):
             val = data.get(field, 0)
             if not isinstance(val, int) or val < 0:
-                return jsonify({"error": f"Field '{field}' must be a non-negative integer"}), 400
+                return (
+                    jsonify(
+                        {"error": f"Field '{field}' must be a non-negative integer"}
+                    ),
+                    400,
+                )
         cost_usd_val = data.get("cost_usd", 0.0)
         if not isinstance(cost_usd_val, (int, float)) or cost_usd_val < 0:
-            return jsonify({"error": "Field 'cost_usd' must be a non-negative number"}), 400
+            return (
+                jsonify({"error": "Field 'cost_usd' must be a non-negative number"}),
+                400,
+            )
 
         wall_seconds = int(data.get("wall_seconds", 0))
         duration_ms = int(data.get("duration_ms", 0))
@@ -383,7 +445,7 @@ def record_activity_endpoint():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
-@app.route('/events/stream', methods=['GET'])
+@app.route("/events/stream", methods=["GET"])
 def events_stream():
     """SSE endpoint: streams new EVENTS.jsonl lines to the Studio UI."""
     from flask import Response, stream_with_context
@@ -391,13 +453,15 @@ def events_stream():
     if not flags.sse_streaming:
         return jsonify({"error": "SSE streaming is disabled"}), 503
 
-    topic = request.args.get('topic', '')
-    project_root = request.args.get('project_root', '')
+    topic = request.args.get("topic", "")
+    project_root = request.args.get("project_root", "")
     if not topic or not project_root:
-        return jsonify({'error': 'topic and project_root are required'}), 400
+        return jsonify({"error": "topic and project_root are required"}), 400
 
     resolved_root = Path(project_root).resolve()
-    events_path = (resolved_root / 'pathly' / 'plans' / topic / 'EVENTS.jsonl').resolve()
+    events_path = (
+        resolved_root / "pathly" / "plans" / topic / "EVENTS.jsonl"
+    ).resolve()
     if not events_path.is_relative_to(resolved_root):
         return jsonify({"error": "Invalid project_root"}), 400
 
@@ -418,9 +482,9 @@ def events_stream():
             while True:
                 try:
                     line = client_q.get(timeout=25)
-                    yield f'data: {line}\n\n'
+                    yield f"data: {line}\n\n"
                 except queue.Empty:
-                    yield ': keepalive\n\n'
+                    yield ": keepalive\n\n"
         except GeneratorExit:
             pass
         finally:
@@ -437,12 +501,12 @@ def events_stream():
 
     return Response(
         stream_with_context(generate()),
-        mimetype='text/event-stream',
+        mimetype="text/event-stream",
         headers={
-            'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no',
-            'Access-Control-Allow-Origin': os.environ.get("PATHLY_CORS_ORIGIN", "null"),
-        }
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": os.environ.get("PATHLY_CORS_ORIGIN", "null"),
+        },
     )
 
 
@@ -455,6 +519,7 @@ def main() -> None:
     host = settings.host
 
     import pathly_orchestrator.http_server as _self
+
     _self._RATE_LIMIT_MAX = settings.rate_limit_max
     _self._RATE_LIMIT_WINDOW = settings.rate_limit_window
 
@@ -467,7 +532,9 @@ def main() -> None:
     project_root = settings.project_root
     _watcher_stop = threading.Event()
     if project_root and flags.feedback_watcher:
-        threading.Thread(target=_feedback_watcher, args=(project_root, _watcher_stop), daemon=True).start()
+        threading.Thread(
+            target=_feedback_watcher, args=(project_root, _watcher_stop), daemon=True
+        ).start()
 
     # Run Flask in non-debug mode, with warnings suppressed
     app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)

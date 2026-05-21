@@ -4,6 +4,7 @@ Receives a JSON payload on stdin with a "file" or "path" key.
 Validates the path stays inside the project's plans/ directory.
 Idempotent: if ttl_hours: is already present in frontmatter, exits 0.
 """
+
 from __future__ import annotations
 
 import json

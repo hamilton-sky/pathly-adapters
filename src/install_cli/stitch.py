@@ -4,7 +4,9 @@ from pathlib import Path
 import yaml
 
 
-def stitch_skill(core_path: Path, meta_path: Path, *, flows_dest: Path | None = None) -> str:
+def stitch_skill(
+    core_path: Path, meta_path: Path, *, flows_dest: Path | None = None
+) -> str:
     with open(meta_path, encoding="utf-8") as f:
         try:
             meta = yaml.safe_load(f)
@@ -44,7 +46,9 @@ def stitch_skill(core_path: Path, meta_path: Path, *, flows_dest: Path | None = 
         or ""
     )
     frontmatter: dict = {"name": meta["skill"], "description": description}
-    fm_str = yaml.dump(frontmatter, default_flow_style=False, allow_unicode=True).strip()
+    fm_str = yaml.dump(
+        frontmatter, default_flow_style=False, allow_unicode=True
+    ).strip()
     body = f"---\n{fm_str}\n---\n\n{body}"
 
     return body
@@ -77,7 +81,9 @@ def stitch_agent(core_path: Path, meta_path: Path, *, footer: str | None = None)
     if meta.get("can_spawn"):
         frontmatter["can_spawn"] = meta["can_spawn"]
 
-    fm_str = yaml.dump(frontmatter, default_flow_style=False, allow_unicode=True).strip()
+    fm_str = yaml.dump(
+        frontmatter, default_flow_style=False, allow_unicode=True
+    ).strip()
 
     parts = [f"---\n{fm_str}\n---", core_body]
 

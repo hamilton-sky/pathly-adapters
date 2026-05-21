@@ -9,7 +9,6 @@ import json
 import sys
 from pathlib import Path
 
-
 _FEEDBACK_PRIORITY = [
     "HUMAN_QUESTIONS",
     "BLOCKED_ON_HUMAN",

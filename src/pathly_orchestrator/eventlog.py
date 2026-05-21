@@ -24,7 +24,12 @@ from pathlib import Path
 
 logger = logging.getLogger("pathly.eventlog")
 
-from pathly_orchestrator.state import valid_states, flow_transitions, VALID_STATES, TRANSITIONS
+from pathly_orchestrator.state import (
+    valid_states,
+    flow_transitions,
+    VALID_STATES,
+    TRANSITIONS,
+)
 
 _APPEND_LOCK = threading.Lock()
 CURRENT_SCHEMA_VERSION = 1
@@ -37,6 +42,7 @@ def _plans_dir() -> Path:
 # bare feature names auto-resolved to pathly/plans/<name>/ for backward compat
 def _resolve_path(storage_path: str) -> Path:
     import pathly_orchestrator.eventlog as _self
+
     if "/" not in storage_path and "\\" not in storage_path:
         return _self._plans_dir() / storage_path
     return Path(storage_path)
@@ -75,11 +81,12 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
         with open(path, "a", encoding="utf-8") as f:
             try:
                 import fcntl
-                fcntl.flock(f, fcntl.LOCK_EX)
+
+                fcntl.flock(f, fcntl.LOCK_EX)  # type: ignore[attr-defined]
                 try:
                     f.write(line)
                 finally:
-                    fcntl.flock(f, fcntl.LOCK_UN)
+                    fcntl.flock(f, fcntl.LOCK_UN)  # type: ignore[attr-defined]
             except ImportError:
                 f.write(line)
 
@@ -147,12 +154,15 @@ def read_events(storage_path: str) -> list[dict]:
         if schema_version is None:
             logger.warning(
                 "Event missing schema_version; assuming version %s: %s",
-                CURRENT_SCHEMA_VERSION, event,
+                CURRENT_SCHEMA_VERSION,
+                event,
             )
         elif schema_version > CURRENT_SCHEMA_VERSION:
             logger.warning(
                 "Event schema_version %s is newer than supported %s; some fields may not be recognized: %s",
-                schema_version, CURRENT_SCHEMA_VERSION, event,
+                schema_version,
+                CURRENT_SCHEMA_VERSION,
+                event,
             )
     return events
 
@@ -213,7 +223,9 @@ def summary(storage_path: str) -> dict:
 def _print_summary(storage_path: str) -> None:
     data = summary(storage_path)
     if not data["agents"]:
-        print(f"No AGENT_DONE events found in {_resolve_path(storage_path)}/EVENTS.jsonl")
+        print(
+            f"No AGENT_DONE events found in {_resolve_path(storage_path)}/EVENTS.jsonl"
+        )
         return
 
     print(f"\n── Token & Cost Summary: {storage_path} ──\n")

@@ -1,4 +1,5 @@
 """Append activity records to ~/.pathly/activity.jsonl."""
+
 from __future__ import annotations
 
 import json

@@ -8,7 +8,9 @@ MANIFEST_NAME = ".pathly-manifest.json"
 
 
 def _hash_files_dict(files: dict) -> str:
-    return hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return hashlib.sha256(
+        json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def _load_manifest(dest: Path) -> dict:
@@ -21,7 +23,9 @@ def _load_manifest(dest: Path) -> dict:
                 return {"files": {}}
             files = data.get("files", {})
             if data.get("_manifest_hash", "") != _hash_files_dict(files):
-                raise ValueError("Manifest hash mismatch — file may be corrupted or tampered")
+                raise ValueError(
+                    "Manifest hash mismatch — file may be corrupted or tampered"
+                )
             return data
         except (json.JSONDecodeError, OSError):
             return {"files": {}}
@@ -32,9 +36,7 @@ def _save_manifest(dest: Path, manifest: dict) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     manifest["_manifest_version"] = "1"
     manifest["_manifest_hash"] = _hash_files_dict(manifest["files"])
-    (dest / MANIFEST_NAME).write_text(
-        json.dumps(manifest, indent=2), encoding="utf-8"
-    )
+    (dest / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
 def materialize(
@@ -98,7 +100,9 @@ def materialize_flows(
     return materialize(files, dest, repair=True, force=force, dry_run=dry_run)
 
 
-def uninstall(dest: Path, *, dry_run: bool = False, confirm_manifest: bool = False) -> list[str]:
+def uninstall(
+    dest: Path, *, dry_run: bool = False, confirm_manifest: bool = False
+) -> list[str]:
     """Remove all Pathly-owned files from dest using the manifest.
 
     Returns list of filenames removed (or would-remove in dry_run).
@@ -108,7 +112,10 @@ def uninstall(dest: Path, *, dry_run: bool = False, confirm_manifest: bool = Fal
     """
     manifest_path = dest / MANIFEST_NAME
     if not manifest_path.exists():
-        print(f"  [warn] No manifest at {manifest_path} — nothing to uninstall.", file=sys.stderr)
+        print(
+            f"  [warn] No manifest at {manifest_path} — nothing to uninstall.",
+            file=sys.stderr,
+        )
         return []
 
     manifest = _load_manifest(dest)

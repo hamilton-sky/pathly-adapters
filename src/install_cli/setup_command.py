@@ -9,7 +9,15 @@ import yaml
 
 from .codex_plugin_config import install_codex_plugin, uninstall_codex_plugin
 from .detect import detect_hosts
-from .resources import adapter_meta_path, adapter_path, adapter_install_yaml, core_agents_path, core_flows_path, core_skills_path, core_templates_path
+from .resources import (
+    adapter_meta_path,
+    adapter_path,
+    adapter_install_yaml,
+    core_agents_path,
+    core_flows_path,
+    core_skills_path,
+    core_templates_path,
+)
 from .stitch import stitch_agent, stitch_skill
 from .materialize import (
     materialize,
@@ -40,7 +48,9 @@ def _codex_skill_openai_yaml(skill_meta: dict) -> str:
         or skill_meta.get("natural_language")
         or f"Run the Pathly {skill_meta['skill']} workflow."
     )
-    default_prompt = skill_meta.get("default_prompt") or f"Use Pathly {skill_meta['skill']}"
+    default_prompt = (
+        skill_meta.get("default_prompt") or f"Use Pathly {skill_meta['skill']}"
+    )
     return yaml.safe_dump(
         {
             "interface": {
@@ -100,7 +110,9 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         else:
             core_file = core_dir / f"{agent_name}.md"
         if not core_file.exists():
-            print(f"  [warn] No core file for {agent_name!r}, skipping", file=sys.stderr)
+            print(
+                f"  [warn] No core file for {agent_name!r}, skipping", file=sys.stderr
+            )
             continue
         stitched = stitch_agent(core_file, meta_file, footer=footer)
         if host == "codex":
@@ -124,15 +136,24 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             skill_name = meta_file.stem.removesuffix("_skill")
             skill_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
             core_file = core_skills_dir / f"{skill_meta['skill']}.md"
-            default_filename = f"{skill_name}/SKILL.md" if nested else f"{skill_name}.md"
+            default_filename = (
+                f"{skill_name}/SKILL.md" if nested else f"{skill_name}.md"
+            )
             try:
                 filename = skill_meta.get("filename", default_filename)
-                skill_files[filename] = stitch_skill(core_file, meta_file, flows_dest=dest)
+                skill_files[filename] = stitch_skill(
+                    core_file, meta_file, flows_dest=dest
+                )
                 if host == "codex" and filename.endswith("/SKILL.md"):
                     skill_dir = filename.removesuffix("/SKILL.md")
-                    skill_files[f"{skill_dir}/agents/openai.yaml"] = _codex_skill_openai_yaml(skill_meta)
+                    skill_files[f"{skill_dir}/agents/openai.yaml"] = (
+                        _codex_skill_openai_yaml(skill_meta)
+                    )
             except FileNotFoundError:
-                print(f"  [warn] No core skill for {skill_name!r}, skipping", file=sys.stderr)
+                print(
+                    f"  [warn] No core skill for {skill_name!r}, skipping",
+                    file=sys.stderr,
+                )
 
     templates_cfg = install_cfg.get("templates")
     template_files: dict[str, str] = {}
@@ -152,16 +173,22 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         source_name = plugin_cfg["source"].rstrip("/")
         plugin_root = adapter_path(host) / source_name
         if not plugin_root.exists():
-            raise FileNotFoundError(f"No plugin source for host {host!r}: {plugin_root}")
+            raise FileNotFoundError(
+                f"No plugin source for host {host!r}: {plugin_root}"
+            )
         for plugin_file in sorted(plugin_root.rglob("*")):
             if plugin_file.is_file():
                 rel = plugin_file.relative_to(plugin_root).as_posix()
-                plugin_files[f"{source_name}/{rel}"] = plugin_file.read_text(encoding="utf-8")
+                plugin_files[f"{source_name}/{rel}"] = plugin_file.read_text(
+                    encoding="utf-8"
+                )
         if plugin_cfg.get("include_stitched"):
             for name, content in agent_files.items():
                 plugin_files[f"agents/{name}"] = content
             for flow_file in sorted(core_flows_path().glob("*.flow.yaml")):
-                plugin_files[f"flows/{flow_file.name}"] = flow_file.read_text(encoding="utf-8")
+                plugin_files[f"flows/{flow_file.name}"] = flow_file.read_text(
+                    encoding="utf-8"
+                )
             for name, content in skill_files.items():
                 plugin_files[f"skills/{name}"] = content
             for name, content in template_files.items():
@@ -192,33 +219,49 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
     written_dests: list[Path] = []
     codex_plugin_registered = False
     try:
-        written = materialize(agent_files, dest, repair=repair, force=force, dry_run=False)
+        written = materialize(
+            agent_files, dest, repair=repair, force=force, dry_run=False
+        )
         if written:
             written_dests.append(dest)
             print(f"[{host}] Wrote {len(written)} file(s) to {dest}")
         else:
-            print(f"[{host}] Nothing to write (files already current or not Pathly-owned)")
+            print(
+                f"[{host}] Nothing to write (files already current or not Pathly-owned)"
+            )
 
-        flow_written = materialize_flows(dest, repair=repair, force=force, dry_run=False)
+        flow_written = materialize_flows(
+            dest, repair=repair, force=force, dry_run=False
+        )
         if flow_written:
             if dest not in written_dests:
                 written_dests.append(dest)
             print(f"[{host}] Wrote {len(flow_written)} flow(s) to {dest}")
 
         if skills_dest and skill_files:
-            written = materialize(skill_files, skills_dest, repair=repair, force=force, dry_run=False)
+            written = materialize(
+                skill_files, skills_dest, repair=repair, force=force, dry_run=False
+            )
             if written:
                 written_dests.append(skills_dest)
                 print(f"[{host}] Wrote {len(written)} skill(s) to {skills_dest}")
 
         if templates_dest and template_files:
-            written = materialize(template_files, templates_dest, repair=repair, force=force, dry_run=False)
+            written = materialize(
+                template_files,
+                templates_dest,
+                repair=repair,
+                force=force,
+                dry_run=False,
+            )
             if written:
                 written_dests.append(templates_dest)
                 print(f"[{host}] Wrote {len(written)} template(s) to {templates_dest}")
 
         if plugin_dest and plugin_files:
-            written = materialize(plugin_files, plugin_dest, repair=repair, force=force, dry_run=False)
+            written = materialize(
+                plugin_files, plugin_dest, repair=repair, force=force, dry_run=False
+            )
             if written:
                 written_dests.append(plugin_dest)
                 print(f"[{host}] Wrote {len(written)} plugin file(s) to {plugin_dest}")
@@ -264,7 +307,9 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
         skills_dest = Path(skills_cfg["destination"]).expanduser()
         skill_removed = uninstall(skills_dest, dry_run=dry_run)
         if dry_run:
-            print(f"\n[{host}] Would remove {len(skill_removed)} skill(s) from {skills_dest}:")
+            print(
+                f"\n[{host}] Would remove {len(skill_removed)} skill(s) from {skills_dest}:"
+            )
             for name in sorted(skill_removed):
                 print(f"  {skills_dest / name}")
         elif skill_removed:
@@ -275,22 +320,30 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
         templates_dest = Path(templates_cfg["destination"]).expanduser()
         tmpl_removed = uninstall(templates_dest, dry_run=dry_run)
         if dry_run:
-            print(f"\n[{host}] Would remove {len(tmpl_removed)} template(s) from {templates_dest}:")
+            print(
+                f"\n[{host}] Would remove {len(tmpl_removed)} template(s) from {templates_dest}:"
+            )
             for name in sorted(tmpl_removed):
                 print(f"  {templates_dest / name}")
         elif tmpl_removed:
-            print(f"[{host}] Removed {len(tmpl_removed)} template(s) from {templates_dest}")
+            print(
+                f"[{host}] Removed {len(tmpl_removed)} template(s) from {templates_dest}"
+            )
 
     plugin_cfg = install_cfg.get("plugin")
     if plugin_cfg:
         plugin_dest = Path(plugin_cfg["destination"]).expanduser()
         plugin_removed = uninstall(plugin_dest, dry_run=dry_run)
         if dry_run:
-            print(f"\n[{host}] Would remove {len(plugin_removed)} plugin file(s) from {plugin_dest}:")
+            print(
+                f"\n[{host}] Would remove {len(plugin_removed)} plugin file(s) from {plugin_dest}:"
+            )
             for name in sorted(plugin_removed):
                 print(f"  {plugin_dest / name}")
         elif plugin_removed:
-            print(f"[{host}] Removed {len(plugin_removed)} plugin file(s) from {plugin_dest}")
+            print(
+                f"[{host}] Removed {len(plugin_removed)} plugin file(s) from {plugin_dest}"
+            )
 
 
 def main() -> None:
@@ -305,23 +358,47 @@ def main() -> None:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {_version}")
     parser.add_argument(
-        "host", nargs="?",
+        "host",
+        nargs="?",
         help="Target host (claude, codex, copilot). Defaults to all detected.",
     )
-    parser.add_argument("--dry-run", action="store_true", help="Preview writes without touching the filesystem.")
-    parser.add_argument("--apply", action="store_true", help="Write agent files to host config locations.")
-    parser.add_argument("--repair", action="store_true", help="Overwrite Pathly-owned files.")
-    parser.add_argument("--force", action="store_true", help="Overwrite all files, even those not owned by Pathly.")
-    parser.add_argument("--uninstall", action="store_true", help="Remove all Pathly-owned files from host config locations.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview writes without touching the filesystem.",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write agent files to host config locations.",
+    )
+    parser.add_argument(
+        "--repair", action="store_true", help="Overwrite Pathly-owned files."
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite all files, even those not owned by Pathly.",
+    )
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Remove all Pathly-owned files from host config locations.",
+    )
     args = parser.parse_args()
 
     hosts = [args.host] if args.host else detect_hosts()
     for h in hosts:
         if h not in ALLOWED_HOSTS:
-            print(f"Error: unsupported host {h!r}. Allowed: {', '.join(sorted(ALLOWED_HOSTS))}", file=sys.stderr)
+            print(
+                f"Error: unsupported host {h!r}. Allowed: {', '.join(sorted(ALLOWED_HOSTS))}",
+                file=sys.stderr,
+            )
             sys.exit(1)
     if not hosts:
-        print("No supported hosts detected. Install Claude Code, Codex, or VS Code + Copilot first.")
+        print(
+            "No supported hosts detected. Install Claude Code, Codex, or VS Code + Copilot first."
+        )
         sys.exit(1)
 
     if args.uninstall:
@@ -407,7 +484,12 @@ def _interactive_menu(hosts: list[str], *, repair: bool, force: bool) -> None:
                 print(f"[{host}] Error: {e}", file=sys.stderr)
         print()
         try:
-            remove_pkg = input("Also remove the pathly-adapters package itself? [y/N]: ").strip().strip("﻿").lower()
+            remove_pkg = (
+                input("Also remove the pathly-adapters package itself? [y/N]: ")
+                .strip()
+                .strip("﻿")
+                .lower()
+            )
         except (KeyboardInterrupt, EOFError):
             print()
             return

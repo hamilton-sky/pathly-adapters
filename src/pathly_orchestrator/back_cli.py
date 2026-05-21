@@ -10,7 +10,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 _SCAN_ROOTS = [
     ("pathly/plans", "team"),
     ("pathly/debugs", "debug"),

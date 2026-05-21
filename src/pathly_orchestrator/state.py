@@ -34,19 +34,34 @@ from pathlib import Path
 
 import yaml
 
-_SCHEMA_PATH = Path(__file__).parent.parent / "pathly_data" / "schemas" / "state.schema.json"
+_SCHEMA_PATH = (
+    Path(__file__).parent.parent / "pathly_data" / "schemas" / "state.schema.json"
+)
 _SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 STATES: dict[str, list[str]] = _SCHEMA["transitions"]
 VALID_STATES: frozenset[str] = frozenset(STATES.keys())
 TRANSITIONS: dict[str, list[str]] = STATES
 
-_REQUIRED_FLOW_KEYS = {"storage_path", "states", "transitions", "agent_map", "feedback_routing"}
-_KNOWN_OPTIONAL_FLOW_KEYS = {"transition_rules", "version", "flow", "transition_actions"}
+_REQUIRED_FLOW_KEYS = {
+    "storage_path",
+    "states",
+    "transitions",
+    "agent_map",
+    "feedback_routing",
+}
+_KNOWN_OPTIONAL_FLOW_KEYS = {
+    "transition_rules",
+    "version",
+    "flow",
+    "transition_actions",
+}
 _ACTION_VOCAB = {
-    "git_commit", "commit",
+    "git_commit",
+    "commit",
     "update_progress",
-    "archive_artifacts", "archive-artifacts",
+    "archive_artifacts",
+    "archive-artifacts",
 }
 
 
@@ -86,19 +101,23 @@ def validate_flow_cli() -> None:
             errors.append(f"Missing required field: {key}")
 
     if "transition_actions" not in flow:
-        print(f"Warning: transition_actions key absent — flow has no declared side effects")
+        print(
+            f"Warning: transition_actions key absent — flow has no declared side effects"
+        )
     else:
         ta = flow["transition_actions"] or {}
         all_transitions: set[tuple[str, str]] = set()
         for from_state, targets in (flow.get("transitions") or {}).items():
-            for to_state in (targets or []):
+            for to_state in targets or []:
                 all_transitions.add((from_state, str(to_state)))
         all_states = set(flow.get("states") or [])
 
         for key, actions in ta.items():
             parts = str(key).split("->", 1)
             if len(parts) != 2:
-                errors.append(f"transition_actions key '{key}' must use FROM->TO format")
+                errors.append(
+                    f"transition_actions key '{key}' must use FROM->TO format"
+                )
                 continue
             from_state, to_state = parts
             if from_state:
@@ -112,7 +131,7 @@ def validate_flow_cli() -> None:
                         f"transition_actions wildcard '->{to_state}' target is not a known state"
                     )
 
-            for action in (actions or []):
+            for action in actions or []:
                 if isinstance(action, dict):
                     action_type = action.get("skill") or action.get("type")
                 else:
@@ -135,7 +154,9 @@ def validate_flow_cli() -> None:
         if isinstance(rule, dict) and "decide" in rule:
             decide = rule["decide"]
             if isinstance(decide, dict) and len(decide.get("options", {})) < 2:
-                print(f"Warning: decide block in state '{state}' has fewer than 2 options.")
+                print(
+                    f"Warning: decide block in state '{state}' has fewer than 2 options."
+                )
 
     if errors:
         for err in errors:

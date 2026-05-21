@@ -6,6 +6,7 @@ transition actions, and state/event persistence.
 
 Zero LLM SDK imports — only stdlib, yaml, and pathly_orchestrator.state.
 """
+
 from __future__ import annotations
 
 import json
@@ -52,8 +53,7 @@ def recover_state(storage_path: Path, flow: dict) -> dict:
     feedback_dir = storage_path / "feedback"
     if feedback_dir.exists():
         open_feedback_files = [
-            f.name for f in sorted(feedback_dir.iterdir())
-            if f.suffix == ".md"
+            f.name for f in sorted(feedback_dir.iterdir()) if f.suffix == ".md"
         ]
     else:
         open_feedback_files = []
@@ -174,9 +174,7 @@ def evaluate_transition_rules(
     if targets:
         return targets[0]
 
-    raise ValueError(
-        f"No default transition defined for state: {current_state!r}"
-    )
+    raise ValueError(f"No default transition defined for state: {current_state!r}")
 
 
 def route_feedback(flow: dict, storage_path: Path) -> dict | None:
@@ -206,7 +204,9 @@ def route_feedback(flow: dict, storage_path: Path) -> dict | None:
             result = {"file": filename, "target_agent": agent}
             if filename in human_files:
                 try:
-                    result["instructions"] = (feedback_dir / filename).read_text(encoding="utf-8")
+                    result["instructions"] = (feedback_dir / filename).read_text(
+                        encoding="utf-8"
+                    )
                 except OSError:
                     result["instructions"] = ""
             return result
@@ -215,8 +215,12 @@ def route_feedback(flow: dict, storage_path: Path) -> dict | None:
 
 
 def run_transition_actions(
-    flow: dict, prev_state: str, next_state: str,
-    storage_path: Path, topic: str, conv: int
+    flow: dict,
+    prev_state: str,
+    next_state: str,
+    storage_path: Path,
+    topic: str,
+    conv: int,
 ) -> None:
     """
     Read flow["transition_actions"].
@@ -259,7 +263,9 @@ def run_transition_actions(
         skill = action.get("skill", "")
 
         if skill in ("commit", "git_commit"):
-            message = action.get("message", f"chore: transition {prev_state}->{next_state}")
+            message = action.get(
+                "message", f"chore: transition {prev_state}->{next_state}"
+            )
             try:
                 try:
                     add_result = subprocess.run(
@@ -272,9 +278,7 @@ def run_transition_actions(
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("git add timed out after 30 seconds")
                 if add_result.returncode != 0:
-                    raise RuntimeError(
-                        f"git add failed: {add_result.stderr}"
-                    )
+                    raise RuntimeError(f"git add failed: {add_result.stderr}")
                 try:
                     commit_result = subprocess.run(
                         ["git", "commit", "-m", message],
@@ -287,12 +291,13 @@ def run_transition_actions(
                     raise RuntimeError("git commit timed out after 30 seconds")
                 if commit_result.returncode != 0:
                     output = commit_result.stdout + commit_result.stderr
-                    if "nothing to commit" in output or "nothing added to commit" in output:
+                    if (
+                        "nothing to commit" in output
+                        or "nothing added to commit" in output
+                    ):
                         pass  # no-op
                     else:
-                        raise RuntimeError(
-                            f"git commit failed: {output}"
-                        )
+                        raise RuntimeError(f"git commit failed: {output}")
             except FileNotFoundError:
                 raise RuntimeError("git executable not found")
 
@@ -300,7 +305,9 @@ def run_transition_actions(
             feedback_dir = storage_path / "feedback"
             if not feedback_dir.exists():
                 continue
-            artifacts_dir = project_root / "pathly" / "pipeline-walkthrough" / topic / "artifacts"
+            artifacts_dir = (
+                project_root / "pathly" / "pipeline-walkthrough" / topic / "artifacts"
+            )
             artifacts_dir.mkdir(parents=True, exist_ok=True)
 
             for md_file in sorted(feedback_dir.glob("*.md")):
@@ -312,7 +319,9 @@ def run_transition_actions(
                 try:
                     shutil.copy2(md_file, dest)
                 except OSError as e:
-                    raise RuntimeError(f"archive-artifacts failed copying {md_file.name}: {e}")
+                    raise RuntimeError(
+                        f"archive-artifacts failed copying {md_file.name}: {e}"
+                    )
 
         elif skill == "update_progress":
             progress_file = storage_path / "PROGRESS.md"

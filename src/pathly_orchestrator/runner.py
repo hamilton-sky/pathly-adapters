@@ -1,4 +1,5 @@
 """pathly-run — autonomous FSM runner. Entry point: main()."""
+
 from __future__ import annotations
 
 import json
@@ -17,13 +18,24 @@ from pathly_orchestrator.fsm_ops import next_action, complete_stage
 
 
 def _storage_path(flow: str, project_root: str, topic: str) -> Path:
-    text = files("pathly_data").joinpath(f"core/flows/{flow}.flow.yaml").read_text(encoding="utf-8")
+    text = (
+        files("pathly_data")
+        .joinpath(f"core/flows/{flow}.flow.yaml")
+        .read_text(encoding="utf-8")
+    )
     flow_config = yaml.safe_load(text)
     template = flow_config["storage_path"]
     return Path(project_root) / template.format(topic=topic)
 
 
-def _patch_last_agent_done(storage_path: Path, cost_usd: float, tokens_in: int, tokens_out: int, wall_seconds: int, tool_uses: int = 0) -> None:
+def _patch_last_agent_done(
+    storage_path: Path,
+    cost_usd: float,
+    tokens_in: int,
+    tokens_out: int,
+    wall_seconds: int,
+    tool_uses: int = 0,
+) -> None:
     """Find the last AGENT_DONE line in EVENTS.jsonl and fill in real cost/token/tool data."""
     events_file = storage_path / "EVENTS.jsonl"
     if not events_file.exists():
@@ -63,10 +75,13 @@ def invoke_agent(
     )
     cmd = [
         "claude",
-        "-p", prompt,
-        "--model", model,
+        "-p",
+        prompt,
+        "--model",
+        model,
         "--dangerously-skip-permissions",
-        "--output-format", "json",
+        "--output-format",
+        "json",
     ]
     t_start = time.monotonic()
     proc = subprocess.Popen(
@@ -102,7 +117,7 @@ def invoke_agent(
             or 0.0
         )
         usage = output.get("usage") or output.get("inputUsage") or {}
-        tokens_in  = int(
+        tokens_in = int(
             (usage.get("input_tokens") or usage.get("inputTokens") or 0)
             + (usage.get("cache_read_input_tokens") or 0)
             + (usage.get("cache_creation_input_tokens") or 0)
@@ -111,7 +126,9 @@ def invoke_agent(
         # Count tool_use content blocks across all messages in the conversation
         messages = output.get("messages", [])
         for msg in messages:
-            for block in msg.get("content", []) if isinstance(msg.get("content"), list) else []:
+            for block in (
+                msg.get("content", []) if isinstance(msg.get("content"), list) else []
+            ):
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     tool_uses += 1
         # Print the agent's text result so the terminal isn't silent
@@ -119,23 +136,40 @@ def invoke_agent(
         if result_text:
             print(result_text)
         # Diagnostic: always log telemetry so we can verify it's being captured
-        logger.info("telemetry", extra={"cost_usd": cost_usd, "tokens_in": tokens_in, "tokens_out": tokens_out, "tool_uses": tool_uses, "wall_seconds": wall_seconds})
+        logger.info(
+            "telemetry",
+            extra={
+                "cost_usd": cost_usd,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "tool_uses": tool_uses,
+                "wall_seconds": wall_seconds,
+            },
+        )
         if cost_usd == 0.0:
-            top_keys = [k for k in output if k not in ("result", "messages", "session_id")]
+            top_keys = [
+                k for k in output if k not in ("result", "messages", "session_id")
+            ]
             logger.warning("cost=0 — JSON top-level keys: %s", top_keys)
     except (json.JSONDecodeError, ValueError) as exc:
         logger.warning("failed to parse claude JSON output: %s", exc)
 
     # Patch the AGENT_DONE event the agent wrote with real numbers
     if storage_path:
-        _patch_last_agent_done(storage_path, cost_usd, tokens_in, tokens_out, wall_seconds, tool_uses)
+        _patch_last_agent_done(
+            storage_path, cost_usd, tokens_in, tokens_out, wall_seconds, tool_uses
+        )
 
 
 def handle_blocked(response: dict) -> None:
     if response.get("target_agent") == "human":
-        print(f"\n⚠  Human checkpoint:\n{response.get('instructions', '')}\nFile: {response['file']}")
+        print(
+            f"\n⚠  Human checkpoint:\n{response.get('instructions', '')}\nFile: {response['file']}"
+        )
     else:
-        print(f"⚠ Blocked on {response['file']} → routed to {response.get('target_agent')}")
+        print(
+            f"⚠ Blocked on {response['file']} → routed to {response.get('target_agent')}"
+        )
 
 
 def handle_decide(flow: str, topic: str, project_root: str, response: dict) -> dict:
@@ -146,12 +180,14 @@ def handle_decide(flow: str, topic: str, project_root: str, response: dict) -> d
     chosen = input(f"Choice (default: {default}): ").strip()
     if not chosen or chosen not in response.get("options", {}):
         chosen = default
-    return complete_stage({
-        "flow": flow,
-        "topic": topic,
-        "project_root": project_root,
-        "decision": chosen,
-    })
+    return complete_stage(
+        {
+            "flow": flow,
+            "topic": topic,
+            "project_root": project_root,
+            "decision": chosen,
+        }
+    )
 
 
 def resolve_stage(
@@ -168,12 +204,14 @@ def resolve_stage(
     MAX_FEEDBACK_ROUNDS = 3
 
     while True:
-        result = complete_stage({
-            "flow": flow,
-            "topic": topic,
-            "project_root": project_root,
-            "resolved_files": resolved or None,
-        })
+        result = complete_stage(
+            {
+                "flow": flow,
+                "topic": topic,
+                "project_root": project_root,
+                "resolved_files": resolved or None,
+            }
+        )
         resolved = []
 
         if result.get("done") or result.get("next_state"):
@@ -195,7 +233,9 @@ def resolve_stage(
 
             feedback_rounds += 1
             if feedback_rounds > MAX_FEEDBACK_ROUNDS:
-                print(f"⚠  Feedback loop exceeded {MAX_FEEDBACK_ROUNDS} rounds on {file}. Escalating to human.")
+                print(
+                    f"⚠  Feedback loop exceeded {MAX_FEEDBACK_ROUNDS} rounds on {file}. Escalating to human."
+                )
                 storage = _storage_path(flow, project_root, topic)
                 escalation = storage / "feedback" / "HUMAN_QUESTIONS.md"
                 escalation.parent.mkdir(parents=True, exist_ok=True)
@@ -208,8 +248,18 @@ def resolve_stage(
                 continue
 
             print(f"\n↩  Feedback: {file}  →  resolving with {target}")
-            fb_instructions = result.get("instructions", f"Resolve feedback in feedback/{file}")
-            invoke_agent(fb_instructions, project_root, model, state=f"resolving {file}", topic=topic, timeout=timeout, storage_path=storage_path)
+            fb_instructions = result.get(
+                "instructions", f"Resolve feedback in feedback/{file}"
+            )
+            invoke_agent(
+                fb_instructions,
+                project_root,
+                model,
+                state=f"resolving {file}",
+                topic=topic,
+                timeout=timeout,
+                storage_path=storage_path,
+            )
             resolved = [file]
             continue
 
@@ -229,7 +279,9 @@ def run_flow(
 
     while True:
         try:
-            response = next_action({"flow": flow, "topic": topic, "project_root": project_root})
+            response = next_action(
+                {"flow": flow, "topic": topic, "project_root": project_root}
+            )
         except RuntimeError as exc:
             print(str(exc))
             return 1
@@ -257,7 +309,15 @@ def run_flow(
             return 1
 
         try:
-            result = resolve_stage(flow, topic, project_root, model, current_state, timeout, storage_path=storage)
+            result = resolve_stage(
+                flow,
+                topic,
+                project_root,
+                model,
+                current_state,
+                timeout,
+                storage_path=storage,
+            )
         except RuntimeError as exc:
             print(str(exc))
             return 1
@@ -284,10 +344,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Autonomous pathly FSM runner")
     parser.add_argument("topic")
     parser.add_argument("--flow", default="team")
-    parser.add_argument("--rigor", default="standard", choices=["lite", "standard", "strict"])
+    parser.add_argument(
+        "--rigor", default="standard", choices=["lite", "standard", "strict"]
+    )
     parser.add_argument("--model", default="claude-sonnet-4-6")
     parser.add_argument("--project-root", default=None)
     parser.add_argument("--timeout", default=600, type=int)
     args = parser.parse_args()
     project_root = args.project_root or str(Path.cwd())
-    sys.exit(run_flow(args.flow, args.topic, project_root, args.rigor, args.model, args.timeout))
+    sys.exit(
+        run_flow(
+            args.flow, args.topic, project_root, args.rigor, args.model, args.timeout
+        )
+    )

@@ -12,7 +12,6 @@ import yaml
 
 from pathly_orchestrator.fsm_ops import complete_stage, next_action
 
-
 _SCAN_ROOTS = [
     ("pathly/plans", "team"),
     ("pathly/debugs", "debug"),
@@ -94,7 +93,9 @@ def main() -> None:
 
     project_root = str(cwd)
 
-    next_result = next_action({"flow": flow, "topic": topic, "project_root": project_root})
+    next_result = next_action(
+        {"flow": flow, "topic": topic, "project_root": project_root}
+    )
 
     if next_result.get("blocked"):
         print(f"Blocked: {next_result}")
@@ -105,40 +106,58 @@ def main() -> None:
 
     try:
         from importlib.resources import files
-        text = files("pathly_data").joinpath(f"core/flows/{flow}.flow.yaml").read_text(encoding="utf-8")
+
+        text = (
+            files("pathly_data")
+            .joinpath(f"core/flows/{flow}.flow.yaml")
+            .read_text(encoding="utf-8")
+        )
         flow_config = yaml.safe_load(text)
         if _has_git_commit_action(flow_config, current_state):
             print("! This transition may include a git commit.")
-            answer = input("Proceed without running the current agent? (y/n): ").strip().lower()
+            answer = (
+                input("Proceed without running the current agent? (y/n): ")
+                .strip()
+                .lower()
+            )
             if answer != "y":
                 print("Aborted.")
                 sys.exit(0)
     except Exception:
         pass
 
-    result = complete_stage({"flow": flow, "topic": topic, "project_root": project_root})
+    cs_result: dict = complete_stage(
+        {"flow": flow, "topic": topic, "project_root": project_root}
+    )
 
-    if result.get("decide"):
+    if cs_result.get("decide"):
         print("FSM needs a routing decision:")
-        print(f"  Question: {result['question']}")
-        if result.get("context"):
-            print(f"  Context:\n{result['context'][:500]}")
-        opts = result.get("options", {})
+        print(f"  Question: {cs_result['question']}")
+        if cs_result.get("context"):
+            print(f"  Context:\n{cs_result['context'][:500]}")
+        opts = cs_result.get("options", {})
         print(f"  Options: {', '.join(opts.keys())}")
         decision = input(f"  Your choice [{'/'.join(opts.keys())}]: ").strip()
-        result = complete_stage(
-            {"flow": flow, "topic": topic, "project_root": project_root, "decision": decision}
+        cs_result = complete_stage(
+            {
+                "flow": flow,
+                "topic": topic,
+                "project_root": project_root,
+                "decision": decision,
+            }
         )
 
-    if result.get("done"):
+    if cs_result.get("done"):
         print("Feature complete.")
         sys.exit(0)
 
-    if result.get("blocked"):
+    if cs_result.get("blocked"):
         print("Blocked by feedback:")
-        print(result)
+        print(cs_result)
         sys.exit(1)
 
-    print(f"Advanced to: {result['next_state']}  Agent: {result.get('agent', '?')}")
+    print(
+        f"Advanced to: {cs_result['next_state']}  Agent: {cs_result.get('agent', '?')}"
+    )
     print("Run /pathly go to continue with the next agent.")
     sys.exit(0)

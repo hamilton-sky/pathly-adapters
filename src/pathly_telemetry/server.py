@@ -4,6 +4,7 @@ Uses the official MCP Python SDK for correct protocol handling.
 
 Run via:  python -m pathly_telemetry
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -60,7 +61,9 @@ async def list_tools() -> list[types.Tool]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict | None = None) -> list[types.TextContent]:
+async def call_tool(
+    name: str, arguments: dict | None = None
+) -> list[types.TextContent]:
     args = arguments or {}
     if name == "record_activity":
         try:

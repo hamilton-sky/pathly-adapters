@@ -4,6 +4,7 @@ Receives a JSON payload on stdin with a "file" or "path" key.
 Validates the path stays inside the project's plans/ directory.
 If ANTHROPIC_API_KEY is not set, exits silently (classification is optional).
 """
+
 from __future__ import annotations
 
 import json
@@ -66,7 +67,11 @@ def main() -> None:
     tagged: list[str] = []
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("- ") and not stripped.startswith("- [REQ]") and not stripped.startswith("- [ARCH]"):
+        if (
+            stripped.startswith("- ")
+            and not stripped.startswith("- [REQ]")
+            and not stripped.startswith("- [ARCH]")
+        ):
             question_text = stripped[2:]
             if _ARCH_QUESTION.search(question_text):
                 tagged.append(f"- [ARCH] {stripped[2:]}")

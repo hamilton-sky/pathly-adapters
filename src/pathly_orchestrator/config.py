@@ -1,4 +1,5 @@
 """Centralized server configuration loaded from environment variables."""
+
 from __future__ import annotations
 
 import os
@@ -24,7 +25,10 @@ class Settings:
             if not (1 <= port <= 65535):
                 raise ValueError()
         except ValueError:
-            print(f"ERROR: PATHLY_FSM_HTTP_PORT must be 1-65535, got {port_str!r}", file=sys.stderr)
+            print(
+                f"ERROR: PATHLY_FSM_HTTP_PORT must be 1-65535, got {port_str!r}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         return cls(

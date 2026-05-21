@@ -1,4 +1,5 @@
 """pathly-tokens CLI — display agent activity log from ~/.pathly/activity.jsonl."""
+
 from __future__ import annotations
 
 import json
@@ -38,7 +39,9 @@ def main() -> None:
 
     W = 72
     print(f"\n{'─' * W}")
-    print(f"  Pathly Agent Activity Log   ({len(entries)} event(s) across {len(by_feature)} feature(s))")
+    print(
+        f"  Pathly Agent Activity Log   ({len(entries)} event(s) across {len(by_feature)} feature(s))"
+    )
     print(f"{'─' * W}")
 
     total_in_all = total_out_all = 0

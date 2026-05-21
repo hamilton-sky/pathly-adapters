@@ -6,6 +6,7 @@ core.py and design_system.py as sibling modules, then runs search.py.
 core.py resolves DATA_DIR as Path(__file__).parent.parent / "data",
 which points at the bundled data/ folder next to scripts/.
 """
+
 import sys
 import runpy
 from pathlib import Path

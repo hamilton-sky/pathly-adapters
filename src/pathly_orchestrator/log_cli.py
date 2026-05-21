@@ -10,7 +10,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-
 _SCAN_ROOTS = [
     ("pathly/plans", "team"),
     ("pathly/debugs", "debug"),
@@ -79,7 +78,9 @@ def _render_event(event: dict) -> str:
     if etype == "DECIDE_ROUTING":
         chosen = event.get("chosen", "?")
         decision_input = event.get("decision_input", "")
-        return f'  {time_str}  {etype:<22}  chosen: {chosen}  (input: "{decision_input}")'
+        return (
+            f'  {time_str}  {etype:<22}  chosen: {chosen}  (input: "{decision_input}")'
+        )
 
     if etype == "NEEDS_CONTEXT":
         count = event.get("count", "?")
@@ -91,9 +92,7 @@ def _render_event(event: dict) -> str:
         return f"  {time_str}  {etype:<22}  {fname}  agent: {agent}"
 
     # Generic fallback
-    extras = "  ".join(
-        f"{k}: {v}" for k, v in event.items() if k not in skip_keys
-    )
+    extras = "  ".join(f"{k}: {v}" for k, v in event.items() if k not in skip_keys)
     return f"  {time_str}  {etype:<22}  {extras}"
 
 
@@ -136,7 +135,11 @@ def main() -> None:
         print("No events recorded.")
         sys.exit(0)
 
-    lines = [line.strip() for line in events_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    lines = [
+        line.strip()
+        for line in events_file.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     events: list[dict] = []
     for line in lines:
         try:

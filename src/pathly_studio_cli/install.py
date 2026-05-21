@@ -1,4 +1,5 @@
 """pathly-studio install — download and install Pathly Studio from GitHub Releases."""
+
 from __future__ import annotations
 
 import json
@@ -15,7 +16,9 @@ _API = f"https://api.github.com/repos/{_REPO}/releases/latest"
 
 
 def _latest_release() -> dict:
-    req = urllib.request.Request(_API, headers={"Accept": "application/vnd.github+json"})
+    req = urllib.request.Request(
+        _API, headers={"Accept": "application/vnd.github+json"}
+    )
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read().decode())
 
@@ -48,14 +51,19 @@ def _download(url: str, dest: Path) -> None:
                 done += len(chunk)
                 if total:
                     pct = done * 100 // total
-                    print(f"\r  {pct}%  ({done // 1024 // 1024} MB)", end="", flush=True)
+                    print(
+                        f"\r  {pct}%  ({done // 1024 // 1024} MB)", end="", flush=True
+                    )
     print()
 
 
 def main() -> None:
     import argparse
+
     p = argparse.ArgumentParser(description="Install Pathly Studio desktop app")
-    p.add_argument("command", choices=["install", "version"], nargs="?", default="install")
+    p.add_argument(
+        "command", choices=["install", "version"], nargs="?", default="install"
+    )
     args = p.parse_args()
 
     if args.command == "version":
@@ -72,7 +80,9 @@ def main() -> None:
         rel = _latest_release()
     except Exception as exc:
         print(f"ERROR: Could not reach GitHub Releases: {exc}", file=sys.stderr)
-        print("Download manually from: https://github.com/hamilton-sky/pathly-adapters/releases")
+        print(
+            "Download manually from: https://github.com/hamilton-sky/pathly-adapters/releases"
+        )
         sys.exit(1)
 
     tag = rel["tag_name"]
@@ -80,8 +90,12 @@ def main() -> None:
     asset = _find_asset(assets)
 
     if not asset:
-        print(f"No Studio installer found in release {tag} for platform {sys.platform}.")
-        print("Download manually from: https://github.com/hamilton-sky/pathly-adapters/releases")
+        print(
+            f"No Studio installer found in release {tag} for platform {sys.platform}."
+        )
+        print(
+            "Download manually from: https://github.com/hamilton-sky/pathly-adapters/releases"
+        )
         sys.exit(1)
 
     print(f"Found: {asset['name']} ({asset['size'] // 1024 // 1024} MB)")
@@ -114,7 +128,9 @@ def main() -> None:
             install_path = Path.home() / ".local" / "bin" / "pathly-studio-app"
             install_path.parent.mkdir(parents=True, exist_ok=True)
             dest.rename(install_path)
-            install_path.chmod(install_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
+            install_path.chmod(
+                install_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP
+            )
             print(f"Installed to {install_path}")
             print("Run:  pathly-studio-app")
 

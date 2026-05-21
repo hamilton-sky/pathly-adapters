@@ -6,6 +6,7 @@ Usage:
     if flags.feedback_watcher:
         ...
 """
+
 from __future__ import annotations
 
 import os

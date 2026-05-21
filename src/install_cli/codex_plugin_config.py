@@ -1,4 +1,5 @@
 """Install/remove Pathly's Codex local marketplace registration."""
+
 from __future__ import annotations
 
 import json
@@ -13,11 +14,15 @@ PLUGIN_NAME = "pathly"
 
 _CODEX_CONFIG = Path.home() / ".codex" / "config.toml"
 _MARKETPLACE_ROOT = Path.home() / ".codex" / "pathly-marketplace"
-_PLUGIN_CACHE_ROOT = Path.home() / ".codex" / "plugins" / "cache" / MARKETPLACE_NAME / PLUGIN_NAME
+_PLUGIN_CACHE_ROOT = (
+    Path.home() / ".codex" / "plugins" / "cache" / MARKETPLACE_NAME / PLUGIN_NAME
+)
 
 
 def _write_error(action: str, path: Path, exc: OSError) -> RuntimeError:
-    return RuntimeError(f"Cannot {action} {path}: {exc}. Check that the Codex config directory is writable.")
+    return RuntimeError(
+        f"Cannot {action} {path}: {exc}. Check that the Codex config directory is writable."
+    )
 
 
 def install_codex_plugin(
@@ -34,11 +39,17 @@ def install_codex_plugin(
 
     if dry_run:
         print(f"  [dry-run] Would write Codex marketplace to {marketplace_root}")
-        print(f"  [dry-run] Would enable plugin '{PLUGIN_NAME}@{MARKETPLACE_NAME}' in {config_path}")
-        print("  [dry-run] Would refresh Codex local marketplace registration if the codex CLI is available")
+        print(
+            f"  [dry-run] Would enable plugin '{PLUGIN_NAME}@{MARKETPLACE_NAME}' in {config_path}"
+        )
+        print(
+            "  [dry-run] Would refresh Codex local marketplace registration if the codex CLI is available"
+        )
         return
 
-    using_default_paths = config_path == _CODEX_CONFIG and marketplace_root == _MARKETPLACE_ROOT
+    using_default_paths = (
+        config_path == _CODEX_CONFIG and marketplace_root == _MARKETPLACE_ROOT
+    )
     plugin_root = marketplace_root / "plugins" / PLUGIN_NAME
     if plugin_root.exists():
         shutil.rmtree(plugin_root)
@@ -80,7 +91,9 @@ def uninstall_codex_plugin(
     marketplace_root = marketplace_root or _MARKETPLACE_ROOT
 
     if dry_run:
-        print(f"  [dry-run] Would remove plugin '{PLUGIN_NAME}@{MARKETPLACE_NAME}' from {config_path}")
+        print(
+            f"  [dry-run] Would remove plugin '{PLUGIN_NAME}@{MARKETPLACE_NAME}' from {config_path}"
+        )
         print(f"  [dry-run] Would remove Codex marketplace at {marketplace_root}")
         return
 
@@ -97,7 +110,9 @@ def _write_marketplace_json(root: Path) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise _write_error("create Codex marketplace metadata directory", path.parent, exc) from exc
+        raise _write_error(
+            "create Codex marketplace metadata directory", path.parent, exc
+        ) from exc
     data = {
         "name": MARKETPLACE_NAME,
         "interface": {"displayName": "Pathly Local"},
@@ -161,10 +176,14 @@ def _refresh_codex_marketplace(
         )
     except OSError as exc:
         print(f"[codex] Codex CLI could not be launched: {exc}", file=sys.stderr)
-        print("[codex] Falling back to direct config.toml registration.", file=sys.stderr)
+        print(
+            "[codex] Falling back to direct config.toml registration.", file=sys.stderr
+        )
         return False
     if remove.returncode != 0:
-        print(f"[codex] Marketplace remove skipped: {remove.stderr.strip() or remove.stdout.strip()}")
+        print(
+            f"[codex] Marketplace remove skipped: {remove.stderr.strip() or remove.stdout.strip()}"
+        )
 
     try:
         add = subprocess.run(
@@ -175,11 +194,18 @@ def _refresh_codex_marketplace(
         )
     except OSError as exc:
         print(f"[codex] Codex CLI could not be launched: {exc}", file=sys.stderr)
-        print("[codex] Falling back to direct config.toml registration.", file=sys.stderr)
+        print(
+            "[codex] Falling back to direct config.toml registration.", file=sys.stderr
+        )
         return False
     if add.returncode != 0:
-        print(f"[codex] Codex CLI marketplace refresh failed: {add.stderr.strip() or add.stdout.strip()}", file=sys.stderr)
-        print("[codex] Falling back to direct config.toml registration.", file=sys.stderr)
+        print(
+            f"[codex] Codex CLI marketplace refresh failed: {add.stderr.strip() or add.stdout.strip()}",
+            file=sys.stderr,
+        )
+        print(
+            "[codex] Falling back to direct config.toml registration.", file=sys.stderr
+        )
         return False
 
     print("[codex] Refreshed Codex local marketplace registration via codex CLI.")
@@ -213,7 +239,9 @@ def _disable_in_codex_config(path: Path) -> None:
 
 def _read_config(path: Path) -> str:
     if not path.exists():
-        print(f"  [warn] Codex config not found at {path}; creating it.", file=sys.stderr)
+        print(
+            f"  [warn] Codex config not found at {path}; creating it.", file=sys.stderr
+        )
         return ""
     return path.read_text(encoding="utf-8")
 
