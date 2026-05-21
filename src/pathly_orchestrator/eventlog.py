@@ -82,11 +82,11 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
             try:
                 import fcntl
 
-                fcntl.flock(f, fcntl.LOCK_EX)  # type: ignore[attr-defined]
+                fcntl.flock(f, fcntl.LOCK_EX)
                 try:
                     f.write(line)
                 finally:
-                    fcntl.flock(f, fcntl.LOCK_UN)  # type: ignore[attr-defined]
+                    fcntl.flock(f, fcntl.LOCK_UN)
             except ImportError:
                 f.write(line)
 
