@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import React, { useId } from 'react'
 import clsx from 'clsx'
 import type { FlowYaml } from '../../../types'
 import type { FlowValidationIssue } from '../utils/validateFlow'
@@ -117,10 +117,9 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
             const isHighlighted = idx === activeIndex
             return (
               <li
-              
                 key={b.name}
                 role="option"
-                aria-selected={isActive}
+                {...{ 'aria-selected': isActive ? 'true' : 'false' } as React.AriaAttributes}
                 onClick={() => onAgentChange(stateId, b.name)}
                 className={clsx(
                   s.behaviorItem,
