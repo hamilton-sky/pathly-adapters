@@ -121,7 +121,9 @@ def next_action(args: dict) -> dict:
 
     state_info = recover_state(storage_path, flow_config)
 
-    # Stamp conv_start_sha at conversation start so scope_gate can baseline the diff.
+    # Stamp conv_start_sha once per conversation start so scope_gate can baseline the diff.
+    # Only write if not already present — re-calling next_action mid-conversation must not
+    # advance the baseline.
     state_file = storage_path / "STATE.json"
     prior_state: dict = {}
     if state_file.exists():
@@ -129,10 +131,11 @@ def next_action(args: dict) -> dict:
             prior_state = json.loads(state_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             prior_state = {}
-    sha = _get_head_sha(project_root)
-    stamped_state = dict(prior_state)
-    stamped_state["conv_start_sha"] = sha
-    write_state(storage_path, state_info["current_state"], stamped_state)
+    if not prior_state.get("conv_start_sha"):
+        sha = _get_head_sha(project_root)
+        stamped_state = dict(prior_state)
+        stamped_state["conv_start_sha"] = sha
+        write_state(storage_path, state_info["current_state"], stamped_state)
 
     feedback = route_feedback(flow_config, storage_path)
 

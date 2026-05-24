@@ -1,4 +1,4 @@
-"""Unit and integration tests for run_gates() — Conv 1."""
+"""Unit and integration tests for run_gates() — Conv 1 and Conv 2 (scope_gate)."""
 from __future__ import annotations
 
 import json
