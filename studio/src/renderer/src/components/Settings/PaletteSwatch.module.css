@@ -1,0 +1,63 @@
+.wrapper {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-color: transparent;
+  transition: 150ms ease-out;
+}
+
+.wrapper.active {
+  border-color: var(--swatch-accent);
+  background-color: var(--swatch-accent-alpha);
+}
+
+.preview {
+  width: 64px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--swatch-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.topBar {
+  flex: 1;
+  background-color: var(--swatch-bg);
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  gap: 4px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dotAccent { background-color: var(--swatch-accent); }
+.dotGreen  { background-color: var(--swatch-green); }
+.dotRed    { background-color: var(--swatch-red); }
+
+.terminal {
+  height: 16px;
+  background-color: var(--swatch-terminal);
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--swatch-text);
+  white-space: nowrap;
+}
+
+.label.active {
+  font-weight: 600;
+  color: var(--swatch-accent);
+}

@@ -86,6 +86,15 @@ function MainApp(): JSX.Element | null {
     const resolved = themes[theme] ?? themes.dark
     document.documentElement.setAttribute('data-theme', theme)
     window.pathly?.window?.setTitleBarOverlay(resolved.bgMantle, resolved.textPrimary)
+    const root = document.documentElement
+    root.style.setProperty('--theme-bg-base', resolved.bgBase)
+    root.style.setProperty('--theme-bg-mantle', resolved.bgMantle)
+    root.style.setProperty('--theme-bg-surface0', resolved.bgSurface0)
+    root.style.setProperty('--theme-text-primary', resolved.textPrimary)
+    root.style.setProperty('--theme-text-secondary', resolved.textSecondary)
+    root.style.setProperty('--theme-text-muted', resolved.textMuted)
+    root.style.setProperty('--theme-accent', resolved.accent)
+    root.style.setProperty('--theme-accent-a11', `${resolved.accent}11`)
   }, [theme])
 
   // Auto-open Monitor if a flow is already running on mount (EC-2.5 handled via catch)

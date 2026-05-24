@@ -1,5 +1,4 @@
-import { useTheme } from '../../useTheme'
-import { makeStyles } from './Settings.styles'
+import s from './RadioCard.module.css'
 
 interface Props {
   active: boolean
@@ -9,13 +8,12 @@ interface Props {
 }
 
 export function RadioCard({ active, label, description, onClick }: Props): JSX.Element {
-  const s = makeStyles(useTheme())
   return (
-    <div style={s.radioCard(active)} onClick={onClick}>
-      <span style={s.radioLabel(active)}>
+    <div className={`${s.radioCard}${active ? ` ${s.active}` : ''}`} onClick={onClick}>
+      <span className={`${s.radioLabel}${active ? ` ${s.active}` : ''}`}>
         <span>{active ? '●' : '○'}</span> {label}
       </span>
-      <span style={s.radioDesc}>{description}</span>
+      <span className={s.radioDesc}>{description}</span>
     </div>
   )
 }

@@ -1,0 +1,90 @@
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background-color: #1e2030;
+  color: #cdd6f4;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.card {
+  width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #cdd6f4;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #45475a;
+  border-top-color: #89b4fa;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.log {
+  background-color: #181825;
+  border-radius: 6px;
+  padding: 12px;
+  height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logLine {
+  font-family: monospace;
+  font-size: 12px;
+  color: #a6adc8;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.errorBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: #2a1a1a;
+  border: 1px solid #f38ba8;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.errorText {
+  font-size: 13px;
+  color: #f38ba8;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.retryButton {
+  align-self: flex-start;
+  padding: 6px 16px;
+  font-size: 13px;
+  background-color: #313244;
+  color: #cdd6f4;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  cursor: pointer;
+}

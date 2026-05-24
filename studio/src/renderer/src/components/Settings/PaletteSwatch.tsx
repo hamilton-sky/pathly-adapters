@@ -1,6 +1,6 @@
 import type { ThemeName } from '../../theme'
-import { paletteLabels } from '../../theme'
-import { makeSwatchStyles } from './Settings.styles'
+import { themes, paletteLabels } from '../../theme'
+import s from './PaletteSwatch.module.css'
 
 interface Props {
   name: ThemeName
@@ -9,18 +9,33 @@ interface Props {
 }
 
 export function PaletteSwatch({ name, active, onClick }: Props): JSX.Element {
-  const s = makeSwatchStyles(name, active)
+  const p = themes[name]
   return (
-    <div onClick={onClick} style={s.wrapper}>
-      <div style={s.preview}>
-        <div style={s.topBar}>
-          <div style={s.dotAccent} />
-          <div style={s.dotGreen} />
-          <div style={s.dotRed} />
+    <div
+      onClick={onClick}
+      className={`${s.wrapper}${active ? ` ${s.active}` : ''}`}
+      style={{
+        '--swatch-accent': p.accent,
+        '--swatch-accent-alpha': `${p.accent}18`,
+        '--swatch-bg': p.bgBase,
+        '--swatch-terminal': p.bgTerminal,
+        '--swatch-green': p.green,
+        '--swatch-red': p.red,
+        '--swatch-border': p.bgSurface0,
+        '--swatch-text': p.textSecondary,
+      } as React.CSSProperties}
+    >
+      <div className={s.preview}>
+        <div className={s.topBar}>
+          <div className={`${s.dot} ${s.dotAccent}`} />
+          <div className={`${s.dot} ${s.dotGreen}`} />
+          <div className={`${s.dot} ${s.dotRed}`} />
         </div>
-        <div style={s.terminal} />
+        <div className={s.terminal} />
       </div>
-      <span style={s.label}>{paletteLabels[name]}</span>
+      <span className={`${s.label}${active ? ` ${s.active}` : ''}`}>
+        {paletteLabels[name]}
+      </span>
     </div>
   )
 }

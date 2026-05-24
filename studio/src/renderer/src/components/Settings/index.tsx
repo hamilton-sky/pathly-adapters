@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
-import { useTheme } from '../../useTheme'
 import type { ThemeName } from '../../theme'
 import { paletteLabels } from '../../theme'
-import { makeStyles } from './Settings.styles'
 import { PaletteSwatch } from './PaletteSwatch'
 import { RadioCard } from './RadioCard'
+import s from './Settings.module.css'
 
 const DARK_PALETTES: ThemeName[] = ['dark', 'nord', 'mocha', 'solarized', 'dracula', 'rose-pine']
 const LIGHT_PALETTES: ThemeName[] = ['light', 'solarized-light', 'latte', 'paper', 'rose-pine-dawn', 'mint']
@@ -16,40 +15,39 @@ export function Settings(): JSX.Element {
     routingEngine, setRoutingEngine,
     mcpCommand, setMcpCommand,
   } = useStore()
-  const s = makeStyles(useTheme())
   const [mcpInput, setMcpInput] = useState(mcpCommand)
 
   return (
-    <div style={s.container}>
-      <div style={s.header}>Settings</div>
-      <div style={s.body}>
+    <div className={s.container}>
+      <div className={s.header}>Settings</div>
+      <div className={s.body}>
 
-        <div style={s.section}>
-          <div style={s.sectionTitle}>Color Palette</div>
-          <div style={s.hint}>
+        <div className={s.section}>
+          <div className={s.sectionTitle}>Color Palette</div>
+          <div className={s.hint}>
             Select your preferred <strong>dark</strong> and <strong>light</strong> palette. The ☽/☀ toggle switches between them.
           </div>
-          <div style={s.paletteGroupLabel}>
-            Dark — <span style={s.accentText}>{paletteLabels[preferredDark]}</span>
+          <div className={s.paletteGroupLabel}>
+            Dark — <span className={s.accentText}>{paletteLabels[preferredDark]}</span>
           </div>
-          <div style={s.swatchRowSpaced}>
+          <div className={s.swatchRowSpaced}>
             {DARK_PALETTES.map((name) => (
               <PaletteSwatch key={name} name={name} active={preferredDark === name} onClick={() => setPreferredDark(name)} />
             ))}
           </div>
-          <div style={s.paletteGroupLabelBottom}>
-            Light — <span style={s.accentText}>{paletteLabels[preferredLight]}</span>
+          <div className={s.paletteGroupLabelBottom}>
+            Light — <span className={s.accentText}>{paletteLabels[preferredLight]}</span>
           </div>
-          <div style={s.swatchRow}>
+          <div className={s.swatchRow}>
             {LIGHT_PALETTES.map((name) => (
               <PaletteSwatch key={name} name={name} active={preferredLight === name} onClick={() => setPreferredLight(name)} />
             ))}
           </div>
         </div>
 
-        <div style={s.section}>
-          <div style={s.sectionTitle}>Routing Engine</div>
-          <div style={s.radioGroup}>
+        <div className={s.section}>
+          <div className={s.sectionTitle}>Routing Engine</div>
+          <div className={s.radioGroup}>
             <RadioCard
               active={routingEngine === 'llm'}
               label="LLM driven"
@@ -65,17 +63,17 @@ export function Settings(): JSX.Element {
           </div>
         </div>
 
-        <div style={s.section}>
-          <div style={s.sectionTitle}>MCP Server Command</div>
-          <div style={s.inputRow}>
+        <div className={s.section}>
+          <div className={s.sectionTitle}>MCP Server Command</div>
+          <div className={s.inputRow}>
             <input
               aria-label="MCP server command"
-              style={s.textInput}
+              className={s.textInput}
               type="text"
               value={mcpInput}
               onChange={(e) => setMcpInput(e.target.value)}
             />
-            <button type="button" style={s.saveBtn} onClick={() => setMcpCommand(mcpInput)}>
+            <button type="button" className={s.saveBtn} onClick={() => setMcpCommand(mcpInput)}>
               Save
             </button>
           </div>
