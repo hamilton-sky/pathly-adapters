@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu } from 'electron'
 import { join } from 'path'
 import { registerFsHandlers } from './ipc/fs'
 import { registerWatcherHandlers } from './ipc/watcher'
-import { registerMcpHandlers } from './ipc/mcp'
+import { registerFsmHandlers } from './ipc/fsm'
 import { registerShellHandlers } from './ipc/shell'
 import { registerTerminalHandlers, killAllPtys } from './ipc/terminal'
 import { spawn, ChildProcess } from 'child_process'
@@ -134,7 +134,7 @@ function registerIpcHandlers(win: BrowserWindow): void {
 
   registerFsHandlers()
   registerWatcherHandlers(win)
-  registerMcpHandlers()
+  registerFsmHandlers()
   registerShellHandlers(win)
   registerTerminalHandlers(win)
   registerSetupHandlers()

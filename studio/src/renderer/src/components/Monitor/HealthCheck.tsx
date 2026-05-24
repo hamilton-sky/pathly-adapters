@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
-import { mcpPing, readFile, listDir } from '../../services/pathlyApi'
+import { fsmPing, readFile, listDir } from '../../services/pathlyApi'
 import type { Theme } from '../../theme'
 
 type CheckStatus = 'pass' | 'warn' | 'fail' | 'loading'
@@ -83,7 +83,7 @@ async function runHealthChecks(projectPath: string, topic: string | null): Promi
 
   // 1. FSM server reachability
   try {
-    const alive = await mcpPing()
+    const alive = await fsmPing()
     items.push({
       label: 'FSM server',
       status: alive ? 'pass' : 'fail',

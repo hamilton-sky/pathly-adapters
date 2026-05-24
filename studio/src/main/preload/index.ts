@@ -24,9 +24,9 @@ contextBridge.exposeInMainWorld('pathly', {
       return () => ipcRenderer.removeListener('shell:output', listener)
     }
   },
-  mcp: {
-    ping: (): Promise<boolean> => ipcRenderer.invoke('mcp:ping'),
-    state: (topic: string): Promise<unknown> => ipcRenderer.invoke('mcp:state', topic)
+  fsm: {
+    ping: (): Promise<boolean> => ipcRenderer.invoke('fsm:ping'),
+    state: (topic: string): Promise<unknown> => ipcRenderer.invoke('fsm:state', topic)
   },
   watch: {
     start: (projectPath: string, topic: string): Promise<void> =>
@@ -35,7 +35,14 @@ contextBridge.exposeInMainWorld('pathly', {
       const listener = (_e: Electron.IpcRendererEvent, d: { path: string; content: string }): void => cb(d)
       ipcRenderer.on('watch:event', listener)
       return () => ipcRenderer.removeListener('watch:event', listener)
-    }
+    },
+    watchWorkspace: (projectPath: string): Promise<void> =>
+      ipcRenderer.invoke('watch:workspace', projectPath),
+    onWorkspaceChanged: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on('workspace:changed', listener)
+      return () => ipcRenderer.removeListener('workspace:changed', listener)
+    },
   },
   terminal: {
     spawn: (tabId: string, cwd: string, command?: string): Promise<void> =>
@@ -93,13 +100,15 @@ declare global {
         publish: (cwd: string) => Promise<number | null>
         onOutput: (cb: (line: string) => void) => () => void
       }
-      mcp: {
+      fsm: {
         ping: () => Promise<boolean>
         state: (topic: string) => Promise<unknown>
       }
       watch: {
         start: (projectPath: string, topic: string) => Promise<void>
         onEvent: (cb: (data: { path: string; content: string }) => void) => () => void
+        watchWorkspace?: (projectPath: string) => Promise<void>
+        onWorkspaceChanged?: (cb: () => void) => () => void
       }
       terminal: {
         spawn: (tabId: string, cwd: string, command?: string) => Promise<void>

@@ -18,13 +18,15 @@ declare global {
         publish: (cwd: string) => Promise<number | null>
         onOutput: (cb: (line: string) => void) => () => void
       }
-      mcp: {
+      fsm: {
         ping: () => Promise<boolean>
         state: (topic: string) => Promise<unknown>
       }
       watch: {
         start: (projectPath: string, topic: string) => Promise<void>
         onEvent: (cb: (data: { path: string; content: string }) => void) => () => void
+        watchWorkspace?: (projectPath: string) => Promise<void>
+        onWorkspaceChanged?: (cb: () => void) => () => void
       }
       terminal: {
         spawn: (tabId: string, cwd: string, command?: string) => Promise<void>

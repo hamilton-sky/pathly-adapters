@@ -13,9 +13,9 @@ export function Settings(): JSX.Element {
   const {
     preferredDark, preferredLight, setPreferredDark, setPreferredLight,
     routingEngine, setRoutingEngine,
-    mcpCommand, setMcpCommand,
+    fsmCommand, setFsmCommand,
   } = useStore()
-  const [mcpInput, setMcpInput] = useState(mcpCommand)
+  const [fsmInput, setFsmInput] = useState(fsmCommand)
 
   return (
     <div className={s.container}>
@@ -55,25 +55,25 @@ export function Settings(): JSX.Element {
               onClick={() => setRoutingEngine('llm')}
             />
             <RadioCard
-              active={routingEngine === 'python-mcp'}
+              active={routingEngine === 'python-fsm'}
               label="Python FSM"
-              description="Deterministic MCP-driven FSM"
-              onClick={() => setRoutingEngine('python-mcp')}
+              description="Deterministic FSM over HTTP"
+              onClick={() => setRoutingEngine('python-fsm')}
             />
           </div>
         </div>
 
         <div className={s.section}>
-          <div className={s.sectionTitle}>MCP Server Command</div>
+          <div className={s.sectionTitle}>FSM Server Command</div>
           <div className={s.inputRow}>
             <input
-              aria-label="MCP server command"
+              aria-label="FSM server command"
               className={s.textInput}
               type="text"
-              value={mcpInput}
-              onChange={(e) => setMcpInput(e.target.value)}
+              value={fsmInput}
+              onChange={(e) => setFsmInput(e.target.value)}
             />
-            <button type="button" className={s.saveBtn} onClick={() => setMcpCommand(mcpInput)}>
+            <button type="button" className={s.saveBtn} onClick={() => setFsmCommand(fsmInput)}>
               Save
             </button>
           </div>

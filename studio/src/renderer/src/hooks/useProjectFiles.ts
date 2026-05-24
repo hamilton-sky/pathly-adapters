@@ -244,6 +244,11 @@ export function useProjectFiles(): {
 
   useEffect(() => {
     void loadItems()
+    if (!projectPath) return
+    const { watchWorkspace, onWorkspaceChanged } = window.pathly.watch
+    if (!watchWorkspace || !onWorkspaceChanged) return
+    void watchWorkspace(projectPath)
+    return onWorkspaceChanged(() => { void loadItems() })
   }, [coreRoot, projectPath, pathlyUserHome, loadItems])
 
   return { sections, setSections, loadItems, customWorkspaceSections }

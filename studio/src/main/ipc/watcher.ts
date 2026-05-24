@@ -1,7 +1,9 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { readFileSync } from 'fs'
-import chokidar from 'chokidar'
+import chokidar, { FSWatcher } from 'chokidar'
+
+let workspaceWatcher: FSWatcher | null = null
 
 export function registerWatcherHandlers(win: BrowserWindow): void {
   ipcMain.handle('watch:start', (_event, projectPath: string, topic: string) => {
@@ -18,5 +20,29 @@ export function registerWatcherHandlers(win: BrowserWindow): void {
       .watch([join(base, 'STATE.json'), join(base, 'EVENTS.jsonl')])
       .on('add', send)
       .on('change', send)
+  })
+
+  ipcMain.handle('watch:workspace', (_event, projectPath: string) => {
+    if (workspaceWatcher) {
+      void workspaceWatcher.close()
+      workspaceWatcher = null
+    }
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    const notify = (): void => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        win.webContents.send('workspace:changed')
+      }, 300)
+    }
+    workspaceWatcher = chokidar
+      .watch(join(projectPath, 'pathly'), {
+        ignoreInitial: true,
+        ignored: /(^|[/\\])\../,
+        depth: 4,
+      })
+      .on('add', notify)
+      .on('unlink', notify)
+      .on('addDir', notify)
+      .on('unlinkDir', notify)
   })
 }

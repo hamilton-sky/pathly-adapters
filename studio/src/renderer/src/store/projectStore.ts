@@ -12,11 +12,11 @@ export interface ProjectState {
   fsmState: FsmState | null
   events: FsmEvent[]
   pipelineStates: string[]
-  monitorSource: 'mcp' | 'chokidar' | 'sse' | null
+  monitorSource: 'chokidar' | 'sse' | null
   publishing: boolean
   publishLog: string[]
-  mcpCommand: string
-  routingEngine: 'python-mcp' | 'llm'
+  fsmCommand: string
+  routingEngine: 'python-fsm' | 'llm'
   setProjectPath: (p: string) => void
   setPathlyRoot: (p: string) => void
   setPathlyUserHome: (p: string) => void
@@ -28,12 +28,12 @@ export interface ProjectState {
   setFsmState: (s: FsmState | null) => void
   setEvents: (e: FsmEvent[]) => void
   setPipelineStates: (s: string[]) => void
-  setMonitorSource: (s: 'mcp' | 'chokidar' | 'sse' | null) => void
+  setMonitorSource: (s: 'chokidar' | 'sse' | null) => void
   setPublishing: (v: boolean) => void
   appendPublishLog: (line: string) => void
   clearPublishLog: () => void
-  setMcpCommand: (s: string) => void
-  setRoutingEngine: (e: 'python-mcp' | 'llm') => void
+  setFsmCommand: (s: string) => void
+  setRoutingEngine: (e: 'python-fsm' | 'llm') => void
 }
 
 export const useProjectStore = create<ProjectState>()(
@@ -51,7 +51,7 @@ export const useProjectStore = create<ProjectState>()(
       monitorSource: null,
       publishing: false,
       publishLog: [],
-      mcpCommand: 'pathly-mcp-server',
+      fsmCommand: 'pathly-fsm-server',
       routingEngine: 'llm',
       setProjectPath: (p) => set({ projectPath: p }),
       setPathlyRoot: (p) => set({ pathlyRoot: p }),
@@ -71,12 +71,12 @@ export const useProjectStore = create<ProjectState>()(
       setPublishing: (v) => set({ publishing: v }),
       appendPublishLog: (line) => set((s) => ({ publishLog: [...s.publishLog, line] })),
       clearPublishLog: () => set({ publishLog: [] }),
-      setMcpCommand: (s) => set({ mcpCommand: s }),
+      setFsmCommand: (s) => set({ fsmCommand: s }),
       setRoutingEngine: (e) => set({ routingEngine: e }),
     }),
     {
       name: 'pathly-studio-project',
-      partialize: (s) => ({ projects: s.projects, pathlyRoot: s.pathlyRoot, mcpCommand: s.mcpCommand, routingEngine: s.routingEngine }),
+      partialize: (s) => ({ projects: s.projects, pathlyRoot: s.pathlyRoot, fsmCommand: s.fsmCommand, routingEngine: s.routingEngine }),
     }
   )
 )
