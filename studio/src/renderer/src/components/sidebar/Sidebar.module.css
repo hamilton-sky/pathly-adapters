@@ -9,6 +9,7 @@
   height: 100%;
   overflow: hidden;
   position: relative;
+  width: var(--sidebar-width, 240px);
 }
 
 .resizeHandle {

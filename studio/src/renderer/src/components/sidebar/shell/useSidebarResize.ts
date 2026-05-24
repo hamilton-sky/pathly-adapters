@@ -1,19 +1,27 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 const SIDEBAR_WIDTH_KEY = 'sidebar-width'
 const MIN_WIDTH = 180
 const MAX_WIDTH = 480
 
-export function useSidebarResize(): { sidebarWidth: number; onDragStart: (e: React.MouseEvent) => void } {
+export function useSidebarResize(): {
+  sidebarRef: React.RefObject<HTMLDivElement>
+  onDragStart: (e: React.MouseEvent) => void
+} {
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY)
     const parsed = saved ? parseInt(saved, 10) : NaN
     return Number.isFinite(parsed) ? Math.min(Math.max(parsed, MIN_WIDTH), MAX_WIDTH) : 240
   })
 
+  const sidebarRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
+
+  useEffect(() => {
+    sidebarRef.current?.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
+  }, [sidebarWidth])
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -39,5 +47,5 @@ export function useSidebarResize(): { sidebarWidth: number; onDragStart: (e: Rea
     window.addEventListener('mouseup', onMouseUp)
   }, [sidebarWidth])
 
-  return { sidebarWidth, onDragStart }
+  return { sidebarRef, onDragStart }
 }

@@ -41,7 +41,7 @@ export function Sidebar(): JSX.Element | null {
     fn().then(setPathlyUserHome).catch(() => {})
   }, [pathlyUserHome, setPathlyUserHome])
 
-  const { sidebarWidth, onDragStart } = useSidebarResize()
+  const { sidebarRef, onDragStart } = useSidebarResize()
 
   const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
@@ -372,7 +372,7 @@ export function Sidebar(): JSX.Element | null {
   }
 
   return (
-    <div className={styles.sidebar} style={{ width: sidebarWidth }}>
+    <div ref={sidebarRef} className={styles.sidebar}>
       <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
 
       <FilterRow
