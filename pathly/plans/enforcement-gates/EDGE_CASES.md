@@ -59,6 +59,14 @@
 - **Expected behavior**: Treated as no declared scope → `GATE_SKIPPED`.
 - **Handled in**: Phase 4 — read failure falls through to the "no declared paths" branch.
 
+### EC-3.3: `CONVERSATION_PROMPTS.md` is restructured or pruned mid-feature
+
+- **Trigger**: A planner or user edits `CONVERSATION_PROMPTS.md` (e.g. reformats file lists, removes backtick/dash prefixes) after the YAML gate is already configured.
+- **Expected behavior**: Parser finds no matching lines → `GATE_SKIPPED`. The gate silently stops enforcing scope without any code change.
+- **Risk**: This is a plan-file-as-enforcement-input fragility. A doc edit can disable the gate.
+- **Mitigation**: If scope enforcement is critical, prefer a dedicated `SCOPE.md` file (one path per line, no Markdown decoration) as the `scope_file` target — it is less likely to be reformatted and easier to parse reliably. The YAML `scope_file` field is configurable; swap the value without touching gate logic.
+- **Status**: Not handled automatically — operator awareness required. Logged here so the decision is visible.
+
 ---
 
 ## Category 4: Gate ordering and commit timing

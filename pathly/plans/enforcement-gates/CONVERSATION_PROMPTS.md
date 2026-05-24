@@ -106,6 +106,8 @@ Implement Enforcement Gates Conversation 2 (Phases 4–6) from plans/enforcement
 
 Conversation 1 is complete. `run_gates()` exists in `fsm.py` with `require_artifact` and `verify_gate`. `team.flow.yaml` has a `gates:` section. All Conv 1 tests pass.
 
+**Pre-flight (do this before writing any code):** Grep the codebase for `conv_start_sha`. Confirm the orchestrator is writing this key to `STATE.json` at conversation start. If the key is absent, stop and report — scope_gate will silently skip on every call without it, making the gate non-enforcing. Do not proceed until this is confirmed or added as a prerequisite.
+
 **Before editing anything:** glob/read the live repo to confirm every file path below exists. Correct any discrepancy before proceeding.
 
 **Codebase files this conversation touches:**

@@ -139,6 +139,12 @@ Add this block after `transition_actions:` in `team.flow.yaml`.
 
 ### Phase 4: Add `scope_gate` primitive + `GATE_SKIPPED` event   ← Conversation: 2
 
+**Pre-condition (check before writing any code):** Grep the codebase for `conv_start_sha`. If the
+orchestrator is not already writing this key to `STATE.json` at conversation start, add that write
+as a prerequisite — do not proceed with scope_gate until it is confirmed present. Without it, every
+scope_gate call silently skips (emitting only `GATE_SKIPPED`), which means the gate is never
+enforcing anything. Stop and report to the user if the key is absent.
+
 **File:** `src/pathly_orchestrator/fsm.py` — MODIFY: add `scope_gate` branch in `run_gates()`
 
 **Done when:** `run_gates()` handles `scope_gate` type: reads declared files from
