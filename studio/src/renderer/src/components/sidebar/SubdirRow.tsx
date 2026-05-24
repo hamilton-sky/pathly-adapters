@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ChevronRight, ChevronDown, FilePlus, Folder, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, FilePlus, Folder, FolderOpen, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { RenameInput } from './RenameInput'
 import { ContextMenu } from './ContextMenu'
 import styles from './Sidebar.module.css'
@@ -70,7 +70,10 @@ export function SubdirRow({
       <span className={styles.chevron}>
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
       </span>
-      <Folder size={13} className={styles.subdirFolderIcon} />
+      {open
+        ? <FolderOpen size={13} className={styles.subdirFolderIcon} />
+        : <Folder size={13} className={styles.subdirFolderIcon} />
+      }
 
       {renamingThis ? (
         <RenameInput
