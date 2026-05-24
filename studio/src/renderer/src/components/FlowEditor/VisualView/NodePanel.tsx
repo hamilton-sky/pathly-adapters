@@ -120,7 +120,7 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
               
                 key={b.name}
                 role="option"
-                aria-selected={isActive ? 'true' : 'false'}
+                aria-selected={isActive}
                 onClick={() => onAgentChange(stateId, b.name)}
                 className={clsx(
                   s.behaviorItem,
