@@ -15,54 +15,48 @@ the full analysis and issue diagnoses)._
 
 ---
 
-## A. Correctness fixes (do these first)
+## A. Correctness fixes ✅ ALL DONE (2026-05-24)
 
-### A1 — Unify the storage path: `plans/` vs `pathly/plans/`  ·  Fix · P0 · ★★★ · M
+### A1 — Unify the storage path: `plans/` vs `pathly/plans/`  ·  ✅ DONE
 
-The single most important change. Skills disagree on where state lives
-(`plans/` in ~25 files, `pathly/plans/` in ~8, plus `explorations/` vs
-`pathly/explorations/` and `debugs/` vs `pathly/debugs/`). This can split state
-across two trees and make feature auto-detection silently miss work.
+~~The single most important change.~~ Fixed: 39 files updated to use `pathly/plans/`,
+`pathly/explorations/`, `pathly/debugs/` throughout `core/skills/` and `core/agents/`.
+Studio Monitor now finds STATE.json for all flows.
 
-- [ ] Pick one canonical root — recommend `pathly/` (namespaced).
-- [ ] Define a documented `STORAGE_ROOT` constant in `SKILLS_OVERVIEW.md` and the
-      feedback-protocol section.
-- [ ] Sweep all of `core/skills/` and `core/agents/` to the single prefix.
-- [ ] Add a CI grep that fails the build on the wrong prefix.
+- [x] Pick one canonical root — `pathly/` (namespaced).
+- [ ] ~~Define a documented `STORAGE_ROOT` constant~~ — still a nice-to-have
+- [x] Sweep all of `core/skills/` and `core/agents/` to the single prefix.
+- [ ] Add a CI grep that fails the build on the wrong prefix — covered by B1
 
-### A2 — Reconcile `team-flow/` vs `team/` naming  ·  Fix · P1 · ★★ · S
+### A2 — Reconcile `team-flow/` vs `team/` naming  ·  ✅ DONE
 
-Docs route to `team-flow/discover`, `team-flow/plan`, etc., but the directory is
-`core/skills/team/`. ~13 dangling references.
+Fixed: all `team-flow` references replaced with `team` across SKILLS_OVERVIEW,
+director, README_routing, po, and pipeline templates. Zero occurrences remain.
 
-- [ ] Keep the directory `team/` (less churn, no adapter changes).
-- [ ] Update all `team-flow/` doc references to `team/`.
+- [x] Keep the directory `team/` (less churn, no adapter changes).
+- [x] Update all `team-flow/` doc references to `team/`.
 
-### A3 — De-duplicate the director routing logic  ·  Fix · P1 · ★★ · M
+### A3 — De-duplicate the director routing logic  ·  ✅ DONE
 
-Intent-classification + rigor-selection is implemented three times
-(`agents/planning/director.md`, `skills/flow/go.md`, inline in
-`skills/flow/pathly.md`) and they have already diverged.
+Fixed: `go.md` is now the single source. `director.md` Decision Rules block
+replaced with a reference to `go.md`. `pathly.md` Behavior: go collapsed to a
+two-line delegation.
 
-- [ ] Make `go.md` the single source for the routing procedure.
-- [ ] Slim `director.md` to the role contract (mindset + boundaries); have it
-      reference `go.md` for the decision table.
-- [ ] Replace the inlined "Behavior: go" in `pathly.md` with a delegation to the
-      `go` skill (it already delegates other subcommands).
+- [x] Make `go.md` the single source for the routing procedure.
+- [x] Slim `director.md` to the role contract; reference `go.md` for the decision table.
+- [x] Replace the inlined "Behavior: go" in `pathly.md` with a delegation.
 
-### A4 — Relocate or justify `director` under `planning/`  ·  Fix · P2 · ★ · S
+### A4 — Relocate `director` out of `planning/`  ·  ✅ DONE
 
-`director` sits above the orchestrator conceptually but lives next to
-`architect`/`planner`/`po`.
+Fixed: `agents/planning/director.md` moved to `agents/director.md`.
 
-- [ ] Move to `agents/routing/` (or `agents/entry/`), or document why it is
-      grouped with planning.
+- [x] Move to top-level `agents/` directory.
 
-### A5 — Rename typo'd directory `skills/team/pathly-controlls/`  ·  Fix · P2 · ★ · S
+### A5 — Rename typo'd directory `skills/team/pathly-controlls/`  ·  ✅ DONE
 
-Double-l typo; contains only `.gitkeep`.
+Fixed: directory deleted (it was empty, containing only `.gitkeep`).
 
-- [ ] Rename to `pathly-controls/`, or delete if unused.
+- [x] Deleted unused `pathly-controlls/` directory.
 
 ---
 
@@ -120,12 +114,14 @@ strong feedback loop, but it depends on a human running `lessons`.
 - [ ] Surface candidate lessons automatically at `end`/`archive` time and prompt
       to promote them.
 
-### D2 — FSM observability (timeline + cost)  ·  Enhancement · ★★★ · M
+### D2 — FSM observability (timeline + cost)  ·  ✅ DONE (already in Studio)
 
-The `EVENTS.jsonl` data already supports this.
+`Monitor/FsmView.tsx` (pipeline stepper), `Monitor/EventLog.tsx` (live SSE stream),
+and `PlanBoard.tsx` (per-conversation token + cost rollups) already cover this at
+the conversation level. Optional: add a flow-level cost summary if a single
+"what did this feature cost?" number is wanted.
 
-- [ ] A small Studio/CLI view of the FSM timeline and per-stage token cost so the
-      system's behavior is legible to users, not just maintainers.
+- [x] Studio Monitor shows FSM timeline and per-event cost.
 
 ### D3 — Guided first-run that hides the machinery  ·  Enhancement · ★★ · M
 
@@ -147,15 +143,14 @@ newcomers; `nano` helps but the concepts still surface early.
 ## E. Suggested sequencing
 
 ```
-Phase 1 (correctness)   : A1 → A2 → A3 → A5 → A4
+Phase 1 (correctness)   : ✅ A1 → A2 → A3 → A5 → A4   DONE 2026-05-24
 Phase 2 (hold the line) : B1 → B2 → B3
 Phase 3 (assurance)     : C1 → C2
-Phase 4 (product value) : D2 → D1 → D3 → D4
+Phase 4 (product value) : D2 ✅ → D1 → D3 → D4
 ```
 
-Phase 1 removes silent-failure risk. Phase 2 prevents the same drift from
-returning. Phases 3–4 are where the system goes from "well-designed" to
-"trustworthy and pleasant to adopt."
+Phase 1 is complete. Phase 2 prevents the same drift from returning.
+Phases 3–4 are where the system goes from "well-designed" to "trustworthy and pleasant to adopt."
 
 ---
 

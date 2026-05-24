@@ -37,7 +37,7 @@ Pathly pipeline. Main panels:
 
 ---
 
-## Key finding — Studio proves ISSUE-1 (storage-path drift) is a live bug
+## ✅ Key finding RESOLVED — Storage-path drift fixed (2026-05-24)
 
 The Monitor probes **only** these three roots for `STATE.json`
 (`Monitor/index.tsx`):
@@ -48,16 +48,11 @@ pathly/debugs/<topic>
 pathly/explorations/<topic>
 ```
 
-It **never** looks at bare `plans/`. Therefore:
+~~It **never** looks at bare `plans/`.~~ **This is now consistent:** all 39
+affected core skill/agent files were updated to use the `pathly/` prefix. The
+Studio Monitor, event log, and cost board will find STATE.json for all flows.
 
-> The canonical storage root is unambiguously **`pathly/`**. Any flow whose
-> skills write to bare `plans/` (the majority — ~25 skill files) is **invisible
-> to the Studio monitor**: the live FSM view, the event log, and the cost board
-> all silently show nothing.
-
-This promotes **A1** from "documentation tidy-up" to **"the desktop app is
-already broken for the most common path."** It also resolves the fix direction:
-unify everything onto `pathly/`, not bare `plans/`.
+A1 is resolved. The canonical root is `pathly/` throughout.
 
 ---
 
@@ -73,28 +68,29 @@ unify everything onto `pathly/`, not bare `plans/`.
 
 ---
 
-## Revised status of the roadmap (post-UI review)
+## Revised status of the roadmap (updated 2026-05-24)
 
-| ID | Was | Now | Note |
-|----|-----|-----|------|
-| A1 | P0 ★★★ | **P0 ★★★ (urgent)** | UI confirms it breaks the monitor today |
-| A2 | P1 ★★ | P1 ★★ | UI confirms "keep `team`" direction |
-| D2 | Enhancement ★★★ | ✅ **Done (conv-level)** | Optional: add a flow-level cost summary |
-| B1 | ★★★ | ★★★ (partial) | Flow YAML covered; extend to skill/agent contracts |
-| D3 | ★★ | ★★ (partial) | Flow-building onboarding exists; feature-run guidance does not |
-| B2 | ★★ | ★★ | No protocol schema yet; UI parses defensively |
-| B3, D1, D4, C1, C2 | — | ❌ Still open | No UI coverage |
+| ID | Status | Note |
+|----|--------|------|
+| A1 | ✅ **Done** | 39 files unified to `pathly/` prefix; monitor unblocked |
+| A2 | ✅ **Done** | All `team-flow` refs replaced with `team` |
+| A3 | ✅ **Done** | `go.md` is single source; director + pathly delegated |
+| A4 | ✅ **Done** | `director.md` moved to `agents/director.md` |
+| A5 | ✅ **Done** | `pathly-controlls/` deleted |
+| D2 | ✅ **Done (conv-level)** | Studio Monitor + PlanBoard already cover this |
+| B1 | ★★★ (partial) | Flow YAML covered by `validateFlow`; skill/agent contract check still open |
+| D3 | ★★ (partial) | Flow-building onboarding exists; feature-run guidance does not |
+| B2 | ★★ | No protocol schema yet; UI parses defensively |
+| B3, D1, D4, C1, C2 | ❌ Open | No UI coverage; see `PATHLY_SUGGESTIONS.md` |
 
 ---
 
-## Recommended next actions
+## Recommended next actions (updated 2026-05-24)
 
-1. **Fix A1 immediately** — unify all `core/skills/` and `core/agents/` paths to
-   `pathly/`. This restores Studio monitoring for the majority of flows.
+1. ~~**Fix A1 immediately**~~ ✅ Done.
 2. **Add the consistency checker (B1)** scoped to the contract layer
-   (path prefix, dangling skill refs, doc drift) — Studio already proves the
+   (path prefix, dangling skill refs, adapter parity) — Studio already proves the
    value of validation for the flow layer; extend the same idea to skills/agents.
-3. **Treat D2 as done** at the conversation level; only build a flow-level cost
-   summary if a single-number "what did this feature cost" view is wanted.
-4. **Leave D1 / D4 as genuine product gaps** — an auto lessons loop and a
-   self-doctor view are the highest-value *new* surfaces Studio doesn't have yet.
+3. ~~**Treat D2 as done**~~ ✅ Already confirmed done.
+4. **D1 and D4 are the highest-value new surfaces** — auto lessons loop and
+   self-doctor view are genuine product gaps with clear implementation paths.

@@ -78,6 +78,10 @@ State is recoverable from disk, so a crashed session can resume.
 
 ## 4. Issues & Solutions
 
+> **Status as of 2026-05-24: ISSUE-1 through ISSUE-5 are all resolved.**
+> The section below is kept for historical record. See `PATHLY_SUGGESTIONS.md`
+> for current open work (B1–D4).
+
 ### Severity legend
 - **P0** — can cause silent runtime misbehavior.
 - **P1** — documentation contradicts reality; misleads maintainers.
@@ -85,7 +89,7 @@ State is recoverable from disk, so a crashed session can resume.
 
 ---
 
-### ISSUE-1 (P0): Storage path inconsistency — `plans/` vs `pathly/plans/`
+### ✅ ISSUE-1 (P0) RESOLVED: Storage path inconsistency — `plans/` vs `pathly/plans/`
 
 **Problem.** Skills disagree on where feature state lives:
 - `plans/<feature>/` — ~25 skill files (e.g. `go.md`, `pathly.md`).
@@ -109,7 +113,7 @@ across two trees.
 
 ---
 
-### ISSUE-2 (P1): `team-flow/` vs `team/` naming drift
+### ✅ ISSUE-2 (P1) RESOLVED: `team-flow/` vs `team/` naming drift
 
 **Problem.** `SKILLS_OVERVIEW.md` repeatedly states sub-skills "live in
 `core/skills/team-flow/`" and routes to `team-flow/discover`, `team-flow/plan`,
@@ -128,7 +132,7 @@ Recommended: **Option A** — fewer moving parts, no adapter changes.
 
 ---
 
-### ISSUE-3 (P1): Director logic triplicated across `core/`
+### ✅ ISSUE-3 (P1) RESOLVED: Director logic triplicated across `core/`
 
 **Problem.** Intent classification + rigor selection is implemented three times:
 - `agents/planning/director.md`
@@ -149,7 +153,7 @@ exists to prevent — and here the rule is violated *within* core.
 
 ---
 
-### ISSUE-4 (P2): `director` filed under `planning/`
+### ✅ ISSUE-4 (P2) RESOLVED: `director` filed under `planning/`
 
 **Problem.** `director` sits *above* the orchestrator conceptually
 (`README_routing.md` architecture diagram), but its file lives in
@@ -162,7 +166,7 @@ purely organizational.
 
 ---
 
-### ISSUE-5 (P2): Typo'd directory `skills/team/pathly-controlls/`
+### ✅ ISSUE-5 (P2) RESOLVED: Typo'd directory `skills/team/pathly-controlls/`
 
 **Problem.** Directory name has a double-l typo (`controlls`) and contains only a
 `.gitkeep`.
@@ -171,7 +175,7 @@ purely organizational.
 
 ---
 
-### ISSUE-6 (P1): `SKILLS_OVERVIEW.md` drifts because it is hand-maintained
+### ISSUE-6 (P1) OPEN: `SKILLS_OVERVIEW.md` drifts because it is hand-maintained
 
 **Problem.** The file's own footer says "update this file after any
 `core/skills/` change" — a manual discipline that has already slipped (see
@@ -191,10 +195,12 @@ rather than maintaining it by hand.
 
 ## 5. Fix priority order
 
-1. **ISSUE-1** (P0) — path inconsistency. Highest value; prevents silent state loss.
-2. **ISSUE-2 / ISSUE-3 / ISSUE-6** (P1) — naming drift, triplicated logic, and the
-   checker that stops all three from recurring.
-3. **ISSUE-4 / ISSUE-5** (P2) — organizational/cosmetic.
+> ISSUE-1 through ISSUE-5 resolved 2026-05-24. Remaining open work is in
+> `PATHLY_SUGGESTIONS.md` sections B–D.
+
+1. ~~**ISSUE-1** (P0) — path inconsistency.~~ ✅ Done
+2. ~~**ISSUE-2 / ISSUE-3**~~ ✅ Done · **ISSUE-6** (P1) — consistency checker still open (B1).
+3. ~~**ISSUE-4 / ISSUE-5**~~ ✅ Done
 
 ---
 
