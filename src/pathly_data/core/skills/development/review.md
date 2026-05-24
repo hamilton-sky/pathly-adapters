@@ -42,7 +42,7 @@ Run the appropriate git diff command based on `$ARGUMENTS`.
 ## Step 2 — Load project rules
 
 Read (if present):
-1. The `ARCHITECTURE_PROPOSAL.md` in the `plans/*/` folder that most closely matches the changed files — defines the intended architecture for in-progress work
+1. The `ARCHITECTURE_PROPOSAL.md` in the `pathly/plans/*/` folder that most closely matches the changed files — defines the intended architecture for in-progress work
 2. Project rule files — project-wide architectural contracts
 
 If neither exists, review against general software engineering good practices and note the absence.

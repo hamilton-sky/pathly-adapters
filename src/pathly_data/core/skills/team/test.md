@@ -6,8 +6,8 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 
 ## FSM operations
 
-All events are appended to `plans/<feature>/EVENTS.jsonl` as JSON lines.
-State snapshots are written to `plans/<feature>/STATE.json`.
+All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
+State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>"}`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>"}`.
@@ -19,7 +19,7 @@ Run: `python -c "import time; print(int(time.time()))"` and note the integer as 
 
 ## Pre-gate
 
-Read `plans/<feature>/PROGRESS.md`. Check every conversation row in the Conversation Breakdown table.
+Read `pathly/plans/<feature>/PROGRESS.md`. Check every conversation row in the Conversation Breakdown table.
 If any row status is not DONE: stop and report:
 ```
 Not all conversations are complete. Route to team <feature> build first. Incomplete: Conv N
@@ -49,7 +49,7 @@ When all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl. Confirm 
 **Spawn** `tester` with `phase: analyze`:
 ```
 phase: analyze
-Read plans/[feature]/USER_STORIES.md.
+Read pathly/plans/[feature]/USER_STORIES.md.
 List what test infrastructure and context you need before verifying — output NEEDS_CONTEXT block only.
 
 NEEDS_CONTEXT format (one entry per line):
@@ -78,14 +78,14 @@ Track `testRetryCount = 0`.
 **Spawn** `tester` with `phase: test` and scout findings injected:
 ```
 phase: test
-Read plans/[feature]/USER_STORIES.md.
+Read pathly/plans/[feature]/USER_STORIES.md.
 Run /test to verify each acceptance criterion.
 
 ## Test Context
 [compressed findings]
 
 For each criterion: PASS / FAIL / NOT COVERED.
-If any FAIL or NOT COVERED: write plans/[feature]/feedback/TEST_FAILURES.md
+If any FAIL or NOT COVERED: write pathly/plans/[feature]/feedback/TEST_FAILURES.md
 using the shared feedback protocol format.
 ```
 
@@ -101,9 +101,9 @@ Log file created for TEST_FAILURES.md.
 
 **Spawn** `builder`:
 ```
-Read plans/[feature]/feedback/TEST_FAILURES.md.
+Read pathly/plans/[feature]/feedback/TEST_FAILURES.md.
 Fix each failing or uncovered criterion.
-Delete plans/[feature]/feedback/TEST_FAILURES.md when resolved.
+Delete pathly/plans/[feature]/feedback/TEST_FAILURES.md when resolved.
 ```
 After builder resolves: log file deleted for TEST_FAILURES.md. Re-spawn tester.
 

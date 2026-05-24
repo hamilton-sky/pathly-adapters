@@ -96,7 +96,7 @@ Verify with the project's standard verify command when done.
 Report: files changed, verify result.
 ```
 
-**Step 3 — Scope check:** Run `git diff --name-only HEAD`. Count changed files (exclude `plans/`).
+**Step 3 — Scope check:** Run `git diff --name-only HEAD`. Count changed files (exclude `pathly/plans/`).
 If count > 2 and builder did not escalate:
 ```
 [NANO ESCALATION] Builder touched N files (nano limit is 2).

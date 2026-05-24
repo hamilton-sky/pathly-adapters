@@ -21,7 +21,7 @@ that role.
 | `architect` | architect | opus | Read, Glob, Grep, Write, Edit, Agent | Technical design, layer decisions, trade-offs, system design |
 | `designer` | designer | sonnet | Read, Glob, Grep, Write, Bash | UI/UX design systems, palette/typography/style generation via UI UX Pro Max, design reviews |
 | `po` | po | opus | Read, Write | Interactive requirements discussion; probes scope, challenges assumptions, validates PRDs |
-| `planner` | product-owner | sonnet | Read, Glob, Grep, Write, Edit, Agent | Requirements, user stories, conversation decomposition, plans/ folder |
+| `planner` | product-owner | sonnet | Read, Glob, Grep, Write, Edit, Agent | Requirements, user stories, conversation decomposition, pathly/plans/ folder |
 | `builder` | executor | sonnet | Read, Glob, Grep, Edit, Write, Bash, Agent, TodoWrite | Coding, verification, staying in scope |
 | `tester` | tester | sonnet | Read, Glob, Grep, Bash, Write, Agent | Verifying acceptance criteria, test plans, coverage gaps |
 | `reviewer` | reviewer | sonnet | Read, Glob, Grep, Write, Agent | Adversarial review, feedback files, scout delegation |
@@ -55,7 +55,7 @@ declared list:
 User request
   -> director
        decides intent, risk, rigor, and entry point
-       invokes /go, /team-flow, /review, /build, or /retro
+       invokes /go, /pathly team, /review, /build, or /retro
   -> orchestrator
        recovers filesystem FSM state
        routes one next action
@@ -73,7 +73,7 @@ feedback routing, retry limits, and stage transitions.
 
 ```text
 director
-  -> chooses workflow and invokes /team-flow
+  -> chooses workflow and invokes /pathly team
 
 orchestrator
   -> runs the filesystem FSM
@@ -82,7 +82,7 @@ storm (architect)
   -> STORM_SEED.md
 
 plan (planner)
-  -> plans/<feature>/
+  -> pathly/plans/<feature>/
        USER_STORIES.md
        IMPLEMENTATION_PLAN.md
        CONVERSATION_PROMPTS.md
@@ -114,12 +114,12 @@ Prefer the natural-language front door:
 Direct pipeline entry is still available:
 
 ```text
-/team-flow <feature-name>
-/team-flow <feature-name> fast
-/team-flow <feature-name> nano
-/team-flow <feature-name> lite
-/team-flow <feature-name> standard
-/team-flow <feature-name> strict
+/pathly team <feature-name>
+/pathly team <feature-name> fast
+/pathly team <feature-name> nano
+/pathly team <feature-name> lite
+/pathly team <feature-name> standard
+/pathly team <feature-name> strict
 ```
 
 ## For Teams

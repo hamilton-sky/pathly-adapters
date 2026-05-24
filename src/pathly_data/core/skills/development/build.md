@@ -14,11 +14,11 @@ Parse `$ARGUMENTS`: the first word is the **plan folder name** (FEATURE), and if
 
 If the first word of `$ARGUMENTS` is a non-keyword word, use it as `FEATURE`.
 Otherwise auto-detect:
-1. Read `plans/*/STATE.json` files, sorted by modification time (newest first).
+1. Read `pathly/plans/*/STATE.json` files, sorted by modification time (newest first).
    Use the most recent feature whose state is not `IDLE` or `DONE`.
-2. If none found, use the most recently modified `plans/*/` folder (excluding `.archive/`).
+2. If none found, use the most recently modified `pathly/plans/*/` folder (excluding `.archive/`).
 3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
-4. If no `plans/` folder exists or is empty: stop →
+4. If no `pathly/plans/` folder exists or is empty: stop →
    `No active feature found. Start with /pathly go to describe what you want to build.`
 
 ## Step 1: Pre-flight check
@@ -75,15 +75,15 @@ phase: implement
 
 ## Step 2: Locate the plan folder
 
-Find the plan folder at `plans/$PLAN/`. If it doesn't exist, list all `plans/*/` folders and ask which one the user meant.
+Find the plan folder at `pathly/plans/$PLAN/`. If it doesn't exist, list all `pathly/plans/*/` folders and ask which one the user meant.
 
 ## Step 3: Read current state
 
 Read these files:
 
-1. **`plans/$PLAN/PROGRESS.md`** — Find the first row in the "Conversation Breakdown" table with status **TODO**. That is the next target conversation. Also check overall Status — if COMPLETE, stop and report.
+1. **`pathly/plans/$PLAN/PROGRESS.md`** — Find the first row in the "Conversation Breakdown" table with status **TODO**. That is the next target conversation. Also check overall Status — if COMPLETE, stop and report.
 
-2. **`plans/$PLAN/CONVERSATION_PROMPTS.md`** — Find the section for the target conversation number. Extract:
+2. **`pathly/plans/$PLAN/CONVERSATION_PROMPTS.md`** — Find the section for the target conversation number. Extract:
    - The full prompt (everything inside the ` ``` ` block)
    - The verify command (from the prompt or the "Expected output" line)
    - Files touched (listed after the prompt block)
@@ -139,7 +139,7 @@ Do NOT update PROGRESS.md. Do NOT commit. The orchestrator (`/pathly team`) hand
 
 ## Exit contract
 
-Write `plans/<feature>/STATE.json`:
+Write `pathly/plans/<feature>/STATE.json`:
 ```json
 {"current": "REVIEWING", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
 ```
@@ -151,7 +151,7 @@ After the builder agent completes (Phase 3 — Implement), parse the `<usage>` b
 
 Compute wall_seconds fallback: run `python -c "import time; print(int(time.time()) - BUILD_START)"` using `BUILD_START` from Step 4.5.
 
-Append to `plans/<feature>/EVENTS.jsonl`:
+Append to `pathly/plans/<feature>/EVENTS.jsonl`:
 ```
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "<iso-timestamp>"}
 ```

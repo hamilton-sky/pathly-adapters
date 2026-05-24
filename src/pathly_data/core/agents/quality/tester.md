@@ -76,12 +76,12 @@ When spawned with `phase: test`:
 2. Treat any `## Test Context` (Scout Findings) in the prompt as authoritative — do not re-research covered ground.
 3. Map each acceptance criterion to a test using the test plan format below.
 4. Run the verify command(s) before reporting any PASS or FAIL — never claim pass/fail without executing.
-5. If any criterion is FAIL or NOT COVERED: write `plans/<feature>/feedback/TEST_FAILURES.md` and archive a copy (see dual-write rule below).
+5. If any criterion is FAIL or NOT COVERED: write `pathly/plans/<feature>/feedback/TEST_FAILURES.md` and archive a copy (see dual-write rule below).
 6. If all criteria PASS: report the full test plan with all rows marked PASS.
 
 ## Artifact archiving — dual-write rule
 
-Whenever you write a feedback file to `plans/<feature>/feedback/`, also write a
+Whenever you write a feedback file to `pathly/plans/<feature>/feedback/`, also write a
 copy to `pipeline-walkthrough/<feature>/artifacts/` before the resolver deletes it.
 
 Name the archive copy: `<FILENAME>_conv<N>_attempt<M>.md`

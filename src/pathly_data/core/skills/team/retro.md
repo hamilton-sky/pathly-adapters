@@ -6,8 +6,8 @@ Parse `$ARGUMENTS`: `FEATURE`.
 
 ## FSM operations
 
-- **Transition state to X:** Write `plans/<feature>/STATE.json` `{"current": "X"}`.
-  Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.jsonl`.
+- **Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
+  Append `{"type": "STATE_TRANSITION", "to": "X"}` to `pathly/plans/<feature>/EVENTS.jsonl`.
 
 ## Subagents
 
@@ -25,8 +25,8 @@ Do not write files; quick is read-only. The retro skill/orchestrator writes RETR
 ```
 
 After quick completes:
-- Write `plans/[feature]/RETRO.md` with the summary provided.
-- Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or plans/).
+- Write `pathly/plans/[feature]/RETRO.md` with the summary provided.
+- Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or pathly/plans/).
 
 Parse the `<usage>` block from quick's response:
 - `total_tokens`: the number after `total_tokens:` (0 if absent)
@@ -39,7 +39,7 @@ Then invoke the `log-agent-done` skill with:
 ```
 
 **Generate pipeline-walkthrough files:**
-Read `plans/[feature]/EVENTS.jsonl`. Fill and write the three templates from
+Read `pathly/plans/[feature]/EVENTS.jsonl`. Fill and write the three templates from
 `{{TEMPLATES_DIR}}/pipeline-walkthrough/` to `pipeline-walkthrough/[feature]/`:
 
 - `01-PIPELINE-FLOW.md` — FSM state sequence, conversation traces, feedback loops.
@@ -61,7 +61,7 @@ If EVENTS.jsonl does not exist, write all three files with placeholders → "not
 Print:
 ```
 [Stage 5 — Retro complete]
-Pipeline complete. RETRO.md written to plans/[feature]/.
+Pipeline complete. RETRO.md written to pathly/plans/[feature]/.
 Pipeline walkthrough written:
   pipeline-walkthrough/[feature]/01-PIPELINE-FLOW.md
   pipeline-walkthrough/[feature]/02-TOKEN-USAGE.md

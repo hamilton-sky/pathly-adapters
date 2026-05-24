@@ -112,16 +112,16 @@ Reads project state, classifies intent, chooses the lightest safe workflow.
       │
       ▼ (ask if empty)
   Read project state
-  plans/, PROGRESS.md, git status
+  pathly/plans/, PROGRESS.md, git status
       │
       ▼
   Classify intent:
   ┌─────────────────────────────────────┐
-  │ tiny_change → team-flow nano        │
-  │ new_feature → team-flow <rigor>     │
+  │ tiny_change → team nano        │
+  │ new_feature → team <rigor>     │
   │ brainstorm  → storm <topic>         │
-  │ resume      → team-flow build       │
-  │ test        → team-flow test        │
+  │ resume      → team build       │
+  │ test        → team test        │
   │ fix/review  → review / nano         │
   │ retro       → retro <feature>       │
   │ unclear     → ask one question      │
@@ -148,7 +148,7 @@ Cleanly suspends the active session without losing state.
 /pathly pause
       │
       ▼
-  Scan plans/ (skip .archive/)
+  Scan pathly/plans/ (skip .archive/)
       │
   ┌───┴──────────────────┐
   ▼                      ▼
@@ -202,7 +202,7 @@ Ask one named role a bounded question without touching code or pipeline state.
       │
       ▼
   Write consult note:
-  plans/<feature>/consults/
+  pathly/plans/<feature>/consults/
   YYYYMMDD-HHMMSS-<role>.md
       │
       ▼
@@ -230,7 +230,7 @@ Wraps up the session; offers retro.
 /pathly end
       │
       ▼
-  Scan plans/ for IN PROGRESS
+  Scan pathly/plans/ for IN PROGRESS
       │
   ┌───┴──────────────────────┐
   ▼                          ▼
@@ -265,7 +265,7 @@ Detects where you are in the pipeline and shows the right next actions.
   ┌────────────────────────────────────┐
   │ no-feature   → start / storm /     │
   │                prd-import          │
-  │ storm-done   → plan / team-flow    │
+  │ storm-done   → plan / team    │
   │ plan-done    → continue / review / │
   │                meet                │
   │ feedback-open→ resume / show       │
@@ -365,7 +365,7 @@ storm [topic]
 
 ## 10. plan — Plan File Generator
 
-Creates the plan files that `build` and `team-flow` consume.
+Creates the plan files that `build` and `team` consume.
 
 ```
 plan <feature> [rigor]
@@ -455,14 +455,14 @@ guide to next       to commit"
 
 ---
 
-## 12. team-flow — Full Feature Pipeline
+## 12. team — Full Feature Pipeline
 
-Thin orchestrator. Reads `plans/<feature>/STATE.json`, routes to the correct
+Thin orchestrator. Reads `pathly/plans/<feature>/STATE.json`, routes to the correct
 sub-skill for the current FSM state, then re-reads state and routes again until DONE.
-Each sub-skill lives in `core/skills/team-flow/` and handles exactly one stage.
+Each sub-skill lives in `core/skills/team/` and handles exactly one stage.
 
 ```
-team-flow <feature> [rigor] [flags]      ← orchestrator (team-flow.md)
+team <feature> [rigor] [flags]      ← orchestrator (team.md)
       │
       ▼
   Parse args → recover STATE.json/EVENTS.jsonl
@@ -474,47 +474,47 @@ builder → reviewer          │
                     ┌───────▼──────────────────────────┐
                     │ FSM state → sub-skill             │
                     │                                   │
-                    │ IDLE/STORMING  → team-flow/discover│
-                    │ PLANNING       → team-flow/plan   │
-                    │ BUILDING       → team-flow/build  │
-                    │ REVIEWING      → team-flow/review │
-                    │ TESTING        → team-flow/test   │
-                    │ RETRO          → team-flow/retro  │
+                    │ IDLE/STORMING  → team/discover│
+                    │ PLANNING       → team/plan   │
+                    │ BUILDING       → team/build  │
+                    │ REVIEWING      → team/review │
+                    │ TESTING        → team/test   │
+                    │ RETRO          → team/retro  │
                     │ BLOCKED_ON_HUMAN → wait for user  │
                     │ DONE           → stop             │
                     └───────────────────────────────────┘
 
 Sub-skill responsibilities:
 
-  team-flow/discover  Stage 0 — 5-path discovery menu
+  team/discover  Stage 0 — 5-path discovery menu
                       (quick storm / skip / PRD / explore / full PO+storm)
                       → writes STATE.json → PLANNING, routes back
 
-  team-flow/plan      Stage 1+2 — architect storm + planner
+  team/plan      Stage 1+2 — architect storm + planner
                       rigor escalator offers extra files if signals fire
                       → writes STATE.json → BUILDING, routes back
 
-  team-flow/build     Stage 3a — analyze → scout → implement (one conv)
+  team/build     Stage 3a — analyze → scout → implement (one conv)
                       feedback routing: IMPL_QUESTIONS → planner
                                         DESIGN_QUESTIONS → architect
                       → writes STATE.json → REVIEWING, routes back
 
-  team-flow/review    Stage 3b — pre-scout + reviewer (per rigor)
+  team/review    Stage 3b — pre-scout + reviewer (per rigor)
                       feedback routing: ARCH_FEEDBACK → architect → rebuild
                                         REVIEW_FAILURES → builder (max 2)
                                         zero-diff stall → HUMAN_QUESTIONS
                       → writes STATE.json → BUILDING or TESTING, routes back
 
-  team-flow/test      Stage 4 — tester(analyze) → scout-flow → tester(test),
+  team/test      Stage 4 — tester(analyze) → scout-flow → tester(test),
                       TEST_FAILURES → builder (max 2)
                       → writes STATE.json → RETRO, routes back
 
-  team-flow/retro     Stage 5 — quick → RETRO.md + LESSONS_CANDIDATE.md
+  team/retro     Stage 5 — quick → RETRO.md + LESSONS_CANDIDATE.md
                       → writes STATE.json → DONE, routes back
 
 State is stored in two files per feature (filesystem-native, no Python required):
-  plans/<feature>/STATE.json    — current FSM state snapshot
-  plans/<feature>/EVENTS.jsonl  — append-only event log
+  pathly/plans/<feature>/STATE.json    — current FSM state snapshot
+  pathly/plans/<feature>/EVENTS.jsonl  — append-only event log
 ```
 
 ---
@@ -528,7 +528,7 @@ debug <symptom>
       │
       ▼
   INVESTIGATING
-  Create debugs/<symptom>/
+  Create pathly/debugs/<symptom>/
   Write SYMPTOM.md
       │
       ▼
@@ -606,7 +606,7 @@ explore <topic>
       ▼
   Show conclusions. Offer:
   ┌──────────────────────────────┐
-  │ 1. Graduate → team-flow      │
+  │ 1. Graduate → team      │
   │ 2. Explore follow-up         │
   │ 3. Keep as reference         │
   │ 4. Archive                   │
@@ -721,7 +721,7 @@ lessons
 
 ## 18. archive — Feature Archiver
 
-Moves a completed feature out of `plans/` after all gates pass.
+Moves a completed feature out of `pathly/plans/` after all gates pass.
 
 ```
 archive <feature>
@@ -729,7 +729,7 @@ archive <feature>
       ▼
   Validate (all must pass):
   ┌──────────────────────────────┐
-  │ ✓ plans/<feature>/ exists   │
+  │ ✓ pathly/plans/<feature>/ exists   │
   │ ✓ RETRO.md exists           │
   │ ✓ All conversations DONE    │
   │ ✓ No open feedback files    │
@@ -737,12 +737,12 @@ archive <feature>
   (any fails → stop + explain)
       │
       ▼
-  mv plans/<feature>/
-     → plans/.archive/<feature>/
+  mv pathly/plans/<feature>/
+     → pathly/plans/.archive/<feature>/
       │
       ▼
   "Archived. Recoverable: git checkout"
-  "plans/ is clean."
+  "pathly/plans/ is clean."
 ```
 
 ---
@@ -750,7 +750,7 @@ archive <feature>
 ## 19. test — Acceptance Test Runner
 
 Verifies acceptance criteria for a completed feature. Standalone alternative to
-`team-flow <feature> test` — usable without running the full pipeline.
+`team <feature> test` — usable without running the full pipeline.
 Orchestrates tester through analyze → scout-flow → test phases, then fix loop.
 
 ```
@@ -841,7 +841,7 @@ po [feature]
       │
       ▼
   Detect feature context
-  (from args or active plans/)
+  (from args or active pathly/plans/)
       │
       ▼
   Spawn po agent:
@@ -854,7 +854,7 @@ po [feature]
       │
       ▼
   Write PO_NOTES.md:
-  plans/<feature>/PO_NOTES.md
+  pathly/plans/<feature>/PO_NOTES.md
       │
       ▼
   "Next: /pathly plan <feature>"
@@ -898,7 +898,7 @@ from `STATE.json` or accepts an explicit topic argument.
 fix [feature]
       │
       ▼
-  Resolve TOPIC (arg or auto-detect from plans/)
+  Resolve TOPIC (arg or auto-detect from pathly/plans/)
       │
       ▼
   Read feedback/ for open files
@@ -1007,7 +1007,7 @@ design [feature]
     typography | interactions
       │
       ▼
-  Write plans/<feature>/DESIGN.md
+  Write pathly/plans/<feature>/DESIGN.md
   "Next: /pathly build <feature>"
 ```
 
@@ -1095,17 +1095,17 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
   INPUT                SKILL          OUTPUT
   ─────────────────────────────────────────────────────
   idea / intent   ──►  storm     ──►  STORM_SEED.md
-  STORM_SEED.md   ──►  plan      ──►  plans/<feature>/
-  any PRD file    ──►  prd-import──►  plans/<feature>/
-  plans/<feature> ──►  build     ──►  code + PROGRESS.md
-  plans/<feature> ──►  team-flow ──►  full pipeline
+  STORM_SEED.md   ──►  plan      ──►  pathly/plans/<feature>/
+  any PRD file    ──►  prd-import──►  pathly/plans/<feature>/
+  pathly/plans/<feature> ──►  build     ──►  code + PROGRESS.md
+  pathly/plans/<feature> ──►  team ──►  full pipeline
   git diff        ──►  review    ──►  violations report
   PROGRESS.md     ──►  retro     ──►  RETRO.md
   RETRO.md files  ──►  lessons   ──►  LESSONS.md
   LESSONS.md      ──►  plan      ──►  (injected silently)
-  RETRO.md + done ──►  archive   ──►  plans/.archive/
+  RETRO.md + done ──►  archive   ──►  pathly/plans/.archive/
   question        ──►  explore   ──►  CONCLUSIONS.md
-  plans/<feature> ──►  test      ──►  test report + TEST_FAILURES.md
+  pathly/plans/<feature> ──►  test      ──►  test report + TEST_FAILURES.md
   bug symptom     ──►  debug     ──►  fix + FIX.md
   any feature     ──►  verify-   ──►  health report
                        state
@@ -1140,7 +1140,7 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
 ## Feedback File Protocol
 
 All pipeline communication between agents happens through files in
-`plans/<feature>/feedback/`. A file present = issue open. Deleted = resolved.
+`pathly/plans/<feature>/feedback/`. A file present = issue open. Deleted = resolved.
 
 ```
 Priority order (highest to lowest):

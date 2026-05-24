@@ -7,8 +7,8 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 
 ## FSM operations
 
-All events are appended to `plans/<feature>/EVENTS.jsonl` as JSON lines.
-State snapshots are written to `plans/<feature>/STATE.json`.
+All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
+State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>"}`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>"}`.
@@ -32,14 +32,14 @@ State snapshots are written to `plans/<feature>/STATE.json`.
 
 ## Feedback file priority (for routing blocked builders)
 
-All files live in `plans/[feature]/feedback/`. File exists = issue open. Absent = resolved.
+All files live in `pathly/plans/[feature]/feedback/`. File exists = issue open. Absent = resolved.
 
 Priority order: `HUMAN_QUESTIONS.md` › `ARCH_FEEDBACK.md` › `DESIGN_QUESTIONS.md` ›
 `IMPL_QUESTIONS.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`
 
 ## Guard — feedback-open check
 
-Before spawning builder, scan `plans/<feature>/feedback/`. If any file exists:
+Before spawning builder, scan `pathly/plans/<feature>/feedback/`. If any file exists:
 1. Identify highest-priority file using the order above.
 2. Log file created for that file.
 3. Route to the responsible agent (see feedback routing below).
@@ -59,7 +59,7 @@ Exception: `IMPL_QUESTIONS.md` and `DESIGN_QUESTIONS.md` are clarification reque
 
 ## Execution
 
-Read `plans/[feature]/PROGRESS.md`. Find the first conversation row with status TODO. This is Conv N.
+Read `pathly/plans/[feature]/PROGRESS.md`. Find the first conversation row with status TODO. This is Conv N.
 
 ### Phase 1 — Analyze
 
@@ -94,8 +94,8 @@ Execute conversation N only. Verify. Do NOT update PROGRESS.md — the orchestra
 ## Scout Findings
 [compressed summary — or "none" if Phase 2 was skipped]
 
-If you hit requirement ambiguity (what should this do?): write plans/[feature]/feedback/IMPL_QUESTIONS.md
-If you hit a technical blocker (how is this possible?): write plans/[feature]/feedback/DESIGN_QUESTIONS.md
+If you hit requirement ambiguity (what should this do?): write pathly/plans/[feature]/feedback/IMPL_QUESTIONS.md
+If you hit a technical blocker (how is this possible?): write pathly/plans/[feature]/feedback/DESIGN_QUESTIONS.md
 Use the shared feedback protocol formats, then report blocked.
 Report: files changed, verify result, stories delivered.
 ```
@@ -105,18 +105,18 @@ Report: files changed, verify result, stories delivered.
 **If `IMPL_QUESTIONS.md` exists** ([REQ] tagged):
 **Spawn** `planner`:
 ```
-Read plans/[feature]/feedback/IMPL_QUESTIONS.md.
+Read pathly/plans/[feature]/feedback/IMPL_QUESTIONS.md.
 Answer each [REQ] question — clarify in USER_STORIES.md or CONVERSATION_PROMPTS.md.
-Delete plans/[feature]/feedback/IMPL_QUESTIONS.md when resolved.
+Delete pathly/plans/[feature]/feedback/IMPL_QUESTIONS.md when resolved.
 ```
 After resolved: log file deleted for IMPL_QUESTIONS.md. Re-run Phase 3. Do not log retry.
 
 **If `DESIGN_QUESTIONS.md` exists** ([ARCH] tagged):
 **Spawn** `architect`:
 ```
-Read plans/[feature]/feedback/DESIGN_QUESTIONS.md.
+Read pathly/plans/[feature]/feedback/DESIGN_QUESTIONS.md.
 Resolve each [ARCH] question — update ARCHITECTURE_PROPOSAL.md (or IMPLEMENTATION_PLAN.md for lite plans).
-Delete plans/[feature]/feedback/DESIGN_QUESTIONS.md when resolved.
+Delete pathly/plans/[feature]/feedback/DESIGN_QUESTIONS.md when resolved.
 ```
 After resolved: log file deleted for DESIGN_QUESTIONS.md. Re-run Phase 3. Do not log retry.
 

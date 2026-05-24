@@ -101,80 +101,8 @@ Wait for user input. Then route:
 
 ## Behavior: go
 
-**Step 0 — Get Intent**
-
-Use `args` as the intent. If `args` is empty, ask:
-
-```
-What do you want to build or do?
-```
-
-Wait for reply.
-
-**Step 1 — Read Project State**
-
-1. Does `plans/` exist and contain feature folders?
-2. For each folder in `plans/` (skip `.archive/`), read `PROGRESS.md` if present.
-3. Count TODO vs DONE conversations.
-4. Check `git status --short`.
-
-**Step 2 — Classify Intent**
-
-| Intent | Signals | Route |
-|---|---|---|
-| `tiny_change` | copy tweak, config, one obvious bug, "quick fix" | `team <feature> nano` |
-| `new_feature` | build, add, create, implement, make, I want | `team <feature> <rigor>` |
-| `brainstorm` | brainstorm, storm, refine, unclear idea | `storm <topic>` |
-| `resume` | continue, resume, finish, next step, keep going | `team <feature> build` |
-| `test` | test, verify, acceptance criteria, QA | `team <feature> test` |
-| `fix_or_review` | fix, broken, bug, check diff, review | `review` or `team <feature> nano` |
-| `retro` | retro, wrap up, lessons, done building | `retro <feature>` |
-| `unclear` | anything else | ask one clarifying question |
-
-Feature name: strip filler words, kebab-case the useful phrase, match to existing
-`plans/<name>/` folder if one exists.
-
-**Step 3 — Choose Rigor**
-
-- **nano**: ≤2 files, obvious path, no high-risk domain, user didn't ask for planning
-- **lite**: low-risk feature, short plan useful, 1–3 conversations
-- **standard**: multiple layers, >3 conversations, meaningful user-facing behavior
-- **strict**: auth, payment, billing, secrets, privacy, schema migration, destructive data, compliance
-
-Add `fast` only if user explicitly asks for no-pause execution. Never combine `strict` + `fast`.
-
-**Step 4 — Ask Only If Unsafe**
-
-Ask one clarifying question only if:
-- Multiple active features could match
-- A destructive request lacks a target
-- Cannot infer intent between review, fix, or new implementation
-
-Otherwise choose conservatively and proceed.
-
-**Step 5 — Print Decision**
-
-```
-I will treat this as: <rigor>
-Reason: <one sentence>
-Starting: <plain-language next action>
-```
-
-**Step 6 — Invoke Route**
-
-```
-storm <topic>
-team <feature> nano
-team <feature> lite
-team <feature> standard
-team <feature> strict
-team <feature> build
-team <feature> test
-review
-retro <feature>
-```
-
-Default for new features: `team <feature> lite`.
+Delegate entirely to the `go` skill. Pass `args` as `$ARGUMENTS` to the `go` skill
+and follow its procedure from Step 0.
 
 ---
 
@@ -182,7 +110,7 @@ Default for new features: `team <feature> lite`.
 
 **Step 1 — Find in-progress feature**
 
-Scan `plans/` (skip `.archive/`). For each feature folder, read `PROGRESS.md`.
+Scan `pathly/plans/` (skip `.archive/`). For each feature folder, read `PROGRESS.md`.
 Look for `status: IN PROGRESS` or `Status: IN PROGRESS`.
 
 **Step 2 — If a feature is in progress**
@@ -215,7 +143,7 @@ Nothing in progress. All done.
 
 ## Behavior: pause
 
-Scan `plans/` for a feature whose `PROGRESS.md` contains `status: IN PROGRESS`.
+Scan `pathly/plans/` for a feature whose `PROGRESS.md` contains `status: IN PROGRESS`.
 If found, write `status: PAUSED` to that feature's `PROGRESS.md`.
 
 Print:
@@ -228,9 +156,9 @@ Session paused. Resume with /pathly go when ready.
 
 ## Behavior: meet
 
-Scan `plans/*/STATE.json` sorted by modification time (most recent first).
+Scan `pathly/plans/*/STATE.json` sorted by modification time (most recent first).
 Pick the active feature and run the meet workflow: consult one relevant role,
-write a read-only consult note to `plans/<feature>/feedback/CONSULT_<role>.md`.
+write a read-only consult note to `pathly/plans/<feature>/feedback/CONSULT_<role>.md`.
 
 ---
 
@@ -238,15 +166,15 @@ write a read-only consult note to `plans/<feature>/feedback/CONSULT_<role>.md`.
 
 **Step 1 — Detect state**
 
-1. If `args` is provided, use it as `FEATURE`. Otherwise scan `plans/` for the
+1. If `args` is provided, use it as `FEATURE`. Otherwise scan `pathly/plans/` for the
    most recently modified feature folder.
-2. Read `plans/$FEATURE/PROGRESS.md` if it exists.
-3. Check `plans/$FEATURE/feedback/` for open files.
+2. Read `pathly/plans/$FEATURE/PROGRESS.md` if it exists.
+3. Check `pathly/plans/$FEATURE/feedback/` for open files.
 4. Infer rigor: **lite** (4 required files only), **standard** (all 8 files),
    **strict** (8 files + audit markers), **unknown** (no plan folder).
 5. Classify state:
-   - **no-feature** — no plans/ folder or no feature found
-   - **storm-done** — `plans/STORM_SEED.md` exists, no plans folder yet
+   - **no-feature** — no pathly/plans/ folder or no feature found
+   - **storm-done** — `pathly/plans/STORM_SEED.md` exists, no plans folder yet
    - **plan-done** — plans folder exists, conversations TODO, no open feedback
    - **feedback-open** — feedback file(s) present
    - **build-done** — all conversations DONE, no RETRO.md yet

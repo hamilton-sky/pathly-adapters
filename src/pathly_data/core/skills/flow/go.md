@@ -37,8 +37,8 @@ Wait for the user's reply. Use that reply as `$ARGUMENTS`.
 
 Check the filesystem:
 
-1. Does `plans/` exist and contain feature folders?
-2. For each folder in `plans/` (skip `.archive/`), read `PROGRESS.md` if present.
+1. Does `pathly/plans/` exist and contain feature folders?
+2. For each folder in `pathly/plans/` (skip `.archive/`), read `PROGRESS.md` if present.
 3. Count TODO vs DONE conversations.
 4. Check whether the working tree has current changes with `git status --short`.
 5. Build a short state map:
@@ -72,7 +72,7 @@ Classify the free text into one intent:
 Feature name extraction:
 - Strip filler words: "I want to", "build me", "can you", "please".
 - Kebab-case the useful phrase.
-- If a matching `plans/<feature>/` folder exists, use that exact folder name.
+- If a matching `pathly/plans/<feature>/` folder exists, use that exact folder name.
 - For resume/test/retro, if exactly one matching feature is active, use it.
 - If multiple active features match, ask which one.
 

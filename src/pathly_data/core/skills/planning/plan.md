@@ -10,9 +10,9 @@ for rendering those routes in their host-native form.
 
 ## Skill Contract
 
-**Consumes (optional):** `plans/STORM_SEED.md` - pre-filled answers for the interview
-**Produces:** `plans/$FEATURE/` - FEATURE_INDEX.md + 4 files in lite, FEATURE_INDEX.md + 8 files in standard/strict
-**Consumed by:** `build` skill reads `plans/$FEATURE/FEATURE_INDEX.md` first, then `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
+**Consumes (optional):** `pathly/plans/STORM_SEED.md` - pre-filled answers for the interview
+**Produces:** `pathly/plans/$FEATURE/` - FEATURE_INDEX.md + 4 files in lite, FEATURE_INDEX.md + 8 files in standard/strict
+**Consumed by:** `build` skill reads `pathly/plans/$FEATURE/FEATURE_INDEX.md` first, then `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
 
 ## Step 0: Parse Arguments
 
@@ -25,7 +25,7 @@ Parse `$ARGUMENTS`:
 
 Use `FEATURE` for the folder name, not the full `$ARGUMENTS` string.
 
-If `plans/$FEATURE/` already exists, treat this as a rigor change or plan completion task:
+If `pathly/plans/$FEATURE/` already exists, treat this as a rigor change or plan completion task:
 - `lite -> standard`: keep existing files and add missing standard files.
 - `standard -> strict`: keep existing files and add strict risk, rollback, approval, and verification mapping.
 - `strict -> standard` or `standard -> lite`: do not delete files; report that downgrades change future gates only.
@@ -40,7 +40,7 @@ If two lessons conflict, prefer the one with more sources listed.
 
 ## Step 2: Understand The Feature
 
-Check if `plans/STORM_SEED.md` exists.
+Check if `pathly/plans/STORM_SEED.md` exists.
 
 If it exists: read it, pre-fill interview answers, confirm with user, then delete the seed file.
 
@@ -81,7 +81,7 @@ All template reads below use `$TEMPLATE_BASE/<FILE>.template.md`.
 
 ## Step 4: Create The Plans Folder
 
-Create `plans/$FEATURE/` if it does not exist. If it exists, add or update only the files/sections needed for the selected rigor.
+Create `pathly/plans/$FEATURE/` if it does not exist. If it exists, add or update only the files/sections needed for the selected rigor.
 
 ### Rigor File Sets
 
@@ -115,7 +115,7 @@ Strict produces the same 8 files plus stronger audit expectations:
 - Keep all assumptions and unresolved questions visible.
 - Do not mark ambiguous requirements as implementation-ready.
 
-Conversation cap rule: max 4 conversations per folder. If more are needed, split into `plans/$FEATURE-part-1/` and `plans/$FEATURE-part-2/`.
+Conversation cap rule: max 4 conversations per folder. If more are needed, split into `pathly/plans/$FEATURE-part-1/` and `pathly/plans/$FEATURE-part-2/`.
 
 ### 4a. FEATURE_INDEX.md ← write this first
 
@@ -160,7 +160,7 @@ Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for the exact fil
 
 Each prompt must be self-contained. Start every prompt with:
 ```
-Read plans/$FEATURE/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+Read pathly/plans/$FEATURE/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
 ```
 Do not re-list all codebase files in the prompt — they live in FEATURE_INDEX.md.
 
@@ -233,9 +233,9 @@ Keep decomposition small enough for builder reliability:
 
 ## Step 5: Verify Structure
 
-- `FEATURE_INDEX.md` exists in `plans/$FEATURE/` for all rigor levels.
-- If `rigor = lite`, all 5 required files exist in `plans/$FEATURE/`.
-- If `rigor = standard` or `strict`, all 9 files exist in `plans/$FEATURE/`.
+- `FEATURE_INDEX.md` exists in `pathly/plans/$FEATURE/` for all rigor levels.
+- If `rigor = lite`, all 5 required files exist in `pathly/plans/$FEATURE/`.
+- If `rigor = standard` or `strict`, all 9 files exist in `pathly/plans/$FEATURE/`.
 - `CONVERSATION_PROMPTS.md` has no more than 4 conversations.
 - Conversation prompts reference correct phase numbers.
 - `PROGRESS.md` conversation table matches `CONVERSATION_PROMPTS.md`.
@@ -247,7 +247,7 @@ Keep decomposition small enough for builder reliability:
 ## Step 6: Report
 
 ```text
-## Plans folder created: plans/$FEATURE/
+## Plans folder created: pathly/plans/$FEATURE/
 
 Rigor: [lite / standard / strict]
 

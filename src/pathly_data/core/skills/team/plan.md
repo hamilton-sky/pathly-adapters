@@ -7,8 +7,8 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor` (lite|standard|strict), `autoFlow`, optio
 
 ## FSM operations
 
-**Transition state to X:** Write `plans/<feature>/STATE.json` `{"current": "X"}`.
-Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.jsonl`.
+**Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
+Append `{"type": "STATE_TRANSITION", "to": "X"}` to `pathly/plans/<feature>/EVENTS.jsonl`.
 
 **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>"}` to EVENTS.jsonl.
 
@@ -35,8 +35,8 @@ Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.json
 ```
 phase: analyze
 Feature: [feature name]
-Read plans/[feature]/PO_NOTES.md if it exists.
-Read plans/[feature]/STORM_SEED.md if it exists.
+Read pathly/plans/[feature]/PO_NOTES.md if it exists.
+Read pathly/plans/[feature]/STORM_SEED.md if it exists.
 List what codebase research and external information you need before storming — output NEEDS_CONTEXT block only.
 
 NEEDS_CONTEXT format (one entry per line):
@@ -97,10 +97,10 @@ Record start time: run `python -c "import time; print(int(time.time()))"` and no
 
 ### PO Phase — Requirements
 
-Before planner analysis, check whether `plans/<feature>/PO_NOTES.md` exists.
+Before planner analysis, check whether `pathly/plans/<feature>/PO_NOTES.md` exists.
 If it exists, skip this phase entirely and proceed to Phase 1 — Analyze.
 
-If `PO_NOTES.md` does not exist, check `plans/<feature>/STORM_SEED.md`
+If `PO_NOTES.md` does not exist, check `pathly/plans/<feature>/STORM_SEED.md`
 richness:
 - Rich STORM_SEED.md: spawn `po` in confirmation-pass mode.
 - Thin or absent STORM_SEED.md: spawn `po` in full-interactive mode.
@@ -119,9 +119,9 @@ If autoFlow is active, PO Phase runs non-interactively. PO writes its best-guess
 ```
 phase: analyze
 Feature: [feature name], rigor: [rigor]
-Read plans/[feature]/STORM_SEED.md if it exists.
-Read plans/[feature]/PO_NOTES.md if it exists.
-If explorations/[feature]/CONCLUSIONS.md exists, read it as prior exploration context — treat its findings as established facts and do not re-investigate what it already covers.
+Read pathly/plans/[feature]/STORM_SEED.md if it exists.
+Read pathly/plans/[feature]/PO_NOTES.md if it exists.
+If pathly/explorations/[feature]/CONCLUSIONS.md exists, read it as prior exploration context — treat its findings as established facts and do not re-investigate what it already covers.
 List what codebase context you need before writing the plan — output NEEDS_CONTEXT block only.
 
 NEEDS_CONTEXT format (one entry per line):
@@ -148,9 +148,9 @@ Collect all findings. Synthesize into a single Scout Findings block before Phase
 ```
 phase: plan
 Route to plan [feature name] [rigor].
-If plans/[feature]/STORM_SEED.md exists, consume it as pre-filled answers.
-Read plans/[feature]/PO_NOTES.md as the authoritative source of user stories.
-If explorations/[feature]/CONCLUSIONS.md exists, treat it as prior exploration: do not re-investigate what it covers; use its Recommendation and Evidence sections to anchor scope and risk decisions.
+If pathly/plans/[feature]/STORM_SEED.md exists, consume it as pre-filled answers.
+Read pathly/plans/[feature]/PO_NOTES.md as the authoritative source of user stories.
+If pathly/explorations/[feature]/CONCLUSIONS.md exists, treat it as prior exploration: do not re-investigate what it covers; use its Recommendation and Evidence sections to anchor scope and risk decisions.
 Decompose — do not re-author stories.
 
 ## Scout Findings
@@ -171,7 +171,7 @@ After planner completes — run the **rigor escalator** (below).
 If not autoFlow — pause:
 ```
 [Stage 2 — Plan complete]
-plans/[feature]/ created with the selected rigor's required files.
+pathly/plans/[feature]/ created with the selected rigor's required files.
 Review USER_STORIES.md and CONVERSATION_PROMPTS.md.
 Reply 'go' to start implementation, or 'stop' to pause here.
 ```
@@ -228,7 +228,7 @@ Does NOT fire for pure UI/label mentions (e.g. "auth button label", "payment ico
 
 ### Offer (interactive mode)
 
-If any signal fires, write `plans/<feature>/feedback/HUMAN_QUESTIONS.md`:
+If any signal fires, write `pathly/plans/<feature>/feedback/HUMAN_QUESTIONS.md`:
 ```
 [RIGOR ESCALATOR] — recommended additions for <feature>
 

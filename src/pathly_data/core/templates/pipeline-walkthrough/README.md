@@ -2,7 +2,7 @@
 
 _Generated: {{DATE}} | Rigor: {{RIGOR}} | Conversations: {{CONV_COUNT}}_
 
-This folder is the metrics record for the **{{FEATURE}}** team-flow pipeline run.
+This folder is the metrics record for the **{{FEATURE}}** team pipeline run.
 It documents every agent spawn, feedback loop, token cost, and artifact produced.
 
 ---
@@ -21,11 +21,11 @@ It documents every agent spawn, feedback loop, token cost, and artifact produced
 
 | Artifact | Stage | Role |
 |---|---|---|
-| [plans/{{FEATURE}}/USER_STORIES.md](../../plans/{{FEATURE}}/USER_STORIES.md) | Planning | Acceptance criteria |
-| [plans/{{FEATURE}}/IMPLEMENTATION_PLAN.md](../../plans/{{FEATURE}}/IMPLEMENTATION_PLAN.md) | Planning | Exact code changes |
-| [plans/{{FEATURE}}/CONVERSATION_PROMPTS.md](../../plans/{{FEATURE}}/CONVERSATION_PROMPTS.md) | Planning | Verbatim builder prompts |
-| [plans/{{FEATURE}}/PROGRESS.md](../../plans/{{FEATURE}}/PROGRESS.md) | Pipeline | Conversation status |
-| [plans/{{FEATURE}}/RETRO.md](../../plans/{{FEATURE}}/RETRO.md) | Retro | Human retrospective |
+| [pathly/plans/{{FEATURE}}/USER_STORIES.md](../../pathly/plans/{{FEATURE}}/USER_STORIES.md) | Planning | Acceptance criteria |
+| [pathly/plans/{{FEATURE}}/IMPLEMENTATION_PLAN.md](../../pathly/plans/{{FEATURE}}/IMPLEMENTATION_PLAN.md) | Planning | Exact code changes |
+| [pathly/plans/{{FEATURE}}/CONVERSATION_PROMPTS.md](../../pathly/plans/{{FEATURE}}/CONVERSATION_PROMPTS.md) | Planning | Verbatim builder prompts |
+| [pathly/plans/{{FEATURE}}/PROGRESS.md](../../pathly/plans/{{FEATURE}}/PROGRESS.md) | Pipeline | Conversation status |
+| [pathly/plans/{{FEATURE}}/RETRO.md](../../pathly/plans/{{FEATURE}}/RETRO.md) | Retro | Human retrospective |
 | [lessons/LESSONS.md](../../lessons/LESSONS.md) | Lessons | Promoted patterns for next planner |
 
 ---
@@ -34,7 +34,7 @@ It documents every agent spawn, feedback loop, token cost, and artifact produced
 
 ```
 /pathly go {{FEATURE}}
-    └─► director → team-flow ({{RIGOR}} rigor)
+    └─► director → team ({{RIGOR}} rigor)
             ├─ discovery     {{DISCOVERY_NOTE}}
             ├─ planning      {{PLANNING_NOTE}}
             ├─ build/review  {{CONV_COUNT}} conversations, {{REVIEW_LOOPS}} review loops

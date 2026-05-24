@@ -8,7 +8,7 @@ appending AGENT_DONE and calling record-cost separately.
 
 `$ARGUMENTS` is a JSON object with these fields:
 - `agent` (required): agent name — `"builder"`, `"reviewer"`, `"tester"`, `"planner"`, `"designer"`, `"quick"`
-- `feature` (required): feature slug matching the plans/ folder name
+- `feature` (required): feature slug matching the pathly/plans/ folder name
 - `conversation` (required): conversation number (integer); use 0 for non-build stages
 - `result` (required): `"DONE"` or `"PASS"`
 - `total_tokens` (optional): total token count from `<usage>` block, default 0

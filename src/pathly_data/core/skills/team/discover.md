@@ -8,8 +8,8 @@ Parse `$ARGUMENTS`: first non-keyword word = `FEATURE`, `lite|standard|strict` =
 
 ## FSM operations
 
-**Transition state to X:** Write `plans/<feature>/STATE.json` `{"current": "X"}`.
-Append `{"type": "STATE_TRANSITION", "to": "X"}` to `plans/<feature>/EVENTS.jsonl`.
+**Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
+Append `{"type": "STATE_TRANSITION", "to": "X"}` to `pathly/plans/<feature>/EVENTS.jsonl`.
 
 **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>"}` to EVENTS.jsonl.
 
@@ -86,7 +86,7 @@ Wait for path. Route to `prd-import [FEATURE] [path] [rigor]`.
 
 After import returns, print:
 ```
-PRD imported. Plan files ready in plans/[feature]/
+PRD imported. Plan files ready in pathly/plans/[feature]/
 
 The PRD covers your requirements. How do you want to proceed?
   [A] Skip to build — PRD is sufficient, go straight to implementation
@@ -104,9 +104,9 @@ Route back to `team [FEATURE] [rigor] [autoFlow]`.
 **B** → Transition state → PO_DISCUSSING. **Spawn** `po`:
 ```
 Run PO mode for the feature: [feature name]
-A PRD has already been imported. Read plans/[feature]/USER_STORIES.md as the baseline.
+A PRD has already been imported. Read pathly/plans/[feature]/USER_STORIES.md as the baseline.
 Focus only on gaps: missing edge cases, unclear acceptance criteria, unstated constraints.
-The user will type "stop notes" when satisfied to write plans/[feature]/PO_NOTES.md.
+The user will type "stop notes" when satisfied to write pathly/plans/[feature]/PO_NOTES.md.
 Remind them of this at the start.
 ```
 After PO completes: transition state → BUILDING.
@@ -125,13 +125,13 @@ Transition state → EXPLORING.
 Route to `explore [FEATURE]`.
 
 The explore skill frames the question, runs the explorer + scout agent pipeline, and
-writes `explorations/[FEATURE]/CONCLUSIONS.md`.
+writes `pathly/explorations/[FEATURE]/CONCLUSIONS.md`.
 
 After the explore skill returns control (user chose "Done" or "Graduate"), read
-`explorations/[FEATURE]/CONCLUSIONS.md` and print:
+`pathly/explorations/[FEATURE]/CONCLUSIONS.md` and print:
 
 ```
-[Explore complete] Findings in explorations/[FEATURE]/CONCLUSIONS.md.
+[Explore complete] Findings in pathly/explorations/[FEATURE]/CONCLUSIONS.md.
 
 What next?
   [A] Plan — go to planning (planner gets CONCLUSIONS.md as context)
@@ -143,7 +143,7 @@ Reply with A, B, or C:
 
 **A** → Transition state → PLANNING.
 Route to `team/plan [FEATURE] [rigor] [autoFlow]`.
-(`team/plan` reads `explorations/[FEATURE]/CONCLUSIONS.md` automatically — no extra injection needed.)
+(`team/plan` reads `pathly/explorations/[FEATURE]/CONCLUSIONS.md` automatically — no extra injection needed.)
 
 **B** → Route back to `team [FEATURE] nano`. (Orchestrator will run nano mode.)
 
@@ -161,7 +161,7 @@ Transition state → PO_DISCUSSING.
 ```
 Run PO mode for the feature: [feature name]
 Probe requirements interactively — problem, users, MVP scope, out-of-scope, constraints, edge cases.
-The user will type "stop notes" when satisfied to write plans/[feature]/PO_NOTES.md.
+The user will type "stop notes" when satisfied to write pathly/plans/[feature]/PO_NOTES.md.
 Remind them of this at the start.
 ```
 After PO completes: transition state → PO_PAUSED.
@@ -169,7 +169,7 @@ After PO completes: transition state → PO_PAUSED.
 If not autoFlow — pause:
 ```
 [Phase 1 — PO Discussion complete]
-Requirements captured in plans/[feature]/PO_NOTES.md.
+Requirements captured in pathly/plans/[feature]/PO_NOTES.md.
 Ready for architect storm? Reply 'yes' to continue, or 'no' to stop here.
 ```
 On 'no': log human response "stop". Write STATE.json with current state. Halt.

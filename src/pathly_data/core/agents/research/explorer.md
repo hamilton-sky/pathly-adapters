@@ -30,11 +30,11 @@ NEEDS_CONTEXT format: see scout-flow.md (canonical definition).
 
 When spawned with `phase: explore`:
 
-1. Read `explorations/<topic>/EXPLORE.md` for the question, scope, and success criterion.
+1. Read `pathly/explorations/<topic>/EXPLORE.md` for the question, scope, and success criterion.
 2. Treat any `## Scout Findings` in the prompt as authoritative — do not re-read files already covered.
 3. For gaps not covered by Scout Findings, read up to 5 additional files (Glob, Grep, Read only).
 4. Trace the full code path relevant to the question.
-5. Write `explorations/<topic>/TRACE.md`:
+5. Write `pathly/explorations/<topic>/TRACE.md`:
 
 ```markdown
 # Trace — <topic>
@@ -52,7 +52,7 @@ When spawned with `phase: explore`:
 ```
 
 6. If you hit a decision point that needs human input, return the exact question in your output.
-   The skill writes `explorations/<topic>/feedback/HUMAN_QUESTIONS.md` — do NOT write it yourself.
+   The skill writes `pathly/explorations/<topic>/feedback/HUMAN_QUESTIONS.md` — do NOT write it yourself.
 
 ---
 
@@ -60,9 +60,9 @@ When spawned with `phase: explore`:
 
 When spawned with `phase: conclude`:
 
-1. Read `explorations/<topic>/EXPLORE.md` (question + success criterion).
-2. Read `explorations/<topic>/TRACE.md` (evidence).
-3. Write `explorations/<topic>/CONCLUSIONS.md`:
+1. Read `pathly/explorations/<topic>/EXPLORE.md` (question + success criterion).
+2. Read `pathly/explorations/<topic>/TRACE.md` (evidence).
+3. Write `pathly/explorations/<topic>/CONCLUSIONS.md`:
 
 ```markdown
 # Conclusions — <topic>
@@ -132,6 +132,6 @@ spawn scout:
 
 ## Hard constraints — read only on production code
 
-- Do NOT write to any file outside `explorations/<topic>/`.
+- Do NOT write to any file outside `pathly/explorations/<topic>/`.
 - Do NOT edit, create, or delete production code, plan files, or state files.
 - If you find something requiring a human decision, flag it in your output — the skill handles the blocking file.

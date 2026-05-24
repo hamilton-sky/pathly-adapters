@@ -10,19 +10,19 @@ for rendering those routes in their host-native form.
 
 ## Skill Contract
 
-**Consumes:** `plans/<FEATURE>/PROGRESS.md` + `plans/<FEATURE>/CONVERSATION_PROMPTS.md`
-**Produces:** `plans/<FEATURE>/RETRO.md`
+**Consumes:** `pathly/plans/<FEATURE>/PROGRESS.md` + `pathly/plans/<FEATURE>/CONVERSATION_PROMPTS.md`
+**Produces:** `pathly/plans/<FEATURE>/RETRO.md`
 **Consumed by:** `storm` skill (user pastes RETRO.md as context for next storm session)
 
 ## Feature detection
 
 If `$ARGUMENTS` contains a non-keyword word, use it as `FEATURE`.
 Otherwise auto-detect:
-1. Read `plans/*/STATE.json` files, sorted by modification time (newest first).
+1. Read `pathly/plans/*/STATE.json` files, sorted by modification time (newest first).
    Use the most recent feature whose state is not `IDLE` or `DONE`.
-2. If none found, use the most recently modified `plans/*/` folder (excluding `.archive/`).
+2. If none found, use the most recently modified `pathly/plans/*/` folder (excluding `.archive/`).
 3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
-4. If no `plans/` folder exists or is empty: stop →
+4. If no `pathly/plans/` folder exists or is empty: stop →
    `No active feature found. Start with /pathly go to describe what you want to build.`
 
 Run a retrospective on the **FEATURE** plan.
@@ -30,10 +30,10 @@ Run a retrospective on the **FEATURE** plan.
 ## Step 1: Read the plan
 
 Read both files:
-1. `plans/$ARGUMENTS/PROGRESS.md` — overall status, what was completed
-2. `plans/$ARGUMENTS/CONVERSATION_PROMPTS.md` — the prompts that were used
+1. `pathly/plans/$ARGUMENTS/PROGRESS.md` — overall status, what was completed
+2. `pathly/plans/$ARGUMENTS/CONVERSATION_PROMPTS.md` — the prompts that were used
 
-If the plan folder doesn't exist, list all `plans/*/` folders and ask which one the user meant.
+If the plan folder doesn't exist, list all `pathly/plans/*/` folders and ask which one the user meant.
 If PROGRESS.md status is not COMPLETE, warn: "This plan is not marked COMPLETE — retro may be incomplete."
 
 ## Step 2: Ask 3 questions
@@ -50,7 +50,7 @@ Ask these three questions, one at a time. Wait for an answer before asking the n
 
 **Before writing — compute cost summary (if EVENTS.jsonl exists):**
 
-Read `plans/$ARGUMENTS/EVENTS.jsonl`. For every line where `type == "AGENT_DONE"`,
+Read `pathly/plans/$ARGUMENTS/EVENTS.jsonl`. For every line where `type == "AGENT_DONE"`,
 collect `agent`, `model`, `tokens_in`, `tokens_out`, `cost_usd`.
 
 Aggregate per agent:
@@ -59,7 +59,7 @@ Aggregate per agent:
 
 If any events have `cost_usd > 0`, build a cost table. Otherwise omit the Cost section.
 
-Write `plans/$ARGUMENTS/RETRO.md`:
+Write `pathly/plans/$ARGUMENTS/RETRO.md`:
 
 ```markdown
 # [Feature Name] — Retrospective
@@ -168,7 +168,7 @@ Do NOT invent lessons. Only extract from what the user actually said.
 ## Step 6: Report
 
 ```
-Retro written: plans/$ARGUMENTS/RETRO.md
+Retro written: pathly/plans/$ARGUMENTS/RETRO.md
 Pipeline walkthrough written:
   pipeline-walkthrough/$ARGUMENTS/01-PIPELINE-FLOW.md
   pipeline-walkthrough/$ARGUMENTS/02-TOKEN-USAGE.md

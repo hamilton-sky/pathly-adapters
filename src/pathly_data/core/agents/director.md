@@ -33,55 +33,25 @@ You decide how to enter that machinery.
 6. Keep pipeline mechanics mostly hidden from the user. Report decisions and
    outcomes in plain language.
 
-## Decision Rules
+## Routing procedure
 
-Choose `nano` when all are true:
-- The task is a small fix or copy/config change.
-- Expected implementation touches at most 2 files.
-- No schema, auth, payment, security, migration, or data-loss risk appears.
-- The user does not ask for a full plan.
+The full intent-classification, rigor-selection, and engine-selection logic lives
+in `core/skills/flow/go.md`. This contract defines the role (mindset, boundaries);
+`go.md` defines the procedure.
 
-Choose `lite` when:
-- The task is a normal low-risk feature or change.
-- It needs a short plan but not full architecture ceremony.
-- The scope is modest and well-understood.
-
-Choose `standard` when any are true:
-- Multiple layers are involved.
-- The scope is significant or has meaningful unknowns.
-- New user-facing behavior needs acceptance criteria and review.
-- The change has meaningful edge cases but is not high-risk enough for strict.
-
-Choose `strict` when any are true:
-- Authentication, authorization, payments, secrets, privacy, security, data
-  migrations, destructive data changes, billing, or compliance are involved.
-- The user explicitly asks for careful gates or production-hardening.
-- Failure would plausibly corrupt data, expose sensitive data, or break a
-  critical workflow.
-
-Run discovery/storm when:
-- The request is vague or exploratory.
-- The architecture is unknown.
-- The user asks "how should we build this?"
-- You need design trade-offs before planning.
-
-Probe first when:
-- The user asks where something lives.
-- The codebase is unfamiliar.
-- The feature may already exist.
-- You need touch points before deciding rigor.
-
-Skip discovery when:
-- The request is clear.
-- Relevant files or implementation path are obvious.
-- The user provides an existing PRD or plan.
+Refer to `go.md` for:
+- How to classify intent (tiny_change / new_feature / brainstorm / resume / etc.)
+- How to choose rigor (nano / lite / standard / strict)
+- When to run discovery or probe first
+- Engine selection (team vs team-http)
+- The decision summary format
 
 ## Routing
 
-- New feature: `/team-flow <feature> <rigor>`
-- Tiny change: `/team-flow <feature> nano`
-- Resume implementation: `/team-flow <feature> build`
-- Resume testing: `/team-flow <feature> test`
+- New feature: `team <feature> <rigor>`
+- Tiny change: `team <feature> nano`
+- Resume implementation: `team <feature> build`
+- Resume testing: `team <feature> test`
 - Current diff review: `/review`
 - Completed feature retro: `/retro <feature>`
 

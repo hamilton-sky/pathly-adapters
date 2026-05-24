@@ -13,7 +13,7 @@ for rendering those routes in their host-native form.
 ## Skill Contract
 
 **Consumes:** Any PRD file — generic, AI-generated, or BMAD-structured (path provided as second argument)
-**Produces:** `plans/$FEATURE/` — 4 files in lite, all 8 plan files in standard/strict, pre-populated from the PRD
+**Produces:** `pathly/plans/$FEATURE/` — 4 files in lite, all 8 plan files in standard/strict, pre-populated from the PRD
 **Consumed by:** `build` skill reads `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
 
 ---
@@ -39,7 +39,7 @@ Example route: `prd-import hotel-search docs/hotel-search-prd.md`
 ```
 
 Check that `PRD_PATH` exists. If not, stop and report the missing file.
-Check that `plans/$FEATURE/` does NOT already exist. If it does, stop and ask the user whether to overwrite.
+Check that `pathly/plans/$FEATURE/` does NOT already exist. If it does, stop and ask the user whether to overwrite.
 
 ---
 
@@ -81,7 +81,7 @@ Determine how many conversations are needed (max 4 per folder):
 
 If complexity is LOW (1-2 stories, ≤4 ACs): 2 conversations
 If complexity is MEDIUM (3-4 stories, 5-8 ACs): 3 conversations
-If complexity is HIGH (5+ stories or 9+ ACs): consider splitting into two plan folders: `plans/$FEATURE-part-1/` and `plans/$FEATURE-part-2/`
+If complexity is HIGH (5+ stories or 9+ ACs): consider splitting into two plan folders: `pathly/plans/$FEATURE-part-1/` and `pathly/plans/$FEATURE-part-2/`
 
 ---
 
@@ -126,7 +126,7 @@ Each edge case from the PRD becomes either:
 
 ## Step 6: Generate Plan Files
 
-Create `plans/$FEATURE/`.
+Create `pathly/plans/$FEATURE/`.
 
 If `rigor = lite`, write only:
 - USER_STORIES.md
@@ -153,7 +153,7 @@ Read `{{TEMPLATES_DIR}}/plan/PROGRESS.template.md` for structure.
 Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for structure.
 
 Each conversation prompt must be self-contained, scoped to specific files and layers, include the relevant architectural boundary rules from project guidance, Do NOT list, verify command, and end with:
-`After done, update plans/$FEATURE/PROGRESS.md phase X to DONE.`
+`After done, update pathly/plans/$FEATURE/PROGRESS.md phase X to DONE.`
 
 ### FILE 5: HAPPY_FLOW.md
 Standard/strict only. Skip in lite.
@@ -176,11 +176,11 @@ ASCII only. Max ~70 chars wide.
 
 ## Step 7: Verify Output
 
-After writing files, confirm the selected rigor's required files exist in `plans/$FEATURE/`.
+After writing files, confirm the selected rigor's required files exist in `pathly/plans/$FEATURE/`.
 
 Then report:
 ```
-PRD import complete. Created plans/$FEATURE/.
+PRD import complete. Created pathly/plans/$FEATURE/.
 
 Rigor: [lite / standard / strict]
 

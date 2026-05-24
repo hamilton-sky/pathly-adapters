@@ -86,7 +86,7 @@ PASS / FAIL
 - Does not run tests (tester owns that)
 - Does not commit (orchestrator owns that)
 - May read source files to check CSS/style implementations
-- May write only `DESIGN.md` and `DESIGN_REVIEW.md` and files under `plans/`
+- May write only `DESIGN.md` and `DESIGN_REVIEW.md` and files under `pathly/plans/`
 
 ## Failure behavior
 

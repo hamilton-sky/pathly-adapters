@@ -13,7 +13,7 @@ an adapter-specific command unless the user explicitly asked for that fallback.
 
 If `$ARGUMENTS` contains `--doctor` (e.g. `doctor` or `help my-feature --doctor`),
 run the diagnostic flow below instead of the normal menu. Extract the feature name from
-`$ARGUMENTS` if one is provided alongside `--doctor`; otherwise scan `plans/` for the most
+`$ARGUMENTS` if one is provided alongside `--doctor`; otherwise scan `pathly/plans/` for the most
 recently modified feature folder.
 
 ### Doctor Step 1 — Run verify-state internally
@@ -55,7 +55,7 @@ Or, if issues found:
 
 Issue 1: REVIEW_FAILURES.md is a leftover from a previous run
   Why: its event ID (2026-04-28T10:00:00Z) does not appear in the current EVENTS.jsonl.
-  Suggestion: delete plans/<feature>/feedback/REVIEW_FAILURES.md
+  Suggestion: delete pathly/plans/<feature>/feedback/REVIEW_FAILURES.md
 
 Issue 2: STATE.json says BUILDING but no conversation is active
   Why: PROGRESS.md shows all conversations as either DONE or TODO — none are in_progress.
@@ -86,11 +86,11 @@ If there are suggestions, ask: `Run suggestion 1? [yes / no / show all suggestio
 Check in this order:
 
 1. If `$ARGUMENTS` is provided, use it as `FEATURE`.
-   Otherwise scan `plans/` for the most recently modified feature folder.
+   Otherwise scan `pathly/plans/` for the most recently modified feature folder.
 
-2. Read `plans/$FEATURE/PROGRESS.md` if it exists.
+2. Read `pathly/plans/$FEATURE/PROGRESS.md` if it exists.
 
-3. Check `plans/$FEATURE/feedback/` for open files.
+3. Check `pathly/plans/$FEATURE/feedback/` for open files.
 
 4. Infer current rigor:
    - **lite** — required 4 files exist, but one or more standard files are missing:
@@ -103,8 +103,8 @@ Check in this order:
    `Rigor: lite|standard|strict|unknown`
 
 6. Classify into one of these states:
-   - **no-feature** — no plans/ folder or no feature found
-   - **storm-done** — `plans/STORM_SEED.md` exists, no plans folder yet
+   - **no-feature** — no pathly/plans/ folder or no feature found
+   - **storm-done** — `pathly/plans/STORM_SEED.md` exists, no plans folder yet
    - **plan-done** — plans folder exists, at least one conversation TODO, no open feedback
    - **feedback-open** — plans folder exists, feedback file(s) present
    - **build-done** — all conversations DONE, no RETRO.md yet
@@ -265,7 +265,7 @@ On '5': print full command reference
 
   What do you want to do?
 
-  [1] Archive this feature      → moves to plans/.archive/
+  [1] Archive this feature      → moves to pathly/plans/.archive/
   [2] Promote lessons           -> lessons (update active memory)
   [3] Start next feature        -> /pathly start
   [4] Read the retro            → show RETRO.md
@@ -321,7 +321,7 @@ On '5': print full command reference
   test <feature>                            tester verifies acceptance criteria via scout-path
   retro <feature>                           quick summarizes; retro skill writes RETRO.md + extracts lessons
   lessons                                   promote candidate lessons -> LESSONS.md
-  archive <feature>                         move completed feature to plans/.archive/
+  archive <feature>                         move completed feature to pathly/plans/.archive/
   prd-import <feature> <file> [rigor]        translate any PRD file -> plan files
   bmad-import <feature> <file> [rigor]       translate BMAD PRD -> plan files
   verify-state [feature]                    check stale feedback, PROGRESS drift, dead references
@@ -351,7 +351,7 @@ On '5': print full command reference
   Never delete plan files just to downgrade. Rigor controls future gates.
 
 ───────────────────────────────────────────
-  FEEDBACK FILES  (plans/<feature>/feedback/)
+  FEEDBACK FILES  (pathly/plans/<feature>/feedback/)
 ───────────────────────────────────────────
 
   ARCH_FEEDBACK.md     reviewer → architect   (BLOCKING)

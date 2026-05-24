@@ -12,7 +12,7 @@ name: Architecture Proposal
 ## Layer Breakdown
 
 ```
-Layer A   (plans/$ARGUMENTS — feature definition)
+Layer A   (pathly/plans/$ARGUMENTS — feature definition)
      │  "phase": "…"
      ▼
 Layer B   (<module>/<component>/<file>.py)

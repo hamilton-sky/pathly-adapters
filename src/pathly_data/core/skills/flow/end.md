@@ -14,7 +14,7 @@ You are wrapping up the current session.
 
 ## Step 1 — Find in-progress feature
 
-Scan `plans/` (skip `.archive/`). For each feature folder, read `PROGRESS.md` if present.
+Scan `pathly/plans/` (skip `.archive/`). For each feature folder, read `PROGRESS.md` if present.
 Look for a feature whose `PROGRESS.md` contains `status: IN PROGRESS` or `Status: IN PROGRESS`.
 
 ## Step 2 — If a feature is in progress
@@ -25,7 +25,7 @@ Look for a feature whose `PROGRESS.md` contains `status: IN PROGRESS` or `Status
    ```
 
 2. Print the read-only summary panel using data from the next_action response.
-   Check whether any `*.md` files exist in `plans/<feature>/feedback/`:
+   Check whether any `*.md` files exist in `pathly/plans/<feature>/feedback/`:
 
 ```
 ─────────────────────────────────────────────────────────
