@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from importlib.resources import files
 from pathlib import Path
 
@@ -94,6 +95,22 @@ def _blocked_response(feedback: dict, state_info: dict) -> dict:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
+def _get_head_sha(project_root: str) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return ""
+
+
 def next_action(args: dict) -> dict:
     flow_name = args["flow"]
     topic = args["topic"]
@@ -103,6 +120,20 @@ def next_action(args: dict) -> dict:
     storage_path = _resolve_storage_path(flow_config, project_root, topic)
 
     state_info = recover_state(storage_path, flow_config)
+
+    # Stamp conv_start_sha at conversation start so scope_gate can baseline the diff.
+    state_file = storage_path / "STATE.json"
+    prior_state: dict = {}
+    if state_file.exists():
+        try:
+            prior_state = json.loads(state_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            prior_state = {}
+    sha = _get_head_sha(project_root)
+    stamped_state = dict(prior_state)
+    stamped_state["conv_start_sha"] = sha
+    write_state(storage_path, state_info["current_state"], stamped_state)
+
     feedback = route_feedback(flow_config, storage_path)
 
     if feedback is not None:

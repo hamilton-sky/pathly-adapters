@@ -203,3 +203,133 @@ def test_complete_stage_gate_then_advance(tmp_path, monkeypatch):
     assert result.get("next_state") == "REVIEWING"
     state_after = json.loads(state_file.read_text(encoding="utf-8"))
     assert state_after["current"] == "REVIEWING"
+
+
+# ── scope_gate tests ──────────────────────────────────────────────────────────
+
+def _make_flow_with_scope_gate(gates: dict | None = None) -> dict:
+    if gates is None:
+        gates = {
+            "A->B": [
+                {
+                    "type": "scope_gate",
+                    "scope_file": "SCOPE.md",
+                    "on_fail": "SCOPE_VIOLATION.md",
+                }
+            ]
+        }
+    flow = _make_flow(gates)
+    flow["feedback_routing"]["SCOPE_VIOLATION"] = "builder"
+    return flow
+
+
+def test_scope_gate_pass(tmp_path, monkeypatch):
+    """Diff only touches declared files — gate passes, no feedback file written."""
+    import pathly_orchestrator.fsm as fsm_mod
+
+    storage = _storage(tmp_path)
+    (storage / "SCOPE.md").write_text(
+        "Files changed:\n- src/foo.py\n- src/bar.py\n", encoding="utf-8"
+    )
+    state_sha = "abc123"
+    (storage / "STATE.json").write_text(
+        json.dumps({"current": "A", "conv_start_sha": state_sha}), encoding="utf-8"
+    )
+
+    monkeypatch.setattr(
+        fsm_mod.subprocess,
+        "run",
+        lambda *args, **kwargs: type(
+            "R", (), {"returncode": 0, "stdout": "src/foo.py\nsrc/bar.py\n", "stderr": ""}
+        )(),
+    )
+
+    flow = _make_flow_with_scope_gate()
+    result = run_gates(flow, "A", "B", storage, "test-feature", 1)
+    assert result is None
+    assert not (storage / "feedback" / "SCOPE_VIOLATION.md").exists()
+
+
+def test_scope_gate_fail_undeclared_path(tmp_path, monkeypatch):
+    """Diff includes a path not in declared scope — gate fails, SCOPE_VIOLATION.md written."""
+    import pathly_orchestrator.fsm as fsm_mod
+
+    storage = _storage(tmp_path)
+    (storage / "SCOPE.md").write_text(
+        "Files:\n- src/foo.py\n", encoding="utf-8"
+    )
+    state_sha = "abc123"
+    (storage / "STATE.json").write_text(
+        json.dumps({"current": "A", "conv_start_sha": state_sha}), encoding="utf-8"
+    )
+
+    monkeypatch.setattr(
+        fsm_mod.subprocess,
+        "run",
+        lambda *args, **kwargs: type(
+            "R", (), {"returncode": 0, "stdout": "src/foo.py\nsrc/UNEXPECTED.py\n", "stderr": ""}
+        )(),
+    )
+
+    flow = _make_flow_with_scope_gate()
+    result = run_gates(flow, "A", "B", storage, "test-feature", 1)
+    assert result is not None
+    assert result["gate_failed"] == "scope_gate"
+    assert result["feedback_file"] == "SCOPE_VIOLATION.md"
+    assert (storage / "feedback" / "SCOPE_VIOLATION.md").exists()
+
+    events_file = storage / "EVENTS.jsonl"
+    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    gate_events = [e for e in events if e.get("type") == "GATE_FAILED"]
+    assert len(gate_events) == 1
+    assert gate_events[0]["gate"] == "scope_gate"
+
+
+def test_scope_gate_no_declared_scope(tmp_path):
+    """Scope file exists but contains no file list — GATE_SKIPPED emitted, gate passes."""
+    storage = _storage(tmp_path)
+    (storage / "SCOPE.md").write_text(
+        "This file has no declared paths.\n", encoding="utf-8"
+    )
+    (storage / "STATE.json").write_text(
+        json.dumps({"current": "A", "conv_start_sha": "abc123"}), encoding="utf-8"
+    )
+
+    flow = _make_flow_with_scope_gate()
+    result = run_gates(flow, "A", "B", storage, "test-feature", 1)
+    assert result is None
+
+    events_file = storage / "EVENTS.jsonl"
+    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    skipped = [e for e in events if e.get("type") == "GATE_SKIPPED"]
+    assert len(skipped) == 1
+    assert skipped[0]["reason"] == "no_declared_scope"
+
+
+def test_scope_gate_no_baseline_sha(tmp_path):
+    """STATE.json has no conv_start_sha — GATE_SKIPPED emitted, gate passes."""
+    storage = _storage(tmp_path)
+    (storage / "SCOPE.md").write_text(
+        "Files:\n- src/foo.py\n", encoding="utf-8"
+    )
+    # STATE.json without conv_start_sha
+    (storage / "STATE.json").write_text(
+        json.dumps({"current": "A"}), encoding="utf-8"
+    )
+
+    flow = _make_flow_with_scope_gate()
+    result = run_gates(flow, "A", "B", storage, "test-feature", 1)
+    assert result is None
+
+    events_file = storage / "EVENTS.jsonl"
+    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    skipped = [e for e in events if e.get("type") == "GATE_SKIPPED"]
+    assert len(skipped) == 1
+    assert skipped[0]["reason"] == "no_baseline_sha"
+
+
+def test_verify_gate_pass_marker_in_body_not_line1(tmp_path):
+    """Pass marker present in body but NOT on line 1 — gate must fail (line-1 sentinel)."""
+    p = tmp_path / "VERIFY.md"
+    p.write_text("# Header\nRESULT: PASS\nSome notes\n", encoding="utf-8")
+    assert _verify_passed(p, "RESULT: PASS") is False

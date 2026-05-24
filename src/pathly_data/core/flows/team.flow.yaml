@@ -43,6 +43,7 @@ feedback_routing:
   DESIGN_QUESTIONS: architect
   IMPL_QUESTIONS: planner
   REVIEW_FAILURES: builder
+  SCOPE_VIOLATION: builder
   TEST_FAILURES: builder
 transition_rules:
   PLANNING:
@@ -76,6 +77,9 @@ gates:
       artifact: VERIFY.md
       pass_marker: "RESULT: PASS"
       on_fail: REVIEW_FAILURES.md
+    - type: scope_gate
+      scope_file: CONVERSATION_PROMPTS.md
+      on_fail: SCOPE_VIOLATION.md
   REVIEWING->TESTING:
     - type: require_artifact
       artifact: REVIEW.md

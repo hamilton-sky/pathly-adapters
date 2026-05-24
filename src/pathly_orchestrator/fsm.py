@@ -362,6 +362,74 @@ def _write_gate_feedback(storage_path: Path, on_fail: str, reason: str) -> None:
     target.write_text(reason, encoding="utf-8")
 
 
+def _scope_clean(storage_path: Path, scope_file: str, baseline_sha: str | None) -> bool:
+    scope_path = storage_path / scope_file
+    declared: set[str] = set()
+
+    if scope_path.exists():
+        try:
+            text = scope_path.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        for line in text.splitlines():
+            stripped = line.strip()
+            # Lines starting with '-' (markdown list) or backtick (inline code)
+            if stripped.startswith("-"):
+                candidate = stripped[1:].strip().strip("`").strip()
+                if candidate:
+                    declared.add(candidate)
+            elif stripped.startswith("`") and stripped.endswith("`") and len(stripped) > 2:
+                candidate = stripped[1:-1].strip()
+                if candidate:
+                    declared.add(candidate)
+
+    if not declared:
+        append_event(
+            storage_path,
+            {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_declared_scope"},
+        )
+        return True
+
+    if not baseline_sha:
+        append_event(
+            storage_path,
+            {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_baseline_sha"},
+        )
+        return True
+
+    # Project root is 3 levels up from storage_path (pathly/plans/{topic}/)
+    project_root = storage_path.parent.parent.parent
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", baseline_sha],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception:
+        append_event(
+            storage_path,
+            {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "git_diff_failed"},
+        )
+        return True
+
+    if result.returncode != 0:
+        append_event(
+            storage_path,
+            {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "git_diff_failed"},
+        )
+        return True
+
+    changed_paths = [p for p in result.stdout.splitlines() if p.strip()]
+    for path in changed_paths:
+        if path not in declared:
+            return False
+
+    return True
+
+
 def run_gates(
     flow: dict,
     prev_state: str,
@@ -375,10 +443,20 @@ def run_gates(
     applicable = gates.get(f"{prev_state}->{next_state}", []) + gates.get(
         f"->{next_state}", []
     )
+    # Read conv_start_sha once for scope_gate use
+    state_file = storage_path / "STATE.json"
+    conv_start_sha: str | None = None
+    if state_file.exists():
+        try:
+            state_doc = json.loads(state_file.read_text(encoding="utf-8"))
+            conv_start_sha = state_doc.get("conv_start_sha") or None
+        except (json.JSONDecodeError, OSError):
+            pass
+
     for gate in applicable:
         gtype = gate["type"]
-        artifact_path = storage_path / gate["artifact"]
         if gtype == "require_artifact":
+            artifact_path = storage_path / gate["artifact"]
             if not artifact_path.exists():
                 reason = f"Required artifact missing: {gate['artifact']}"
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
@@ -392,9 +470,24 @@ def run_gates(
                 )
                 return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "verify_gate":
+            artifact_path = storage_path / gate["artifact"]
             marker = gate["pass_marker"]
             if not _verify_passed(artifact_path, marker):
                 reason = f"Gate verification failed: {gate['artifact']} does not start with {marker!r}"
+                _write_gate_feedback(storage_path, gate["on_fail"], reason)
+                append_event(
+                    storage_path,
+                    {
+                        "type": "GATE_FAILED",
+                        "gate": gtype,
+                        "transition": f"{prev_state}->{next_state}",
+                    },
+                )
+                return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
+        elif gtype == "scope_gate":
+            scope_file = gate["scope_file"]
+            if not _scope_clean(storage_path, scope_file, conv_start_sha):
+                reason = f"Scope gate failed: changes outside declared scope in {scope_file}"
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
                 append_event(
                     storage_path,
