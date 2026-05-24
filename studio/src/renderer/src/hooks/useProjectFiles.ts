@@ -205,25 +205,12 @@ export function useProjectFiles(): {
     if (!projectPath) return
 
     for (const section of WORKSPACE_SECTIONS) {
-      try {
-        const dir = `${projectPath}/${section.dir}`
-        const subdirNames = await listDirs(dir)
-        const subdirs: TemplateSubdir[] = []
-        for (const subdirName of subdirNames) {
-          const subdirPath = `${dir}/${subdirName}`
-          let files: PathlyItem[] = []
-          try {
-            const fileNames = await listDir(subdirPath)
-            files = fileNames
-              .filter((f) => f !== '.gitkeep')
-              .map((fname) => ({ name: fname, path: `${subdirPath}/${fname}`, type: section.type }))
-          } catch { /* empty subdir */ }
-          subdirs.push({ name: subdirName, open: false, files })
-        }
-        setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs } }))
-      } catch {
-        setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], items: [], subdirs: null } }))
-      }
+      const dir = `${projectPath}/${section.dir}`
+      const result = await loadSubdirAwareSection(dir, section.type)
+      setSections((prev) => ({
+        ...prev,
+        [section.label]: { ...prev[section.label], items: result.items, subdirs: result.subdirs ?? undefined },
+      }))
     }
 
     // Discover any custom folders at pathly/ root (not in known dirs)

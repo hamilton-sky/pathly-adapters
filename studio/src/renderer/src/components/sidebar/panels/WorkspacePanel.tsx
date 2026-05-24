@@ -129,7 +129,8 @@ export function WorkspacePanel(props: Props): JSX.Element {
         if (!state) return null
         if (state.subdirs === null) return null
         const subdirs = state.subdirs ?? []
-        const hasMatch = !filter || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
+        const directItems = (state.items ?? []).filter((i) => i.name !== '.gitkeep')
+        const hasMatch = !filter || directItems.some((i) => i.name.toLowerCase().includes(lowerFilter)) || subdirs.some((sd) => sd.files.some((f) => f.name.toLowerCase().includes(lowerFilter)))
         if (!hasMatch) return null
         const sectionTargetDir = `${projectPath}/${section.dir}`
         return (
@@ -189,6 +190,25 @@ export function WorkspacePanel(props: Props): JSX.Element {
                     onCancel={onInlineCreateCancel}
                   />
                 )}
+                {(filter ? directItems.filter((i) => i.name.toLowerCase().includes(lowerFilter)) : directItems).map((item) => (
+                  <WorkspaceItem
+                    key={item.path}
+                    item={item}
+                    itemDir={sectionTargetDir}
+                    isSelected={selectedItem?.path === item.path}
+                    isDirty={dirtyItems.has(item.path)}
+                    renamingPath={renamingPath}
+                    renameValue={renameValue}
+                    onSelect={() => onSelect(item)}
+                    onRenameChange={onRenameChange}
+                    onRenameCommit={() => onRenameCommit(item, sectionTargetDir)}
+                    onRenameCancel={onRenameCancel}
+                    onStartRename={() => onStartRename(item, sectionTargetDir)}
+                    onStartDelete={() => onStartDelete(item)}
+                    sectionId={section.type}
+                    isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
+                  />
+                ))}
                 {subdirs.map((subdir, idx) => {
                   const filteredFiles = filter ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter)) : subdir.files
                   if (filter && filteredFiles.length === 0) return null
