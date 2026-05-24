@@ -70,3 +70,13 @@ transition_actions:
       message: 'feat: complete building stage'
   RETRO->DONE:
     - skill: archive-artifacts
+gates:
+  BUILDING->REVIEWING:
+    - type: verify_gate
+      artifact: VERIFY.md
+      pass_marker: "RESULT: PASS"
+      on_fail: REVIEW_FAILURES.md
+  REVIEWING->TESTING:
+    - type: require_artifact
+      artifact: REVIEW.md
+      on_fail: HUMAN_QUESTIONS.md

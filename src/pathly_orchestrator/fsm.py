@@ -342,6 +342,74 @@ def run_transition_actions(
             raise RuntimeError(f"Unknown action skill: {skill!r}")
 
 
+def _verify_passed(path: Path, marker: str) -> bool:
+    if not path.exists():
+        return False
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    for line in text.splitlines():
+        if line.strip():
+            return line.strip() == marker
+    return False
+
+
+def _write_gate_feedback(storage_path: Path, on_fail: str, reason: str) -> None:
+    feedback_dir = storage_path / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    target = feedback_dir / on_fail
+    target.write_text(reason, encoding="utf-8")
+
+
+def run_gates(
+    flow: dict,
+    prev_state: str,
+    next_state: str,
+    storage_path: Path,
+    topic: str,
+    conv: int,
+) -> dict | None:
+    gates = flow.get("gates", {})
+    # Gates are evaluated fail-fast: stop at the first failure so feedback is unambiguous.
+    applicable = gates.get(f"{prev_state}->{next_state}", []) + gates.get(
+        f"->{next_state}", []
+    )
+    for gate in applicable:
+        gtype = gate["type"]
+        artifact_path = storage_path / gate["artifact"]
+        if gtype == "require_artifact":
+            if not artifact_path.exists():
+                reason = f"Required artifact missing: {gate['artifact']}"
+                _write_gate_feedback(storage_path, gate["on_fail"], reason)
+                append_event(
+                    storage_path,
+                    {
+                        "type": "GATE_FAILED",
+                        "gate": gtype,
+                        "transition": f"{prev_state}->{next_state}",
+                    },
+                )
+                return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
+        elif gtype == "verify_gate":
+            marker = gate["pass_marker"]
+            if not _verify_passed(artifact_path, marker):
+                reason = f"Gate verification failed: {gate['artifact']} does not start with {marker!r}"
+                _write_gate_feedback(storage_path, gate["on_fail"], reason)
+                append_event(
+                    storage_path,
+                    {
+                        "type": "GATE_FAILED",
+                        "gate": gtype,
+                        "transition": f"{prev_state}->{next_state}",
+                    },
+                )
+                return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
+        else:
+            raise RuntimeError(f"Unknown gate type: {gtype!r}")
+    return None
+
+
 def write_state(storage_path: Path, next_state: str, prior_state: dict) -> None:
     """
     Write STATE.json atomically (write to .tmp then rename).

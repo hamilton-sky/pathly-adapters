@@ -13,6 +13,7 @@ from pathly_orchestrator.fsm import (
     evaluate_transition_rules,
     recover_state,
     route_feedback,
+    run_gates,
     run_transition_actions,
     write_state,
 )
@@ -215,6 +216,16 @@ def complete_stage(args: dict) -> dict:
             eval_result, str
         ), f"Unexpected result type: {type(eval_result)}"
         next_state = eval_result
+
+    gate_failure = run_gates(
+        flow_config, state_info["current_state"], next_state,
+        storage_path, topic, state_info["conv"]
+    )
+    if gate_failure is not None:
+        feedback = route_feedback(flow_config, storage_path)
+        if feedback is None:
+            feedback = {"target_agent": "human", "file": gate_failure.get("feedback_file", "HUMAN_QUESTIONS.md")}
+        return _blocked_response(feedback, state_info)
 
     if state_before is not None and state_file.exists():
         try:

@@ -1,0 +1,8 @@
+---
+
+---
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-24T22:16:50.359185+00:00"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "DESIGNING", "ts": "2026-05-24T22:18:05.753101+00:00"}
+{"type": "STATE_TRANSITION", "from": "DESIGNING", "to": "DESIGNING", "ts": "2026-05-24T22:18:18.141207+00:00"}
+{"type": "STATE_TRANSITION", "from": "DESIGNING", "to": "BUILDING", "ts": "2026-05-24T22:18:52.493427+00:00"}
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-24T22:25:35.845318+00:00"}
