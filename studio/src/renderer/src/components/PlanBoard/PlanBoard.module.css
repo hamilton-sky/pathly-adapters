@@ -1,0 +1,206 @@
+/* ─── Layout ─────────────────────────────────────── */
+.container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-base);
+  overflow-y: auto;
+  height: 100%;
+}
+
+.placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 15px;
+  margin-top: 80px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--bg-surface0);
+  flex-shrink: 0;
+}
+
+.planName {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fsmBadge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bg-base);
+  padding: 2px 10px;
+  border-radius: 12px;
+  background-color: var(--text-muted);
+}
+
+.fsmBadge[data-fsm-state="done"]      { background-color: var(--green); }
+.fsmBadge[data-fsm-state="building"]  { background-color: var(--runtime); }
+.fsmBadge[data-fsm-state="reviewing"] { background-color: var(--runtime); }
+.fsmBadge[data-fsm-state="blocked"]   { background-color: var(--red); }
+
+/* ─── Card list ──────────────────────────────────── */
+.cardList {
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ─── Conv card ──────────────────────────────────── */
+@keyframes pathly-pulse-border {
+  0%, 100% { border-left-color: #06b6d4; }
+  50%       { border-left-color: rgba(6, 182, 212, 0.15); }
+}
+
+.card {
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 52px;
+  border-left: 3px solid var(--text-muted);
+  background-color: rgba(108, 112, 134, 0.05);
+  cursor: pointer;
+  outline: none;
+}
+
+.card[data-status="done"] {
+  border-left-color: #16a34a;
+  background-color: rgba(166, 227, 161, 0.05);
+}
+
+.card[data-status="active"] {
+  border-left-color: #06b6d4;
+  background-color: rgba(34, 211, 238, 0.05);
+}
+
+.card[data-status="blocked"] {
+  border-left-color: var(--red);
+  background-color: rgba(243, 139, 168, 0.05);
+}
+
+.card[data-selected="true"] {
+  border-left-color: var(--accent);
+  background-color: var(--bg-surface1);
+}
+
+.card[data-hovered="true"]:not([data-selected="true"]) {
+  background-color: var(--bg-surface1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card[data-status="active"]:not([data-selected="true"]) {
+    animation: pathly-pulse-border 1.5s ease-in-out infinite;
+  }
+}
+
+/* ─── Card internals ─────────────────────────────── */
+.cardInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  gap: 8px;
+}
+
+.cardLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.statusIcon {
+  font-weight: 700;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.statusIcon[data-status="done"]    { color: #16a34a; }
+.statusIcon[data-status="active"]  { color: #06b6d4; }
+.statusIcon[data-status="blocked"] { color: var(--red); }
+
+.textBlock {
+  flex: 1;
+  overflow: hidden;
+}
+
+.cardTitle {
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cardCost {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.statusBadge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.statusBadge[data-status="done"]    { color: #16a34a; }
+.statusBadge[data-status="active"]  { color: #06b6d4; }
+.statusBadge[data-status="blocked"] { color: var(--red); }
+
+/* ─── Events section ─────────────────────────────── */
+.recentEventsSection {
+  padding: 0 24px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recentEventsHeader {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.eventRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-secondary);
+  padding: 2px 0;
+}
+
+.eventType   { color: var(--blue);      font-weight: 600; flex-shrink: 0; }
+.eventAgent  { color: var(--accent);    flex-shrink: 0; }
+.eventResult { color: var(--green);     flex-shrink: 0; }
+.eventCost   { color: var(--yellow);    flex-shrink: 0; }
+.eventTime   { color: var(--text-muted); font-size: 11px; margin-left: auto; }

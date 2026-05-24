@@ -1,20 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../../store'
 import { readFile } from '../../services/pathlyApi'
-import { useTheme } from '../../useTheme'
-import type { Theme } from '../../theme'
 import type { ConvRow } from '../../types'
 import { parseProgressMd } from '../../hooks/usePlanConversations'
 import { formatRelativeTime } from '../Monitor/utils'
-import {
-  isActiveStatus,
-  makeStyles,
-  makeCardStyles,
-  statusBorderColor,
-  statusBgColor,
-  statusIcon,
-  PULSE_BORDER_CSS,
-} from './PlanBoard.styles'
+import s from './PlanBoard.module.css'
 
 interface EventEntry {
   type: string
@@ -38,38 +28,24 @@ interface ConvCardProps {
   onSelect: () => void
   onHoverEnter: () => void
   onHoverLeave: () => void
-  t: Theme
 }
 
-function ConvCard({ conv, events, isSelected, isHovered, onSelect, onHoverEnter, onHoverLeave, t }: ConvCardProps): JSX.Element {
-  const active = isActiveStatus(conv.status)
-  const cardRef = useRef<HTMLDivElement>(null)
-  const styleInjectedRef = useRef(false)
+function normalizeStatus(status: string): 'done' | 'active' | 'blocked' | undefined {
+  if (status === 'DONE') return 'done'
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return 'active'
+  if (status === 'BLOCKED') return 'blocked'
+  return undefined
+}
 
-  useEffect(() => {
-    if (styleInjectedRef.current) return
-    styleInjectedRef.current = true
-    try {
-      const el = document.createElement('style')
-      el.textContent = PULSE_BORDER_CSS
-      el.setAttribute('data-pathly-pulse-border', '1')
-      if (!document.querySelector('[data-pathly-pulse-border]')) {
-        document.head.appendChild(el)
-      }
-    } catch { /* CSP may block — base state has no animation, so safe to fail */ }
-  }, [])
+function statusIconChar(status: string): string {
+  if (status === 'DONE') return '✓'
+  if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return '●'
+  if (status === 'BLOCKED') return '✗'
+  return '○'
+}
 
-  useEffect(() => {
-    const el = cardRef.current
-    if (!el) return
-    if (active) {
-      el.classList.add('pathly-pulse-border')
-      function onAnimEnd(): void { el?.classList.remove('pathly-pulse-border') }
-      el.addEventListener('animationend', onAnimEnd, { once: true })
-      return () => { el.removeEventListener('animationend', onAnimEnd) }
-    }
-    return undefined
-  }, [active, conv.status])
+function ConvCard({ conv, events, isSelected, isHovered, onSelect, onHoverEnter, onHoverLeave }: ConvCardProps): JSX.Element {
+  const dataStatus = normalizeStatus(conv.status)
 
   const agentDoneEvents = events.filter(
     (e) => e.type === 'AGENT_DONE' && e.conversation === conv.num
@@ -82,40 +58,36 @@ function ConvCard({ conv, events, isSelected, isHovered, onSelect, onHoverEnter,
   const latestEvent = agentDoneEvents[agentDoneEvents.length - 1] ?? null
   const latestTs = latestEvent?.ts ?? latestEvent?.timestamp ?? null
 
-  const { icon, color: iconColor } = statusIcon(conv.status, t)
-  const borderColor = isSelected ? t.accent : statusBorderColor(conv.status, t)
-  const bgColor = isHovered || isSelected ? t.bgSurface1 : statusBgColor(conv.status)
-  const cs = makeCardStyles(t, borderColor, bgColor, iconColor)
-
   return (
     <div
-      ref={cardRef}
       role="button"
       tabIndex={0}
-      aria-pressed={isSelected}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       onMouseEnter={onHoverEnter}
       onMouseLeave={onHoverLeave}
-      style={cs.card}
+      className={s.card}
+      data-status={dataStatus}
+      data-selected={isSelected ? 'true' : 'false'}
+      data-hovered={isHovered ? 'true' : 'false'}
     >
-      <div style={cs.inner}>
-        <div style={cs.left}>
-          <span style={cs.statusIcon}>{icon}</span>
-          <div style={cs.textBlock}>
-            <div style={cs.title}>Conv {conv.num} · {conv.title}</div>
-            <div style={cs.meta}>
+      <div className={s.cardInner}>
+        <div className={s.cardLeft}>
+          <span className={s.statusIcon} data-status={dataStatus}>{statusIconChar(conv.status)}</span>
+          <div className={s.textBlock}>
+            <div className={s.cardTitle}>Conv {conv.num} · {conv.title}</div>
+            <div className={s.cardMeta}>
               {conv.phases && <span>Phase {conv.phases}</span>}
               {latestTs && <span>{formatRelativeTime(latestTs)}</span>}
             </div>
             {hasCostData && (
-              <div style={cs.cost}>
+              <div className={s.cardCost}>
                 {(totalTokensIn / 1000).toFixed(1)}k in / {(totalTokensOut / 1000).toFixed(1)}k out · ${totalCost.toFixed(3)}
               </div>
             )}
           </div>
         </div>
-        <span style={cs.statusBadge}>{conv.status}</span>
+        <span className={s.statusBadge} data-status={dataStatus}>{conv.status}</span>
       </div>
     </div>
   )
@@ -123,8 +95,6 @@ function ConvCard({ conv, events, isSelected, isHovered, onSelect, onHoverEnter,
 
 export function PlanBoard(): JSX.Element {
   const { projectPath, activeTopic } = useStore()
-  const t = useTheme()
-  const s = makeStyles(t)
 
   const [fsmState, setFsmState] = useState<string>('')
   const [convs, setConvs] = useState<ConvRow[]>([])
@@ -182,32 +152,36 @@ export function PlanBoard(): JSX.Element {
 
   if (!activeTopic) {
     return (
-      <div style={s.container}>
-        <div style={s.placeholder}>Select a topic to view its plan</div>
+      <div className={s.container}>
+        <div className={s.placeholder}>Select a topic to view its plan</div>
       </div>
     )
   }
 
   if (noProgress && convs.length === 0) {
     return (
-      <div style={s.container}>
-        <div style={s.header}>
-          <span style={s.planName}>{activeTopic}</span>
-          {fsmState && <span style={s.fsmBadge(fsmState)}>{fsmState}</span>}
+      <div className={s.container}>
+        <div className={s.header}>
+          <span className={s.planName}>{activeTopic}</span>
+          {fsmState && (
+            <span className={s.fsmBadge} data-fsm-state={fsmState.toLowerCase()}>{fsmState}</span>
+          )}
         </div>
-        <div style={s.placeholder}>No PROGRESS.md found for this plan</div>
+        <div className={s.placeholder}>No PROGRESS.md found for this plan</div>
       </div>
     )
   }
 
   return (
-    <div style={s.container}>
-      <div style={s.header}>
-        <span style={s.planName}>{activeTopic}</span>
-        {fsmState && <span style={s.fsmBadge(fsmState)}>{fsmState}</span>}
+    <div className={s.container}>
+      <div className={s.header}>
+        <span className={s.planName}>{activeTopic}</span>
+        {fsmState && (
+          <span className={s.fsmBadge} data-fsm-state={fsmState.toLowerCase()}>{fsmState}</span>
+        )}
       </div>
 
-      <div style={s.cardList}>
+      <div className={s.cardList}>
         {convs.map((conv) => (
           <ConvCard
             key={conv.num}
@@ -218,24 +192,23 @@ export function PlanBoard(): JSX.Element {
             onSelect={() => setSelectedConv(conv.num === selectedConv ? null : conv.num)}
             onHoverEnter={() => setHoveredConv(conv.num)}
             onHoverLeave={() => setHoveredConv(null)}
-            t={t}
           />
         ))}
       </div>
 
       {events.length > 0 && (
-        <div style={s.recentEventsSection}>
-          <div style={s.recentEventsHeader}>Recent events</div>
+        <div className={s.recentEventsSection}>
+          <div className={s.recentEventsHeader}>Recent events</div>
           {events.map((ev, i) => (
-            <div key={i} style={s.eventRow}>
-              <span style={s.eventType}>{ev.type}</span>
-              {ev.agent && <span style={s.eventAgent}>{ev.agent}</span>}
-              {ev.result && <span style={s.eventResult}>{ev.result}</span>}
-              {ev.to && <span style={s.eventResult}>→ {ev.to}</span>}
+            <div key={i} className={s.eventRow}>
+              <span className={s.eventType}>{ev.type}</span>
+              {ev.agent && <span className={s.eventAgent}>{ev.agent}</span>}
+              {ev.result && <span className={s.eventResult}>{ev.result}</span>}
+              {ev.to && <span className={s.eventResult}>→ {ev.to}</span>}
               {ev.cost_usd !== undefined && (
-                <span style={s.eventCost}>${ev.cost_usd.toFixed(4)}</span>
+                <span className={s.eventCost}>${ev.cost_usd.toFixed(4)}</span>
               )}
-              <span style={s.eventTime}>{ev.timestamp ?? ev.ts ?? ''}</span>
+              <span className={s.eventTime}>{ev.timestamp ?? ev.ts ?? ''}</span>
             </div>
           ))}
         </div>

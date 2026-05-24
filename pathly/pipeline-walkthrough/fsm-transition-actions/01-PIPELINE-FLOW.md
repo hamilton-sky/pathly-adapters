@@ -1,3 +1,6 @@
+---
+
+---
 # 01 — Pipeline Flow: fsm-transition-actions
 
 _Date: 2026-05-14 | Branch: claude/funny-pascal-86c09c_
