@@ -12,8 +12,10 @@ const PATHLY_SECTIONS = [
 ]
 
 const WORKSPACE_SECTIONS = [
-  { label: 'Debugs',       type: 'debug'   as const, dir: 'pathly/debugs'       },
-  { label: 'Explorations', type: 'explore' as const, dir: 'pathly/explorations' },
+  { label: 'Debugs',               type: 'debug'   as const, dir: 'pathly/debugs'               },
+  { label: 'Explorations',         type: 'explore' as const, dir: 'pathly/explorations'         },
+  { label: 'Lessons',              type: 'explore' as const, dir: 'pathly/lessons'              },
+  { label: 'Pipeline-walkthrough', type: 'explore' as const, dir: 'pathly/pipeline-walkthrough' },
 ]
 
 const USER_LIBRARY_SECTIONS = [
@@ -35,8 +37,10 @@ const INITIAL_SECTIONS: Record<string, SectionState> = {
   Skills:       { items: [], open: false },
   Agents:       { items: [], open: false },
   Templates:    { items: [], open: true  },
-  Debugs:       { items: [], open: false },
-  Explorations: { items: [], open: false },
+  Debugs:                 { items: [], open: false },
+  Explorations:           { items: [], open: false },
+  Lessons:                { items: [], open: false },
+  'Pipeline-walkthrough': { items: [], open: false },
   UserAgents:    { items: [], open: false },
   UserSkills:    { items: [], open: false },
   UserTemplates: { items: [], open: false },
