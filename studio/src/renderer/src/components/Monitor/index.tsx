@@ -4,6 +4,7 @@ import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
+import { HealthCheck } from './HealthCheck'
 import type { FsmEvent } from '../../types'
 import { watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
 
@@ -390,6 +391,7 @@ export function Monitor(): JSX.Element {
         />
       )}
       <FsmView />
+      <HealthCheck />
       <EventLog />
     </div>
   )
