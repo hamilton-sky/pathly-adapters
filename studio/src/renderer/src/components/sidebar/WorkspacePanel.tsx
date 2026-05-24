@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FolderPlus, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
+import { FolderPlus, Lock, Pencil, Plus, Trash2, X } from 'lucide-react'
 import type { PathlyItem, SectionState, PathlyReorgDragItem, PathlyFolderDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
@@ -311,9 +311,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
                 </IconButton>
               }
               actions={
-                <IconButton onClick={(e) => onInlineCreateFile(section, e)} title="New file">
-                  <Plus size={12} />
-                </IconButton>
+                <>
+                  <IconButton onClick={(e) => onInlineCreateFile(section, e)} title="New file">
+                    <Plus size={12} />
+                  </IconButton>
+                  <IconButton onClick={() => onDeleteCustomSection?.(section.dir)} title="Delete section" style={{ color: 'var(--red, #e05252)' }}>
+                    <X size={12} />
+                  </IconButton>
+                </>
               }
             />
             {state.open && (

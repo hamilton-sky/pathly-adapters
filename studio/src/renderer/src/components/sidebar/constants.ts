@@ -26,8 +26,10 @@ export const WORKSPACE_USER_SECTIONS: Section[] = [
 ]
 
 export const WORKSPACE_FILE_SECTIONS: Section[] = [
-  { label: 'Debugs',       type: 'debug',   dir: 'pathly/debugs'       },
-  { label: 'Explorations', type: 'explore', dir: 'pathly/explorations' },
+  { label: 'Debugs',               type: 'debug',   dir: 'pathly/debugs'               },
+  { label: 'Explorations',         type: 'explore', dir: 'pathly/explorations'         },
+  { label: 'Lessons',              type: 'explore', dir: 'pathly/lessons'              },
+  { label: 'Pipeline-walkthrough', type: 'explore', dir: 'pathly/pipeline-walkthrough' },
 ]
 
 export const PROTECTED_FILENAMES = new Set([
