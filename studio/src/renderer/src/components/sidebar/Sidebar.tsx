@@ -1,14 +1,16 @@
-import { useEffect, useDeferredValue, useRef, useState, useCallback } from 'react'
+import { useEffect, useDeferredValue, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import type { PathlyItem, PathlyCanvasDragItem, PathlyReorgDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import { useProjectFiles } from '../../hooks/useProjectFiles'
 import { usePlanFiles } from '../../hooks/usePlanFiles'
-import { FlowWizard } from '../FlowWizard'
-import { NewItemDialog } from '../NewItemDialog'
-import { DeleteConfirmModal } from './DeleteConfirmModal'
-import { LibraryPanel } from './LibraryPanel'
-import { WorkspacePanel } from './WorkspacePanel'
+import { LibraryPanel } from './panels/LibraryPanel'
+import { WorkspacePanel } from './panels/WorkspacePanel'
+import { useSidebarResize } from './shell/useSidebarResize'
+import { TabBar } from './shell/TabBar'
+import { FilterRow } from './shell/FilterRow'
+import { BottomNav } from './shell/BottomNav'
+import { SidebarDialogs } from './shell/SidebarDialogs'
 import type { Section } from './types'
 import styles from './Sidebar.module.css'
 
@@ -39,43 +41,7 @@ export function Sidebar(): JSX.Element | null {
     fn().then(setPathlyUserHome).catch(() => {})
   }, [pathlyUserHome, setPathlyUserHome])
 
-  const SIDEBAR_WIDTH_KEY = 'sidebar-width'
-  const MIN_WIDTH = 180
-  const MAX_WIDTH = 480
-
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY)
-    const parsed = saved ? parseInt(saved, 10) : NaN
-    return Number.isFinite(parsed) ? Math.min(Math.max(parsed, MIN_WIDTH), MAX_WIDTH) : 240
-  })
-
-  const isDraggingRef = useRef(false)
-  const startXRef = useRef(0)
-  const startWidthRef = useRef(0)
-
-  const onDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    isDraggingRef.current = true
-    startXRef.current = e.clientX
-    startWidthRef.current = sidebarWidth
-
-    function onMouseMove(ev: MouseEvent): void {
-      if (!isDraggingRef.current) return
-      const delta = ev.clientX - startXRef.current
-      const next = Math.min(Math.max(startWidthRef.current + delta, MIN_WIDTH), MAX_WIDTH)
-      setSidebarWidth(next)
-    }
-
-    function onMouseUp(): void {
-      isDraggingRef.current = false
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-      setSidebarWidth((w) => { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(w)); return w })
-    }
-
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }, [sidebarWidth])
+  const { sidebarWidth, onDragStart } = useSidebarResize()
 
   const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
@@ -407,42 +373,14 @@ export function Sidebar(): JSX.Element | null {
 
   return (
     <div className={styles.sidebar} style={{ width: sidebarWidth }}>
-      <div className={styles.tabBar} role="tablist" aria-label="Sidebar view">
-        <button
-          role="tab"
-          aria-selected={!libraryOpen}
-          className={`${styles.tab} ${!libraryOpen ? styles.tabActive : ''}`}
-          onClick={() => switchTab('workspace')}
-        >
-          WORKSPACE
-        </button>
-        <button
-          role="tab"
-          aria-selected={libraryOpen}
-          className={`${styles.tab} ${libraryOpen ? styles.tabActive : ''}`}
-          onClick={() => switchTab('library')}
-        >
-          LIBRARY
-        </button>
-      </div>
+      <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
 
-      <div className={styles.filterRow}>
-        <input
-          className={styles.filterInput}
-          placeholder={libraryOpen ? 'Search library…' : 'Filter…'}
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        {filter && (
-          <button
-            className={styles.filterClear}
-            onClick={() => setFilter('')}
-            title="Clear filter"
-          >
-            ×
-          </button>
-        )}
-      </div>
+      <FilterRow
+        libraryOpen={libraryOpen}
+        filter={filter}
+        onChange={setFilter}
+        onClear={() => setFilter('')}
+      />
 
       <div className={styles.treeContainer}>
         {libraryOpen && (
@@ -512,78 +450,48 @@ export function Sidebar(): JSX.Element | null {
           />
         )}
 
-        <div className={styles.divider} />
-
-        <button
-          className={`${styles.bottomRow} ${activePanel === 'monitor' ? styles.bottomRowActive : ''}`}
-          onClick={() => setActivePanel('monitor')}
-        >
-          <span className={styles.monitorDot}>●</span> Monitor
-        </button>
-
-        <button
-          className={`${styles.bottomRow} ${activePanel === 'settings' ? styles.bottomRowActive : ''}`}
-          onClick={() => setActivePanel('settings')}
-        >
-          ⚙ Settings
-        </button>
-
-        <div className={styles.divider} />
+        <BottomNav
+          activePanel={activePanel}
+          onMonitor={() => setActivePanel('monitor')}
+          onSettings={() => setActivePanel('settings')}
+        />
       </div>
 
       <div className={styles.resizeHandle} onMouseDown={onDragStart} role="separator" aria-orientation="vertical" aria-label="Resize sidebar" />
 
-      {showFlowWizard && (
-        <FlowWizard
-          onClose={() => setShowFlowWizard(false)}
-          onCreated={(filePath) => {
-            setShowFlowWizard(false)
-            setSections((prev) => ({ ...prev, Flows: { ...prev.Flows, open: true } }))
-            loadItems().then(() => {
-              if (filePath) {
-                const item: PathlyItem = {
-                  name: filePath.split('/').pop() ?? '',
-                  path: filePath,
-                  type: 'flow',
-                }
-                setSelectedItem(item)
-                setActivePanel('flow')
-                setLastUsedFlowPath(filePath)
+      <SidebarDialogs
+        showFlowWizard={showFlowWizard}
+        showNewItemDialog={showNewItemDialog}
+        newItemTarget={newItemTarget}
+        confirmDelete={confirmDelete}
+        confirmDeleteFolder={confirmDeleteFolder}
+        confirmDeleteSection={confirmDeleteSection}
+        onFlowWizardClose={() => setShowFlowWizard(false)}
+        onFlowWizardCreated={(filePath) => {
+          setShowFlowWizard(false)
+          setSections((prev) => ({ ...prev, Flows: { ...prev.Flows, open: true } }))
+          loadItems().then(() => {
+            if (filePath) {
+              const item: PathlyItem = {
+                name: filePath.split('/').pop() ?? '',
+                path: filePath,
+                type: 'flow',
               }
-            })
-          }}
-        />
-      )}
-      {showNewItemDialog && newItemTarget && (
-        <NewItemDialog
-          type={newItemTarget.type}
-          dir={newItemTarget.dir}
-          onClose={() => setShowNewItemDialog(false)}
-          onCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor'); void loadItems() }}
-        />
-      )}
-
-      {confirmDelete && (
-        <DeleteConfirmModal
-          item={confirmDelete}
-          onCancel={() => setConfirmDelete(null)}
-          onConfirm={() => void doDelete(confirmDelete)}
-        />
-      )}
-      {confirmDeleteFolder && (
-        <DeleteConfirmModal
-          item={{ name: confirmDeleteFolder.split('/').pop() ?? confirmDeleteFolder, path: confirmDeleteFolder, type: 'explore' }}
-          onCancel={() => setConfirmDeleteFolder(null)}
-          onConfirm={() => { setConfirmDeleteFolder(null); void handleDeleteFolder(confirmDeleteFolder) }}
-        />
-      )}
-      {confirmDeleteSection && (
-        <DeleteConfirmModal
-          item={{ name: confirmDeleteSection.name, path: confirmDeleteSection.dir, type: 'explore' }}
-          onCancel={() => setConfirmDeleteSection(null)}
-          onConfirm={() => void doDeleteCustomSection(confirmDeleteSection.dir)}
-        />
-      )}
+              setSelectedItem(item)
+              setActivePanel('flow')
+              setLastUsedFlowPath(filePath)
+            }
+          })
+        }}
+        onNewItemDialogClose={() => setShowNewItemDialog(false)}
+        onNewItemDialogCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor'); void loadItems() }}
+        onConfirmDeleteCancel={() => setConfirmDelete(null)}
+        onConfirmDeleteConfirm={(item) => void doDelete(item)}
+        onConfirmDeleteFolderCancel={() => setConfirmDeleteFolder(null)}
+        onConfirmDeleteFolderConfirm={(folderPath) => { setConfirmDeleteFolder(null); void handleDeleteFolder(folderPath) }}
+        onConfirmDeleteSectionCancel={() => setConfirmDeleteSection(null)}
+        onConfirmDeleteSectionConfirm={(dir) => void doDeleteCustomSection(dir)}
+      />
     </div>
   )
 }

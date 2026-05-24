@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { ChevronRight, ChevronDown, FilePlus, FolderPlus, Folder, FolderOpen, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
-import { RenameInput } from './RenameInput'
-import { ContextMenu } from './ContextMenu'
-import styles from './Sidebar.module.css'
+import { RenameInput } from '../shared/RenameInput'
+import { ContextMenu } from '../shared/ContextMenu'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   name: string

@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import styles from './Sidebar.module.css'
+import styles from '../Sidebar.module.css'
 
 interface ContextMenuProps {
   anchor: DOMRect

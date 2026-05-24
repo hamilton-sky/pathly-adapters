@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Plus, Trash2 } from 'lucide-react'
-import type { PathlyItem } from '../../types'
-import type { PlanFolder } from '../../hooks/usePlanFiles'
-import { IconButton } from '../ui'
-import { SectionHeader } from './SectionHeader'
+import type { PathlyItem } from '../../../types'
+import type { PlanFolder } from '../../../hooks/usePlanFiles'
+import { IconButton } from '../../ui'
+import { SectionHeader } from '../shared/SectionHeader'
 import { WorkspaceItem } from './WorkspaceItem'
-import { InlineCreateInput } from './InlineCreateInput'
-import { ContextMenu } from './ContextMenu'
-import { PROTECTED_FILENAMES } from './constants'
-import styles from './Sidebar.module.css'
+import { InlineCreateInput } from '../shared/InlineCreateInput'
+import { ContextMenu } from '../shared/ContextMenu'
+import { PROTECTED_FILENAMES } from '../constants'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   planFolders: PlanFolder[]

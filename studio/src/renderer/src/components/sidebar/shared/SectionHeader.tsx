@@ -1,5 +1,5 @@
 import { ChevronRight, ChevronDown } from 'lucide-react'
-import styles from './Sidebar.module.css'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   label: string

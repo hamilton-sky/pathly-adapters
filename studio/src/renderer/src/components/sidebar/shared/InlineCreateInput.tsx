@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { FileText, Folder } from 'lucide-react'
-import styles from './Sidebar.module.css'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   type: 'file' | 'folder'

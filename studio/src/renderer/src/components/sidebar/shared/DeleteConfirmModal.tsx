@@ -1,5 +1,5 @@
-import type { PathlyItem } from '../../types'
-import styles from './Sidebar.module.css'
+import type { PathlyItem } from '../../../types'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   item: PathlyItem

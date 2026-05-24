@@ -1,12 +1,12 @@
 import { BookOpen, Plus } from 'lucide-react'
-import type { PathlyItem, SectionState } from '../../types'
-import { IconButton } from '../ui'
-import { SectionHeader } from './SectionHeader'
-import { SubdirRow } from './SubdirRow'
-import { LibraryItem } from './LibraryItem'
-import { PATHLY_SECTIONS, USER_LIBRARY_SECTIONS, USER_LIBRARY_DISPLAY_LABELS } from './constants'
-import type { Section } from './types'
-import styles from './Sidebar.module.css'
+import type { PathlyItem, SectionState } from '../../../types'
+import { IconButton } from '../../ui'
+import { SectionHeader } from '../shared/SectionHeader'
+import { SubdirRow } from '../items/SubdirRow'
+import { LibraryItem } from '../items/LibraryItem'
+import { PATHLY_SECTIONS, USER_LIBRARY_SECTIONS, USER_LIBRARY_DISPLAY_LABELS } from '../constants'
+import type { Section } from '../types'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   sections: Record<string, SectionState>

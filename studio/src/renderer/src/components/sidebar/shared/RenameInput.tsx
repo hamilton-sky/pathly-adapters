@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import styles from './Sidebar.module.css'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   value: string

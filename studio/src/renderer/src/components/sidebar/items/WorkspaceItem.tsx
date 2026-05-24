@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
 import { FileText, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
-import { useUiStore } from '../../store/uiStore'
-import type { PathlyItem, PathlyReorgDragItem, PathlySection } from '../../types'
-import { PATHLY_DRAG_MIME } from '../../types'
-import { RenameInput } from './RenameInput'
-import { ContextMenu } from './ContextMenu'
-import styles from './Sidebar.module.css'
+import { useUiStore } from '../../../store/uiStore'
+import type { PathlyItem, PathlyReorgDragItem, PathlySection } from '../../../types'
+import { PATHLY_DRAG_MIME } from '../../../types'
+import { RenameInput } from '../shared/RenameInput'
+import { ContextMenu } from '../shared/ContextMenu'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   item: PathlyItem

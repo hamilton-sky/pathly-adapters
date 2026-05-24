@@ -1,7 +1,7 @@
 import { FileText, GripVertical, Pencil, Trash2 } from 'lucide-react'
-import type { PathlyItem } from '../../types'
-import { RenameInput } from './RenameInput'
-import styles from './Sidebar.module.css'
+import type { PathlyItem } from '../../../types'
+import { RenameInput } from '../shared/RenameInput'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   item: PathlyItem

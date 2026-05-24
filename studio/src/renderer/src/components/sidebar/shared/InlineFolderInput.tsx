@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
-import styles from './Sidebar.module.css'
+import styles from '../Sidebar.module.css'
 
 interface Props {
   onConfirm: (name: string) => void
