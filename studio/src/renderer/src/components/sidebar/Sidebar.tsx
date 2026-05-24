@@ -89,6 +89,7 @@ export function Sidebar(): JSX.Element | null {
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [renameValue, setRenameValue]   = useState('')
   const [confirmDelete, setConfirmDelete] = useState<PathlyItem | null>(null)
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<{ dir: string; name: string } | null>(null)
   const [dragOverPath, setDragOverPath] = useState<string | null>(null)
   const [inlineCreate, setInlineCreate] = useState<{
@@ -500,7 +501,7 @@ export function Sidebar(): JSX.Element | null {
             onToggleFolder={handleToggleFolder}
             onFolderClick={handleFolderClick}
             onRenameFolder={(oldPath, newName) => { void handleRenameFolder(oldPath, newName) }}
-            onDeleteFolder={(folderPath) => { void handleDeleteFolder(folderPath) }}
+            onDeleteFolder={(folderPath) => setConfirmDeleteFolder(folderPath)}
             onDeletePlanFolder={(folderPath) => { void handleDeletePlanFolder(folderPath) }}
             onDeleteCustomSection={(dir) => { void handleDeleteCustomSection(dir) }}
             onInlineCreateFileInFolder={handleInlineCreateFileInFolder}
@@ -567,6 +568,13 @@ export function Sidebar(): JSX.Element | null {
           item={confirmDelete}
           onCancel={() => setConfirmDelete(null)}
           onConfirm={() => void doDelete(confirmDelete)}
+        />
+      )}
+      {confirmDeleteFolder && (
+        <DeleteConfirmModal
+          item={{ name: confirmDeleteFolder.split('/').pop() ?? confirmDeleteFolder, path: confirmDeleteFolder, type: 'explore' }}
+          onCancel={() => setConfirmDeleteFolder(null)}
+          onConfirm={() => { setConfirmDeleteFolder(null); void handleDeleteFolder(confirmDeleteFolder) }}
         />
       )}
       {confirmDeleteSection && (
