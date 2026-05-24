@@ -98,6 +98,7 @@ def test_require_artifact_fail(tmp_path):
     assert len(gate_events) == 1
     assert gate_events[0]["gate"] == "require_artifact"
     assert gate_events[0]["transition"] == "A->B"
+    assert gate_events[0].get("ts"), "GATE_FAILED event must have a non-empty ts field"
 
     # STATE.json must not have been created
     assert not (storage / "STATE.json").exists()
@@ -170,6 +171,8 @@ def test_complete_stage_gate_blocks(tmp_path, monkeypatch):
     })
 
     assert result.get("blocked") is True
+    assert result.get("target_agent"), "blocked response must include a non-empty target_agent"
+    assert result.get("file"), "blocked response must include a non-empty file"
     # STATE.json still says BUILDING
     state_after = json.loads(state_file.read_text(encoding="utf-8"))
     assert state_after["current"] == "BUILDING"
@@ -283,6 +286,7 @@ def test_scope_gate_fail_undeclared_path(tmp_path, monkeypatch):
     gate_events = [e for e in events if e.get("type") == "GATE_FAILED"]
     assert len(gate_events) == 1
     assert gate_events[0]["gate"] == "scope_gate"
+    assert gate_events[0].get("ts"), "GATE_FAILED event must have a non-empty ts field"
 
 
 def test_scope_gate_no_declared_scope(tmp_path):
@@ -333,3 +337,11 @@ def test_verify_gate_pass_marker_in_body_not_line1(tmp_path):
     p = tmp_path / "VERIFY.md"
     p.write_text("# Header\nRESULT: PASS\nSome notes\n", encoding="utf-8")
     assert _verify_passed(p, "RESULT: PASS") is False
+
+
+def test_no_gates_on_transition(tmp_path):
+    """Empty gates dict means no gate is checked — run_gates returns None (transition proceeds)."""
+    storage = _storage(tmp_path)
+    flow = _make_flow({})
+    result = run_gates(flow, "BUILDING", "REVIEWING", storage, "t", 0)
+    assert result is None
