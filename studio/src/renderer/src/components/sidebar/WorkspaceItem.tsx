@@ -21,7 +21,6 @@ interface Props {
   onRenameCancel: () => void
   onStartRename?: () => void
   onStartDelete?: () => void
-  sidebarWidth?: number
   sectionId?: string
   isProtectedFile?: boolean
 }
@@ -39,13 +38,13 @@ export function WorkspaceItem({
   onRenameCancel,
   onStartRename,
   onStartDelete,
-  sidebarWidth,
   sectionId,
   isProtectedFile,
 }: Props): JSX.Element {
   const { userLockedPaths, toggleUserLock } = useUiStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
 
   const isUserLocked = userLockedPaths.has(item.path)
   // "actionable" = parent supplied at least one handler (not a system-protected file)
@@ -67,7 +66,11 @@ export function WorkspaceItem({
     <div
       ref={rowRef}
       className={cls}
-      draggable={!isProtectedFile && renamingPath !== item.path}
+      onClick={() => { if (renamingPath !== item.path) onSelect() }}
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect() }}
+      title={item.path}
+      draggable={!isProtectedFile && !isUserLocked && renamingPath !== item.path}
       onDragStart={(e) => {
         if (isProtectedFile) { e.preventDefault(); return }
         const payload: PathlyReorgDragItem = {
@@ -81,10 +84,6 @@ export function WorkspaceItem({
         e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
         e.dataTransfer.effectAllowed = 'move'
       }}
-      onClick={() => { if (renamingPath !== item.path) onSelect() }}
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect() }}
-      title={item.path}
     >
       <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
 
@@ -108,6 +107,7 @@ export function WorkspaceItem({
                 </span>
               )}
               <button
+                ref={menuButtonRef}
                 className={styles.rowAction}
                 title="Actions"
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
@@ -115,13 +115,12 @@ export function WorkspaceItem({
                 <MoreHorizontal size={13} />
               </button>
 
-              {menuOpen && rowRef.current && (
+              {menuOpen && menuButtonRef.current && (
                 <ContextMenu
-                  anchor={rowRef.current.getBoundingClientRect()}
-                  sidebarWidth={sidebarWidth ?? parseInt(localStorage.getItem('sidebar-width') ?? '240', 10)}
+                  anchor={menuButtonRef.current.getBoundingClientRect()}
                   onClose={() => setMenuOpen(false)}
                 >
-                  {onStartRename && (
+                  {onStartRename && !isUserLocked && (
                     <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartRename) }}>
                       <Pencil size={12} />
                       Rename

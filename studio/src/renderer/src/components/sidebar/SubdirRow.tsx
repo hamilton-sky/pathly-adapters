@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ChevronRight, ChevronDown, FilePlus, Folder, FolderOpen, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, FilePlus, FolderPlus, Folder, FolderOpen, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { RenameInput } from './RenameInput'
 import { ContextMenu } from './ContextMenu'
 import styles from './Sidebar.module.css'
@@ -14,13 +14,14 @@ interface Props {
   onStartDeleteFolder?: () => void
   onStartRenameFolder?: () => void
   onCreateFileInFolder?: () => void
-  onFolderDragStart?: (e: React.DragEvent) => void
+  onCreateFolderInFolder?: () => void
   renamingThis?: boolean
   renameValue?: string
   onRenameChange?: (v: string) => void
   onRenameCommit?: () => void
   onRenameCancel?: () => void
   folderPath?: string
+  onFolderDragStart?: (e: React.DragEvent) => void
   isDragOver?: boolean
   onDragOver?: (e: React.DragEvent) => void
   onDrop?: (e: React.DragEvent) => void
@@ -37,12 +38,13 @@ export function SubdirRow({
   onStartDeleteFolder,
   onStartRenameFolder,
   onCreateFileInFolder,
-  onFolderDragStart,
+  onCreateFolderInFolder,
   renamingThis,
   renameValue,
   onRenameChange,
   onRenameCommit,
   onRenameCancel,
+  onFolderDragStart,
   isDragOver,
   onDragOver,
   onDrop,
@@ -50,19 +52,18 @@ export function SubdirRow({
 }: Props): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
-
-  const sidebarWidth = parseInt(localStorage.getItem('sidebar-width') ?? '240', 10)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
 
   return (
     <div
       ref={rowRef}
       className={`${styles.subdirHeader}${isDragOver ? ` ${styles.subdirRowDragOver}` : ''}`}
-      draggable={!isSystemFolder && !renamingThis && Boolean(onFolderDragStart)}
       onClick={onToggle}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle() }}
-      onDragStart={(e) => { if (!isSystemFolder && !renamingThis) onFolderDragStart?.(e) }}
+      draggable={!isSystemFolder && !isUserLocked && !renamingThis && Boolean(onFolderDragStart)}
+      onDragStart={(e) => { if (!isSystemFolder && !isUserLocked && !renamingThis) onFolderDragStart?.(e) }}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver?.(e) }}
       onDrop={(e) => { e.preventDefault(); onDrop?.(e) }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) onDragLeave?.() }}
@@ -102,12 +103,13 @@ export function SubdirRow({
               <Lock size={11} />
             </span>
           )}
-          {onFolderDragStart && (
+          {onFolderDragStart && !isUserLocked && !isSystemFolder && (
             <span className={`${styles.rowAction} ${styles.grip}`} title="Drag to move folder">
               <GripVertical size={12} />
             </span>
           )}
           <button
+            ref={menuButtonRef}
             className={styles.rowAction}
             title="Actions"
             onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
@@ -115,12 +117,20 @@ export function SubdirRow({
             <MoreHorizontal size={13} />
           </button>
 
-          {menuOpen && rowRef.current && (
+          {menuOpen && menuButtonRef.current && (
             <ContextMenu
-              anchor={rowRef.current.getBoundingClientRect()}
-              sidebarWidth={sidebarWidth}
+              anchor={menuButtonRef.current.getBoundingClientRect()}
               onClose={() => setMenuOpen(false)}
             >
+              {onCreateFolderInFolder && (
+                <button
+                  className={styles.itemMenuItem}
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onCreateFolderInFolder() }}
+                >
+                  <FolderPlus size={12} />
+                  New folder
+                </button>
+              )}
               {onCreateFileInFolder && (
                 <button
                   className={styles.itemMenuItem}

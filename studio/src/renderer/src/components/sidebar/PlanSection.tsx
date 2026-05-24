@@ -63,7 +63,6 @@ export function PlanSection({
 }: Props): JSX.Element {
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null)
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null)
-  const sidebarWidth = parseInt(localStorage.getItem('sidebar-width') ?? '240', 10)
 
   const visibleFolders = lowerFilter
     ? planFolders.filter((f) =>
@@ -161,7 +160,6 @@ export function PlanSection({
                       {menuOpenFor === folder.name && menuAnchor && (
                         <ContextMenu
                           anchor={menuAnchor}
-                          sidebarWidth={sidebarWidth}
                           onClose={() => setMenuOpenFor(null)}
                         >
                           <button

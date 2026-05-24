@@ -136,20 +136,26 @@ export function Sidebar(): JSX.Element | null {
     }
   }
 
-  function handleInlineCreateFile(section: { dir: string }, e: React.MouseEvent<HTMLButtonElement>): void {
+  function handleInlineCreateFile(section: { label: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation()
     if (!projectPath) return
+    setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], open: true } }))
     setInlineCreate({ target: section.dir, parentDir: `${projectPath}/${section.dir}`, type: 'file' })
   }
 
-  function handleInlineCreateFolder(section: { dir: string }, e: React.MouseEvent<HTMLButtonElement>): void {
+  function handleInlineCreateFolder(section: { label: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation()
     if (!projectPath) return
+    setSections((prev) => ({ ...prev, [section.label]: { ...prev[section.label], open: true } }))
     setInlineCreate({ target: section.dir, parentDir: `${projectPath}/${section.dir}`, type: 'folder' })
   }
 
   function handleInlineCreateFileInFolder(folderPath: string): void {
     setInlineCreate({ target: folderPath, parentDir: folderPath, type: 'file' })
+  }
+
+  function handleInlineCreateFolderInFolder(folderPath: string): void {
+    setInlineCreate({ target: folderPath, parentDir: folderPath, type: 'folder' })
   }
 
   function handleCreateTopLevelFolder(e: React.MouseEvent<HTMLButtonElement>): void {
@@ -326,6 +332,17 @@ export function Sidebar(): JSX.Element | null {
     await loadItems()
   }
 
+  async function handleReorgDrop(sourcePath: string, targetDir: string, _sectionId: string): Promise<void> {
+    const fileName = sourcePath.split('/').pop() ?? ''
+    if (!fileName) return
+    const targetPath = `${targetDir}/${fileName}`
+    if (sourcePath === targetPath) return
+    const content = await window.pathly.fs.read(sourcePath).catch(() => '')
+    await window.pathly.fs.write(targetPath, content ?? '')
+    await window.pathly.fs.delete(sourcePath)
+    await loadItems()
+  }
+
   async function handleDeleteFolder(folderPath: string): Promise<void> {
     try {
       const files = await window.pathly.fs.list(folderPath).catch(() => [] as string[])
@@ -380,17 +397,6 @@ export function Sidebar(): JSX.Element | null {
   }
 
   void dragOverPath
-
-  async function handleReorgDrop(sourcePath: string, targetDir: string, _sectionId: string): Promise<void> {
-    const fileName = sourcePath.split('/').pop() ?? ''
-    if (!fileName) return
-    const targetPath = `${targetDir}/${fileName}`
-    if (sourcePath === targetPath) return
-    const content = await window.pathly.fs.read(sourcePath).catch(() => '')
-    await window.pathly.fs.write(targetPath, content ?? '')
-    await window.pathly.fs.delete(sourcePath)
-    await loadItems()
-  }
 
   function switchTab(tab: 'library' | 'workspace'): void {
     setLibraryOpen(tab === 'library')
@@ -493,13 +499,14 @@ export function Sidebar(): JSX.Element | null {
             onTogglePlan={() => setPlanOpen((v) => !v)}
             onToggleFolder={handleToggleFolder}
             onFolderClick={handleFolderClick}
-            onReorgDrop={(src, tgt, sid) => { void handleReorgDrop(src, tgt, sid) }}
             onRenameFolder={(oldPath, newName) => { void handleRenameFolder(oldPath, newName) }}
             onDeleteFolder={(folderPath) => { void handleDeleteFolder(folderPath) }}
-            onMoveFolder={(src, tgt) => { void handleMoveFolder(src, tgt) }}
             onDeletePlanFolder={(folderPath) => { void handleDeletePlanFolder(folderPath) }}
             onDeleteCustomSection={(dir) => { void handleDeleteCustomSection(dir) }}
             onInlineCreateFileInFolder={handleInlineCreateFileInFolder}
+            onInlineCreateFolderInFolder={handleInlineCreateFolderInFolder}
+            onReorgDrop={(src, tgt, sid) => { void handleReorgDrop(src, tgt, sid) }}
+            onMoveFolder={(src, tgt) => { void handleMoveFolder(src, tgt) }}
             customWorkspaceSections={customWorkspaceSections}
           />
         )}

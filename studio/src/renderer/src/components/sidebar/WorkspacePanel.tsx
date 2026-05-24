@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FilePlus, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { FolderPlus, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { PathlyItem, SectionState, PathlyReorgDragItem, PathlyFolderDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import type { PlanFolder } from '../../hooks/usePlanFiles'
@@ -9,7 +9,6 @@ import { SubdirRow } from './SubdirRow'
 import { WorkspaceItem } from './WorkspaceItem'
 import { PlanSection } from './PlanSection'
 import { InlineCreateInput } from './InlineCreateInput'
-import { ContextMenu } from './ContextMenu'
 import { WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from './constants'
 import type { Section } from './types'
 import { useUiStore } from '../../store/uiStore'
@@ -47,13 +46,14 @@ interface Props {
   onTogglePlan: () => void
   onToggleFolder: (name: string) => void
   onFolderClick: (name: string) => void
-  onReorgDrop?: (sourcePath: string, targetDir: string, sectionId: string) => void
   onRenameFolder?: (oldPath: string, newName: string) => void
   onDeleteFolder?: (folderPath: string) => void
-  onMoveFolder?: (sourcePath: string, targetSectionDir: string) => void
   onDeletePlanFolder?: (folderPath: string) => void
   onDeleteCustomSection?: (sectionDir: string) => void
   onInlineCreateFileInFolder?: (folderPath: string) => void
+  onInlineCreateFolderInFolder?: (folderPath: string) => void
+  onReorgDrop?: (sourcePath: string, targetDir: string, sectionId: string) => void
+  onMoveFolder?: (sourcePath: string, targetSectionDir: string) => void
   customWorkspaceSections?: Section[]
 }
 
@@ -69,8 +69,9 @@ export function WorkspacePanel(props: Props): JSX.Element {
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
-    onReorgDrop, onRenameFolder, onDeleteFolder, onMoveFolder, onDeletePlanFolder,
-    onDeleteCustomSection, onInlineCreateFileInFolder, customWorkspaceSections = [],
+    onRenameFolder, onDeleteFolder, onDeletePlanFolder,
+    onDeleteCustomSection, onInlineCreateFileInFolder, onInlineCreateFolderInFolder,
+    onReorgDrop, onMoveFolder, customWorkspaceSections = [],
   } = props
 
   const { userLockedFolders, toggleFolderLock } = useUiStore()
@@ -78,10 +79,6 @@ export function WorkspacePanel(props: Props): JSX.Element {
   const [dragOverSection, setDragOverSection] = useState<string | null>(null)
   const [renamingFolderPath, setRenamingFolderPath] = useState<string | null>(null)
   const [renamingFolderValue, setRenamingFolderValue] = useState('')
-  const [customSectionMenuOpen, setCustomSectionMenuOpen] = useState<string | null>(null)
-  const [customSectionMenuAnchor, setCustomSectionMenuAnchor] = useState<DOMRect | null>(null)
-  const sidebarWidth = parseInt(localStorage.getItem('sidebar-width') ?? '240', 10)
-
   return (
     <>
       <div className={styles.workspaceHeader}>
@@ -138,7 +135,6 @@ export function WorkspacePanel(props: Props): JSX.Element {
         return (
           <div
             key={section.label}
-            className={dragOverSection === section.label ? styles.subdirRowDragOver : undefined}
             onDragOver={(e) => {
               if (e.dataTransfer.types.includes(PATHLY_DRAG_MIME)) {
                 e.preventDefault()
@@ -161,27 +157,29 @@ export function WorkspacePanel(props: Props): JSX.Element {
               } catch { /* ignore */ }
             }}
           >
-            <SectionHeader
-              label={section.label}
-              open={state.open}
-              onToggle={() => onToggleSection(section.label)}
-              actionsLeft={
-                <IconButton
-                  onClick={(e) => onInlineCreateFolder(section, e)}
-                  title="New folder"
-                >
-                  <FolderPlus size={12} />
-                </IconButton>
-              }
-              actions={
-                <IconButton
-                  onClick={(e) => onInlineCreateFile(section, e)}
-                  title="New file"
-                >
-                  <Plus size={12} />
-                </IconButton>
-              }
-            />
+            <div className={dragOverSection === section.label ? styles.subdirRowDragOver : undefined}>
+              <SectionHeader
+                label={section.label}
+                open={state.open}
+                onToggle={() => onToggleSection(section.label)}
+                actionsLeft={
+                  <IconButton
+                    onClick={(e) => onInlineCreateFolder(section, e)}
+                    title="New folder"
+                  >
+                    <FolderPlus size={12} />
+                  </IconButton>
+                }
+                actions={
+                  <IconButton
+                    onClick={(e) => onInlineCreateFile(section, e)}
+                    title="New file"
+                  >
+                    <Plus size={12} />
+                  </IconButton>
+                }
+              />
+            </div>
             {state.open && (
               <div>
                 {inlineCreate?.target === section.dir && (
@@ -206,6 +204,32 @@ export function WorkspacePanel(props: Props): JSX.Element {
                         isUserLocked={userLockedFolders.has(folderKey)}
                         onToggleFolderLock={() => toggleFolderLock(folderKey)}
                         folderPath={folderKey}
+                        renamingThis={renamingFolderPath === folderKey}
+                        renameValue={renamingFolderValue}
+                        onRenameChange={setRenamingFolderValue}
+                        onRenameCommit={() => {
+                          const v = renamingFolderValue
+                          setRenamingFolderPath(null)
+                          onRenameFolder?.(folderKey, v)
+                        }}
+                        onRenameCancel={() => setRenamingFolderPath(null)}
+                        onStartRenameFolder={!userLockedFolders.has(folderKey) ? () => {
+                          setRenamingFolderValue(subdir.name)
+                          setRenamingFolderPath(folderKey)
+                        } : undefined}
+                        onStartDeleteFolder={
+                          !userLockedFolders.has(folderKey)
+                            ? () => onDeleteFolder?.(folderKey)
+                            : undefined
+                        }
+                        onCreateFileInFolder={() => {
+                          if (!subdir.open) onToggleSubdir(section.label, idx)
+                          onInlineCreateFileInFolder?.(folderKey)
+                        }}
+                        onCreateFolderInFolder={() => {
+                          if (!subdir.open) onToggleSubdir(section.label, idx)
+                          onInlineCreateFolderInFolder?.(folderKey)
+                        }}
                         isDragOver={dragOverFolder === folderKey}
                         onDragOver={() => setDragOverFolder(folderKey)}
                         onDrop={(e) => {
@@ -220,28 +244,6 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           } catch { /* ignore malformed payload */ }
                         }}
                         onDragLeave={() => setDragOverFolder(null)}
-                        renamingThis={renamingFolderPath === folderKey}
-                        renameValue={renamingFolderValue}
-                        onRenameChange={setRenamingFolderValue}
-                        onRenameCommit={() => {
-                          const v = renamingFolderValue
-                          setRenamingFolderPath(null)
-                          onRenameFolder?.(folderKey, v)
-                        }}
-                        onRenameCancel={() => setRenamingFolderPath(null)}
-                        onStartRenameFolder={() => {
-                          setRenamingFolderValue(subdir.name)
-                          setRenamingFolderPath(folderKey)
-                        }}
-                        onStartDeleteFolder={
-                          !userLockedFolders.has(folderKey)
-                            ? () => onDeleteFolder?.(folderKey)
-                            : undefined
-                        }
-                        onCreateFileInFolder={() => {
-                          if (!subdir.open) onToggleSubdir(section.label, idx)
-                          onInlineCreateFileInFolder?.(folderKey)
-                        }}
                         onFolderDragStart={(e) => {
                           const payload: PathlyFolderDragItem = {
                             dragType: 'reorg-folder',
@@ -255,7 +257,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                       />
                       {subdir.open && inlineCreate?.target === folderKey && (
                         <InlineCreateInput
-                          type="file"
+                          type={inlineCreate.type}
                           deep
                           onCommit={onInlineCreateSubmit}
                           onCancel={onInlineCreateCancel}
@@ -303,57 +305,15 @@ export function WorkspacePanel(props: Props): JSX.Element {
               label={section.label}
               open={state.open}
               onToggle={() => onToggleSection(section.label)}
-              alwaysShowActions
+              actionsLeft={
+                <IconButton onClick={(e) => onInlineCreateFolder(section, e)} title="New folder">
+                  <FolderPlus size={12} />
+                </IconButton>
+              }
               actions={
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 2 }}>
-                  {userLockedFolders.has(sectionTargetDir) && (
-                    <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked">
-                      <Lock size={11} />
-                    </span>
-                  )}
-                  <button
-                    className={styles.rowAction}
-                    title="Actions"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const next = customSectionMenuOpen === section.label ? null : section.label
-                      setCustomSectionMenuOpen(next)
-                      if (next) setCustomSectionMenuAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())
-                    }}
-                  >
-                    <MoreHorizontal size={13} />
-                  </button>
-                  {customSectionMenuOpen === section.label && customSectionMenuAnchor && (
-                    <ContextMenu
-                      anchor={customSectionMenuAnchor}
-                      sidebarWidth={sidebarWidth}
-                      onClose={() => setCustomSectionMenuOpen(null)}
-                    >
-                      <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); onInlineCreateFolder(section, e) }}>
-                        <FolderPlus size={12} />
-                        New folder
-                      </button>
-                      <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); onInlineCreateFile(section, e) }}>
-                        <FilePlus size={12} />
-                        New file
-                      </button>
-                      <div className={styles.itemMenuSep} />
-                      <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); toggleFolderLock(sectionTargetDir) }}>
-                        <Lock size={12} />
-                        {userLockedFolders.has(sectionTargetDir) ? 'Unlock section' : 'Lock section'}
-                      </button>
-                      {!userLockedFolders.has(sectionTargetDir) && (
-                        <>
-                          <div className={styles.itemMenuSep} />
-                          <button className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`} onClick={(e) => { e.stopPropagation(); setCustomSectionMenuOpen(null); onDeleteCustomSection?.(section.dir) }}>
-                            <Trash2 size={12} />
-                            Delete section
-                          </button>
-                        </>
-                      )}
-                    </ContextMenu>
-                  )}
-                </div>
+                <IconButton onClick={(e) => onInlineCreateFile(section, e)} title="New file">
+                  <Plus size={12} />
+                </IconButton>
               }
             />
             {state.open && (
@@ -398,10 +358,6 @@ export function WorkspacePanel(props: Props): JSX.Element {
                         isSystemFolder={subdir.files.some(f => PROTECTED_FILENAMES.has(f.name))}
                         isUserLocked={userLockedFolders.has(folderKey)}
                         onToggleFolderLock={() => toggleFolderLock(folderKey)}
-                        isDragOver={dragOverFolder === folderKey}
-                        onDragOver={() => setDragOverFolder(folderKey)}
-                        onDrop={(e) => { setDragOverFolder(null); e.dataTransfer.getData(PATHLY_DRAG_MIME) }}
-                        onDragLeave={() => setDragOverFolder(null)}
                         renamingThis={renamingFolderPath === folderKey}
                         renameValue={renamingFolderValue}
                         onRenameChange={setRenamingFolderValue}
@@ -413,6 +369,14 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           if (!subdir.open) onToggleSubdir(section.label, idx)
                           onInlineCreateFileInFolder?.(folderKey)
                         }}
+                        onCreateFolderInFolder={() => {
+                          if (!subdir.open) onToggleSubdir(section.label, idx)
+                          onInlineCreateFolderInFolder?.(folderKey)
+                        }}
+                        isDragOver={dragOverFolder === folderKey}
+                        onDragOver={() => setDragOverFolder(folderKey)}
+                        onDrop={(e) => { setDragOverFolder(null); e.dataTransfer.getData(PATHLY_DRAG_MIME) }}
+                        onDragLeave={() => setDragOverFolder(null)}
                         onFolderDragStart={(e) => {
                           const payload = { dragType: 'reorg-folder', name: subdir.name, sourcePath: folderKey, sectionDir: sectionTargetDir }
                           e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
@@ -421,7 +385,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                       />
                       {subdir.open && inlineCreate?.target === folderKey && (
                         <InlineCreateInput
-                          type="file"
+                          type={inlineCreate.type}
                           deep
                           onCommit={onInlineCreateSubmit}
                           onCancel={onInlineCreateCancel}
