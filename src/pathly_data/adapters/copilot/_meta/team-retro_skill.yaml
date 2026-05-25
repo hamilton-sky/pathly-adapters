@@ -1,5 +1,0 @@
-skill: team/retro
-filename: pathly-team/retro/SKILL.md
-natural_language: "/pathly team retro, team retrospective phase"
-variables:
-  TEMPLATES_DIR: ~/.vscode/extensions/pathly/templates

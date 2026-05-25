@@ -2,7 +2,7 @@
 
 Unified entry point for the Pathly team pipeline.
 HTTP/FSM engine first (auto-starts the Python server via `fsm-call`); falls back to
-the LLM orchestrator if the server cannot start. Use `team-http` to force HTTP-only.
+the LLM orchestrator if the server cannot start.
 
 Run for `$ARGUMENTS`.
 

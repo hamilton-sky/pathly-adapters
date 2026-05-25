@@ -1,7 +1,0 @@
-name: team/build
-description: "Build stage for the team pipeline — spawns builder with scout-gathered context, handles feedback loops."
-model: gpt-5.5
-filename: team/build.toml
-core_file: skills/team/build.md
-tools: [Read, Glob, Grep, Write, Edit, Bash]
-can_spawn: [builder, planner, architect, scout, quick]

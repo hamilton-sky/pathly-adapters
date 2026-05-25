@@ -1,7 +1,0 @@
-name: team/discover
-description: "Discovery stage for the team pipeline — presents discovery menu, routes to PO, explore, architect storm, or directly to planning."
-model: gpt-5.5
-filename: team/discover.toml
-core_file: skills/team/discover.md
-tools: [Read, Glob, Grep, Write, Edit]
-can_spawn: [po, architect, planner, quick]
