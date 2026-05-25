@@ -21,6 +21,8 @@ def append_activity(
     total_tokens: int = 0,
 ) -> None:
     ACTIVITY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if ACTIVITY_FILE.exists() and ACTIVITY_FILE.stat().st_size > 5 * 1024 * 1024:
+        ACTIVITY_FILE.rename(ACTIVITY_FILE.with_suffix('.jsonl.bak'))
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "agent": agent,

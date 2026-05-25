@@ -13,3 +13,6 @@ __pycache__/
 .env
 .env.*
 *.env
+build/lib/
+build/bdist*/
+build/temp*/

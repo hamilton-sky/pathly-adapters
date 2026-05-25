@@ -1,1 +1,1 @@
-# pathly_telemetry — agent activity MCP server + CLI reporter
+# pathly_telemetry — HTTP telemetry storage + CLI reporter
