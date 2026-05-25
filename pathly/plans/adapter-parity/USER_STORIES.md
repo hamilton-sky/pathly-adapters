@@ -12,8 +12,7 @@ name: User Stories
 **Acceptance criteria:**
 - `src/pathly_data/adapters/copilot/_meta/archive_skill.yaml` exists and is valid YAML
 - `src/pathly_data/adapters/copilot/_meta/archive-artifacts_skill.yaml` exists and is valid YAML
-- Both files have the same `skill`, `filename`, and `natural_language` fields as the equivalent Claude files
-- Running `pathly-setup --dry-run --host copilot` lists both archive skills in the manifest
+- Both `src/pathly_data/adapters/copilot/_meta/archive_skill.yaml` and `src/pathly_data/adapters/copilot/_meta/archive-artifacts_skill.yaml` exist, are valid YAML, and have the same `skill`, `filename`, and `natural_language` fields as the equivalent Claude files
 
 ## S2: Copilot and Codex users can commit changes via Pathly
 
@@ -28,11 +27,11 @@ name: User Stories
 ## S3: Explorer agent has a behavioral contract
 
 **As a** developer working on any adapter,
-**I want** `src/pathly_data/core/agents/explorer.md` to exist,
+**I want** `src/pathly_data/core/agents/research/explorer.md` to exist,
 **so that** the `explorer.yaml` metadata files in all three adapters have a backing contract.
 
 **Acceptance criteria:**
-- `src/pathly_data/core/agents/explorer.md` exists with frontmatter (`name`, `description`)
+- `src/pathly_data/core/agents/research/explorer.md` exists with frontmatter (`name`, `description`)
 - The file describes the explorer agent's role, tool boundaries, inputs/outputs, and handoff contracts
 - The description is consistent with the `description:` field in each adapter's `explorer.yaml`
 

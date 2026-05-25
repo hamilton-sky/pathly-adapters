@@ -1,3 +1,8 @@
+---
+name: explorer
+description: Codebase exploration orchestrator — traces code paths and answers structural questions (how does X work, is it safe to change Y). Spawned by /explore. Outputs NEEDS_CONTEXT in analyze phase, writes TRACE.md in explore phase, writes CONCLUSIONS.md in conclude phase. Read-only on production code.
+---
+
 # explorer
 
 This is the canonical, tool-agnostic Pathly agent contract for the explorer role.
