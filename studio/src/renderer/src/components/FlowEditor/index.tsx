@@ -22,6 +22,7 @@ export function FlowEditor(): JSX.Element {
     rawYaml,
     loading,
     saveError,
+    yamlParseError,
     yamlSyncContent,
     handleTabSwitch,
     handleVisualChange,
@@ -59,9 +60,23 @@ export function FlowEditor(): JSX.Element {
   }
 
   if (loading) {
+    const skeletonWidths = ['85%', '70%', '90%', '60%']
     return (
       <div style={styles.panel}>
-        <span style={styles.message}>Loading…</span>
+        <style>{`
+          @keyframes skeleton-shimmer {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .fe-skeleton-line { animation: none !important; }
+          }
+        `}</style>
+        <div style={styles.skeletonContainer} role="status" aria-label="Loading flow">
+          {skeletonWidths.map((w, i) => (
+            <div key={i} className="fe-skeleton-line" style={{ ...styles.skeletonLine, width: w }} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -77,6 +92,11 @@ export function FlowEditor(): JSX.Element {
   if (!flowData) {
     return (
       <div style={styles.panel}>
+        {yamlParseError && (
+          <div style={{ padding: '4px 12px', backgroundColor: `${t.red}22`, borderBottom: `1px solid ${t.red}`, flexShrink: 0 }}>
+            <span style={styles.error}>{yamlParseError}</span>
+          </div>
+        )}
         <span style={styles.message}>Unable to parse flow YAML</span>
       </div>
     )

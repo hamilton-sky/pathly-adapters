@@ -1,4 +1,5 @@
 import React from 'react'
+import { Button } from '../ui'
 
 interface WizardFooterProps {
   step: number
@@ -38,9 +39,9 @@ export function WizardFooter({
             Next →
           </button>
         ) : (
-          <button style={saveNextStyle} onClick={onSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Flow'}
-          </button>
+          <Button onClick={onSave} loading={saving} disabled={saving}>
+            Save Flow
+          </Button>
         )}
       </div>
     </div>

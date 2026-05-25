@@ -53,6 +53,18 @@ export function makeFlowEditorStyles(t: Theme): Record<string, React.CSSProperti
       color: t.textMuted,
       fontSize: '15px',
       margin: 'auto'
+    },
+    skeletonContainer: {
+      padding: '16px 20px',
+      display: 'flex',
+      flexDirection: 'column'
+    },
+    skeletonLine: {
+      height: '14px',
+      borderRadius: '4px',
+      marginBottom: '10px',
+      backgroundColor: t.bgSurface0,
+      animation: 'skeleton-shimmer 1.4s ease-in-out infinite'
     }
   }
 }

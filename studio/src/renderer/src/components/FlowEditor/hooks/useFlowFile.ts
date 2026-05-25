@@ -61,8 +61,14 @@ export function useFlowFile(
           const parsed = jsYaml.load(content ?? '') as FlowYaml
           setFlowData(parsed)
           lastValidFlowDataRef.current = parsed
-        } catch {
+        } catch (error) {
           setFlowData(null)
+          if (error instanceof jsYaml.YAMLException) {
+            const line = (error.mark?.line ?? 0) + 1
+            setYamlParseError(`YAML parse error on line ${line}: ${error.reason ?? error.message}`)
+          } else {
+            setYamlParseError((error as Error).message)
+          }
         }
       })
       .catch(() => {

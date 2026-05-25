@@ -9,6 +9,7 @@ interface ButtonProps {
   variant?: Variant
   size?: Size
   disabled?: boolean
+  loading?: boolean
   onClick?: () => void
   children: React.ReactNode
   style?: React.CSSProperties
@@ -18,15 +19,16 @@ export function Button({
   variant = 'primary',
   size = 'md',
   disabled = false,
+  loading = false,
   onClick,
   children,
   style,
 }: ButtonProps): JSX.Element {
   return (
     <button
-      className={clsx('pathly-btn', styles.btn, styles[variant], styles[size], uiStyles.focusVisible)}
+      className={clsx('pathly-btn', styles.btn, styles[variant], styles[size], uiStyles.focusVisible, loading && styles.loading)}
       style={style}
-      disabled={disabled}
+      disabled={disabled || loading}
       onClick={onClick}
     >
       {children}
