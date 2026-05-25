@@ -108,6 +108,8 @@ export interface FsmEvent {
   detail?: string
   from?: string
   to?: string
+  stage?: string
+  next?: string
   reason?: string
   agent?: string
   model?: string

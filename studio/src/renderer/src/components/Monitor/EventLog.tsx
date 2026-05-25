@@ -76,7 +76,7 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
     case 'GATE_SKIPPED':
       return `${ts}  ${pad('GATE_SKIPPED', 14)}  ${ev.key ?? ev.detail ?? ''}${ev.reason ? `  reason: ${ev.reason}` : ''}`
     case 'STAGE_COMPLETE':
-      return `${ts}  ${pad('STAGE_COMPLETE', 14)}  ${ev.from ?? '?'} → ${ev.to ?? '?'}`
+      return `${ts}  ${pad('STAGE_COMPLETE', 14)}  ${ev.stage ?? ev.from ?? '?'} → ${ev.next ?? ev.to ?? '?'}`
     default: {
       const { type, ts: _ts, timestamp: _ts2, ...rest } = ev
       const extra = Object.entries(rest).map(([k, v]) => `${k}=${String(v)}`).join('  ')

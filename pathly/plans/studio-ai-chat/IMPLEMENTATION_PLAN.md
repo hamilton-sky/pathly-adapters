@@ -2,274 +2,303 @@
 
 ## Overview
 
-Adds a local AI chat assistant to Pathly Studio (Electron). The assistant runs entirely offline via Ollama, is aware of the current pipeline stage and feature plan, and can propose terminal commands for the user to approve. Three layers: Python chat agent server, React + Zustand chat UI, Electron IPC bridge for terminal write.
+Adds the **Conductor** — a local AI chat panel to Pathly Studio (Electron). The Conductor
+interprets plain-English intent, matches it to the right Pathly skill via embedding similarity
+(MiniLM, ~22ms, offline), explains the match with phi4-mini, and writes the skill command to
+the Claude Code or Codex terminal tab with user approval.
+
+**Read DESIGN_SPEC.md before building any UI.** It contains ASCII layouts, design tokens,
+component specs, and the interaction model.
 
 ## Pre-flight
 
-Before Conversation 1, run the existing test suite and record any pre-existing failures as the known baseline. Do not attribute pre-existing failures to this feature.
-
+Before Conversation 1:
 ```
 cd studio && npm run typecheck
 ```
+Record any pre-existing failures as baseline.
 
 ## Layer Architecture
 
 ```
-Studio Renderer (React + Zustand)
-     │  HTTP POST /chat (fetch + ReadableStream)
+Studio Renderer (React + Zustand + CSS Modules)
+     │  matchIntent() — MiniLM via transformers.js (~22ms)
+     │  POST /chat — phi4-mini explanation (SSE streaming)
      ▼
 Pathly Python Server (http_server.py :8765)
-     │  chat_agent.py — ReAct loop
+     │  chat_agent.py — explainer only, NOT router
      ▼
-Ollama (local, :11434)
-     │  phi4-mini or configurable model
+Ollama (:11434) — phi4-mini
+     │  streams 2-3 sentence explanation
      ▼
-Response streams back up through all layers
+Back to Renderer → MatchCard + explanation bubble
 
-Renderer ──IPC──► Electron Main (ipc/chat.ts)
-                       │  node-pty.write()
-                       ▼
-                  Shell Terminal
+Renderer ──IPC 'chat:write-terminal'──► Electron Main
+                                              │  node-pty.write("/pathly <skill>\n")
+                                              ▼
+                                    Claude Code terminal tab
+                                         OR
+                                    Codex terminal tab
 ```
 
 ---
 
-## Phase 1: Add Ollama dependency + /chat endpoint skeleton   ← Conversation: 1
+## Phase 1: POST /chat SSE endpoint skeleton   ← Conversation 1
 
-**File:** `src/pathly_orchestrator/http_server.py` — MODIFY: add `POST /chat` route
-**File:** `pyproject.toml` — MODIFY: add `ollama>=0.3` to dependencies
-**Done when:** `curl -X POST http://127.0.0.1:8765/chat -H "Content-Type: application/json" -d '{"message":"hi","history":[]}' ` returns a 200 (even a static response)
-**Delivers stories:** S1.1 (partial)
-**Depends on:** nothing
-**Enables:** Phase 2 (agent loop)
+**File:** `src/pathly_orchestrator/http_server.py` — MODIFY
+**Done when:** `curl -X POST http://127.0.0.1:8765/chat -H "Content-Type: application/json" -d '{"message":"explain build","matchedSkill":"build","history":[]}'` returns 200
+**Delivers:** S1.1 (partial)
 **Details:**
-- Add route `/chat` accepting POST with JSON body `{ message: str, history: list }`
-- Return chunked streaming response (`Content-Type: text/event-stream`)
+- Add route `/chat` accepting POST: `{ message, matchedSkill, skillDescription, history, context }`
+- Return `Content-Type: text/event-stream`
 - Static placeholder: `data: {"text": "chat endpoint ready"}\n\n`
-- Add `ollama` to pyproject.toml dependencies list
-**Verify:** `python -m pytest tests/ -x -q` (baseline check)
+- Add `ollama>=0.3` to `pyproject.toml`
 
 ---
 
-## Phase 2: ReAct agent loop + Ollama call   ← Conversation: 1
+## Phase 2: phi4-mini explainer agent   ← Conversation 1
 
 **File:** `src/pathly_orchestrator/chat_agent.py` — CREATE
-**Done when:** `/chat` returns a real streamed response from the local Ollama model
-**Delivers stories:** S1.1
-**Depends on:** Phase 1
-**Enables:** Phase 3 (context injection)
+**Done when:** `/chat` streams a 2-3 sentence explanation referencing the matched skill and FSM stage
+**Delivers:** S1.1
 **Details:**
-- `ChatAgent` class with `stream(message, history, context) -> AsyncGenerator[str]`
-- Calls `ollama.AsyncClient().chat()` with model from env `PATHLY_CHAT_MODEL` (default `phi4-mini`)
-- Streams response chunks back via async generator
-- `http_server.py` `/chat` route calls `ChatAgent().stream()` and yields chunks as SSE: `data: {"text": "..."}\n\n`
-- On `ollama.ResponseError` or connection refused: yield `data: {"error": "Ollama not available"}\n\n` then close with 503
+- `ChatAgent` class with `stream(message, matchedSkill, context, history) -> AsyncGenerator[str]`
+- System prompt: **explainer role** (see DESIGN_SPEC.md → phi4-mini System Prompt)
+- Calls `ollama.AsyncClient().chat()` with model from `PATHLY_CHAT_MODEL` (default `phi4-mini`)
+- Streams chunks as SSE: `data: {"text": "..."}\n\n`
+- On Ollama error: yield `data: {"error": "Ollama offline"}\n\n` — MatchCard still works without this
 
 ---
 
-## Phase 3: Pathly context injection   ← Conversation: 1
+## Phase 3: Context injection   ← Conversation 1
 
 **File:** `src/pathly_orchestrator/chat_tools.py` — CREATE
-**File:** `src/pathly_orchestrator/chat_agent.py` — MODIFY: inject context into system prompt
-**Done when:** AI response references the active FSM stage by name when asked "what stage am I in?"
-**Delivers stories:** S1.2
-**Depends on:** Phase 2
-**Enables:** Conversation 2 (UI can display meaningful responses)
+**Done when:** phi4-mini explanation mentions the current FSM stage by name
+**Delivers:** S1.2
 **Details:**
-- `chat_tools.py` exports three functions:
-  - `get_fsm_state(project_root) -> dict` — reads FSM state file or calls `/next_action` internally
-  - `read_plan_summary(project_root) -> str` — reads `plans/*/FEATURE_INDEX.md` for the active feature (most recently modified)
-  - `list_skills() -> list[str]` — reads skill names from the installed skills manifest
-- `chat_agent.py` calls these three before the Ollama call to build `system_prompt`:
-  ```
-  You are the Pathly Studio AI assistant. You help developers use the Pathly pipeline.
-
-  ## Current State
-  Stage: {fsm_stage}
-  Feature: {feature_name}
-
-  ## Active Plan
-  {plan_summary}  (truncate to 800 tokens max)
-
-  ## Available Skills
-  {skills_list}
-
-  Be concise. When suggesting commands, wrap them in a fenced code block starting with $.
-  ```
-- Total system prompt capped at 2,000 tokens (truncate plan summary if needed)
+- `get_fsm_state(project_root) -> dict` — reads FSM state or calls `/next_action` internally
+- `read_plan_summary(project_root) -> str` — reads most-recently-modified `plans/*/FEATURE_INDEX.md`
+- Inject into system prompt: `Stage: {fsm_stage} | Feature: {feature_name} | Matched skill: {skill}`
+- Total system prompt cap: 1,000 tokens (explainer context is smaller than general chat)
 
 ---
 
-## Phase 4: Zustand chat store   ← Conversation: 2
+## Phase 4: Zustand chat store   ← Conversation 2
 
 **File:** `studio/src/renderer/src/store/chatStore.ts` — CREATE
-**Done when:** `useChatStore()` returns `{ messages, isStreaming, sendMessage, stopStream }` without TypeScript errors
-**Delivers stories:** S2.2 (partial)
-**Depends on:** Phase 1–3 complete (server running)
-**Enables:** Phase 5 (ChatPanel renders from store)
+**Done when:** `useChatStore()` returns all fields without TypeScript errors
+**Delivers:** S2.2 (partial)
 **Details:**
-- Follow pattern from `studio/src/renderer/src/store/uiStore.ts` (create with persist)
-- State shape:
-  ```ts
-  interface Message { id: string; role: 'user' | 'assistant'; content: string; timestamp: number }
-  interface ChatStore {
-    messages: Message[]
-    isStreaming: boolean
-    addMessage: (msg: Message) => void
-    appendToLastMessage: (chunk: string) => void
-    setStreaming: (v: boolean) => void
-    clearMessages: () => void
-  }
-  ```
-- Use `crypto.randomUUID()` for message IDs
-- Persist messages in localStorage key `pathly-chat`
+- Follow pattern from existing `uiStore.ts`
+- Full state shape in DESIGN_SPEC.md → Zustand Store Shape
+- Key additions over a simple message store: `currentMatch`, `altMatches`, `isEmbedding`, `embedReady`
+- Persist: `autoApprove` only (matches and messages are session-only)
 
 ---
 
-## Phase 5: ChatPanel collapsible container   ← Conversation: 2
+## Phase 5: uiStore additions   ← Conversation 2
 
-**File:** `studio/src/renderer/src/components/ChatPanel/index.tsx` — CREATE
-**File:** `studio/src/renderer/src/components/ChatPanel/ChatPanel.module.css` — CREATE
-**Done when:** ChatPanel renders in Studio, collapse toggle works, panel width animates between 32px and 320px
-**Delivers stories:** S2.1
-**Depends on:** Phase 4
-**Enables:** Phase 6 (message list and input inside panel)
-**Details:**
-- Read `uiStore` for `chatOpen` state; toggle on button click
-- CSS: `transition: width 200ms ease-out` — no layout thrashing, transform only
-- Collapsed: 32px wide, shows only `<ChevronLeft />` from lucide-react
-- Expanded: 320px wide, shows header + content area
-- Colors from design system: background `#0F172A`, border-left `1px solid #475569`
-- Panel sits as a flex sibling after MainPanel in App.tsx body row
-
----
-
-## Phase 6: MessageList + ChatInput components   ← Conversation: 2
-
-**File:** `studio/src/renderer/src/components/ChatPanel/MessageList.tsx` — CREATE
-**File:** `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx` — CREATE
-**Done when:** User can type a message, press Enter or click Send, see their message appear, then see streamed AI response appear word by word
-**Delivers stories:** S2.2
-**Depends on:** Phase 5
-**Enables:** Phase 7 (wired into App)
-**Details:**
-- `MessageList`: maps `messages` from chatStore; user messages right-aligned (surface `#1E293B`), AI messages left-aligned; streaming message shows blinking `▋` cursor appended to content; scroll to bottom on new message (`useEffect` + `ref.scrollIntoView`)
-- `ChatInput`: textarea (1–4 rows auto-resize); Send button (`<Send />` icon, accent `#22C55E`); Stop button (`<StopCircle />`) visible only when `isStreaming`; Enter submits, Shift+Enter newline
-- `sendMessage` flow: add user Message to store → `fetch('http://127.0.0.1:8765/chat', { method: 'POST', body: JSON.stringify({message, history}) })` → `ReadableStream` reader → call `appendToLastMessage` per chunk → `setStreaming(false)` on done
-- Stop: call `reader.cancel()` → `setStreaming(false)`
-
----
-
-## Phase 7: Wire ChatPanel into App layout   ← Conversation: 2
-
-**File:** `studio/src/renderer/src/App.tsx` — MODIFY
 **File:** `studio/src/renderer/src/store/uiStore.ts` — MODIFY
-**Done when:** Studio launches with ChatPanel visible on the right; toggling collapse works
-**Delivers stories:** S2.1 (complete)
-**Depends on:** Phase 5, 6
-**Enables:** Conversation 3
+**Done when:** `chatOpen` and `skillsPanelOpen` toggle and persist across remounts
+**Delivers:** S2.1 (partial)
 **Details:**
-- `uiStore.ts`: add `chatOpen: boolean` (default `true`) and `toggleChat: () => void`
-- `App.tsx`: import `ChatPanel`, add `<ChatPanel />` after `<MainPanel />` inside the body flex row
-- No changes to Sidebar, TopBar, or Terminal
+- Add `chatOpen: boolean` (default `true`)
+- Add `skillsPanelOpen: boolean` (default `true`)
+- Add `toggleChat()` and `toggleSkillsPanel()` actions
 
 ---
 
-## Phase 8: Electron IPC terminal-write handler   ← Conversation: 3
+## Phase 6: ConductorHeader component   ← Conversation 2
 
-**File:** `studio/src/main/ipc/chat.ts` — CREATE
-**File:** `studio/src/main/index.ts` — MODIFY
-**Done when:** Calling `ipcRenderer.invoke('chat:write-terminal', 'echo hello')` writes `echo hello\n` to the active PTY tab and it executes in the terminal
-**Delivers stories:** S3.1 (partial)
-**Depends on:** Phase 7 (app running)
-**Enables:** Phase 9 (approval UI calls this)
+**File:** `studio/src/renderer/src/components/ChatPanel/ConductorHeader.tsx` — CREATE
+**Done when:** Header renders with title, Manual/Auto toggle, Claude Code + Codex pills showing correct active/idle state
+**Delivers:** S2.1 (partial)
 **Details:**
-- `chat.ts`: `ipcMain.handle('chat:write-terminal', (event, command: string) => { activePtys.get(activeTabId)?.write(command + '\n') })`
-- Import `activePtys` map from `terminal.ts` (check exact export name)
+- `⚡ Conductor` title in JetBrains Mono, accent #22C55E
+- `[Manual]` / `[Auto]` toggle reads from `chatStore.autoApprove`
+- CLI pills: Claude Code (#38BDF8), Codex (#F59E0B) — active = colored dot, idle = grey dot 0.45 opacity
+- Collapse `[›]` button calls `uiStore.toggleChat()`
+
+---
+
+## Phase 7: SkillsPanel component   ← Conversation 2
+
+**File:** `studio/src/renderer/src/components/ChatPanel/SkillsPanel.tsx` — CREATE
+**Done when:** All 14 skill chips render; chip click creates a MatchCard for that skill; matched chip highlights
+**Delivers:** S2.3
+**Details:**
+- Reads skills from `skillsManifest` (will be created in Conv 5; use a static fallback list for Conv 2)
+- Static fallback list: `['plan','po','storm','build','review','test','retro','explore','debug','design','fix','status','log','end']`
+- Chip: JetBrains Mono 10px, surface bg, border #475569
+- Highlighted chip (when `chatStore.currentMatch?.skill.name === chip`): accent border + accent text
+- Collapse toggle reads `uiStore.skillsPanelOpen`
+
+---
+
+## Phase 8: MessageList + ChatInput + Panel wiring   ← Conversation 2
+
+**Files:** `MessageList.tsx`, `ChatInput.tsx`, `ChatPanel/index.tsx`, `App.tsx` — CREATE/MODIFY
+**Done when:** User can type a message, see it in the list, and see a placeholder MatchCard (static for now)
+**Delivers:** S2.1 (complete), S2.2
+**Details:**
+- `MessageList`: maps messages + renders MatchCard and OutputSnippet inline (not as separate bubbles)
+- `ChatInput`: textarea 1–3 rows, Enter = send, Shift+Enter = newline; `◈ MiniLM` pill (purple), `phi4-mini` pill (green); Send/Stop toggle
+- `ChatPanel/index.tsx`: collapse animation `width 200ms ease-out`, 300px ↔ 36px
+- `App.tsx`: add `<ChatPanel />` after `<MainPanel />` in body flex row
+- Design: see DESIGN_SPEC.md → Full UI Layout (ASCII)
+
+---
+
+## Phase 9: MatchCard component   ← Conversation 3
+
+**File:** `studio/src/renderer/src/components/ChatPanel/MatchCard.tsx` — CREATE
+**Done when:** MatchCard renders green (≥65%) and amber (<65%) states; Run and Not this work
+**Delivers:** S3.1
+**Details:**
+- Props: `match: MatchResult`, `alts: MatchResult[]`, `onRun: () => void`, `onReject: () => void`, `onSelectAlt: (skill) => void`
+- Confidence bar: CSS width = `score * 100%`, green when ≥65%, amber when <65%
+- Status label: `✓ MATCHED` (green) or `~ UNSURE` (amber)
+- Alt chips: clickable, calls `onSelectAlt` — replaces current match
+- Sent state: `opacity: 0.4`, shows `✓ Sent` label, Run/Not this hidden
+- No match state (score < 0.4): text message instead of card
+- See DESIGN_SPEC.md → MatchCard for full visual spec
+
+---
+
+## Phase 10: OutputSnippet component   ← Conversation 3
+
+**File:** `studio/src/renderer/src/components/ChatPanel/OutputSnippet.tsx` — CREATE
+**Done when:** After Run, OutputSnippet shows live PTY lines with ● Running / ✓ Done / ✗ Error status
+**Delivers:** S3.2 (partial)
+**Details:**
+- Props: `target: "claude-code" | "codex"`, `status: "running" | "done" | "error"`, `lines: string[]`
+- Shows last 5 lines from PTY output (ANSI stripped)
+- Status color: running = amber, done = green, error = red
+- `ChatPanel/index.tsx` subscribes to IPC output event and pipes to store
+
+---
+
+## Phase 11: IPC terminal write handler   ← Conversation 3
+
+**Files:** `studio/src/main/ipc/chat.ts` — CREATE, `studio/src/main/index.ts` — MODIFY
+**Done when:** `ipcRenderer.invoke('chat:write-terminal', { command: '/pathly build', target: 'claude-code' })` writes to the correct PTY tab — auto-creating a tab if none is open
+**Delivers:** S3.2
+**Details:**
+- `ipcMain.handle('chat:write-terminal', (event, { command, target }) => { ... })`
+- Find PTY by target name (check how `activePtys` is keyed in `terminal.ts`)
+- **Auto-spawn if no PTY found:** if `activePtys` has no entry for `target`, call the same
+  tab-creation logic used by the `+` button (read `terminal.ts` to find that function) to
+  spawn a new Claude Code or Codex tab, wait for it to be ready, then write the command.
+  The new tab becomes visible in the terminal area — the user can watch execution there.
+- Sanitize command before write: strip `;`, `&&`, `||`, `|`, `>`, `<`. Log warning if stripped.
+- Return `{ ok: true, spawned?: boolean }` or `{ error: string }`
+  - `spawned: true` signals to the renderer that a new tab was opened (ChatPanel can show a hint)
+- Expose on preload: `window.electronAPI.writeToTerminal(command, target): Promise<{ok?:boolean, spawned?:boolean, error?:string}>`
 - Register in `index.ts` alongside other IPC handlers
-- Expose on preload as `window.electronAPI.writeToTerminal(cmd: string): Promise<void>`
+- **Result:** user can use the Conductor with zero terminals open — Run opens one automatically
 
 ---
 
-## Phase 9: Approval flow UI + configurable setting   ← Conversation: 3
-
-**File:** `studio/src/renderer/src/components/ChatPanel/TerminalApproval.tsx` — CREATE
-**File:** `studio/src/renderer/src/store/chatStore.ts` — MODIFY: add `pendingCommand`, `autoApprove`
-**Done when:** When AI responds with a fenced code block starting with `$` or `/pathly`, approval banner appears; Run executes it in terminal; Auto toggle in panel header bypasses banner
-**Delivers stories:** S3.1, S3.2
-**Depends on:** Phase 8
-**Enables:** Conversation 4
-**Details:**
-- Parse AI message content for ` ```\n$... ``` ` or ` ```\n/pathly... ``` ` pattern (simple regex, no AST)
-- `TerminalApproval`: shows command text + `<Play /> Run` (accent green) + `<X /> Dismiss` (muted) buttons
-- `chatStore`: add `pendingCommand: string | null`, `autoApprove: boolean` (persisted)
-- When `autoApprove` is true, skip the banner and call `writeToTerminal` immediately after message completes
-- ChatPanel header: `<Toggle>` label "Auto" / "Manual" reading from `chatStore.autoApprove`
-- Approval banner styling: surface `#334155`, border-left `3px solid #22C55E`, border-radius 4px
-
----
-
-## Phase 10: Copy PageAnalyzer pure TS analyzers   ← Conversation: 4
-
-**File:** `studio/src/renderer/src/lib/pageAnalyzer/` — CREATE directory
-**Done when:** `import { analyzePageDirect } from '../lib/pageAnalyzer/utils/analyzePageDirect'` compiles without errors in Studio renderer
-**Delivers stories:** S4.1 (partial)
-**Depends on:** Phase 9 (app stable)
-**Enables:** Phase 11 (context builder uses it)
-**Details:**
-- Copy these files verbatim from `C:\Users\Yafit\brightsky-ai\frontend\src\components\PageAnalyzer\`:
-  - `utils/analyzePageDirect.ts`
-  - `utils/CacheManager.ts`
-  - `DOMAnalyzer2.ts`
-  - `ButtonAnalyzer.ts`
-  - `FormAnalyzer.ts`
-  - `TextAnalyzer.ts`
-  - `LinkAnalyzer.ts`
-- Fix any imports that reference `@brightsky-ai/shared` — replace with inline type definitions
-- Do NOT copy Redux-dependent or Chrome-extension-dependent files
-
----
-
-## Phase 11: pathlyContext builder   ← Conversation: 4
+## Phase 12: pathlyContext builder   ← Conversation 4
 
 **File:** `studio/src/renderer/src/lib/pathlyContext.ts` — CREATE
-**Done when:** `buildPathlyContext()` returns a JSON-serializable object with `fsmStage`, `featureName`, `planSummary`, `screenElements`, `skills` fields
-**Delivers stories:** S4.1, S4.2
-**Depends on:** Phase 10
-**Enables:** Phase 12 (ChatPanel injects this)
+**Done when:** `buildPathlyContext()` returns `{ fsmStage, featureName, screenElements, skills }`
+**Delivers:** S4.1, S4.2
 **Details:**
-- `buildPathlyContext()` async function:
-  1. Calls `fetch('http://127.0.0.1:8765/next_action')` → extracts current stage name
-  2. Calls `analyzePageDirect()` → extracts `buttons`, `forms`, `textBlocks` (cap at 20 items each)
-  3. Returns `{ fsmStage, featureName: 'unknown', planSummary: '', screenElements: {...}, skills: KNOWN_SKILLS }`
-- `KNOWN_SKILLS`: hardcoded list of pathly skill names (plan, build, review, test, etc.) — no filesystem read from renderer
+- Fetch `http://127.0.0.1:8765/next_action` → extract current stage name
+- `KNOWN_SKILLS`: static list from skills.json (will be dynamic in Conv 5)
+- Wrap FSM fetch in try/catch → fallback `fsmStage: "unknown"`
+- Cap screen elements at 20 buttons + 10 forms + 10 text blocks
 
 ---
 
-## Phase 12: Inject context into chat messages   ← Conversation: 4
+## Phase 13: Copy PageAnalyzer from BrightSky   ← Conversation 4
+
+**File:** `studio/src/renderer/src/lib/pageAnalyzer/` — CREATE
+**Done when:** `import { analyzePageDirect } from '../lib/pageAnalyzer/utils/analyzePageDirect'` compiles
+**Delivers:** S4.1 (partial)
+**Details:**
+- Copy from `C:\Users\Yafit\brightsky-ai\frontend\src\components\PageAnalyzer\`:
+  `analyzePageDirect.ts`, `CacheManager.ts`, `DOMAnalyzer2.ts`, `ButtonAnalyzer.ts`,
+  `FormAnalyzer.ts`, `TextAnalyzer.ts`, `LinkAnalyzer.ts`
+- Fix imports referencing `@brightsky-ai/shared` — replace with inline types
+- Do NOT copy Redux-dependent files
+
+---
+
+## Phase 14: Inject context per message   ← Conversation 4
 
 **File:** `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY
-**Done when:** AI response correctly references a button visible on the current screen and the current FSM stage
-**Delivers stories:** S4.1, S4.2 (complete)
-**Depends on:** Phase 11
-**Enables:** feature complete
+**Done when:** phi4-mini explanation correctly names the FSM stage and feature
+**Delivers:** S4.1, S4.2 (complete)
 **Details:**
-- Before calling `fetch('/chat')`, call `buildPathlyContext()`
-- Add `context` field to request body: `{ message, history, context }`
-- `http_server.py` `/chat` route passes `context` to `ChatAgent.stream()`
-- `chat_agent.py` appends context to system prompt under `## Current Screen` and `## Available Skills`
-- Screen elements capped at 500 tokens; truncate oldest items first if over limit
+- Call `buildPathlyContext()` before each POST /chat
+- Add `context` field to request body
+
+---
+
+## Phase 15: skills.json data file   ← Conversation 5
+
+**File:** `studio/src/renderer/src/data/skills.json` — CREATE
+**Done when:** File is valid JSON with 14 skills, each with `name`, `command`, `description`
+**Delivers:** S5.2 (partial)
+**Details:**
+- 14 skills: plan, po, storm, build, review, test, retro, explore, debug, design, fix, status, log, end
+- Each skill needs a **specific** description (1–2 sentences, includes WHEN to use it)
+- Example: `{ "name": "build", "command": "/pathly build", "description": "Spawn the builder agent to implement the feature. Use when the implementation plan is written and approved and you're ready to write code." }`
+
+---
+
+## Phase 16: skillsManifest loader   ← Conversation 5
+
+**File:** `studio/src/renderer/src/lib/skillsManifest.ts` — CREATE
+**Done when:** `loadSkills()` returns typed `Skill[]` without errors
+**Delivers:** S5.1 (partial)
+**Details:**
+- `interface Skill { name: string; command: string; description: string; vector?: number[] }`
+- `loadSkills(): Skill[]` — imports skills.json, returns typed array
+- `vector` field is populated by embedRouter at startup, not stored in JSON
+
+---
+
+## Phase 17: embedRouter — MiniLM wrapper   ← Conversation 5
+
+**File:** `studio/src/renderer/src/lib/embedRouter.ts` — CREATE
+**Done when:** `matchIntent("I want to build")` returns `[{ skill: "build", score: ~0.92, command: "/pathly build" }, ...]`
+**Delivers:** S5.1, S5.2
+**Details:**
+- Load model at startup: `const embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2')`
+- `preEmbedSkills(skills: Skill[]): Promise<void>` — embeds all skill descriptions at startup
+- `matchIntent(input: string): MatchResult[]` — embeds input, cosine similarity, returns top 3
+- `cosineSim(a: number[], b: number[]): number` — utility function
+- Signal `embedReady: true` to chatStore when preEmbedSkills completes
+
+---
+
+## Phase 18: Wire embedding into send flow   ← Conversation 5
+
+**Files:** `ChatPanel/index.tsx` — MODIFY, `chatStore.ts` — MODIFY
+**Done when:** MatchCard renders < 50ms after send; all 5 test phrases match correctly (see S5.2)
+**Delivers:** S5.2, S5.3 (complete)
+**Details:**
+- On message send: call `matchIntent(input)` → `setMatch(topMatch, altMatches)`
+- MatchCard renders from `chatStore.currentMatch` — no waiting for phi4-mini
+- POST /chat fires async in parallel with MatchCard render
+- Add `{ matchedSkill, skillDescription }` to POST /chat body
+- If `topMatch.score < 0.4`: show no-match message, skip MatchCard, still send to phi4-mini
+- If `autoApprove && topMatch.score >= 0.65`: auto-invoke Run after phi4-mini explanation completes
 
 ---
 
 ## Prerequisites
-- Ollama installed locally (`winget install Ollama.Ollama` or https://ollama.com)
-- `ollama pull phi4-mini` run once before Conv 1
+- Ollama installed: `winget install Ollama.Ollama`
+- Model pulled: `ollama pull phi4-mini`
+- MiniLM will auto-download via transformers.js (~22MB, first launch only)
 - Pathly FSM server running on port 8765 before testing Conv 1
 
 ## Key Decisions
-- **Ollama over web-llm**: Ollama runs as a system service, survives page reloads, supports model switching without browser download. web-llm requires WebGPU and is harder to update.
-- **HTTP over WebSocket for chat**: Studio already uses HTTP to the FSM server. Adding WebSocket would require a new server. HTTP + ReadableStream gives streaming at no extra cost.
-- **CSS Modules over Tailwind**: Studio already uses CSS Modules. Adding Tailwind is out of scope.
-- **No Redux**: Studio uses Zustand. ChatPanel state lives in a new `chatStore`, same pattern as `uiStore`.
-- **Context cap at 2,000 tokens**: Phi4-mini has 16k context. 2,000 for system prompt leaves plenty for conversation history.
+- **Embedding over LLM for routing:** Zero hallucination, 22ms, deterministic. See ARCHITECTURE_PROPOSAL.md Decision 1.
+- **phi4-mini as explainer only:** Routing and explaining are separate concerns with different latency needs.
+- **Skills are the command vocabulary:** All commands are Pathly skills. Claude Code and Codex are terminal surfaces, not routing targets.
+- **Pre-embed at startup:** Ensures first-message latency is instant. 14 skills × ~384 dimensions = negligible memory.
+- **Confidence threshold UI:** Users need to see and understand match quality to trust the system.

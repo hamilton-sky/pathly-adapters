@@ -8,11 +8,12 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 ## FSM operations
 
 All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
+Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
-- **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>"}`.
-- **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>"}`.
-- **Log retry:** Append `{"type": "RETRY", "key": "conv-N:FILE.md"}`.
+- **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
+- **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
+- **Log retry:** Append `{"type": "RETRY", "key": "conv-N:FILE.md", "ts": "<iso-timestamp>"}`.
 - **Check retry count:** Count RETRY events in EVENTS.jsonl where `key = "conv-N:FILE.md"`.
 
 ## Core rules

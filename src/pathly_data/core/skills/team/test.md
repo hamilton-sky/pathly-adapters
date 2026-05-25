@@ -7,11 +7,12 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 ## FSM operations
 
 All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
+Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
-- **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>"}`.
-- **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>"}`.
-- **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>"}`.
+- **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
+- **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
+- **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>", "ts": "<iso-timestamp>"}`.
 
 ## Phase 0 — Record test start time
 
@@ -25,7 +26,7 @@ If any row status is not DONE: stop and report:
 Not all conversations are complete. Route to team <feature> build first. Incomplete: Conv N
 ```
 
-When all DONE: append `{"type": "IMPLEMENT_COMPLETE"}` to EVENTS.jsonl. Confirm state is TESTING in STATE.json.
+When all DONE: append `{"type": "IMPLEMENT_COMPLETE", "ts": "<iso-timestamp>"}` to EVENTS.jsonl. Confirm state is TESTING in STATE.json.
 
 ## Subagents
 

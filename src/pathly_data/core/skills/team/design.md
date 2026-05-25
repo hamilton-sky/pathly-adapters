@@ -8,10 +8,11 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 ## FSM operations
 
 All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
+Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
-- **Log file created:** Append `{"type": "FILE_CREATED", "file": "DESIGN.md"}`.
-- **Log stage start:** Append `{"type": "STAGE_START", "stage": "DESIGNING"}`.
+- **Log file created:** Append `{"type": "FILE_CREATED", "file": "DESIGN.md", "ts": "<iso-timestamp>"}`.
+- **Log stage start:** Append `{"type": "STAGE_START", "stage": "DESIGNING", "ts": "<iso-timestamp>"}`.
 
 ## Step 1 — Extract feature description
 
@@ -75,8 +76,8 @@ Write `pathly/plans/<feature>/DESIGN.md`:
 
 Append to `pathly/plans/<feature>/EVENTS.jsonl`:
 ```json
-{"type": "FILE_CREATED", "file": "DESIGN.md"}
-{"type": "STAGE_COMPLETE", "stage": "DESIGNING", "next": "BUILDING"}
+{"type": "FILE_CREATED", "file": "DESIGN.md", "ts": "<iso-timestamp>"}
+{"type": "STAGE_COMPLETE", "stage": "DESIGNING", "next": "BUILDING", "ts": "<iso-timestamp>"}
 ```
 
 Compute wall_seconds: run `python -c "import time; print(int(time.time()) - DESIGN_START)"`.

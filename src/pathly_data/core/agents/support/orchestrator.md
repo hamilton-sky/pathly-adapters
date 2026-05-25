@@ -91,7 +91,7 @@ After each sub-agent or sub-skill returns control, determine the next state:
    - First match → set `next_state` to the mapped state value. Stop checking.
 3. If no artifact matched → set `next_state` to `default`.
 4. Write `<storage_path>/STATE.json` with `{"current": next_state}`.
-5. Append `{"type": "STATE_TRANSITION", "to": next_state}` to `<storage_path>/EVENTS.jsonl`.
+5. Append `{"type": "STATE_TRANSITION", "to": next_state, "ts": "<iso-timestamp>"}` to `<storage_path>/EVENTS.jsonl`.
 
 ### Execute transition_actions
 
@@ -122,7 +122,7 @@ When `HUMAN_QUESTIONS.md` exists in `<storage_path>/feedback/`:
 1. Print the file contents to the user.
 2. Wait for reply.
 3. Delete `HUMAN_QUESTIONS.md`.
-4. Append `{"type": "HUMAN_RESPONSE", "value": "<reply>"}` to `<storage_path>/EVENTS.jsonl`.
+4. Append `{"type": "HUMAN_RESPONSE", "value": "<reply>", "ts": "<iso-timestamp>"}` to `<storage_path>/EVENTS.jsonl`.
 5. Restore prior state in `<storage_path>/STATE.json`.
 6. Continue FSM loop.
 
@@ -130,7 +130,7 @@ When `HUMAN_QUESTIONS.md` exists in `<storage_path>/feedback/`:
 
 - **Delegate, never implement.** Every action is a subagent spawn.
 - **Recover before acting.** State must be derivable from disk.
-- **Append events.** Record every transition in `<storage_path>/EVENTS.jsonl`. Write `STATE.json` alongside it.
+- **Append events.** Record every transition in `<storage_path>/EVENTS.jsonl`. Every appended event includes `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time. Write `STATE.json` alongside it.
 - **Check feedback files after every event.** Never advance without checking.
 - **Reviewer gates follow scope.** Standard and strict scope review every builder task; lite scope may review final-only unless feedback or risk requires earlier review.
 - **Max 2 retry cycles per conversation and feedback file.** If exceeded: stop and report to user.

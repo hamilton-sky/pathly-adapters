@@ -1,6 +1,41 @@
 # Studio AI Chat — Flow Diagram
 
-## Happy Path: User sends a message
+## End-to-End Message Flow
+
+```
+USER                  RENDERER                    MAIN PROCESS         PYTHON SERVER        OLLAMA
+ │                       │                              │                    │                 │
+ │  types intent          │                              │                    │                 │
+ │──────────────────────►│                              │                    │                 │
+ │                       │  matchIntent(input)          │                    │                 │
+ │                       │  MiniLM cosine sim (~22ms)   │                    │                 │
+ │                       │  setMatch(top, alts)         │                    │                 │
+ │  sees MatchCard < 50ms │  MatchCard renders instantly │                    │                 │
+ │◄──────────────────────│                              │                    │                 │
+ │                       │  POST /chat (async, parallel)│                    │                 │
+ │                       │─────────────────────────────────────────────────►│                 │
+ │                       │                              │                    │  chat(phi4-mini) │
+ │                       │                              │                    │────────────────►│
+ │                       │  ◄── SSE chunks ─────────────────────────────────│◄────────────────│
+ │  sees explanation      │  appendToLastMessage()       │                    │                 │
+ │◄──────────────────────│                              │                    │                 │
+ │  clicks ▶ Run         │                              │                    │                 │
+ │──────────────────────►│  ipcRenderer.invoke(         │                    │                 │
+ │                       │    'chat:write-terminal',    │                    │                 │
+ │                       │    { command, target } )     │                    │                 │
+ │                       │─────────────────────────────►│                    │                 │
+ │                       │                              │  sanitize(cmd)     │                 │
+ │                       │                              │  activePtys        │                 │
+ │                       │                              │    .get(target)    │                 │
+ │                       │                              │    .write(cmd+\n)  │                 │
+ │  sees cmd in terminal  │  OutputSnippet lines         │  PTY onData ──────►│                 │
+ │◄──────────────────────│◄─────────────────────────────│                    │                 │
+ │                       │  cmd completes → matchIntent │                    │                 │
+ │  sees next suggestion  │  → new MatchCard appears     │                    │                 │
+ │◄──────────────────────│                              │                    │                 │
+```
+
+## OLD DIAGRAM (replaced)
 
 ```
 User types message + presses Enter

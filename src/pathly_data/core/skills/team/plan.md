@@ -8,9 +8,11 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor` (lite|standard|strict), `autoFlow`, optio
 ## FSM operations
 
 **Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
-Append `{"type": "STATE_TRANSITION", "to": "X"}` to `pathly/plans/<feature>/EVENTS.jsonl`.
+Append `{"type": "STATE_TRANSITION", "to": "X", "ts": "<iso-timestamp>"}` to `pathly/plans/<feature>/EVENTS.jsonl`.
 
-**Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>"}` to EVENTS.jsonl.
+Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
+
+**Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>", "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
 
 ## Subagents
 

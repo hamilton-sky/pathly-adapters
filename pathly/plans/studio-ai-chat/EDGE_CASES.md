@@ -1,71 +1,111 @@
 # Studio AI Chat — Edge Cases
 
-## Category 1: Ollama Not Available
+## Category 1: Ollama / phi4-mini Offline
 
-### EC-1.1: Ollama is not installed or not running
-- **Trigger:** User sends a message but Ollama daemon is not running on :11434
-- **Current behavior:** fetch to Ollama times out; Python server crashes or hangs
-- **Expected behavior:** `/chat` returns 503 with `{"error": "Ollama not available"}` within 3 seconds; ChatPanel shows an inline error message "AI model offline — start Ollama to continue"
-- **Handled in:** Phase 2 / Conv 1 — wrap Ollama call in try/except, return 503
+### EC-1.1: Ollama not running
+- **Trigger:** User sends message; Ollama daemon not running on :11434
+- **Expected:** MatchCard still appears (embedding is unaffected). Explanation area shows
+  inline message: *"Ollama offline — explanation unavailable. Install: `winget install Ollama.Ollama`"*
+- **Key:** MatchCard must render even without phi4-mini. Explanation is a nice-to-have, routing is required.
+- **Handled in:** Conv 1, Phase 2 — wrap Ollama call in try/except, return graceful response
 
 ### EC-1.2: Requested model not pulled
-- **Trigger:** `PATHLY_CHAT_MODEL=llama3` but user never ran `ollama pull llama3`
-- **Current behavior:** Ollama returns model-not-found error
-- **Expected behavior:** `/chat` returns 503 with `{"error": "Model 'llama3' not found — run: ollama pull llama3"}`
-- **Handled in:** Phase 2 / Conv 1 — catch `ollama.ResponseError`, extract model name from error message
+- **Trigger:** `PATHLY_CHAT_MODEL=phi4-mini` but `ollama pull phi4-mini` was never run
+- **Expected:** `/chat` returns `{ "error": "Model 'phi4-mini' not found — run: ollama pull phi4-mini" }`
+- **Handled in:** Conv 1, Phase 2 — catch `ollama.ResponseError`
 
 ---
 
-## Category 2: Context Overflow
+## Category 2: MiniLM / Embedding Issues
 
-### EC-2.1: Plan file is very large
-- **Trigger:** Active feature plan has 5,000+ tokens in FEATURE_INDEX.md
-- **Current behavior:** System prompt exceeds 2,000 token cap
-- **Expected behavior:** Plan summary is truncated to fit within the cap; truncation marker appended: `[...truncated]`
-- **Handled in:** Phase 3 / Conv 1 — token-count plan summary before injecting, truncate at character boundary
+### EC-2.1: MiniLM model not yet loaded when user sends first message
+- **Trigger:** User types a message before startup pre-embedding completes
+- **Expected:** Show `◈ Loading model…` in MiniLM pill; disable send button until `embedReady: true`
+- **Handled in:** Conv 5, Phase 17 — check `embedReady` in ChatInput before calling matchIntent()
 
-### EC-2.2: PageAnalyzer returns hundreds of elements
-- **Trigger:** Studio has many UI elements visible (large plan board, many buttons)
-- **Current behavior:** Screen context exceeds 500 token budget
-- **Expected behavior:** Truncate elements list to first 20 buttons + 10 forms + 10 text blocks; skip the rest
-- **Handled in:** Phase 11–12 / Conv 4 — cap arrays in pathlyContext.ts before serialization
+### EC-2.2: No skill matches above threshold
+- **Trigger:** User types something with no relation to Pathly skills (e.g. "what's the weather?")
+- **Expected:** All scores < 40%; show message: *"I couldn't match that to a Pathly skill. Try rephrasing or pick a skill from the panel above."* No MatchCard rendered.
+- **Handled in:** Conv 5, Phase 18 — check top score before rendering MatchCard
 
----
-
-## Category 3: Streaming Interruption
-
-### EC-3.1: User stops stream mid-response
-- **Trigger:** User clicks Stop button while AI is mid-sentence
-- **Current behavior:** undefined — reader continues in background, store gets partial updates
-- **Expected behavior:** `reader.cancel()` is called; `setStreaming(false)`; partial message is kept in store as-is with a `[stopped]` marker
-- **Handled in:** Phase 6 / Conv 2 — Stop button calls `abortController.abort()`, message content frozen
-
-### EC-3.2: FSM server not running during context fetch
-- **Trigger:** `pathly-fsm-http` was never started; `buildPathlyContext()` fetch to :8765 fails
-- **Current behavior:** Unhandled promise rejection; message send may fail entirely
-- **Expected behavior:** Context is sent with `fsmStage: "unknown"` — AI still responds but notes it can't read the pipeline state
-- **Handled in:** Phase 11 / Conv 4 — wrap FSM fetch in try/catch, fallback to `{ fsmStage: "unknown" }`
+### EC-2.3: All skills have identical/missing descriptions
+- **Trigger:** skills.json has empty or one-word descriptions
+- **Expected:** Matches will be low quality and low confidence. System still works (amber cards shown).
+- **Mitigation:** Each skill in skills.json must have a specific 1–2 sentence description — document this requirement in skills.json comments.
 
 ---
 
-## Category 4: IPC / Terminal Write
+## Category 3: IPC / Terminal Write
 
-### EC-4.1: No active PTY tab when command is approved
-- **Trigger:** User closes all terminal tabs then approves a command
-- **Current behavior:** `activePtys.get(activeTabId)` returns undefined; silent failure
-- **Expected behavior:** IPC handler returns `{ error: "No terminal open" }`; ChatPanel shows toast "Open a terminal tab first"
-- **Handled in:** Phase 8 / Conv 3 — check for undefined PTY, return error to renderer
+### EC-3.1: No active PTY tab when Run is clicked
+- **Trigger:** User has no terminal tabs open (or never opened one) and clicks Run in MatchCard
+- **Expected:** IPC handler auto-spawns a new terminal tab for the target CLI (Claude Code or Codex),
+  waits for it to be ready, then writes the command. IPC returns `{ ok: true, spawned: true }`.
+  ChatPanel shows a brief hint: *"Opened a Claude Code tab to run this command."*
+  The new terminal tab becomes visible in the terminal area so the user can watch execution.
+- **Key:** The user never needs to manually open a terminal. The Conductor is the primary interface.
+- **Fallback:** If tab creation fails (e.g. CLI binary not found), return `{ error: "Could not open terminal — is Claude Code installed?" }`
+- **Handled in:** Conv 3, Phase 11 — auto-spawn in IPC handler before write
 
-### EC-4.2: Command contains shell injection characters
-- **Trigger:** AI hallucinates a command with `; rm -rf /` appended
-- **Current behavior:** Would execute destructively if auto-approved
-- **Expected behavior:** In manual mode, user sees the full command and can dismiss. In auto mode: strip any `;`, `&&`, `||`, `|`, `>` characters before writing — or disable auto-approve for commands longer than 80 chars
-- **Handled in:** Phase 9 / Conv 3 — sanitize command string in TerminalApproval before invoking IPC
+### EC-3.2: Active tab is wrong CLI
+- **Trigger:** User has Codex tab active but the skill should run in Claude Code
+- **Expected:** In Manual mode, user sees which terminal the command will write to in the MatchCard.
+  They can switch tabs before clicking Run. System writes to whichever tab is currently active.
+- **Note:** The system does not auto-switch tabs — that would be unexpected.
+
+### EC-3.3: Command string contains injection characters
+- **Trigger:** A malicious or hallucinated command with `; rm -rf /` appended
+- **Expected:** Strip `;`, `&&`, `||`, `|`, `>`, `<` from command string before IPC write.
+  Log warning in main process.
+- **Handled in:** Conv 3, Phase 11 — sanitize in IPC handler before `pty.write()`
 
 ---
 
-## Known Limitations
-- Chat history is stored in localStorage only — no disk persistence, lost on browser data clear
-- PageAnalyzer only reads the Studio renderer DOM, not external browser windows
-- Ollama model quality varies; phi4-mini may misidentify FSM stages on first try
-- Auto-approve is per-session only in Conv 3; cross-session persistence added in Conv 3 via Zustand persist
+## Category 4: Context / FSM
+
+### EC-4.1: FSM server not running
+- **Trigger:** `pathly-fsm-http` never started; context fetch to :8765 fails
+- **Expected:** `buildPathlyContext()` catches the error; sends context with `fsmStage: "unknown"`.
+  phi4-mini notes it can't read the stage.
+- **Handled in:** Conv 4, Phase 12
+
+### EC-4.2: Plan file too large
+- **Trigger:** FEATURE_INDEX.md has 5,000+ tokens
+- **Expected:** Truncated to fit within 1,000 token cap; `[...truncated]` appended
+- **Handled in:** Conv 1, Phase 3 — truncate in chat_tools.py
+
+---
+
+## Category 5: UI / Streaming
+
+### EC-5.1: User clicks "Not this" on a low-confidence match
+- **Trigger:** MatchCard shows `~ UNSURE`, user clicks "Not this"
+- **Expected:** MatchCard is cleared from message list. Input refocuses with placeholder
+  "Try rephrasing…". No command is sent.
+- **Handled in:** Conv 3, Phase 9
+
+### EC-5.2: User clicks alternative skill chip
+- **Trigger:** MatchCard shows alts `[/pathly plan 34%]`, user clicks it
+- **Expected:** Current MatchCard is replaced with a new MatchCard for `/pathly plan`.
+  phi4-mini re-explains for the new skill. Skills panel updates highlight.
+- **Handled in:** Conv 3, Phase 9
+
+### EC-5.3: User stops phi4-mini stream mid-explanation
+- **Trigger:** User clicks Stop (■) while explanation is streaming
+- **Expected:** `abortController.abort()` called; partial explanation kept with `[stopped]` marker.
+  MatchCard is already rendered and unaffected — user can still click Run.
+- **Handled in:** Conv 2, Phase 8
+
+### EC-5.4: PTY output contains ANSI escape codes
+- **Trigger:** Claude Code outputs coloured/formatted terminal text
+- **Expected:** Strip ANSI codes before displaying in OutputSnippet (use `strip-ansi` or equivalent)
+- **Handled in:** Conv 3, Phase 10
+
+---
+
+## Known Limitations (accepted for v1)
+- Chat history stored in localStorage only — lost on browser data clear
+- Panel width fixed at 300px — not resizable
+- Auto-approve disabled for matches < 65% confidence regardless of setting
+- phi4-mini explanation quality depends on Ollama model version and available RAM
+- OutputSnippet shows only last 5 PTY lines — no scroll history

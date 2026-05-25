@@ -41,5 +41,5 @@ Copy it to `pathly/pipeline-walkthrough/<topic>/artifacts/<FILENAME>_conv<conv>_
 
 Append this JSON line to `<storage_path>/EVENTS.jsonl`:
 ```json
-{"type": "ACTION_DONE", "action": "archive-artifacts", "topic": "<topic>"}
+{"type": "ACTION_DONE", "action": "archive-artifacts", "topic": "<topic>", "ts": "<iso-timestamp>"}
 ```
