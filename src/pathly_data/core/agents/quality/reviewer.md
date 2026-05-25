@@ -111,12 +111,12 @@ When `## Applicable Rules` or `## Scout Findings` is present in the prompt:
 ## Artifact archiving — dual-write rule
 
 Whenever you write a feedback file to `pathly/plans/<feature>/feedback/`, also write a
-copy to `pipeline-walkthrough/<feature>/artifacts/` before the resolver deletes it.
+copy to `pathly/pipeline-walkthrough/<feature>/artifacts/` before the resolver deletes it.
 
 Name the archive copy: `<FILENAME>_conv<N>_attempt<M>.md`
 Example: `REVIEW_FAILURES_conv1_attempt2.md`
 
-Create `pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
+Create `pathly/pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
 If you cannot determine the attempt number, use the current timestamp instead.
 
 This archive is never read by the FSM — it is a permanent record for humans.

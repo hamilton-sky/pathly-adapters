@@ -82,12 +82,12 @@ Implement the task. If the skill ran Phase 1, scout findings will be injected in
 ## Artifact archiving — dual-write rule
 
 Whenever you write a feedback file to `pathly/plans/<feature>/feedback/`, also write a
-copy to `pipeline-walkthrough/<feature>/artifacts/` at the same time.
+copy to `pathly/pipeline-walkthrough/<feature>/artifacts/` at the same time.
 
 Name the archive copy: `<FILENAME>_conv<N>_attempt<M>.md`
 Example: `IMPL_QUESTIONS_conv2_attempt1.md`
 
-Create `pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
+Create `pathly/pipeline-walkthrough/<feature>/artifacts/` if it does not exist.
 If you cannot determine the attempt number, use the current timestamp instead.
 
 This archive is never read by the FSM — it is a permanent record for humans.

@@ -224,9 +224,9 @@ Consultation rules for every role:
 Write the consultation note to two locations simultaneously:
 
 1. `pathly/plans/$FEATURE/consults/YYYYMMDD-HHMMSS-<role>.md` — live reference for planner/architect promotion
-2. `pipeline-walkthrough/$FEATURE/artifacts/YYYYMMDD-HHMMSS-<role>-consult.md` — permanent pipeline record
+2. `pathly/pipeline-walkthrough/$FEATURE/artifacts/YYYYMMDD-HHMMSS-<role>-consult.md` — permanent pipeline record
 
-Create `pipeline-walkthrough/$FEATURE/artifacts/` if it does not exist.
+Create `pathly/pipeline-walkthrough/$FEATURE/artifacts/` if it does not exist.
 
 Use this structure:
 
