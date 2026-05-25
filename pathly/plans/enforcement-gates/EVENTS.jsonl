@@ -8,3 +8,7 @@
 {"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-24T22:25:35.845318+00:00"}
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-24T22:31:43.359194+00:00"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-24T22:36:15.473884+00:00"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-24T22:43:24.077253+00:00"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "ts": "2026-05-24T22:45:37.216832+00:00"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "ts": "2026-05-24T22:52:02.885843+00:00"}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "ts": "2026-05-24T22:54:22.662397+00:00"}

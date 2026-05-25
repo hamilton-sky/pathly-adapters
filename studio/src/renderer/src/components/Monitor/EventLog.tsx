@@ -1,8 +1,21 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
-import type { FsmEvent } from '../../types'
+import type { FsmEvent } from '../../types/index'
+
+const FLASH_CSS = `
+@keyframes pathly-row-flash {
+  0%   { background-color: rgba(59,130,246,0.18); }
+  100% { background-color: transparent; }
+}
+.pathly-new-row {
+  animation: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pathly-new-row { animation: pathly-row-flash 400ms ease-out forwards; }
+}
+`
 
 function eventColor(ev: FsmEvent, t: Theme): string {
   switch (ev.type) {
@@ -15,6 +28,10 @@ function eventColor(ev: FsmEvent, t: Theme): string {
     case 'FILE_DELETED': return t.yellow
     case 'RETRY': return t.red
     case 'HUMAN_RESPONSE': return t.textSecondary
+    case 'GATE_FAILED': return '#EF4444'
+    case 'GATE_SKIPPED': return '#F59E0B'
+    case 'AGENT_SPAWNED': return '#06B6D4'
+    case 'STAGE_COMPLETE': return '#34D399'
     default: return t.textMuted
   }
 }
@@ -51,6 +68,12 @@ function formatEvent(ev: FsmEvent): string {
       return `${ts}  ${pad('HUMAN_RESPONSE', 14)}  ${ev.value ?? ''}`
     case 'IMPLEMENT_COMPLETE':
       return `${ts}  IMPLEMENT_COMPLETE`
+    case 'GATE_FAILED':
+      return `${ts}  ${pad('GATE_FAILED', 14)}  ${ev.key ?? ev.detail ?? ''}${ev.to ? ` → ${ev.to}` : ''}`
+    case 'GATE_SKIPPED':
+      return `${ts}  ${pad('GATE_SKIPPED', 14)}  ${ev.key ?? ev.detail ?? ''}${ev.reason ? `  reason: ${ev.reason}` : ''}`
+    case 'STAGE_COMPLETE':
+      return `${ts}  ${pad('STAGE_COMPLETE', 14)}  ${ev.from ?? '?'} → ${ev.to ?? '?'}`
     default: {
       const { type, ts: _ts, timestamp: _ts2, ...rest } = ev
       const extra = Object.entries(rest).map(([k, v]) => `${k}=${String(v)}`).join('  ')
@@ -59,19 +82,22 @@ function formatEvent(ev: FsmEvent): string {
   }
 }
 
-function RawEventLine({ ev, t }: { ev: FsmEvent; t: Theme }): JSX.Element {
+function RawEventLine({ ev, t, isNew }: { ev: FsmEvent; t: Theme; isNew: boolean }): JSX.Element {
   const color = eventColor(ev, t)
   return (
-    <div style={{
-      color,
-      fontFamily: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace",
-      fontSize: '12px',
-      lineHeight: '1.7',
-      whiteSpace: 'pre',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      padding: '1px 0',
-    }}>
+    <div
+      className={isNew ? 'pathly-new-row' : undefined}
+      style={{
+        color,
+        fontFamily: "'Fira Mono', 'Cascadia Code', 'Consolas', monospace",
+        fontSize: '12px',
+        lineHeight: '1.7',
+        whiteSpace: 'pre',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        padding: '1px 0',
+      }}
+    >
       {formatEvent(ev)}
     </div>
   )
@@ -93,6 +119,14 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
       marginBottom: '8px',
       textTransform: 'uppercase' as const,
       letterSpacing: '0.05em',
+    },
+    logWrapper: {
+      flex: 1,
+      position: 'relative' as const,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      overflow: 'hidden',
+      minHeight: 0,
     },
     log: {
       flex: 1,
@@ -132,13 +166,76 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
 
 export function EventLog(): JSX.Element {
   const events = useStore((s) => s.events)
-  const bottomRef = useRef<HTMLDivElement>(null)
   const t = useTheme()
   const styles = makeStyles(t)
 
+  const logRef = useRef<HTMLDivElement>(null)
+  const autoScrollRef = useRef(true)
+  const prevLengthRef = useRef(0)
+  const newCountRef = useRef(0)
+  const flashCountRef = useRef(0)
+  const styleInjectedRef = useRef(false)
+
+  const [newCount, setNewCount] = useState(0)
+  const [, forceUpdate] = useState(0)
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (styleInjectedRef.current) return
+    styleInjectedRef.current = true
+    const style = document.createElement('style')
+    style.textContent = FLASH_CSS
+    document.head.appendChild(style)
+  }, [])
+
+  useEffect(() => {
+    const added = events.length - prevLengthRef.current
+    prevLengthRef.current = events.length
+
+    if (added <= 0) return
+
+    if (autoScrollRef.current) {
+      if (logRef.current) {
+        logRef.current.scrollTop = logRef.current.scrollHeight
+      }
+      newCountRef.current = 0
+      setNewCount(0)
+    } else {
+      newCountRef.current += added
+      setNewCount(newCountRef.current)
+    }
+
+    flashCountRef.current = added
+    forceUpdate((n) => n + 1)
+
+    const timer = setTimeout(() => {
+      flashCountRef.current = 0
+      forceUpdate((n) => n + 1)
+    }, 500)
+
+    return () => clearTimeout(timer)
   }, [events])
+
+  const handleScroll = (): void => {
+    const el = logRef.current
+    if (!el) return
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distFromBottom > 40) {
+      autoScrollRef.current = false
+    } else {
+      autoScrollRef.current = true
+      newCountRef.current = 0
+      setNewCount(0)
+    }
+  }
+
+  const handlePillClick = (): void => {
+    const el = logRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    autoScrollRef.current = true
+    newCountRef.current = 0
+    setNewCount(0)
+  }
 
   const agentDone = events.filter((e) => e.type === 'AGENT_DONE')
   const totalIn = agentDone.reduce((s, e) => s + (e.tokens_in ?? 0), 0)
@@ -146,16 +243,47 @@ export function EventLog(): JSX.Element {
   const totalCost = agentDone.reduce((s, e) => s + (e.cost_usd ?? 0), 0)
   const hasTelemetry = agentDone.length > 0
 
+  const flashStart = events.length - flashCountRef.current
+
   return (
     <div style={styles.container}>
       <div style={styles.title}>Event Log</div>
-      <div style={styles.log}>
-        {events.length === 0 ? (
-          <div style={styles.empty}>No events yet</div>
-        ) : (
-          events.map((ev, i) => <RawEventLine key={i} ev={ev} t={t} />)
+      <div style={styles.logWrapper}>
+        <div ref={logRef} style={styles.log} onScroll={handleScroll}>
+          {events.length === 0 ? (
+            <div style={styles.empty}>No events yet</div>
+          ) : (
+            events.map((ev, i) => (
+              <RawEventLine
+                key={`${ev.ts ?? ''}-${ev.type}-${i}`}
+                ev={ev}
+                t={t}
+                isNew={i >= flashStart}
+              />
+            ))
+          )}
+        </div>
+        {newCount > 0 && (
+          <div
+            onClick={handlePillClick}
+            style={{
+              position: 'absolute',
+              bottom: '8px',
+              right: '16px',
+              backgroundColor: '#1E3A5F',
+              color: '#3B82F6',
+              border: '1px solid #3B82F6',
+              borderRadius: 12,
+              padding: '2px 10px',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: t.fontFamilyMono,
+              userSelect: 'none',
+            }}
+          >
+            ↓ {newCount} new
+          </div>
         )}
-        <div ref={bottomRef} />
       </div>
       <div style={styles.totalsBar}>
         <span style={styles.totalsLabel}>

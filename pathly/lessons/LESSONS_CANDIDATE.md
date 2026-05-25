@@ -138,3 +138,68 @@ MUST include a single grep that covers all adapter YAML files for the changed fi
 
 ### Source
 Feature: agent-architecture-refactor | Stage: implementation | Date: 2026-05-13
+
+---
+
+## [enforcement-gates] Pre-flight manifest scan before Phase 1
+
+### Pattern
+Features that depend on existing codebase keys (e.g. `conv_start_sha` in STATE.json) assume those keys exist. When they don't, unplanned prerequisite work interrupts mid-phase.
+
+### Rule
+MUST scan all assumed keys/fields and patch gaps as a standalone prerequisite before Phase 1 — not as mid-phase discoveries.
+
+### Source
+Feature: enforcement-gates | Stage: planning | Date: 2026-05-25
+
+---
+
+## [enforcement-gates] Gate artifact feedback must say WHERE to write the artifact
+
+### Pattern
+When a gate fails because an artifact is missing (e.g. `VERIFY.md`), the feedback file tells the builder the file is missing but not where to write it or in what format. Builders must infer this from gate config.
+
+### Rule
+MUST include in the gate `on_fail` feedback file: the expected path, the required first line, and an example content block.
+
+### Source
+Feature: enforcement-gates | Stage: building | Date: 2026-05-25
+
+---
+
+## [enforcement-gates] Embed event schema in IMPLEMENTATION_PLAN
+
+### Pattern
+GATE_FAILED and GATE_SKIPPED events were appended without `schema_version`. The tester caught a `ts` vs `timestamp` naming mismatch. No cross-reference to existing events existed in the plan.
+
+### Rule
+MUST list exact fields for each new event type and cross-reference existing events in the codebase in IMPLEMENTATION_PLAN before implementation begins.
+
+### Source
+Feature: enforcement-gates | Stage: testing | Date: 2026-05-25
+
+---
+
+## [enforcement-gates] Hardcode scope-file parsing rules, not prose descriptions
+
+### Pattern
+"Lines starting with `-` or backtick" is ambiguous. Loose parsing silently produces zero declared paths, causing GATE_SKIPPED when enforcement was expected.
+
+### Rule
+MUST specify the exact regex or parsing algorithm in the plan, not prose descriptions. Include a test case in Phase 1 that verifies the parser produces non-empty output on a representative input.
+
+### Source
+Feature: enforcement-gates | Stage: implementation | Date: 2026-05-25
+
+---
+
+## [enforcement-gates] VERIFY.md not auto-created by pipeline — builders must do it manually
+
+### Pattern
+The pipeline has no mechanism to automatically create VERIFY.md after a verify command succeeds. Builders must write it manually; the feedback file on gate failure did not explain this.
+
+### Rule
+MUST add a builder convention or transition_action that produces VERIFY.md after the verify command passes. Until then, document the manual step explicitly in CONVERSATION_PROMPTS.md.
+
+### Source
+Feature: enforcement-gates | Stage: building | Date: 2026-05-25

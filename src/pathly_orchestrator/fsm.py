@@ -13,7 +13,6 @@ import json
 import re
 import shutil
 import subprocess
-from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -521,15 +520,6 @@ def write_state(storage_path: Path, next_state: str, prior_state: dict) -> None:
 
 
 def append_event(storage_path: Path, event: dict) -> None:
-    """
-    Append a single JSON line to EVENTS.jsonl.
-    Inject "ts": datetime.utcnow().isoformat() into event before writing.
-    Create the file if absent.
-    """
-    storage_path.mkdir(parents=True, exist_ok=True)
-    events_file = storage_path / "EVENTS.jsonl"
-    event = dict(event)
-    event["ts"] = datetime.now(timezone.utc).isoformat()
-    line = json.dumps(event) + "\n"
-    with open(events_file, "a", encoding="utf-8") as f:
-        f.write(line)
+    from pathly_orchestrator.eventlog import append_event as _append_event
+
+    _append_event(str(storage_path), event)

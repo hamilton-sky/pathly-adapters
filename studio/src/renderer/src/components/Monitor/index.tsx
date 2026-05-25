@@ -5,7 +5,8 @@ import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
 import { HealthCheck } from './HealthCheck'
-import type { FsmEvent } from '../../types'
+import { Tooltip } from '../ui/Tooltip'
+import type { FsmEvent } from '../../types/index'
 import { watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
 
 type FlowType = 'team' | 'debug' | 'explore'
@@ -26,6 +27,19 @@ function getFlowYamlName(flow: string | undefined): string {
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
 }
+
+const LIVE_BADGE_CSS = `
+@keyframes pathly-live-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pathly-live-dot {
+  animation: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pathly-live-dot { animation: pathly-live-breathe 2s ease-in-out infinite; }
+}
+`
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   return {
@@ -74,57 +88,101 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
 }
 
 function HeaderBar(): JSX.Element {
-  const { fsmState, events, activeTopic, monitorSource } = useStore()
+  const { fsmState, activeTopic, monitorSource } = useStore()
   const t = useTheme()
-  const styles = makeStyles(t)
+  const styleInjectedRef = useRef(false)
 
-  const flow = fsmState?.flow ?? '—'
+  useEffect(() => {
+    if (styleInjectedRef.current) return
+    styleInjectedRef.current = true
+    const style = document.createElement('style')
+    style.textContent = LIVE_BADGE_CSS
+    document.head.appendChild(style)
+  }, [])
+
+  const flow = fsmState?.flow as string | undefined
   const topic = fsmState?.feature
     ? truncate(fsmState.feature as string, 32)
     : activeTopic ? truncate(activeTopic, 32) : '—'
-  const state = fsmState?.current ?? '—'
   const conv = fsmState?.conv != null
     ? String(fsmState.conv)
     : fsmState?.current_conversation != null
       ? String(fsmState.current_conversation)
-      : '—'
+      : null
 
-  const lastAgentEvent = [...events].reverse().find((e) => e.type === 'AGENT_SPAWNED')
-  const agent = lastAgentEvent?.agent ?? '—'
+  // Meta row: "team · conv 1" — only include known values
+  const metaParts: string[] = []
+  if (flow) metaParts.push(flow)
+  if (conv) metaParts.push(`conv ${conv}`)
 
-  const badgeText = monitorSource === 'sse' ? '● live'
-    : monitorSource === 'chokidar' ? '○ polling' : '—'
-  const badgeColor = monitorSource === 'sse' ? t.runtime : t.textMuted
-  const badgeAriaLabel = monitorSource === 'sse' ? 'Live connection'
-    : monitorSource === 'chokidar' ? 'Polling for updates' : 'Not connected'
+  // Connection badge: ● live (green) / ● syncing (amber) / ○ offline (red)
+  const badgeDotClass = monitorSource === 'sse' ? 'pathly-live-dot' : undefined
+  const badgeDot = monitorSource == null ? '○' : '●'
+  const badgeLabel = monitorSource === 'sse' ? 'live'
+    : monitorSource === 'chokidar' ? 'syncing' : 'offline'
+  const badgeColor = monitorSource === 'sse' ? '#22C55E'
+    : monitorSource === 'chokidar' ? '#F59E0B'
+    : '#EF4444'
+  const badgeAriaLabel = monitorSource === 'sse' ? 'Live SSE connection'
+    : monitorSource === 'chokidar' ? 'Syncing via file watcher' : 'Not connected'
 
   return (
-    <div style={styles.header}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <div style={styles.headerTitle}>
-          Pathly&nbsp;&nbsp;·&nbsp;&nbsp;{flow}&nbsp;&nbsp;·&nbsp;&nbsp;{topic}
-        </div>
+    <div style={{
+      backgroundColor: t.bgSurface0,
+      borderBottom: `1px solid ${t.bgSurface1}`,
+      padding: '8px 12px 6px',
+      flexShrink: 0,
+    }}>
+      {/* Row 1: feature name (bold, large) + connection badge */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+        <span style={{
+          fontSize: '14px',
+          fontWeight: 600,
+          color: t.textPrimary,
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {topic}
+        </span>
         <span
           role="status"
           aria-live="polite"
           aria-atomic={true}
           aria-label={badgeAriaLabel}
-          style={{ fontSize: t.fontSizeSm, color: badgeColor, marginLeft: '8px' }}
+          style={{
+            flexShrink: 0,
+            marginLeft: '12px',
+            fontSize: '11px',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            color: badgeColor,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+          }}
         >
-          <span aria-hidden="true">{badgeText}</span>
+          <span className={badgeDotClass} aria-hidden="true" style={{ color: badgeColor }}>{badgeDot}</span>
+          <span aria-hidden="true">{badgeLabel}</span>
         </span>
       </div>
-      <div style={styles.headerRow}>
-        <span><span style={{ color: t.textMuted }}>State</span>&nbsp;&nbsp;{state}</span>
-        <span><span style={{ color: t.textMuted }}>Conv</span>&nbsp;&nbsp;{conv}</span>
-        <span><span style={{ color: t.textMuted }}>Agent</span>&nbsp;&nbsp;{agent}</span>
-      </div>
+      {/* Row 2: flow · conv — omit entirely if nothing to show */}
+      {metaParts.length > 0 && (
+        <div style={{
+          fontSize: '11px',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          color: '#64748B',
+          letterSpacing: '0.01em',
+        }}>
+          {metaParts.join(' · ')}
+        </div>
+      )}
     </div>
   )
 }
 
 interface TabBarProps {
-  sessions: Record<string, import('../../types').FlowSession>
+  sessions: Record<string, import('../../types/index').FlowSession>
   activeTab: string | null
   onTabSelect: (topic: string) => void
 }
@@ -211,6 +269,99 @@ function TabBar({ sessions, activeTab, onTabSelect }: TabBarProps): JSX.Element 
         >
           …
         </button>
+      )}
+    </div>
+  )
+}
+
+function MetricsStrip(): JSX.Element {
+  const events = useStore((s) => s.events)
+  const t = useTheme()
+
+  const agentDone = events.filter((e) => e.type === 'AGENT_DONE')
+  const totalTokens = agentDone.reduce((s, e) => s + (e.tokens_in ?? 0) + (e.tokens_out ?? 0), 0)
+  const lastWall = agentDone.length > 0 ? agentDone[agentDone.length - 1].wall_seconds : undefined
+  const totalCost = agentDone.reduce((s, e) => s + (e.cost_usd ?? 0), 0)
+
+  const noTelemetry = events.length > 0 && agentDone.length === 0
+
+  function fmtTokens(n: number): string {
+    if (n === 0) return '—'
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+    return String(n)
+  }
+  function fmtWall(n: number | undefined): string {
+    return n == null ? '—' : `${n}s`
+  }
+  function fmtCost(n: number): string {
+    return n === 0 ? '—' : `$${n.toFixed(2)}`
+  }
+
+  const EMPTY_TOOLTIP = 'Waiting for AGENT_DONE events with telemetry'
+
+  const tiles: { label: string; value: string; empty: boolean; tooltip?: string }[] = [
+    { label: 'TOKENS', value: fmtTokens(totalTokens), empty: totalTokens === 0, tooltip: EMPTY_TOOLTIP },
+    { label: 'WALL',   value: fmtWall(lastWall),      empty: lastWall == null,  tooltip: EMPTY_TOOLTIP },
+    { label: 'COST',   value: fmtCost(totalCost),     empty: totalCost === 0,   tooltip: EMPTY_TOOLTIP },
+    { label: 'EVENTS', value: String(events.length),  empty: false },
+  ]
+
+  return (
+    <div style={{ flexShrink: 0, borderBottom: `1px solid ${t.bgSurface0}` }}>
+      <div style={{ display: 'flex' }}>
+        {tiles.map((tile, i) => (
+          <Tooltip
+            key={tile.label}
+            label={tile.empty && tile.tooltip ? tile.tooltip : tile.label}
+            placement="top"
+            delay={300}
+          >
+          <div
+            style={{
+              flex: 1,
+              height: '44px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderLeft: i > 0 ? `1px solid ${t.bgSurface0}` : undefined,
+            }}
+          >
+            <span style={{
+              fontSize: '16px',
+              fontFamily: t.fontFamilyMono,
+              fontWeight: 600,
+              // Empty values use deeply muted color so they read as "no data", not "zero"
+              color: tile.empty ? '#374151' : t.textPrimary,
+              lineHeight: 1,
+            }}>
+              {tile.value}
+            </span>
+            <span style={{
+              fontSize: '9px',
+              color: t.textMuted,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              marginTop: '3px',
+              fontFamily: "'Inter', system-ui, sans-serif",
+            }}>
+              {tile.label}
+            </span>
+          </div>
+          </Tooltip>
+        ))}
+      </div>
+      {noTelemetry && (
+        <div style={{
+          fontSize: '10px',
+          color: '#4B5563',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontStyle: 'italic',
+          padding: '3px 12px 4px',
+          borderTop: `1px solid ${t.bgSurface0}`,
+        }}>
+          No telemetry captured — HTTP pipeline events do not include cost data
+        </div>
       )}
     </div>
   )
@@ -390,8 +541,9 @@ export function Monitor(): JSX.Element {
           onTabSelect={setActiveMonitorTab}
         />
       )}
-      <FsmView />
       <HealthCheck />
+      <FsmView />
+      <MetricsStrip />
       <EventLog />
     </div>
   )

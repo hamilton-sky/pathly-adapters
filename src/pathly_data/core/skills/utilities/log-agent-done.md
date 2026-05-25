@@ -4,6 +4,10 @@ Internal utility — writes an AGENT_DONE event to EVENTS.jsonl and POSTs teleme
 to the Pathly HTTP backend. Call this once per completed stage instead of manually
 appending AGENT_DONE and calling record-cost separately.
 
+Provider-agnostic: supports Claude, OpenAI, Google Gemini, and any other model.
+Pass `cost_usd` directly if the API response included it. Otherwise cost is computed
+from token counts using a built-in pricing table (Claude models only).
+
 ## Arguments
 
 `$ARGUMENTS` is a JSON object with these fields:
@@ -11,10 +15,14 @@ appending AGENT_DONE and calling record-cost separately.
 - `feature` (required): feature slug matching the pathly/plans/ folder name
 - `conversation` (required): conversation number (integer); use 0 for non-build stages
 - `result` (required): `"DONE"` or `"PASS"`
-- `total_tokens` (optional): total token count from `<usage>` block, default 0
-- `tool_uses` (optional): tool call count from `<usage>` block, default 0
-- `duration_ms` (optional): duration in milliseconds from `<usage>` block, default 0
-- `wall_seconds` (optional): fallback elapsed seconds if duration_ms is 0, default 0
+- `model` (optional): model ID used by the agent (e.g. `"claude-sonnet-4-6"`, `"gpt-4o"`, `"gemini-2.0-flash"`); used for cost computation; defaults to `"claude-sonnet-4-6"`
+- `cost_usd` (optional): cost in USD if already known from API response — **takes priority over computation**; default not set
+- `input_tokens` (optional): input token count; default 0
+- `output_tokens` (optional): output token count; default 0
+- `total_tokens` (optional): total token count from `<usage>` block — used when input/output split is unknown; default 0
+- `tool_uses` (optional): tool call count from `<usage>` block; default 0
+- `duration_ms` (optional): duration in milliseconds from `<usage>` block; default 0
+- `wall_seconds` (optional): fallback elapsed seconds if duration_ms is 0; default 0
 - `summary` (optional): one-line summary for the activity log; defaults to `"<agent> conv <conversation> <result>"`
 
 ## Step 1 — Parse and validate
@@ -31,16 +39,57 @@ Compute final `wall_seconds`:
 
 Build `summary` if not provided: `"<agent> conv <conversation> <result>"`
 
-## Step 2 — Write AGENT_DONE to EVENTS.jsonl
+## Step 2 — Compute cost_usd
+
+**Priority 1 — Caller-provided cost:**
+If `cost_usd` is present in `$ARGUMENTS` and is a number, use it directly. Skip pricing table.
+
+**Priority 2 — Claude pricing table (Anthropic models only):**
+
+Only applies if model starts with `claude-`. Pricing per million tokens (as of 2025):
+
+| Model prefix | Input $/MTok | Output $/MTok |
+|---|---|---|
+| `claude-opus-4` | 15.00 | 75.00 |
+| `claude-sonnet-4` | 3.00 | 15.00 |
+| `claude-haiku-4` | 0.80 | 4.00 |
+| `claude-*` (other/unknown) | 3.00 | 15.00 |
+
+If both `input_tokens` and `output_tokens` are provided and > 0:
+```
+cost_usd = (input_tokens / 1_000_000 * input_rate) + (output_tokens / 1_000_000 * output_rate)
+```
+
+Else if only `total_tokens` > 0, approximate with 80/20 split:
+```
+input_est  = total_tokens * 0.80
+output_est = total_tokens * 0.20
+cost_usd   = (input_est / 1_000_000 * input_rate) + (output_est / 1_000_000 * output_rate)
+```
+
+**Priority 3 — Non-Claude / unknown models:**
+If model does not start with `claude-` and `cost_usd` was not provided:
+- Set `cost_usd = 0.0`
+- Set `cost_note = "cost not computed — pass cost_usd directly for non-Claude models"`
+- Print: `log-agent-done: cost_usd not computed for model "<model>" — pass cost_usd in arguments if available`
+
+**Final:** Round `cost_usd` to 6 decimal places.
+
+Set `tokens_in` and `tokens_out`:
+- If `input_tokens` / `output_tokens` provided: use directly
+- If only `total_tokens`: `tokens_in = round(total_tokens * 0.80)`, `tokens_out = round(total_tokens * 0.20)`
+- Else: both 0
+
+## Step 3 — Write AGENT_DONE to EVENTS.jsonl
 
 Append this JSON line to `pathly/plans/<feature>/EVENTS.jsonl`:
 ```json
-{"type":"AGENT_DONE","agent":"<agent>","model":"<model>","conversation":<conversation>,"result":"<result>","tokens_in":0,"tokens_out":0,"total_tokens":<total_tokens>,"cost_usd":0,"tool_uses":<tool_uses>,"wall_seconds":<wall_seconds>,"ts":"<iso-timestamp>","schema_version":1}
+{"type":"AGENT_DONE","agent":"<agent>","model":"<model>","conversation":<conversation>,"result":"<result>","tokens_in":<tokens_in>,"tokens_out":<tokens_out>,"total_tokens":<total_tokens>,"cost_usd":<cost_usd>,"tool_uses":<tool_uses>,"wall_seconds":<wall_seconds>,"ts":"<iso-timestamp>","schema_version":1}
 ```
 
 If the file does not exist, create it. If the directory does not exist, stop with an error.
 
-## Step 3 — POST telemetry to HTTP backend
+## Step 4 — POST telemetry to HTTP backend
 
 Check server health:
 ```bash
@@ -56,7 +105,7 @@ POST telemetry:
 ```bash
 curl -s -X POST http://127.0.0.1:8765/record_activity \
   -H "Content-Type: application/json" \
-  -d '{"agent":"<agent>","feature":"<feature>","summary":"<summary>","conversation":<conversation>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"wall_seconds":<wall_seconds>,"duration_ms":<duration_ms>,"input_tokens":0,"output_tokens":0,"cost_usd":0}'
+  -d '{"agent":"<agent>","feature":"<feature>","summary":"<summary>","conversation":<conversation>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"wall_seconds":<wall_seconds>,"duration_ms":<duration_ms>,"input_tokens":<tokens_in>,"output_tokens":<tokens_out>,"cost_usd":<cost_usd>}'
 ```
 
 If response contains `"status":"recorded"`: silent success.

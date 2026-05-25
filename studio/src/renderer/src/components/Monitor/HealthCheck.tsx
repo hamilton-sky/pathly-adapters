@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import { fsmPing, readFile, listDir } from '../../services/pathlyApi'
-import type { Theme } from '../../theme'
+import { Tooltip } from '../ui/Tooltip'
 
 type CheckStatus = 'pass' | 'warn' | 'fail' | 'loading'
 
@@ -10,63 +10,6 @@ interface CheckItem {
   label: string
   status: CheckStatus
   detail: string
-}
-
-function makeStyles(t: Theme): Record<string, React.CSSProperties> {
-  return {
-    section: {
-      flexShrink: 0,
-      borderTop: `1px solid ${t.bgSurface0}`,
-    },
-    sectionHeader: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '5px 12px',
-      backgroundColor: t.bgSurface0,
-      cursor: 'pointer',
-      userSelect: 'none',
-      fontSize: '12px',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      color: t.textSecondary,
-    },
-    headerLeft: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-    },
-    body: {
-      backgroundColor: t.bgBase,
-      padding: '6px 12px 8px',
-    },
-    row: {
-      display: 'flex',
-      alignItems: 'baseline',
-      gap: '8px',
-      padding: '2px 0',
-      fontSize: '12px',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    },
-    label: {
-      color: t.textMuted,
-      minWidth: '110px',
-      flexShrink: 0,
-    },
-    detail: {
-      color: t.textSecondary,
-      fontFamily: t.fontFamilyMono,
-      fontSize: '11px',
-    },
-    refreshBtn: {
-      fontSize: '11px',
-      color: t.textMuted,
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      padding: '0',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    },
-  }
 }
 
 function statusDot(status: CheckStatus, t: ReturnType<typeof useTheme>): { symbol: string; color: string } {
@@ -153,12 +96,16 @@ async function runHealthChecks(projectPath: string, topic: string | null): Promi
   return items
 }
 
+// Strip item labels match the 4 checks in order
+const STRIP_LABELS = ['FSM', 'State', 'Feedback', 'Events']
+
 export function HealthCheck(): JSX.Element {
   const { projectPath, activeTopic, activeMonitorTab, activeFlowSessions } = useStore()
   const t = useTheme()
-  const styles = makeStyles(t)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const [expanded, setExpanded] = useState(false)
+  const [hovered, setHovered] = useState(false)
   const [checks, setChecks] = useState<CheckItem[]>([])
   const [running, setRunning] = useState(false)
 
@@ -169,12 +116,11 @@ export function HealthCheck(): JSX.Element {
   const run = useCallback((): void => {
     if (!projectPath) return
     setRunning(true)
-    // Set all to loading
     setChecks([
-      { label: 'FSM server',    status: 'loading', detail: '…' },
-      { label: 'STATE.json',    status: 'loading', detail: '…' },
+      { label: 'FSM server',     status: 'loading', detail: '…' },
+      { label: 'STATE.json',     status: 'loading', detail: '…' },
       { label: 'Feedback files', status: 'loading', detail: '…' },
-      { label: 'Event log',     status: 'loading', detail: '…' },
+      { label: 'Event log',      status: 'loading', detail: '…' },
     ])
     runHealthChecks(projectPath, effectiveTopic ?? null)
       .then((results) => { setChecks(results) })
@@ -182,71 +128,129 @@ export function HealthCheck(): JSX.Element {
       .finally(() => { setRunning(false) })
   }, [projectPath, effectiveTopic])
 
-  // Auto-run when topic/project changes and panel is expanded
+  // Auto-run when project/topic changes (not gated on expanded)
   useEffect(() => {
-    if (expanded) run()
-  }, [expanded, effectiveTopic, projectPath]) // eslint-disable-line react-hooks/exhaustive-deps
+    run()
+  }, [effectiveTopic, projectPath]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Derive summary badge from completed checks
-  const overallStatus: CheckStatus = (() => {
-    if (checks.length === 0 || checks.some((c) => c.status === 'loading')) return 'loading'
-    if (checks.some((c) => c.status === 'fail'))  return 'fail'
-    if (checks.some((c) => c.status === 'warn'))  return 'warn'
-    return 'pass'
-  })()
-
-  const dot = statusDot(overallStatus, t)
+  // 4 slot statuses for strip dots — pad with loading if checks not ready
+  const slotStatuses: CheckStatus[] = STRIP_LABELS.map((_, i) =>
+    checks[i]?.status ?? 'loading'
+  )
 
   return (
-    <div style={styles.section}>
+    <div ref={containerRef} style={{ flexShrink: 0, position: 'relative' }}>
+      {/* 24px strip — label LEFT (VSCode pattern): ▾ Health · ● FSM ● State ● Feedback ● Events */}
       <div
-        style={styles.sectionHeader}
-        onClick={() => {
-          const next = !expanded
-          setExpanded(next)
-          if (next && checks.length === 0) run()
-        }}
         role="button"
         aria-expanded={expanded}
-        aria-label="Health check panel"
+        aria-label={expanded ? 'Collapse health details' : 'Expand health details'}
         tabIndex={0}
+        onClick={() => setExpanded((v) => !v)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded((v) => !v) }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          height: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0',
+          padding: '0 12px',
+          backgroundColor: hovered ? t.bgSurface0 : t.bgMantle,
+          borderBottom: `1px solid ${t.bgSurface0}`,
+          cursor: 'pointer',
+          userSelect: 'none',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          transition: 'background-color 150ms ease',
+        }}
       >
-        <span style={styles.headerLeft}>
-          <span style={{ color: dot.color, fontSize: '8px' }} aria-hidden="true">{dot.symbol}</span>
-          <span>Health</span>
+        {/* ▾ Health — section label + toggle cue, left-anchored */}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginRight: '10px' }}>
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-block',
+              transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+              transition: 'transform 150ms ease',
+              fontSize: '9px',
+              color: expanded ? t.accent : t.textMuted,
+              lineHeight: 1,
+            }}
+          >▾</span>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 500,
+            color: expanded ? t.accent : t.textSecondary,
+            letterSpacing: '0.03em',
+            transition: 'color 150ms ease',
+          }}>Health</span>
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {expanded && (
-            <button
-              style={styles.refreshBtn}
-              onClick={(e) => { e.stopPropagation(); run() }}
-              disabled={running}
-              aria-label="Refresh health checks"
-            >
-              {running ? '…' : '↺'}
-            </button>
-          )}
-          <span aria-hidden="true" style={{ fontSize: '10px', color: t.textMuted }}>{expanded ? '▲' : '▼'}</span>
-        </span>
+
+        {/* Thin divider */}
+        <span style={{ width: '1px', height: '12px', backgroundColor: t.bgSurface1, flexShrink: 0, marginRight: '10px' }} />
+
+        {/* Summary dots — tooltip shows live check detail */}
+        {STRIP_LABELS.map((label, i) => {
+          const d = statusDot(slotStatuses[i], t)
+          const detail = checks[i]?.detail ?? '…'
+          const statusLabel = checks[i]?.status ?? 'loading'
+          return (
+            <Tooltip key={label} label={`${label}: ${detail}`} placement="bottom" delay={200}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '10px' }}>
+                <span style={{ color: d.color, fontSize: '7px' }} aria-hidden="true">{d.symbol}</span>
+                <span style={{
+                  fontSize: '11px',
+                  color: statusLabel === 'fail' ? t.red : statusLabel === 'warn' ? t.yellow : t.textMuted,
+                }}>{label}</span>
+              </span>
+            </Tooltip>
+          )
+        })}
+
+        {/* Far-right: running spinner only */}
+        {running && (
+          <span style={{ marginLeft: 'auto', color: t.textMuted, fontSize: '10px' }}>…</span>
+        )}
       </div>
 
+      {/* Inline popover */}
       {expanded && (
-        <div style={styles.body}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '24px',
+            left: 0,
+            right: 0,
+            zIndex: 20,
+            backgroundColor: t.bgSurface0,
+            border: `1px solid ${t.bgSurface1}`,
+            padding: '8px 12px',
+          }}
+        >
           {checks.map((item) => {
             const d = statusDot(item.status, t)
             return (
-              <div key={item.label} style={styles.row}>
+              <div
+                key={item.label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: '8px',
+                  padding: '2px 0',
+                  fontSize: '12px',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                }}
+              >
                 <span style={{ color: d.color, fontSize: '8px', lineHeight: '18px' }} aria-hidden="true">
                   {d.symbol}
                 </span>
-                <span style={styles.label}>{item.label}</span>
-                <span style={styles.detail}>{item.detail}</span>
+                <span style={{ color: t.textMuted, minWidth: '110px', flexShrink: 0 }}>{item.label}</span>
+                <span style={{ color: t.textSecondary, fontFamily: t.fontFamilyMono, fontSize: '11px' }}>{item.detail}</span>
               </div>
             )
           })}
           {checks.length === 0 && (
-            <div style={{ ...styles.row, color: t.textMuted }}>Click ↺ to run checks</div>
+            <div style={{ color: t.textMuted, fontSize: '12px' }}>Running checks…</div>
           )}
         </div>
       )}

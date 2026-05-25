@@ -232,6 +232,32 @@ Track per stage (reset each stage):
 3. Else: call `scout-path`, feed summary back, resume.
 The FSM is NOT notified about NEEDS_CONTEXT cycles.
 
+### Step 3.5 — Record telemetry
+
+After the agent completes, read the `<usage>` block from the Agent tool result:
+```
+total_tokens: <N>
+tool_uses: <N>
+duration_ms: <N>
+```
+
+Invoke the `log-agent-done` skill with:
+```json
+{
+  "agent": "<agent name from next_action result>",
+  "feature": "<FEATURE>",
+  "conversation": <conv number from fsmState, or 0 if unknown>,
+  "result": "<DONE or PASS — PASS for reviewer/tester on success, DONE for all others>",
+  "model": "<model used — from instructions or default claude-sonnet-4-6>",
+  "total_tokens": <total_tokens from usage block, or 0>,
+  "tool_uses": <tool_uses from usage block, or 0>,
+  "duration_ms": <duration_ms from usage block, or 0>
+}
+```
+
+If the `<usage>` block is absent or unreadable, pass zeros — do not fail the stage.
+If `log-agent-done` is unavailable, print a warning and continue to Step 4.
+
 ### Step 4 — Complete the stage
 
 Invoke the `fsm-call` skill with:
