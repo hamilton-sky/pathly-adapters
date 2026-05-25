@@ -85,15 +85,13 @@ def materialize(
 def materialize_flows(
     dest: Path,
     *,
-    repair: bool = False,
     force: bool = False,
     dry_run: bool = False,
 ) -> list[str]:
     """Copy *.flow.yaml files from the installed package to dest. Returns list of filenames written.
 
-    Flow YAMLs are always authoritative — repair=True is forced so that
-    re-running the installer keeps installed flows in sync with the source
-    without requiring an explicit --repair flag.
+    Flow YAMLs are always authoritative: repair is forced True so re-running
+    the installer keeps installed flows in sync with the source package.
     """
     from .resources import core_flows_path
 

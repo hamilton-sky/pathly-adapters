@@ -231,7 +231,7 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             )
 
         flow_written = materialize_flows(
-            dest, repair=repair, force=force, dry_run=False
+            dest, force=force, dry_run=False
         )
         if flow_written:
             if dest not in written_dests:
