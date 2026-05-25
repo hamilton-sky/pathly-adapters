@@ -45,7 +45,10 @@ export function killAllPtys(): void {
 export function registerTerminalHandlers(win: BrowserWindow): void {
   ipcMain.handle('terminal:spawn', (event, tabId: string, cwd: string, command?: string) => {
     if (!pty) throw new Error('node-pty is not available')
-    if (activePtys.has(tabId)) return
+    if (activePtys.has(tabId)) {
+      event.sender.send('terminal:error', tabId, 'Tab already exists')
+      return
+    }
 
     // Phase 1: validate command against allowlist
     if (command !== undefined && !ALLOWED_SHELLS.has(command)) {
@@ -53,10 +56,13 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       return
     }
 
-    const resolvedCwd = cwd || app.getAppPath()
+    if (!cwd) {
+      event.sender.send('terminal:error', tabId, 'Working directory is required')
+      return
+    }
 
     // Phase 2: validate cwd is within the user's home directory
-    if (!isValidCwd(resolvedCwd)) {
+    if (!isValidCwd(cwd)) {
       event.sender.send('terminal:error', tabId, 'Invalid working directory')
       return
     }
@@ -69,7 +75,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       name: 'xterm-color',
       cols: 80,
       rows: 24,
-      cwd: resolvedCwd,
+      cwd: cwd,
       env: process.env as Record<string, string>,
     })
 
@@ -98,11 +104,13 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     activePtys.get(tabId)?.write(data)
   })
 
-  ipcMain.handle('terminal:resize', (_event, tabId: string, cols: number, rows: number) => {
+  ipcMain.handle('terminal:resize', (event, tabId: string, cols: number, rows: number) => {
+    if (ptyOwners.get(tabId) !== event.sender.id) return
     activePtys.get(tabId)?.resize(cols, rows)
   })
 
-  ipcMain.handle('terminal:kill', (_event, tabId: string) => {
+  ipcMain.handle('terminal:kill', (event, tabId: string) => {
+    if (ptyOwners.get(tabId) !== event.sender.id) return
     const p = activePtys.get(tabId)
     if (p) {
       p.kill()
@@ -112,7 +120,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     }
   })
 
-  ipcMain.handle('terminal:popout', (_event, tabId: string, label: string) => {
+  ipcMain.handle('terminal:popout', (event, tabId: string, label: string) => {
+    if (ptyOwners.get(tabId) !== event.sender.id) return
     const ptyProcess = activePtys.get(tabId)
     if (!ptyProcess) throw new Error(`No PTY for tab ${tabId}`)
 

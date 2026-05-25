@@ -7,3 +7,8 @@
 {"type":"FILE_CREATED","file":"DESIGN.md"}
 {"type":"STAGE_COMPLETE","stage":"DESIGNING","next":"BUILDING"}
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-25T13:41:25.320832+00:00"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-25T13:46:23.622897+00:00"}
+{"type":"RETRY","key":"conv-1:REVIEW_FAILURES.md"}
+{"type":"RETRY","key":"conv-1:REVIEW_FAILURES.md"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}
+{"type":"STAGE_COMPLETE","stage":"REVIEWING","conv":1}
