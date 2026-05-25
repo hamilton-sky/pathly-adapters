@@ -1,0 +1,5 @@
+{"type":"STATE_TRANSITION","to":"PLANNING","ts":"2026-05-25T13:40:48Z"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "DESIGNING", "ts": "2026-05-25T13:40:56.735010+00:00"}
+{"type":"STAGE_START","stage":"DESIGNING"}
+{"type":"FILE_CREATED","file":"DESIGN.md"}
+{"type":"STAGE_COMPLETE","stage":"DESIGNING","next":"BUILDING"}
