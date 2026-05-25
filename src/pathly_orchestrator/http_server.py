@@ -155,7 +155,7 @@ def _broadcast(key: tuple[str, str], line: str) -> None:
 def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
     topic, project_root = key
     path = Path(project_root) / "pathly" / "plans" / topic / "EVENTS.jsonl"
-    pos = 0
+    pos = path.stat().st_size if path.exists() else 0
     while not stop.is_set():
         try:
             if path.exists():
@@ -366,6 +366,41 @@ def complete_stage_endpoint():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+def _append_agent_done_event(
+    *,
+    project_root: str,
+    feature: str,
+    agent: str,
+    result: str,
+    conversation: object,
+    total_tokens: int,
+    tool_uses: int,
+    wall_seconds: int,
+    cost_usd: float,
+) -> None:
+    """Append an AGENT_DONE event to the feature's EVENTS.jsonl so SSE subscribers see it."""
+    try:
+        events_path = Path(project_root) / "pathly" / "plans" / feature / "EVENTS.jsonl"
+        if not events_path.parent.exists():
+            return
+        event: dict[str, object] = {
+            "type": "AGENT_DONE",
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "agent": agent,
+            "result": result,
+            "total_tokens": total_tokens,
+            "tool_uses": tool_uses,
+            "wall_seconds": wall_seconds,
+            "cost_usd": cost_usd,
+        }
+        if conversation is not None:
+            event["conversation"] = conversation
+        with open(events_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(event) + "\n")
+    except Exception:
+        logger.debug("_append_agent_done_event error", exc_info=True)
+
+
 @app.route("/record_activity", methods=["POST"])
 def record_activity_endpoint():
     """Append an activity record to ~/.pathly/activity.jsonl."""
@@ -439,6 +474,21 @@ def record_activity_endpoint():
                 cost_usd=float(data.get("cost_usd", 0.0)),
                 total_tokens=int(data.get("total_tokens", 0)),
             )
+
+        project_root = data.get("project_root", "")
+        if project_root and data.get("feature"):
+            _append_agent_done_event(
+                project_root=str(project_root),
+                feature=str(data["feature"]),
+                agent=str(data["agent"]),
+                result=str(data.get("result", "DONE")),
+                conversation=data.get("conversation"),
+                total_tokens=int(data.get("total_tokens", 0)),
+                tool_uses=int(data.get("tool_uses", 0)),
+                wall_seconds=wall_seconds,
+                cost_usd=float(data.get("cost_usd", 0.0)),
+            )
+
         return jsonify({"status": "recorded"}), 200
     except Exception as e:
         logging.exception("record_activity error")

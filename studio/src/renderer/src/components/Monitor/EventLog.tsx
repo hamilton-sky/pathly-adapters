@@ -42,13 +42,15 @@ function formatTime(ts?: string): string {
   try { return new Date(ts).toTimeString().slice(0, 8) } catch { return '--:--:--' }
 }
 
-function formatEvent(ev: FsmEvent): string {
+function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
   const ts = formatTime(ev.ts ?? ev.timestamp)
   const pad = (s: string, n: number): string => s.padEnd(n)
 
   switch (ev.type) {
-    case 'STATE_TRANSITION':
-      return `${ts}  ${pad('TRANSITION', 14)}  ${ev.from ?? '?'} → ${ev.to ?? '?'}`
+    case 'STATE_TRANSITION': {
+      const prefix = retrograde ? '↩ ' : ''
+      return `${ts}  ${pad('TRANSITION', 14)}  ${prefix}${ev.from ?? '?'} → ${ev.to ?? '?'}`
+    }
     case 'AGENT_DONE': {
       const conv = ev.conversation != null ? ` #${ev.conversation}` : ''
       const result = ev.result ?? ''
@@ -83,8 +85,9 @@ function formatEvent(ev: FsmEvent): string {
   }
 }
 
-function RawEventLine({ ev, t, isNew }: { ev: FsmEvent; t: Theme; isNew: boolean }): JSX.Element {
-  const color = eventColor(ev, t)
+function RawEventLine({ ev, t, isNew, retrograde }: { ev: FsmEvent; t: Theme; isNew: boolean; retrograde?: boolean }): JSX.Element {
+  const baseColor = eventColor(ev, t)
+  const color = retrograde ? '#F97316' : baseColor
   return (
     <div
       className={isNew ? 'pathly-new-row' : undefined}
@@ -99,9 +102,21 @@ function RawEventLine({ ev, t, isNew }: { ev: FsmEvent; t: Theme; isNew: boolean
         padding: '1px 0',
       }}
     >
-      {formatEvent(ev)}
+      {formatEvent(ev, retrograde)}
     </div>
   )
+}
+
+function computeRetrograde(events: FsmEvent[]): boolean[] {
+  const seen = new Set<string>()
+  return events.map((ev) => {
+    if (ev.type !== 'STATE_TRANSITION') return false
+    const to = ev.to ?? ''
+    if (!to) return false
+    if (seen.has(to)) return true
+    seen.add(to)
+    return false
+  })
 }
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
@@ -229,6 +244,8 @@ export function EventLog(): JSX.Element {
     setNewCount(0)
   }
 
+  const retrogradeFlags = computeRetrograde(events)
+
   return (
     <div style={styles.container}>
       <div style={styles.title}>Event Log</div>
@@ -243,6 +260,7 @@ export function EventLog(): JSX.Element {
                 ev={ev}
                 t={t}
                 isNew={i >= flashStart}
+                retrograde={retrogradeFlags[i]}
               />
             ))
           )}
