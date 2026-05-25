@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useStore } from '../../store'
 import { readFile } from '../../services/pathlyApi'
 import type { ConvRow } from '../../types'
@@ -103,7 +103,7 @@ export function PlanBoard(): JSX.Element {
   const [selectedConv, setSelectedConv] = useState<number | null>(null)
   const [hoveredConv, setHoveredConv] = useState<number | null>(null)
 
-  useEffect(() => {
+  const loadAll = useCallback(async (): Promise<void> => {
     if (!projectPath || !activeTopic) {
       setFsmState('')
       setConvs([])
@@ -114,41 +114,48 @@ export function PlanBoard(): JSX.Element {
 
     const base = `${projectPath}/pathly/plans/${activeTopic}`
 
-    async function loadAll(): Promise<void> {
-      try {
-        const raw = await readFile(`${base}/STATE.json`)
-        const parsed = JSON.parse(raw) as { current?: string }
-        setFsmState(parsed.current ?? '')
-      } catch {
-        setFsmState('')
-      }
-
-      try {
-        const md = await readFile(`${base}/PROGRESS.md`)
-        const rows = parseProgressMd(md)
-        setConvs(rows)
-        setNoProgress(rows.length === 0)
-      } catch {
-        setConvs([])
-        setNoProgress(true)
-      }
-
-      try {
-        const raw = await readFile(`${base}/EVENTS.jsonl`)
-        const parsed: EventEntry[] = []
-        for (const line of raw.split('\n')) {
-          const trimmed = line.trim()
-          if (!trimmed) continue
-          try { parsed.push(JSON.parse(trimmed) as EventEntry) } catch { /* skip malformed */ }
-        }
-        setEvents(parsed)
-      } catch {
-        setEvents([])
-      }
+    try {
+      const raw = await readFile(`${base}/STATE.json`)
+      const parsed = JSON.parse(raw) as { current?: string }
+      setFsmState(parsed.current ?? '')
+    } catch {
+      setFsmState('')
     }
 
-    loadAll()
+    try {
+      const md = await readFile(`${base}/PROGRESS.md`)
+      const rows = parseProgressMd(md)
+      setConvs(rows)
+      setNoProgress(rows.length === 0)
+    } catch {
+      setConvs([])
+      setNoProgress(true)
+    }
+
+    try {
+      const raw = await readFile(`${base}/EVENTS.jsonl`)
+      const parsed: EventEntry[] = []
+      for (const line of raw.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        try { parsed.push(JSON.parse(trimmed) as EventEntry) } catch { /* skip malformed */ }
+      }
+      setEvents(parsed)
+    } catch {
+      setEvents([])
+    }
   }, [projectPath, activeTopic])
+
+  useEffect(() => {
+    void loadAll()
+  }, [loadAll])
+
+  useEffect(() => {
+    if (!projectPath) return
+    const { onWorkspaceChanged } = window.pathly.watch
+    if (!onWorkspaceChanged) return
+    return onWorkspaceChanged(() => { void loadAll() })
+  }, [loadAll, projectPath])
 
   if (!activeTopic) {
     return (

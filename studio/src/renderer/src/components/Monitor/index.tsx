@@ -29,6 +29,18 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
 }
 
+// Session keys are "flowType/topic" (e.g. "debug/security-hardening").
+// extractTopic strips the flow-type prefix; safe on plain topic strings too.
+function extractTopic(sessionKey: string): string {
+  const slash = sessionKey.indexOf('/')
+  return slash === -1 ? sessionKey : sessionKey.slice(slash + 1)
+}
+
+function flowTypeLabel(flowKey: string): string {
+  const t = flowKey.replace('.flow.yaml', '')
+  return t === 'team' ? 'plan' : t
+}
+
 const LIVE_BADGE_CSS = `
 @keyframes pathly-live-breathe {
   0%, 100% { opacity: 1; }
@@ -218,22 +230,29 @@ function TabBar({ sessions, activeTab, onTabSelect }: TabBarProps): JSX.Element 
   const visible = keys.slice(0, 4)
   const overflow = keys.slice(4)
 
+  // When all sessions share the same topic, just show the flow type (e.g. "plan", "debug").
+  // When topics differ, show "flowType/topic" so the user knows which is which.
+  const allSameTopic = keys.length > 0 && keys.every(k => extractTopic(k) === extractTopic(keys[0]))
+
   return (
     <div
       role="tablist"
       aria-label="Active flows"
       style={styles.tabBar}
     >
-      {visible.map((topic, idx) => {
-        const session = sessions[topic]
-        const isActive = activeTab === topic || (activeTab === null && idx === 0)
+      {visible.map((sessionKey, idx) => {
+        const session = sessions[sessionKey]
+        const isActive = activeTab === sessionKey || (activeTab === null && idx === 0)
+        const label = allSameTopic
+          ? flowTypeLabel(session.flowKey)
+          : `${flowTypeLabel(session.flowKey)}/${truncate(extractTopic(sessionKey), 10)}`
         return (
           <button
-            key={topic}
+            key={sessionKey}
             role="tab"
             aria-selected={isActive}
             tabIndex={isActive ? 0 : -1}
-            onClick={() => onTabSelect(topic)}
+            onClick={() => onTabSelect(sessionKey)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
             style={{
               height: '100%',
@@ -251,7 +270,7 @@ function TabBar({ sessions, activeTab, onTabSelect }: TabBarProps): JSX.Element 
               outline: 'none'
             }}
           >
-            {session.flowKey.replace('.flow.yaml', '')}
+            {label}
             {session.isRunning && (
               <span
                 className="pathly-pulse"
@@ -359,6 +378,7 @@ export function Monitor(): JSX.Element {
     projectPath,
     activeTopic,
     events,
+    monitorSource,
     setMonitorSource,
     setFsmState,
     setEvents,
@@ -372,13 +392,24 @@ export function Monitor(): JSX.Element {
   const eventsRef = useRef(events)
   eventsRef.current = events
 
+  const monitorSourceRef = useRef(monitorSource)
+  monitorSourceRef.current = monitorSource
+
   const t = useTheme()
   const styles = makeStyles(t)
 
-  // Derive effective topic: prefer active tab if valid, else fall back to activeTopic (EC-4.3)
-  const effectiveTopic = (activeMonitorTab && activeFlowSessions[activeMonitorTab])
-    ? activeMonitorTab
-    : activeTopic
+  // Session keys are compound "flowType/topic". Extract the plain topic for SSE/file paths.
+  const activeTabValid = activeMonitorTab != null && !!activeFlowSessions[activeMonitorTab]
+  const effectiveTopic = activeTabValid ? extractTopic(activeMonitorTab!) : activeTopic
+
+  // When the sidebar topic changes, clear all sessions and reset the active tab.
+  const prevTopicRef = useRef(activeTopic)
+  useEffect(() => {
+    if (prevTopicRef.current === activeTopic) return
+    prevTopicRef.current = activeTopic
+    setActiveFlowSessions(() => ({}))
+    setActiveMonitorTab(null)
+  }, [activeTopic, setActiveFlowSessions, setActiveMonitorTab])
 
   useEffect(() => {
     if (!effectiveTopic) {
@@ -414,12 +445,14 @@ export function Monitor(): JSX.Element {
         }
         setFsmState(parsedState)
 
-        // Upsert session into activeFlowSessions
+        // Upsert session using compound key "flowType/topic" to allow plan + debug in parallel.
         if (activeTopic) {
+          const flowType = (parsedState.flow as string | undefined) ?? 'team'
+          const sessionKey = `${flowType}/${activeTopic}`
           setActiveFlowSessions((prev) => ({
             ...prev,
-            [activeTopic]: {
-              flowKey: `${(parsedState.flow as string | undefined) ?? 'team'}.flow.yaml`,
+            [sessionKey]: {
+              flowKey: `${flowType}.flow.yaml`,
               topic: activeTopic,
               isRunning: parsedState.current !== 'IDLE' && parsedState.current !== 'DONE',
               isPaused: false,
@@ -466,7 +499,15 @@ export function Monitor(): JSX.Element {
       if (data.path.endsWith('STATE.json')) {
         try { setFsmState(JSON.parse(data.content)) } catch { /* ignore */ }
       }
-      // EVENTS.jsonl handled by SSE below — ignore here
+      // EVENTS.jsonl: use chokidar only when SSE has permanently closed
+      if (data.path.endsWith('EVENTS.jsonl') && monitorSourceRef.current === 'chokidar') {
+        const parsed: FsmEvent[] = []
+        for (const line of data.content.split('\n')) {
+          const trimmed = line.trim()
+          if (trimmed) try { parsed.push(JSON.parse(trimmed) as FsmEvent) } catch { /* skip */ }
+        }
+        setEvents(parsed)
+      }
     })
 
     // EVENTS.jsonl — live appends via SSE
@@ -495,18 +536,11 @@ export function Monitor(): JSX.Element {
     return () => {
       removeListener()
       es.close()
-      // Remove session on cleanup
-      if (activeTopic) {
-        setActiveFlowSessions((prev) => {
-          const next = { ...prev }
-          delete next[activeTopic]
-          return next
-        })
-        // If the tab being cleaned up was active, revert to activeTopic path (EC-4.2)
-        setActiveMonitorTab(null)
-      }
+      // Do NOT delete from activeFlowSessions or reset activeMonitorTab here.
+      // Session lifetime is managed by the activeTopic-change effect above,
+      // so that switching tabs doesn't collapse the tab bar.
     }
-  }, [effectiveTopic, activeMonitorTab, projectPath, setMonitorSource, setFsmState, setEvents, setPipelineStates, setActiveFlowSessions, setActiveMonitorTab, activeTopic])
+  }, [effectiveTopic, projectPath, setMonitorSource, setFsmState, setEvents, setPipelineStates, setActiveFlowSessions, activeTopic])
 
   const showTabBar = Object.keys(activeFlowSessions).length >= 2
 
