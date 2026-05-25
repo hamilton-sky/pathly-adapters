@@ -436,10 +436,10 @@ def test_append_event_ts_injected(tmp_path):
 
 
 def test_append_event_preserves_other_fields(tmp_path):
-    append_event(tmp_path, {"type": "STATE_TRANSITION", "from": "A", "to": "B"})
+    append_event(tmp_path, {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING"})
     line = (tmp_path / "EVENTS.jsonl").read_text(encoding="utf-8").strip()
     event = json.loads(line)
     assert event["type"] == "STATE_TRANSITION"
-    assert event["from"] == "A"
-    assert event["to"] == "B"
+    assert event["from"] == "BUILDING"
+    assert event["to"] == "REVIEWING"
     assert "ts" in event

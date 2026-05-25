@@ -70,3 +70,14 @@ setup_command.py    ← shim: from .cli import main; __all__ = ['main']
 ```
 
 **Rule:** `orchestrate.py` does NOT import from `cli.py`. The dependency is one-directional: cli → orchestrate → implementation modules.
+
+### File responsibilities (explicit)
+
+| File | Responsibility | Approx size |
+|---|---|---|
+| `cli.py` | Owns `main()`: argparse setup, host validation, uninstall/apply dispatch, interactive menu (`_interactive_menu`), package uninstall helper (`_uninstall_package`). Imports from `.detect`, `.orchestrate`. | ~90–120 lines |
+| `setup_command.py` | Thin re-export shim. Exactly two meaningful lines: `from .cli import main` and `__all__ = ['main']`. No argparse, no logic, no other imports. | 2 lines |
+| `orchestrate.py` | `_run_host`, `_run_host_uninstall`. Pure orchestration. Never imports `cli.py` or `setup_command.py`. | — |
+| `__main__.py` | Entry point: `from .setup_command import main; main()`. Kept stable for backward compatibility. | — |
+
+**Why the shim exists at all:** `setup_command.py` is the historical public entry name referenced by `__main__.py` and likely external scripts/console_scripts. Renaming would break callers. Keeping it as a 2-line re-export preserves the import surface while letting `cli.py` own the logic.

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import { makeFlowEditorStyles } from './FlowEditor.styles'
@@ -7,15 +7,45 @@ import { VisualView } from './VisualView'
 import { YamlView } from './YamlView'
 import { validateFlow } from './utils/validateFlow'
 import { useProjectFiles } from '../../hooks/useProjectFiles'
+import type { PathlyItem } from '../../types'
+import styles2 from './UnsavedChangesModal.module.css'
 
 type TabMode = 'visual' | 'yaml'
 
 export function FlowEditor(): JSX.Element {
-  const { selectedItem, markDirty, clearDirty } = useStore()
+  const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
   const t = useTheme()
   const styles = makeFlowEditorStyles(t)
   const [tab, setTab] = useState<TabMode>('visual')
   const { sections } = useProjectFiles()
+
+  const [displayedItem, setDisplayedItem] = useState<PathlyItem | null>(selectedItem)
+  const [pendingNavigation, setPendingNavigation] = useState<PathlyItem | null>(null)
+  const prevDisplayedItemRef = useRef<PathlyItem | null>(displayedItem)
+
+  useEffect(() => {
+    prevDisplayedItemRef.current = displayedItem
+  }, [displayedItem])
+
+  useEffect(() => {
+    if (!selectedItem) {
+      setDisplayedItem(null)
+      return
+    }
+    const prev = prevDisplayedItemRef.current
+    if (
+      prev &&
+      prev.path !== selectedItem.path &&
+      prev.path.endsWith('.flow.yaml') &&
+      dirtyItems.has(prev.path)
+    ) {
+      setPendingNavigation(selectedItem)
+    } else {
+      setDisplayedItem(selectedItem)
+    }
+  // dirtyItems intentionally omitted — only check at navigation moment
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItem])
 
   const {
     flowData,
@@ -31,7 +61,7 @@ export function FlowEditor(): JSX.Element {
     handleYamlParseError,
     handleVisualSave,
     handleYamlSave
-  } = useFlowFile(selectedItem, markDirty, clearDirty)
+  } = useFlowFile(displayedItem, markDirty, clearDirty)
 
   function sectionAllItems(key: string): string[] {
     const s = sections[key]
@@ -81,7 +111,7 @@ export function FlowEditor(): JSX.Element {
     )
   }
 
-  if (!selectedItem) {
+  if (!displayedItem) {
     return (
       <div style={styles.panel}>
         <span style={styles.message}>Select a flow from the sidebar</span>
@@ -133,6 +163,32 @@ export function FlowEditor(): JSX.Element {
           />
         )}
       </div>
+      {pendingNavigation !== null && (
+        <div className={styles2.overlay}>
+          <div className={styles2.card}>
+            <div className={styles2.title}>Unsaved changes</div>
+            <div className={styles2.body}>You have unsaved changes. Discard and continue?</div>
+            <div className={styles2.actions}>
+              <button
+                className={styles2.cancelBtn}
+                onClick={() => setPendingNavigation(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles2.discardBtn}
+                onClick={() => {
+                  if (displayedItem) clearDirty(displayedItem.path)
+                  setDisplayedItem(pendingNavigation)
+                  setPendingNavigation(null)
+                }}
+              >
+                Discard changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

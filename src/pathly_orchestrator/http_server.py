@@ -389,6 +389,8 @@ def _append_agent_done_event(
             "agent": agent,
             "result": result,
             "total_tokens": total_tokens,
+            "tokens_in": total_tokens,
+            "tokens_out": 0,
             "tool_uses": tool_uses,
             "wall_seconds": wall_seconds,
             "cost_usd": cost_usd,

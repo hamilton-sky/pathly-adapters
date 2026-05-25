@@ -7,6 +7,26 @@ Patterns extracted from retros. Promote to LESSONS.md via `/lessons`.
 
 ---
 
+## [studio-polish] Pyright re-export: use `import X as X` in shim modules
+
+### Pattern
+When creating a thin shim module (`from .cli import main`), Pyright's `reportMissingImports` fires when the re-exported name is consumed via `from shim import name`. Fix: use `from .cli import main as main` — the `as X` pattern signals an explicit re-export to Pyright.
+
+### Source
+studio-polish retro, 2026-05-25
+
+---
+
+## [studio-polish] Name every function by file in refactor stories before building
+
+### Pattern
+A refactor story that says "module X becomes a thin shim" is ambiguous. The builder left `main()` in the wrong file, requiring one ARCH_FEEDBACK cycle. Fix: list each function's destination file by name in the story's acceptance criteria.
+
+### Source
+studio-polish retro, 2026-05-25
+
+---
+
 ## [docs-sync] Builder acts on plan-baked facts instead of re-verifying live paths
 
 ### Pattern

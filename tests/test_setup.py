@@ -100,37 +100,37 @@ def test_no_flags_launches_interactive_menu():
     # With no flags, main() delegates to _interactive_menu rather than writing
     # files directly. Patch the menu to return immediately (simulating Exit).
     with patch.object(sys, "argv", ["pathly-setup"]):
-        with patch("install_cli.setup_command.detect_hosts", return_value=["claude"]):
-            with patch("install_cli.setup_command._interactive_menu") as mock_menu:
+        with patch("install_cli.cli.detect_hosts", return_value=["claude"]):
+            with patch("install_cli.cli._interactive_menu") as mock_menu:
                 main()
     mock_menu.assert_called_once_with(["claude"], repair=False, force=False)
 
 
 def test_dry_run_calls_run_host_with_dry_run_true():
     with patch.object(sys, "argv", ["pathly-setup", "--dry-run"]):
-        with patch("install_cli.setup_command.detect_hosts", return_value=["claude"]):
-            with patch("install_cli.setup_command._run_host") as mock_run:
+        with patch("install_cli.cli.detect_hosts", return_value=["claude"]):
+            with patch("install_cli.cli._run_host") as mock_run:
                 main()
     mock_run.assert_called_once_with("claude", dry_run=True, repair=False, force=False)
 
 
 def test_host_argument_limits_to_that_host():
     with patch.object(sys, "argv", ["pathly-setup", "claude", "--dry-run"]):
-        with patch("install_cli.setup_command._run_host") as mock_run:
+        with patch("install_cli.cli._run_host") as mock_run:
             main()
     mock_run.assert_called_once_with("claude", dry_run=True, repair=False, force=False)
 
 
 def test_apply_calls_run_host_without_dry_run():
     with patch.object(sys, "argv", ["pathly-setup", "claude", "--apply"]):
-        with patch("install_cli.setup_command._run_host") as mock_run:
+        with patch("install_cli.cli._run_host") as mock_run:
             main()
     mock_run.assert_called_once_with("claude", dry_run=False, repair=False, force=False)
 
 
 def test_no_detected_hosts_exits():
     with patch.object(sys, "argv", ["pathly-setup", "--dry-run"]):
-        with patch("install_cli.setup_command.detect_hosts", return_value=[]):
+        with patch("install_cli.cli.detect_hosts", return_value=[]):
             with pytest.raises(SystemExit) as exc:
                 main()
     assert exc.value.code == 1
