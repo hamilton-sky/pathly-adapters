@@ -114,8 +114,8 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   }
 }
 
-function HeaderBar(): JSX.Element {
-  const { fsmState, activeTopic, monitorSource } = useStore()
+function HeaderBar({ effectiveTopic }: { effectiveTopic: string | null }): JSX.Element {
+  const { fsmState, monitorSource } = useStore()
   const t = useTheme()
 
   useInjectCSS(LIVE_BADGE_CSS)
@@ -123,7 +123,7 @@ function HeaderBar(): JSX.Element {
   const flow = fsmState?.flow as string | undefined
   const topic = fsmState?.feature
     ? truncate(fsmState.feature as string, 32)
-    : activeTopic ? truncate(activeTopic, 32) : '—'
+    : effectiveTopic ? truncate(effectiveTopic, 32) : '—'
   const conv = fsmState?.conv != null
     ? String(fsmState.conv)
     : fsmState?.current_conversation != null
@@ -554,7 +554,7 @@ export function Monitor(): JSX.Element {
 
   return (
     <div style={styles.panel}>
-      <HeaderBar />
+      <HeaderBar effectiveTopic={effectiveTopic} />
       {showTabBar && (
         <TabBar
           sessions={activeFlowSessions}
