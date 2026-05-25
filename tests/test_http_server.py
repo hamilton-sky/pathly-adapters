@@ -150,6 +150,64 @@ def test_record_activity_negative_total_tokens_rejected(client):
     assert r.status_code == 400
 
 
+def test_record_activity_appends_complete_agent_done_event(client):
+    c, tmp = client
+    events_dir = tmp / "pathly" / "plans" / "feature-a"
+    events_dir.mkdir(parents=True)
+
+    r = c.post(
+        "/record_activity",
+        json={
+            "agent": "builder",
+            "feature": "feature-a",
+            "summary": "done",
+            "project_root": str(tmp),
+            "model": "gpt-5",
+            "conversation": 2,
+            "result": "DONE",
+            "total_tokens": 15,
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "tool_uses": 3,
+            "duration_ms": 2500,
+            "cost_usd": 0.0123,
+        },
+    )
+
+    assert r.status_code == 200
+    event = json.loads((events_dir / "EVENTS.jsonl").read_text().strip())
+    assert event["schema_version"] == 1
+    assert event["model"] == "gpt-5"
+    assert event["conversation"] == 2
+    assert event["tokens_in"] == 10
+    assert event["tokens_out"] == 5
+    assert event["cost_usd"] == 0.0123
+
+
+def test_record_activity_uses_total_tokens_when_split_is_missing(client):
+    c, tmp = client
+    events_dir = tmp / "pathly" / "plans" / "feature-b"
+    events_dir.mkdir(parents=True)
+
+    r = c.post(
+        "/record_activity",
+        json={
+            "agent": "builder",
+            "feature": "feature-b",
+            "summary": "done",
+            "project_root": str(tmp),
+            "total_tokens": 15,
+            "cost_usd": 0.0,
+        },
+    )
+
+    assert r.status_code == 200
+    event = json.loads((events_dir / "EVENTS.jsonl").read_text().strip())
+    assert event["tokens_in"] == 15
+    assert event["tokens_out"] == 0
+    assert "cost_usd" in event
+
+
 def test_events_stream_missing_params(client):
     c, _ = client
     r = c.get("/events/stream")

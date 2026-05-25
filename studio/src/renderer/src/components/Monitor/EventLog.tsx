@@ -185,6 +185,7 @@ export function EventLog(): JSX.Element {
   const t = useTheme()
   const styles = makeStyles(t)
   const { totalIn, totalOut, totalCost, agentDone } = useAgentTelemetry()
+  const missingCostData = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd == null)
 
   useInjectCSS(FLASH_CSS)
 
@@ -297,9 +298,9 @@ export function EventLog(): JSX.Element {
             &nbsp;&nbsp;
             {totalCost > 0 ? `$${totalCost.toFixed(4)}` : '—'}
           </span>
-          {agentDone.length > 0 && totalCost === 0 && (
+          {missingCostData && (
             <span style={{ ...styles.totalsLabel, marginLeft: 12, opacity: 0.5 }}>
-              (no telemetry — FSM needs cost_usd in AGENT_DONE events)
+              (no cost data - AGENT_DONE events are missing cost_usd)
             </span>
           )}
         </span>

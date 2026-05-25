@@ -371,9 +371,12 @@ def _append_agent_done_event(
     project_root: str,
     feature: str,
     agent: str,
+    model: str,
     result: str,
     conversation: object,
     total_tokens: int,
+    tokens_in: int,
+    tokens_out: int,
     tool_uses: int,
     wall_seconds: int,
     cost_usd: float,
@@ -384,13 +387,15 @@ def _append_agent_done_event(
         if not events_path.parent.exists():
             return
         event: dict[str, object] = {
+            "schema_version": 1,
             "type": "AGENT_DONE",
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "agent": agent,
+            "model": model,
             "result": result,
             "total_tokens": total_tokens,
-            "tokens_in": total_tokens,
-            "tokens_out": 0,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
             "tool_uses": tool_uses,
             "wall_seconds": wall_seconds,
             "cost_usd": cost_usd,
@@ -479,13 +484,21 @@ def record_activity_endpoint():
 
         project_root = data.get("project_root", "")
         if project_root and data.get("feature"):
+            total_tokens = int(data.get("total_tokens", 0))
+            tokens_in = int(data.get("input_tokens", 0))
+            tokens_out = int(data.get("output_tokens", 0))
+            if tokens_in == 0 and tokens_out == 0 and total_tokens > 0:
+                tokens_in = total_tokens
             _append_agent_done_event(
                 project_root=str(project_root),
                 feature=str(data["feature"]),
                 agent=str(data["agent"]),
+                model=str(data.get("model", "")),
                 result=str(data.get("result", "DONE")),
                 conversation=data.get("conversation"),
-                total_tokens=int(data.get("total_tokens", 0)),
+                total_tokens=total_tokens,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
                 tool_uses=int(data.get("tool_uses", 0)),
                 wall_seconds=wall_seconds,
                 cost_usd=float(data.get("cost_usd", 0.0)),
