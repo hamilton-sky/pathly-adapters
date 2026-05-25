@@ -1,11 +1,21 @@
 import json
 
+import pytest
+
 from install_cli.codex_plugin_config import (
     MARKETPLACE_NAME,
     PLUGIN_NAME,
     install_codex_plugin,
     uninstall_codex_plugin,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolate_plugin_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "install_cli.codex_plugin_config._PLUGIN_CACHE_ROOT",
+        tmp_path / "plugin-cache",
+    )
 
 
 def test_install_codex_plugin_writes_real_marketplace_and_config(tmp_path):
