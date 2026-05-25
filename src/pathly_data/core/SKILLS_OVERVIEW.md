@@ -1013,31 +1013,6 @@ design [feature]
 
 ---
 
-## 29. team-http — HTTP FSM Server Wrapper
-
-Runs the full team pipeline via the Pathly Python FSM HTTP server (explicit HTTP-only mode).
-All FSM calls delegated to `fsm-call`. **No LLM fallback — fails loudly if the server
-cannot start.** Use `/pathly team` for the standard entry point (HTTP-first with LLM fallback).
-
-```
-team-http [feature] [rigor] [flags]
-      │
-      ▼
-  fsm-call: next_action (auto-starts server if needed)
-  (server unavailable → hard stop)
-      │
-      ▼
-  Execute stage agent
-      │
-      ▼
-  fsm-call: complete_stage
-      │
-      ▼
-  Repeat until DONE
-```
-
----
-
 ## Transition-Action Skills (internal, orchestrator-only)
 
 These two skills are not user-facing. The orchestrator spawns them automatically
@@ -1118,7 +1093,6 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
   (CLI wrapper)   ──►  status    ──►  all-feature dashboard
   (CLI wrapper)   ──►  log       ──►  event timeline
   plan done       ──►  design    ──►  DESIGN.md visual spec
-  (HTTP strict)   ──►  team-http ──►  full pipeline via HTTP FSM server
   ─────────────────────────────────────────────────────
   TRANSITION ACTIONS (spawned by orchestrator, not users)
   BUILDING→REVIEWING──► commit   ──►  git commit

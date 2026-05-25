@@ -85,7 +85,7 @@ def test_uninstall_without_manifest_returns_empty(tmp_path):
 
 def test_rollback_exceptions_logged_to_stderr(capsys, monkeypatch):
     """If uninstall() raises during rollback, the error is logged to stderr."""
-    import install_cli.setup_command as sc
+    import install_cli.orchestrate as orchestrate
 
     # Make materialize succeed (adds dest to written_dests), then materialize_flows raise
     # so the except block is entered and uninstall is attempted.
@@ -101,12 +101,12 @@ def test_rollback_exceptions_logged_to_stderr(capsys, monkeypatch):
     def fake_uninstall(*_args, **_kwargs):
         raise OSError("disk full")
 
-    monkeypatch.setattr(sc, "materialize", fake_materialize)
-    monkeypatch.setattr(sc, "materialize_flows", fake_materialize_flows)
-    monkeypatch.setattr(sc, "uninstall", fake_uninstall)
+    monkeypatch.setattr(orchestrate, "materialize", fake_materialize)
+    monkeypatch.setattr(orchestrate, "materialize_flows", fake_materialize_flows)
+    monkeypatch.setattr(orchestrate, "uninstall", fake_uninstall)
 
     with pytest.raises(OSError):
-        sc._run_host("claude", dry_run=False, repair=False, force=False)
+        orchestrate._run_host("claude", dry_run=False, repair=False, force=False)
 
     captured = capsys.readouterr()
     assert "[pathly rollback error]" in captured.err

@@ -43,7 +43,7 @@ Refer to `go.md` for:
 - How to classify intent (tiny_change / new_feature / brainstorm / resume / etc.)
 - How to choose rigor (nano / lite / standard / strict)
 - When to run discovery or probe first
-- Engine selection (team vs team-http)
+- Engine selection through the unified `team` pipeline
 - The decision summary format
 
 ## Routing

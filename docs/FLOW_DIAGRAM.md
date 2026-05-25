@@ -134,7 +134,6 @@ Command                   Purpose
 /pathly status            cross-feature dashboard (all active flows + states)
 /pathly log               event timeline for active or named feature
 /pathly design            generate DESIGN.md visual spec (after plan, before build)
-/pathly team-http         run full pipeline via HTTP FSM server (no LLM fallback)
 ```
 
 *`/pathly verify` dispatches to `verify-state` (different stem from all other `/pathly <x>` → `<x>` pairs).

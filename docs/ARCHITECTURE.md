@@ -46,7 +46,7 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   │   ├── fsm-call.md  ← internal utility: HTTP transport to FSM server (shared)
 │       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
 │       │   │   ├── archive-artifacts.md  ← transition-action skill (orchestrator only)
-│       │   │   └── ...          (29 user-facing + 2 transition-action skills total)
+│       │   │   └── ...          (28 user-facing + 2 transition-action skills total)
 │       │   ├── flows/           ← Flow YAML definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/

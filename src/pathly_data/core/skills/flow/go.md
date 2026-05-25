@@ -121,9 +121,8 @@ Fast mode:
 - Never combine `strict` with `fast`.
 
 Engine selection:
-- Default to `team` — tries the HTTP FSM engine first, falls back to LLM automatically.
-- Use `team-http` only if the user explicitly asks for the HTTP FSM engine with no LLM fallback.
-- Never route to `team-http` unless the user specifically requests it.
+- Use `team` for the feature pipeline. It tries the HTTP FSM engine first and
+  falls back to LLM automatically if the local server cannot start.
 
 ---
 
@@ -207,7 +206,6 @@ team <feature> standard
 team <feature> strict
 team <feature> build
 team <feature> test
-team-http <feature> <rigor>  ← HTTP FSM engine only (explicit request only)
 review
 retro <feature>
 ```

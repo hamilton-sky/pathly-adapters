@@ -92,6 +92,18 @@ def test_materialize_without_repair_skips_owned(tmp_path):
     assert (tmp_path / "agent.md").read_text() == "v1"
 
 
+def test_materialize_repair_removes_obsolete_owned_files(tmp_path):
+    materialize({"keep.md": "v1", "obsolete/SKILL.md": "old"}, tmp_path)
+
+    written = materialize({"keep.md": "v2"}, tmp_path, repair=True)
+
+    manifest = json.loads((tmp_path / MANIFEST_NAME).read_text(encoding="utf-8"))
+    assert written == ["keep.md"]
+    assert not (tmp_path / "obsolete" / "SKILL.md").exists()
+    assert not (tmp_path / "obsolete").exists()
+    assert "obsolete/SKILL.md" not in manifest["files"]
+
+
 # ---------------------------------------------------------------------------
 # setup_command
 # ---------------------------------------------------------------------------

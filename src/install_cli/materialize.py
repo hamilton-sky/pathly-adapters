@@ -44,6 +44,15 @@ def _save_manifest(dest: Path, manifest: dict) -> None:
     (dest / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
+def _remove_empty_parents(parent: Path, dest: Path) -> None:
+    while parent != dest:
+        try:
+            parent.rmdir()
+        except OSError:
+            break
+        parent = parent.parent
+
+
 def materialize(
     files: dict[str, str],
     dest: Path,
@@ -52,7 +61,7 @@ def materialize(
     force: bool = False,
     dry_run: bool = False,
 ) -> list[str]:
-    """Copy stitched agent files to dest. Returns list of filenames written (or would-write)."""
+    """Synchronize stitched files to dest. Returns filenames written (or would-write)."""
     manifest = _load_manifest(dest)
     owned = set(manifest["files"].keys())
     written: list[str] = []
@@ -76,7 +85,23 @@ def materialize(
             target.write_text(content, encoding="utf-8")
             manifest["files"][name] = datetime.now(timezone.utc).isoformat()
 
-    if not dry_run and written:
+    pruned = False
+    if repair and not dry_run:
+        for name in sorted(owned - set(files)):
+            target = dest / name
+            if not target.resolve().is_relative_to(dest.resolve()):
+                raise ValueError(
+                    f"Path traversal detected in manifest: {name!r} escapes destination {dest}"
+                )
+            try:
+                target.unlink()
+            except FileNotFoundError:
+                pass
+            _remove_empty_parents(target.parent, dest)
+            del manifest["files"][name]
+            pruned = True
+
+    if not dry_run and (written or pruned):
         _save_manifest(dest, manifest)
 
     return written
@@ -156,11 +181,7 @@ def uninstall(
                 target.unlink()
             except FileNotFoundError:
                 pass
-            # Remove empty parent directories (nested skill dirs)
-            try:
-                target.parent.rmdir()
-            except OSError:
-                pass
+            _remove_empty_parents(target.parent, dest)
 
     if not dry_run:
         try:
