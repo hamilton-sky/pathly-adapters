@@ -6,3 +6,4 @@
 {"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-25T15:03:37.447918+00:00"}
 {"type": "HUMAN_RESPONSE", "value": "auto-advance"}
 {"type": "STAGE_COMPLETE", "stage": "PLANNING", "next": "BUILDING"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-25T15:04:19.418435+00:00"}
