@@ -164,6 +164,14 @@ Location: top of ChatPanel, fixed
   - Idle: grey dot, 0.45 opacity
   - Pulsing animation when command is running
 
+**Host-specific command format (critical):**
+| CLI | Command format | Example |
+|-----|---------------|---------|
+| Claude Code | `/pathly <skill>` | `/pathly build` |
+| Codex | `Use Pathly <skill>` | `Use Pathly build` |
+Codex does NOT support `/pathly` slash commands — it uses natural-language plugin prompts.
+See `src/pathly_data/adapters/codex/README.md` for the full Codex prompt contract.
+
 ### SkillsPanel
 Location: below ConductorHeader, collapsible
 ```
@@ -331,11 +339,16 @@ Step 3  User reviews MatchCard
         → User clicks ▶ Run
 
 Step 4  Command executes — no terminal needed upfront
-        → IPC: chat:write-terminal('/pathly build', 'claude-code')
-        → If no Claude Code tab open: Electron main auto-spawns one (same as clicking +)
-        → Waits for PTY ready, then writes command
-        → IPC returns { ok: true, spawned: true }
-        → ChatPanel shows hint: "Opened a Claude Code tab to run this command."
+        → Renderer looks up terminalStore.tabs to find tab with kind === 'claude'
+        → If no claude tab: renderer calls handleLaunch('claude') (same as clicking + → Claude)
+          auto-spawn happens in the RENDERER, not main process — this is where addTab() lives
+        → Gets the UUID tabId for that tab
+        → Generates host-correct command:
+            Claude Code tab → "/pathly build"
+            Codex tab       → "Use Pathly build"
+        → IPC: chat:write-terminal({ command, tabId })
+        → Main process: activePtys.get(tabId).write(command + '\n')
+        → IPC returns { ok: true, spawned?: boolean }
         → MatchCard dims to "✓ Sent"
         → OutputSnippet appears with live PTY lines
         → Claude Code pill pulses (active)
@@ -481,3 +494,6 @@ interface ChatStore {
 - ❌ Resizable panel — fixed 300px for v1
 - ❌ Chat export — v1 only
 - ❌ "Open a terminal first" error message — auto-spawn instead, never block the user
+- ❌ Looking up PTY by string name ("claude-code") in main process — PTYs are keyed by UUID tabId; renderer must resolve tabId from terminalStore and pass it to IPC
+- ❌ Writing `/pathly <skill>` to Codex — Codex uses `"Use Pathly <skill>"` (natural-language plugin prompt)
+- ❌ Calling `/next_action` for read context — it mutates FSM state; use the read-only `/status` GET endpoint instead

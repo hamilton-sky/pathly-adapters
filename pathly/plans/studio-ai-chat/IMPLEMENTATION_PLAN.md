@@ -43,16 +43,22 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 
 ---
 
-## Phase 1: POST /chat SSE endpoint skeleton   ← Conversation 1
+## Phase 1: POST /chat SSE endpoint skeleton + GET /status   ← Conversation 1
 
 **File:** `src/pathly_orchestrator/http_server.py` — MODIFY
-**Done when:** `curl -X POST http://127.0.0.1:8765/chat -H "Content-Type: application/json" -d '{"message":"explain build","matchedSkill":"build","history":[]}'` returns 200
-**Delivers:** S1.1 (partial)
+**Done when:** `curl -X POST http://127.0.0.1:8765/chat ...` returns 200 AND `curl http://127.0.0.1:8765/status` returns current FSM stage without mutating state
+**Delivers:** S1.1 (partial), S1.2 (partial)
 **Details:**
 - Add route `/chat` accepting POST: `{ message, matchedSkill, skillDescription, history, context }`
 - Return `Content-Type: text/event-stream`
 - Static placeholder: `data: {"text": "chat endpoint ready"}\n\n`
 - Add `ollama>=0.3` to `pyproject.toml`
+- **Add route `GET /status`** — read-only FSM state endpoint:
+  - Calls `read_state()` from `fsm_ops.py` (pure read, no write)
+  - Returns `{ "current_state": str, "feature": str, "project_root": str }`
+  - Returns `{ "current_state": "unknown" }` if no project loaded
+  - **DO NOT call `/next_action` for context** — it writes `conv_start_sha` to disk on every call
+  - This endpoint is the safe replacement for context reads throughout the feature
 
 ---
 
@@ -76,7 +82,8 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 **Done when:** phi4-mini explanation mentions the current FSM stage by name
 **Delivers:** S1.2
 **Details:**
-- `get_fsm_state(project_root) -> dict` — reads FSM state or calls `/next_action` internally
+- `get_fsm_state(project_root) -> dict` — calls `read_state()` from `fsm_ops.py` directly (pure read)
+  **DO NOT call `/next_action`** — it writes `conv_start_sha` to disk. Use `read_state()` only.
 - `read_plan_summary(project_root) -> str` — reads most-recently-modified `plans/*/FEATURE_INDEX.md`
 - Inject into system prompt: `Stage: {fsm_stage} | Feature: {feature_name} | Matched skill: {skill}`
 - Total system prompt cap: 1,000 tokens (explainer context is smaller than general chat)
@@ -185,22 +192,43 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 
 ## Phase 11: IPC terminal write handler   ← Conversation 3
 
-**Files:** `studio/src/main/ipc/chat.ts` — CREATE, `studio/src/main/index.ts` — MODIFY
-**Done when:** `ipcRenderer.invoke('chat:write-terminal', { command: '/pathly build', target: 'claude-code' })` writes to the correct PTY tab — auto-creating a tab if none is open
+**Files:** `studio/src/main/ipc/chat.ts` — CREATE, `studio/src/main/index.ts` — MODIFY,
+`studio/src/main/ipc/terminal.ts` — MODIFY (ALLOWED_SHELLS pre-flight fix)
+**Done when:** `ipcRenderer.invoke('chat:write-terminal', { command, tabId })` writes to the correct PTY tab
 **Delivers:** S3.2
-**Details:**
-- `ipcMain.handle('chat:write-terminal', (event, { command, target }) => { ... })`
-- Find PTY by target name (check how `activePtys` is keyed in `terminal.ts`)
-- **Auto-spawn if no PTY found:** if `activePtys` has no entry for `target`, call the same
-  tab-creation logic used by the `+` button (read `terminal.ts` to find that function) to
-  spawn a new Claude Code or Codex tab, wait for it to be ready, then write the command.
-  The new tab becomes visible in the terminal area — the user can watch execution there.
+
+**Pre-flight fix (do this first):**
+Read `studio/src/main/ipc/terminal.ts` line 13. The `ALLOWED_SHELLS` set only contains bash/zsh/shell variants.
+Add `'claude'` and `'codex'` to `ALLOWED_SHELLS` — they are valid execution targets.
+Without this fix, the existing Claude Code and Codex terminal buttons are broken.
+
+**IPC handler design:**
+- `ipcMain.handle('chat:write-terminal', (event, { command, tabId }) => { ... })`
+- PTYs are keyed by **UUID tabId** in `activePtys` — NOT by string names like "claude-code"
+- The renderer is responsible for resolving `tabId` from `terminalStore` before calling this IPC
+- Main process simply does: `activePtys.get(tabId)?.write(command + '\n')`
 - Sanitize command before write: strip `;`, `&&`, `||`, `|`, `>`, `<`. Log warning if stripped.
-- Return `{ ok: true, spawned?: boolean }` or `{ error: string }`
-  - `spawned: true` signals to the renderer that a new tab was opened (ChatPanel can show a hint)
-- Expose on preload: `window.electronAPI.writeToTerminal(command, target): Promise<{ok?:boolean, spawned?:boolean, error?:string}>`
+- Return `{ ok: true }` or `{ error: string }`
+- Expose on preload: `window.electronAPI.writeToTerminal(command: string, tabId: string): Promise<{ok?:boolean, error?:string}>`
 - Register in `index.ts` alongside other IPC handlers
-- **Result:** user can use the Conductor with zero terminals open — Run opens one automatically
+
+**Renderer side (in ChatPanel/index.tsx):**
+- Before calling IPC, look up target tab from `terminalStore`:
+  ```typescript
+  const { tabs, activeTabIdLeft } = useTerminalStore()
+  const claudeTab = tabs.find(t => t.kind === 'claude')
+  ```
+- **Auto-spawn if no claude tab:** call `handleLaunch('claude')` — this is the same function
+  the terminal `+` button uses. It lives in the renderer (Terminal/index.tsx). Import or
+  lift it so ChatPanel can call it. Wait for the tab to appear in terminalStore.
+- Generate **host-correct command**:
+  ```typescript
+  const command = tab.kind === 'claude'
+    ? `/pathly ${skill.name}`       // Claude Code: slash command
+    : `Use Pathly ${skill.name}`    // Codex: natural-language plugin prompt
+  ```
+- Then call `window.electronAPI.writeToTerminal(command, tab.id)`
+- **Result:** user can use Conductor with zero terminals open — Run opens one automatically
 
 ---
 
@@ -210,7 +238,9 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 **Done when:** `buildPathlyContext()` returns `{ fsmStage, featureName, screenElements, skills }`
 **Delivers:** S4.1, S4.2
 **Details:**
-- Fetch `http://127.0.0.1:8765/next_action` → extract current stage name
+- Fetch `http://127.0.0.1:8765/status` (GET) → extract `current_state` and `feature`
+  **DO NOT use `/next_action`** — it mutates FSM state (writes `conv_start_sha` to disk)
+  The `/status` endpoint was added in Phase 1 and is purely read-only.
 - `KNOWN_SKILLS`: static list from skills.json (will be dynamic in Conv 5)
 - Wrap FSM fetch in try/catch → fallback `fsmStage: "unknown"`
 - Cap screen elements at 20 buttons + 10 forms + 10 text blocks

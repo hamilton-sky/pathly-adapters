@@ -34,6 +34,11 @@ Scope:
   Request body: { message, matchedSkill, skillDescription, history, context }.
   Static placeholder first: data: {"text": "chat endpoint ready"}\n\n
   Add ollama>=0.3 to pyproject.toml.
+  ALSO add GET /status endpoint — read-only FSM state:
+    Calls read_state() from fsm_ops.py (pure read, NO write).
+    Returns { "current_state": str, "feature": str, "project_root": str } or { "current_state": "unknown" }.
+    DO NOT call next_action() here — it writes conv_start_sha to disk on every invocation.
+    This endpoint replaces /next_action for all context reads in this feature.
 
 - Phase 2: Create chat_agent.py with ChatAgent class.
   Method: stream(message, matchedSkill, context, history) -> AsyncGenerator[str].
@@ -45,7 +50,8 @@ Scope:
   On model not found: yield data: {"error": "Model 'phi4-mini' not found — run: ollama pull phi4-mini"}\n\n
 
 - Phase 3: Create chat_tools.py.
-  get_fsm_state(project_root) -> dict — reads FSM state or calls /next_action internally.
+  get_fsm_state(project_root) -> dict — calls read_state() from fsm_ops.py directly (pure read).
+  DO NOT call next_action() — it mutates FSM state by writing conv_start_sha to disk.
   read_plan_summary(project_root) -> str — reads most-recently-modified plans/*/FEATURE_INDEX.md.
   Inject into system prompt: Stage: {fsm_stage} | Feature: {feature_name} | Matched skill: {skill}.
   System prompt token cap: 1,000 tokens. Truncate plan summary if exceeded — append [...truncated].
@@ -208,17 +214,32 @@ Scope:
   ChatPanel/index.tsx subscribes to an IPC output event and pipes lines to chatStore.
   See DESIGN_SPEC.md OutputSnippet section for ASCII layout.
 
-- Phase 11: Create studio/src/main/ipc/chat.ts.
-  ipcMain.handle('chat:write-terminal', (event, { command, target }) => { ... })
-  Find PTY by target name — read terminal.ts first to understand the map structure.
-  AUTO-SPAWN: if no PTY found for target, call the same tab-creation logic used by the + button
-  (find it in terminal.ts) to open a new Claude Code or Codex tab. Wait for PTY ready, then write.
-  This means the user NEVER needs to manually open a terminal — clicking Run is enough.
+- Phase 11: Read terminal.ts and Terminal/index.tsx thoroughly before writing anything.
+
+  PRE-FLIGHT FIX (do this first):
+  Read studio/src/main/ipc/terminal.ts line 13 — ALLOWED_SHELLS set.
+  Add 'claude' and 'codex' to ALLOWED_SHELLS. Without this, the existing Claude Code and
+  Codex terminal buttons are broken (they pass 'claude'/'codex' as the command, which the
+  allowlist rejects with "Shell not allowed").
+
+  IPC HANDLER (studio/src/main/ipc/chat.ts):
+  ipcMain.handle('chat:write-terminal', (event, { command, tabId }) => { ... })
+  PTYs are keyed by UUID tabId (NOT by string names like "claude-code").
+  The renderer resolves tabId BEFORE calling this IPC — main process just does activePtys.get(tabId)?.write(command + '\n').
   Sanitize command before write: strip ;, &&, ||, |, >, < characters. Log warning if stripped.
-  Return { ok: true, spawned?: boolean } or { error: string }.
-  spawned: true tells the renderer a new tab was opened (show a brief hint in ChatPanel).
-  Expose on preload: window.electronAPI.writeToTerminal(command, target): Promise<{ok?:boolean, spawned?:boolean, error?:string}>
+  Return { ok: true } or { error: string }.
+  Expose on preload: window.electronAPI.writeToTerminal(command: string, tabId: string): Promise<{ok?:boolean, error?:string}>
   Register in index.ts alongside other IPC handlers.
+
+  RENDERER SIDE (ChatPanel/index.tsx):
+  Before calling IPC, resolve the tab: const claudeTab = terminalStore.tabs.find(t => t.kind === 'claude')
+  AUTO-SPAWN if no tab found: call handleLaunch('claude') — same function the + button uses,
+  lives in Terminal/index.tsx. Lift or export it so ChatPanel can call it.
+  Wait for tab to appear in terminalStore (watch with useEffect + tabs dependency).
+  HOST-CORRECT COMMAND:
+    Claude Code tab (kind === 'claude') → "/pathly <skill>"
+    Codex tab (kind === 'codex')        → "Use Pathly <skill>"
+  Then call window.electronAPI.writeToTerminal(command, tab.id).
 
 Architectural rules:
 - MatchCard replaces the old TerminalApproval concept entirely — do NOT create a TerminalApproval component.
@@ -263,7 +284,8 @@ Also read the source files in C:\Users\Yafit\brightsky-ai\frontend\src\component
 
 Scope:
 - Phase 12: Create studio/src/renderer/src/lib/pathlyContext.ts.
-  buildPathlyContext() fetches FSM state from http://127.0.0.1:8765/next_action → extract stage name.
+  buildPathlyContext() fetches FSM state from GET http://127.0.0.1:8765/status → extract current_state and feature.
+  DO NOT use /next_action — it mutates FSM state. Use /status (added in Conv 1 Phase 1).
   KNOWN_SKILLS: static list for now (will be dynamic in Conv 5).
   Wrap FSM fetch in try/catch → fallback fsmStage: "unknown".
   Cap screen elements at 20 buttons + 10 forms + 10 text blocks.

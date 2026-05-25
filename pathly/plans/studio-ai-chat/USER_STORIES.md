@@ -127,14 +127,20 @@ system is, **so that** I can make an informed decision before running.
 
 ---
 
-## Story S3.2: Run writes the skill command to the active terminal tab
+## Story S3.2: Run writes the correct host command to the active terminal tab
 
-**As a** Pathly Studio user, **I want** clicking Run to write the matched skill command to the
-terminal tab (Claude Code or Codex), **so that** I don't have to copy-paste anything.
+**As a** Pathly Studio user, **I want** clicking Run to write the skill command to the correct
+terminal tab in the format that tab understands, **so that** I don't have to copy-paste anything
+or know CLI syntax differences.
 
 **Acceptance Criteria:**
-- [ ] Clicking Run sends `{ command: "/pathly <skill>", target: "claude-code" | "codex" }` to IPC handler `chat:write-terminal`
-- [ ] IPC handler writes `command + "\n"` to the active PTY for the specified tab
+- [ ] Renderer looks up active tab from `terminalStore.tabs` by `kind` ('claude' or 'codex')
+- [ ] If no tab of the target kind exists: renderer auto-spawns one via `handleLaunch(kind)` before writing
+- [ ] Command is generated in the **host-correct format**:
+  - Claude Code tab (`kind === 'claude'`): `/pathly <skill>` (e.g. `/pathly build`)
+  - Codex tab (`kind === 'codex'`): `Use Pathly <skill>` (e.g. `Use Pathly build`)
+- [ ] Renderer passes `{ command, tabId }` (UUID) to IPC handler `chat:write-terminal`
+- [ ] IPC handler writes `command + "\n"` to `activePtys.get(tabId)`
 - [ ] MatchCard dims to "✓ Sent" state after Run
 - [ ] If no terminal tab is open: IPC returns error, ChatPanel shows inline toast "Open a terminal tab first"
 - [ ] OutputSnippet appears below MatchCard showing live PTY output lines
