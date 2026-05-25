@@ -275,13 +275,13 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         for d in written_dests:
             try:
                 uninstall(d)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[pathly rollback error] {e}", file=sys.stderr)
         if codex_plugin_registered:
             try:
                 uninstall_codex_plugin(dry_run=False)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[pathly rollback error] {e}", file=sys.stderr)
         raise
 
 

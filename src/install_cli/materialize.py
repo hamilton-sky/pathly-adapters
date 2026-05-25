@@ -22,10 +22,15 @@ def _load_manifest(dest: Path) -> dict:
                 # Legacy manifest from an older install — treat as fresh.
                 return {"files": {}}
             files = data.get("files", {})
-            if data.get("_manifest_hash", "") != _hash_files_dict(files):
-                raise ValueError(
-                    "Manifest hash mismatch — file may be corrupted or tampered"
-                )
+            try:
+                if data.get("_manifest_hash", "") != _hash_files_dict(files):
+                    raise ValueError(
+                        "Manifest hash mismatch — file may be corrupted or tampered"
+                    )
+            except ValueError as e:
+                raise RuntimeError(
+                    f"Manifest integrity check failed for {dest}: {e} — use --force to bypass"
+                ) from e
             return data
         except (json.JSONDecodeError, OSError):
             return {"files": {}}

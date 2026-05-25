@@ -12,3 +12,5 @@
 {"type":"RETRY","key":"conv-1:REVIEW_FAILURES.md"}
 {"type":"HUMAN_RESPONSE","value":"auto-advance"}
 {"type":"STAGE_COMPLETE","stage":"REVIEWING","conv":1}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}
+{"type":"STAGE_COMPLETE","stage":"REVIEWING","conv":3}

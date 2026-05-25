@@ -7,7 +7,7 @@ name: Progress
 |---|---|---|---|---|
 | 1 | Terminal IPC hardening | S1, S2 | DONE | Phases 1-2 |
 | 2 | Delete dead MCP server + log rotation + git hygiene | S3, S5 | DONE | Phases 3-4 |
-| 3 | Installer error handling | S6 | TODO | Phase 5 |
+| 3 | Installer error handling | S6 | DONE | Phase 5 |
 
 ## Phase tracking
 
@@ -17,4 +17,4 @@ name: Progress
 | 2 | Terminal cwd + tabId ownership | 1 | DONE |
 | 3 | mcp dep + telemetry opt-out + rotation | 2 | DONE |
 | 4 | Remove build/lib from git | 2 | DONE |
-| 5 | Manifest ValueError + rollback logging | 3 | TODO |
+| 5 | Manifest ValueError + rollback logging | 3 | DONE |
