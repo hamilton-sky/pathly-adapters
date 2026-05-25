@@ -203,3 +203,36 @@ MUST add a builder convention or transition_action that produces VERIFY.md after
 
 ### Source
 Feature: enforcement-gates | Stage: building | Date: 2026-05-25
+
+---
+
+## [adapter-parity] Acceptance criteria that depend on CLI behavior fail silently when CLI is broken
+
+### Pattern
+An acceptance criterion was written assuming `pathly-setup --dry-run --host copilot` would list skills in the manifest. In reality `setup_command.py` skips all 20+ skills with a warning for the entire adapter ecosystem — the CLI has never worked for this case. The criterion passed file-creation checks but failed at test time, requiring a rewrite.
+
+### Rule
+MUST run the exact CLI command in the acceptance criterion during planning and confirm it produces the expected output before writing it as a criterion. If the command fails, write a criterion that tests what is actually verifiable (file existence, schema shape) rather than CLI output.
+
+### Injection
+- Add to `USER_STORIES.md` acceptance criteria review step: "For any criterion that invokes a CLI command, run that command during planning and confirm the output matches expectations. If not, rewrite as a direct file/schema check."
+
+### Source
+Feature: adapter-parity | Stage: test | Date: 2026-05-25
+
+---
+
+## [adapter-parity] File path in acceptance criteria must reflect actual codebase structure, not intended structure
+
+### Pattern
+The plan specified `src/pathly_data/core/agents/explorer.md` but the file correctly lives at `src/pathly_data/core/agents/research/explorer.md` — following the existing subdirectory structure (research/, planning/, building/, quality/). The acceptance criterion named a non-existent path, failing at test time and requiring a criterion update plus frontmatter addition.
+
+### Rule
+MUST glob the target directory and confirm the exact intended path before writing it in an acceptance criterion. For core agents, the path is always `core/agents/<subdirectory>/<name>.md` — always check which subdirectory applies.
+
+### Injection
+- Add to `USER_STORIES.md` path criteria: "Before writing any file path in an acceptance criterion, run a glob against the containing directory to confirm the path structure matches the live repo."
+- Add to acceptance criteria for new core agent files: include `frontmatter check` as an explicit sub-criterion — `name:` and `description:` fields must be present.
+
+### Source
+Feature: adapter-parity | Stage: test | Date: 2026-05-25
