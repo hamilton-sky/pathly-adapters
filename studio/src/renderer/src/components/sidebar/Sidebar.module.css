@@ -51,7 +51,7 @@
   background: var(--bg-surface0);
   color: var(--text-primary);
 }
-.expandBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
+.expandBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .filterRow {
   display: flex;
@@ -76,6 +76,7 @@
 }
 .filterInput::placeholder { color: var(--text-muted); }
 .filterInput:focus { border-color: var(--accent); }
+.filterInput:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .treeContainer {
   flex: 1;
@@ -133,7 +134,7 @@
   font-family: var(--font-family-base);
 }
 .sectionToggle:hover { color: var(--text-secondary); }
-.sectionToggle:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
+.sectionToggle:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .sectionActions {
   display: flex;
@@ -178,7 +179,7 @@
   font-family: var(--font-family-base);
 }
 .subdirHeader:hover { background: var(--bg-surface0); color: var(--text-primary); }
-.subdirHeader:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
+.subdirHeader:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 /* ── Plan / conversation rows ── */
 .convRow {
@@ -199,7 +200,7 @@
   background: var(--bg-surface0);
   color: var(--text-primary);
 }
-.convRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
+.convRow:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 
 .convLabel {
   flex: 1;
@@ -247,7 +248,7 @@
   font-family: var(--font-family-base);
 }
 .itemRow:hover { background: var(--bg-surface0); color: var(--text-primary); }
-.itemRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
+.itemRow:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 .itemRowSelected {
   background: var(--bg-surface0);
   border-left-color: var(--accent);
@@ -317,7 +318,7 @@
   background: var(--bg-surface0);
   color: var(--text-primary);
 }
-.bottomRow:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
+.bottomRow:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 .bottomRowActive {
   background: var(--bg-surface1);
   border-left-color: var(--accent);
@@ -344,7 +345,7 @@
   transition: color 0.12s;
 }
 .collapseBtn:hover { color: var(--text-secondary); }
-.collapseBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
+.collapseBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .newBtn {
   display: block;
@@ -361,7 +362,7 @@
   transition: opacity 0.12s;
 }
 .newBtn:hover { opacity: 1; }
-.newBtn:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: 2px; }
+.newBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 /* ── Drag grip (⠿) — canvas assign handle for skill/agent rows ── */
 .grip {
@@ -379,8 +380,8 @@
 
 /* ── Drop target highlight for folder rows ── */
 .dropTarget {
-  border-left: 2px solid #8B5CF6 !important;
-  background: rgba(139, 92, 246, 0.08) !important;
+  border-left: 2px solid var(--accent) !important;
+  background: var(--accent-bg) !important;
 }
 
 /* ── Library toggle button (kept for back-compat, hidden when tabs shown) ── */
@@ -409,7 +410,7 @@
   font-family: var(--font-family-base);
 }
 .tab:hover { color: var(--text-secondary); }
-.tab:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -2px; }
+.tab:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 .tabActive {
   color: var(--accent);
   border-bottom-color: var(--accent);

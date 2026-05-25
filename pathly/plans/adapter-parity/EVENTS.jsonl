@@ -9,3 +9,6 @@
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-25T14:35:26.903492+00:00"}
 {"type": "HUMAN_RESPONSE", "value": "auto-advance"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-25T14:35:58.653859+00:00"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-25T14:37:38.813149+00:00"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "ts": "2026-05-25T14:38:06.619506+00:00"}
