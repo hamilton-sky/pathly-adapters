@@ -142,6 +142,11 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 **Delivers:** S2.1 (complete), S2.2
 **Details:**
 - `MessageList`: maps messages + renders MatchCard and OutputSnippet inline (not as separate bubbles)
+- **EmptyState**: when `messages.length === 0`, render the empty state component instead of an empty list
+  - If `fsmStage === "unknown"` or no active feature: show "What do you want to build?" with quick-start chips `[▸ po] [▸ plan] [▸ storm]`
+  - If feature is active but no messages: show feature name + stage + "Describe what you want to do next"
+  - Quick-start chips bypass embedding — clicking one immediately sets `currentMatch` to that skill
+  - See DESIGN_SPEC.md → EmptyState for full visual spec
 - `ChatInput`: textarea 1–3 rows, Enter = send, Shift+Enter = newline; `◈ MiniLM` pill (purple), `phi4-mini` pill (green); Send/Stop toggle
 - `ChatPanel/index.tsx`: collapse animation `width 200ms ease-out`, 300px ↔ 36px
 - `App.tsx`: add `<ChatPanel />` after `<MainPanel />` in body flex row

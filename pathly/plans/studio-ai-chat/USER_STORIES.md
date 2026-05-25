@@ -44,6 +44,23 @@ and feature, **so that** it's specific to what I'm doing right now.
 
 ---
 
+## Story S2.4: Empty state guides user to start a new flow
+
+**As a** Pathly Studio user opening the Conductor with no active feature (or for the first time),
+**I want** to see a clear starting point, **so that** I can create a new development flow without
+knowing any Pathly skill names.
+
+**Acceptance Criteria:**
+- [ ] When `messages.length === 0` and no active feature (`fsmStage === "unknown"`): show "What do you want to build?" prompt with quick-start chips `[▸ po]` `[▸ plan]` `[▸ storm]`
+- [ ] When `messages.length === 0` and a feature IS active: show feature name + current FSM stage + "Describe what you want to do next"
+- [ ] Clicking a quick-start chip (`po`, `plan`, `storm`) immediately sets `currentMatch` to that skill — bypasses embedding — and fires phi4-mini explanation
+- [ ] Empty state disappears as soon as the first message is sent
+- [ ] User can describe "I want to build a login page" → Conductor routes to `/pathly po` and starts the flow from scratch
+
+**Delivered by:** Conv 2
+
+---
+
 ## Story S2.1: Collapsible Conductor panel in Studio
 
 **As a** Pathly Studio user, **I want** the Conductor panel on the right side of Studio that I

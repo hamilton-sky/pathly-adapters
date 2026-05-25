@@ -11,6 +11,7 @@
 | S2.1 | Collapsible Conductor panel | Conv 2 | TODO |
 | S2.2 | phi4-mini explanation streams in real-time | Conv 2 | TODO |
 | S2.3 | Skills panel shows all skills as chips | Conv 2 | TODO |
+| S2.4 | Empty state guides user to start a new flow | Conv 2 | TODO |
 | S3.1 | MatchCard shows matched skill + confidence | Conv 3 | TODO |
 | S3.2 | Run writes skill command to terminal tab | Conv 3 | TODO |
 | S4.1 | Context includes FSM stage + screen state | Conv 4 | TODO |

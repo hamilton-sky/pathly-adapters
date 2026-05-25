@@ -220,6 +220,39 @@ Appears below MatchCard after Run is clicked:
 - Status: `● Running` amber, `✓ Done` green, `✗ Error` red
 - When done: AI automatically embed-matches next suggested action
 
+### EmptyState
+Shown in MessageList when `messages.length === 0` (no active flow OR fresh session).
+Detects via FSM: if `fsmStage === "unknown"` or no feature open → show new-feature prompt.
+If a feature IS active but no messages yet → show in-flow prompt.
+
+```
+┌──────────────────────────────────────────┐
+│                                          │
+│   ⚡ What do you want to build?          │  ← no active feature
+│                                          │
+│   Describe it and I'll route you to      │
+│   the right starting point.             │
+│                                          │
+│   [▸ po]  [▸ plan]  [▸ storm]           │  ← quick-start chips
+│                                          │
+└──────────────────────────────────────────┘
+
+   — OR, when a feature IS active —
+
+┌──────────────────────────────────────────┐
+│                                          │
+│   ⚡ studio-ai-chat · DESIGNING          │  ← feature + stage
+│                                          │
+│   Describe what you want to do next.     │
+│   I'll find the right skill.             │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+- Quick-start chips (`po`, `plan`, `storm`) bypass embedding — clicking one immediately sets `currentMatch` to that skill and fires phi4-mini explanation
+- Feature name + stage pulled from `buildPathlyContext()` on panel open
+- Empty state disappears as soon as the first message is sent
+
 ### ChatInput
 ```
 ┌──────────────────────────────────────┬───┐

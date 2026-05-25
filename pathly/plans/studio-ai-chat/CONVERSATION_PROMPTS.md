@@ -127,6 +127,12 @@ Scope:
   MessageList: maps messages array from chatStore. User messages right-aligned, AI messages left-aligned.
   Renders MatchCard placeholder (renders null for now — component created in Conv 3) and OutputSnippet placeholder inline.
   Auto-scroll to bottom on new message.
+  EMPTY STATE (when messages.length === 0): render EmptyState component instead of empty list.
+    - No active feature (fsmStage === "unknown"): show "⚡ What do you want to build?" + quick-start chips [▸ po] [▸ plan] [▸ storm]
+    - Active feature: show "⚡ <featureName> · <stage>" + "Describe what you want to do next."
+    - Quick-start chip click: sets chatStore.currentMatch to that skill (bypasses embedding), fires phi4-mini explanation
+    - Empty state disappears on first message send
+    - See DESIGN_SPEC.md → EmptyState for exact visual spec and ASCII layout
   ChatInput: textarea 1-3 rows auto-resize. Enter = send, Shift+Enter = newline.
   "◈ MiniLM" pill (purple #C084FC), "phi4-mini" pill (accent #22C55E). Send/Stop toggle.
   ChatPanel/index.tsx: collapse animation width 200ms ease-out. 300px expanded ↔ 36px collapsed.
