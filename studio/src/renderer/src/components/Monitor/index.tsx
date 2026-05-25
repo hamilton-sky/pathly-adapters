@@ -395,6 +395,9 @@ export function Monitor(): JSX.Element {
   const monitorSourceRef = useRef(monitorSource)
   monitorSourceRef.current = monitorSource
 
+  const activeMonitorTabRef = useRef(activeMonitorTab)
+  activeMonitorTabRef.current = activeMonitorTab
+
   const t = useTheme()
   const styles = makeStyles(t)
 
@@ -445,20 +448,31 @@ export function Monitor(): JSX.Element {
         }
         setFsmState(parsedState)
 
-        // Upsert session using compound key "flowType/topic" to allow plan + debug in parallel.
+        // Compound session key "flowType/topic". Remove when done; add/update when running.
         if (activeTopic) {
           const flowType = (parsedState.flow as string | undefined) ?? 'team'
           const sessionKey = `${flowType}/${activeTopic}`
-          setActiveFlowSessions((prev) => ({
-            ...prev,
-            [sessionKey]: {
-              flowKey: `${flowType}.flow.yaml`,
-              topic: activeTopic,
-              isRunning: parsedState.current !== 'IDLE' && parsedState.current !== 'DONE',
-              isPaused: false,
-              isCli: false as const
-            }
-          }))
+          const isDone = parsedState.current === 'DONE' || parsedState.current === 'IDLE'
+          if (isDone) {
+            setActiveFlowSessions((prev) => {
+              if (!(sessionKey in prev)) return prev
+              const next = { ...prev }
+              delete next[sessionKey]
+              return next
+            })
+            if (activeMonitorTabRef.current === sessionKey) setActiveMonitorTab(null)
+          } else {
+            setActiveFlowSessions((prev) => ({
+              ...prev,
+              [sessionKey]: {
+                flowKey: `${flowType}.flow.yaml`,
+                topic: activeTopic,
+                isRunning: true,
+                isPaused: false,
+                isCli: false as const
+              }
+            }))
+          }
         }
 
         const flowName = parsedState.flow as string | undefined
@@ -497,7 +511,22 @@ export function Monitor(): JSX.Element {
     watchStart(projectPath, effectiveTopic)
     const removeListener = onWatchEvent((data) => {
       if (data.path.endsWith('STATE.json')) {
-        try { setFsmState(JSON.parse(data.content)) } catch { /* ignore */ }
+        try {
+          const newState = JSON.parse(data.content)
+          setFsmState(newState)
+          // Remove the tab when the flow reaches a terminal state
+          if (newState.current === 'DONE' || newState.current === 'IDLE') {
+            const flowType = (newState.flow as string | undefined) ?? 'team'
+            const sessionKey = `${flowType}/${activeTopic}`
+            setActiveFlowSessions((prev) => {
+              if (!(sessionKey in prev)) return prev
+              const next = { ...prev }
+              delete next[sessionKey]
+              return next
+            })
+            if (activeMonitorTabRef.current === sessionKey) setActiveMonitorTab(null)
+          }
+        } catch { /* ignore */ }
       }
       // EVENTS.jsonl: use chokidar only when SSE has permanently closed
       if (data.path.endsWith('EVENTS.jsonl') && monitorSourceRef.current === 'chokidar') {
