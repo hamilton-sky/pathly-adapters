@@ -37,7 +37,7 @@
   ┌─────────────────────────────────────────────┐
   │  ipc/fs.ts     read / write / list          │
   │  ipc/watcher.ts  chokidar → push events     │
-  │  ipc/mcp.ts    stdio MCP client             │
+  │  ipc/http.ts    stdio HTTP client             │
   │  ipc/shell.ts  pip install subprocess       │
   └────┬──────────────────────────┬─────────────┘
        │                          │
@@ -49,7 +49,7 @@
   core/flows/
        │
        ▼
-  pathly-mcp-server (stdio)
+  pathly-http-server (stdio)
   [Python process — optional]
 ```
 
@@ -61,14 +61,14 @@
   Monitor panel opens
          │
          ▼
-  mcp:ping ──── timeout >500ms ──► monitorSource = filewatch
+  http:ping ──── timeout >500ms ──► monitorSource = filewatch
          │                                │
   response OK                      chokidar watches
          │                         STATE.json + EVENTS.jsonl
          ▼                                │
-  monitorSource = mcp               on change: parse + push
+  monitorSource = http               on change: parse + push
          │                         to Zustand store
-  poll mcp:state every 2s
+  poll http:state every 2s
          │
          ▼
   store.fsmState updated

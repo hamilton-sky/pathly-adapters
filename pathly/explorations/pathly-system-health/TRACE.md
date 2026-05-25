@@ -29,7 +29,7 @@ The Pathly system architecture is generally well-structured with clear layer sep
    - `setup_command.py` — main installer orchestrator
    - `materialize.py` — file copying with manifest tracking
    - `codex_plugin_config.py` — Codex AI integration
-   - `mcp_config.py` — MCP server registration
+   - `http_config.py` — HTTP server registration
    - `resources.py`, `detect.py`, `stitch.py` — helpers
    - `__main__.py`, `__init__.py` — entry points
 
@@ -38,7 +38,7 @@ The Pathly system architecture is generally well-structured with clear layer sep
    - `core/skills/` — 27 skill markdown files
    - `adapters/` — adapter-specific YAML (out of scope)
 
-5. `src/pathly_telemetry/` (MCP server)
+5. `src/pathly_telemetry/` (HTTP server)
    - `server.py` — implements record_activity tool
    - `storage.py`, `report.py` — backend
    - `__main__.py` — entry point
@@ -52,7 +52,7 @@ Adapter (claude/codex/copilot-specific)
   ↓
 installer (setup_command.py)
   ├→ materialize.py (copy files, manage manifest)
-  ├→ mcp_config.py (register telemetry server)
+  ├→ http_config.py (register telemetry server)
   ├→ deploy_codex_hooks() / deploy_copilot_hooks()
   └→ hook registration (hooks installed to ~/.codex/ or ~/.github/hooks/)
   ↓
@@ -84,7 +84,7 @@ Sub-skills (builder, reviewer, tester, explorer, etc.)
 2. **Codex clean-machine gap** — no pre-flight checks, no CI
 3. **Orchestrator dual role** — library + CLI, no schema versioning
 4. **Version drift** — docs out of sync (e.g., SECURITY.md @ 1.0.0)
-5. **MCP opaque** — record_activity tool not documented in README
+5. **HTTP opaque** — record_activity tool not documented in README
 
 ---
 
@@ -310,7 +310,7 @@ On Windows, if two Python processes append to EVENTS.jsonl simultaneously, race 
 - `src/pathly_data/core/flows/team.flow.yaml` — flow definition
 - `src/pathly_data/core/skills/explore.md` — 115 lines
 - `src/install_cli/setup_command.py` — lines 45-235 (agent stitching, hook registration)
-- `src/pathly_telemetry/server.py` — lines 1-60 (MCP tool definition)
+- `src/pathly_telemetry/server.py` — lines 1-60 (HTTP tool definition)
 
 ### Key findings
 
@@ -369,19 +369,19 @@ When state is FRAMING, orchestrator spawns agent "explorer". The agent is loaded
 
 ---
 
-#### Issue 4: record_activity MCP tool is not clearly discoverable
+#### Issue 4: record_activity HTTP tool is not clearly discoverable
 
 **File:Line:** `server.py:17-53`
 
-The tool is exposed by the MCP server, but:
+The tool is exposed by the HTTP server, but:
 - `setup_command.py:28-34` mentions it in telemetry footer, added to all agent prompts
 - `README.md` does NOT mention record_activity
-- `docs/PATHLY_ARCHITECTURE.md:125` lists "MCP configuration support" but not what it does
-- `mcp_config.py` registers the server but has no docstring explaining the tool
+- `docs/PATHLY_ARCHITECTURE.md:125` lists "HTTP configuration support" but not what it does
+- `http_config.py` registers the server but has no docstring explaining the tool
 
 **Impact:** New LLM agents (user's first explore session) may not know the tool exists and may not call it.
 
-**Improvement 7:** Add a one-sentence description to `mcp_config.py` docstring and/or `README.md` explaining what `record_activity` does.
+**Improvement 7:** Add a one-sentence description to `http_config.py` docstring and/or `README.md` explaining what `record_activity` does.
 
 ---
 
@@ -491,7 +491,7 @@ Orchestrator sees state = DONE, prints "[Complete]", exits
 
 6. **eventlog.py:62-72** — On Windows, use `msvcrt.locking()` instead of fcntl for file locking.
 
-7. **mcp_config.py, README.md** — Document the record_activity MCP tool in README.
+7. **http_config.py, README.md** — Document the record_activity HTTP tool in README.
 
 ---
 

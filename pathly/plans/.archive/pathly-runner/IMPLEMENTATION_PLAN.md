@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add a `pathly-run <topic>` CLI command that drives the Pathly FSM autonomously from the current state to DONE. The runner is a thin loop around the existing `_next_action` and `_complete_stage` functions in `mcp_server.py`. It invokes Claude as a subprocess per stage, surfaces human checkpoints and decide blocks interactively, and writes events to EVENTS.jsonl via the existing FSM functions so Studio sees live progress automatically.
+Add a `pathly-run <topic>` CLI command that drives the Pathly FSM autonomously from the current state to DONE. The runner is a thin loop around the existing `_next_action` and `_complete_stage` functions in `http_server.py`. It invokes Claude as a subprocess per stage, surfaces human checkpoints and decide blocks interactively, and writes events to EVENTS.jsonl via the existing FSM functions so Studio sees live progress automatically.
 
 Rigor: standard — 4 conversations.
 
@@ -11,7 +11,7 @@ Rigor: standard — 4 conversations.
 Run before starting Conv 1. Expected outputs are noted inline.
 
 ```bash
-python -c "from pathly_orchestrator.mcp_server import _next_action, _complete_stage; print('OK')"
+python -c "from pathly_orchestrator.http_server import _next_action, _complete_stage; print('OK')"
 python -c "from pathly_orchestrator.fsm import recover_state; print('OK')"
 grep "pathly-run" pyproject.toml && echo EXISTS || echo "OK - not present"
 ls src/pathly_orchestrator/runner.py 2>/dev/null && echo EXISTS || echo "OK - not present"
@@ -41,7 +41,7 @@ Module docstring:
 
 **`run_flow(flow: str, topic: str, project_root: str, rigor: str = "standard", model: str = "claude-sonnet-4-6") -> int`**
 
-1. Import `_next_action`, `_complete_stage` from `pathly_orchestrator.mcp_server`.
+1. Import `_next_action`, `_complete_stage` from `pathly_orchestrator.http_server`.
 2. Print `── pathly-run ──  flow={flow}  topic={topic}  project_root={project_root}`.
 3. Call `_next_action(flow, topic, project_root)`.
 4. If response has `"blocked"`: call `handle_blocked(response)`, return 1.

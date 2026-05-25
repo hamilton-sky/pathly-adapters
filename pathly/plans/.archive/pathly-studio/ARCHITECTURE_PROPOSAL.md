@@ -18,11 +18,11 @@ Main process (Node.js)
   ├── window management
   ├── ipc/fs.ts       — readFile, writeFile, listDir
   ├── ipc/watcher.ts  — chokidar STATE.json + EVENTS.jsonl
-  ├── ipc/mcp.ts      — stdio MCP client (ping, get_fsm_state, get_events)
+  ├── ipc/http.ts      — stdio HTTP client (ping, get_fsm_state, get_events)
   └── ipc/shell.ts    — pip install subprocess
 
 Preload (contextBridge)
-  └── exposes window.pathly = { fs, watch, mcp, shell }
+  └── exposes window.pathly = { fs, watch, http, shell }
       all handlers are typed — no raw ipcRenderer.invoke in renderer
 
 Renderer (React + Zustand)
@@ -47,8 +47,8 @@ export type IpcChannels = {
   'fs:list':    { dir: string } → string[]
   'watch:start':{ path: string } → void
   'watch:event':{ path: string; content: string } → void  // pushed to renderer
-  'mcp:ping':   {} → boolean
-  'mcp:state':  { topic: string } → FsmState | null
+  'http:ping':   {} → boolean
+  'http:state':  { topic: string } → FsmState | null
   'shell:publish': { cwd: string } → void
   'shell:output':  { line: string } → void  // streamed to renderer
 }
@@ -72,7 +72,7 @@ interface StudioStore {
   // monitor
   fsmState:          FsmState | null
   events:            FsmEvent[]
-  monitorSource:     'mcp' | 'filewatch' | 'detecting'
+  monitorSource:     'http' | 'filewatch' | 'detecting'
 
   // publish
   publishing:        boolean
@@ -82,30 +82,30 @@ interface StudioStore {
 
 ---
 
-## MCP client (ipc/mcp.ts)
+## HTTP client (ipc/http.ts)
 
-The MCP server (`pathly-mcp-server`) runs as a separate stdio process, launched
-by Claude/Codex. Studio connects as a second MCP client on the same server.
+The HTTP server (`pathly-http-server`) runs as a separate stdio process, launched
+by Claude/Codex. Studio connects as a second HTTP client on the same server.
 
-> **Risk — stdio is single-client.** MCP over stdio is point-to-point: one process
+> **Risk — stdio is single-client.** HTTP over stdio is point-to-point: one process
 > writes to stdin, one reads from stdout. A second client attaching to the same stdio
 > pipe will corrupt the framing. Two options:
 > 1. **(Recommended for Part 1)** Don't attach to the running server — run a separate
->    read-only `pathly-mcp-server` instance as a child process of Studio's main process.
+>    read-only `pathly-http-server` instance as a child process of Studio's main process.
 >    Pass `--read-only` (or equivalent) so it doesn't mutate FSM state.
-> 2. **(Part 2+)** Add a TCP/named-pipe transport to `pathly-mcp-server` so multiple
+> 2. **(Part 2+)** Add a TCP/named-pipe transport to `pathly-http-server` so multiple
 >    clients can connect.
 >
-> For now: treat the MCP path as best-effort. The file-watch fallback is the reliable
+> For now: treat the HTTP path as best-effort. The file-watch fallback is the reliable
 > path and must always work correctly.
 
 Connection sequence:
-1. On monitor open: spawn `pathly-mcp-server` in stdio mode (or attach if already running)
-2. Send `ping` tool call — if response within 500ms: set source = `mcp`
+1. On monitor open: spawn `pathly-http-server` in stdio mode (or attach if already running)
+2. Send `ping` tool call — if response within 500ms: set source = `http`
 3. On timeout/error: fall back to chokidar file watch, set source = `filewatch`
-4. On MCP: poll `get_fsm_state(topic)` every 2 seconds while monitor is open
+4. On HTTP: poll `get_fsm_state(topic)` every 2 seconds while monitor is open
 
-MCP tools the studio calls (must be added to mcp_server.py in mcp-fsm-driver):
+HTTP tools the studio calls (must be added to http_server.py in http-fsm-driver):
 - `get_fsm_state(topic: str)` → `{ state, flow, engine, conv_count }`
 - `get_events(topic: str, limit: int)` → `FsmEvent[]`
 

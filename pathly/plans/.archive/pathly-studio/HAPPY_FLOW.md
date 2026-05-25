@@ -34,7 +34,7 @@ Developer selects topic "user-auth-refactor" in the top bar dropdown.
 Clicks Monitor in sidebar.
 Monitor panel shows: `STORMING ✓  PLANNING ✓  [ BUILDING ]  reviewing  testing  done`
 Event log shows last 10 events with timestamps.
-Connection badge shows `● MCP live`.
+Connection badge shows `● HTTP live`.
 Developer watches — a new `STATE_TRANSITION` event appears in the log without refreshing.
 
 ## 5. Publish

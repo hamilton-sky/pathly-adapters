@@ -1,8 +1,0 @@
----
-
----
-{"type": "FSM_START", "state": "INVESTIGATING"}
-{"type": "STATE_TRANSITION", "to": "ROOT_CAUSE_FOUND"}
-{"type": "STATE_TRANSITION", "to": "FIXING"}
-{"type": "STATE_TRANSITION", "to": "VERIFYING"}
-{"type": "STATE_TRANSITION", "to": "DONE"}

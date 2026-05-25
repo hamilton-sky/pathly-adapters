@@ -45,7 +45,7 @@
 | ARCHITECTURE_PROPOSAL.md | yes |
 | FLOW_DIAGRAM.md | yes |
 
-## MCP scope note
+## HTTP scope note
 
-`studio/src/main/ipc/mcp.ts` is fully stubbed — `mcp:ping` always returns `false`.
-MCP event subscription is **out of scope** for this plan; it depends on `mcp-fsm-driver` completing first.
+`studio/src/main/ipc/http.ts` is fully stubbed — `http:ping` always returns `false`.
+HTTP event subscription is **out of scope** for this plan; it depends on `http-fsm-driver` completing first.

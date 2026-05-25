@@ -495,5 +495,5 @@ The following are explicitly **out of scope** for this feature. Do not implement
 | **Persisting canvas node positions to YAML** | Positions stay UI state only. A future layout-persistence feature can revisit this. |
 | **Editing skills/agents/templates from inside the visual flow editor** | The visual editor is for assembly. Editing source requires an explicit action in the existing Editor. |
 | **Redesigning Monitor, Terminal, TopBar, PlanBoard, Settings, HomeScreen, SetupScreen, FlowWizard** | These surfaces are stable. Monitor improvements are a separate `studio-monitor-live` plan. |
-| **MCP runtime, Electron installer, or backend changes** | This feature is renderer-side except for the optional `pathlyApi.ts` helper in Phase 14. |
+| **HTTP runtime, Electron installer, or backend changes** | This feature is renderer-side except for the optional `pathlyApi.ts` helper in Phase 14. |
 | **Workspace rows (Plan, Monitor, Settings) drag/CRUD** | Workspace items are navigation destinations, not library primitives. Click-to-navigate only. |

@@ -1,2 +1,0 @@
-{"type": "FSM_START", "stage": "FRAMING"}
-{"type": "STATE_TRANSITION", "to": "ANALYZING"}

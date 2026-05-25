@@ -29,7 +29,7 @@
   orchestrating agent while scouts are active.
 - Add `docs/RISK_ASSESSMENT.md` — architecture risk assessment for 5 identified risks
   (hook contract mismatch, Codex clean-machine gap, unversioned event schema,
-  version drift, mcp_config opacity) with proposed solutions for each.
+  version drift, installer configuration opacity) with proposed solutions for each.
 - Add `pathly/explorations/architecture-risk-assessment/` — full exploration artifacts
   (EXPLORE.md, TRACE.md, CONCLUSIONS.md) from the risk assessment conducted 2026-05-13.
 

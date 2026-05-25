@@ -43,7 +43,7 @@
 
 ## What is explicitly NOT in scope
 
-- MCP event subscription (`mcp:ping` always returns false; requires `mcp-fsm-driver`)
+- HTTP event subscription (`http:ping` always returns false; requires `http-fsm-driver`)
 - Agent / conv info in the Monitor pipeline bar (UX diagram section 11 shows this; deferred)
-- `● MCP live` badge driving actual event stream (cosmetic until MCP is live)
+- `● HTTP live` badge driving actual event stream (cosmetic until HTTP is live)
 - Plan conversation representation redesign beyond parser fix (the sidebar shows phase ranges from PROGRESS.md as titles; a richer timeline view is a separate feature)

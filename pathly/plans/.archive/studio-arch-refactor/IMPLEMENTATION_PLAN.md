@@ -28,7 +28,7 @@ export const pickFolder      = (): Promise<string | null>                       
 export const publish         = (cwd: string): Promise<number | null>                   => window.pathly.shell.publish(cwd)
 export const onPublishOutput = (cb: (line: string) => void): (() => void)             => window.pathly.shell.onOutput(cb)
 export const openWindow      = (url: string): void                                     => window.pathly.shell.openWindow(url)
-export const mcpPing         = (): Promise<boolean>                                    => window.pathly.mcp.ping()
+export const httpPing         = (): Promise<boolean>                                    => window.pathly.http.ping()
 export const watchStart      = (projectPath: string, topic: string): Promise<void>    => window.pathly.watch.start(projectPath, topic)
 export const onWatchEvent    = (cb: (data: { path: string; content: string }) => void): (() => void) => window.pathly.watch.onEvent(cb)
 ```

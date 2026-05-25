@@ -163,7 +163,7 @@ Empty state: `"Waiting for flow activity."` in `t.textMuted`, 13px, centered.
 
 **Delivers stories:** S3
 
-**Depends on:** `monitorSource` in projectStore (type: `'mcp' | 'chokidar' | 'sse' | null`). `t.runtime` from Phase 1.
+**Depends on:** `monitorSource` in projectStore (type: `'http' | 'chokidar' | 'sse' | null`). `t.runtime` from Phase 1.
 
 **Details:**
 

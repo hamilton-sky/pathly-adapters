@@ -7,7 +7,7 @@
 
 ## What is pathly-runner?
 
-`pathly-runner` adds a `pathly-run <topic>` CLI command that drives the Pathly FSM autonomously from the current state all the way to DONE. Rather than requiring a human to manually invoke each builder conversation, the runner loops over `_next_action` and `_complete_stage` from `mcp_server.py`, invokes the correct agent via a `claude -p` subprocess for each stage, surfaces human checkpoints and decide blocks interactively in the terminal, and writes every state transition to EVENTS.jsonl so the Studio Monitor picks them up automatically via its existing SSE tail — no extra wiring needed.
+`pathly-runner` adds a `pathly-run <topic>` CLI command that drives the Pathly FSM autonomously from the current state all the way to DONE. Rather than requiring a human to manually invoke each builder conversation, the runner loops over `_next_action` and `_complete_stage` from `http_server.py`, invokes the correct agent via a `claude -p` subprocess for each stage, surfaces human checkpoints and decide blocks interactively in the terminal, and writes every state transition to EVENTS.jsonl so the Studio Monitor picks them up automatically via its existing SSE tail — no extra wiring needed.
 
 ---
 

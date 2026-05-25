@@ -9,14 +9,14 @@ and what is the minimal fix or contract change needed to close each one?
 2. **Codex unverified on clean machine** — adapter committed, setup runs clean, but no end-to-end smoke test on a fresh machine
 3. **pathly_orchestrator dual role** — internal FSM schema + public CLI (`pathly-events`, `pathly-state`) — event schema changes break user state; no migration story
 4. **Version drift** — docs can lag pyproject.toml version; no CI gate enforcing sync
-5. **mcp_config.py opaque** — module purpose not documented in README or module table
+5. **http_config.py opaque** — module purpose not documented in README or module table
 
 ## Scope
 - `src/pathly_hooks/classify_feedback.py`
 - `src/pathly_hooks/inject_feedback_ttl.py`
 - `src/install_cli/materialize.py` (hook deployment)
 - `src/install_cli/codex_plugin_config.py`
-- `src/install_cli/mcp_config.py`
+- `src/install_cli/http_config.py`
 - `src/pathly_orchestrator/events.py`, `eventlog.py`, `state.py`, `__init__.py`
 - `pyproject.toml` (version + entry points)
 - `tests/test_codex_plugin_config.py`, `tests/test_hooks.py`

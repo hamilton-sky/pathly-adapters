@@ -80,7 +80,7 @@ to advance the FSM without running the current agent,
 **so that** I can keep FSM state in sync when I work outside the pipeline.
 
 **Implementation:** Python CLI (`pathly-ff`) + thin skill wrapper.  
-Python calls `complete_stage` via the MCP server's Python API directly.
+Python calls `complete_stage` via the HTTP server's Python API directly.
 If `{decide: true}` is returned: Python prompts for input via `input()` — no LLM needed.
 
 **Acceptance criteria:**

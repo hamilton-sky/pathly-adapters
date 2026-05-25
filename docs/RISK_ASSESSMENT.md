@@ -158,31 +158,3 @@ Version bumps are not gated on documentation updates.
        sys.exit(1)
    ```
    Run this as a pre-release step or wire it into CI (`on: push, tags: 'v*'`).
-
----
-
-## Risk 5 — mcp_config.py purpose not documented externally
-
-### Description
-
-`src/install_cli/mcp_config.py` has a clear module-level docstring (lines 1-6)
-but is not explained in external-facing documentation. `docs/PATHLY_ARCHITECTURE.md:125`
-lists it as "MCP configuration support" with no further detail. README does not
-mention it. A new contributor sees the module in the package list but must open
-the file to understand it registers the `pathly-telemetry` MCP server in
-`~/.claude/settings.json` and `~/.codex/config.toml`.
-
-**Severity: Low (documentation gap only; no functional risk)**
-
-### Proposed solution
-
-1. **Update `docs/PATHLY_ARCHITECTURE.md:125`** module table entry to:
-   > `mcp_config.py` — Registers the `pathly-telemetry` MCP server (`record_activity`
-   > tool) in `~/.claude/settings.json` (mcpServers) and `~/.codex/config.toml`
-   > ([mcp_servers]). Silent no-op for Copilot (no MCP convention yet).
-
-2. **Add a "Telemetry MCP Server" subsection to README** (2–3 sentences):
-   > Pathly optionally installs a local MCP server (`pathly-telemetry`) that agents
-   > use to record activity. Each agent calls the `record_activity` tool at task
-   > completion, logging its name, the feature it worked on, and token counts.
-   > Run `pathly-tokens` to view the activity report.

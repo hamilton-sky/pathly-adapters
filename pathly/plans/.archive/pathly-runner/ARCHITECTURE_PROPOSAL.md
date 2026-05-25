@@ -7,7 +7,7 @@ pathly-run (CLI entry point)
      ↓
 runner.py: run_flow(flow, topic, project_root, rigor, model)
      ↓ calls directly (no HTTP)
-_next_action() / _complete_stage()  ← mcp_server.py
+_next_action() / _complete_stage()  ← http_server.py
      ↓
 fsm.py: recover_state / evaluate_transition_rules / route_feedback / run_transition_actions
      ↓ writes
@@ -45,7 +45,7 @@ claude -p <prompt> --dangerously-skip-permissions  (cwd=project_root)
 
 ### Direct Python call, not HTTP
 
-The runner imports `_next_action` and `_complete_stage` directly from `pathly_orchestrator.mcp_server`. This avoids requiring a running HTTP server as a prerequisite, removes a network round-trip per stage, and keeps the runner testable with simple mocks. The HTTP server (`pathly-fsm-http`) remains useful for Studio integration but is not a runner dependency.
+The runner imports `_next_action` and `_complete_stage` directly from `pathly_orchestrator.http_server`. This avoids requiring a running HTTP server as a prerequisite, removes a network round-trip per stage, and keeps the runner testable with simple mocks. The HTTP server (`pathly-fsm-http`) remains useful for Studio integration but is not a runner dependency.
 
 ### `claude -p` subprocess for agent invocation
 
@@ -57,7 +57,7 @@ The runner calls FSM functions that internally call `fsm.append_event`. That fun
 
 ### No new FSM logic in runner.py
 
-`runner.py` is a thin orchestration loop. All state-machine logic (transition evaluation, feedback routing, transition actions, state writes) lives in `fsm.py` and `mcp_server.py`. The runner is not allowed to write STATE.json or EVENTS.jsonl directly — it always goes through `_next_action` / `_complete_stage`.
+`runner.py` is a thin orchestration loop. All state-machine logic (transition evaluation, feedback routing, transition actions, state writes) lives in `fsm.py` and `http_server.py`. The runner is not allowed to write STATE.json or EVENTS.jsonl directly — it always goes through `_next_action` / `_complete_stage`.
 
 ### Feedback file deletion owned by `complete_stage`
 

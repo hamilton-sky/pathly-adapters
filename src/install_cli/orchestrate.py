@@ -25,6 +25,56 @@ from .materialize import (
 # must appear here, or auto-detected installs will fail with a confusing error.
 ALLOWED_HOSTS = {"claude", "codex", "copilot"}
 
+_AGENT_GROUPS = {
+    "architect": "planning",
+    "builder": "building",
+    "designer": "building",
+    "explorer": "research",
+    "orchestrator": "support",
+    "planner": "planning",
+    "po": "planning",
+    "quick": "support",
+    "reviewer": "quality",
+    "scout": "research",
+    "tester": "quality",
+    "web-researcher": "research",
+}
+
+_SKILL_GROUPS = {
+    "archive-artifacts": "utilities",
+    "archive": "utilities",
+    "back": "flow",
+    "build": "development",
+    "commit": "development",
+    "debug": "development",
+    "design": "development",
+    "end": "flow",
+    "explore": "development",
+    "ff": "flow",
+    "fix": "development",
+    "fsm-call": "utilities",
+    "go": "flow",
+    "help": "utilities",
+    "lessons": "utilities",
+    "log-agent-done": "utilities",
+    "log": "utilities",
+    "meet": "utilities",
+    "pathly": "flow",
+    "pause": "flow",
+    "plan": "planning",
+    "po": "planning",
+    "prd-import": "planning",
+    "retro": "planning",
+    "review": "development",
+    "scout-path": "utilities",
+    "start": "flow",
+    "status": "flow",
+    "storm": "planning",
+    "team": "team",
+    "test": "development",
+    "verify-state": "utilities",
+}
+
 _TELEMETRY_FOOTER = """
 ---
 
@@ -35,6 +85,11 @@ curl -s -X POST http://127.0.0.1:8765/record_activity \
   -d '{"agent":"<your-agent-name>","feature":"<feature>","summary":"<one-line summary>","input_tokens":0,"output_tokens":0}'
 ```
 """.strip()
+
+
+def _grouped_core_file(root: Path, name: str, groups: dict[str, str]) -> Path:
+    group = groups.get(name)
+    return root / group / f"{name}.md" if group else root / f"{name}.md"
 
 
 def _codex_skill_openai_yaml(skill_meta: dict) -> str:
@@ -104,7 +159,7 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         if "core_file" in agent_meta:
             core_file = core_dir.parent / agent_meta["core_file"]
         else:
-            core_file = core_dir / f"{agent_name}.md"
+            core_file = _grouped_core_file(core_dir, agent_name, _AGENT_GROUPS)
         if not core_file.exists():
             print(
                 f"  [warn] No core file for {agent_name!r}, skipping", file=sys.stderr
@@ -131,7 +186,9 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         for meta_file in sorted(meta_dir.glob("*_skill.yaml")):
             skill_name = meta_file.stem.removesuffix("_skill")
             skill_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
-            core_file = core_skills_dir / f"{skill_meta['skill']}.md"
+            core_file = _grouped_core_file(
+                core_skills_dir, skill_meta["skill"], _SKILL_GROUPS
+            )
             default_filename = (
                 f"{skill_name}/SKILL.md" if nested else f"{skill_name}.md"
             )
@@ -340,4 +397,3 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
             print(
                 f"[{host}] Removed {len(plugin_removed)} plugin file(s) from {plugin_dest}"
             )
-

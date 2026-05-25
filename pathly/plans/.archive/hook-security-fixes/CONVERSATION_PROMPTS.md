@@ -22,7 +22,7 @@ gaps you are fixing are documented in `docs/SECURITY.md`.
 Read these files before starting:
 - `docs/SECURITY.md`
 - `src/install_cli/materialize.py`
-- `src/install_cli/mcp_config.py`
+- `src/install_cli/http_config.py`
 - `tests/test_setup.py`
 
 ### Task 1 — Locate hook scripts (Phase 1)
@@ -132,11 +132,11 @@ Add tests to `tests/test_setup.py` (preferred) or create `tests/test_materialize
 Use `tmp_path`. Write the manifest file programmatically — do not rely on a
 pre-existing manifest on disk.
 
-### Task 6 — tests/test_mcp_config.py (Phase 6, Story 5)
+### Task 6 — tests/test_http_config.py (Phase 6, Story 5)
 
-Create `tests/test_mcp_config.py`. Redirect `_CLAUDE_SETTINGS` and
+Create `tests/test_http_config.py`. Redirect `_CLAUDE_SETTINGS` and
 `_CODEX_CONFIG` to temp files using `monkeypatch.setattr` on the
-`install_cli.mcp_config` module.
+`install_cli.http_config` module.
 
 Required tests (cover both `"claude"` and `"codex"` hosts):
 1. `test_install_adds_entry_claude` — install adds `pathly-telemetry` to
@@ -149,15 +149,15 @@ Required tests (cover both `"claude"` and `"codex"` hosts):
 
 Additional edge cases:
 6. `test_install_invalid_json_claude` — `settings.json` contains invalid JSON;
-   `install_mcp_config` prints a warning to stderr and returns without raising.
-7. `test_install_idempotent_claude` — calling `install_mcp_config` twice does
+   `install_http_config` prints a warning to stderr and returns without raising.
+7. `test_install_idempotent_claude` — calling `install_http_config` twice does
    not create a duplicate entry. Idempotency means: skip if an entry with the
    name `pathly-telemetry` already exists, regardless of its contents.
 8. `test_install_idempotent_different_args` — install once, then manually
    modify the `pathly-telemetry` entry's args in the config file, then call
-   `install_mcp_config` again. Assert the manually modified entry is preserved
+   `install_http_config` again. Assert the manually modified entry is preserved
    unchanged (not overwritten by the second install call).
-9. `test_uninstall_missing_entry_claude` — entry is absent; `uninstall_mcp_config`
+9. `test_uninstall_missing_entry_claude` — entry is absent; `uninstall_http_config`
    returns cleanly.
 
 ### Completion check

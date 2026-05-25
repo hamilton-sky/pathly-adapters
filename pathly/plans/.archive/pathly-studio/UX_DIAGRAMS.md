@@ -39,7 +39,7 @@ Cmd/Ctrl+click `[→]` opens the project in a new Electron window (for side-by-s
 
 ```
 ┌─ Pathly Studio ──────────────────────────────────────────────────────────────┐
-│ [← Projects]  Pathly Studio     user-auth-refactor ▼   ● MCP live [↑ Publish]│
+│ [← Projects]  Pathly Studio     user-auth-refactor ▼   ● HTTP live [↑ Publish]│
 ├────────────────┬─────────────────────────────────────────────────────────────┤
 ```
 
@@ -51,7 +51,7 @@ Clicking `[← Projects]` returns to the home screen without closing the window.
 
 ```
 ┌─ Pathly Studio ──────────────────────────────────────────────────────────────┐
-│  Pathly Studio          user-auth-refactor ▼        ● MCP live  [↑ Publish] │
+│  Pathly Studio          user-auth-refactor ▼        ● HTTP live  [↑ Publish] │
 ├────────────────┬─────────────────────────────────────────────────────────────┤
 │ ▼ Flows        │                                                              │
 │   team.yaml    │                                                              │
@@ -332,7 +332,7 @@ Clicking `[►]` restores the sidebar to full width.
 
 ```
 ┌─ Monitor ──────────────────────────────────────────────────────────────────┐
-│  Source: ● MCP live                                                         │
+│  Source: ● HTTP live                                                         │
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  STORMING ✓   PLANNING ✓   [ BUILDING ]   reviewing   testing   done      │
@@ -398,7 +398,7 @@ Clicking `[►]` restores the sidebar to full width.
 ## 14. Publish — in progress
 
 ```
-┌─ Pathly Studio ────────────────────── user-auth-refactor ▼  ● MCP live  [↑…]─┐
+┌─ Pathly Studio ────────────────────── user-auth-refactor ▼  ● HTTP live  [↑…]─┐
 ├────────────────┬──────────────────────────────────────────────────────────────┤
 │                │                                                               │
 │  (sidebar)     │          (main panel — editor or monitor)                    │
@@ -418,7 +418,7 @@ Clicking `[►]` restores the sidebar to full width.
 ## 15. Publish — success
 
 ```
-┌─ Pathly Studio ────────────────────── user-auth-refactor ▼  ● MCP live  [↑ Publish]─┐
+┌─ Pathly Studio ────────────────────── user-auth-refactor ▼  ● HTTP live  [↑ Publish]─┐
 ├────────────────┬─────────────────────────────────────────────────────────────────────┤
 │                │                                                                      │
 │  (sidebar)     │  ┌─ ✓ Published successfully ──────────────────────────────────┐   │
@@ -477,11 +477,11 @@ Dragging from any node's right-side handle to another node's left-side handle cr
 │  [ C:\Users\Yafit\pathly-adapters                                    ] [✓] │
 │                                                                             │
 │  Routing engine default                                                     │
-│  ( ) Python FSM — deterministic, MCP-driven                                │
+│  ( ) Python FSM — deterministic, HTTP-driven                                │
 │  (●) LLM driven — orchestrator reads YAML                                  │
 │                                                                             │
-│  MCP server command                                                         │
-│  [ pathly-mcp-server                                                 ]      │
+│  HTTP server command                                                         │
+│  [ pathly-http-server                                                 ]      │
 │                                                                             │
 │  Theme                                                                      │
 │  [●] Dark   ( ) Light   ( ) System                                         │

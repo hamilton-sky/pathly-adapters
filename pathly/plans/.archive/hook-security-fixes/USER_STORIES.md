@@ -136,23 +136,23 @@ so that the path-traversal guard in `materialize.py` is regression-tested.
 
 ---
 
-## Story 5 — MCP config tests
+## Story 5 — HTTP config tests
 
 **Delivered by:** Conversation 1
 
 As a maintainer,
-I want a test file `tests/test_mcp_config.py` that exercises
-`src/install_cli/mcp_config.py`,
-so that install and uninstall behavior for the MCP server entry is verified
+I want a test file `tests/test_http_config.py` that exercises
+`src/install_cli/http_config.py`,
+so that install and uninstall behavior for the HTTP server entry is verified
 automatically.
 
 ### Acceptance criteria
 
-- [ ] `tests/test_mcp_config.py` exists and is collected by `pytest -q` with no
+- [ ] `tests/test_http_config.py` exists and is collected by `pytest -q` with no
   errors.
-- [ ] Test: `install_mcp_config("claude")` adds a `pathly-telemetry` entry to a
+- [ ] Test: `install_http_config("claude")` adds a `pathly-telemetry` entry to a
   temp `settings.json` file.
-- [ ] Test: `uninstall_mcp_config("claude")` removes the entry from a temp
+- [ ] Test: `uninstall_http_config("claude")` removes the entry from a temp
   `settings.json` file.
 - [ ] Test: calling either function with `dry_run=True` makes no changes to the
   file on disk.
@@ -163,12 +163,12 @@ automatically.
 
 ### Edge cases
 
-- Settings file exists but contains invalid JSON — `install_mcp_config` warns
+- Settings file exists but contains invalid JSON — `install_http_config` warns
   and returns without crashing.
-- `pathly-telemetry` entry is already present — `install_mcp_config` is
+- `pathly-telemetry` entry is already present — `install_http_config` is
   idempotent: skip if an entry with the name `pathly-telemetry` already exists,
   regardless of its contents (do not overwrite).
-- Entry is absent — `uninstall_mcp_config` returns cleanly without error.
+- Entry is absent — `uninstall_http_config` returns cleanly without error.
 - `test_install_idempotent_different_args`: install once, manually modify the
   entry's args, install again — assert the manually modified entry is preserved
   unchanged (not overwritten).

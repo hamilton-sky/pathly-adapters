@@ -14,7 +14,7 @@ README documentation update only.
 
 **Goal:** Harden hook scripts against path traversal, confirm the manifest
 uninstall guard exists and is tested, and add test coverage for hooks and
-`mcp_config.py`. The codebase must pass `pytest -q` at the end of this
+`http_config.py`. The codebase must pass `pytest -q` at the end of this
 conversation.
 
 ### Phase 1 — Locate hook scripts
@@ -92,9 +92,9 @@ Use `tmp_path` for all filesystem operations.
 
 **Leaves codebase:** `pytest -q` passes.
 
-### Phase 6 — New test file: `tests/test_mcp_config.py` (Story 5)
+### Phase 6 — New test file: `tests/test_http_config.py` (Story 5)
 
-Create `tests/test_mcp_config.py`. Patch `_CLAUDE_SETTINGS` and `_CODEX_CONFIG`
+Create `tests/test_http_config.py`. Patch `_CLAUDE_SETTINGS` and `_CODEX_CONFIG`
 module-level constants (or use `monkeypatch`) to point at temp files.
 
 Cover for both `"claude"` and `"codex"` hosts:
@@ -104,12 +104,12 @@ Cover for both `"claude"` and `"codex"` hosts:
 - Missing config file produces a stderr warning and no exception.
 
 Additional edge cases:
-- `settings.json` contains invalid JSON — `install_mcp_config` warns and returns.
-- `install_mcp_config` is idempotent when entry already exists: skip if an
+- `settings.json` contains invalid JSON — `install_http_config` warns and returns.
+- `install_http_config` is idempotent when entry already exists: skip if an
   entry with the name `pathly-telemetry` already exists, regardless of its
   contents. Test `test_install_idempotent_different_args` verifies the entry
   is not overwritten even if its args differ from the default.
-- `uninstall_mcp_config` returns cleanly when entry is absent.
+- `uninstall_http_config` returns cleanly when entry is absent.
 
 **Leaves codebase:** `pytest -q` passes.
 
@@ -163,7 +163,7 @@ feature:
 | 2 — Manifest traversal guard | Conv 1 Phase 3 | 1 |
 | 3 — Hook path-safety tests | Conv 1 Phase 4 | 1 |
 | 4 — Manifest uninstall traversal tests | Conv 1 Phase 5 | 1 |
-| 5 — MCP config tests | Conv 1 Phase 6 | 1 |
+| 5 — HTTP config tests | Conv 1 Phase 6 | 1 |
 | 6 — Known Limitations in README | Conv 2 Phase 2 | 2 |
 
 ---
@@ -176,7 +176,7 @@ feature:
 - `src/install_cli/materialize.py` — may require no change if guard already present
 - `tests/test_hooks.py` — new
 - `tests/test_setup.py` or `tests/test_materialize.py` — new tests added
-- `tests/test_mcp_config.py` — new
+- `tests/test_http_config.py` — new
 
 **Conversation 2:**
 - `README.md` — Known Limitations section added

@@ -37,5 +37,5 @@ name: Edge Cases
 
 | Case | Expected behavior |
 |---|---|
-| `mcp` package not installed (old wheel) | `server.py` raises `ImportError` with message "run: pip install mcp" |
-| `mcp` installed but wrong version | pip dependency resolver handles at install time |
+| `http` package not installed (old wheel) | `server.py` raises `ImportError` with message "run: pip install http" |
+| `http` installed but wrong version | pip dependency resolver handles at install time |

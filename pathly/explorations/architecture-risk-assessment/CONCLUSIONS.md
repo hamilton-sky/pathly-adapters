@@ -109,25 +109,25 @@ and the CHANGELOG gap means release history is lost.
 
 ---
 
-## Risk 5 — mcp_config.py opaque
+## Risk 5 — http_config.py opaque
 **Verdict: PARTIALLY REAL — module purpose is clear from its own docstring, not from external docs.**
 
-`mcp_config.py:1-6` has a clear module-level docstring explaining what it does.
-`docs/PATHLY_ARCHITECTURE.md:125` lists it as "MCP configuration support" — terse but not zero.
+`http_config.py:1-6` has a clear module-level docstring explaining what it does.
+`docs/PATHLY_ARCHITECTURE.md:125` lists it as "HTTP configuration support" — terse but not zero.
 README does not mention it at all.
 
 The telemetry server (`server.py:17-53`) exposes exactly one tool (`record_activity`) — well-scoped.
 
 **Severity: LOW**
 Anyone who opens the file immediately understands it. The gap is cross-reference: a new contributor
-reading the architecture doc sees "MCP configuration support" and doesn't know what MCP server,
+reading the architecture doc sees "HTTP configuration support" and doesn't know what HTTP server,
 what config files, or what tools it registers.
 
 **Minimal fix:**
 1. Update `docs/PATHLY_ARCHITECTURE.md:125` module table entry to read:
-   "Registers the `pathly-telemetry` MCP server (`record_activity` tool) in `~/.claude/settings.json`
+   "Registers the `pathly-telemetry` HTTP server (`record_activity` tool) in `~/.claude/settings.json`
    and `~/.codex/config.toml`. No-op for Copilot."
-2. Add a 2-sentence "Telemetry MCP Server" subsection to README under the Install section.
+2. Add a 2-sentence "Telemetry HTTP Server" subsection to README under the Install section.
 
 ---
 
@@ -139,4 +139,4 @@ what config files, or what tools it registers.
 | 3 | Event schema unversioned, public CLI with no migration story | MODERATE | Small | ✅ Yes |
 | 4 | SECURITY.md stale (1.0.0), CHANGELOG gap (2.2.0/2.3.0 missing) | LOW | Trivial | ✅ Yes (10 min fix) |
 | 2 | Codex error handling + no CI | MODERATE | Medium | ⏳ Before public Codex claim |
-| 5 | mcp_config.py not documented externally | LOW | Trivial | ⏳ Next doc pass |
+| 5 | http_config.py not documented externally | LOW | Trivial | ⏳ Next doc pass |

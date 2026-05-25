@@ -7,4 +7,4 @@
 | 3 | Human checkpoints + feedback loop | S4, S5 | DONE |
 | 4 | Tests | — | DONE |
 
-**Prerequisites:** mcp-fsm-driver all 4 conversations DONE (✓ already done).
+**Prerequisites:** http-fsm-driver all 4 conversations DONE (✓ already done).

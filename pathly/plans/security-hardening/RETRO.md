@@ -3,7 +3,7 @@
 ## What Went Well
 - **Systematic ownership model**: ptyOwners tabId tracking cleanly isolated terminal operations (write/resize/kill/popout) with minimal surface area.
 - **Test-driven validation**: test_storage.py rotation tests, manifest hash mismatch, and rollback stderr capture added coverage for logic that was correct but untested.
-- **Clean dependency removal**: Dead MCP telemetry server.py/__main__.py removal simplified the codebase with no side effects.
+- **Clean dependency removal**: Dead HTTP telemetry server.py/__main__.py removal simplified the codebase with no side effects.
 - **Build config hygiene**: .gitignore addition for build/lib/ prevented accidental binary commits.
 
 ## What Was Surprising

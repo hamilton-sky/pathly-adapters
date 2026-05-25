@@ -11,9 +11,9 @@ name: Happy Flow
 5. `ptyOwners.set(tabId, webContentsId)` recorded
 6. User types commands → `terminal:write` fires → `ptyOwners.get(tabId) === event.sender.id` → write proceeds
 
-## Install on fresh machine (after mcp fix)
-1. `pip install pathly-adapters` → resolves `mcp>=1.0` as a dependency → installs alongside
-2. `pathly-setup --apply` runs → telemetry MCP server import succeeds
+## Install on fresh machine (after http fix)
+1. `pip install pathly-adapters` → resolves `http>=1.0` as a dependency → installs alongside
+2. `pathly-setup --apply` runs → telemetry HTTP server import succeeds
 3. `PATHLY_FF_TELEMETRY=0 pathly-setup --apply` → telemetry storage.record() returns immediately → no activity.jsonl created
 
 ## Manifest integrity (after fix)

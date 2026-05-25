@@ -82,7 +82,7 @@ contextBridge.exposeInMainWorld('pathly', {
   }
 })
 ```
-(watcher, mcp, shell added in Conv 4)
+(watcher, http, shell added in Conv 4)
 
 ### 1.4 Types + multi-project store
 
@@ -299,7 +299,7 @@ Topic selector scans `pathly/plans/` via `window.pathly.fs.list` on mount and on
 **File:** `studio/src/renderer/src/components/Monitor/FsmView.tsx`
 **Done when:** renders states as horizontal pills; active state has blue border; completed states show `✓`; blocked state shows `⚠ BLOCKED: <filename>`.
 
-State data flows from Zustand `fsmState` — either from MCP or file watch (both set the same store field).
+State data flows from Zustand `fsmState` — either from HTTP or file watch (both set the same store field).
 
 ### 4.4 Event log
 
@@ -317,15 +317,15 @@ Watch both `STATE.json` and `EVENTS.jsonl` for the active topic.
 Parse STATE.json → dispatch to `store.setFsmState`.
 Parse EVENTS.jsonl (last 50 lines) → dispatch to `store.setEvents`.
 
-### 4.6 MCP client IPC
+### 4.6 HTTP client IPC
 
-**File:** `studio/src/main/ipc/mcp.ts`
-**Done when:** `ipcMain.handle('mcp:ping')` attempts to call the MCP server and returns `true` within 500ms or `false` on timeout; `mcp:state` returns parsed FsmState or null.
+**File:** `studio/src/main/ipc/http.ts`
+**Done when:** `ipcMain.handle('http:ping')` attempts to call the HTTP server and returns `true` within 500ms or `false` on timeout; `http:state` returns parsed FsmState or null.
 
-On monitor open: call `mcp:ping` → if true set `monitorSource = 'mcp'`; else set `monitorSource = 'filewatch'` and start watcher.
-Poll `mcp:state` every 2 seconds when source = mcp.
+On monitor open: call `http:ping` → if true set `monitorSource = 'http'`; else set `monitorSource = 'filewatch'` and start watcher.
+Poll `http:state` every 2 seconds when source = http.
 
-Connection status badge: `● MCP live` (green) or `○ File watch` (grey).
+Connection status badge: `● HTTP live` (green) or `○ File watch` (grey).
 
 ### 4.7 Publish IPC
 

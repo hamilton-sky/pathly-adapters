@@ -22,7 +22,7 @@ to roll back. These commands close that gap.
 
 ## Prior work this builds on
 
-- `mcp-fsm-driver` — MUST be complete. `next_action` and `complete_stage` MCP
+- `http-fsm-driver` — MUST be complete. `next_action` and `complete_stage` HTTP
   tools are called by `fix.md` and the updated entry-point skills.
 - `fsm-transition-actions` — DONE. `transition_actions` in flow YAMLs is what
   `pathly-ff` warns about before advancing state.

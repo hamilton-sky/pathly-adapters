@@ -80,6 +80,13 @@ def test_apply_creates_expected_files(tmp_path):
         f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
 
+    orchestrator = (agents_dest / "orchestrator.md").read_text(encoding="utf-8")
+    fix_skill = (
+        tmp_path / ".claude" / "skills" / "pathly-fix" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "pathly_orchestrator.http_server" in orchestrator
+    assert "fsm-call" in fix_skill
+
 
 # ---------------------------------------------------------------------------
 # test_apply_then_uninstall_cleans_up

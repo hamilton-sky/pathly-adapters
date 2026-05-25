@@ -24,18 +24,18 @@ name: User Stories
 - `terminal:write` with a `tabId` not owned by the calling window returns a silent no-op (does not throw, does not write)
 - The PTY ownership map is populated on `terminal:spawn` and cleared on `terminal:kill`
 
-## S3: Dead MCP telemetry server is removed; log rotates at 5 MB
+## S3: Dead HTTP telemetry server is removed; log rotates at 5 MB
 
 **As a** developer maintaining pathly-adapters,
-**I want** the dead `server.py` and `__main__.py` MCP files removed,
-**so that** the codebase doesn't suggest an MCP dependency that doesn't exist and the `mcp` package is never accidentally required.
+**I want** the dead `server.py` and `__main__.py` HTTP files removed,
+**so that** the codebase doesn't suggest an HTTP dependency that doesn't exist and the `http` package is never accidentally required.
 
 **Context:** Telemetry is fully HTTP. Agents post to `http://127.0.0.1:8765/record_activity` (the FSM HTTP server). The `PATHLY_FF_TELEMETRY` opt-out is already implemented in `feature_flags.py`. `server.py` is dead code.
 
 **Acceptance criteria:**
 - `src/pathly_telemetry/server.py` does not exist
 - `src/pathly_telemetry/__main__.py` does not exist
-- `python -c "import pathly_telemetry"` succeeds without any `mcp` import
+- `python -c "import pathly_telemetry"` succeeds without any `http` import
 - `storage.py` rotates `activity.jsonl` to `activity.jsonl.bak` when the file exceeds 5 MB
 - A bad input with `server.py` — `/tmp/malicious-server` — causes `pathly_telemetry server` invocation to fail (the entrypoint simply no longer exists)
 

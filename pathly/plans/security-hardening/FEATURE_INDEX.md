@@ -39,9 +39,9 @@ name: Feature Index
 |---|---|---|
 | `studio/src/main/ipc/terminal.ts` | Conv 1 | Add command allowlist + cwd validation + tabId ownership check |
 | `studio/src/main/ipc/fs.ts` | Conv 1 | Verify path safety (read-only check, no changes expected) |
-| `src/pathly_telemetry/server.py` | Conv 2 | DELETE — dead MCP implementation, replaced by HTTP endpoint |
+| `src/pathly_telemetry/server.py` | Conv 2 | DELETE — dead HTTP implementation, replaced by HTTP endpoint |
 | `src/pathly_telemetry/__main__.py` | Conv 2 | DELETE — only caller was the dead server |
-| `src/pathly_telemetry/__init__.py` | Conv 2 | Update comment (remove "MCP server") |
+| `src/pathly_telemetry/__init__.py` | Conv 2 | Update comment (remove "HTTP server") |
 | `src/pathly_telemetry/storage.py` | Conv 2 | Add 5 MB rotation cap before append |
 | `.gitignore` | Conv 2 | Add `build/lib/` and `build/bdist*/` entries |
 | `src/install_cli/materialize.py` | Conv 3 | Catch ValueError on manifest hash mismatch; raise RuntimeError with clear message |

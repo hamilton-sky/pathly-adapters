@@ -135,7 +135,7 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 |---|---|---|---|
 | Agent behavior contracts | ✓ via ~/.claude/agents/ | ✓ via ~/.codex/agents/ | ✓ via AGENTS.md standard |
 | Skills (SKILL.md) | ✓ native | ✓ native | ✓ native (Aug 2025) |
-| Subagent spawning | Agent() tool | Agents SDK (MCP) | /fleet, /delegate |
+| Subagent spawning | Agent() tool | Agents SDK | /fleet, /delegate |
 | Natural language activation | /go skill + director | natural language | natural language |
 
 **Key constraint:** Subagent spawning syntax is tool-specific. There is no universal standard.

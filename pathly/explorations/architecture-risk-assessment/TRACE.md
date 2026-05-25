@@ -108,10 +108,10 @@ all silently return empty/wrong results. No version guard exists.
 
 ---
 
-## Risk 5 — mcp_config.py opaque (Scout C)
+## Risk 5 — http_config.py opaque (Scout C)
 
 ### Files visited
-- `src/install_cli/mcp_config.py` — lines 1-6, 15-16, 34-48
+- `src/install_cli/http_config.py` — lines 1-6, 15-16, 34-48
 - `src/pathly_telemetry/server.py` — lines 1-53
 - `docs/PATHLY_ARCHITECTURE.md` — lines 42, 113, 125
 - `README.md`
@@ -119,9 +119,9 @@ all silently return empty/wrong results. No version guard exists.
 ### Key findings
 | File:Line | Finding |
 |---|---|
-| `mcp_config.py:1-6` | Clear module docstring: registers `pathly-telemetry` MCP server in Claude/Codex configs |
-| `mcp_config.py:15-16` | Writes to `~/.claude/settings.json` (mcpServers) and `~/.codex/config.toml` |
-| `mcp_config.py:40` | Copilot silently skipped ("no MCP config convention yet") |
+| `http_config.py:1-6` | Clear module docstring: registers `pathly-telemetry` HTTP server in Claude/Codex configs |
+| `http_config.py:15-16` | Writes to `~/.claude/settings.json` (httpServers) and `~/.codex/config.toml` |
+| `http_config.py:40` | Copilot silently skipped ("no HTTP config convention yet") |
 | `server.py:17-53` | Exposes one tool: `record_activity(agent, feature, summary, input_tokens, output_tokens)` |
-| `docs/PATHLY_ARCHITECTURE.md:125` | Listed in module table as "MCP configuration support" — **no description of what it does** |
+| `docs/PATHLY_ARCHITECTURE.md:125` | Listed in module table as "HTTP configuration support" — **no description of what it does** |
 | `README.md` | **Not mentioned** |

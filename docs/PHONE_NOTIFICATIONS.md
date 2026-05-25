@@ -120,7 +120,7 @@ User-tunable via `~/.pathly/notify.json`.
 - **Hook into `record_activity` HTTP endpoint.** Would require
   intercepting requests in-process. SSE consumption from outside is
   cleaner.
-- **MCP server.** Possible but over-engineered for a one-way push. A
+- **Dedicated protocol server.** Possible but over-engineered for a one-way push. A
   background daemon + a tiny skill is simpler and survives Claude Code
   restarts.
 

@@ -12,7 +12,7 @@ Key files identified:
 - `src/pathly_orchestrator/` — FSM engine, state management
 - `src/pathly_data/core/flows/` — flow YAML definitions
 - `src/install_cli/` — installer and hook registration
-- `src/pathly_telemetry/` — MCP telemetry server
+- `src/pathly_telemetry/` — HTTP telemetry server
 - `src/pathly_data/core/skills/` — skill prompt definitions
 
 Scout clusters (4 scouts, 4 distinct risk areas):

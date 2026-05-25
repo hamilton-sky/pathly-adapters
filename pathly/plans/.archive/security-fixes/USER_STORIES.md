@@ -33,7 +33,7 @@
 
 ## Story 3a — Telemetry server: cap Content-Length reads
 
-**As** a system operator running the telemetry MCP server,
+**As** a system operator running the telemetry HTTP server,
 **I want** the server to reject messages whose `Content-Length` exceeds 1 MB,
 **So that** a caller cannot exhaust memory by advertising an arbitrarily large body size.
 
@@ -48,7 +48,7 @@
 
 ## Story 3b — Telemetry server: safe Content-Length parse
 
-**As** a system operator running the telemetry MCP server,
+**As** a system operator running the telemetry HTTP server,
 **I want** the server to handle a non-integer `Content-Length` header without crashing,
 **So that** a malformed or adversarial request cannot bring down the server process.
 

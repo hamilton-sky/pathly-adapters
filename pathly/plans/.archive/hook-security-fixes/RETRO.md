@@ -12,7 +12,7 @@
 
 - **Hook scripts did not exist anywhere in the repo.** A full-repo search across `.py`, `.yaml`, `.json`, `.toml` found nothing. Case C (create stubs + register in install.yaml) was the outcome — a hidden dependency not evident from the stories.
 - **`plans_dir.resolve()` caught by reviewer.** Both hook files constructed `plans_dir` without resolving it, making `is_relative_to()` unreliable on symlinked project roots. A subtle but critical security defect.
-- **Weak test assertion (`or True`).** The MCP config invalid-JSON test had `or True` making it always pass. And the no-traceback assertion used a vacuous disjunction. Both passed initial test runs but were caught in review.
+- **Weak test assertion (`or True`).** The HTTP config invalid-JSON test had `or True` making it always pass. And the no-traceback assertion used a vacuous disjunction. Both passed initial test runs but were caught in review.
 - **Python version claim was wrong.** Story 6 originally said `Path.resolve()` requires Python 3.11+ — incorrect. Correct claim: `Path.is_relative_to()` requires 3.9+. Would have shipped a factually wrong README without the PO consult.
 
 ## What to do differently next time

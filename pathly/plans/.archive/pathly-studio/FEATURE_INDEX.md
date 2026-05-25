@@ -12,7 +12,7 @@ Opens to a **Home Screen** listing all known projects with their live FSM state.
 Each project opens in its own window. Three core panels per window: **Sidebar**
 (file tree of all agents/skills/flows/templates), **Editor** (config form +
 markdown editor with Edit/Preview tabs), and **Flow Editor** (ReactFlow visual
-graph + YAML tab). Live monitor shows real-time FSM state — auto-detects MCP
+graph + YAML tab). Live monitor shows real-time FSM state — auto-detects HTTP
 server (Python-driven) or falls back to file watching (LLM-driven).
 
 **This is Part 1 of 2.** Part 1 covers scaffold + editor + flow editor + monitor.
@@ -39,7 +39,7 @@ Part 2 (`pathly-studio-part-2`) covers packaging, auto-update, and install wizar
 
 | File | Present? | Purpose |
 |---|---|---|
-| `ARCHITECTURE_PROPOSAL.md` | yes | Electron IPC design, MCP client, data flow |
+| `ARCHITECTURE_PROPOSAL.md` | yes | Electron IPC design, HTTP client, data flow |
 | `EDGE_CASES.md` | yes | Failure modes and risk scenarios |
 | `HAPPY_FLOW.md` | yes | Golden-path narrative |
 | `FLOW_DIAGRAM.md` | yes | Multi-component interaction diagram |
@@ -73,7 +73,7 @@ Part 2 (`pathly-studio-part-2`) covers packaging, auto-update, and install wizar
 | `studio/src/renderer/src/components/Monitor/EventLog.tsx` | Conv 4 | CREATE — scrollable event timeline from EVENTS.jsonl |
 | `studio/src/renderer/src/components/TopBar.tsx` | Conv 4 | CREATE — topic selector, connection status badge, Publish button |
 | `studio/src/main/ipc/watcher.ts` | Conv 4 | CREATE — chokidar watcher: STATE.json + EVENTS.jsonl → IPC events |
-| `studio/src/main/ipc/mcp.ts` | Conv 4 | CREATE — MCP stdio client: ping, get_fsm_state, get_events |
+| `studio/src/main/ipc/http.ts` | Conv 4 | CREATE — HTTP stdio client: ping, get_fsm_state, get_events |
 | `studio/src/main/ipc/shell.ts` | Conv 4 | CREATE — runs pip install -e . subprocess, streams output |
 
 > **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
@@ -88,7 +88,7 @@ Part 2 (`pathly-studio-part-2`) covers packaging, auto-update, and install wizar
 | 1 | Electron scaffold + home screen + sidebar | S1, S2, S7 | TODO | `studio/package.json`, `main/index.ts`, `preload/index.ts`, `App.tsx`, `HomeScreen.tsx`, `Sidebar.tsx`, `store/index.ts`, `types/index.ts` |
 | 2 | Editor panel | S3 | TODO | `ipc/fs.ts`, `Editor/index.tsx`, `ConfigForm.tsx`, `MarkdownEditor.tsx`, `MarkdownPreview.tsx` |
 | 3 | Flow editor | S4 | TODO | `FlowEditor/index.tsx`, `VisualView.tsx`, `YamlView.tsx` |
-| 4 | Live monitor + Publish | S5, S6 | TODO | `Monitor/`, `TopBar.tsx`, `ipc/watcher.ts`, `ipc/mcp.ts`, `ipc/shell.ts` |
+| 4 | Live monitor + Publish | S5, S6 | TODO | `Monitor/`, `TopBar.tsx`, `ipc/watcher.ts`, `ipc/http.ts`, `ipc/shell.ts` |
 
 ---
 

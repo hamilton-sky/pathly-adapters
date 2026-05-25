@@ -53,7 +53,7 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 
 ---
 
-## Conversation 2: Delete dead MCP server + log rotation + git hygiene (Phases 3-4)
+## Conversation 2: Delete dead HTTP server + log rotation + git hygiene (Phases 3-4)
 
 **Stories delivered:** S3, S5
 
@@ -64,15 +64,15 @@ Read pathly/plans/security-hardening/FEATURE_INDEX.md first to orient yourself a
 Implement security-hardening Conversation 2 (Phases 3-4) from pathly/plans/security-hardening/IMPLEMENTATION_PLAN.md.
 
 **Architecture context (read this before touching anything):**
-Telemetry is fully HTTP — agents POST to http://127.0.0.1:8765/record_activity (see setup_command.py line ~37 for the _TELEMETRY_FOOTER). The HTTP endpoint is in http_server.py:369 and calls storage.append_activity() directly. The PATHLY_FF_TELEMETRY opt-out is already implemented in feature_flags.py. The MCP server.py and __main__.py files are dead code — nothing registers or calls them.
+Telemetry is fully HTTP — agents POST to http://127.0.0.1:8765/record_activity (see setup_command.py line ~37 for the _TELEMETRY_FOOTER). The HTTP endpoint is in http_server.py:369 and calls storage.append_activity() directly. The PATHLY_FF_TELEMETRY opt-out is already implemented in feature_flags.py. The HTTP server.py and __main__.py files are dead code — nothing registers or calls them.
 
 **Before editing anything:** confirm by reading:
-- `src/pathly_telemetry/server.py` — verify it's MCP-only, no other callers
+- `src/pathly_telemetry/server.py` — verify it's HTTP-only, no other callers
 - `src/pathly_telemetry/__main__.py` — verify it only calls server.run()
 - `src/pathly_orchestrator/http_server.py` lines ~369-445 — the real telemetry endpoint
 - `.gitignore` — current contents
 
-**Phase 3 — Delete dead MCP telemetry files:**
+**Phase 3 — Delete dead HTTP telemetry files:**
 - Delete `src/pathly_telemetry/server.py` (use the file deletion tool or git rm)
 - Delete `src/pathly_telemetry/__main__.py`
 - Update `src/pathly_telemetry/__init__.py`: change the comment to read "# pathly_telemetry — HTTP telemetry storage + CLI reporter"

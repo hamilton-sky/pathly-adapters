@@ -2,9 +2,9 @@
 
 _Ready-to-paste prompts. Run each to completion before starting the next._
 
-**Before Conv 1:** verify mcp-fsm-driver is complete:
+**Before Conv 1:** verify http-fsm-driver is complete:
 ```bash
-python -c "from pathly_orchestrator.mcp_server import next_action, complete_stage; print('OK')"
+python -c "from pathly_orchestrator.http_server import next_action, complete_stage; print('OK')"
 ```
 
 ---
@@ -135,13 +135,13 @@ Before writing any YAML: read one existing skill YAML from each adapter director
 They differ: Claude uses `tools:` list, Codex uses `model: gpt-*`, Copilot is a
 subset with fewer fields. Match each adapter's own conventions exactly.
 natural_language / description: one sentence matching the story AC summary.
-No MCP syntax — these skills call Python CLI via Bash, not MCP tools.
+No HTTP syntax — these skills call Python CLI via Bash, not HTTP tools.
 
 ## Constraints
 
 - Do not touch any existing skill files.
-- Do not touch mcp_server.py or fsm.py.
-- status_cli.py and log_cli.py must use stdlib only (no mcp package, no yaml needed
+- Do not touch http_server.py or fsm.py.
+- status_cli.py and log_cli.py must use stdlib only (no http package, no yaml needed
   for status — just read STATE.json as JSON).
 
 ## Verify
@@ -174,12 +174,12 @@ Conversation 1 must be complete. Verify:
 ## Context
 
 back and ff are Python CLI scripts with input() confirmation. ff calls
-complete_stage from mcp_server.py directly as a Python function — not via
-the MCP protocol. If complete_stage returns {decide: True}, ff prompts the
+complete_stage from http_server.py directly as a Python function — not via
+the HTTP protocol. If complete_stage returns {decide: True}, ff prompts the
 user for a typed answer via input().
 
 Read before writing:
-  src/pathly_orchestrator/mcp_server.py     (complete_stage + next_action signatures)
+  src/pathly_orchestrator/http_server.py     (complete_stage + next_action signatures)
   src/pathly_orchestrator/status_cli.py     (auto-detect topic pattern to reuse)
   src/pathly_orchestrator/eventlog.py       (EVENTS.jsonl append pattern)
 
@@ -230,7 +230,7 @@ Entry point: main(). Stdlib + pathlib + json + datetime.
 ## ff_cli.py — implement exactly this
 
 Entry point: main(). Import complete_stage and next_action directly:
-  from pathly_orchestrator.mcp_server import complete_stage, next_action
+  from pathly_orchestrator.http_server import complete_stage, next_action
 
 1. Parse optional TOPIC. Auto-detect if absent. Resolve flow, project_root = str(Path.cwd()).
 2. Call next_action(flow=flow, topic=topic, project_root=project_root).
@@ -279,10 +279,10 @@ ff.md:
 
 ## Constraints
 
-- Do not edit mcp_server.py or fsm.py.
+- Do not edit http_server.py or fsm.py.
 - back_cli.py must write STATE.json atomically (tmp + rename).
 - ff_cli.py must import complete_stage as a Python function, NOT via subprocess
-  or MCP protocol.
+  or HTTP protocol.
 
 ## Verify
 
@@ -316,8 +316,8 @@ fix is the only new command that must be an LLM skill — it spawns an agent to
 resolve feedback content. Python cannot do this. No CLI backing script needed.
 
 Read before writing:
-  src/pathly_data/core/skills/team.md                       (topic resolution + MCP pattern)
-  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md         (Scenario 2 blocked panel format)
+  src/pathly_data/core/skills/team.md                       (topic resolution + HTTP pattern)
+  pathly/plans/http-fsm-driver/CONTEXTUAL_MENU_UX.md         (Scenario 2 blocked panel format)
 
 ## Files to create
 
@@ -481,7 +481,7 @@ Conversation 4 must be complete. Verify:
 
 ## Context
 
-This is the deferred work from mcp-fsm-driver Conv 3. Add the contextual state
+This is the deferred work from http-fsm-driver Conv 3. Add the contextual state
 panel to four existing entry-point skills. Edits only — no new files.
 
 Read ALL of these before making any change:
@@ -489,7 +489,7 @@ Read ALL of these before making any change:
   src/pathly_data/core/skills/pause.md
   src/pathly_data/core/skills/end.md
   src/pathly_data/core/skills/start.md
-  pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md   ← authoritative format spec
+  pathly/plans/http-fsm-driver/CONTEXTUAL_MENU_UX.md   ← authoritative format spec
   src/pathly_data/core/skills/team.md   ← topic resolution + next_action call pattern
 
 ## Files to edit

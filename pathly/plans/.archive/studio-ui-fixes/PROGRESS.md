@@ -38,5 +38,5 @@
 ## Blocked By
 - Nothing
 
-## MCP note
-`mcp-fsm-driver` must complete before MCP event subscription can be added. Out of scope here.
+## HTTP note
+`http-fsm-driver` must complete before HTTP event subscription can be added. Out of scope here.

@@ -250,9 +250,9 @@ If verification fails and the fix requires out-of-scope changes, stop and report
 
 Read `pathly/plans/pathly-studio/FEATURE_INDEX.md` first to orient yourself and verify codebase paths.
 
-Conv 3 is complete: all three editor types work (skills, agents, flows). Your job is to add the live monitor panel and the Publish button. This conv also adds the TopBar component and wires up the MCP client + chokidar file watcher in the main process.
+Conv 3 is complete: all three editor types work (skills, agents, flows). Your job is to add the live monitor panel and the Publish button. This conv also adds the TopBar component and wires up the HTTP client + chokidar file watcher in the main process.
 
-**Important:** The MCP tools `get_fsm_state` and `get_events` must be added to `src/pathly_orchestrator/mcp_server.py` as read-only tools. If `mcp_server.py` does not yet exist (mcp-fsm-driver plan not complete), implement the file-watch path only and log a warning when MCP ping fails — do NOT block this conversation on mcp-fsm-driver completion.
+**Important:** The HTTP tools `get_fsm_state` and `get_events` must be added to `src/pathly_orchestrator/http_server.py` as read-only tools. If `http_server.py` does not yet exist (http-fsm-driver plan not complete), implement the file-watch path only and log a warning when HTTP ping fails — do NOT block this conversation on http-fsm-driver completion.
 
 ### What to build
 
@@ -260,11 +260,11 @@ Conv 3 is complete: all three editor types work (skills, agents, flows). Your jo
 Fixed height bar at top of the window (above sidebar + main panel in App.tsx layout). Contains:
 - Left: "Pathly Studio" text
 - Center: topic selector `<select>` — options loaded from `pathly/plans/` subdirs (excluding `.archive/`). Calls `store.setActiveTopic(value)` on change. Refreshes every 5 seconds.
-- Right: connection status badge (`● MCP live` green / `○ File watch` grey) + `[↑ Publish]` button
+- Right: connection status badge (`● HTTP live` green / `○ File watch` grey) + `[↑ Publish]` button
 
 **Phase 4.2 — Monitor panel** (`studio/src/renderer/src/components/Monitor/index.tsx`)
 When `store.activePanel === 'monitor'`:
-1. On mount: call `window.pathly.mcp.ping()` — if true set `store.monitorSource = 'mcp'`; else set `store.monitorSource = 'filewatch'` and start file watch
+1. On mount: call `window.pathly.http.ping()` — if true set `store.monitorSource = 'http'`; else set `store.monitorSource = 'filewatch'` and start file watch
 2. Render `<FsmView>` + `<EventLog>` stacked vertically
 3. If no `activeTopic`: show "Select a topic above to monitor"
 
@@ -294,14 +294,14 @@ Renderer listens for `watch:event` and dispatches to store:
 - `STATE.json` change → `store.setFsmState(JSON.parse(content))`
 - `EVENTS.jsonl` change → parse last 50 lines as JSON, `store.setEvents(events)`
 
-**Phase 4.6 — MCP client** (`studio/src/main/ipc/mcp.ts`)
+**Phase 4.6 — HTTP client** (`studio/src/main/ipc/http.ts`)
 ```ts
-ipcMain.handle('mcp:ping', async () => { /* attempt tool call, return bool within 500ms */ })
-ipcMain.handle('mcp:state', async (_, topic: string) => { /* call get_fsm_state(topic) */ })
+ipcMain.handle('http:ping', async () => { /* attempt tool call, return bool within 500ms */ })
+ipcMain.handle('http:state', async (_, topic: string) => { /* call get_fsm_state(topic) */ })
 ```
-Poll `mcp:state` every 2 seconds when `monitorSource === 'mcp'`. On error: fall back to `filewatch`.
+Poll `http:state` every 2 seconds when `monitorSource === 'http'`. On error: fall back to `filewatch`.
 
-Add to preload: `window.pathly.mcp = { ping, state }` and `window.pathly.watch = { start }`.
+Add to preload: `window.pathly.http = { ping, state }` and `window.pathly.watch = { start }`.
 
 **Phase 4.7 — Publish** (`studio/src/main/ipc/shell.ts`)
 ```ts
@@ -318,8 +318,8 @@ TopBar Publish button: disabled while `store.publishing`. On click: set `store.p
 Add to preload: `window.pathly.shell = { publish, onOutput }`.
 
 ### Constraints
-- Do NOT modify existing Python source files except adding two read-only tools to `mcp_server.py`.
-- If `mcp_server.py` does not exist: skip Phase 4.6, note it as follow-up.
+- Do NOT modify existing Python source files except adding two read-only tools to `http_server.py`.
+- If `http_server.py` does not exist: skip Phase 4.6, note it as follow-up.
 
 ### Verify
 ```

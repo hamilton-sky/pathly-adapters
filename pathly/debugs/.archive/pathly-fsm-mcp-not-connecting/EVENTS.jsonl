@@ -1,3 +1,0 @@
-{"type": "STATE_TRANSITION", "to": "REPRODUCING"}
-{"type": "STATE_TRANSITION", "to": "ROOT_CAUSE_FOUND"}
-{"type": "STATE_TRANSITION", "to": "FIXING"}

@@ -19,7 +19,7 @@ The architecture is well-organized into clean layers:
 - Installer layer (setup_command, materialize, hook registration)
 - Orchestrator layer (state machine, event log, FSM engine)
 - Flow & skills layer (YAML definitions, markdown skill prompts)
-- Telemetry layer (MCP server, record_activity)
+- Telemetry layer (HTTP server, record_activity)
 
 Dependency direction is one-way downward. File structure is easy to navigate. Layer responsibilities are clearly separated.
 
@@ -70,7 +70,7 @@ The explore flow was successfully executed in this run (FRAMING → ANALYZING �
 
 6. **Windows file locking missing:** No msvcrt.locking() fallback on Windows. Concurrent appends to EVENTS.jsonl could corrupt the file.
 
-7. **record_activity tool not documented:** The MCP telemetry tool is not mentioned in README.md or docs/PATHLY_ARCHITECTURE.md. New LLM agents may not discover it.
+7. **record_activity tool not documented:** The HTTP telemetry tool is not mentioned in README.md or docs/PATHLY_ARCHITECTURE.md. New LLM agents may not discover it.
 
 **Verdict:** Hooks work for the happy path (env var set, file writable, schema stable). The 7 issues are fixable. No showstoppers.
 
@@ -132,10 +132,10 @@ All improvements are **concrete and testable**. None require architectural chang
 - **Time:** < 1 hour
 
 **Improvement 7: Document record_activity tool**
-- **Files:** `README.md`, `src/install_cli/mcp_config.py`, `docs/PATHLY_ARCHITECTURE.md:125`
+- **Files:** `README.md`, `src/install_cli/http_config.py`, `docs/PATHLY_ARCHITECTURE.md:125`
 - **Action:** 
-  - Add one sentence to `mcp_config.py` docstring: "Registers the pathly-telemetry MCP server, which exposes record_activity to log agent work."
-  - Add a note to README.md under "MCP" or "Telemetry" section: "Agents automatically call record_activity to report completion."
+  - Add one sentence to `http_config.py` docstring: "Registers the pathly-telemetry HTTP server, which exposes record_activity to log agent work."
+  - Add a note to README.md under "HTTP" or "Telemetry" section: "Agents automatically call record_activity to report completion."
 - **Time:** < 30 min
 
 ---
@@ -150,7 +150,7 @@ This exploration cross-referenced prior findings from `pathly/explorations/archi
 | Risk 2: Codex clean-machine gap | No | Out of scope (adapter-specific) |
 | Risk 3: orchestrator dual role (no schema version) | Relevant | Yes — Improvement 5 addresses schema versioning |
 | Risk 4: Version drift in docs | Partially relevant | Yes — docs mention hooks, but no improvements needed beyond Improvement 1 |
-| Risk 5: mcp_config opaque | Relevant | Yes — Improvement 7 addresses documentation |
+| Risk 5: http_config opaque | Relevant | Yes — Improvement 7 addresses documentation |
 
 **Conclusion:** This exploration has identified the root causes of prior risks and specified fixes.
 
@@ -166,7 +166,7 @@ Each improvement is testable:
 4. **Improvement 4:** Add pre-flight check tests: missing PATHLY_PROJECT_ROOT → exit 1, plans/ not writable → exit 1.
 5. **Improvement 5:** Parse EVENTS.jsonl, verify first line is `{"schema_version": "1.0"}`.
 6. **Improvement 6:** Run on Windows with concurrent appends; verify EVENTS.jsonl is not corrupted.
-7. **Improvement 7:** Build HTML docs; verify mcp_config.py and record_activity appear in output.
+7. **Improvement 7:** Build HTML docs; verify http_config.py and record_activity appear in output.
 
 ---
 

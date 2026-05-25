@@ -21,7 +21,7 @@
 - [x] Phase 3 — Verify / add manifest traversal guard
 - [x] Phase 4 — `tests/test_hooks.py`
 - [x] Phase 5 — Manifest traversal test
-- [x] Phase 6 — `tests/test_mcp_config.py`
+- [x] Phase 6 — `tests/test_http_config.py`
 
 **Done when:** `pytest -q` passes with all new tests collected and passing.
 

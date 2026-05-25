@@ -133,7 +133,7 @@ error TS2339: Property 'clipboard' does not exist on type '{ fs: ...; shell: ...
 
 **Root cause:** Terminal components (added in Conv 5) reference `window.pathly.clipboard.*`
 for copy/paste, but this namespace was never declared in `global.d.ts`. The `global.d.ts`
-defines `fs`, `shell`, `mcp`, `watch`, `terminal`, and `setup` — no `clipboard` entry.
+defines `fs`, `shell`, `http`, `watch`, `terminal`, and `setup` — no `clipboard` entry.
 
 **Expected:** `window.pathly.clipboard` typed in global.d.ts.
 **Actual:** Property missing → 4 type errors.

@@ -2,9 +2,9 @@
 
 _Rigor: standard — 5 conversations._
 
-**Prerequisite:** `mcp-fsm-driver` all 4 conversations complete. Verify:
+**Prerequisite:** `http-fsm-driver` all 4 conversations complete. Verify:
 ```bash
-python -c "from pathly_orchestrator.mcp_server import next_action, complete_stage; print('OK')"
+python -c "from pathly_orchestrator.http_server import next_action, complete_stage; print('OK')"
 grep "next_action\|complete_stage" src/pathly_data/core/skills/team.md
 ```
 
@@ -15,7 +15,7 @@ runs `pathly-status` via Bash and prints the output. Also callable directly from
 any terminal without opening a conversation.
 
 **Menu spec:** Skill files that display state must read
-`pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md` for the exact panel format.
+`pathly/plans/http-fsm-driver/CONTEXTUAL_MENU_UX.md` for the exact panel format.
 
 ---
 
@@ -244,7 +244,7 @@ pytest -q
 
 **Scope:** Two Python CLI scripts + two thin skill wrappers. `pathly-back` reads
 EVENTS.jsonl and writes STATE.json with `input()` confirmation. `pathly-ff` calls
-`complete_stage` via the MCP server's Python API; if `{decide: true}` is returned
+`complete_stage` via the HTTP server's Python API; if `{decide: true}` is returned
 it prompts via `input()` — no LLM needed.
 
 **Natural seam:** After this conversation the two most common FSM corrections
@@ -255,7 +255,7 @@ it prompts via `input()` — no LLM needed.
 | File | Type | Change |
 |------|------|--------|
 | `src/pathly_orchestrator/back_cli.py` | Python | One-state rollback |
-| `src/pathly_orchestrator/ff_cli.py` | Python | Fast-forward via MCP |
+| `src/pathly_orchestrator/ff_cli.py` | Python | Fast-forward via HTTP |
 | `src/pathly_data/core/skills/back.md` | Skill wrapper | Calls `pathly-back` |
 | `src/pathly_data/core/skills/ff.md` | Skill wrapper | Calls `pathly-ff` |
 | `src/pathly_data/adapters/claude/_meta/back_skill.yaml` | Adapter | Claude |
@@ -290,8 +290,8 @@ Steps:
 
 ### `ff_cli.py` — what to implement
 
-Import and call `complete_stage` from `pathly_orchestrator.mcp_server` directly
-(not via the MCP protocol — just a regular Python function call).
+Import and call `complete_stage` from `pathly_orchestrator.http_server` directly
+(not via the HTTP protocol — just a regular Python function call).
 
 Steps:
 1. Parse topic (auto-detect if absent). Resolve `flow`, `project_root = str(Path.cwd())`.
@@ -347,8 +347,8 @@ Thin wrappers are not applicable here; this is a full skill.
 ### `fix.md` — what to implement
 
 Read before writing:
-- `src/pathly_data/core/skills/team.md` (topic resolution + MCP call pattern)
-- `pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md` (Scenario 2 blocked panel)
+- `src/pathly_data/core/skills/team.md` (topic resolution + HTTP call pattern)
+- `pathly/plans/http-fsm-driver/CONTEXTUAL_MENU_UX.md` (Scenario 2 blocked panel)
 
 Steps:
 1. Resolve TOPIC (auto-detect if absent). Resolve `flow`, `project_root`.
@@ -449,10 +449,10 @@ grep "feedback_routing" src/pathly_data/core/skills/meet.md
 
 **Stories:** S7
 
-**Scope:** Deferred from mcp-fsm-driver Conv 3. Add contextual state panel to
+**Scope:** Deferred from http-fsm-driver Conv 3. Add contextual state panel to
 four existing entry-point skills. Edits only — no new files.
 
-Read `pathly/plans/mcp-fsm-driver/CONTEXTUAL_MENU_UX.md` before touching any file.
+Read `pathly/plans/http-fsm-driver/CONTEXTUAL_MENU_UX.md` before touching any file.
 
 ### Files to edit
 

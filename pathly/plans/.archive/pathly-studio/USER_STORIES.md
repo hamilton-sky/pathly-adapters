@@ -104,9 +104,9 @@ state,
 - FSM progress bar shows all states in order; active state is highlighted; completed states are checked
 - Event log shows entries from EVENTS.jsonl: `HH:MM:SS  EVENT_TYPE  detail`, newest at bottom
 - Monitor auto-detects data source:
-  - If MCP server responds to ping within 500ms → reads state via `get_fsm_state` MCP tool call
+  - If HTTP server responds to ping within 500ms → reads state via `get_fsm_state` HTTP tool call
   - Otherwise → watches `pathly/plans/<topic>/STATE.json` and `EVENTS.jsonl` with chokidar
-- Connection status badge in top bar: `● MCP live` (green) or `○ File watch` (grey)
+- Connection status badge in top bar: `● HTTP live` (green) or `○ File watch` (grey)
 - New events appear without manual refresh
 
 ---

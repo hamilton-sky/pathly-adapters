@@ -78,7 +78,7 @@ pathly-validate-flow <flow.yaml>    # validate a flow YAML against the FSM schem
 
 ## FSM HTTP Server
 
-Pathly skills communicate with the Python FSM engine over HTTP, not MCP. The server runs locally on port 8765 and is auto-started by the `fsm-call` skill when needed — no manual setup required.
+Pathly skills communicate with the Python FSM engine over HTTP. The server runs locally on port 8765 and is auto-started by the `fsm-call` skill when needed - no manual setup required.
 
 ```
 POST http://127.0.0.1:8765/next_action       ← get current state + agent instructions
@@ -136,7 +136,7 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 Stable (2.9.0). Core install path (`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on failure. Copilot destination paths follow the VS Code Copilot agent spec and may require `--repair` after a VS Code update.
 
-**2.9.0 changes:** FSM and telemetry transport moved from MCP to HTTP. All skills now use the shared `fsm-call` skill which auto-starts the HTTP server. `mcp_config.py` removed; no MCP servers are registered during install.
+**2.9.0 changes:** FSM and telemetry run over HTTP. All skills now use the shared `fsm-call` skill, which auto-starts the HTTP server. No local transport server is registered during install.
 
 ## Known Limitations
 

@@ -32,6 +32,6 @@
 ## User browses a debug session
 
 1. User expands DEBUGS in sidebar
-2. Sees: `missing-inputs-in-meta-schema/`, `claude-hooks-not-registered/`, `pathly-fsm-mcp-connection/`
+2. Sees: `missing-inputs-in-meta-schema/`, `claude-hooks-not-registered/`, `pathly-fsm-http-connection/`
 3. User expands `claude-hooks-not-registered/` → sees `SYMPTOM.md`, `ROOT_CAUSE.md`, `FIX.md`
 4. User clicks `ROOT_CAUSE.md` → file opens in editor

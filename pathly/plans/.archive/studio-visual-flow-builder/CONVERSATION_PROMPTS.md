@@ -28,7 +28,7 @@ Architectural rules to observe:
 - Canvas positions are UI state only unless an explicit layout persistence design is added later.
 - Do not introduce a new flow schema in this conversation.
 
-Do NOT touch drag/drop library behavior, inspector redesign, YAML export, terminal panes, monitor, setup, installer, or backend MCP code yet.
+Do NOT touch drag/drop library behavior, inspector redesign, YAML export, terminal panes, monitor, setup, installer, or backend HTTP code yet.
 
 Verify: cd studio; npm run typecheck
 On Windows, use `npm.cmd run typecheck` if the PowerShell `npm.ps1` shim is blocked by execution policy.
@@ -68,7 +68,7 @@ Architectural rules to observe:
 - Drag/drop on workspace plan, debug, or exploration rows is OUT OF SCOPE.
 - Editing skills/agents/templates from inside the flow editor is OUT OF SCOPE.
 
-Do NOT touch node inspector redesign, edge inspector redesign, validation UI, export targets, installer, MCP, or plan/monitor features yet.
+Do NOT touch node inspector redesign, edge inspector redesign, validation UI, export targets, installer, HTTP, or plan/monitor features yet.
 
 Verify: cd studio; npm run typecheck
 On Windows, use `npm.cmd run typecheck` if the PowerShell `npm.ps1` shim is blocked by execution policy.
@@ -108,7 +108,7 @@ Architectural rules to observe:
 - Validation messages should be short, local, and actionable. No banners.
 - State rename is OUT OF SCOPE; show state id as read-only with a hint pointing to YAML view.
 
-Do NOT touch export file writes, installer logic, MCP servers, terminal panes, or monitor views yet.
+Do NOT touch export file writes, installer logic, HTTP servers, terminal panes, or monitor views yet.
 
 Verify: cd studio; npm run typecheck
 On Windows, use `npm.cmd run typecheck` if the PowerShell `npm.ps1` shim is blocked by execution policy.
@@ -145,7 +145,7 @@ Architectural rules to observe:
 - Export target adapters may write host-specific files but must not silently mutate the source graph.
 - Export should be disabled or warning-gated when validation fails.
 
-Do NOT touch installer packaging, MCP runtime code, monitor event processing, or unrelated Studio layout polish.
+Do NOT touch installer packaging, HTTP runtime code, monitor event processing, or unrelated Studio layout polish.
 
 Verify: cd studio; npm run typecheck
 On Windows, use `npm.cmd run typecheck` if the PowerShell `npm.ps1` shim is blocked by execution policy.

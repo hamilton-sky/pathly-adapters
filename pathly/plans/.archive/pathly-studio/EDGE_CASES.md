@@ -34,9 +34,9 @@
 
 ---
 
-## E5 — MCP server not running
+## E5 — HTTP server not running
 
-**Situation:** Monitor opens, MCP ping times out (> 500ms).
+**Situation:** Monitor opens, HTTP ping times out (> 500ms).
 **Expected:** Silently falls back to file watch. Badge shows `○ File watch`. No error dialog.
 If file watch also fails (no STATE.json for the topic): shows "No state file found for `<topic>`. Run the pipeline first."
 **Risk:** Low — expected scenario for LLM-driven mode users.
