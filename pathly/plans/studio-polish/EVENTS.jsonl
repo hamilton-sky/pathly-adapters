@@ -1,0 +1,8 @@
+{"type": "STATE_TRANSITION", "to": "STORMING"}
+{"type": "STATE_TRANSITION", "to": "PLANNING"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "DESIGNING", "ts": "2026-05-25T15:02:32.975500+00:00"}
+{"type": "FILE_CREATED", "file": "DESIGN.md"}
+{"type": "STAGE_COMPLETE", "stage": "DESIGNING", "next": "BUILDING"}
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "ts": "2026-05-25T15:03:37.447918+00:00"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance"}
+{"type": "STAGE_COMPLETE", "stage": "PLANNING", "next": "BUILDING"}
