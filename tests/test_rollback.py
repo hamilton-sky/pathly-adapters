@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -82,3 +81,32 @@ def test_uninstall_without_manifest_returns_empty(tmp_path):
     """uninstall() on a dir with no manifest is a no-op and returns []."""
     result = uninstall(tmp_path)
     assert result == []
+
+
+def test_rollback_exceptions_logged_to_stderr(capsys, monkeypatch):
+    """If uninstall() raises during rollback, the error is logged to stderr."""
+    import install_cli.setup_command as sc
+
+    # Make materialize succeed (adds dest to written_dests), then materialize_flows raise
+    # so the except block is entered and uninstall is attempted.
+    call_count = {"n": 0}
+
+    def fake_materialize(files, _dest, **_kwargs):
+        call_count["n"] += 1
+        return list(files.keys())
+
+    def fake_materialize_flows(_dest, **_kwargs):
+        raise OSError("simulated mid-install failure")
+
+    def fake_uninstall(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(sc, "materialize", fake_materialize)
+    monkeypatch.setattr(sc, "materialize_flows", fake_materialize_flows)
+    monkeypatch.setattr(sc, "uninstall", fake_uninstall)
+
+    with pytest.raises(OSError):
+        sc._run_host("claude", dry_run=False, repair=False, force=False)
+
+    captured = capsys.readouterr()
+    assert "[pathly rollback error]" in captured.err

@@ -27,7 +27,7 @@ def test_host_markers_cover_all_supported_hosts():
     assert "copilot" in _HOST_MARKERS
 
 
-def test_detect_claude_when_dir_missing(tmp_path, monkeypatch):
+def test_detect_claude_when_dir_missing(tmp_path):
     with patch("install_cli.detect._HOST_MARKERS", {"claude": [tmp_path / "nonexistent"]}):
         result = detect_hosts()
     assert "claude" not in result
@@ -96,7 +96,7 @@ def test_materialize_without_repair_skips_owned(tmp_path):
 # setup_command
 # ---------------------------------------------------------------------------
 
-def test_no_flags_launches_interactive_menu(capsys):
+def test_no_flags_launches_interactive_menu():
     # With no flags, main() delegates to _interactive_menu rather than writing
     # files directly. Patch the menu to return immediately (simulating Exit).
     with patch.object(sys, "argv", ["pathly-setup"]):
@@ -128,7 +128,7 @@ def test_apply_calls_run_host_without_dry_run():
     mock_run.assert_called_once_with("claude", dry_run=False, repair=False, force=False)
 
 
-def test_no_detected_hosts_exits(capsys):
+def test_no_detected_hosts_exits():
     with patch.object(sys, "argv", ["pathly-setup", "--dry-run"]):
         with patch("install_cli.setup_command.detect_hosts", return_value=[]):
             with pytest.raises(SystemExit) as exc:
@@ -197,3 +197,20 @@ def test_uninstall_clean_manifest(tmp_path):
 
     assert removed == ["agent.md"]
     assert not tracked_file.exists()
+
+
+def test_materialize_raises_on_tampered_manifest(tmp_path):
+    from install_cli.materialize import materialize, MANIFEST_NAME
+    # Write a manifest with a bad hash
+    manifest = {
+        "_manifest_version": "1",
+        "_manifest_hash": "deadbeef",  # wrong hash
+        "files": {"agent.md": "2024-01-01T00:00:00+00:00"},
+    }
+    (tmp_path / MANIFEST_NAME).write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8"
+    )
+    (tmp_path / "agent.md").write_text("# agent", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="Manifest integrity check failed"):
+        materialize({"agent.md": "# updated"}, tmp_path)
