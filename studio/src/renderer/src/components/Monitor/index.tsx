@@ -8,6 +8,7 @@ import { HealthCheck } from './HealthCheck'
 import { Tooltip } from '../ui/Tooltip'
 import type { FsmEvent } from '../../types/index'
 import { watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
+import { useInjectCSS, useAgentTelemetry } from './utils'
 
 type FlowType = 'team' | 'debug' | 'explore'
 
@@ -40,6 +41,20 @@ const LIVE_BADGE_CSS = `
   .pathly-live-dot { animation: pathly-live-breathe 2s ease-in-out infinite; }
 }
 `
+
+const EMPTY_TOOLTIP = 'Waiting for AGENT_DONE events with telemetry'
+
+function fmtTokens(n: number): string {
+  if (n === 0) return '—'
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
+function fmtWall(n: number | undefined): string {
+  return n == null ? '—' : `${n}s`
+}
+function fmtCost(n: number): string {
+  return n === 0 ? '—' : `$${n.toFixed(2)}`
+}
 
 function makeStyles(t: Theme): Record<string, React.CSSProperties> {
   return {
@@ -90,15 +105,8 @@ function makeStyles(t: Theme): Record<string, React.CSSProperties> {
 function HeaderBar(): JSX.Element {
   const { fsmState, activeTopic, monitorSource } = useStore()
   const t = useTheme()
-  const styleInjectedRef = useRef(false)
 
-  useEffect(() => {
-    if (styleInjectedRef.current) return
-    styleInjectedRef.current = true
-    const style = document.createElement('style')
-    style.textContent = LIVE_BADGE_CSS
-    document.head.appendChild(style)
-  }, [])
+  useInjectCSS(LIVE_BADGE_CSS)
 
   const flow = fsmState?.flow as string | undefined
   const topic = fsmState?.feature
@@ -275,35 +283,14 @@ function TabBar({ sessions, activeTab, onTabSelect }: TabBarProps): JSX.Element 
 }
 
 function MetricsStrip(): JSX.Element {
-  const events = useStore((s) => s.events)
   const t = useTheme()
-
-  const agentDone = events.filter((e) => e.type === 'AGENT_DONE')
-  const totalTokens = agentDone.reduce((s, e) => s + (e.tokens_in ?? 0) + (e.tokens_out ?? 0), 0)
-  const lastWall = agentDone.length > 0 ? agentDone[agentDone.length - 1].wall_seconds : undefined
-  const totalCost = agentDone.reduce((s, e) => s + (e.cost_usd ?? 0), 0)
-
-  const noTelemetry = events.length > 0 && agentDone.length === 0
-
-  function fmtTokens(n: number): string {
-    if (n === 0) return '—'
-    if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
-    return String(n)
-  }
-  function fmtWall(n: number | undefined): string {
-    return n == null ? '—' : `${n}s`
-  }
-  function fmtCost(n: number): string {
-    return n === 0 ? '—' : `$${n.toFixed(2)}`
-  }
-
-  const EMPTY_TOOLTIP = 'Waiting for AGENT_DONE events with telemetry'
+  const { totalTokens, lastWall, totalCost, noTelemetry, eventsCount } = useAgentTelemetry()
 
   const tiles: { label: string; value: string; empty: boolean; tooltip?: string }[] = [
     { label: 'TOKENS', value: fmtTokens(totalTokens), empty: totalTokens === 0, tooltip: EMPTY_TOOLTIP },
     { label: 'WALL',   value: fmtWall(lastWall),      empty: lastWall == null,  tooltip: EMPTY_TOOLTIP },
     { label: 'COST',   value: fmtCost(totalCost),     empty: totalCost === 0,   tooltip: EMPTY_TOOLTIP },
-    { label: 'EVENTS', value: String(events.length),  empty: false },
+    { label: 'EVENTS', value: String(eventsCount),    empty: false },
   ]
 
   return (

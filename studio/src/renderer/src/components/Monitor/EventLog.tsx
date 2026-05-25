@@ -3,6 +3,7 @@ import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import type { Theme } from '../../theme'
 import type { FsmEvent } from '../../types/index'
+import { useInjectCSS, useAgentTelemetry } from './utils'
 
 const FLASH_CSS = `
 @keyframes pathly-row-flash {
@@ -168,24 +169,17 @@ export function EventLog(): JSX.Element {
   const events = useStore((s) => s.events)
   const t = useTheme()
   const styles = makeStyles(t)
+  const { totalIn, totalOut, totalCost, agentDone } = useAgentTelemetry()
+
+  useInjectCSS(FLASH_CSS)
 
   const logRef = useRef<HTMLDivElement>(null)
   const autoScrollRef = useRef(true)
   const prevLengthRef = useRef(0)
   const newCountRef = useRef(0)
-  const flashCountRef = useRef(0)
-  const styleInjectedRef = useRef(false)
 
   const [newCount, setNewCount] = useState(0)
-  const [, forceUpdate] = useState(0)
-
-  useEffect(() => {
-    if (styleInjectedRef.current) return
-    styleInjectedRef.current = true
-    const style = document.createElement('style')
-    style.textContent = FLASH_CSS
-    document.head.appendChild(style)
-  }, [])
+  const [flashStart, setFlashStart] = useState(Infinity)
 
   useEffect(() => {
     const added = events.length - prevLengthRef.current
@@ -204,12 +198,10 @@ export function EventLog(): JSX.Element {
       setNewCount(newCountRef.current)
     }
 
-    flashCountRef.current = added
-    forceUpdate((n) => n + 1)
+    setFlashStart(events.length - added)
 
     const timer = setTimeout(() => {
-      flashCountRef.current = 0
-      forceUpdate((n) => n + 1)
+      setFlashStart(Infinity)
     }, 500)
 
     return () => clearTimeout(timer)
@@ -236,14 +228,6 @@ export function EventLog(): JSX.Element {
     newCountRef.current = 0
     setNewCount(0)
   }
-
-  const agentDone = events.filter((e) => e.type === 'AGENT_DONE')
-  const totalIn = agentDone.reduce((s, e) => s + (e.tokens_in ?? 0), 0)
-  const totalOut = agentDone.reduce((s, e) => s + (e.tokens_out ?? 0), 0)
-  const totalCost = agentDone.reduce((s, e) => s + (e.cost_usd ?? 0), 0)
-  const hasTelemetry = agentDone.length > 0
-
-  const flashStart = events.length - flashCountRef.current
 
   return (
     <div style={styles.container}>
@@ -295,7 +279,7 @@ export function EventLog(): JSX.Element {
             &nbsp;&nbsp;
             {totalCost > 0 ? `$${totalCost.toFixed(4)}` : '—'}
           </span>
-          {!hasTelemetry && agentDone.length > 0 && (
+          {agentDone.length > 0 && totalCost === 0 && (
             <span style={{ ...styles.totalsLabel, marginLeft: 12, opacity: 0.5 }}>
               (no telemetry — FSM needs cost_usd in AGENT_DONE events)
             </span>

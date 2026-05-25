@@ -2,12 +2,10 @@ import { useEffect, useRef } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import { Tooltip } from '../ui/Tooltip'
+import { useInjectCSS } from './utils'
 
 const COMPLETED_GREEN = '#16A34A'
 const ACTIVE_CYAN = '#06B6D4'
-const BLOCKED_AMBER = '#FBBF24'  // reserved for future blocked state
-
-void BLOCKED_AMBER  // suppress unused warning
 
 const PULSE_CSS = `
 @keyframes pathly-pulse {
@@ -63,15 +61,8 @@ export function FsmView(): JSX.Element {
   const fsmState = useStore((s) => s.fsmState)
   const pipelineStates = useStore((s) => s.pipelineStates)
   const t = useTheme()
-  const styleInjectedRef = useRef(false)
 
-  useEffect(() => {
-    if (styleInjectedRef.current) return
-    styleInjectedRef.current = true
-    const style = document.createElement('style')
-    style.textContent = PULSE_CSS
-    document.head.appendChild(style)
-  }, [])
+  useInjectCSS(PULSE_CSS)
 
   const PIPELINE = (pipelineStates.length > 0
     ? pipelineStates
@@ -120,28 +111,28 @@ export function FsmView(): JSX.Element {
             <div key={state} style={{ display: 'flex', alignItems: 'flex-start', flex: isLast ? '0 0 auto' : 1, minWidth: 0 }}>
               {/* Dot + label column */}
               <Tooltip label={`${state} — ${status}`} placement="bottom" delay={200}>
-              <div
-                aria-label={`${state}: ${status}`}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, cursor: 'default' }}
-              >
-                <TimelineDot status={status} currentState={activeState ?? ''} />
-                <span style={{
-                  fontSize: '9px',
-                  color: labelColor,
-                  marginTop: '3px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.03em',
-                  maxWidth: '34px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  textAlign: 'center',
-                  fontFamily: t.fontFamilyMono,
-                  fontWeight: status === 'active' ? 600 : 400,
-                }}>
-                  {state.slice(0, 8)}
-                </span>
-              </div>
+                <div
+                  aria-label={`${state}: ${status}`}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, cursor: 'default' }}
+                >
+                  <TimelineDot status={status} currentState={activeState ?? ''} />
+                  <span style={{
+                    fontSize: '9px',
+                    color: labelColor,
+                    marginTop: '3px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.03em',
+                    maxWidth: '34px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    textAlign: 'center',
+                    fontFamily: t.fontFamilyMono,
+                    fontWeight: status === 'active' ? 600 : 400,
+                  }}>
+                    {state.slice(0, 8)}
+                  </span>
+                </div>
               </Tooltip>
 
               {/* Connector line (not after last dot) */}
