@@ -12,11 +12,69 @@ component specs, and the interaction model.
 
 ## Pre-flight
 
-Before Conversation 1:
+Before Conversation 0:
 ```
 cd studio && npm run typecheck
 ```
-Record any pre-existing failures as baseline.
+Record any pre-existing failures as baseline. Conv 0 must not introduce new errors.
+
+---
+
+## Phase 0a: Fix ALLOWED_SHELLS   ← Conversation 0
+
+**File:** `studio/src/main/ipc/terminal.ts` — MODIFY
+**Done when:** Clicking `A Claude` and `✳ Codex` buttons in Studio launches terminal tabs without error
+**Delivers:** S0.3
+**Details:**
+- Line 13: `ALLOWED_SHELLS` only contains bash/zsh/shell variants — add `'claude'` and `'codex'`
+- This is an existing bug: the PaneTabBar passes `'claude'`/`'codex'` as the command to `terminal:spawn`,
+  which the allowlist rejects with "Shell not allowed"
+- After this fix, Claude Code and Codex tabs will open correctly
+
+---
+
+## Phase 0b: Compact terminal dock   ← Conversation 0
+
+**Files:** `studio/src/renderer/src/components/Terminal/index.tsx` — MODIFY,
+`studio/src/renderer/src/components/Terminal/Terminal.module.css` (or equivalent) — MODIFY
+**Done when:** Terminal area is 180px tall when a session is open; 72px when no session is open; no large blank dead zone
+**Delivers:** S0.1
+**Details:**
+- Read the current height value (index.tsx line 18 is reportedly 260px) — confirm and change to 180px
+- **Empty state (no open tabs):** shrink terminal area to 72px tall; replace "Press + to open a terminal"
+  centered text with a compact inline row:
+  ```
+  No terminal open.    [+ Shell]  [Open Claude]  [Open Codex]
+  ```
+  Buttons call the existing `handleLaunch` function directly
+- **Active state:** full 180px height, normal terminal output
+- Transition: `height 150ms ease-out` when switching between empty and active states
+- Do NOT change any PTY logic, spawning, or data flow
+
+---
+
+## Phase 0c: Session vs launcher hierarchy in tab bar   ← Conversation 0
+
+**Files:** `studio/src/renderer/src/components/Terminal/PaneTabBar.tsx` — MODIFY,
+CSS module — MODIFY
+**Done when:** Active session tabs and new-session launcher buttons are visually distinct; active tab is clearly legible
+**Delivers:** S0.2
+**Details:**
+- **Current problem:** `+ Shell`, `A Claude`, `✳ Codex` all look like identical tabs whether they are
+  live sessions or launch buttons — no visual hierarchy
+- **New layout:**
+  ```
+  Sessions: [● A Claude  ×]  [✳ Codex  ×]     │  New: [+ Shell] [+ Claude] [+ Codex]
+  ```
+  - Left side: open session tabs — filled background, colored dot (blue=Claude, amber=Codex),
+    close `×` button per tab, active tab has accent-colored bottom border
+  - Right side: launcher buttons — muted style, clearly secondary, separated by a `│` divider
+  - If no sessions open: only launcher buttons visible (no empty tab strip)
+- **Active tab style:** `background: var(--surface2)`, `border-bottom: 2px solid var(--accent)`,
+  label full opacity; inactive tabs: `background: transparent`, 60% opacity
+- **Split mode:** one shared dock header row; each pane has its own compact session tab strip
+  below it (no duplicate full tab bars)
+- Use existing Studio design tokens — do not introduce new colors
 
 ## Layer Architecture
 

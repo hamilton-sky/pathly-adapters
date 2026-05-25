@@ -6,6 +6,9 @@
 
 | Story | Title | Delivered by | Status |
 |-------|-------|--------------|--------|
+| S0.1 | Terminal dock is compact and IDE-style | Conv 0 | TODO |
+| S0.2 | Sessions and launchers have clear visual hierarchy | Conv 0 | TODO |
+| S0.3 | ALLOWED_SHELLS accepts claude and codex | Conv 0 | TODO |
 | S1.1 | phi4-mini explainer responds via SSE | Conv 1 | TODO |
 | S1.2 | System prompt includes active Pathly context | Conv 1 | TODO |
 | S2.1 | Collapsible Conductor panel | Conv 2 | TODO |
@@ -24,8 +27,9 @@
 
 | Conv | Phases | Stories | Status | Verify |
 |------|--------|---------|--------|--------|
+| 0 | 0a–0c | S0.1, S0.2, S0.3 | TODO | `cd studio && npm run typecheck` + visual check in Studio |
 | 1 | 1–3 | S1.1, S1.2 | TODO | `curl -X POST http://127.0.0.1:8765/chat -d '{"message":"explain /pathly build","matchedSkill":"build","history":[]}'` |
-| 2 | 4–8 | S2.1, S2.2, S2.3 | TODO | `cd studio && npm run typecheck` |
+| 2 | 4–8 | S2.1, S2.2, S2.3, S2.4 | TODO | `cd studio && npm run typecheck` |
 | 3 | 9–11 | S3.1, S3.2 | TODO | `cd studio && npm run typecheck` |
 | 4 | 12–14 | S4.1, S4.2 | TODO | `cd studio && npm run typecheck` |
 | 5 | 15–18 | S5.1, S5.2, S5.3 | TODO | `cd studio && npm run typecheck` |
@@ -34,7 +38,10 @@
 
 | Conv | Phase | File | Description | Done when | Status |
 |------|-------|------|-------------|-----------|--------|
-| 1 | 1 | `src/pathly_orchestrator/http_server.py` | Add POST /chat SSE skeleton | curl returns 200 | TODO |
+| 0 | 0a | `studio/src/main/ipc/terminal.ts` | Add claude+codex to ALLOWED_SHELLS | Terminal tabs launch without "Shell not allowed" | TODO |
+| 0 | 0b | `Terminal/index.tsx` + CSS | Compact dock: 180px default, 72px empty, inline launchers | No blank dead zone, launch buttons visible | TODO |
+| 0 | 0c | `Terminal/PaneTabBar.tsx` + CSS | Sessions vs launchers hierarchy, active tab styling | Clear visual separation, active tab legible | TODO |
+| 1 | 1 | `src/pathly_orchestrator/http_server.py` | Add POST /chat SSE skeleton + GET /status | curl returns 200, /status returns stage | TODO |
 | 1 | 2 | `src/pathly_orchestrator/chat_agent.py` | phi4-mini explainer agent | Streams 2-3 sentence explanation | TODO |
 | 1 | 3 | `src/pathly_orchestrator/chat_tools.py` | get_fsm_state, read_plan_summary | AI references FSM stage by name | TODO |
 | 2 | 4 | `studio/src/renderer/src/store/chatStore.ts` | Zustand store — messages + match state | No TS errors | TODO |

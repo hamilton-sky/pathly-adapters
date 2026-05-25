@@ -1,11 +1,98 @@
 # Studio AI Chat — Conversation Prompts
 
-Split into **5 conversations**. Each produces runnable, testable code.
+Split into **6 conversations** (Conv 0 through Conv 5). Each produces runnable, testable code.
 After each conversation, **commit your changes** before starting the next.
 
 **Before building any UI:** read `pathly/plans/studio-ai-chat/DESIGN_SPEC.md` — it is the builder's bible: ASCII layouts, design tokens, component specs, interaction model, and what NOT to build.
 
 A live HTML mockup showing the target layout lives at: `studio-chat-mockup/index.html`
+
+---
+
+## Conversation 0: Terminal Dock Improvements (Phases 0a–0c)
+
+**Stories delivered:** S0.1, S0.2, S0.3
+**Requires:** Nothing — this is the foundation.
+**Verify:** `cd studio && npm run typecheck` — zero new errors. Launch Studio and confirm:
+- Claude Code and Codex terminal tabs open without error
+- Empty terminal area is compact (72px), not a large blank zone
+- Session tabs and launcher buttons are visually distinct
+
+**Prompt to paste:**
+```
+Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 0a–0c before touching any file.
+
+Implement Studio AI Chat Conversation 0 (Phases 0a–0c) — terminal dock improvements.
+
+**Before editing anything:**
+1. Run: cd studio && npm run typecheck — record any pre-existing errors as baseline
+2. Read studio/src/main/ipc/terminal.ts fully (especially lines 13–100)
+3. Read studio/src/renderer/src/components/Terminal/index.tsx fully
+4. Read studio/src/renderer/src/components/Terminal/PaneTabBar.tsx fully
+5. Confirm file paths and CSS module names before editing
+
+**Codebase files this conversation touches:**
+- `studio/src/main/ipc/terminal.ts` — MODIFY: add claude+codex to ALLOWED_SHELLS
+- `studio/src/renderer/src/components/Terminal/index.tsx` — MODIFY: compact height + empty state
+- `studio/src/renderer/src/components/Terminal/PaneTabBar.tsx` — MODIFY: sessions vs launchers hierarchy
+- Terminal CSS module(s) — MODIFY: active tab style, compact empty state style
+
+Scope:
+
+Phase 0a — Fix ALLOWED_SHELLS (do this first, it unblocks everything):
+  Read terminal.ts line 13. ALLOWED_SHELLS only contains shell variants (bash, zsh, etc).
+  Add 'claude' and 'codex' to the set.
+  This is an existing bug: PaneTabBar passes 'claude'/'codex' as the command to terminal:spawn,
+  which the allowlist currently rejects with "Shell not allowed".
+
+Phase 0b — Compact terminal dock height:
+  Find where terminal height is set (reportedly 260px in index.tsx) — confirm the actual value.
+  Change default open height to 180px.
+  Empty state (no open tabs): shrink to 72px tall.
+  Replace "Press + to open a terminal" centered text with a compact inline row:
+    No terminal open.   [+ Shell]  [Open Claude]  [Open Codex]
+  These buttons call the existing handleLaunch function.
+  Add height transition: 150ms ease-out between empty (72px) and active (180px).
+  Do NOT change any PTY logic, spawning, IPC, or data flow.
+
+Phase 0c — Session vs launcher hierarchy in PaneTabBar:
+  Current problem: + Shell, A Claude, Codex all look identical whether they are live sessions
+  or launch buttons. No visual hierarchy.
+  New layout:
+    Left: open session tabs — filled bg, colored dot (blue=Claude amber=Codex), × close per tab,
+          active tab has accent-colored bottom border (border-bottom: 2px solid var(--accent))
+    Divider: │ or spacing
+    Right: launcher buttons — muted/secondary style, clearly different from session tabs
+  Active session tab: background var(--surface2), label full opacity
+  Inactive session tab: transparent bg, 60% opacity
+  If no sessions open: only launchers visible — no empty tab strip taking up space
+  Split mode: one shared dock header; each pane has its own compact session strip
+  Use existing Studio design tokens only — do not introduce new colors or font sizes
+
+Design tokens already in Studio (use these, do not invent new ones):
+  --bg: #0F172A, --surface: #1E293B, --surface2: #334155
+  --accent: #22C55E, --fg: #F8FAFC, --muted: #94A3B8, --border: #475569
+  --claude-blue: #38BDF8 (or check what the existing Claude tab uses)
+  --codex-amber: #F59E0B (or check what the existing Codex tab uses)
+
+Architectural rules:
+  - Do NOT touch any IPC handlers beyond the ALLOWED_SHELLS line
+  - Do NOT touch PTY spawning logic, data flow, or FSM code
+  - Do NOT touch App.tsx, the sidebar, main content area, or any Conductor/chat files
+  - Match the existing CSS Modules pattern — no inline styles, no Tailwind
+
+Verify: cd studio && npm run typecheck
+Expected: zero NEW TypeScript errors (pre-existing baseline is acceptable).
+Visual check: launch Studio — no blank dead zone, Claude/Codex tabs open, sessions vs launchers clear.
+
+After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 0a–0c to DONE.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+If fundamentally broken, rollback with git checkout on affected files and retry.
+```
+
+**Expected output:** Terminal dock is compact and IDE-style. ALLOWED_SHELLS bug fixed. Conductor can build on a solid terminal foundation from Conv 3 onward.
+**Files touched:** `terminal.ts`, `Terminal/index.tsx`, `Terminal/PaneTabBar.tsx`, CSS module(s)
 
 ---
 
