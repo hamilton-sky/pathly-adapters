@@ -14,3 +14,7 @@
 {"type":"STAGE_COMPLETE","stage":"REVIEWING","conv":1}
 {"type":"HUMAN_RESPONSE","value":"auto-advance"}
 {"type":"STAGE_COMPLETE","stage":"REVIEWING","conv":3}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "ts": "2026-05-25T14:02:32.397669+00:00"}
+{"type":"IMPLEMENT_COMPLETE"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}
+{"type":"STATE_TRANSITION","to":"DONE"}
