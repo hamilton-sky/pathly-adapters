@@ -33,6 +33,9 @@ export async function getEngine(
   enginePromise = (async () => {
     try {
       const mlc = await CreateMLCEngine(modelId, {
+        // Use IndexedDB — Cache API is unreliable in Electron's file:// context.
+        // See: https://github.com/mlc-ai/web-llm/issues/313
+        appConfig: { model_list: [], cacheBackend: 'indexeddb' },
         initProgressCallback: (report) => {
           const pct = Math.round(report.progress * 100)
           const elapsed = report.timeElapsed != null ? ` (${Math.round(report.timeElapsed)}s)` : ''
@@ -60,15 +63,49 @@ export async function getEngine(
 }
 
 export async function getCachedWebLLMModelIds(): Promise<string[]> {
+  // With indexeddb backend, check IndexedDB for model records.
+  // WebLLM stores each shard as a record keyed by URL; we extract the model ID
+  // segment from those keys. Falls back to Cache API for legacy installs.
   try {
-    const cache = await caches.open('webllm/model')
-    const keys = await cache.keys()
     const ids = new Set<string>()
-    for (const req of keys) {
-      const url = req.url
-      const match = url.match(/\/([^/]+)\//)?.[1]
-      if (match) ids.add(match)
+
+    // IndexedDB check (primary — matches WEBLLM_APP_CONFIG cacheBackend)
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.open('webllm-model-cache', 1)
+      req.onsuccess = () => {
+        try {
+          const db = req.result
+          const storeNames = Array.from(db.objectStoreNames)
+          if (storeNames.length === 0) { db.close(); resolve(); return }
+          const tx = db.transaction(storeNames[0], 'readonly')
+          const store = tx.objectStore(storeNames[0])
+          const keysReq = store.getAllKeys()
+          keysReq.onsuccess = () => {
+            for (const k of keysReq.result as string[]) {
+              const m = String(k).match(/\/([^/]+)\//)
+              if (m) ids.add(m[1])
+            }
+            db.close()
+            resolve()
+          }
+          keysReq.onerror = () => { db.close(); resolve() }
+        } catch { resolve() }
+      }
+      req.onerror = () => resolve()
+    })
+
+    // Cache API fallback (legacy / browser context)
+    if (ids.size === 0) {
+      try {
+        const cache = await caches.open('webllm/model')
+        const keys = await cache.keys()
+        for (const req of keys) {
+          const m = req.url.match(/\/([^/]+)\//)
+          if (m) ids.add(m[1])
+        }
+      } catch { /* Cache API unavailable */ }
     }
+
     return [...ids]
   } catch {
     return []

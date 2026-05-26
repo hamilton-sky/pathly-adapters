@@ -9,8 +9,9 @@ import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
 import { PATHLY_API_BASE } from '../../lib/config'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
-import { askWebLLM, getEngine, getCachedWebLLMModelIds } from '../../lib/webLLMEngine'
+import { askWebLLM, getEngine } from '../../lib/webLLMEngine'
 import { useModelStore } from '../../store/modelStore'
+import { WEB_LLM_MODELS } from '../../data/models'
 import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
 import { SkillsPanel } from './SkillsPanel'
@@ -201,7 +202,7 @@ export function ChatPanel(): JSX.Element {
     } catch {
       // Embedding failed (e.g. model download error) — continue with no match.
       // Always include the known skills list so the fallback response is useful.
-      context = { fsmStage: 'unknown', featureName: '', skills: loadSkills().map((s) => s.name), studioSchema: [] }
+      context = { fsmStage: 'unknown', featureName: '', skills: ['plan','po','storm','build','review','test','retro','explore','debug','design','fix','status','log','end'], studioSchema: [] }
     } finally {
       setIsEmbedding(false)
     }
@@ -233,26 +234,18 @@ export function ChatPanel(): JSX.Element {
       const systemPrompt = buildSystemPrompt(context, topMatch)
       try {
         const selectedModelId = useModelStore.getState().selectedModelId
+        const selectedModelName = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)?.name ?? selectedModelId
         const isCached = useModelStore.getState().cachedModelIds.includes(selectedModelId)
         if (!isCached) {
-          // Model not downloaded yet — auto-download and show progress in the chat bubble
-          updateLastMessage({ content: '⬇ Downloading model — this may take a few minutes…', status: 'streaming' })
-          await getEngine(selectedModelId, (pct, progressText) => {
-            useModelStore.getState().setProgress(selectedModelId, pct)
-            const shardMatch = progressText?.match(/\[(\d+)\/(\d+)\]/)
-            const shardLabel = shardMatch ? ` · shard ${shardMatch[1]}/${shardMatch[2]}` : ''
-            updateLastMessage({
-              content: `⬇ Downloading model… **${pct}%**${shardLabel}`,
-              status: 'streaming',
-            })
+          // Model not downloaded — give an immediate response instead of blocking the chat
+          updateLastMessage({
+            content: `📥 **${selectedModelName}** isn't downloaded yet.\n\nOpen the model selector (top right) and click **↓ Download & use this model** to get it. Download takes a few minutes depending on your connection.\n\nOnce the green dot appears next to the model name, you're ready to chat.`,
+            status: 'done',
           })
-          const updated = await getCachedWebLLMModelIds()
-          useModelStore.getState().setCached(updated)
-          useModelStore.getState().setProgress(selectedModelId, 100)
-          updateLastMessage({ content: '', status: 'streaming' })
-        } else {
-          await getEngine(selectedModelId)
+          setLoading(false)
+          return
         }
+        await getEngine(selectedModelId)
         let fullText = ''
         try {
           await askWebLLM(text, systemPrompt, (chunk) => {
