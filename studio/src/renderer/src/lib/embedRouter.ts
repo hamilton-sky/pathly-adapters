@@ -1,7 +1,6 @@
 import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers'
 import type { Skill } from './skillsManifest'
-import type { MatchResult } from '../store/chatStore'
-import { useChatStore } from '../store/chatStore'
+import type { MatchResult } from '../types/chat'
 
 let embedder: FeatureExtractionPipeline | null = null
 let embeddedSkills: Skill[] = []
@@ -39,7 +38,6 @@ export async function preEmbedSkills(skills: Skill[]): Promise<void> {
     skill.vector = Array.from(output.data as Float32Array)
   }
   embeddedSkills = skills
-  useChatStore.getState().setEmbedReady(true)
 }
 
 export async function matchIntent(input: string): Promise<MatchResult[]> {
@@ -50,6 +48,7 @@ export async function matchIntent(input: string): Promise<MatchResult[]> {
       skill: s.name,
       confidence: cosineSim(inputVec, s.vector!),
       command: s.command,
+      description: s.description,
     }))
     .sort((a, b) => b.confidence - a.confidence)
   return scored.slice(0, 3)

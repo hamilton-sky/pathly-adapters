@@ -51,6 +51,7 @@ export function ChatPanel(): JSX.Element {
   const setCurrentMatch = useChatStore((s) => s.setCurrentMatch)
   const setAltMatches = useChatStore((s) => s.setAltMatches)
   const setIsEmbedding = useChatStore((s) => s.setIsEmbedding)
+  const setEmbedReady = useChatStore((s) => s.setEmbedReady)
   const setLoading = useChatStore((s) => s.setLoading)
   const isLoading = useChatStore((s) => s.isLoading)
   const isCommandRunning = useChatStore((s) => s.isCommandRunning)
@@ -99,8 +100,10 @@ export function ChatPanel(): JSX.Element {
 
   // Pre-embed all skill descriptions once on first mount
   useEffect(() => {
-    void preEmbedSkills(loadSkills())
-  }, [])
+    preEmbedSkills(loadSkills())
+      .then(() => setEmbedReady(true))
+      .catch(() => setEmbedReady(false))
+  }, [setEmbedReady])
 
   async function handleSend(): Promise<void> {
     const text = inputValue.trim()
@@ -122,7 +125,7 @@ export function ChatPanel(): JSX.Element {
     if (text.startsWith('/pathly')) {
       const parts = text.split(' ')
       const skill = parts[1] || ''
-      setCurrentMatch({ skill, confidence: 1.0, command: text })
+      setCurrentMatch({ skill, confidence: 1.0, command: text, description: '' })
       return
     }
 
@@ -164,7 +167,7 @@ export function ChatPanel(): JSX.Element {
           context,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
           ...(topMatch && topMatch.confidence >= 0.4
-            ? { matchedSkill: topMatch.skill, skillDescription: topMatch.command }
+            ? { matchedSkill: topMatch.skill, skillDescription: topMatch.description }
             : {}),
         }),
       })
@@ -227,7 +230,7 @@ export function ChatPanel(): JSX.Element {
   }
 
   function handleSelectAlt(skill: string): void {
-    setCurrentMatch({ skill, confidence: 1.0, command: `/pathly ${skill}` })
+    setCurrentMatch({ skill, confidence: 1.0, command: `/pathly ${skill}`, description: '' })
     setCommandRunning(false)
     clearOutputLines()
   }

@@ -1,5 +1,6 @@
 import { Send } from 'lucide-react'
 import { useTheme } from '../../useTheme'
+import { useChatStore } from '../../store/chatStore'
 import styles from './ChatInput.module.css'
 
 interface ChatInputProps {
@@ -11,6 +12,8 @@ interface ChatInputProps {
 
 export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps): JSX.Element {
   const t = useTheme()
+  const isEmbedding = useChatStore((s) => s.isEmbedding)
+  const embedReady = useChatStore((s) => s.embedReady)
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -53,6 +56,18 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
         >
           phi-4 mini
         </span>
+        {(isEmbedding || embedReady) && (
+          <span
+            className={styles.modelPill}
+            style={{
+              background: t.bgSurface1,
+              color: isEmbedding ? t.accent : t.textMuted,
+              fontFamily: t.fontFamilyMono,
+            }}
+          >
+            {isEmbedding ? '◈ Routing…' : '◈ MiniLM'}
+          </span>
+        )}
         <button
           className={styles.sendButton}
           onClick={() => { if (!disabled && value.trim()) onSend() }}

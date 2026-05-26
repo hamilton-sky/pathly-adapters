@@ -1,4 +1,7 @@
 import { create } from 'zustand'
+import type { MatchResult } from '../types/chat'
+
+export type { MatchResult }
 
 export interface Message {
   id: string
@@ -6,12 +9,6 @@ export interface Message {
   content: string
   status: 'idle' | 'streaming' | 'done'
   tokens?: number
-}
-
-export interface MatchResult {
-  skill: string
-  confidence: number
-  command: string
 }
 
 export interface ChatState {

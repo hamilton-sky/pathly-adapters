@@ -1,4 +1,4 @@
-import type { MatchResult } from '../../store/chatStore'
+import type { MatchResult } from '../../types/chat'
 import { useTheme } from '../../useTheme'
 import styles from './MatchCard.module.css'
 
@@ -39,7 +39,7 @@ export function MatchCard({ match, alts, onRun, onReject, onSelectAlt }: MatchCa
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.btnRun} onClick={onRun} disabled={!matched} aria-label={`Run ${match.skill}`}>
+        <button className={styles.btnRun} onClick={onRun} aria-label={`Run ${match.skill}`}>
           Run
         </button>
         <button
