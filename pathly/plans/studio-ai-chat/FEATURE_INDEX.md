@@ -30,15 +30,32 @@
 
 ## Feature Vision
 
-The **Conductor** is a right-side chat panel in Pathly Studio. It interprets plain-English intent
-and routes to the matching Pathly skill using **embedding similarity** (not LLM guessing).
-Two models, two jobs:
+The **Conductor** is a right-side chat panel in Pathly Studio. It has three capabilities:
 
-- **MiniLM** (`all-MiniLM-L6-v2`, transformers.js, ~22ms): finds the right skill — zero hallucination
-- **phi4-mini** (Ollama, offline): explains what the skill does in 2–3 sentences
+**1. Skill Routing** — interprets plain-English intent and routes to the matching Pathly skill
+using **embedding similarity** (MiniLM, ~22ms, zero hallucination). The matched command is
+written to Claude Code or Codex terminal tab via Electron IPC after user approval.
 
-The matched skill command (`/pathly build`, `/pathly review`, etc.) is written to the
-Claude Code or Codex terminal tab via Electron IPC after user approval.
+**2. UI Automation** — the AI can read the live Studio UI (via a component registry) and execute
+actions (click, fill, select) on behalf of the user. Two modes:
+- **Staged**: AI shows each step and waits for user approval before executing
+- **Auto**: AI executes the full action sequence without interruption
+
+**3. Model Selector** — user picks their local AI model (Phi-4 Mini, Qwen3 4B, Qwen2.5 Coder 7B,
+Llama 3.2 3B). The selected model downloads and caches via WebLLM (`@mlc-ai/web-llm`, WebGPU).
+No Ollama required. Models data and engine ported from zakamurai.
+
+### Two Build Tracks (parallel after Conv 5)
+
+**Track A — UI Automation** (Convs 6–8)
+- Conv 6: Page Analyzer (component registry + live element map)
+- Conv 7: Action Executor (IPC click/fill/select)
+- Conv 8: Staged/Auto mode in chat
+
+**Track B — Model Selector** (Conv 9, independent)
+- Port WebLLMModels + WebLLMAPI from zakamurai
+- Build model selector UI
+- Replace Ollama with WebLLM engine
 
 ---
 
@@ -67,6 +84,19 @@ Claude Code or Codex terminal tab via Electron IPC after user approval.
 | `studio/src/renderer/src/lib/embedRouter.ts` | 5 | CREATE — MiniLM wrapper + matchIntent() |
 | `studio/src/renderer/src/lib/skillsManifest.ts` | 5 | CREATE — typed skills.json loader |
 | `studio/src/renderer/src/data/skills.json` | 5 | CREATE — 14 skills with descriptions |
+| `studio/src/renderer/src/hooks/usePageAnalyzer.ts` | 6 | CREATE — component self-registration hook |
+| `studio/src/renderer/src/store/pageAnalyzerStore.ts` | 6 | CREATE — live element registry |
+| `studio/src/renderer/src/lib/pageAnalyzer/index.ts` | 6 | CREATE — getPageContext() for AI consumption |
+| `studio/src/renderer/src/lib/actionExecutor.ts` | 7 | CREATE — renderer-side action dispatch |
+| `studio/src/main/ipc/uiActions.ts` | 7 | CREATE — IPC handler for click/fill/select |
+| `studio/src/main/index.ts` | 7 | MODIFY — register uiActions IPC handler |
+| `studio/src/renderer/src/store/automationStore.ts` | 8 | CREATE — step queue, staged/auto state |
+| `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx` | 8 | CREATE — staged step UI with approve/skip |
+| `studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx` | 8 | CREATE — AI action plan display |
+| `studio/src/renderer/src/data/models.ts` | 9 | CREATE — model definitions (ported from zakamurai) |
+| `studio/src/renderer/src/lib/webLLMEngine.ts` | 9 | CREATE — WebLLM engine wrapper (ported from zakamurai) |
+| `studio/src/renderer/src/store/modelStore.ts` | 9 | CREATE — selected model, download progress, cache state |
+| `studio/src/renderer/src/components/ChatPanel/ModelSelector.tsx` | 9 | CREATE — model picker UI with system req cards |
 
 > **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
 
@@ -74,13 +104,17 @@ Claude Code or Codex terminal tab via Electron IPC after user approval.
 
 ## Conversation map
 
-| Conv | Title | Stories | Status | Key files touched |
-|---|---|---|---|---|
-| 1 | Python Chat Agent Server | S1.1, S1.2 | TODO | `http_server.py`, `chat_agent.py`, `chat_tools.py` |
-| 2 | Studio Chat UI + Skills Panel | S2.1, S2.2, S2.3 | TODO | `chatStore.ts`, `ChatPanel/`, `App.tsx` |
-| 3 | MatchCard + IPC Terminal Write | S3.1, S3.2 | TODO | `MatchCard.tsx`, `OutputSnippet.tsx`, `ipc/chat.ts` |
-| 4 | Context Injection | S4.1, S4.2 | TODO | `pathlyContext.ts`, `ChatPanel/index.tsx` |
-| 5 | Embedding Router | S5.1, S5.2, S5.3 | TODO | `embedRouter.ts`, `skillsManifest.ts`, `skills.json` |
+| Conv | Title | Track | Stories | Status | Key files touched |
+|---|---|---|---|---|---|
+| 1 | Python Chat Agent Server | Core | S1.1, S1.2 | TODO | `http_server.py`, `chat_agent.py`, `chat_tools.py` |
+| 2 | Studio Chat UI + Skills Panel | Core | S2.1, S2.2, S2.3 | TODO | `chatStore.ts`, `ChatPanel/`, `App.tsx` |
+| 3 | MatchCard + IPC Terminal Write | Core | S3.1, S3.2 | TODO | `MatchCard.tsx`, `OutputSnippet.tsx`, `ipc/chat.ts` |
+| 4 | Context Injection | Core | S4.1, S4.2 | TODO | `pathlyContext.ts`, `ChatPanel/index.tsx` |
+| 5 | Embedding Router | Core | S5.1, S5.2, S5.3 | TODO | `embedRouter.ts`, `skillsManifest.ts`, `skills.json` |
+| 6 | Page Analyzer | Track A | S6.1, S6.2, S6.3 | TODO | `usePageAnalyzer.ts`, `pageAnalyzerStore.ts`, `pageAnalyzer/index.ts` |
+| 7 | Action Executor | Track A | S7.1, S7.2, S7.3 | TODO | `actionExecutor.ts`, `ipc/uiActions.ts` |
+| 8 | Staged / Auto Automation Mode | Track A | S8.1, S8.2, S8.3, S8.4 | TODO | `automationStore.ts`, `StepQueue.tsx`, `AutomationCard.tsx` |
+| 9 | Model Selector + WebLLM | Track B | S9.1, S9.2, S9.3, S9.4 | TODO | `models.ts`, `webLLMEngine.ts`, `modelStore.ts`, `ModelSelector.tsx` |
 
 ---
 

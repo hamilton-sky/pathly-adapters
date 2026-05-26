@@ -383,11 +383,197 @@ Without this fix, the existing Claude Code and Codex terminal buttons are broken
 
 ---
 
+---
+
+## Phase 19: usePageAnalyzer hook   ← Conversation 6
+
+**File:** `studio/src/renderer/src/hooks/usePageAnalyzer.ts` — CREATE
+**Done when:** Any component calling `usePageAnalyzer({ id, type, label })` appears in the registry
+**Delivers:** S6.1
+**Details:**
+- `usePageAnalyzer(meta: ElementMeta): void` — registers element on mount, unregisters on unmount
+- `ElementMeta: { id: string; type: 'button' | 'input' | 'select' | 'link' | 'panel'; label: string; value?: string; disabled?: boolean; visible?: boolean }`
+- On mount: `pageAnalyzerStore.register(meta)`
+- On unmount: `pageAnalyzerStore.unregister(meta.id)`
+- On value/disabled change: `pageAnalyzerStore.update(id, patch)` — called via `useEffect` deps
+
+---
+
+## Phase 20: pageAnalyzerStore + getPageContext()   ← Conversation 6
+
+**Files:** `studio/src/renderer/src/store/pageAnalyzerStore.ts` — CREATE,
+`studio/src/renderer/src/lib/pageAnalyzer/index.ts` — CREATE
+**Done when:** `getPageContext()` returns a JSON snapshot of all currently registered elements
+**Delivers:** S6.2, S6.3
+**Details:**
+- Zustand store: `elements: Map<string, ElementMeta>`, `register()`, `unregister()`, `update()`
+- `getPageContext(): PageContext` — reads store, returns `{ elements: ElementMeta[], timestamp: number }`
+- Cap at 50 elements — if more registered, prioritize by `type` order: input > button > select > panel > link
+- Add `usePageAnalyzer` calls to key Studio components:
+  - `FlowEditor`: register flow canvas panel + "New Flow" button
+  - `StepEditor`: register all step form inputs + "Add Step" button + step type selector
+  - `ChatPanel`: register send button + input textarea
+  - Any modal or dialog that opens — register its CTA buttons
+
+---
+
+## Phase 21: Inject page context into pathlyContext   ← Conversation 6
+
+**File:** `studio/src/renderer/src/lib/pathlyContext.ts` — MODIFY
+**Done when:** `buildPathlyContext()` includes `pageContext` in its return value
+**Delivers:** S6.2 (complete)
+**Details:**
+- Import `getPageContext` from `pageAnalyzer/index.ts`
+- Add `pageContext: PageContext` to the return type
+- Pass `pageContext` in the POST /chat body alongside `fsmStage`, `featureName`, `skills`
+- System prompt in `chat_agent.py`: add section `## Current UI Elements` listing registered elements
+- Cap page context contribution at 300 tokens
+
+---
+
+## Phase 22: Action Executor — IPC handler   ← Conversation 7
+
+**File:** `studio/src/main/ipc/uiActions.ts` — CREATE, `studio/src/main/index.ts` — MODIFY
+**Done when:** `ipcRenderer.invoke('ui:execute-action', action)` clicks/fills the target element
+**Delivers:** S7.1, S7.2, S7.3
+**Details:**
+- `ipcMain.handle('ui:execute-action', (event, action: UIAction) => { ... })`
+- `UIAction: { type: 'click' | 'fill' | 'select'; elementId: string; value?: string }`
+- Main process forwards to renderer via `webContents.executeJavaScript`:
+  ```ts
+  `window.__uiExecutor?.execute(${JSON.stringify(action)})`
+  ```
+- Expose on preload: `window.electronAPI.executeUIAction(action: UIAction): Promise<{ok: boolean; error?: string}>`
+- Register in `index.ts` alongside other IPC handlers
+
+---
+
+## Phase 23: Action Executor — renderer side   ← Conversation 7
+
+**File:** `studio/src/renderer/src/lib/actionExecutor.ts` — CREATE
+**Done when:** `executeAction({ type: 'click', elementId: 'btn-add-step' })` clicks the matching DOM element
+**Delivers:** S7.1, S7.2, S7.3 (complete)
+**Details:**
+- `window.__uiExecutor = { execute(action: UIAction): { ok: boolean; error?: string } }`
+- Look up element via `document.querySelector(`[data-conductor-id="${action.elementId}"]`)`
+- For `click`: call `.click()` on the element
+- For `fill`: set `.value`, dispatch `input` + `change` events (React synthetic event compat)
+- For `select`: set `.value`, dispatch `change` event
+- Each Studio component that calls `usePageAnalyzer` must add `data-conductor-id={id}` to its DOM node
+- Return `{ ok: false, error: 'element not found' }` if querySelector returns null
+- Register `window.__uiExecutor` in a top-level `useEffect` in `App.tsx`
+
+---
+
+## Phase 24: automationStore + step queue state   ← Conversation 8
+
+**File:** `studio/src/renderer/src/store/automationStore.ts` — CREATE
+**Done when:** `useAutomationStore()` returns typed state without TS errors
+**Delivers:** S8.1 (partial)
+**Details:**
+- State: `steps: AutomationStep[]`, `currentStepIndex: number`, `mode: 'staged' | 'auto'`, `status: 'idle' | 'running' | 'paused' | 'done' | 'error'`
+- `AutomationStep: { id: string; description: string; action: UIAction; status: 'pending' | 'approved' | 'skipped' | 'done' | 'error' }`
+- Actions: `setSteps(steps)`, `approveStep(id)`, `skipStep(id)`, `setMode(mode)`, `reset()`
+- Persist: `mode` only — steps are session-only
+
+---
+
+## Phase 25: StepQueue + AutomationCard components   ← Conversation 8
+
+**Files:** `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx` — CREATE,
+`studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx` — CREATE
+**Done when:** Staged mode shows step cards with Approve/Skip; Auto mode runs silently with a progress bar
+**Delivers:** S8.1, S8.2, S8.3
+**Details:**
+- `AutomationCard`: shows AI's action plan summary (step count, intent description), `[▶ Run All]` and `[Step by Step]` buttons — sets `automationStore.mode`
+- `StepQueue` (staged mode):
+  - Shows all steps as cards: step number, description, action preview (`click "Add Step"`)
+  - Current step: highlighted, `[✓ Approve]` `[→ Skip]` buttons
+  - Completed steps: dimmed with `✓` or `→` badge
+  - Pending steps: grey, no buttons
+- `StepQueue` (auto mode): single progress bar, step count `2 / 5`, `[■ Stop]` button
+- Both modes: live feedback when each action executes — element flashes accent color for 400ms
+
+---
+
+## Phase 26: Wire AI → action plan in chat flow   ← Conversation 8
+
+**Files:** `ChatPanel/index.tsx` — MODIFY, `chatStore.ts` — MODIFY,
+`src/pathly_orchestrator/chat_agent.py` — MODIFY
+**Done when:** User types "create a checkout flow" → AI returns action steps → AutomationCard appears → Approve executes actions
+**Delivers:** S8.4 (complete)
+**Details:**
+- Extend `POST /chat` request to include `pageContext` and `mode: 'automation'` flag
+- When `mode === 'automation'`: `chat_agent.py` returns structured JSON steps instead of plain text:
+  ```json
+  { "type": "automation", "intent": "...", "steps": [{ "description": "...", "action": {...} }] }
+  ```
+- On receive: parse steps → `automationStore.setSteps(steps)` → render `AutomationCard` in message list
+- Staged: `StepQueue` calls `executeAction()` → advances to next step on approve
+- Auto: loop through all steps calling `executeAction()` with 300ms delay between each
+- After all steps done: AI sends summary message "Flow created — 5 steps executed"
+
+---
+
+## Phase 27: WebLLM models data + engine   ← Conversation 9
+
+**Files:** `studio/src/renderer/src/data/models.ts` — CREATE,
+`studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE
+**Done when:** `getEngine()` loads Phi-4 Mini in Electron and `askWebLLM("hello")` streams a response
+**Delivers:** S9.3 (partial)
+**Details:**
+- Port `WebLLMModels.js` from zakamurai (`src/components/AI/WebLLMModels.js`) to TypeScript:
+  - `Model: { id: string; name: string; description: string; useCase: string; system: string; storage: string; speed: string; recommended?: boolean }`
+  - 4 models: Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC, Qwen3-4B-q4f16_1-MLC, Phi-4-mini-instruct-q4f16_1-MLC (recommended), Llama-3.2-3B-Instruct-q4f16_1-MLC
+- Port `WebLLMAPI.js` from zakamurai to TypeScript:
+  - `getEngine(modelId, onProgress): Promise<MLCEngine>` — singleton, recreates if model changes
+  - `getCachedWebLLMModelIds(): Promise<string[]>` — checks browser cache storage
+  - `cacheWebLLMModel(modelId, onProgress): Promise<void>` — download + cache
+  - `deleteCachedWebLLMModel(modelId): Promise<void>`
+  - `askWebLLM(prompt, system, onChunk): Promise<string>` — streaming via callback
+- Add `@mlc-ai/web-llm` to `studio/package.json`
+
+---
+
+## Phase 28: modelStore + ModelSelector UI   ← Conversation 9
+
+**Files:** `studio/src/renderer/src/store/modelStore.ts` — CREATE,
+`studio/src/renderer/src/components/ChatPanel/ModelSelector.tsx` — CREATE
+**Done when:** Model selector UI renders; selecting Phi-4 Mini downloads it with progress; selection persists
+**Delivers:** S9.1, S9.2, S9.4
+**Details:**
+- `modelStore`: `selectedModelId: string`, `cachedModelIds: string[]`, `downloadProgress: Record<string, number>`, `setSelectedModel(id)`, `setCached(ids)`, `setProgress(id, pct)`
+- Persist: `selectedModelId` only
+- `ModelSelector` UI (matches your screenshots):
+  - Dropdown trigger showing current model name + `▼` chevron + `ℹ` info button
+  - Dropdown panel: each model as an expandable card showing name, description, SYSTEM / STORAGE / SPEED rows
+  - Badges: `Recommended` (teal), `Cached` (green), `Selected` (blue)
+  - `Cache` toggle per model — calls `cacheWebLLMModel()` / `deleteCachedWebLLMModel()`
+  - Download progress: linear progress bar under the model card while downloading
+  - Wired into `ConductorHeader` — replace the `phi4-mini` pill with the `ModelSelector` dropdown
+
+---
+
+## Phase 29: Wire WebLLM into chat flow   ← Conversation 9
+
+**Files:** `src/pathly_orchestrator/chat_agent.py` — MODIFY (make Ollama optional),
+`ChatPanel/index.tsx` — MODIFY, `chatStore.ts` — MODIFY
+**Done when:** phi4-mini explanation comes from WebLLM (selected model) instead of Ollama
+**Delivers:** S9.3 (complete)
+**Details:**
+- Replace `POST /chat` SSE call with local `askWebLLM()` call in the renderer (no server round-trip)
+- The Python `chat_agent.py` stays for teams using Ollama — make it optional via `PATHLY_CHAT_BACKEND=ollama|webllm`
+- Default to `webllm` — `askWebLLM(prompt, systemPrompt, onChunk)` streams into chatStore directly
+- Update `ChatInput` model pill: was `phi4-mini` hardcoded → now reads `modelStore.selectedModelId` short name
+- If WebLLM engine not loaded yet: show spinner in explanation area (same as "Ollama offline" fallback)
+
+---
+
 ## Prerequisites
-- Ollama installed: `winget install Ollama.Ollama`
-- Model pulled: `ollama pull phi4-mini`
 - MiniLM will auto-download via transformers.js (~22MB, first launch only)
+- WebLLM models download on first cache (Phi-4 Mini ~2GB, Qwen3 4B ~3GB, Qwen2.5 Coder ~5GB)
 - Pathly FSM server running on port 8765 before testing Conv 1
+- Ollama optional (legacy backend) — not required for Conv 9+
 
 ## Key Decisions
 - **Embedding over LLM for routing:** Zero hallucination, 22ms, deterministic. See ARCHITECTURE_PROPOSAL.md Decision 1.

@@ -22,17 +22,35 @@
 | S5.1 | MiniLM loads at startup | Conv 5 | TODO |
 | S5.2 | Embedding matches intent to Pathly skill | Conv 5 | TODO |
 | S5.3 | Low-confidence state guides user to correct skill | Conv 5 | TODO |
+| S6.1 | Components self-register with page analyzer | Conv 6 | TODO |
+| S6.2 | AI receives live page element map | Conv 6 | TODO |
+| S6.3 | Page context updates on UI changes | Conv 6 | TODO |
+| S7.1 | AI can click a button | Conv 7 | TODO |
+| S7.2 | AI can fill a text input | Conv 7 | TODO |
+| S7.3 | AI can select a dropdown option | Conv 7 | TODO |
+| S8.1 | Staged mode with per-step approval | Conv 8 | TODO |
+| S8.2 | Auto mode executes full plan | Conv 8 | TODO |
+| S8.3 | Auto mode blocked on low confidence | Conv 8 | TODO |
+| S8.4 | Full flow creation from plain-English description | Conv 8 | TODO |
+| S9.1 | Model selector shows all models with specs | Conv 9 | TODO |
+| S9.2 | Model download and cache via toggle | Conv 9 | TODO |
+| S9.3 | Selected model used for all AI responses | Conv 9 | TODO |
+| S9.4 | Model selection persists across restarts | Conv 9 | TODO |
 
 ## Conversation Breakdown
 
-| Conv | Phases | Stories | Status | Verify |
-|------|--------|---------|--------|--------|
-| 0 | 0a–0c | S0.1, S0.2, S0.3 | TODO | `cd studio && npm run typecheck` + visual check in Studio |
-| 1 | 1–3 | S1.1, S1.2 | TODO | `curl -X POST http://127.0.0.1:8765/chat -d '{"message":"explain /pathly build","matchedSkill":"build","history":[]}'` |
-| 2 | 4–8 | S2.1, S2.2, S2.3, S2.4 | TODO | `cd studio && npm run typecheck` |
-| 3 | 9–11 | S3.1, S3.2 | TODO | `cd studio && npm run typecheck` |
-| 4 | 12–14 | S4.1, S4.2 | TODO | `cd studio && npm run typecheck` |
-| 5 | 15–18 | S5.1, S5.2, S5.3 | TODO | `cd studio && npm run typecheck` |
+| Conv | Phases | Track | Stories | Status | Verify |
+|------|--------|-------|---------|--------|--------|
+| 0 | 0a–0c | Core | S0.1, S0.2, S0.3 | TODO | `cd studio && npm run typecheck` + visual check in Studio |
+| 1 | 1–3 | Core | S1.1, S1.2 | TODO | `curl -X POST http://127.0.0.1:8765/chat -d '{"message":"explain /pathly build","matchedSkill":"build","history":[]}'` |
+| 2 | 4–8 | Core | S2.1, S2.2, S2.3, S2.4 | TODO | `cd studio && npm run typecheck` |
+| 3 | 9–11 | Core | S3.1, S3.2 | TODO | `cd studio && npm run typecheck` |
+| 4 | 12–14 | Core | S4.1, S4.2 | TODO | `cd studio && npm run typecheck` |
+| 5 | 15–18 | Core | S5.1, S5.2, S5.3 | TODO | `cd studio && npm run typecheck` |
+| 6 | 19–21 | Track A | S6.1, S6.2, S6.3 | TODO | `cd studio && npm run typecheck` + verify registry in React DevTools |
+| 7 | 22–23 | Track A | S7.1, S7.2, S7.3 | TODO | `cd studio && npm run typecheck` + manual click/fill test in Studio |
+| 8 | 24–26 | Track A | S8.1, S8.2, S8.3, S8.4 | TODO | E2E: type "create a test flow" → approve steps → flow appears in Studio |
+| 9 | 27–29 | Track B | S9.1, S9.2, S9.3, S9.4 | TODO | Select Phi-4 Mini → download → send message → response streams from WebLLM |
 
 ## Phase Detail
 
@@ -59,11 +77,23 @@
 | 5 | 16 | `studio/src/renderer/src/lib/skillsManifest.ts` | Typed loader for skills.json | No TS errors | TODO |
 | 5 | 17 | `studio/src/renderer/src/lib/embedRouter.ts` | MiniLM wrapper + matchIntent() | Returns top-3 matches with scores | TODO |
 | 5 | 18 | `ChatPanel/index.tsx` + `chatStore.ts` | Wire embedding into send flow | MatchCard renders < 50ms after send | TODO |
+| 6 | 19 | `hooks/usePageAnalyzer.ts` | Self-registration hook | Hook compiles, elements appear in store | TODO |
+| 6 | 20 | `store/pageAnalyzerStore.ts` + `lib/pageAnalyzer/index.ts` | Element registry + getPageContext() | getPageContext() returns live JSON | TODO |
+| 6 | 21 | `lib/pathlyContext.ts` | Inject page context into chat | AI references screen elements by label | TODO |
+| 7 | 22 | `main/ipc/uiActions.ts` + `main/index.ts` | IPC action handler | ipcRenderer.invoke('ui:execute-action') works | TODO |
+| 7 | 23 | `lib/actionExecutor.ts` + `App.tsx` | Renderer action executor | Click/fill/select executes on real DOM | TODO |
+| 8 | 24 | `store/automationStore.ts` | Step queue state | No TS errors | TODO |
+| 8 | 25 | `ChatPanel/StepQueue.tsx` + `AutomationCard.tsx` | Staged/auto UI components | Staged approve/skip works visually | TODO |
+| 8 | 26 | `ChatPanel/index.tsx` + `chat_agent.py` | Wire AI → action plan → execution | Full flow creation E2E works | TODO |
+| 9 | 27 | `data/models.ts` + `lib/webLLMEngine.ts` | WebLLM models data + engine | Phi-4 Mini loads and streams response | TODO |
+| 9 | 28 | `store/modelStore.ts` + `ChatPanel/ModelSelector.tsx` | Model selector UI | Download, cache, selection all work | TODO |
+| 9 | 29 | `ChatPanel/index.tsx` + `chat_agent.py` | Wire WebLLM into chat flow | Responses stream from local model | TODO |
 
 ## Prerequisites
-- [ ] Ollama installed: `winget install Ollama.Ollama`
-- [ ] Model pulled: `ollama pull phi4-mini`
 - [ ] FSM server running before testing Conv 1
+- [ ] MiniLM auto-downloads on first launch (~22MB, transformers.js)
+- [ ] WebLLM models download on first cache (Phi-4 Mini ~2GB — Conv 9)
+- [ ] Ollama optional (legacy backend only, not required for Conv 9+)
 
 ## Blocked By
 - Nothing

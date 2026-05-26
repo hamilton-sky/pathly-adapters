@@ -226,3 +226,213 @@ Pathly skill suggested immediately, **so that** I never need to remember skill n
 - [ ] Clicking an alternative skill chip replaces the current MatchCard with a new one for that skill
 
 **Delivered by:** Conv 5
+
+---
+
+## Story S6.1: Studio components register themselves with the page analyzer
+
+**As a** Pathly Studio user, **I want** the AI to always know what's on my screen,
+**so that** it can take actions without me describing the layout.
+
+**Acceptance Criteria:**
+- [ ] `usePageAnalyzer({ id, type, label })` hook exists and is called by key Studio components
+- [ ] Components register on mount and unregister on unmount — registry is always live
+- [ ] Registered components include: flow editor panel, "New Flow" button, step editor inputs, "Add Step" button, step type selector, modal CTAs
+- [ ] `data-conductor-id` attribute is present on every registered DOM element
+
+**Delivered by:** Conv 6
+
+---
+
+## Story S6.2: AI receives a structured map of the current page
+
+**As a** Pathly Studio user, **I want** the AI's responses to reference what's actually on my screen,
+**so that** its guidance is specific to my current view — not generic.
+
+**Acceptance Criteria:**
+- [ ] `getPageContext()` returns a JSON array of all currently registered elements with id, type, label, value, disabled
+- [ ] Page context is included in every POST /chat request
+- [ ] phi4-mini (or WebLLM model) can reference specific element labels in its response
+- [ ] Page context is capped at 50 elements / 300 tokens
+
+**Delivered by:** Conv 6
+
+---
+
+## Story S6.3: Page context updates automatically when the UI changes
+
+**As a** Pathly Studio user, **I want** the AI's knowledge of the screen to stay accurate as I navigate,
+**so that** it never refers to buttons or fields that aren't there anymore.
+
+**Acceptance Criteria:**
+- [ ] Opening a modal registers new elements; closing it unregisters them
+- [ ] Switching between flow editor and step editor updates the registry within one render cycle
+- [ ] Disabled state changes (e.g. Save button disabled until form is valid) are reflected in the registry
+
+**Delivered by:** Conv 6
+
+---
+
+## Story S7.1: AI can click a button on behalf of the user
+
+**As a** Pathly Studio user, **I want** the AI to be able to click buttons for me,
+**so that** I can say "add a step" and it just happens.
+
+**Acceptance Criteria:**
+- [ ] `executeAction({ type: 'click', elementId: 'btn-add-step' })` triggers a real click on the DOM element
+- [ ] Click works for buttons, links, and toggle controls
+- [ ] If element not found: returns `{ ok: false, error: 'element not found' }` — no crash
+- [ ] After click: element flashes accent color for 400ms as visual feedback
+
+**Delivered by:** Conv 7
+
+---
+
+## Story S7.2: AI can fill a text input on behalf of the user
+
+**As a** Pathly Studio user, **I want** the AI to fill in form fields for me with recommended values,
+**so that** I don't have to type repetitive or boilerplate content.
+
+**Acceptance Criteria:**
+- [ ] `executeAction({ type: 'fill', elementId: 'input-flow-name', value: 'Checkout Flow' })` sets the input value and triggers React's change event
+- [ ] The field updates visually as if the user typed it
+- [ ] Works with controlled React inputs (value + onChange pattern)
+
+**Delivered by:** Conv 7
+
+---
+
+## Story S7.3: AI can select a dropdown option on behalf of the user
+
+**As a** Pathly Studio user, **I want** the AI to select the right option in dropdowns and step type pickers,
+**so that** creating a flow with specific step types is fully automated.
+
+**Acceptance Criteria:**
+- [ ] `executeAction({ type: 'select', elementId: 'select-step-type', value: 'HTTP' })` selects the matching option
+- [ ] Works with native `<select>` elements and custom dropdown components (via simulated change event)
+
+**Delivered by:** Conv 7
+
+---
+
+## Story S8.1: Staged mode shows each AI action step and waits for approval
+
+**As a** Pathly Studio user, **I want** the AI to show me each action it plans to take before executing it,
+**so that** I stay in control and can catch mistakes.
+
+**Acceptance Criteria:**
+- [ ] After AI generates an action plan, `AutomationCard` appears showing the intent and step count
+- [ ] `[Step by Step]` button activates staged mode
+- [ ] `StepQueue` renders each step as a card with description and action preview
+- [ ] Current step is highlighted with `[✓ Approve]` and `[→ Skip]` buttons
+- [ ] Approve executes the action and advances to the next step
+- [ ] Skip marks step as skipped and advances without executing
+- [ ] Completed steps remain visible, dimmed, with `✓` or `→` badge
+
+**Delivered by:** Conv 8
+
+---
+
+## Story S8.2: Auto mode executes the full action plan without interruption
+
+**As a** Pathly Studio user, **I want** to hand off a full flow creation to the AI and have it complete everything automatically,
+**so that** I can describe what I want once and walk away.
+
+**Acceptance Criteria:**
+- [ ] `[▶ Run All]` button activates auto mode
+- [ ] All steps execute in sequence with 300ms delay between each
+- [ ] Progress bar shows `n / total` steps completed
+- [ ] `[■ Stop]` button halts execution at the current step
+- [ ] After completion: AI sends a summary message listing what was created
+
+**Delivered by:** Conv 8
+
+---
+
+## Story S8.3: Auto mode is blocked when confidence is low
+
+**As a** Pathly Studio user, **I want** the AI to force step-by-step review when it's uncertain,
+**so that** I don't end up with a wrong flow created automatically.
+
+**Acceptance Criteria:**
+- [ ] If AI confidence in the action plan is below threshold: `[▶ Run All]` button is disabled
+- [ ] Tooltip on disabled Run All: "Confidence too low for auto mode — use Step by Step"
+- [ ] Staged mode is always available regardless of confidence
+
+**Delivered by:** Conv 8
+
+---
+
+## Story S8.4: User can create a complete flow from a plain-English description
+
+**As a** Pathly Studio user, **I want** to describe what I want to build in plain English and have the AI create the flow in Studio for me,
+**so that** I never have to manually navigate menus, fill forms, or remember step types.
+
+**Acceptance Criteria:**
+- [ ] User types "create a checkout flow with an HTTP step to Stripe and a condition step" → AI generates a complete action plan
+- [ ] Action plan covers: create flow, name it, add each step, configure step type, fill required fields
+- [ ] Staged or Auto mode executes the plan in Studio
+- [ ] After completion: flow exists in Studio with the correct structure
+
+**Delivered by:** Conv 8
+
+---
+
+## Story S9.1: User can see all available AI models with system requirements
+
+**As a** Pathly Studio user, **I want** to see what local AI models are available and what hardware they need,
+**so that** I can pick the right one for my device.
+
+**Acceptance Criteria:**
+- [ ] Model selector dropdown shows in the Conductor header (replaces the `phi4-mini` pill)
+- [ ] Dropdown lists 4 models: Qwen2.5 Coder 7B, Qwen3 4B, Phi-4 Mini, Llama 3.2 3B
+- [ ] Each model card shows: name, description, use case, SYSTEM / STORAGE / SPEED specs
+- [ ] `Recommended` badge on Phi-4 Mini
+- [ ] `Cached` badge on models already downloaded
+
+**Delivered by:** Conv 9
+
+---
+
+## Story S9.2: User can download and cache a model with a toggle
+
+**As a** Pathly Studio user, **I want** to download and cache a model with one click,
+**so that** it loads instantly on future app starts.
+
+**Acceptance Criteria:**
+- [ ] Each model card has a `Cache` toggle
+- [ ] Turning toggle on starts download — linear progress bar appears under the card
+- [ ] After download: toggle shows green, `Cached` badge appears
+- [ ] Turning toggle off deletes the cached model after confirmation
+- [ ] Download progress persists if the panel is closed and reopened
+
+**Delivered by:** Conv 9
+
+---
+
+## Story S9.3: Selected model is used for all AI responses in the Conductor
+
+**As a** Pathly Studio user, **I want** the Conductor to use my chosen model for all explanations and action planning,
+**so that** I get responses that match my device capability.
+
+**Acceptance Criteria:**
+- [ ] Changing model selection immediately uses the new model for the next message
+- [ ] If selected model is not cached: Conductor shows "Download this model to use it" inline
+- [ ] ChatInput model pill shows the short name of the currently selected model
+- [ ] WebLLM streams responses the same way Ollama did — character by character in the message bubble
+
+**Delivered by:** Conv 9
+
+---
+
+## Story S9.4: Model selection persists across app restarts
+
+**As a** Pathly Studio user, **I want** my model choice to be remembered,
+**so that** I don't have to re-select it every time I open Studio.
+
+**Acceptance Criteria:**
+- [ ] `modelStore.selectedModelId` persists via Zustand persist middleware
+- [ ] On app start: selected model loads automatically if cached
+- [ ] If selected model is no longer cached (user cleared storage): falls back to Phi-4 Mini (recommended default)
+
+**Delivered by:** Conv 9
