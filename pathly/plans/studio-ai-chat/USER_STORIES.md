@@ -229,87 +229,76 @@ Pathly skill suggested immediately, **so that** I never need to remember skill n
 
 ---
 
-## Story S6.1: Studio components register themselves with the page analyzer
+## Story S6.1: AI receives a static schema of Studio's key UI elements
 
-**As a** Pathly Studio user, **I want** the AI to always know what's on my screen,
-**so that** it can take actions without me describing the layout.
+**As a** Pathly Studio user, **I want** the AI to know what's in Studio without runtime scanning,
+**so that** it can generate accurate automation steps based on a reliable, always-correct element map.
 
 **Acceptance Criteria:**
-- [ ] `usePageAnalyzer({ id, type, label })` hook exists and is called by key Studio components
-- [ ] Components register on mount and unregister on unmount — registry is always live
-- [ ] Registered components include: flow editor panel, "New Flow" button, step editor inputs, "Add Step" button, step type selector, modal CTAs
-- [ ] `data-conductor-id` attribute is present on every registered DOM element
+- [ ] `getStudioSchema()` returns a typed list of elements, each with `screen`, `type`, `label`, `description`
+- [ ] Schema is included in every POST /chat request as `studioSchema`
+- [ ] AI references element labels (not IDs) when generating automation steps
+- [ ] Schema covers FlowEditor, StepEditor, ChatPanel, and modal CTAs
+- [ ] `studioSchema.ts` is a typed constant — no hooks, no subscriptions, no runtime scanning
 
 **Delivered by:** Conv 6
 
 ---
 
-## Story S6.2: AI receives a structured map of the current page
+## Story S6.2: AI system prompt includes Studio UI context
 
-**As a** Pathly Studio user, **I want** the AI's responses to reference what's actually on my screen,
-**so that** its guidance is specific to my current view — not generic.
+**As a** Pathly Studio user, **I want** the AI's system prompt to describe what Studio's interface looks like,
+**so that** the AI generates steps that reference real, accessible element labels.
 
 **Acceptance Criteria:**
-- [ ] `getPageContext()` returns a JSON array of all currently registered elements with id, type, label, value, disabled
-- [ ] Page context is included in every POST /chat request
-- [ ] phi4-mini (or WebLLM model) can reference specific element labels in its response
-- [ ] Page context is capped at 50 elements / 300 tokens
+- [ ] System prompt includes a `## Studio UI Elements` section listing elements grouped by screen
+- [ ] AI-generated automation steps reference only labels from this list
+- [ ] Schema contribution to system prompt is capped at 400 tokens
 
 **Delivered by:** Conv 6
 
 ---
 
-## Story S6.3: Page context updates automatically when the UI changes
+## Story S7.1: Playwright executor connects to Electron window
 
-**As a** Pathly Studio user, **I want** the AI's knowledge of the screen to stay accurate as I navigate,
-**so that** it never refers to buttons or fields that aren't there anymore.
-
-**Acceptance Criteria:**
-- [ ] Opening a modal registers new elements; closing it unregisters them
-- [ ] Switching between flow editor and step editor updates the registry within one render cycle
-- [ ] Disabled state changes (e.g. Save button disabled until form is valid) are reflected in the registry
-
-**Delivered by:** Conv 6
-
----
-
-## Story S7.1: AI can click a button on behalf of the user
-
-**As a** Pathly Studio user, **I want** the AI to be able to click buttons for me,
-**so that** I can say "add a step" and it just happens.
+**As a** Pathly Studio user, **I want** the automation executor to be ready when Studio starts,
+**so that** the first automation request can run without setup delay.
 
 **Acceptance Criteria:**
-- [ ] `executeAction({ type: 'click', elementId: 'btn-add-step' })` triggers a real click on the DOM element
-- [ ] Click works for buttons, links, and toggle controls
-- [ ] If element not found: returns `{ ok: false, error: 'element not found' }` — no crash
-- [ ] After click: element flashes accent color for 400ms as visual feedback
+- [ ] `PlaywrightExecutor.connect(cdpUrl)` establishes a CDP connection to the running Studio window
+- [ ] Executed at app startup (after `app.ready`), available before first automation request
+- [ ] CDP remote debugging port is set before `BrowserWindow` is created
 
 **Delivered by:** Conv 7
 
 ---
 
-## Story S7.2: AI can fill a text input on behalf of the user
+## Story S7.2: AI can click, fill, or select any Studio element by label
 
-**As a** Pathly Studio user, **I want** the AI to fill in form fields for me with recommended values,
-**so that** I don't have to type repetitive or boilerplate content.
+**As a** Pathly Studio user, **I want** the AI to interact with Studio UI elements using their visible labels,
+**so that** automation works without fragile DOM IDs or injected attributes.
 
 **Acceptance Criteria:**
-- [ ] `executeAction({ type: 'fill', elementId: 'input-flow-name', value: 'Checkout Flow' })` sets the input value and triggers React's change event
-- [ ] The field updates visually as if the user typed it
-- [ ] Works with controlled React inputs (value + onChange pattern)
+- [ ] `executeStep({ type: 'click', label: 'New Flow' })` finds and clicks the matching element
+- [ ] Element resolution cascade: `getByRole` → `getByLabel` → `getByPlaceholder` → `getByText`
+- [ ] If not found: returns `{ ok: false, error: 'element not found: New Flow' }` — no crash
+- [ ] Disabled element check: returns `{ ok: false, error: 'element disabled: Save' }`
+- [ ] Works for click, fill (React synthetic events), and selectOption
 
 **Delivered by:** Conv 7
 
 ---
 
-## Story S7.3: AI can select a dropdown option on behalf of the user
+## Story S7.3: Step execution is reliable across UI changes
 
-**As a** Pathly Studio user, **I want** the AI to select the right option in dropdowns and step type pickers,
-**so that** creating a flow with specific step types is fully automated.
+**As a** Pathly Studio user, **I want** automation steps to degrade gracefully if a label changes,
+**so that** a renamed button gives a clear error instead of silently breaking the flow.
 
 **Acceptance Criteria:**
-- [ ] `executeAction({ type: 'select', elementId: 'select-step-type', value: 'HTTP' })` selects the matching option
-- [ ] Works with native `<select>` elements and custom dropdown components (via simulated change event)
+- [ ] If an element label changes (e.g. "New Flow" → "Create Flow"), the `getByText` fallback tries a partial match
+- [ ] If still not found: step returns a clear error with the label that wasn't found
+- [ ] No silent failures — every failed step produces an actionable error message
+- [ ] Fix path is simple: update the label in `studioSchema.ts`
 
 **Delivered by:** Conv 7
 

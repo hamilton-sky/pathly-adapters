@@ -162,3 +162,70 @@ Studio Renderer (React 18 + Zustand + CSS Modules + JetBrains Mono)
   ANSI from OutputSnippet display lines before showing in chat.
 - **Auto-approve + wrong match:** If autoApprove is on and confidence is low, wrong skill
   runs. Mitigate: auto-approve is disabled for matches below 65% confidence regardless of setting.
+
+---
+
+## Automation Architecture (Track A — Convs 6–8)
+
+### Static Studio schema (not a runtime registry)
+
+Studio is our own app with a fixed layout. Rather than scanning the DOM at runtime or requiring
+every component to register itself, we describe Studio's key UI elements once as a typed constant
+in `studioSchema.ts`.
+
+**Why static:**
+- Fixed app — the layout doesn't change at runtime (no user-configurable panels, no plugin slots)
+- Always accurate — no stale registry state, no mount/unmount race conditions
+- Zero runtime overhead — no hooks, no Zustand subscriptions, no event bus
+- One file to update — if a label changes, one edit in `studioSchema.ts` reflects everywhere
+
+### Playwright in Electron main process
+
+UI interactions are executed by Playwright's Node.js API (`@playwright/test`) running in the
+Electron main process. Playwright connects to the live Electron window via Chrome DevTools
+Protocol (CDP) on a fixed debug port.
+
+**Why Playwright:**
+- Semantic element resolution — no fragile DOM IDs, no `data-conductor-id` pollution
+- Self-healing — if a label changes, the cascade tries alternatives before failing
+- Reliable React input handling — Playwright's `.fill()` triggers React synthetic events correctly
+- Native Electron support via `chromium.connectOverCDP`
+
+### Element resolution cascade
+
+When executing a step, Playwright tries each strategy in order until an element is found:
+
+1. `page.getByRole(type, { name: label })` — most reliable; ARIA role + accessible name
+2. `page.getByLabel(label)` — form elements with associated `<label>`
+3. `page.getByPlaceholder(label)` — inputs with placeholder text
+4. `page.getByText(label, { exact: false })` — visible text fallback
+
+This pattern is inspired by the playwright-stepper-framework's ElementResolver, implemented
+in TypeScript using Playwright's native locator API (no Python subprocess).
+
+### Plan preview UX pattern
+
+The AI generates all steps first. The user sees the complete plan in an `AutomationCard` before
+any execution begins. This is the same pattern as Cursor's diff preview: show intent, get
+approval, then act.
+
+Two approval modes:
+- **Auto** (`[▶ Run All]`): executes all steps with 300ms delay between each
+- **Staged** (`[Step by Step]`): user approves each step individually via `[✓ Approve]` / `[→ Skip]`
+
+**Why plan-first:** Trust before execution. Users who can see and cancel a plan are far more
+willing to use automation than users who watch actions happen without warning.
+
+### Decision: No page analyzer hook
+
+**Previous approach:** `usePageAnalyzer` hook on every React component — registers elements on
+mount, unregisters on unmount. Requires `data-conductor-id` DOM attributes everywhere.
+
+**Rejected because:**
+- Invasive — every component needs to be modified
+- Brittle — registry can be stale if a component doesn't unregister cleanly
+- Unnecessary — Studio is our own app; we know what's in it without scanning at runtime
+
+**New approach:** Static schema in `studioSchema.ts`. The AI knows what's in Studio because
+we told it once, not because Studio told the AI at runtime. Playwright finds elements by
+semantic label — no DOM attribute required.

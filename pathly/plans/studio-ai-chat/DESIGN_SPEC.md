@@ -915,11 +915,11 @@ interface ChatStore {
 | `studio/src/renderer/src/data/skills.json` | 5 | Skills name+command+description |
 | `studio/src/renderer/src/lib/pathlyContext.ts` | 4 | FSM + screen context builder |
 | `studio/src/renderer/src/App.tsx` | 2 | Add ChatPanel to layout |
-| `studio/src/renderer/src/hooks/usePageAnalyzer.ts` | 6 | Self-registration hook |
-| `studio/src/renderer/src/store/pageAnalyzerStore.ts` | 6 | Live element registry |
-| `studio/src/renderer/src/lib/pageAnalyzer/index.ts` | 6 | getPageContext() |
-| `studio/src/renderer/src/lib/actionExecutor.ts` | 7 | Renderer-side click/fill/select |
-| `studio/src/main/ipc/uiActions.ts` | 7 | IPC action handler |
+| `studio/src/renderer/src/data/studioSchema.ts` | 6 | Static Studio UI element definitions |
+| `studio/src/renderer/src/lib/pathlyContext.ts` | 6 | MODIFY — inject studioSchema into AI context |
+| `studio/src/main/automation/playwrightExecutor.ts` | 7 | Playwright element resolver + executor |
+| `studio/src/main/ipc/automation.ts` | 7 | IPC handler for step execution |
+| `studio/package.json` | 7 | MODIFY — add @playwright/test |
 | `studio/src/renderer/src/store/automationStore.ts` | 8 | Step queue state |
 | `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx` | 8 | Staged/auto step UI |
 | `studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx` | 8 | Plan summary card |
@@ -1034,18 +1034,26 @@ Replaces the `phi4-mini` pill in ConductorHeader. Opens as an inline dropdown pa
 
 ### How the AI knows what to click
 
-Every interactive Studio component registers itself with `usePageAnalyzer`. The AI receives a structured element map with every message. The AI must reference only element IDs present in that map.
+The AI receives a static schema of Studio's key UI elements with every message. This schema is a typed constant in `studioSchema.ts` — not a runtime registry, not DOM scanning.
+
+The AI must only reference labels from this schema when generating steps. If a user requests something that requires an element not in the schema, the AI says so instead of inventing a label.
 
 ```
-Component mounts → usePageAnalyzer({ id, type, label }) → pageAnalyzerStore
-                                                                    │
-User sends message → getPageContext() → { elements: [...] } ────────┘
-                                                    │
-                                          POST /chat body
-                                          AI sees: "Current UI: btn-new-flow (button, 'New Flow'), ..."
-                                                    │
-                                          AI returns: { type: 'automation', steps: [{action: {elementId: 'btn-new-flow', ...}}] }
+studioSchema.ts → getStudioSchema() → injected into pathlyContext → POST /chat body
+→ AI system prompt: "## Studio UI Elements: [New Flow (button, FlowEditor)], ..."
+→ AI generates: { "action": "click", "label": "New Flow", "screen": "FlowEditor" }
 ```
+
+### How steps are executed
+
+Playwright runs in the Electron main process. It connects to the app window via CDP (remote debugging). Element resolution uses a semantic cascade — no brittle IDs, no DOM attribute pollution:
+
+1. `getByRole(type, { name: label })` — most reliable
+2. `getByLabel(label)` — form elements
+3. `getByPlaceholder(label)` — inputs with placeholder text
+4. `getByText(label, { exact: false })` — visible text fallback
+
+This is the same pattern as playwright-stepper-framework's ElementResolver, implemented in TypeScript using Playwright's native locator API.
 
 ### Automation modes
 
@@ -1082,8 +1090,12 @@ Detection heuristic: presence of creation/modification verbs + Studio nouns ("fl
 - Glassmorphism / backdrop-filter — no background to blur, GPU overdraw
 - Tailwind — fights the CSS custom property token system
 - Gradient backgrounds — flat surfaces only, per Linear chrome-reduction principle
-- Scraping DOM for page context — use the component registry (`usePageAnalyzer`), never raw DOM queries
+- Runtime DOM scanning for automation context — use the static `studioSchema.ts` constant, not DOM queries
+- `usePageAnalyzer` hooks on Studio components — the static schema replaces runtime registration entirely
+- `data-conductor-id` attributes on DOM nodes — Playwright resolves elements by semantic label, not injected IDs
+- `webContents.executeJavaScript` for automation — Playwright CDP connection is the execution path
+- `window.__uiExecutor` or renderer-side action dispatch — execution happens in main process via Playwright
 - Drag-and-drop automation — click/fill/select only for v1
-- Generating automation steps without page context — AI must see the registry before generating actions
+- Generating automation steps without studioSchema — AI must see the schema before generating actions
 - Ollama as required dependency — it is optional/legacy; WebLLM is the default from Conv 9
 - Removing the Python backend — keep for teams that prefer Ollama

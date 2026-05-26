@@ -108,45 +108,51 @@
 
 ---
 
-## Category 6: Page Analyzer
+## Category 6: Static Studio Schema
 
-### EC-6.1: Element registered but DOM node removed before action
-- **Trigger:** AI generates action for `btn-add-step` but user navigated away before execution
-- **Expected:** `window.__uiExecutor.execute()` returns `{ ok: false, error: 'element not found' }`. StepQueue marks step as `error`, shows inline message "Element not found — page may have changed". User can retry or skip.
-- **Handled in:** Conv 7, Phase 23
+### EC-6.1: AI references a label not in the schema
+- **Trigger:** AI generates a step with `label: 'Submit'` but that label isn't in `studioSchema.ts`
+- **Expected:** Playwright cascade tries `getByText('Submit', { exact: false })` as a final fallback. If still not found, step returns `{ ok: false, error: 'element not found: Submit' }`. StepQueue shows inline error. User can skip or retry.
+- **Handled in:** Conv 7, Phase 21 — getByText fallback in resolveElement cascade
 
-### EC-6.2: No components registered (empty registry)
-- **Trigger:** AI requests page context but no Studio components call `usePageAnalyzer` yet (Conv 6 incomplete)
-- **Expected:** `getPageContext()` returns `{ elements: [], timestamp }`. AI context section reads "No UI elements registered." AI still responds but cannot generate action steps.
-- **Handled in:** Conv 6, Phase 20
+### EC-6.2: Studio adds a new screen or component not in schema
+- **Trigger:** Developer adds a new modal or panel to Studio that isn't described in `studioSchema.ts`
+- **Expected:** Any step targeting that screen's elements fails with "element not found". Fix path: add the new screen's elements to `studioSchema.ts` — one file, one edit, no runtime changes needed.
+- **Handled in:** Conv 6, Phase 19 — schema is the single source of truth
 
-### EC-6.3: Too many elements registered
-- **Trigger:** A complex flow editor view has 80+ interactive elements
-- **Expected:** `getPageContext()` caps at 50 elements, prioritizes by type: input > button > select > panel > link. Truncated count noted in context: "20 more elements not shown."
-- **Handled in:** Conv 6, Phase 20
-
-### EC-6.4: React controlled input — value doesn't update after fill
-- **Trigger:** `executeAction({ type: 'fill', ... })` sets `.value` but React's onChange never fires
-- **Expected:** Action executor dispatches both `input` and `change` synthetic events after setting value. React reconciler picks up the state change.
-- **Handled in:** Conv 7, Phase 23 — use `nativeInputValueSetter` trick for React controlled inputs
+### EC-6.3: Schema has a wrong label for an element
+- **Trigger:** `studioSchema.ts` describes a button as "New Flow" but the actual button text is "Create Flow"
+- **Expected:** Playwright cascade tries role → label → placeholder → text (partial match). The `getByText('New Flow', { exact: false })` strategy may still match if "New Flow" appears as part of the button's accessible name. Worst case: clean error with the label that wasn't found — no silent failure.
+- **Handled in:** Conv 7, Phase 21 — cascade provides automatic resilience
 
 ---
 
-## Category 7: Action Executor
+## Category 7: Playwright Executor
 
-### EC-7.1: AI generates action for a disabled element
+### EC-7.1: CDP connection fails (app restarted without reinitializing)
+- **Trigger:** Studio app is restarted but `playwrightExecutor` singleton was not reconnected
+- **Expected:** On next `executeStep` call, executor detects `this.page === null` and returns `{ ok: false, error: 'Playwright not connected' }`. StepQueue shows "Automation unavailable — restart Studio". Reconnect can be triggered manually or on next app start.
+- **Handled in:** Conv 7, Phase 21 — null check in executeStep
+
+### EC-7.2: Element found but disabled
 - **Trigger:** AI tries to click "Save" but it's disabled (form validation not passed)
-- **Expected:** `executeAction` detects `element.disabled === true`, returns `{ ok: false, error: 'element disabled' }`. StepQueue shows "Save is disabled — complete required fields first." Staged mode pauses; auto mode stops and shows error.
-- **Handled in:** Conv 7, Phase 23
+- **Expected:** `locator.isDisabled()` returns true. Step returns `{ ok: false, error: 'element disabled: Save' }`. StepQueue shows "Save is disabled — complete required fields first." Staged mode pauses; auto mode stops and shows error.
+- **Handled in:** Conv 7, Phase 21 — isDisabled check before executing action
 
-### EC-7.2: Action sequence partially completes before error
-- **Trigger:** Steps 1–3 succeed (flow created, named), step 4 fails (step type selector not found)
-- **Expected:** Auto mode stops at step 4 and shows "Stopped at step 4 — element not found". Previously completed steps remain done. User can resume from step 4 in staged mode.
-- **Handled in:** Conv 8, Phase 26 — `automationStore` tracks per-step status; resume picks up from last non-done step
+### EC-7.3: Multiple elements match the same label
+- **Trigger:** Two buttons both have accessible name "Save" on the same page
+- **Expected:** Playwright's `.first()` is used as tiebreaker — the first matching element in DOM order is acted on. A warning is logged with the match count. No crash.
+- **Handled in:** Conv 7, Phase 21 — `loc.first()` in resolveElement
 
-### EC-7.3: User edits a field after AI filled it
-- **Trigger:** AI fills "Flow Name" with "Checkout Flow", user overwrites it with "Payment Flow" mid-staged-mode
-- **Expected:** No conflict. The fill was a one-shot action. The user's edit is the current value. If AI tries to fill the same field again in a later step, it overwrites the user's value — this is expected (user should have skipped the step if they wanted their value).
+### EC-7.4: Fill on a React controlled input
+- **Trigger:** `executeStep({ type: 'fill', label: 'Flow Name', value: 'Checkout Flow' })`
+- **Expected:** Playwright's `.fill()` triggers React synthetic events correctly — unlike raw DOM value assignment, Playwright dispatches the correct input events that React's synthetic event system picks up. No special handling needed.
+- **Handled in:** Conv 7, Phase 21 — Playwright `.fill()` handles this natively
+
+### EC-7.5: Playwright not installed
+- **Trigger:** `@playwright/test` is missing from `studio/package.json` or browsers not downloaded
+- **Expected:** Import fails at startup. Electron logs a clear error: "Playwright not available — automation disabled". All `executeStep` calls return `{ ok: false, error: 'Playwright not connected' }`. Skill routing (MatchCard) is unaffected.
+- **Handled in:** Conv 7, Phase 21 — startup check logs warning; automation disabled gracefully
 
 ---
 
@@ -157,15 +163,15 @@
 - **Expected:** Execution halts immediately after current action completes (no mid-action cancellation). Steps 4–7 remain `pending`. Summary message: "Stopped at step 3 — 4 steps not executed." User can restart in staged mode.
 - **Handled in:** Conv 8, Phase 26 — `automationStore.status` set to `'paused'` on stop
 
-### EC-8.2: AI generates an action step with no matching element ID
-- **Trigger:** AI hallucinates an element ID that doesn't exist in the registry (e.g. `btn-submit` when registry has `btn-save`)
-- **Expected:** `executeAction` returns `{ ok: false, error: 'element not found' }`. For staged mode: shows error + "This step couldn't find the right button. Skip or retry?" For auto mode: stops and reports.
-- **Mitigation:** AI system prompt includes the full `pageContext` element list — AI must only reference IDs from that list. Non-existent IDs are a hallucination that context injection should prevent.
+### EC-8.2: AI generates an action step with a label not in the schema
+- **Trigger:** AI hallucinates a label that doesn't exist in `studioSchema.ts` (e.g. `label: 'Submit'` when schema has `'Save'`)
+- **Expected:** `PlaywrightExecutor.executeStep` tries the full cascade including `getByText` fuzzy match. If nothing found, returns `{ ok: false, error: 'element not found: Submit' }`. Staged mode shows error + "This step couldn't find the right element. Skip or retry?" Auto mode stops and reports.
+- **Mitigation:** AI system prompt lists all labels from `studioSchema` and instructs the AI to use only those labels. Label hallucination should be rare when schema is injected correctly.
 - **Handled in:** Conv 8, Phase 26
 
-### EC-8.3: Auto mode runs when no page context is available
-- **Trigger:** User requests "create a flow" before Conv 6 page analyzer is implemented
-- **Expected:** If `pageContext.elements.length === 0`, `[▶ Run All]` is disabled. Tooltip: "No UI elements registered — page analyzer required."
+### EC-8.3: Auto mode runs before studioSchema is available
+- **Trigger:** User requests "create a flow" before Conv 6 static schema is implemented
+- **Expected:** If `studioSchema` is missing from context, `[▶ Run All]` is disabled. Tooltip: "Studio schema not loaded — Conv 6 required."
 - **Handled in:** Conv 8, Phase 25
 
 ---
@@ -200,5 +206,5 @@
 - Auto-approve disabled for matches < 65% confidence regardless of setting
 - WebLLM model quality depends on selected model and device GPU capability
 - OutputSnippet shows only last 5 PTY lines — no scroll history
-- Action executor supports click/fill/select only — no drag-and-drop or keyboard shortcuts
+- Playwright executor supports click/fill/select only — no drag-and-drop or keyboard shortcuts
 - Ollama backend is optional/legacy — not required for Conv 9+ (WebLLM is default)

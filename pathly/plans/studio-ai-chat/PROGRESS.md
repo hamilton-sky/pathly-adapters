@@ -22,12 +22,11 @@
 | S5.1 | MiniLM loads at startup | Conv 5 | TODO |
 | S5.2 | Embedding matches intent to Pathly skill | Conv 5 | TODO |
 | S5.3 | Low-confidence state guides user to correct skill | Conv 5 | TODO |
-| S6.1 | Components self-register with page analyzer | Conv 6 | TODO |
-| S6.2 | AI receives live page element map | Conv 6 | TODO |
-| S6.3 | Page context updates on UI changes | Conv 6 | TODO |
-| S7.1 | AI can click a button | Conv 7 | TODO |
-| S7.2 | AI can fill a text input | Conv 7 | TODO |
-| S7.3 | AI can select a dropdown option | Conv 7 | TODO |
+| S6.1 | AI receives static schema of Studio UI elements | Conv 6 | TODO |
+| S6.2 | AI system prompt includes Studio UI context | Conv 6 | TODO |
+| S7.1 | Playwright executor connects to Electron window | Conv 7 | TODO |
+| S7.2 | AI can click, fill, or select any Studio element by label | Conv 7 | TODO |
+| S7.3 | Step execution is reliable across UI changes | Conv 7 | TODO |
 | S8.1 | Staged mode with per-step approval | Conv 8 | TODO |
 | S8.2 | Auto mode executes full plan | Conv 8 | TODO |
 | S8.3 | Auto mode blocked on low confidence | Conv 8 | TODO |
@@ -47,8 +46,8 @@
 | 3 | 9–11 | Core | S3.1, S3.2 | TODO | `cd studio && npm run typecheck` |
 | 4 | 12–14 | Core | S4.1, S4.2 | TODO | `cd studio && npm run typecheck` |
 | 5 | 15–18 | Core | S5.1, S5.2, S5.3 | TODO | `cd studio && npm run typecheck` |
-| 6 | 19–21 | Track A | S6.1, S6.2, S6.3 | TODO | `cd studio && npm run typecheck` + verify registry in React DevTools |
-| 7 | 22–23 | Track A | S7.1, S7.2, S7.3 | TODO | `cd studio && npm run typecheck` + manual click/fill test in Studio |
+| 6 | 19–20 | Track A | S6.1, S6.2 | TODO | `cd studio && npm run typecheck` + inspect POST /chat body includes studioSchema |
+| 7 | 21–22 | Track A | S7.1, S7.2, S7.3 | TODO | `cd studio && npm run typecheck` + devtools: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` |
 | 8 | 24–26 | Track A | S8.1, S8.2, S8.3, S8.4 | TODO | E2E: type "create a test flow" → approve steps → flow appears in Studio |
 | 9 | 27–29 | Track B | S9.1, S9.2, S9.3, S9.4 | TODO | Select Phi-4 Mini → download → send message → response streams from WebLLM |
 
@@ -77,11 +76,10 @@
 | 5 | 16 | `studio/src/renderer/src/lib/skillsManifest.ts` | Typed loader for skills.json | No TS errors | TODO |
 | 5 | 17 | `studio/src/renderer/src/lib/embedRouter.ts` | MiniLM wrapper + matchIntent() | Returns top-3 matches with scores | TODO |
 | 5 | 18 | `ChatPanel/index.tsx` + `chatStore.ts` | Wire embedding into send flow | MatchCard renders < 50ms after send | TODO |
-| 6 | 19 | `hooks/usePageAnalyzer.ts` | Self-registration hook | Hook compiles, elements appear in store | TODO |
-| 6 | 20 | `store/pageAnalyzerStore.ts` + `lib/pageAnalyzer/index.ts` | Element registry + getPageContext() | getPageContext() returns live JSON | TODO |
-| 6 | 21 | `lib/pathlyContext.ts` | Inject page context into chat | AI references screen elements by label | TODO |
-| 7 | 22 | `main/ipc/uiActions.ts` + `main/index.ts` | IPC action handler | ipcRenderer.invoke('ui:execute-action') works | TODO |
-| 7 | 23 | `lib/actionExecutor.ts` + `App.tsx` | Renderer action executor | Click/fill/select executes on real DOM | TODO |
+| 6 | 19 | `data/studioSchema.ts` | Static Studio UI schema | No TS errors, schema covers all key elements | TODO |
+| 6 | 20 | `lib/pathlyContext.ts` | Inject schema into AI context | AI references element labels in responses | TODO |
+| 7 | 21 | `main/automation/playwrightExecutor.ts` | Playwright executor | executeStep click/fill/select works | TODO |
+| 7 | 22 | `main/ipc/automation.ts` | IPC handler | ipcRenderer.invoke executes step via Playwright | TODO |
 | 8 | 24 | `store/automationStore.ts` | Step queue state | No TS errors | TODO |
 | 8 | 25 | `ChatPanel/StepQueue.tsx` + `AutomationCard.tsx` | Staged/auto UI components | Staged approve/skip works visually | TODO |
 | 8 | 26 | `ChatPanel/index.tsx` + `chat_agent.py` | Wire AI → action plan → execution | Full flow creation E2E works | TODO |

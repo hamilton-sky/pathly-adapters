@@ -36,8 +36,9 @@ The **Conductor** is a right-side chat panel in Pathly Studio. It has three capa
 using **embedding similarity** (MiniLM, ~22ms, zero hallucination). The matched command is
 written to Claude Code or Codex terminal tab via Electron IPC after user approval.
 
-**2. UI Automation** — the AI can read the live Studio UI (via a component registry) and execute
-actions (click, fill, select) on behalf of the user. Two modes:
+**2. UI Automation** — the AI uses a static schema of Studio's key UI elements and executes
+actions (click, fill, select) on behalf of the user via Playwright in the Electron main process.
+Two modes:
 - **Staged**: AI shows each step and waits for user approval before executing
 - **Auto**: AI executes the full action sequence without interruption
 
@@ -48,8 +49,8 @@ No Ollama required. Models data and engine ported from zakamurai.
 ### Two Build Tracks (parallel after Conv 5)
 
 **Track A — UI Automation** (Convs 6–8)
-- Conv 6: Page Analyzer (component registry + live element map)
-- Conv 7: Action Executor (IPC click/fill/select)
+- Conv 6: Static Studio schema (typed element definitions) + inject into AI context
+- Conv 7: Playwright executor in main process (semantic element resolution, no DOM IDs)
 - Conv 8: Staged/Auto mode in chat
 
 **Track B — Model Selector** (Conv 9, independent)
@@ -84,12 +85,12 @@ No Ollama required. Models data and engine ported from zakamurai.
 | `studio/src/renderer/src/lib/embedRouter.ts` | 5 | CREATE — MiniLM wrapper + matchIntent() |
 | `studio/src/renderer/src/lib/skillsManifest.ts` | 5 | CREATE — typed skills.json loader |
 | `studio/src/renderer/src/data/skills.json` | 5 | CREATE — 14 skills with descriptions |
-| `studio/src/renderer/src/hooks/usePageAnalyzer.ts` | 6 | CREATE — component self-registration hook |
-| `studio/src/renderer/src/store/pageAnalyzerStore.ts` | 6 | CREATE — live element registry |
-| `studio/src/renderer/src/lib/pageAnalyzer/index.ts` | 6 | CREATE — getPageContext() for AI consumption |
-| `studio/src/renderer/src/lib/actionExecutor.ts` | 7 | CREATE — renderer-side action dispatch |
-| `studio/src/main/ipc/uiActions.ts` | 7 | CREATE — IPC handler for click/fill/select |
-| `studio/src/main/index.ts` | 7 | MODIFY — register uiActions IPC handler |
+| `studio/src/renderer/src/data/studioSchema.ts` | 6 | CREATE — static Studio UI element definitions |
+| `studio/src/renderer/src/lib/pathlyContext.ts` | 6 | MODIFY — inject studioSchema into AI context |
+| `studio/src/main/automation/playwrightExecutor.ts` | 7 | CREATE — Playwright element resolver + executor |
+| `studio/src/main/ipc/automation.ts` | 7 | CREATE — IPC handler for step execution |
+| `studio/package.json` | 7 | MODIFY — add @playwright/test |
+| `studio/src/main/index.ts` | 7 | MODIFY — register automation IPC handler + init executor |
 | `studio/src/renderer/src/store/automationStore.ts` | 8 | CREATE — step queue, staged/auto state |
 | `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx` | 8 | CREATE — staged step UI with approve/skip |
 | `studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx` | 8 | CREATE — AI action plan display |
@@ -111,8 +112,8 @@ No Ollama required. Models data and engine ported from zakamurai.
 | 3 | MatchCard + IPC Terminal Write | Core | S3.1, S3.2 | TODO | `MatchCard.tsx`, `OutputSnippet.tsx`, `ipc/chat.ts` |
 | 4 | Context Injection | Core | S4.1, S4.2 | TODO | `pathlyContext.ts`, `ChatPanel/index.tsx` |
 | 5 | Embedding Router | Core | S5.1, S5.2, S5.3 | TODO | `embedRouter.ts`, `skillsManifest.ts`, `skills.json` |
-| 6 | Page Analyzer | Track A | S6.1, S6.2, S6.3 | TODO | `usePageAnalyzer.ts`, `pageAnalyzerStore.ts`, `pageAnalyzer/index.ts` |
-| 7 | Action Executor | Track A | S7.1, S7.2, S7.3 | TODO | `actionExecutor.ts`, `ipc/uiActions.ts` |
+| 6 | Static Studio Schema + Context Injection | Track A | S6.1, S6.2 | TODO | `studioSchema.ts`, `pathlyContext.ts` |
+| 7 | Playwright Executor | Track A | S7.1, S7.2, S7.3 | TODO | `playwrightExecutor.ts`, `ipc/automation.ts`, `studio/package.json` |
 | 8 | Staged / Auto Automation Mode | Track A | S8.1, S8.2, S8.3, S8.4 | TODO | `automationStore.ts`, `StepQueue.tsx`, `AutomationCard.tsx` |
 | 9 | Model Selector + WebLLM | Track B | S9.1, S9.2, S9.3, S9.4 | TODO | `models.ts`, `webLLMEngine.ts`, `modelStore.ts`, `ModelSelector.tsx` |
 

@@ -495,155 +495,161 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 
 ---
 
-## Conversation 6: Page Analyzer (Phases 19–21) — Track A
+## Conversation 6: Static Studio Schema + Context Injection (Phases 19–20) — Track A
 
-**Stories delivered:** S6.1, S6.2, S6.3
+**Stories delivered:** S6.1, S6.2
 **Requires:** Conversation 5 complete.
-**Verify:** `cd studio && npm run typecheck` — zero errors. Send a message and confirm `pageContext.elements` is populated in the request body.
+**Verify:** `cd studio && npm run typecheck` — zero errors. Send a message, check POST /chat body includes `studioSchema` array with 10+ elements.
 
 **Prompt to paste:**
 ```
-Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
-Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 19–21 for full details.
+Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first.
+Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 19–20.
 
-Implement Studio AI Chat Conversation 6 (Phases 19–21) — Page Analyzer.
+Implement Studio AI Chat Conversation 6 (Phases 19–20) — Static Studio Schema.
 
-**Before editing anything:** glob/read the live repo to confirm every file path below exists.
+Files:
+- studio/src/renderer/src/data/studioSchema.ts — CREATE
+- studio/src/renderer/src/lib/pathlyContext.ts — MODIFY
 
-**Codebase files this conversation touches:**
-- `studio/src/renderer/src/hooks/usePageAnalyzer.ts` — CREATE: self-registration hook
-- `studio/src/renderer/src/store/pageAnalyzerStore.ts` — CREATE: live element registry
-- `studio/src/renderer/src/lib/pageAnalyzer/index.ts` — CREATE: getPageContext()
-- `studio/src/renderer/src/lib/pathlyContext.ts` — MODIFY: include pageContext
-- Key Studio components (FlowEditor, StepEditor, ChatPanel, modals) — MODIFY: add usePageAnalyzer calls + data-conductor-id attributes
+Phase 19 — studioSchema.ts:
+  interface StudioElement { id: string; screen: string; type: 'button'|'input'|'select'|'panel'; label: string; description: string }
 
-Scope:
+  Define elements for these screens (read the actual Studio source to get real labels):
+    FlowEditor screen: "New Flow" button, flow name input, flow list panel
+    StepEditor screen: "Add Step" button, step type selector, step name input, URL input field, "Save" button
+    ChatPanel screen: send button, message input
+    Modals: "Save" button, "Cancel" button, "Delete" button
 
-Phase 19 — usePageAnalyzer hook:
-  interface ElementMeta { id: string; type: 'button'|'input'|'select'|'link'|'panel'; label: string; value?: string; disabled?: boolean; visible?: boolean }
-  usePageAnalyzer(meta: ElementMeta): void
-  On mount: pageAnalyzerStore.register(meta)
-  On unmount: pageAnalyzerStore.unregister(meta.id)
-  On value/disabled changes: pageAnalyzerStore.update(id, patch) via useEffect deps
+  export function getStudioSchema(): StudioElement[]
+  export function getSchemaForScreen(screen: string): StudioElement[]
 
-Phase 20 — pageAnalyzerStore + getPageContext():
-  Zustand store: elements: Map<string, ElementMeta>, register(), unregister(), update()
-  getPageContext(): PageContext — reads store, returns { elements: ElementMeta[], timestamp: number }
-  Cap at 50 elements — prioritize: input > button > select > panel > link
-  Add usePageAnalyzer calls to these Studio components (read each component first to find correct IDs):
-    - FlowEditor: register flow canvas panel + "New Flow" button
-    - StepEditor: register step form inputs + "Add Step" button + step type selector
-    - ChatPanel: register send button + input textarea
-    - Any modal/dialog: register CTA buttons
-  Each registered DOM node must have data-conductor-id={id} attribute
+Phase 20 — pathlyContext.ts:
+  Import getStudioSchema from data/studioSchema.ts
+  Add studioSchema to buildPathlyContext() return type and value
+  Pass studioSchema in POST /chat body
 
-Phase 21 — Inject page context into pathlyContext:
-  Import getPageContext from lib/pageAnalyzer/index.ts
-  Add pageContext: PageContext to buildPathlyContext() return type
-  Pass pageContext in POST /chat body
-  In chat_agent.py: add ## Current UI Elements section to system prompt (elements list, capped at 300 tokens)
+  In src/pathly_orchestrator/chat_agent.py:
+    Add ## Studio UI Elements section to system prompt
+    List elements grouped by screen: "FlowEditor: [New Flow (button)], [Flow Name (input)]..."
+    Cap at 400 tokens
+    AI instruction: "When generating automation steps, use only labels from this list"
 
 Architectural rules:
-- pageAnalyzerStore is renderer-only — no IPC, no server roundtrip
-- The registry is the ground truth — never scrape DOM directly
-- Do NOT copy BrightSky's PageAnalyzer files (that was the OLD approach for external pages)
+- This is a static constant, NOT a runtime registry — no hooks, no subscriptions
+- Read actual Studio component source to find real button/input labels before writing the schema
+- Do NOT add usePageAnalyzer hooks or data-conductor-id anywhere
 - Do NOT touch MatchCard, embedRouter, or any Conv 1–5 work
 
-Verify: cd studio && npm run typecheck
-Check: open browser devtools → Application → look at pageAnalyzerStore state → confirm elements populate on Studio render.
-Check: POST /chat request body includes pageContext.elements array.
-
-After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 19–21 to DONE.
+Verify: npm run typecheck. Send a message to /chat, inspect request body — studioSchema must be present.
+After done, update PROGRESS.md phases 19–20 to DONE.
 
 If verification fails and the fix requires out-of-scope changes, stop and report.
 ```
 
-**Expected output:** Every key Studio component registers its interactive elements. `getPageContext()` returns a live JSON map. AI receives element context with every message.
-**Files touched:** `usePageAnalyzer.ts`, `pageAnalyzerStore.ts`, `pageAnalyzer/index.ts`, `pathlyContext.ts`, Studio component files (FlowEditor, StepEditor, etc.)
+**Expected output:** `studioSchema.ts` exports a typed constant describing all key Studio UI elements. AI system prompt includes a `## Studio UI Elements` section. POST /chat body includes the schema.
+**Files touched:** `data/studioSchema.ts`, `lib/pathlyContext.ts`, `src/pathly_orchestrator/chat_agent.py`
 
 ---
 
-## Conversation 7: Action Executor (Phases 22–23) — Track A
+## Conversation 7: Playwright Executor (Phases 21–22) — Track A
 
 **Stories delivered:** S7.1, S7.2, S7.3
-**Requires:** Conversation 6 complete (elements registered with `data-conductor-id`).
-**Verify:** `cd studio && npm run typecheck` — zero errors. Call `window.electronAPI.executeUIAction({ type: 'click', elementId: 'btn-new-flow' })` from devtools console — "New Flow" button clicks.
+**Requires:** Conversation 6 complete.
+**Verify:** `cd studio && npm run typecheck` — zero errors. Open Studio devtools console: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` — New Flow button clicks.
 
 **Prompt to paste:**
 ```
-Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
-Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 22–23 for full details.
+Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first.
+Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 21–22.
 
-Implement Studio AI Chat Conversation 7 (Phases 22–23) — Action Executor.
+Implement Studio AI Chat Conversation 7 (Phases 21–22) — Playwright Executor.
 
-**Before editing anything:** glob/read every file path below. Read studio/src/main/index.ts to understand how IPC handlers are registered — match that pattern exactly.
+Files:
+- studio/package.json — MODIFY: add @playwright/test
+- studio/src/main/automation/playwrightExecutor.ts — CREATE
+- studio/src/main/ipc/automation.ts — CREATE
+- studio/src/main/index.ts — MODIFY: init executor + register IPC
 
-**Codebase files this conversation touches:**
-- `studio/src/main/ipc/uiActions.ts` — CREATE: IPC handler for click/fill/select
-- `studio/src/main/index.ts` — MODIFY: register uiActions IPC handler
-- `studio/src/renderer/src/lib/actionExecutor.ts` — CREATE: renderer-side executor
-- `studio/src/renderer/src/App.tsx` — MODIFY: register window.__uiExecutor on mount
+Phase 21 — playwrightExecutor.ts:
+  import { chromium, Page } from '@playwright/test'
 
-Scope:
+  type AutomationStep = { type: 'click'|'fill'|'select'; label: string; value?: string; screen?: string }
+  type StepResult = { ok: boolean; error?: string }
 
-Phase 22 — IPC handler (main process):
-  ipcMain.handle('ui:execute-action', (event, action: UIAction) => { ... })
-  UIAction: { type: 'click' | 'fill' | 'select'; elementId: string; value?: string }
-  Main process forwards to renderer via:
-    webContents.executeJavaScript(`window.__uiExecutor?.execute(${JSON.stringify(action)})`)
-  This returns the result from the renderer executor.
-  Expose on preload: window.electronAPI.executeUIAction(action: UIAction): Promise<{ok:boolean; error?:string}>
-  Register in index.ts alongside other IPC handlers.
+  export class PlaywrightExecutor {
+    private page: Page | null = null
 
-Phase 23 — Renderer executor (actionExecutor.ts):
-  export function createUIExecutor() {
-    return {
-      execute(action: UIAction): { ok: boolean; error?: string } {
-        const el = document.querySelector(`[data-conductor-id="${action.elementId}"]`)
-        if (!el) return { ok: false, error: 'element not found' }
-        if ((el as HTMLButtonElement).disabled) return { ok: false, error: 'element disabled' }
-        switch (action.type) {
-          case 'click': (el as HTMLElement).click(); break
-          case 'fill': {
-            // React controlled input: use nativeInputValueSetter
-            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
-            nativeInputValueSetter?.call(el, action.value)
-            el.dispatchEvent(new Event('input', { bubbles: true }))
-            el.dispatchEvent(new Event('change', { bubbles: true }))
-            break
-          }
-          case 'select': {
-            (el as HTMLSelectElement).value = action.value!
-            el.dispatchEvent(new Event('change', { bubbles: true }))
-            break
-          }
-        }
-        // Flash accent color for 400ms
-        (el as HTMLElement).style.outline = '2px solid #22C55E'
-        setTimeout(() => { (el as HTMLElement).style.outline = '' }, 400)
-        return { ok: true }
+    async connect(cdpUrl: string): Promise<void> {
+      const browser = await chromium.connectOverCDP(cdpUrl)
+      const context = browser.contexts()[0]
+      this.page = context.pages()[0]
+    }
+
+    async executeStep(step: AutomationStep): Promise<StepResult> {
+      if (!this.page) return { ok: false, error: 'Playwright not connected' }
+      const { type, label, value } = step
+
+      // Resolution cascade
+      const locator = await this.resolveElement(label)
+      if (!locator) return { ok: false, error: `element not found: ${label}` }
+
+      const isDisabled = await locator.isDisabled()
+      if (isDisabled) return { ok: false, error: `element disabled: ${label}` }
+
+      if (type === 'click') await locator.click()
+      if (type === 'fill') await locator.fill(value ?? '')
+      if (type === 'select') await locator.selectOption(value ?? '')
+
+      return { ok: true }
+    }
+
+    private async resolveElement(label: string) {
+      if (!this.page) return null
+      // Try in order: role+name, label, placeholder, text
+      const strategies = [
+        () => this.page!.getByRole('button', { name: label }),
+        () => this.page!.getByRole('combobox', { name: label }),
+        () => this.page!.getByRole('textbox', { name: label }),
+        () => this.page!.getByLabel(label),
+        () => this.page!.getByPlaceholder(label),
+        () => this.page!.getByText(label, { exact: false }),
+      ]
+      for (const strategy of strategies) {
+        try {
+          const loc = strategy()
+          if (await loc.count() > 0) return loc.first()
+        } catch {}
       }
+      return null
     }
   }
-  In App.tsx: useEffect(() => { window.__uiExecutor = createUIExecutor() }, [])
-  Add to window type declarations: window.__uiExecutor: { execute(action: UIAction): {...} }
+
+  export const playwrightExecutor = new PlaywrightExecutor()
+
+Phase 22 — ipc/automation.ts + index.ts:
+  ipcMain.handle('automation:execute-step', async (event, step) => playwrightExecutor.executeStep(step))
+
+  In index.ts: get the CDP URL for the Electron window
+    app.commandLine.appendSwitch('remote-debugging-port', '9222') — MUST be before BrowserWindow creation
+    After app ready: await playwrightExecutor.connect('http://localhost:9222')
+
+  Preload: window.electronAPI.executeAutomationStep(step: AutomationStep): Promise<StepResult>
 
 Architectural rules:
-- Main process NEVER directly manipulates DOM — it only forwards via executeJavaScript
-- Renderer executor works ONLY on elements with data-conductor-id attribute
-- Do NOT use coordinates or pixel positions — always use elementId
-- Do NOT modify any existing IPC handlers
+- Playwright runs in main process (Node.js) — not renderer
+- CDP remote debugging port must be set BEFORE BrowserWindow is created
+- Do NOT use executeJavaScript, data-conductor-id, or any DOM manipulation
+- Do NOT modify the existing terminal IPC or FSM IPC
 
-Verify: cd studio && npm run typecheck
-Manual test: open Studio devtools console → window.electronAPI.executeUIAction({ type: 'click', elementId: '<a real id from devtools>' }) → element should click and flash green.
-
-After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 22–23 to DONE.
+Verify: npm run typecheck. Open Studio devtools console: window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' }) — button should click.
+After done, update PROGRESS.md phases 21–22 to DONE.
 
 If verification fails and the fix requires out-of-scope changes, stop and report.
 ```
 
-**Expected output:** AI can click, fill, and select any registered Studio element via IPC. Element flashes accent color as visual confirmation.
-**Files touched:** `ipc/uiActions.ts`, `main/index.ts`, `actionExecutor.ts`, `App.tsx`
+**Expected output:** Playwright connects to the Electron window via CDP. `executeStep` resolves elements by semantic label cascade (role → label → placeholder → text) and clicks/fills/selects them. IPC bridge exposes this to the renderer.
+**Files touched:** `studio/package.json`, `main/automation/playwrightExecutor.ts`, `main/ipc/automation.ts`, `main/index.ts`
 
 ---
 
@@ -675,7 +681,7 @@ Implement Studio AI Chat Conversation 8 (Phases 24–26) — Staged/Auto Automat
 Scope:
 
 Phase 24 — automationStore:
-  type AutomationStep = { id: string; description: string; action: UIAction; status: 'pending'|'approved'|'skipped'|'done'|'error'; errorMessage?: string }
+  type AutomationStep = { id: string; description: string; action: { type: 'click'|'fill'|'select'; label: string; value?: string; screen?: string }; status: 'pending'|'approved'|'skipped'|'done'|'error'; errorMessage?: string }
   state: steps[], currentStepIndex, mode: 'staged'|'auto', status: 'idle'|'running'|'paused'|'done'|'error'
   actions: setSteps, approveStep, skipStep, setMode, advanceToNext, reset
   persist: mode only
@@ -685,7 +691,7 @@ Phase 25 — AutomationCard + StepQueue:
     Shows: intent description + step count ("5 steps planned")
     [▶ Run All] button → setMode('auto') + start execution
     [Step by Step] button → setMode('staged') + show StepQueue
-    [▶ Run All] disabled when pageContext.elements.length === 0 (tooltip: "No UI elements registered")
+    [▶ Run All] disabled when studioSchema is not present in context (tooltip: "Studio schema unavailable")
   StepQueue (staged mode):
     Each step as a card: step number, description, action preview ("click 'Add Step'")
     Current step (index === currentStepIndex): highlighted surface2 bg, [✓ Approve] [→ Skip] buttons
@@ -698,24 +704,25 @@ Phase 25 — AutomationCard + StepQueue:
   See DESIGN_SPEC.md for token/typography rules — match existing Conductor visual system
 
 Phase 26 — Wire AI → action plan in chat flow:
-  Extend POST /chat request: add pageContext and mode: 'automation' when intent seems like flow creation
+  Extend POST /chat request: add studioSchema and mode: 'automation' when intent seems like flow creation
   Detection heuristic: if message contains "create", "make", "build a flow", "add a step" → mode automation
   Otherwise → mode chat (existing explain behavior)
   chat_agent.py automation response format:
-    { "type": "automation", "intent": "...", "steps": [{ "id": "step-1", "description": "...", "action": { "type": "click", "elementId": "btn-new-flow" } }] }
-  AI must only use elementIds present in pageContext.elements — include this constraint in system prompt
+    { "type": "automation", "intent": "...", "steps": [{ "id": "step-1", "description": "...", "action": { "type": "click", "label": "New Flow", "screen": "FlowEditor" } }] }
+  AI must only use labels from studioSchema — include this constraint in system prompt
   Chat response format (existing):
     { "type": "chat", "text": "..." }
   On receive:
     If type === 'automation': automationStore.setSteps(steps) → render AutomationCard in MessageList
     If type === 'chat': existing message append behavior
-  Staged execution: approveStep(id) → executeAction(step.action) → advance index → render next step
-  Auto execution: loop steps with 300ms delay, calling executeAction, updating status each step
+  Staged execution: approveStep(id) → window.electronAPI.executeAutomationStep(step.action) → advance index
+  Auto execution: loop steps with 300ms delay, calling window.electronAPI.executeAutomationStep, updating status each step
   After all done: AI sends summary "Flow created — N steps executed" as a chat message
 
 Architectural rules:
-- pageContext is REQUIRED for automation mode — never generate action steps without it
-- AI must reference only elementIds from the current pageContext — add this to system prompt
+- studioSchema is REQUIRED context for automation mode — never generate action steps without it
+- AI must reference only labels from studioSchema — add this to system prompt
+- Do NOT use executeAction(), actionExecutor.ts, data-conductor-id, or window.__uiExecutor
 - Do NOT change the existing chat flow for normal skill-routing messages
 - Do NOT add new IPC beyond what Conv 7 established
 

@@ -133,71 +133,60 @@ fetch POST :8765/chat
 ## UI Automation Flow (Conv 6–8)
 
 ```
+User: "create a checkout flow"
+        │
+        ▼
+AI reads studioSchema (injected in system prompt)
+→ knows FlowEditor has "New Flow" button
+→ knows StepEditor has step type selector
+        │
+        ▼
+POST /chat (mode: 'automation', studioSchema in context)
+AI returns: { type:'automation', steps:[{ type:'click', label:'New Flow', screen:'FlowEditor' },...] }
+        │
+        ▼
+AutomationCard shows full plan — user sees all steps before execution
+[▶ Run All] or [Step by Step]
+        │
+        ▼  (on approval)
+ipcRenderer.invoke('automation:execute-step', step)
+        │
+        ▼  (Electron main)
+PlaywrightExecutor.executeStep(step)
+→ getByRole / getByLabel / getByPlaceholder / getByText cascade
+→ Playwright click/fill/select on live Electron window
+        │
+        ▼
+StepResult { ok: true } → advance to next step
+```
+
+**Staged mode detail:**
+```
 USER                  RENDERER                     MAIN PROCESS
- │                       │                              │
- │  types "create a      │                              │
- │  checkout flow"        │                              │
- │──────────────────────►│                              │
- │                       │  buildPathlyContext()         │
- │                       │  → getPageContext()           │
- │                       │    reads pageAnalyzerStore    │
- │                       │    returns { elements[] }     │
- │                       │                              │
- │                       │  POST /chat (mode:'automation')
- │                       │  body: { message, pageContext }
- │                       │──────────────────────────────►
- │                       │                              │  WebLLM / phi4-mini
- │                       │  ◄── SSE: { type:'automation', steps:[] }
  │                       │                              │
  │  sees AutomationCard   │  setSteps(steps)             │
  │  "5 steps planned"     │  render AutomationCard       │
  │◄──────────────────────│                              │
  │                       │                              │
- │  [Step by Step] or     │                              │
- │  [▶ Run All]          │                              │
- │──────────────────────►│                              │
- │                       │                              │
- │                     STAGED MODE                       │
- │                       │  show StepQueue              │
+ │  [Step by Step]        │                              │
+ │──────────────────────►│  show StepQueue              │
  │  sees step 1 card      │  current step highlighted    │
  │◄──────────────────────│                              │
  │  [✓ Approve]          │                              │
- │──────────────────────►│  executeAction(step.action)  │
+ │──────────────────────►│  executeAutomationStep(step) │
  │                       │─────────────────────────────►│
- │                       │  ipc: ui:execute-action       │
- │                       │  webContents.executeJavaScript│
- │                       │  window.__uiExecutor.execute()│
- │  sees element flash    │◄─────────────────────────────│
- │  accent color 400ms    │  { ok: true }                │
+ │                       │  ipc: automation:execute-step │
+ │                       │  PlaywrightExecutor.executeStep
+ │                       │  → semantic cascade finds el  │
+ │                       │  → Playwright .click()        │
+ │  sees step execute     │◄─────────────────────────────│
+ │  in live Studio app    │  { ok: true }                │
  │◄──────────────────────│  advance to step 2           │
  │  ...repeats per step   │                              │
  │                       │                              │
  │  sees "Flow created —  │  AI sends summary message    │
  │  5 steps executed"     │                              │
  │◄──────────────────────│                              │
-```
-
-## Page Analyzer Registration Flow (Conv 6)
-
-```
-React component mounts
-        │
-        │  usePageAnalyzer({ id: 'btn-add-step', type: 'button', label: 'Add Step' })
-        ▼
-pageAnalyzerStore.register(meta)
-        │  adds to Map<id, ElementMeta>
-        ▼
-DOM node gets data-conductor-id="btn-add-step" attribute
-
-User sends message
-        │
-        │  getPageContext()
-        ▼
-Returns { elements: ElementMeta[] }  ← always live, zero staleness
-        │
-        │  added to POST /chat body as pageContext
-        ▼
-AI receives: "Current UI: [Add Step (button)], [Flow Name (input)], [Step Type (select)]..."
 ```
 
 ## Model Selection Flow (Conv 9)
@@ -238,10 +227,10 @@ USER                  RENDERER (WebLLM)
 | Symbol | Meaning |
 |--------|---------|
 | ChatInput.tsx | User input bar; initiates send flow |
-| pathlyContext.ts | Gathers FSM state + page context + skills before every send |
-| pageAnalyzerStore.ts | Live registry of all registered UI elements |
-| usePageAnalyzer.ts | Hook — components call this to register themselves |
-| actionExecutor.ts | Renderer-side dispatcher — executes click/fill/select on DOM |
+| pathlyContext.ts | Gathers FSM state + studioSchema + skills before every send |
+| studioSchema.ts | Static typed constant — describes all key Studio UI elements by screen |
+| playwrightExecutor.ts | Main process — connects via CDP, resolves elements semantically, executes steps |
+| ipc/automation.ts | Electron main handler; delegates step execution to playwrightExecutor |
 | automationStore.ts | Step queue state for staged and auto modes |
 | StepQueue.tsx | Per-step approval UI (staged) or progress bar (auto) |
 | AutomationCard.tsx | AI action plan summary — shows intent + step count, mode buttons |
@@ -253,4 +242,3 @@ USER                  RENDERER (WebLLM)
 | chatStore.ts | Zustand store; source of truth for all chat state |
 | MessageList.tsx | Renders messages; auto-scrolls; shows streaming cursor |
 | ipc/chat.ts | Electron main handler; writes to node-pty stdin |
-| ipc/uiActions.ts | Electron main handler; forwards actions to renderer DOM |

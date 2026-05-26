@@ -91,9 +91,9 @@ A developer wants to create a new BrightSky workflow but doesn't want to manuall
 
 - **User does:** Types "create a checkout flow with an HTTP step to Stripe and a condition step"
 - **System does:**
-  1. `buildPathlyContext()` runs — includes `pageContext` with all registered Studio elements
-  2. POST /chat fires with `mode: 'automation'` and the page context
-  3. AI (WebLLM model) reads the element registry: sees "New Flow" button, flow name input, step type selector
+  1. `buildPathlyContext()` runs — includes `studioSchema` describing all key Studio UI elements
+  2. POST /chat fires with `mode: 'automation'` and the studio schema
+  3. AI (WebLLM model) reads the schema: sees "New Flow" button (FlowEditor), flow name input, step type selector (StepEditor)
   4. AI generates a structured action plan: 5 steps covering create → name → add HTTP → configure → add condition
 - **State after:** `automationStore.steps` populated with 5 steps, `AutomationCard` appears in chat
 
@@ -107,9 +107,9 @@ A developer wants to create a new BrightSky workflow but doesn't want to manuall
 ### Step 3: Staged execution — step by step
 
 - **User does:** Reads step 1 card: *"Click 'New Flow' button"* — clicks `[✓ Approve]`
-- **System does:** `executeAction({ type: 'click', elementId: 'btn-new-flow' })` — element flashes accent color. New flow modal opens in Studio. New elements register (modal CTA buttons, flow name input).
+- **System does:** `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow', screen: 'FlowEditor' })` — Playwright resolves the element and clicks it. New flow modal opens in Studio.
 - **User does:** Reads step 2: *"Fill flow name with 'Checkout Flow'"* — clicks `[✓ Approve]`
-- **System does:** `executeAction({ type: 'fill', elementId: 'input-flow-name', value: 'Checkout Flow' })` — name field populates. User can see it in the open modal.
+- **System does:** `window.electronAPI.executeAutomationStep({ type: 'fill', label: 'Flow Name', value: 'Checkout Flow' })` — Playwright fills the input. User can see it update in the open modal.
 - **... continues through 3 more steps ...**
 - **State after:** All 5 steps executed, flow "Checkout Flow" exists in Studio with correct structure
 
