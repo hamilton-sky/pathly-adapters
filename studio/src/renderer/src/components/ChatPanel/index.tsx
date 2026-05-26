@@ -48,6 +48,7 @@ export function ChatPanel(): JSX.Element {
   const autoApprove = useChatStore((s) => s.autoApprove)
   const appendOutputLine = useChatStore((s) => s.appendOutputLine)
   const clearOutputLines = useChatStore((s) => s.clearOutputLines)
+  const clearMessages = useChatStore((s) => s.clearMessages)
   const setCurrentMatch = useChatStore((s) => s.setCurrentMatch)
   const setAltMatches = useChatStore((s) => s.setAltMatches)
   const setIsEmbedding = useChatStore((s) => s.setIsEmbedding)
@@ -242,7 +243,7 @@ export function ChatPanel(): JSX.Element {
       className={styles.panel}
       style={{ background: t.bgBase, borderLeft: t.border, fontFamily: t.fontFamilyBase }}
     >
-      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} onToggleChat={toggleChat} />
+      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} onToggleChat={toggleChat} onClearChat={clearMessages} />
       <SkillsPanel onSkillClick={handleSkillClick} />
       <MessageList />
       {currentMatch !== null && (
