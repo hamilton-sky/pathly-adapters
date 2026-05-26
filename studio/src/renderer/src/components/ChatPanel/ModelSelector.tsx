@@ -10,11 +10,38 @@ function formatElapsed(secs: number): string {
   return `${Math.floor(secs / 60)}m ${secs % 60}s`
 }
 
-function parseShardLabel(text: string | undefined): string | null {
-  // WebLLM fires text like "Fetching param cache[3/12]: 340MB/s"
-  const m = text?.match(/\[(\d+)\/(\d+)\]/)
-  if (m) return `shard ${m[1]}/${m[2]}`
-  return null
+/** Translate raw WebLLM status text into a short human-readable phase label. */
+function describePhase(text: string | undefined): { label: string; hint?: string } {
+  if (!text) return { label: 'connecting…' }
+  const t = text.toLowerCase()
+
+  // GPU shader / WASM compilation — the slow one-time step
+  if (t.includes('shader') || (t.includes('gpu') && t.includes('module')) || t.includes('compil')) {
+    const m = text.match(/\[(\d+)\/(\d+)\]/)
+    const pct = text.match(/:\s*(\d+)%/)
+    const pos = m ? ` ${m[1]}/${m[2]}` : ''
+    const pctLabel = pct ? ` (${pct[1]}%)` : ''
+    return {
+      label: `compiling GPU shaders${pos}${pctLabel}`,
+      hint: 'One-time compilation — next launch will be instant',
+    }
+  }
+
+  // Fetching / downloading model weight shards
+  if (t.includes('fetch') || t.includes('param cache') || t.includes('downloading')) {
+    const m = text.match(/\[(\d+)\/(\d+)\]/)
+    return { label: m ? `downloading weights ${m[1]}/${m[2]}` : 'downloading weights…' }
+  }
+
+  // Loading already-cached files
+  if (t.includes('loading') || t.includes('from cache')) {
+    const m = text.match(/\[(\d+)\/(\d+)\]/)
+    return { label: m ? `loading ${m[1]}/${m[2]}` : 'loading from cache…' }
+  }
+
+  // Fallback: try to extract [X/Y]
+  const m = text.match(/\[(\d+)\/(\d+)\]/)
+  return { label: m ? `step ${m[1]}/${m[2]}` : 'preparing…' }
 }
 
 export function ModelSelector(): JSX.Element {
@@ -180,21 +207,15 @@ export function ModelSelector(): JSX.Element {
                   </div>
                 </div>
 
-                {isDownloading && (
+                {isDownloading && (() => {
+                  const phase = describePhase(progressText[model.id])
+                  return (
                   <div className={styles.downloadBlock}>
-                    {/* meta row: percent + shard label + elapsed */}
+                    {/* meta row: percent + phase label + elapsed */}
                     <div className={styles.downloadMeta}>
                       <span className={styles.downloadPct}>{progress > 0 ? `${progress}%` : '…'}</span>
-                      <span className={styles.downloadPhase}>
-                        {progress === 0
-                          ? 'connecting…'
-                          : downloadPhase[model.id] === 2
-                            ? `weights ${parseShardLabel(progressText[model.id]) ?? ''}`
-                            : `setup ${parseShardLabel(progressText[model.id]) ?? '…'}`}
-                      </span>
-                      <span className={styles.downloadElapsed}>
-                        {downloadPhase[model.id] === 2 ? '⬇ phase 2/2 · ' : ''}{formatElapsed(elapsed[model.id] ?? 0)}
-                      </span>
+                      <span className={styles.downloadPhase}>{phase.label}</span>
+                      <span className={styles.downloadElapsed}>{formatElapsed(elapsed[model.id] ?? 0)}</span>
                     </div>
 
                     {/* two-layer progress bar: stripes behind, solid fill on top */}
@@ -203,14 +224,13 @@ export function ModelSelector(): JSX.Element {
                       <div className={styles.progressFill} style={{ width: `${progress}%` }} />
                     </div>
 
-                    {/* raw WebLLM status text — truncated to one line */}
-                    {progressText[model.id] && (
-                      <span className={styles.downloadStatus}>
-                        {progressText[model.id]}
-                      </span>
+                    {/* one-time hint (e.g. shader compilation) */}
+                    {phase.hint && (
+                      <span className={styles.downloadHint}>{phase.hint}</span>
                     )}
                   </div>
-                )}
+                  )
+                })()}
 
                 {isDownloading ? (
                   <button
