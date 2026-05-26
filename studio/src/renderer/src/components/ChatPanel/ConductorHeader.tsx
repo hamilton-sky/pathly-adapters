@@ -1,4 +1,4 @@
-import { Brain, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useUiStore } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useTheme } from '../../useTheme'
@@ -18,9 +18,8 @@ export function ConductorHeader(): JSX.Element {
       style={{ borderBottom: t.border, background: t.bgMantle }}
     >
       <div className={styles.titleRow}>
-        <Brain size={15} style={{ color: t.accent }} />
         <span className={styles.title} style={{ color: t.textPrimary, fontFamily: t.fontFamilyBase }}>
-          Conductor
+          ⚡ Conductor
         </span>
       </div>
 

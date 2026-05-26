@@ -76,7 +76,6 @@ function MainApp(): JSX.Element | null {
   const setLastUsedFlowPath = useStore((s) => s.setLastUsedFlowPath)
   const setSelectedItem = useStore((s) => s.setSelectedItem)
   const chatOpen = useUiStore((s) => s.chatOpen)
-  const toggleChat = useUiStore((s) => s.toggleChat)
 
   const [setupDone, setSetupDone] = useState<boolean | null>(null)
 
@@ -152,29 +151,6 @@ function MainApp(): JSX.Element | null {
         )}
       </div>
       <PanelErrorBoundary><Terminal /></PanelErrorBoundary>
-      <button
-        onClick={toggleChat}
-        title="Toggle Conductor chat"
-        style={{
-          position: 'fixed',
-          bottom: 16,
-          right: 16,
-          zIndex: 1000,
-          width: 36,
-          height: 36,
-          borderRadius: '50%',
-          border: 'none',
-          background: chatOpen ? 'var(--theme-accent)' : 'var(--theme-bg-surface0)',
-          color: 'var(--theme-text-primary)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 14,
-        }}
-      >
-        AI
-      </button>
     </div>
   )
 }

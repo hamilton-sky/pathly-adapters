@@ -5,4 +5,5 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  transition: width 200ms ease-out;
 }

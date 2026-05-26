@@ -1,3 +1,4 @@
+import { Send } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import styles from './ChatInput.module.css'
 
@@ -41,16 +42,30 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
           caretColor: t.accent,
         }}
       />
-      <span
-        className={styles.modelPill}
-        style={{
-          background: t.bgSurface1,
-          color: t.textMuted,
-          fontFamily: t.fontFamilyMono,
-        }}
-      >
-        phi-4 mini
-      </span>
+      <div className={styles.footer}>
+        <span
+          className={styles.modelPill}
+          style={{
+            background: t.bgSurface1,
+            color: t.textMuted,
+            fontFamily: t.fontFamilyMono,
+          }}
+        >
+          phi-4 mini
+        </span>
+        <button
+          className={styles.sendButton}
+          onClick={() => { if (!disabled && value.trim()) onSend() }}
+          disabled={disabled || !value.trim()}
+          title="Send (Enter)"
+          style={{
+            background: value.trim() && !disabled ? t.accent : t.bgSurface1,
+            color: value.trim() && !disabled ? '#000' : t.textMuted,
+          }}
+        >
+          <Send size={13} />
+        </button>
+      </div>
     </div>
   )
 }

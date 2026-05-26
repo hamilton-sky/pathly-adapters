@@ -37,3 +37,7 @@
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:35:32Z"}
 {"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-26T12:36:29Z"}
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:36:29Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:53:19Z"}
+{"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":2,"result":"PASS","tokens_in":20151,"tokens_out":5038,"total_tokens":25189,"cost_usd":0.136021,"tool_uses":23,"wall_seconds":85,"ts":"2026-05-26T14:53:31Z","schema_version":1}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-26T13:03:32Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T13:03:58Z"}

@@ -216,6 +216,7 @@ Implement Studio AI Chat Conversation 2 (Phases 4–8).
 - `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx` — CREATE: input + model pills
 - `studio/src/renderer/src/components/ChatPanel/ChatPanel.module.css` — CREATE: all chat styles
 - `studio/src/renderer/src/App.tsx` — MODIFY: add <ChatPanel /> as right sidebar
+- `studio/src/renderer/src/components/TopBar.tsx` — MODIFY: add Brain icon toggle for Conductor
 
 Scope:
 - Phase 4: Create chatStore.ts following uiStore.ts pattern (Zustand + persist middleware).

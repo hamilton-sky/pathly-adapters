@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Terminal, ChevronDown, X, Moon, Sun, Menu, LayoutGrid, List, Activity } from 'lucide-react'
+import { Terminal, ChevronDown, X, Moon, Sun, Menu, LayoutGrid, List, Activity, Brain } from 'lucide-react'
 import { useStore } from '../store'
+import { useUiStore } from '../store/uiStore'
 import { isLightPalette } from '../theme'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
@@ -80,6 +81,7 @@ export function TopBar(): JSX.Element {
   }
 
   const { toggle: toggleTerminal, open: terminalOpen, addTab, tabs } = useTerminalStore()
+  const { chatOpen, toggleChat } = useUiStore()
 
   const [terminalDropdownOpen, setTerminalDropdownOpen] = useState(false)
   const [terminalDropdownPos, setTerminalDropdownPos] = useState<{ top: number; right: number } | null>(null)
@@ -186,6 +188,11 @@ export function TopBar(): JSX.Element {
 
         <div className={styles.right}>
           {badge}
+          <Tooltip label="Toggle Conductor" placement="bottom">
+            <IconButton onClick={toggleChat} title="Toggle Conductor">
+              <Brain size={14} style={{ color: chatOpen ? 'var(--theme-accent)' : undefined }} />
+            </IconButton>
+          </Tooltip>
           <IconButton
             onClick={() => setTheme(isLightPalette(theme) ? preferredDark : preferredLight)}
             title={isLightPalette(theme) ? `Switch to dark (${preferredDark})` : `Switch to light (${preferredLight})`}
