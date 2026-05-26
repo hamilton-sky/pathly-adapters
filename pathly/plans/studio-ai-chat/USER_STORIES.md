@@ -135,15 +135,14 @@ or know CLI syntax differences.
 
 **Acceptance Criteria:**
 - [ ] Renderer looks up active tab from `terminalStore.tabs` by `kind` ('claude' or 'codex')
-- [ ] If no tab of the target kind exists: renderer auto-spawns one via `handleLaunch(kind)` before writing
+- [ ] If no tab of the target kind exists: renderer calls `launchTerminal(kind, cwd)` to auto-spawn one, then writes
 - [ ] Command is generated in the **host-correct format**:
   - Claude Code tab (`kind === 'claude'`): `/pathly <skill>` (e.g. `/pathly build`)
   - Codex tab (`kind === 'codex'`): `Use Pathly <skill>` (e.g. `Use Pathly build`)
-- [ ] Renderer passes `{ command, tabId }` (UUID) to IPC handler `chat:write-terminal`
-- [ ] IPC handler writes `command + "\n"` to `activePtys.get(tabId)`
+- [ ] Renderer sanitizes command (strips `;`, `&&`, `||`, `|`, `>`, `<`) before writing
+- [ ] Renderer calls `window.pathly.terminal.write(tabId, command + '\n')` directly — no new IPC channel
 - [ ] MatchCard dims to "✓ Sent" state after Run
-- [ ] If no terminal tab is open: IPC returns error, ChatPanel shows inline toast "Open a terminal tab first"
-- [ ] OutputSnippet appears below MatchCard showing live PTY output lines
+- [ ] OutputSnippet appears below MatchCard showing live PTY output lines (via `window.pathly.terminal.onData`)
 
 **Delivered by:** Conv 3
 

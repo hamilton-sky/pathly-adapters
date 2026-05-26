@@ -47,7 +47,7 @@ function resolveShell(command: string | undefined): { shell: string; args: strin
   if (command === 'codex')  return { shell: 'cmd.exe', args: ['/k', 'codex'] }
   return { shell: 'powershell.exe', args: [] }
 }
-const { shell, shellArgs } = resolveShell(command)  // replace the hardcoded shell/shellArgs lines
+const { shell, args: shellArgs } = resolveShell(command)  // replace the hardcoded shell/shellArgs lines
 ```
 Replace the existing `const shell = ...` and `const shellArgs: string[] = []` lines with a call to `resolveShell`.
 The rest of the `pty.spawn(shell, shellArgs, ...)` call is unchanged.
@@ -133,8 +133,9 @@ Ollama (:11434) — phi4-mini
      ▼
 Back to Renderer → MatchCard + explanation bubble
 
-Renderer ──IPC 'chat:write-terminal'──► Electron Main
-                                              │  node-pty.write("/pathly <skill>\n")
+Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
+  OR                window.pathly.terminal.write(tabId, "Use Pathly <skill>\n")
+                                              │  (same renderer → ptyOwners check passes)
                                               ▼
                                     Claude Code terminal tab
                                          OR
@@ -154,7 +155,7 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 - Static placeholder: `data: {"text": "chat endpoint ready"}\n\n`
 - Add `ollama>=0.3` to `pyproject.toml`
 - **Add route `GET /status`** — read-only FSM state endpoint:
-  - Calls `read_state()` from `fsm_ops.py` (pure read, no write)
+  - Calls `read_state()` from `eventlog.py` (pure read, no write)
   - Returns `{ "current_state": str, "feature": str, "project_root": str }`
   - Returns `{ "current_state": "unknown" }` if no project loaded
   - **DO NOT call `/next_action` for context** — it writes `conv_start_sha` to disk on every call
@@ -182,7 +183,7 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 **Done when:** phi4-mini explanation mentions the current FSM stage by name
 **Delivers:** S1.2
 **Details:**
-- `get_fsm_state(project_root) -> dict` — calls `read_state()` from `fsm_ops.py` directly (pure read)
+- `get_fsm_state(project_root) -> dict` — calls `read_state()` from `eventlog.py` directly (pure read)
   **DO NOT call `/next_action`** — it writes `conv_start_sha` to disk. Use `read_state()` only.
 - `read_plan_summary(project_root) -> str` — reads most-recently-modified `plans/*/FEATURE_INDEX.md`
 - Inject into system prompt: `Stage: {fsm_stage} | Feature: {feature_name} | Matched skill: {skill}`
@@ -290,67 +291,80 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 
 ---
 
-## Phase 11: IPC terminal write handler   ← Conversation 3
+## Phase 11: Terminal write + launchTerminal utility   ← Conversation 3
 
-**Files:** `studio/src/main/ipc/chat.ts` — CREATE, `studio/src/main/index.ts` — MODIFY
-**Done when:** `ipcRenderer.invoke('chat:write-terminal', { command, tabId })` writes to the correct PTY tab
+**Files:** `studio/src/renderer/src/lib/launchTerminal.ts` — CREATE,
+`studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY
+**Done when:** Clicking Run in MatchCard writes the correct host command to a terminal tab; auto-spawns if none exists
 **Delivers:** S3.2
 
-> Note: `ALLOWED_SHELLS` was already fixed in Phase 0a (Conv 0). No need to touch `terminal.ts` again here.
+> Note: `ALLOWED_SHELLS` and Windows spawning were fixed in Phase 0a (Conv 0).
+> No new Electron main-process IPC file needed — `window.pathly.terminal.*` already covers everything.
+> ChatPanel is in the same renderer as Terminal (same `webContentsId`), so the existing
+> `terminal:write` ownership check in `terminal.ts:103` passes transparently.
 
-**Pre-flight: export a write helper from terminal.ts (do this first)**
+**Why no new IPC channel:**
+The preload already exposes the full terminal API at `window.pathly.terminal`:
+- `window.pathly.terminal.spawn(tabId, cwd, command?)` — spawns a PTY
+- `window.pathly.terminal.write(tabId, data)` — writes to a PTY
+- `window.pathly.terminal.onData(tabId, cb)` — subscribes to PTY output
+ChatPanel can call these directly. The `ptyOwners` check in `terminal:write` passes because
+ChatPanel and Terminal share the same `webContents.id` (same BrowserWindow renderer).
 
-`activePtys` is module-local in `terminal.ts` — `chat.ts` cannot access it directly.
-Also, the existing `terminal:write` IPC handler checks `ptyOwners` (line 103) — only the
-renderer that spawned the tab can write to it. The chat IPC sender is a different context and
-will be silently ignored.
+**Create `launchTerminal.ts` (shared renderer utility):**
+```typescript
+import { v4 as uuid } from 'uuid'
+import { useTerminalStore } from '../store/terminalStore'
 
-Fix: add a trusted write export to `terminal.ts`:
-```ts
-// In terminal.ts — add after the activePtys declaration:
-export function writeToTab(tabId: string, data: string): boolean {
-  const p = activePtys.get(tabId)
-  if (!p) return false
-  p.write(data)
-  return true
-}
-
-export function spawnTab(tabId: string, cwd: string, command: string, win: BrowserWindow): void {
-  // Same logic as the terminal:spawn handler body — extract it into this function.
-  // The IPC handler calls spawnTab(); chat.ts also calls spawnTab() for auto-spawn.
+export async function launchTerminal(
+  kind: 'claude' | 'codex',
+  cwd: string
+): Promise<string> {
+  const tabId = uuid()
+  const label = kind === 'claude' ? 'A Claude' : '✳ Codex'
+  useTerminalStore.getState().addTab(tabId, label, 'left', kind)
+  await window.pathly.terminal.spawn(tabId, cwd, kind)
+  return tabId
 }
 ```
-Refactor `terminal:spawn` IPC handler to call `spawnTab()` internally (no behavior change).
-This gives `chat.ts` a clean, tested path to both spawn and write without accessing private state.
+Calling `terminalStore.addTab()` before `spawn()` ensures the tab appears in the store
+immediately — the Terminal component renders it, and the PTY data starts flowing into it.
 
-**IPC handler design (chat.ts):**
-- Import `writeToTab` and `spawnTab` from `./terminal`
-- `ipcMain.handle('chat:write-terminal', (event, { command, tabId }) => { ... })`
-- PTYs are keyed by **UUID tabId** — the renderer resolves `tabId` from `terminalStore` before calling
-- Sanitize command: strip `;`, `&&`, `||`, `|`, `>`, `<`. Log warning if stripped.
-- Call `writeToTab(tabId, sanitized + '\n')` — returns false if tab not found
-- Return `{ ok: true }` or `{ error: string }`
-- Expose on preload: `window.electronAPI.writeToTerminal(command: string, tabId: string): Promise<{ok?:boolean, error?:string}>`
-- Register in `index.ts` alongside other IPC handlers
+**Renderer side (ChatPanel/index.tsx):**
+```typescript
+import { launchTerminal } from '../../lib/launchTerminal'
 
-**Renderer side (in ChatPanel/index.tsx):**
-- Before calling IPC, look up target tab from `terminalStore`:
-  ```typescript
-  const { tabs } = useTerminalStore()
-  const claudeTab = tabs.find(t => t.kind === 'claude')
-  ```
-- **Auto-spawn if no claude tab:** call `ipcRenderer.invoke('terminal:spawn', newTabId, cwd, 'claude')`
-  directly — do NOT call `handleLaunch` (that is a React component internal). The preload already
-  exposes `window.electronAPI.spawnTerminal(tabId, cwd, command)`. Wait for `terminalStore` to
-  update (listen for the tab to appear) before writing the command.
-- Generate **host-correct command**:
-  ```typescript
-  const command = tab.kind === 'claude'
-    ? `/pathly ${skill.name}`       // Claude Code: slash command
-    : `Use Pathly ${skill.name}`    // Codex: natural-language plugin prompt
-  ```
-- Then call `window.electronAPI.writeToTerminal(command, tab.id)`
-- **Result:** user can use Conductor with zero terminals open — Run opens one automatically
+// On Run click:
+const { tabs } = useTerminalStore()
+let claudeTab = tabs.find(t => t.kind === 'claude')
+
+if (!claudeTab) {
+  const cwd = await window.pathly.fs.userHome()
+  const tabId = await launchTerminal('claude', cwd)
+  claudeTab = useTerminalStore.getState().tabs.find(t => t.id === tabId)!
+}
+
+// Sanitize: strip ;, &&, ||, |, >, <
+const safe = command.replace(/[;&|><]/g, '').trim()
+
+// Host-correct command format:
+const cmd = claudeTab.kind === 'claude'
+  ? `/pathly ${skill.name}`       // Claude Code: slash command
+  : `Use Pathly ${skill.name}`    // Codex: natural-language plugin prompt
+
+window.pathly.terminal.write(claudeTab.id, cmd + '\n')
+```
+
+**OutputSnippet PTY subscription:**
+```typescript
+useEffect(() => {
+  if (!activeTabId) return
+  const unsub = window.pathly.terminal.onData(activeTabId, (data) => {
+    // strip ANSI, append to outputLines in chatStore
+  })
+  return unsub
+}, [activeTabId])
+```
 
 ---
 

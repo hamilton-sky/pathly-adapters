@@ -101,8 +101,8 @@ Design tokens already in Studio (use these, do not invent new ones):
   --codex-amber: #F59E0B (or check what the existing Codex tab uses)
 
 Architectural rules:
-  - Do NOT touch any IPC handlers beyond the ALLOWED_SHELLS line
-  - Do NOT touch PTY spawning logic, data flow, or FSM code
+  - Do NOT touch PTY spawning logic beyond the resolveShell fix in Phase 0a
+  - Do NOT touch any other IPC handlers, data flow, or FSM code
   - Do NOT touch App.tsx, the sidebar, main content area, or any Conductor/chat files
   - Match the existing CSS Modules pattern — no inline styles, no Tailwind
 
@@ -147,7 +147,7 @@ Scope:
   Static placeholder first: data: {"text": "chat endpoint ready"}\n\n
   Add ollama>=0.3 to pyproject.toml.
   ALSO add GET /status endpoint — read-only FSM state:
-    Calls read_state() from fsm_ops.py (pure read, NO write).
+    Calls read_state() from eventlog.py (pure read, NO write).
     Returns { "current_state": str, "feature": str, "project_root": str } or { "current_state": "unknown" }.
     DO NOT call next_action() here — it writes conv_start_sha to disk on every invocation.
     This endpoint replaces /next_action for all context reads in this feature.
@@ -162,7 +162,7 @@ Scope:
   On model not found: yield data: {"error": "Model 'phi4-mini' not found — run: ollama pull phi4-mini"}\n\n
 
 - Phase 3: Create chat_tools.py.
-  get_fsm_state(project_root) -> dict — calls read_state() from fsm_ops.py directly (pure read).
+  get_fsm_state(project_root) -> dict — calls read_state() from eventlog.py directly (pure read).
   DO NOT call next_action() — it mutates FSM state by writing conv_start_sha to disk.
   read_plan_summary(project_root) -> str — reads most-recently-modified plans/*/FEATURE_INDEX.md.
   Inject into system prompt: Stage: {fsm_stage} | Feature: {feature_name} | Matched skill: {skill}.
@@ -326,45 +326,58 @@ Scope:
   ChatPanel/index.tsx subscribes to an IPC output event and pipes lines to chatStore.
   See DESIGN_SPEC.md OutputSnippet section for ASCII layout.
 
-- Phase 11: Read terminal.ts and Terminal/index.tsx thoroughly before writing anything.
+- Phase 11: Read terminal.ts, preload/index.ts, and terminalStore.ts before writing anything.
 
-  NOTE: ALLOWED_SHELLS was fixed in Phase 0a (Conv 0). Do not repeat it here.
+  NOTE: ALLOWED_SHELLS and Windows spawning were fixed in Phase 0a (Conv 0). Do not repeat here.
+  NO new Electron main-process IPC file (chat.ts) is needed — the existing terminal API covers everything.
 
-  CRITICAL — terminal.ts has two constraints that affect how chat.ts must be written:
-  1. activePtys is module-local (line 15) — chat.ts cannot access it directly.
-  2. terminal:write IPC checks ptyOwners (line 103) — only the spawning renderer can write;
-     the chat IPC sender is a different context and will be silently ignored.
+  KEY FACTS about the existing API (read preload/index.ts to verify):
+  - window.pathly.terminal.spawn(tabId, cwd, command?) — spawns a PTY
+  - window.pathly.terminal.write(tabId, data) — writes to a PTY (ipcRenderer.send, not invoke)
+  - window.pathly.terminal.onData(tabId, cb) — subscribes to PTY output
+  - window.pathly.terminal.onExit(cb) — subscribes to tab exit events
+  ChatPanel is in the same BrowserWindow renderer as Terminal — same webContentsId — so
+  terminal:write's ptyOwners check (terminal.ts:103) passes transparently. No bypass needed.
 
-  Fix: add exported helpers to terminal.ts (Phase 11 plan has the exact signatures):
-    export function writeToTab(tabId: string, data: string): boolean
-    export function spawnTab(tabId: string, cwd: string, command: string, win: BrowserWindow): void
-  Refactor the terminal:spawn IPC handler to call spawnTab() internally (no behavior change).
-
-  IPC HANDLER (studio/src/main/ipc/chat.ts):
-  Import writeToTab and spawnTab from './terminal'.
-  ipcMain.handle('chat:write-terminal', (event, { command, tabId }) => { ... })
-  PTYs are keyed by UUID tabId (NOT by string names like "claude-code").
-  The renderer resolves tabId BEFORE calling this IPC.
-  Sanitize command: strip ;, &&, ||, |, >, < characters. Log warning if stripped.
-  Call writeToTab(tabId, sanitized + '\n') — returns false if tab not found.
-  Return { ok: true } or { error: string }.
-  Expose on preload: window.electronAPI.writeToTerminal(command: string, tabId: string): Promise<{ok?:boolean, error?:string}>
-  Register in index.ts alongside other IPC handlers.
+  CREATE studio/src/renderer/src/lib/launchTerminal.ts:
+    import { v4 as uuid } from 'uuid'
+    import { useTerminalStore } from '../store/terminalStore'
+    export async function launchTerminal(kind: 'claude' | 'codex', cwd: string): Promise<string> {
+      const tabId = uuid()
+      const label = kind === 'claude' ? 'A Claude' : '✳ Codex'
+      useTerminalStore.getState().addTab(tabId, label, 'left', kind)
+      await window.pathly.terminal.spawn(tabId, cwd, kind)
+      return tabId
+    }
+  This is the shared utility both ChatPanel and (optionally) Terminal component use for auto-spawn.
+  Calling addTab() before spawn() ensures the tab is in the store before PTY data starts flowing.
 
   RENDERER SIDE (ChatPanel/index.tsx):
-  Before calling IPC, resolve the tab: const claudeTab = terminalStore.tabs.find(t => t.kind === 'claude')
-  AUTO-SPAWN if no tab found: call window.electronAPI.spawnTerminal(newTabId, cwd, 'claude')
-  directly — do NOT call handleLaunch (that is internal to Terminal/index.tsx React component).
-  Wait for tab to appear in terminalStore (useEffect + tabs dependency), then write.
-  HOST-CORRECT COMMAND:
-    Claude Code tab (kind === 'claude') → "/pathly <skill>"
-    Codex tab (kind === 'codex')        → "Use Pathly <skill>"
-  Then call window.electronAPI.writeToTerminal(command, tab.id).
+  const { tabs } = useTerminalStore()
+  let claudeTab = tabs.find(t => t.kind === 'claude')
+  if (!claudeTab) {
+    const cwd = await window.pathly.fs.userHome()
+    const tabId = await launchTerminal('claude', cwd)
+    claudeTab = useTerminalStore.getState().tabs.find(t => t.id === tabId)!
+  }
+  // Sanitize command (renderer-side):
+  const safe = command.replace(/[;&|><]/g, '').trim()
+  // Host-correct format:
+  const cmd = claudeTab.kind === 'claude' ? `/pathly ${skill.name}` : `Use Pathly ${skill.name}`
+  window.pathly.terminal.write(claudeTab.id, cmd + '\n')
+
+  OutputSnippet PTY subscription:
+  useEffect(() => {
+    if (!activeTabId) return
+    return window.pathly.terminal.onData(activeTabId, (data) => {
+      // strip ANSI codes, append to outputLines in chatStore
+    })
+  }, [activeTabId])
 
 Architectural rules:
-- MatchCard replaces the old TerminalApproval concept entirely — do NOT create a TerminalApproval component.
-- Read terminal.ts before writing chat.ts — the PTY map keying must match exactly.
-- Preload must be updated if window.electronAPI doesn't already have writeToTerminal.
+- MatchCard replaces the old TerminalApproval concept — do NOT create a TerminalApproval component.
+- Do NOT create main/ipc/chat.ts — no new main-process IPC is needed.
+- Do NOT modify terminal.ts in this conversation — Phase 0a already handled it.
 - Do NOT modify FSM IPC handlers or Python backend.
 
 Verify: cd studio && npm run typecheck
@@ -376,7 +389,7 @@ If verification fails and the fix requires out-of-scope changes, stop and report
 If fundamentally broken, rollback with git checkout on affected files and retry.
 ```
 
-**Expected output:** MatchCard shows matched skill + confidence + Run/"Not this" buttons. Run writes the `/pathly <skill>` command to the correct terminal tab. OutputSnippet shows live PTY lines.
+**Expected output:** MatchCard shows matched skill + confidence + Run/"Not this" buttons. Run writes the host-correct command (`/pathly <skill>` or `Use Pathly <skill>`) to the correct terminal tab via `window.pathly.terminal.write`. OutputSnippet shows live PTY lines.
 **Files touched:** `MatchCard.tsx`, `OutputSnippet.tsx`, `ipc/chat.ts`, `main/index.ts`, `ChatPanel/index.tsx`
 
 ---
