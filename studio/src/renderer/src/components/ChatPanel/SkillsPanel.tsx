@@ -69,7 +69,7 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
                 onClick={() => onSkillClick(`/pathly ${skill}`)}
                 style={{
                   background: t.bgSurface1,
-                  color: t.accent + '33',
+                  color: t.textSecondary,
                   fontFamily: t.fontFamilyMono,
                   border: `1px solid ${t.bgSurface1}`,
                 }}

@@ -152,13 +152,22 @@ export function ChatPanel(): JSX.Element {
     }
     addMessage(userMsg)
 
-    // Run embed routing and POST /chat in parallel
+    // Run embed routing and context fetch in parallel.
+    // Always clear isEmbedding even if matchIntent throws (model download fail etc.)
     setIsEmbedding(true)
-    const [matches, context] = await Promise.all([
-      matchIntent(text),
-      buildPathlyContext(),
-    ])
-    setIsEmbedding(false)
+    let matches: Awaited<ReturnType<typeof matchIntent>> = []
+    let context: Awaited<ReturnType<typeof buildPathlyContext>>
+    try {
+      ;[matches, context] = await Promise.all([
+        matchIntent(text),
+        buildPathlyContext(),
+      ])
+    } catch {
+      // Embedding failed (e.g. model download error) — continue with no match
+      context = { fsmStage: 'unknown', featureName: '', skills: [], studioSchema: [] }
+    } finally {
+      setIsEmbedding(false)
+    }
 
     const topMatch = matches[0] ?? null
     const rest = matches.slice(1)
