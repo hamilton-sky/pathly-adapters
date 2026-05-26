@@ -409,55 +409,53 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
 Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 12–14 for full details.
 
-Implement Studio AI Chat Conversation 4 (Phases 12–14).
+Implement Studio AI Chat Conversation 4 (Phases 12 and 14 only — Phase 13 is removed).
 
-**Before editing anything:** glob/read the live repo to confirm every file path below exists.
-Also read the source files in C:\Users\Yafit\brightsky-ai\frontend\src\components\PageAnalyzer\ to understand which files to copy.
+**Before editing anything:** glob/read every file path below to confirm it exists.
 
 **Codebase files this conversation touches:**
-- `studio/src/renderer/src/lib/pageAnalyzer/` — CREATE directory + copy pure TS analyzers from BrightSky
-- `studio/src/renderer/src/lib/pathlyContext.ts` — CREATE: context builder
+- `studio/src/renderer/src/lib/pathlyContext.ts` — CREATE: FSM context builder
 - `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY: inject context per message
+
+**Phase 13 is intentionally skipped — do not implement it.**
+Phase 13 was a PageAnalyzer copy from BrightSky. The architecture moved to a static Studio
+schema (Conv 6, Phase 19) and Playwright executor (Conv 7). Do NOT create a pageAnalyzer/
+directory, do NOT copy any BrightSky files, do NOT add usePageAnalyzer hooks or
+data-conductor-id attributes anywhere.
 
 Scope:
 - Phase 12: Create studio/src/renderer/src/lib/pathlyContext.ts.
-  buildPathlyContext() fetches FSM state from GET http://127.0.0.1:8765/status → extract current_state and feature.
-  DO NOT use /next_action — it mutates FSM state. Use /status (added in Conv 1 Phase 1).
-  KNOWN_SKILLS: static list for now (will be dynamic in Conv 5).
-  Wrap FSM fetch in try/catch → fallback fsmStage: "unknown".
-  Cap screen elements at 20 buttons + 10 forms + 10 text blocks.
-  Returns: { fsmStage, featureName, screenElements, skills }
-
-- Phase 13: Copy these files from C:\Users\Yafit\brightsky-ai\frontend\src\components\PageAnalyzer\
-  to studio/src/renderer/src/lib/pageAnalyzer/:
-  analyzePageDirect.ts, CacheManager.ts, DOMAnalyzer2.ts, ButtonAnalyzer.ts,
-  FormAnalyzer.ts, TextAnalyzer.ts, LinkAnalyzer.ts
-  Replace any @brightsky-ai/shared imports with inline type definitions.
-  Do NOT copy Redux-dependent files.
-  Verify: import { analyzePageDirect } from '../lib/pageAnalyzer/analyzePageDirect' compiles.
+  export async function buildPathlyContext(): Promise<PathlyContext>
+  Fetch FSM state from GET http://127.0.0.1:8765/status → extract current_state and feature.
+  CRITICAL: DO NOT call /next_action — it writes conv_start_sha to disk on every call.
+  /status is the read-only replacement (added in Conv 1 Phase 1).
+  KNOWN_SKILLS: static list for now (will be MiniLM-powered in Conv 5).
+  Wrap FSM fetch in try/catch → fallback { fsmStage: "unknown", featureName: "" }.
+  Returns: { fsmStage: string, featureName: string, skills: string[] }
+  Note: NO screenElements field — static schema (Conv 6) handles UI layout separately.
 
 - Phase 14: Modify ChatPanel/index.tsx.
   Call buildPathlyContext() before each POST /chat.
-  Add context field to request body.
+  Add context field to the request body sent to /chat.
   phi4-mini explanation should now reference the current FSM stage and feature.
 
 Architectural rules:
-- Only copy pure TS files — no Chrome extension APIs, no Redux, no @brightsky-ai/shared.
-- Screen context cap: 500 tokens max. Truncate items list if exceeded.
-- Do NOT add new IPC calls. Context is gathered in the renderer via fetch + DOM APIs only.
+- Do NOT create pageAnalyzer/, lib/pageAnalyzer/, or any runtime DOM scanner.
+- Do NOT add screenElements to PathlyContext — it was removed from the architecture.
+- Do NOT add new IPC calls.
 - Do NOT touch MatchCard, chatStore approval logic, or any Conv 3 work.
 
 Verify: cd studio && npm run typecheck
 Expected: zero TypeScript errors. phi4-mini explanation mentions current FSM stage by name.
 
-After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 12–14 to DONE.
+After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 12 and 14 to DONE (13 stays as REMOVED).
 
 If verification fails and the fix requires out-of-scope changes, stop and report.
 If fundamentally broken, rollback with git checkout on affected files and retry.
 ```
 
 **Expected output:** phi4-mini explanation knows the current FSM stage, feature name, and available skills.
-**Files touched:** `lib/pageAnalyzer/` (7 files), `pathlyContext.ts`, `ChatPanel/index.tsx`
+**Files touched:** `pathlyContext.ts`, `ChatPanel/index.tsx`
 
 ---
 

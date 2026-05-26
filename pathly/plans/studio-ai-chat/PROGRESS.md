@@ -70,7 +70,7 @@
 | 3 | 10 | `ChatPanel/OutputSnippet.tsx` | Live PTY output reader | Shows last 5 lines in real-time | TODO |
 | 3 | 11 | `lib/launchTerminal.ts` + `chatStore.targetKind` | Terminal write + auto-spawn utility | Run writes host-correct cmd; auto-spawns + opens dock | TODO |
 | 4 | 12 | `studio/src/renderer/src/lib/pathlyContext.ts` | Context builder | Returns { fsmStage, featureName, skills } | TODO |
-| 4 | 13 | `studio/src/renderer/src/lib/pageAnalyzer/` | DOM analyzer (from BrightSky) | Compiles without errors | TODO |
+| 4 | ~~13~~ | ~~PageAnalyzer copy~~ | **REMOVED** — superseded by static schema (Conv 6) | — | REMOVED |
 | 4 | 14 | `ChatPanel/index.tsx` | Inject context into every message | AI references FSM stage | TODO |
 | 5 | 15 | `studio/src/renderer/src/data/skills.json` | 14 skills with name+command+description | File valid JSON, all skills present | TODO |
 | 5 | 16 | `studio/src/renderer/src/lib/skillsManifest.ts` | Typed loader for skills.json | No TS errors | TODO |

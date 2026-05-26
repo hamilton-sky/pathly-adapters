@@ -155,8 +155,7 @@ and what stage I'm in, **so that** the explanation is specific not generic.
 
 **Acceptance Criteria:**
 - [ ] `buildPathlyContext()` runs before each message send
-- [ ] Returns `{ fsmStage, featureName, screenElements, skills }`
-- [ ] Screen context capped at 500 tokens
+- [ ] Returns `{ fsmStage, featureName, skills }` (no `screenElements` — static schema handles UI layout from Conv 6)
 - [ ] If FSM server unreachable, `fsmStage` defaults to `"unknown"`
 
 **Delivered by:** Conv 4
