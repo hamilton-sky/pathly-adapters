@@ -216,6 +216,7 @@ Implement Studio AI Chat Conversation 2 (Phases 4–8).
 - `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx` — CREATE: input + model pills
 - `studio/src/renderer/src/components/ChatPanel/ChatPanel.module.css` — CREATE: all chat styles
 - `studio/src/renderer/src/App.tsx` — MODIFY: add <ChatPanel /> as right sidebar
+- `studio/src/renderer/src/components/TopBar.tsx` — MODIFY: add Brain icon toggle for Conductor
 
 Scope:
 - Phase 4: Create chatStore.ts following uiStore.ts pattern (Zustand + persist middleware).
@@ -596,7 +597,7 @@ If verification fails and the fix requires out-of-scope changes, stop and report
 
 ---
 
-## Conversation 7: Playwright Executor (Phases 21–22) — Track A
+## Conversation 7: Playwright Executor (Phases 21–21.5–22) — Track A
 
 **Stories delivered:** S7.1, S7.2, S7.3
 **Requires:** Conversation 6 complete.
@@ -605,24 +606,34 @@ If verification fails and the fix requires out-of-scope changes, stop and report
 **Prompt to paste:**
 ```
 Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first.
-Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 21–22.
+Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 21, 21.5, and 22.
 
-Implement Studio AI Chat Conversation 7 (Phases 21–22) — Playwright Executor.
+Implement Studio AI Chat Conversation 7 (Phases 21–21.5–22) — Playwright Executor with 3-tier element resolution.
 
-Files:
+Files to create/modify:
 - studio/package.json — MODIFY: add @playwright/test
 - studio/src/main/automation/playwrightExecutor.ts — CREATE
+- studio/src/renderer/src/lib/elementResolver.ts — CREATE
 - studio/src/main/ipc/automation.ts — CREATE
-- studio/src/main/index.ts — MODIFY: init executor + register IPC
+- studio/src/preload/index.ts (or equivalent preload file) — MODIFY: expose executeAutomationStep
+- studio/src/main/index.ts — MODIFY: init Playwright + register IPC
+
+---
 
 Phase 21 — playwrightExecutor.ts:
-  import { chromium, Page } from '@playwright/test'
 
-  type AutomationStep = { type: 'click'|'fill'|'select'; label: string; value?: string; screen?: string }
-  type StepResult = { ok: boolean; error?: string }
+  import { chromium, Page, Locator } from '@playwright/test'
+
+  export type AutomationStep = { type: 'click'|'fill'|'select'; label: string; value?: string; screen?: string }
+  export type StepResult = { ok: boolean; error?: string; attempts?: number }
 
   export class PlaywrightExecutor {
     private page: Page | null = null
+
+    constructor(
+      private semanticResolve: (candidates: string[], target: string) => Promise<{label: string; score: number}> = async () => ({ label: '', score: 0 }),
+      private llmResolve: (candidates: string[], target: string) => Promise<{label: string | null}> = async () => ({ label: null })
+    ) {}
 
     async connect(cdpUrl: string): Promise<void> {
       const browser = await chromium.connectOverCDP(cdpUrl)
@@ -632,68 +643,197 @@ Phase 21 — playwrightExecutor.ts:
 
     async executeStep(step: AutomationStep): Promise<StepResult> {
       if (!this.page) return { ok: false, error: 'Playwright not connected' }
-      const { type, label, value } = step
-
-      // Resolution cascade
-      const locator = await this.resolveElement(label)
-      if (!locator) return { ok: false, error: `element not found: ${label}` }
-
-      const isDisabled = await locator.isDisabled()
-      if (isDisabled) return { ok: false, error: `element disabled: ${label}` }
-
-      if (type === 'click') await locator.click()
-      if (type === 'fill') await locator.fill(value ?? '')
-      if (type === 'select') await locator.selectOption(value ?? '')
-
-      return { ok: true }
+      const backoffs = [500, 1000, 1500]
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const locator = await this.resolveElement(step.label)
+        if (!locator) {
+          if (attempt < 3) { await this.sleep(backoffs[attempt - 1]); continue }
+          return { ok: false, error: `element not found after all tiers: ${step.label}`, attempts: 3 }
+        }
+        if (await locator.isDisabled()) {
+          await this.sleep(800)
+          continue
+        }
+        if (step.type === 'click') await locator.click()
+        if (step.type === 'fill') await locator.fill(step.value ?? '')
+        if (step.type === 'select') await locator.selectOption(step.value ?? '')
+        return { ok: true, attempts: attempt }
+      }
+      return { ok: false, error: `element not found after all tiers: ${step.label}`, attempts: 3 }
     }
 
-    private async resolveElement(label: string) {
+    private async resolveElement(label: string): Promise<Locator | null> {
       if (!this.page) return null
-      // Try in order: role+name, label, placeholder, text
-      const strategies = [
+
+      // Tier 1: deterministic Playwright locator strategies
+      const tier1Strategies: Array<() => Locator> = [
         () => this.page!.getByRole('button', { name: label }),
         () => this.page!.getByRole('combobox', { name: label }),
         () => this.page!.getByRole('textbox', { name: label }),
+        () => this.page!.getByRole('link', { name: label }),
+        () => this.page!.getByRole('tab', { name: label }),
         () => this.page!.getByLabel(label),
         () => this.page!.getByPlaceholder(label),
+        () => this.page!.getByText(label, { exact: true }),
         () => this.page!.getByText(label, { exact: false }),
+        () => this.page!.locator(`[title="${label}"]`),
       ]
-      for (const strategy of strategies) {
+      for (const strategy of tier1Strategies) {
         try {
-          const loc = strategy()
-          if (await loc.count() > 0) return loc.first()
+          let loc = strategy()
+          const count = await loc.count()
+          if (count === 1) return loc
+          if (count > 1) {
+            const visible = loc.filter({ hasNot: this.page!.locator('[hidden]') })
+            if (await visible.count() === 1) return visible
+          }
         } catch {}
       }
+
+      // Tier 2: MiniLM semantic similarity via renderer round-trip
+      const snapshot = await this.page.accessibility.snapshot()
+      const candidates: Array<{ name: string; role: string }> = []
+      const walk = (node: any) => {
+        if (node?.name && node?.role) candidates.push({ name: node.name, role: node.role })
+        for (const child of node?.children ?? []) walk(child)
+      }
+      walk(snapshot)
+      const names = candidates.map(c => c.name)
+      const { label: semanticLabel, score } = await this.semanticResolve(names, label)
+      if (score >= 0.65 && semanticLabel) {
+        const match = candidates.find(c => c.name === semanticLabel)
+        if (match) {
+          try {
+            return this.page.getByRole(match.role as any, { name: match.name })
+          } catch {}
+        }
+      }
+
+      // Tier 3: phi4-mini LLM fallback (stub in Conv 7 — always returns null until Conv 9)
+      const { label: llmLabel } = await this.llmResolve(names, label)
+      if (llmLabel) {
+        try { return this.page.getByText(llmLabel, { exact: true }) } catch {}
+      }
+
       return null
     }
+
+    private sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
   }
 
-  export const playwrightExecutor = new PlaywrightExecutor()
+---
 
-Phase 22 — ipc/automation.ts + index.ts:
-  ipcMain.handle('automation:execute-step', async (event, step) => playwrightExecutor.executeStep(step))
+Phase 21.5 — studio/src/renderer/src/lib/elementResolver.ts:
 
-  In index.ts: get the CDP URL for the Electron window
-    app.commandLine.appendSwitch('remote-debugging-port', '9222') — MUST be before BrowserWindow creation
-    After app ready: await playwrightExecutor.connect('http://localhost:9222')
+  // Renderer-side handlers for semantic and LLM element resolution.
+  // Called by the main process via IPC round-trip (main sends a request channel,
+  // renderer replies on the :result channel).
 
-  Preload: window.electronAPI.executeAutomationStep(step: AutomationStep): Promise<StepResult>
+  import { ipcRenderer } from 'electron'
+  // Re-use the embed function and cosineSim from embedRouter.ts
+  // NOTE: embed() is exported from embedRouter.ts (added in Conv 6 review)
+  import { embed, cosineSim } from './embedRouter'
+
+  export async function handleSemanticResolve(
+    candidates: string[],
+    target: string
+  ): Promise<{ label: string; score: number }> {
+    const targetVec = await embed(target)
+    let best = { label: '', score: -1 }
+    for (const c of candidates) {
+      const vec = await embed(c)
+      const score = cosineSim(targetVec, vec)
+      if (score > best.score) best = { label: c, score }
+    }
+    return best
+  }
+
+  export async function handleLLMResolve(
+    candidates: string[],
+    target: string
+  ): Promise<{ label: string | null }> {
+    // Placeholder until Conv 9 ships WebLLM.
+    // Conv 9 will: import { webLLMEngine } from './webLLMEngine' and call generate().
+    return { label: null }
+  }
+
+  // Register IPC listeners once at renderer startup.
+  // Call registerElementResolverListeners() from renderer main.tsx or equivalent init.
+  export function registerElementResolverListeners() {
+    ipcRenderer.on('automation:semantic-resolve', async (_event, { candidates, target }) => {
+      const result = await handleSemanticResolve(candidates, target)
+      ipcRenderer.send('automation:semantic-resolve:result', result)
+    })
+    ipcRenderer.on('automation:llm-resolve', async (_event, { candidates, target }) => {
+      const result = await handleLLMResolve(candidates, target)
+      ipcRenderer.send('automation:llm-resolve:result', result)
+    })
+  }
+
+Call registerElementResolverListeners() near the top of the renderer entry point (before any user interaction).
+
+---
+
+Phase 22 — studio/src/main/ipc/automation.ts + index.ts:
+
+  // automation.ts (main process)
+  import { ipcMain, BrowserWindow } from 'electron'
+  import { PlaywrightExecutor, AutomationStep } from '../automation/playwrightExecutor'
+
+  // Main → renderer round-trip helper
+  function makeRendererCaller(channel: string) {
+    return (candidates: string[], target: string): Promise<any> =>
+      new Promise((resolve) => {
+        const win = BrowserWindow.getAllWindows()[0]
+        win.webContents.send(channel, { candidates, target })
+        ipcMain.once(`${channel}:result`, (_e, result) => resolve(result))
+      })
+  }
+
+  const semanticResolve = makeRendererCaller('automation:semantic-resolve')
+  const llmResolve      = makeRendererCaller('automation:llm-resolve')
+
+  // Singleton created here so callbacks are injected at construction time
+  export const playwrightExecutor = new PlaywrightExecutor(semanticResolve, llmResolve)
+
+  export function registerAutomationIPC() {
+    ipcMain.handle('automation:execute-step', async (_event, step: AutomationStep) =>
+      playwrightExecutor.executeStep(step)
+    )
+  }
+
+  In index.ts:
+    app.commandLine.appendSwitch('remote-debugging-port', '9222')  // MUST be before BrowserWindow creation
+    // After app ready + window created:
+    import { playwrightExecutor, registerAutomationIPC } from './ipc/automation'
+    await playwrightExecutor.connect('http://localhost:9222')
+    registerAutomationIPC()
+
+  Preload (expose to renderer):
+    window.electronAPI.executeAutomationStep(step: AutomationStep): Promise<StepResult>
+    // uses ipcRenderer.invoke('automation:execute-step', step)
+
+  // automation:semantic-resolve and automation:llm-resolve are main→renderer pushes.
+  // They do NOT need preload exposure — main sends them directly via webContents.send.
 
 Architectural rules:
 - Playwright runs in main process (Node.js) — not renderer
-- CDP remote debugging port must be set BEFORE BrowserWindow is created
+- CDP remote debugging port MUST be set BEFORE BrowserWindow is created
 - Do NOT use executeJavaScript, data-conductor-id, or any DOM manipulation
 - Do NOT modify the existing terminal IPC or FSM IPC
+- Tier 3 LLM fallback is a stub in this conversation — handleLLMResolve always returns null
+  The interface is final; Conv 9 will fill in the body without touching any other file
 
-Verify: npm run typecheck. Open Studio devtools console: window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' }) — button should click.
+Verify: npm run typecheck — zero errors. Open Studio devtools console:
+  window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })
+  The New Flow button should click.
 After done, update PROGRESS.md phases 21–22 to DONE.
 
 If verification fails and the fix requires out-of-scope changes, stop and report.
 ```
 
-**Expected output:** Playwright connects to the Electron window via CDP. `executeStep` resolves elements by semantic label cascade (role → label → placeholder → text) and clicks/fills/selects them. IPC bridge exposes this to the renderer.
-**Files touched:** `studio/package.json`, `main/automation/playwrightExecutor.ts`, `main/ipc/automation.ts`, `main/index.ts`
+**Expected output:** Playwright connects to the Electron window via CDP. `resolveElement` runs a 3-tier cascade: (1) 10 deterministic Playwright locator strategies with multi-match filtering, (2) MiniLM semantic similarity via renderer round-trip IPC, (3) phi4-mini LLM fallback stub returning null. Self-healing retries up to 3 times with exponential backoff. IPC bridge exposes `executeAutomationStep` to the renderer.
+**Files touched:** `studio/package.json`, `main/automation/playwrightExecutor.ts`, `renderer/src/lib/elementResolver.ts`, `main/ipc/automation.ts`, `preload/index.ts`, `main/index.ts`
 
 ---
 

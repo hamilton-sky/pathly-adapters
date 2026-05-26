@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal, X, Moon, Sun, Menu, LayoutGrid, List, Activity } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Terminal, ChevronDown, X, Moon, Sun, Menu, LayoutGrid, List, Activity, Brain } from 'lucide-react'
 import { useStore } from '../store'
+import { useUiStore } from '../store/uiStore'
 import { isLightPalette } from '../theme'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
 import { IconButton, Tooltip } from './ui'
+import { ClaudeIcon, CodexIcon } from './Terminal/BrandIcons'
+import { launchTerminal } from '../lib/launchTerminal'
 import styles from './TopBar.module.css'
 
 export function TopBar(): JSX.Element {
@@ -76,7 +80,50 @@ export function TopBar(): JSX.Element {
     }
   }
 
-  const { toggle: toggleTerminal } = useTerminalStore()
+  const { toggle: toggleTerminal, open: terminalOpen, addTab, tabs } = useTerminalStore()
+  const { chatOpen, toggleChat } = useUiStore()
+
+  const [terminalDropdownOpen, setTerminalDropdownOpen] = useState(false)
+  const [terminalDropdownPos, setTerminalDropdownPos] = useState<{ top: number; right: number } | null>(null)
+  const terminalChevronRef = useRef<HTMLButtonElement>(null)
+  const terminalDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!terminalDropdownOpen) return
+    function handleMouseDown(e: MouseEvent): void {
+      if (
+        terminalDropdownRef.current && !terminalDropdownRef.current.contains(e.target as Node) &&
+        terminalChevronRef.current && !terminalChevronRef.current.contains(e.target as Node)
+      ) {
+        setTerminalDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [terminalDropdownOpen])
+
+  async function launchTerminalWithKind(cmd: string | undefined, label: string): Promise<void> {
+    setTerminalDropdownOpen(false)
+    try {
+      await launchTerminal({
+        command: cmd,
+        label,
+        pane: 'left',
+        projectPath,
+        open: terminalOpen,
+        toggle: toggleTerminal,
+        addTab,
+      })
+    } catch { /* PTY errors surface in terminal */ }
+  }
+
+  function openTerminalDropdown(): void {
+    if (terminalChevronRef.current) {
+      const rect = terminalChevronRef.current.getBoundingClientRect()
+      setTerminalDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    }
+    setTerminalDropdownOpen((v) => !v)
+  }
 
   const badgeLabel = monitorSource === 'sse' ? 'SSE live' : 'File watch'
   const badge = (
@@ -141,15 +188,52 @@ export function TopBar(): JSX.Element {
 
         <div className={styles.right}>
           {badge}
+          <Tooltip label="Toggle Conductor" placement="bottom">
+            <IconButton onClick={toggleChat} title="Toggle Conductor">
+              <Brain size={14} style={{ color: chatOpen ? 'var(--theme-accent)' : undefined }} />
+            </IconButton>
+          </Tooltip>
           <IconButton
             onClick={() => setTheme(isLightPalette(theme) ? preferredDark : preferredLight)}
             title={isLightPalette(theme) ? `Switch to dark (${preferredDark})` : `Switch to light (${preferredLight})`}
           >
             {isLightPalette(theme) ? <Moon size={14} /> : <Sun size={14} />}
           </IconButton>
-          <IconButton onClick={() => toggleTerminal()} title="Toggle terminal" shortcut="Ctrl+`">
-            <Terminal size={14} />
-          </IconButton>
+          <div className={styles.terminalSplit}>
+            <IconButton onClick={() => toggleTerminal()} title="Toggle terminal" shortcut="Ctrl+`">
+              <Terminal size={14} />
+            </IconButton>
+            <div className={styles.terminalSplitDivider} />
+            <button
+              ref={terminalChevronRef}
+              className={styles.terminalSplitChevron}
+              onClick={openTerminalDropdown}
+              aria-label="Open terminal launcher"
+            >
+              <ChevronDown size={10} />
+            </button>
+          </div>
+          {terminalDropdownOpen && terminalDropdownPos && createPortal(
+            <div
+              ref={terminalDropdownRef}
+              className={styles.terminalDropdown}
+              style={{ position: 'fixed', top: terminalDropdownPos.top, right: terminalDropdownPos.right }}
+            >
+              <button className={styles.terminalDropdownItem} onClick={() => void launchTerminalWithKind(undefined, `Shell ${tabs.length + 1}`)}>
+                + Shell
+              </button>
+              <div className={styles.terminalDropdownDivider} />
+              <button className={styles.terminalDropdownItem} onClick={() => void launchTerminalWithKind('claude', 'Claude')}>
+                <ClaudeIcon size={13} />
+                Claude Code
+              </button>
+              <button className={styles.terminalDropdownItem} onClick={() => void launchTerminalWithKind('codex', 'Codex')}>
+                <CodexIcon size={13} />
+                Codex
+              </button>
+            </div>,
+            document.body
+          )}
           <Tooltip label="Push hooks to server" placement="bottom">
             <button className={styles.publishBtn} onClick={() => void handlePublish()} disabled={publishing}>
               {publishing ? '…' : 'Publish'}

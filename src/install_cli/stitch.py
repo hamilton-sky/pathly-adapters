@@ -5,7 +5,11 @@ import yaml
 
 
 def stitch_skill(
-    core_path: Path, meta_path: Path, *, flows_dest: Path | None = None
+    core_path: Path,
+    meta_path: Path,
+    *,
+    flows_dest: Path | None = None,
+    host_instructions: str | None = None,
 ) -> str:
     with open(meta_path, encoding="utf-8") as f:
         try:
@@ -49,7 +53,11 @@ def stitch_skill(
     fm_str = yaml.dump(
         frontmatter, default_flow_style=False, allow_unicode=True
     ).strip()
-    body = f"---\n{fm_str}\n---\n\n{body}"
+    parts = [f"---\n{fm_str}\n---"]
+    if host_instructions:
+        parts.append(host_instructions.strip())
+    parts.append(body)
+    body = "\n\n".join(parts)
 
     return body
 

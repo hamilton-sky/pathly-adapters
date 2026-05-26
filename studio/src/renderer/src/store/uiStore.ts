@@ -35,6 +35,8 @@ export interface UiState {
   activeFlowSessions: Record<string, FlowSession>
   activeMonitorTab: string | null
   lastUsedFlowPath: string | null
+  chatOpen: boolean
+  skillsPanelOpen: boolean
   setSidebarCollapsed: (v: boolean) => void
   setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
   markDirty: (path: string) => void
@@ -47,6 +49,8 @@ export interface UiState {
   setActiveFlowSessions: (updater: (prev: Record<string, FlowSession>) => Record<string, FlowSession>) => void
   setActiveMonitorTab: (tab: string | null) => void
   setLastUsedFlowPath: (p: string | null) => void
+  toggleChat: () => void
+  toggleSkillsPanel: () => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -63,6 +67,8 @@ export const useUiStore = create<UiState>()(
       activeFlowSessions: {},
       activeMonitorTab: null,
       lastUsedFlowPath: loadLastUsedFlowPath(),
+      chatOpen: false,
+      skillsPanelOpen: true,
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setActivePanel: (p) => set({ activePanel: p }),
       markDirty: (path) => set((s) => ({ dirtyItems: new Set([...s.dirtyItems, path]) })),
@@ -94,6 +100,8 @@ export const useUiStore = create<UiState>()(
       setActiveFlowSessions: (updater) =>
         set((s) => ({ activeFlowSessions: updater(s.activeFlowSessions) })),
       setActiveMonitorTab: (tab) => set({ activeMonitorTab: tab }),
+      toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
+      toggleSkillsPanel: () => set((s) => ({ skillsPanelOpen: !s.skillsPanelOpen })),
       setLastUsedFlowPath: (p) => {
         try {
           if (p === null) {

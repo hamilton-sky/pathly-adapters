@@ -63,7 +63,7 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 | Host | User surface | Source files | Installed destination |
 |---|---|---|---|
 | Claude Code | `/pathly ...`, `/go ...` | `src/pathly_data/adapters/claude/_meta/` | `~/.claude/agents/`, `~/.claude/skills/` |
-| Codex | `Use Pathly ...` natural-language plugin skills | `src/pathly_data/adapters/codex/_meta/` | `~/.codex/agents/`, `~/.codex/skills/` |
+| Codex | `Use Pathly ...` natural-language plugin skills | `src/pathly_data/adapters/codex/_meta/` | `~/.codex/agents/`, `~/.agents/skills/`, plugin bundle/cache |
 | Copilot | Copilot-native skill invocation | `src/pathly_data/adapters/copilot/_meta/` | VS Code agents folder |
 
 Current Codex builds do not expose Pathly as `/pathly`. Use natural-language
@@ -95,7 +95,7 @@ pathly-setup
         │
         ├── materialize.py writes stitched files:
         │   ├── src/pathly_data/adapters/claude/_meta/**  ──────► ~/.claude/agents/ + ~/.claude/skills/
-        │   ├── src/pathly_data/adapters/codex/_meta/**   ──────► ~/.codex/agents/ + ~/.codex/skills/
+        │   ├── src/pathly_data/adapters/codex/_meta/**   ──────► ~/.codex/agents/ + ~/.agents/skills/
         │   └── src/pathly_data/adapters/copilot/_meta/** ──────► Copilot workspace config
         │
         └── setup_command.py is the CLI entry point (registered as `pathly-setup`)
@@ -135,13 +135,16 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 |---|---|---|---|
 | Agent behavior contracts | ✓ via ~/.claude/agents/ | ✓ via ~/.codex/agents/ | ✓ via AGENTS.md standard |
 | Skills (SKILL.md) | ✓ native | ✓ native | ✓ native (Aug 2025) |
-| Subagent spawning | Agent() tool | Agents SDK | /fleet, /delegate |
+| Subagent spawning | Agent() tool | Named role when exposed; otherwise current-agent execution or permitted generic delegation | /fleet, /delegate |
 | Natural language activation | /go skill + director | natural language | natural language |
 
 **Key constraint:** Subagent spawning syntax is tool-specific. There is no universal standard.
 
 **Solution (thin adapters):** `src/pathly_data/core/skills/` contains the skill *logic* in natural language.
-Each adapter's `_meta/*.yaml` adds only the tool-specific spawn call on top:
+Each adapter renders that intent into behavior supported by its host. For Codex,
+the generated skill prepends `adapters/codex/SKILL_EXECUTION.md`, which treats
+named role invocation as optional and falls back to executing the lifecycle
+role in the current agent:
 
 ```
 # src/pathly_data/core/skills/team.md
@@ -159,8 +162,9 @@ Spawn Agent(subagent_type="reviewer") for review.
 - Codex plugin manifest: `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`
 - Public Codex marketplace metadata: `.agents/plugins/marketplace.json`
 
-There is no root `.codex-plugin/` directory. Root `.agents/` is marketplace
-metadata only; there is no `.agents/skills/` directory.
+There is no repository-root `.codex-plugin/` directory. Repository-root
+`.agents/` is marketplace metadata only; installed Codex skills are written to
+the user-level `~/.agents/skills/` directory.
 
 ## pathly-setup Commands
 

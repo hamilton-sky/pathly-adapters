@@ -34,6 +34,7 @@ except ImportError:
     sys.exit(1)
 
 from pathly_orchestrator.config import Settings
+from pathly_orchestrator.eventlog import read_state
 from pathly_orchestrator.feature_flags import flags
 from pathly_orchestrator.fsm_ops import next_action, complete_stage
 from pathly_telemetry.storage import append_activity
@@ -187,6 +188,64 @@ def health():
         checks["project_root_exists"] = root.exists()
         checks["project_root_writable"] = os.access(project_root, os.W_OK)
     return jsonify(checks), 200
+
+
+@app.route("/status", methods=["GET"])
+def status_endpoint():
+    """Read-only FSM state endpoint for the Studio renderer.
+
+    Query params:
+      project_root (optional): absolute path to project root;
+                               falls back to PATHLY_PROJECT_ROOT env var.
+
+    Returns JSON:
+      { "current_state": str, "feature": str, "project_root": str }
+    or { "current_state": "unknown" } if STATE.json not found or project_root not set.
+    """
+    project_root = request.args.get("project_root", "").strip()
+    if not project_root:
+        project_root = os.environ.get("PATHLY_PROJECT_ROOT", "").strip()
+
+    if not project_root:
+        return jsonify({"current_state": "unknown"}), 200
+
+    resolved_root = Path(project_root).resolve()
+    plans_dir = resolved_root / "pathly" / "plans"
+    if not plans_dir.resolve().is_relative_to(resolved_root):
+        return jsonify({"error": "Invalid project_root"}), 400
+    if not plans_dir.exists():
+        return jsonify({"current_state": "unknown"}), 200
+
+    # Find the most recently updated STATE.json across all features.
+    best_state: dict | None = None
+    best_mtime: float = -1.0
+    try:
+        for state_file in plans_dir.glob("*/STATE.json"):
+            if not state_file.resolve().is_relative_to(resolved_root):
+                continue
+            try:
+                mtime = state_file.stat().st_mtime
+                if mtime > best_mtime:
+                    candidate = read_state(str(state_file.parent))
+                    if candidate is not None:
+                        best_mtime = mtime
+                        best_state = candidate
+            except Exception:
+                logger.debug("status: error reading %s", state_file, exc_info=True)
+    except Exception:
+        logger.debug("status: error scanning plans dir", exc_info=True)
+        return jsonify({"current_state": "unknown"}), 200
+
+    if best_state is None:
+        return jsonify({"current_state": "unknown"}), 200
+
+    return jsonify(
+        {
+            "current_state": best_state.get("current", "unknown"),
+            "feature": best_state.get("feature", ""),
+            "project_root": project_root,
+        }
+    ), 200
 
 
 @app.route("/metrics", methods=["GET"])

@@ -239,6 +239,11 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 
 ## Phase 8: MessageList + ChatInput + Panel wiring + WebLLM engine   ← Conversation 2
 
+> **Resize added (post-Conv 6 hotfix):** `ChatPanel/useChatResize.ts` was created and wired into
+> `ChatPanel/index.tsx`. The panel has a draggable left-edge handle (260px–720px, persisted in
+> `localStorage['chat-panel-width']`). The CSS variable `--chat-width` drives the width.
+> No plan changes needed for Conv 7+; the resize is transparent to all other components.
+
 **Files:** `MessageList.tsx`, `ChatInput.tsx`, `ChatPanel/index.tsx`, `App.tsx` — CREATE/MODIFY,
 `studio/src/renderer/src/data/models.ts` — CREATE,
 `studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE
@@ -477,9 +482,12 @@ useEffect(() => {
 
 ---
 
-## Phase 19: Static Studio schema   ← Conversation 6
+## Phase 19: Static Studio schema   ← Conversation 6 ✓ DONE
 
-**File:** `studio/src/renderer/src/data/studioSchema.ts` — CREATE
+**Files (actual locations after Conv 6 review):**
+- `studio/src/renderer/src/lib/studioSchema.ts` — created (canonical location)
+- `studio/src/renderer/src/types/studio.ts` — created (`StudioElement` interface)
+- `studio/src/renderer/src/data/studioSchema.ts` — backward-compat re-export shim
 **Done when:** `getStudioSchema()` returns typed description of all key Studio UI elements
 **Delivers:** S6.1
 **Details:**
@@ -496,13 +504,13 @@ useEffect(() => {
 
 ---
 
-## Phase 20: Inject schema into AI context   ← Conversation 6
+## Phase 20: Inject schema into AI context   ← Conversation 6 ✓ DONE
 
 **File:** `studio/src/renderer/src/lib/pathlyContext.ts` — MODIFY
 **Done when:** POST /chat includes `studioSchema` and AI system prompt references element labels
 **Delivers:** S6.2
 **Details:**
-- Import `getStudioSchema` from `data/studioSchema.ts`
+- Import `getStudioSchema` from `./studioSchema` (i.e., `lib/studioSchema.ts`) — the `data/` shim re-exports it but use the canonical `lib/` path
 - Add `studioSchema: StudioElement[]` to `buildPathlyContext()` return type and value
 - Pass `studioSchema` in POST /chat body
 - In `src/pathly_orchestrator/chat_agent.py`: add `## Studio UI Elements` section to system prompt listing elements grouped by screen: "FlowEditor: [New Flow (button)], [Flow Name (input)]..."
@@ -511,7 +519,7 @@ useEffect(() => {
 
 ---
 
-## Phase 21: Playwright executor   ← Conversation 7
+## Phase 21: Playwright executor — 3-tier cascade   ← Conversation 7
 
 **Files:** `studio/src/main/automation/playwrightExecutor.ts` — CREATE, `studio/src/main/index.ts` — MODIFY
 **Done when:** `executeStep({ type: 'click', label: 'New Flow' })` clicks the matching element in Studio
@@ -520,22 +528,90 @@ useEffect(() => {
 - Add `@playwright/test` to `studio/package.json` (Electron support via `_electron`)
 - `PlaywrightExecutor` class in main process:
   - `connect(cdpUrl: string): Promise<void>` — connects Playwright to the Electron window using `chromium.connectOverCDP`
-  - `executeStep(step: AutomationStep): Promise<StepResult>` — element resolution cascade:
-    1. Try `page.getByRole('button', { name: label })`
-    2. Try `page.getByRole('combobox', { name: label })`
-    3. Try `page.getByRole('textbox', { name: label })`
-    4. Try `page.getByLabel(label)`
-    5. Try `page.getByPlaceholder(label)`
-    6. Try `page.getByText(label, { exact: false })`
-    7. If none found: return `{ ok: false, error: 'element not found: ${label}' }`
-  - Check `locator.isDisabled()` — return `{ ok: false, error: 'element disabled: ${label}' }` if true
-  - For `click`: call `.click()` on resolved locator
-  - For `fill`: call `.fill(value)` on resolved locator
-  - For `select`: call `.selectOption(value)` on resolved locator
+  - `executeStep(step: AutomationStep): Promise<StepResult>` — delegates to `resolveElement` then performs the action
+  - For `click`: `.click()`, for `fill`: `.fill(value)`, for `select`: `.selectOption(value)`
+  - `resolveElement(label: string)` implements the 3-tier cascade (see below); wrapped in self-healing loop
+- `AutomationStep: { type: 'click'|'fill'|'select'; label: string; value?: string; screen?: string }`
+- `StepResult: { ok: boolean; error?: string; attempts?: number }`
 - `export const playwrightExecutor = new PlaywrightExecutor()` — singleton
 - Initialize after app is ready in `index.ts`: `app.commandLine.appendSwitch('remote-debugging-port', '9222')` BEFORE BrowserWindow creation, then `await playwrightExecutor.connect('http://localhost:9222')` after app ready
-- `AutomationStep: { type: 'click'|'fill'|'select'; label: string; value?: string; screen?: string }`
-- `StepResult: { ok: boolean; error?: string }`
+
+**Self-healing wrapper (wraps all 3 tiers):**
+- Max 3 attempts; exponential backoff: 500ms → 1000ms → 1500ms
+- On each retry: re-run full cascade from Tier 1 (page may have re-rendered)
+- If element found but `isDisabled()`: wait 800ms and retry (disabled → enabled transition)
+- On final failure: return `{ ok: false, error: '...', attempts: 3 }`
+
+**Tier 1 — Deterministic (0–5ms, always runs first):**
+Try each strategy in order; return the first that yields exactly 1 match.
+1. `getByRole('button', { name: label })`
+2. `getByRole('combobox', { name: label })`
+3. `getByRole('textbox', { name: label })`
+4. `getByRole('link', { name: label })`
+5. `getByRole('tab', { name: label })`
+6. `getByLabel(label)` — aria-label attribute
+7. `getByPlaceholder(label)`
+8. `getByText(label, { exact: true })`
+9. `getByText(label, { exact: false })`
+10. `locator('[title="${label}"]')`
+
+If a strategy returns multiple matches → filter to `.filter({ hasNot: page.locator('[hidden]') })` (visible only). If still multiple → continue to next strategy.
+If Tier 1 yields exactly 1 match → use it. If 0 or ambiguous after all 10 → fall through to Tier 2.
+
+**Tier 2 — MiniLM semantic similarity (~50ms, runs when Tier 1 finds 0 or ambiguous):**
+1. Get page accessibility snapshot: `await page.accessibility.snapshot()`
+2. Walk snapshot recursively; collect all `{ name, role }` pairs for interactable nodes
+3. Call `semanticResolve` callback (injected from IPC layer, see Phase 22): `await semanticResolve(candidates, target)` → `{ label: string; score: number }`
+4. If score ≥ 0.65: locate via `page.getByRole(role, { name: label })`
+5. If score < 0.65: fall through to Tier 3
+
+**Tier 3 — phi4-mini LLM fallback (~2–5s, last resort — stub in Conv 7, filled in Conv 9):**
+1. Call `llmResolve` callback (injected from IPC layer): `await llmResolve(candidates, target)` → `{ label: string | null }`
+2. If label returned: locate by name
+3. If null: return `{ ok: false, error: 'element not found after all tiers: ${target}' }`
+
+Note: In Conv 7, `llmResolve` is wired as a stub that always returns `{ label: null }`. The interface is defined now so Conv 9 can fill it in without touching this file.
+
+**Constructor injection pattern:**
+`PlaywrightExecutor` accepts optional callbacks:
+```
+constructor(
+  private semanticResolve: (candidates: string[], target: string) => Promise<{label: string; score: number}> = async () => ({ label: '', score: 0 }),
+  private llmResolve: (candidates: string[], target: string) => Promise<{label: string | null}> = async () => ({ label: null })
+) {}
+```
+The IPC layer (Phase 22) creates the singleton with real callbacks wired to the round-trip IPC pattern.
+
+---
+
+## Phase 21.5: elementResolver.ts (renderer-side semantic + LLM resolution)   ← Conversation 7
+
+**File:** `studio/src/renderer/src/lib/elementResolver.ts` — CREATE
+**Done when:** File exports `handleSemanticResolve` and `handleLLMResolve`; no TS errors
+**Delivers:** S7.2 (semantic tier), S7.3 (LLM tier stub)
+**Details:**
+
+`handleSemanticResolve(candidates: string[], target: string): Promise<{label: string; score: number}>`
+- Uses `embed(text)` exported from `embedRouter.ts` (shares the same MiniLM singleton — no double-init)
+- Embeds `target` and all `candidates`, computes cosine similarity using `cosineSim` from `embedRouter.ts`
+- Returns `{ label, score }` for the top match
+
+`handleLLMResolve(candidates: string[], target: string): Promise<{label: string | null}>`
+- Placeholder in Conv 7: checks if WebLLM engine is loaded (from Conv 9's `webLLMEngine.ts`); returns `{ label: null }` if not
+- When Conv 9 ships: builds prompt `"Page elements: [list]. Which element should I interact with to '${target}'? Reply with just the element name."` and calls `webLLMEngine.generate(prompt)`
+
+**IPC listener registration (called once at renderer startup):**
+```
+ipcRenderer.on('automation:semantic-resolve', async (event, { candidates, target }) => {
+  const result = await handleSemanticResolve(candidates, target)
+  event.sender.send('automation:semantic-resolve:result', result)
+})
+ipcRenderer.on('automation:llm-resolve', async (event, { candidates, target }) => {
+  const result = await handleLLMResolve(candidates, target)
+  event.sender.send('automation:llm-resolve:result', result)
+})
+```
+Register these listeners in the renderer entry point (e.g., `main.tsx` or a dedicated init call).
 
 ---
 
@@ -549,6 +625,30 @@ useEffect(() => {
 - Expose on preload: `window.electronAPI.executeAutomationStep(step: AutomationStep): Promise<StepResult>`
 - Register in `index.ts` alongside other IPC handlers
 - Do NOT use `webContents.executeJavaScript`, `data-conductor-id`, or `window.__uiExecutor`
+
+**Main → renderer round-trip IPC for Tiers 2 and 3:**
+Use the send/once pattern so main can call renderer-side logic:
+```
+// In automation.ts (main side)
+function makeRendererCaller(channel: string) {
+  return (candidates: string[], target: string) =>
+    new Promise<any>((resolve) => {
+      const win = BrowserWindow.getAllWindows()[0]
+      win.webContents.send(`${channel}`, { candidates, target })
+      ipcMain.once(`${channel}:result`, (_e, result) => resolve(result))
+    })
+}
+
+const semanticResolve = makeRendererCaller('automation:semantic-resolve')
+const llmResolve      = makeRendererCaller('automation:llm-resolve')
+
+export const playwrightExecutor = new PlaywrightExecutor(semanticResolve, llmResolve)
+```
+Note: the singleton is created here (not in `playwrightExecutor.ts`) so callbacks are available at construction time. `playwrightExecutor.ts` exports only the class.
+
+**Preload additions:**
+- `automation:semantic-resolve` and `automation:llm-resolve` are main→renderer pushes, not invokes — no preload exposure needed for these channels
+- `automation:execute-step` remains the only invoke the renderer calls
 
 ---
 

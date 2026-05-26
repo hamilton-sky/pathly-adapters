@@ -206,6 +206,94 @@
   word-break: break-all;
 }
 
+/* ── Terminal split-button ── */
+.terminalSplit {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  transition: border-color 0.12s;
+}
+
+.terminalSplit:hover {
+  border-color: var(--bg-surface1);
+}
+
+.terminalSplitDivider {
+  width: 1px;
+  height: 14px;
+  background: var(--bg-surface1);
+  flex-shrink: 0;
+}
+
+.terminalSplitChevron {
+  width: 16px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+  -webkit-app-region: no-drag;
+}
+
+.terminalSplitChevron:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.terminalSplitChevron:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* ── Terminal launcher dropdown (portal — position:fixed set inline) ── */
+.terminalDropdown {
+  min-width: 170px;
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 6px;
+  z-index: 9999;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.terminalDropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 7px 12px;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+
+.terminalDropdownItem:hover {
+  background: var(--bg-surface1);
+}
+
+.terminalDropdownItem:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.terminalDropdownDivider {
+  height: 1px;
+  background: var(--bg-surface1);
+  margin: 4px 0;
+}
+
 .navBtn {
   background: transparent;
   border: none;

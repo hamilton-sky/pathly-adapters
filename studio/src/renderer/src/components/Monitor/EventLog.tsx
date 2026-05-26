@@ -184,7 +184,7 @@ export function EventLog(): JSX.Element {
   const events = useStore((s) => s.events)
   const t = useTheme()
   const styles = makeStyles(t)
-  const { totalIn, totalOut, totalCost, agentDone } = useAgentTelemetry()
+  const { totalIn, totalOut, totalTokens, agentDone } = useAgentTelemetry()
   const missingCostData = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd == null)
 
   useInjectCSS(FLASH_CSS)
@@ -288,22 +288,23 @@ export function EventLog(): JSX.Element {
           </div>
         )}
       </div>
-      <div style={styles.totalsBar}>
-        <span style={styles.totalsLabel}>
-          Total&nbsp;&nbsp;
-          <span style={styles.totalsValue}>
-            {totalIn > 0 ? `${(totalIn / 1000).toFixed(1)}k` : '—'}↑
-            &nbsp;&nbsp;
-            {totalOut > 0 ? `${(totalOut / 1000).toFixed(1)}k` : '—'}↓
-            &nbsp;&nbsp;
-            {totalCost > 0 ? `$${totalCost.toFixed(4)}` : '—'}
-          </span>
-          {missingCostData && (
-            <span style={{ ...styles.totalsLabel, marginLeft: 12, opacity: 0.5 }}>
-              (no cost data - AGENT_DONE events are missing cost_usd)
-            </span>
-          )}
+      <div style={{ ...styles.totalsBar, display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={styles.totalsLabel}>in/out</span>
+        <span style={styles.totalsValue}>
+          {totalIn > 0 ? `${(totalIn / 1000).toFixed(1)}k` : '—'}↑
+          &nbsp;&nbsp;
+          {totalOut > 0 ? `${(totalOut / 1000).toFixed(1)}k` : '—'}↓
         </span>
+        {totalTokens > 0 && (
+          <span style={{ ...styles.totalsLabel, marginLeft: 'auto', opacity: 0.5, fontStyle: 'italic' }}>
+            = {totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens} combined ↑
+          </span>
+        )}
+        {missingCostData && (
+          <span style={{ ...styles.totalsLabel, marginLeft: 'auto', opacity: 0.5 }}>
+            (no cost data)
+          </span>
+        )}
       </div>
     </div>
   )

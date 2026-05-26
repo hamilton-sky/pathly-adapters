@@ -87,6 +87,7 @@ def test_complete_stage_blocked_by_review_failures(tmp_path):
     })
     assert result.get("blocked") is True
     assert result.get("target_agent") == "builder"
+    assert "# builder" in result["instructions"]
 
 
 # ── Two-call decide protocol ──────────────────────────────────────────────────

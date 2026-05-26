@@ -5,6 +5,7 @@ files:
 skills:
   destination: ~/.agents/skills/
   structure: nested
+  host_instructions: SKILL_EXECUTION.md
 templates:
   destination: ~/.codex/plugins/pathly/templates
 plugin:

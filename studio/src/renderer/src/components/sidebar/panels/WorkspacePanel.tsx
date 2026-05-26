@@ -49,6 +49,7 @@ interface Props {
   onRenameFolder?: (oldPath: string, newName: string) => void
   onDeleteFolder?: (folderPath: string) => void
   onDeletePlanFolder?: (folderPath: string) => void
+  onTogglePlanSubdir?: (folderName: string, subdirName: string) => void
   onDeleteCustomSection?: (sectionDir: string) => void
   onInlineCreateFileInFolder?: (folderPath: string) => void
   onInlineCreateFolderInFolder?: (folderPath: string) => void
@@ -69,7 +70,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
-    onRenameFolder, onDeleteFolder, onDeletePlanFolder,
+    onRenameFolder, onDeleteFolder, onDeletePlanFolder, onTogglePlanSubdir,
     onDeleteCustomSection, onInlineCreateFileInFolder, onInlineCreateFolderInFolder,
     onReorgDrop, onMoveFolder, customWorkspaceSections = [],
   } = props
@@ -116,6 +117,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
         onInlineCreateSubmit={onInlineCreateSubmit}
         onInlineCreateCancel={onInlineCreateCancel}
         onDeletePlanFolder={onDeletePlanFolder}
+        onTogglePlanSubdir={onTogglePlanSubdir}
         onSelect={onSelect}
         onRenameChange={onRenameChange}
         onRenameCommit={onRenameCommit}

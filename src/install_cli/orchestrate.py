@@ -183,6 +183,15 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         skills_dest = Path(skills_cfg["destination"]).expanduser()
         nested = skills_cfg.get("structure") == "nested"
         core_skills_dir = core_skills_path()
+        host_instructions: str | None = None
+        instructions_name = skills_cfg.get("host_instructions")
+        if instructions_name:
+            instructions_path = adapter_path(host) / instructions_name
+            if not instructions_path.exists():
+                raise FileNotFoundError(
+                    f"No skill host instructions for {host!r}: {instructions_path}"
+                )
+            host_instructions = instructions_path.read_text(encoding="utf-8")
         for meta_file in sorted(meta_dir.glob("*_skill.yaml")):
             skill_name = meta_file.stem.removesuffix("_skill")
             skill_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
@@ -195,7 +204,10 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             try:
                 filename = skill_meta.get("filename", default_filename)
                 skill_files[filename] = stitch_skill(
-                    core_file, meta_file, flows_dest=dest
+                    core_file,
+                    meta_file,
+                    flows_dest=dest,
+                    host_instructions=host_instructions,
                 )
                 if host == "codex" and filename.endswith("/SKILL.md"):
                     skill_dir = filename.removesuffix("/SKILL.md")

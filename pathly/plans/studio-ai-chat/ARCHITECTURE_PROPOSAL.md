@@ -1,3 +1,6 @@
+---
+
+---
 # Studio AI Chat — Architecture Proposal
 
 ## Problem Statement
@@ -150,6 +153,49 @@ Studio Renderer (React 18 + Zustand + CSS Modules + JetBrains Mono)
 | `pathlyContext` | `lib/pathlyContext.ts` | FSM state context builder |
 | `launchTerminal` | `lib/launchTerminal.ts` | Renderer utility: addTab + spawn in one call |
 | `chatStore` | `store/chatStore.ts` | All chat state: messages, match, streaming, autoApprove |
+| `chatTypes` | `types/chat.ts` | Shared cross-layer types: `MatchResult`, `Message`, etc. |
+
+## Layer Contract (Three-Layer Rule)
+
+```
+  ┌────────────────────────────────────────────────────────┐
+  │  COMPONENTS  (src/renderer/.../ChatPanel/*)            │
+  │  - May import from: store, lib, types                  │
+  │  - May call: store mutators, lib functions             │
+  └────────────────────────────────────────────────────────┘
+              │ reads/writes              │ calls
+              ▼                           ▼
+  ┌──────────────────────┐   ┌───────────────────────────┐
+  │  STORE  (src/store/) │   │  LIB  (src/lib/)          │
+  │  - May import: types │   │  - May import: types ONLY │
+  │  - NO lib imports    │   │  - NO store imports       │
+  │                      │   │  - NO store mutator calls │
+  └──────────────────────┘   └───────────────────────────┘
+              │                           │
+              └───────────┬───────────────┘
+                          ▼
+              ┌────────────────────────┐
+              │  TYPES  (src/types/)   │
+              │  - No imports (leaf)   │
+              └────────────────────────┘
+```
+
+**Rules (enforced by review):**
+1. `src/lib/*` modules MUST NOT import from `src/store/*`.
+2. `src/lib/*` modules MUST NOT call store mutators (e.g. `useChatStore.getState().setX(...)`).
+3. Types that cross layers live in `src/types/chat.ts`. Both store and lib import from `types/`,
+   never from each other.
+4. Side effects that mutate store state belong to the component layer. Lib functions return
+   values or `Promise<T>`; the caller decides what to do with the result.
+
+### Applied to `embedRouter` (Conv 5 contract)
+
+- `MatchResult` is defined in `studio/src/renderer/src/types/chat.ts` (not in `chatStore.ts`).
+  Both `embedRouter.ts` and `chatStore.ts` import it from `types/chat`.
+- `preEmbedSkills()` returns `Promise<void>`. It does NOT touch the store.
+- `ChatPanel/index.tsx` is the caller: it `await`s `preEmbedSkills()` and then calls
+  `useChatStore.getState().setEmbedReady(true)` (or via a hook selector) on success, and
+  surfaces the error on rejection.
 
 ## Risks
 

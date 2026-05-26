@@ -7,6 +7,8 @@
 
 /* ── Panel shell ── */
 .panel {
+  --t-claude-hover: rgba(167, 139, 250, 0.1);
+  --t-codex-hover: rgba(96, 170, 255, 0.1);
   display: flex;
   flex-direction: column;
   background: var(--t-bg);
@@ -105,17 +107,19 @@
 
 .tabActive {
   color: var(--t-text);
-  background: var(--t-bg);
-  border-top: 2px solid var(--t-accent);
+  background: var(--t-surface0);
+  border-bottom: 2px solid var(--t-accent);
 }
 
 .tabInactive {
   color: var(--t-text-muted);
   background: transparent;
-  transition: background 150ms ease-out, color 150ms ease-out;
+  opacity: 0.6;
+  transition: background 150ms ease-out, color 150ms ease-out, opacity 150ms ease-out;
 }
 
 .tabInactive:hover {
+  opacity: 1;
   background: var(--t-surface0);
   color: var(--t-text);
 }
@@ -145,11 +149,13 @@
   margin-left: 4px;
   flex-shrink: 0;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 150ms ease-out;
 }
 
 .tab:hover .popoutBtn {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .popoutBtn:hover {
@@ -227,7 +233,7 @@
 }
 
 .iconBtnClaude:hover {
-  background: rgba(167, 139, 250, 0.1) !important;
+  background: var(--t-claude-hover) !important;
   color: var(--t-accent) !important;
 }
 
@@ -240,7 +246,7 @@
 }
 
 .iconBtnCodex:hover {
-  background: rgba(96, 170, 255, 0.1) !important;
+  background: var(--t-codex-hover) !important;
   color: var(--t-blue) !important;
 }
 
@@ -348,7 +354,7 @@
   flex: 1;
   overflow: hidden;
   position: relative;
-  background: #0f0f1a;
+  background: var(--t-mantle);
 }
 
 .emptyHint {
@@ -359,6 +365,49 @@
   justify-content: center;
   color: var(--t-text-muted);
   font-size: 13px;
+}
+
+.emptyRow {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.emptyLabel {
+  color: var(--t-text-muted);
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.emptyBtn {
+  background: none;
+  border: 1px solid var(--t-surface1);
+  border-radius: 4px;
+  color: var(--t-text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 3px 10px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  outline: none;
+  transition: border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.emptyBtn:hover {
+  border-color: var(--t-accent);
+  color: var(--t-text);
+}
+
+.emptyBtn:focus-visible {
+  outline: 1px solid var(--t-accent);
+  outline-offset: -2px;
+  border-radius: 4px;
 }
 
 /* ── xterm container ── */
@@ -384,11 +433,11 @@
   background: transparent;
 }
 .tabViewActive .xterm-viewport::-webkit-scrollbar-thumb {
-  background: #343452;
+  background: var(--t-surface1);
   border-radius: 3px;
 }
 .tabViewActive .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: #5a5d8a;
+  background: var(--t-text-muted);
 }
 
 /* ── Agent status dot ── */

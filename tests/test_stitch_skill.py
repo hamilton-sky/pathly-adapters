@@ -77,6 +77,18 @@ def test_stitch_skill_no_strip_by_default(tmp_path):
     assert result.startswith("---\n")
 
 
+def test_stitch_skill_includes_host_instructions_after_frontmatter(skill_files):
+    core, meta = skill_files
+    result = stitch_skill(
+        core,
+        meta,
+        host_instructions="## Codex Execution Contract\n\nExecute locally.",
+    )
+
+    assert result.index("## Codex Execution Contract") < result.index("# go")
+    assert "Execute locally." in result
+
+
 def test_stitch_skill_missing_required_fields_raises(tmp_path):
     core = tmp_path / "skill.md"
     core.write_text("# skill", encoding="utf-8")

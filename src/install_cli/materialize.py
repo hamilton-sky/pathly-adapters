@@ -3,6 +3,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 MANIFEST_NAME = ".pathly-manifest.json"
 
@@ -60,6 +61,7 @@ def materialize(
     repair: bool = False,
     force: bool = False,
     dry_run: bool = False,
+    prune_filter: Callable[[str], bool] | None = None,
 ) -> list[str]:
     """Synchronize stitched files to dest. Returns filenames written (or would-write)."""
     manifest = _load_manifest(dest)
@@ -87,7 +89,10 @@ def materialize(
 
     pruned = False
     if repair and not dry_run:
-        for name in sorted(owned - set(files)):
+        stale_names = owned - set(files)
+        if prune_filter is not None:
+            stale_names = {name for name in stale_names if prune_filter(name)}
+        for name in sorted(stale_names):
             target = dest / name
             if not target.resolve().is_relative_to(dest.resolve()):
                 raise ValueError(
@@ -125,7 +130,14 @@ def materialize_flows(
         f.name: f.read_text(encoding="utf-8")
         for f in sorted(flows_src.glob("*.flow.yaml"))
     }
-    return materialize(files, dest, repair=True, force=force, dry_run=dry_run)
+    return materialize(
+        files,
+        dest,
+        repair=True,
+        force=force,
+        dry_run=dry_run,
+        prune_filter=lambda name: name.endswith(".flow.yaml"),
+    )
 
 
 def uninstall(

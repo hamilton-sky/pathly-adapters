@@ -59,6 +59,21 @@ Restart Codex after installing or changing the local marketplace. If the plugin
 was enabled but not selected in an existing thread, start a fresh thread after
 the restart.
 
+## Role Execution In Codex
+
+Core Pathly skills use host-neutral directions such as `Spawn builder`.
+Generated Codex skills prepend `SKILL_EXECUTION.md` so those directions match
+the capabilities exposed in the current Codex session:
+
+- If a named Pathly role is callable, Codex may invoke it directly.
+- Otherwise, Codex executes lifecycle-role work in the current agent.
+- Generic sub-agent delegation is used only when the user requested delegation
+  and the active Codex tool policy permits it.
+
+The installed `agents/*.toml` files preserve role contracts for Codex surfaces
+that load custom agents; their presence does not guarantee named-agent
+invocation in an already running session.
+
 Manual PowerShell equivalent:
 
 ```powershell
@@ -87,7 +102,8 @@ pathly-setup codex --apply
 
 The Codex adapter uses `_meta/*.yaml` metadata files that are stitched with
 content from `core/agents/` and `core/skills/` at install time. The resulting
-files are deployed to `~/.codex/agents/` and `~/.codex/skills/` by
+agent files are deployed to `~/.codex/agents/`, skills to `~/.agents/skills/`,
+and a plugin bundle to `~/.codex/plugins/pathly/` by
 `pathly-setup codex --apply`.
 
 Claude Code keeps its own model-specific wrappers under

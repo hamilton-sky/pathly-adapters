@@ -177,6 +177,14 @@ export function Sidebar(): JSX.Element | null {
     setPlanFolders((prev) => prev.map((f) => f.name === name ? { ...f, open: !f.open } : f))
   }
 
+  function handleTogglePlanSubdir(folderName: string, subdirName: string): void {
+    setPlanFolders((prev) => prev.map((f) =>
+      f.name === folderName
+        ? { ...f, subdirs: f.subdirs.map((sd) => sd.name === subdirName ? { ...sd, open: !sd.open } : sd) }
+        : f
+    ))
+  }
+
   function handleFolderClick(name: string): void {
     setActiveTopic(name)
     setActivePanel('plan')
@@ -441,6 +449,7 @@ export function Sidebar(): JSX.Element | null {
             onRenameFolder={(oldPath, newName) => { void handleRenameFolder(oldPath, newName) }}
             onDeleteFolder={(folderPath) => setConfirmDeleteFolder(folderPath)}
             onDeletePlanFolder={(folderPath) => { void handleDeletePlanFolder(folderPath) }}
+            onTogglePlanSubdir={handleTogglePlanSubdir}
             onDeleteCustomSection={(dir) => { void handleDeleteCustomSection(dir) }}
             onInlineCreateFileInFolder={handleInlineCreateFileInFolder}
             onInlineCreateFolderInFolder={handleInlineCreateFolderInFolder}

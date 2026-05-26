@@ -13,7 +13,15 @@ interface UseFlowValidationArgs {
   t: Theme
 }
 
-export function useFlowValidation({ data, knownBehaviors, nodes, edges, t }: UseFlowValidationArgs) {
+interface UseFlowValidationResult {
+  validationIssues: FlowValidationIssue[]
+  nodesWithIssues: Node[]
+  edgesWithValidation: Edge[]
+  hasErrors: boolean
+  hasWarnings: boolean
+}
+
+export function useFlowValidation({ data, knownBehaviors, nodes, edges, t }: UseFlowValidationArgs): UseFlowValidationResult {
   const validationIssues = useMemo(
     () => validateFlow(data, knownBehaviors),
     [data, knownBehaviors]
@@ -21,7 +29,7 @@ export function useFlowValidation({ data, knownBehaviors, nodes, edges, t }: Use
 
   const nodesWithIssues = useMemo(
     () =>
-      nodes.map((node) => {
+      nodes.map((node): Node => {
         const nodeIssues = validationIssues.filter((i) => i.target === 'node' && i.id === node.id)
         const baseData = node.data as Record<string, unknown>
         const isStart = data.states[0] === node.id

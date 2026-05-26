@@ -19,6 +19,21 @@ from pathly_orchestrator.fsm import (
     write_state,
 )
 
+_AGENT_GROUPS = {
+    "architect": "planning",
+    "builder": "building",
+    "designer": "building",
+    "explorer": "research",
+    "orchestrator": "support",
+    "planner": "planning",
+    "po": "planning",
+    "quick": "support",
+    "reviewer": "quality",
+    "scout": "research",
+    "tester": "quality",
+    "web-researcher": "research",
+}
+
 # ── Private helpers ───────────────────────────────────────────────────────────
 
 
@@ -44,9 +59,13 @@ def _load_agent_text(agent: str) -> str:
             .joinpath(f"core/skills/{agent}.md")
             .read_text(encoding="utf-8")
         )
+    group = _AGENT_GROUPS.get(agent)
+    relative_path = (
+        f"core/agents/{group}/{agent}.md" if group else f"core/agents/{agent}.md"
+    )
     return (
         files("pathly_data")
-        .joinpath(f"core/agents/{agent}.md")
+        .joinpath(relative_path)
         .read_text(encoding="utf-8")
     )
 
@@ -288,6 +307,7 @@ def complete_stage(args: dict) -> dict:
             "from": state_info["current_state"],
             "to": next_state,
         },
+        flow=flow_config,
     )
 
     if next_state == "DONE":

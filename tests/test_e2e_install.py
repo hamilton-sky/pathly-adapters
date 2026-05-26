@@ -22,6 +22,12 @@ def _make_env(tmp_path: Path) -> dict[str, str]:
     env["USERPROFILE"] = str(tmp_path)
     env["APPDATA"] = str(tmp_path / "AppData" / "Roaming")
     env["LOCALAPPDATA"] = str(tmp_path / "AppData" / "Local")
+    source_path = str(REPO_ROOT / "src")
+    env["PYTHONPATH"] = (
+        source_path + os.pathsep + env["PYTHONPATH"]
+        if env.get("PYTHONPATH")
+        else source_path
+    )
     return env
 
 

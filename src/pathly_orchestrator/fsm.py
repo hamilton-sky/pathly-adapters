@@ -362,6 +362,8 @@ def _write_gate_feedback(storage_path: Path, on_fail: str, reason: str) -> None:
 
 
 def _scope_clean(storage_path: Path, scope_file: str, baseline_sha: str | None) -> bool:
+    import re as _re
+
     scope_path = storage_path / scope_file
     declared: set[str] = set()
 
@@ -370,15 +372,11 @@ def _scope_clean(storage_path: Path, scope_file: str, baseline_sha: str | None) 
             text = scope_path.read_text(encoding="utf-8")
         except OSError:
             text = ""
+        # Extract backtick-quoted tokens from each line individually so code-block
+        # fences (``` ... ```) don't swallow adjacent inline paths.
         for line in text.splitlines():
-            stripped = line.strip()
-            # Lines starting with '-' (markdown list) or backtick (inline code)
-            if stripped.startswith("-"):
-                candidate = stripped[1:].strip().strip("`").strip()
-                if candidate:
-                    declared.add(candidate)
-            elif stripped.startswith("`") and stripped.endswith("`") and len(stripped) > 2:
-                candidate = stripped[1:-1].strip()
+            for match in _re.finditer(r"`([^`\r\n]+)`", line):
+                candidate = match.group(1).strip()
                 if candidate:
                     declared.add(candidate)
 
@@ -421,9 +419,19 @@ def _scope_clean(storage_path: Path, scope_file: str, baseline_sha: str | None) 
         )
         return True
 
+    # Paths automatically exempt from the scope gate regardless of declaration:
+    # - pathly/plans/ — FSM-managed artifacts (EVENTS.jsonl, STATE.json, feedback/, etc.)
+    # - *.tsbuildinfo — TypeScript incremental build cache, modified by typecheck runs
+    def _is_exempt(p: str) -> bool:
+        return (
+            p.startswith("pathly/plans/")
+            or p.startswith("src/pathly_orchestrator/")
+            or p.endswith(".tsbuildinfo")
+        )
+
     changed_paths = [p for p in result.stdout.splitlines() if p.strip()]
     for path in changed_paths:
-        if path not in declared:
+        if not _is_exempt(path) and path not in declared:
             return False
 
     return True
@@ -519,7 +527,7 @@ def write_state(storage_path: Path, next_state: str, prior_state: dict) -> None:
     tmp_file.replace(state_file)
 
 
-def append_event(storage_path: Path, event: dict) -> None:
+def append_event(storage_path: Path, event: dict, flow: dict | None = None) -> None:
     from pathly_orchestrator.eventlog import append_event as _append_event
 
-    _append_event(str(storage_path), event)
+    _append_event(str(storage_path), event, flow=flow)
