@@ -146,12 +146,18 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       height: 600,
       title: safeLabel,
       backgroundColor: '#1e1e2e',
+      show: false,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: false,
       },
+    })
+
+    popupWin.once('ready-to-show', () => {
+      popupWin.show()
+      popupWin.focus()
     })
 
     // Route PTY data to popup window and transfer ownership

@@ -1,3 +1,5 @@
+import { PATHLY_API_BASE } from './config'
+
 export interface PathlyContext {
   fsmStage: string
   featureName: string
@@ -11,7 +13,7 @@ const KNOWN_SKILLS = [
 
 export async function buildPathlyContext(): Promise<PathlyContext> {
   try {
-    const res = await fetch('http://127.0.0.1:8765/status')
+    const res = await fetch(`${PATHLY_API_BASE}/status`)
     const data = await res.json() as { current_state?: string; feature?: string }
     return {
       fsmStage: data.current_state ?? 'unknown',

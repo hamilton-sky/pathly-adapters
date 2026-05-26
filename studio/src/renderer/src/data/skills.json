@@ -1,0 +1,72 @@
+[
+  {
+    "name": "plan",
+    "command": "/pathly plan",
+    "description": "Use when you want to create or update a project plan. Breaks down goals into tasks and milestones."
+  },
+  {
+    "name": "po",
+    "command": "/pathly po",
+    "description": "Use when you need product-owner-level decisions or backlog prioritization. Evaluates trade-offs and sets sprint scope."
+  },
+  {
+    "name": "storm",
+    "command": "/pathly storm",
+    "description": "Use when brainstorming ideas, exploring solution space, or generating creative options before committing to a direction."
+  },
+  {
+    "name": "build",
+    "command": "/pathly build",
+    "description": "Use when you want to implement a feature or write code. Produces working code from a spec or task description."
+  },
+  {
+    "name": "review",
+    "command": "/pathly review",
+    "description": "Use when you want code or output reviewed for quality, correctness, or best practices. Returns structured feedback."
+  },
+  {
+    "name": "test",
+    "command": "/pathly test",
+    "description": "Use when you want automated tests written or run. Covers unit, integration, and edge-case scenarios."
+  },
+  {
+    "name": "retro",
+    "command": "/pathly retro",
+    "description": "Use to run a retrospective on a completed sprint or task. Surfaces what went well, what didn't, and action items."
+  },
+  {
+    "name": "explore",
+    "command": "/pathly explore",
+    "description": "Use when you want to investigate an unfamiliar codebase, library, or concept. Returns a structured summary of findings."
+  },
+  {
+    "name": "debug",
+    "command": "/pathly debug",
+    "description": "Use when you have a failing test, error, or unexpected behavior. Diagnoses root cause and proposes a fix."
+  },
+  {
+    "name": "design",
+    "command": "/pathly design",
+    "description": "Use when you need architecture or system design decisions. Produces diagrams, interface contracts, or component sketches."
+  },
+  {
+    "name": "fix",
+    "command": "/pathly fix",
+    "description": "Use when you have a specific known bug to patch. Applies a targeted fix without broader refactoring."
+  },
+  {
+    "name": "status",
+    "command": "/pathly status",
+    "description": "Use to get a quick snapshot of current pipeline state, open tasks, and recent activity."
+  },
+  {
+    "name": "log",
+    "command": "/pathly log",
+    "description": "Use to view a structured log of past agent actions, decisions, and outputs for auditing or context."
+  },
+  {
+    "name": "end",
+    "command": "/pathly end",
+    "description": "Use to cleanly close out a feature, sprint, or session. Archives artifacts and marks work as complete."
+  }
+]

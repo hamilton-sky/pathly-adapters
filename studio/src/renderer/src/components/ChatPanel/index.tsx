@@ -2,9 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useChatStore } from '../../store/chatStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
+import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
+import { PATHLY_API_BASE } from '../../lib/config'
+import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
+import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
 import { SkillsPanel } from './SkillsPanel'
 import { MessageList } from './MessageList'
@@ -38,11 +42,15 @@ export function ChatPanel(): JSX.Element {
   const addMessage = useChatStore((s) => s.addMessage)
   const updateLastMessage = useChatStore((s) => s.updateLastMessage)
   const currentMatch = useChatStore((s) => s.currentMatch)
+  const altMatches = useChatStore((s) => s.altMatches)
   const outputLines = useChatStore((s) => s.outputLines)
   const targetKind = useChatStore((s) => s.targetKind)
+  const autoApprove = useChatStore((s) => s.autoApprove)
   const appendOutputLine = useChatStore((s) => s.appendOutputLine)
   const clearOutputLines = useChatStore((s) => s.clearOutputLines)
   const setCurrentMatch = useChatStore((s) => s.setCurrentMatch)
+  const setAltMatches = useChatStore((s) => s.setAltMatches)
+  const setIsEmbedding = useChatStore((s) => s.setIsEmbedding)
   const setLoading = useChatStore((s) => s.setLoading)
   const isLoading = useChatStore((s) => s.isLoading)
   const isCommandRunning = useChatStore((s) => s.isCommandRunning)
@@ -53,7 +61,12 @@ export function ChatPanel(): JSX.Element {
   const open = useTerminalStore((s) => s.open)
   const toggle = useTerminalStore((s) => s.toggle)
 
+  const toggleChat = useUiStore((s) => s.toggleChat)
+
   const projectPath = useStore((s) => s.projectPath)
+
+  const hasClaudeTab = tabs.some((tab) => tab.kind === 'claude')
+  const hasCodexTab = tabs.some((tab) => tab.kind === 'codex')
 
   const t = useTheme()
   // Accumulates partial terminal data until a newline arrives
@@ -84,6 +97,11 @@ export function ChatPanel(): JSX.Element {
     }
   }, [targetKind, tabs, appendOutputLine])
 
+  // Pre-embed all skill descriptions once on first mount
+  useEffect(() => {
+    void preEmbedSkills(loadSkills())
+  }, [])
+
   async function handleSend(): Promise<void> {
     const text = inputValue.trim()
     if (!text) return
@@ -105,58 +123,89 @@ export function ChatPanel(): JSX.Element {
       const parts = text.split(' ')
       const skill = parts[1] || ''
       setCurrentMatch({ skill, confidence: 1.0, command: text })
+      return
+    }
+
+    // Run embed routing and POST /chat in parallel
+    setIsEmbedding(true)
+    const [matches, context] = await Promise.all([
+      matchIntent(text),
+      buildPathlyContext(),
+    ])
+    setIsEmbedding(false)
+
+    const topMatch = matches[0] ?? null
+    const rest = matches.slice(1)
+
+    if (topMatch && topMatch.confidence >= 0.4) {
+      setCurrentMatch(topMatch)
+      setAltMatches(rest)
     } else {
-      const context = await buildPathlyContext()
-      const assistantMsg = {
-        id: crypto.randomUUID(),
-        role: 'assistant' as const,
-        content: '',
-        status: 'streaming' as const,
+      setCurrentMatch(null)
+      setAltMatches([])
+    }
+
+    const assistantMsg = {
+      id: crypto.randomUUID(),
+      role: 'assistant' as const,
+      content: '',
+      status: 'streaming' as const,
+    }
+    addMessage(assistantMsg)
+    setLoading(true)
+
+    let streamedContent = ''
+    try {
+      const res = await fetch(`${PATHLY_API_BASE}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          context,
+          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          ...(topMatch && topMatch.confidence >= 0.4
+            ? { matchedSkill: topMatch.skill, skillDescription: topMatch.command }
+            : {}),
+        }),
+      })
+
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      if (!topMatch || topMatch.confidence < 0.4) {
+        streamedContent = 'No matching skill found. '
+        updateLastMessage({ content: streamedContent })
       }
-      addMessage(assistantMsg)
-      setLoading(true)
 
-      try {
-        const res = await fetch('http://127.0.0.1:8765/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: text,
-            context,
-            history: messages.map((m) => ({ role: m.role, content: m.content })),
-          }),
-        })
-
-        const reader = res.body?.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        let accContent = ''
-
-        while (reader) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() ?? ''
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            try {
-              const payload = JSON.parse(line.slice(6)) as { text?: string; error?: string }
-              if (payload.text) {
-                accContent += payload.text
-                updateLastMessage({ content: accContent })
-              } else if (payload.error) {
-                updateLastMessage({ content: payload.error, status: 'done' })
-              }
-            } catch { /* malformed SSE chunk — skip */ }
-          }
+      while (reader) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const payload = JSON.parse(line.slice(6)) as { text?: string; error?: string }
+            if (payload.text) {
+              streamedContent += payload.text
+              updateLastMessage({ content: streamedContent })
+            } else if (payload.error) {
+              updateLastMessage({ content: payload.error, status: 'done' })
+            }
+          } catch { /* malformed SSE chunk — skip */ }
         }
-        updateLastMessage({ status: 'done' })
-      } catch {
-        updateLastMessage({ content: 'Chat server unavailable.', status: 'done' })
-      } finally {
-        setLoading(false)
       }
+      updateLastMessage({ status: 'done' })
+    } catch {
+      updateLastMessage({ content: 'Chat server unavailable.', status: 'done' })
+    } finally {
+      setLoading(false)
+    }
+
+    if (autoApprove && topMatch && topMatch.confidence >= 0.65) {
+      await handleRun()
     }
   }
 
@@ -190,13 +239,13 @@ export function ChatPanel(): JSX.Element {
       className={styles.panel}
       style={{ background: t.bgBase, borderLeft: t.border, fontFamily: t.fontFamilyBase }}
     >
-      <ConductorHeader />
+      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} onToggleChat={toggleChat} />
       <SkillsPanel onSkillClick={handleSkillClick} />
       <MessageList />
       {currentMatch !== null && (
         <MatchCard
           match={currentMatch}
-          alts={[]}
+          alts={altMatches}
           onRun={() => { void handleRun() }}
           onReject={handleReject}
           onSelectAlt={handleSelectAlt}

@@ -7,11 +7,11 @@
 }
 
 .cardMatched {
-  border-color: #22C55E;
+  border-color: var(--accent);
 }
 
 .cardUnsure {
-  border-color: #F59E0B;
+  border-color: var(--codex-amber);
 }
 
 .header {
@@ -36,13 +36,13 @@
 }
 
 .badgeMatched {
-  background: #22C55E22;
-  color: #22C55E;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--accent);
 }
 
 .badgeUnsure {
-  background: #F59E0B22;
-  color: #F59E0B;
+  background: color-mix(in srgb, var(--codex-amber) 13%, transparent);
+  color: var(--codex-amber);
 }
 
 .confidence {
@@ -62,15 +62,15 @@
 .barFill {
   height: 100%;
   border-radius: 2px;
-  transition: width 300ms ease;
+  transition: width var(--t-bar) var(--ease-out-expo);
 }
 
 .barFillMatched {
-  background: #22C55E;
+  background: var(--accent);
 }
 
 .barFillUnsure {
-  background: #F59E0B;
+  background: var(--codex-amber);
 }
 
 .actions {
@@ -87,8 +87,8 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  background: #22C55E;
-  color: #fff;
+  background: var(--accent);
+  color: var(--fg);
 }
 
 .btnRun:hover {

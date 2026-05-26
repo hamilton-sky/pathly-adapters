@@ -39,7 +39,7 @@ export function MatchCard({ match, alts, onRun, onReject, onSelectAlt }: MatchCa
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.btnRun} onClick={onRun}>
+        <button className={styles.btnRun} onClick={onRun} disabled={!matched} aria-label={`Run ${match.skill}`}>
           Run
         </button>
         <button
@@ -55,7 +55,15 @@ export function MatchCard({ match, alts, onRun, onReject, onSelectAlt }: MatchCa
         <div className={styles.alts}>
           <span className={styles.altLabel}>Try instead:</span>
           {alts.map((a) => (
-            <span key={a.skill} className={styles.altChip} onClick={() => onSelectAlt(a.skill)}>
+            <span
+              key={a.skill}
+              className={styles.altChip}
+              role="button"
+              aria-label={`Select ${a.skill}`}
+              tabIndex={0}
+              onClick={() => onSelectAlt(a.skill)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectAlt(a.skill) }}
+            >
               {a.skill}
             </span>
           ))}

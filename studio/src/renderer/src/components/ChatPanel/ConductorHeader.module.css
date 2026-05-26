@@ -4,6 +4,8 @@
   gap: 8px;
   padding: 8px 12px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .titleRow {
@@ -15,6 +17,7 @@
 .title {
   font-size: 13px;
   font-weight: 600;
+  color: var(--fg);
 }
 
 .pills {
@@ -32,6 +35,8 @@
   font-size: 11px;
   padding: 2px 7px;
   border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
 }
 
 .dot {
@@ -39,6 +44,11 @@
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+  background: var(--muted);
+}
+
+.dotActive {
+  background: var(--accent);
 }
 
 .closeBtn {
@@ -50,6 +60,7 @@
   align-items: center;
   border-radius: 4px;
   transition: opacity 150ms ease-out;
+  color: var(--muted);
 }
 
 .closeBtn:hover {

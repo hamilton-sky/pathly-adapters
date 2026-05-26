@@ -8,12 +8,6 @@ export interface Message {
   tokens?: number
 }
 
-export type MatchState = {
-  skill: string
-  confidence: number
-  command: string
-} | null
-
 export interface MatchResult {
   skill: string
   confidence: number
@@ -22,32 +16,41 @@ export interface MatchResult {
 
 export interface ChatState {
   messages: Message[]
-  matchState: MatchState
   isLoading: boolean
   isCommandRunning: boolean
   targetKind: 'claude' | 'codex'
   outputLines: string[]
   currentMatch: MatchResult | null
+  autoApprove: boolean
+  altMatches: MatchResult[]
+  isEmbedding: boolean
+  embedReady: boolean
   addMessage: (msg: Message) => void
   updateLastMessage: (patch: Partial<Message>) => void
   clearMessages: () => void
-  setMatchState: (ms: MatchState) => void
   setLoading: (b: boolean) => void
   setCommandRunning: (b: boolean) => void
   setTargetKind: (kind: 'claude' | 'codex') => void
   appendOutputLine: (line: string) => void
   clearOutputLines: () => void
   setCurrentMatch: (match: MatchResult | null) => void
+  setAutoApprove: (b: boolean) => void
+  setAltMatches: (matches: MatchResult[]) => void
+  setIsEmbedding: (b: boolean) => void
+  setEmbedReady: (b: boolean) => void
 }
 
 export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
-  matchState: null,
   isLoading: false,
   isCommandRunning: false,
   targetKind: 'claude',
   outputLines: [],
   currentMatch: null,
+  autoApprove: false,
+  altMatches: [],
+  isEmbedding: false,
+  embedReady: false,
 
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
@@ -61,8 +64,6 @@ export const useChatStore = create<ChatState>()((set) => ({
 
   clearMessages: () => set({ messages: [] }),
 
-  setMatchState: (ms) => set({ matchState: ms }),
-
   setLoading: (b) => set({ isLoading: b }),
 
   setCommandRunning: (b) => set({ isCommandRunning: b }),
@@ -75,4 +76,9 @@ export const useChatStore = create<ChatState>()((set) => ({
   clearOutputLines: () => set({ outputLines: [] }),
 
   setCurrentMatch: (match) => set({ currentMatch: match }),
+
+  setAutoApprove: (b) => set({ autoApprove: b }),
+  setAltMatches: (matches) => set({ altMatches: matches }),
+  setIsEmbedding: (b) => set({ isEmbedding: b }),
+  setEmbedReady: (b) => set({ embedReady: b }),
 }))
