@@ -68,8 +68,8 @@
 | 2 | 8 | `MessageList.tsx` + `ChatInput.tsx` | Messages + input bar | Streaming works, model pills visible | TODO |
 | 3 | 9 | `ChatPanel/MatchCard.tsx` | Match result card | Green/amber states, Run/Not this work | TODO |
 | 3 | 10 | `ChatPanel/OutputSnippet.tsx` | Live PTY output reader | Shows last 5 lines in real-time | TODO |
-| 3 | 11 | `studio/src/main/ipc/chat.ts` + `index.ts` | IPC terminal write handler | PTY receives command | TODO |
-| 4 | 12 | `studio/src/renderer/src/lib/pathlyContext.ts` | Context builder | Returns { fsmStage, featureName, screenElements, skills } | TODO |
+| 3 | 11 | `lib/launchTerminal.ts` + `chatStore.targetKind` | Terminal write + auto-spawn utility | Run writes host-correct cmd; auto-spawns + opens dock | TODO |
+| 4 | 12 | `studio/src/renderer/src/lib/pathlyContext.ts` | Context builder | Returns { fsmStage, featureName, skills } | TODO |
 | 4 | 13 | `studio/src/renderer/src/lib/pageAnalyzer/` | DOM analyzer (from BrightSky) | Compiles without errors | TODO |
 | 4 | 14 | `ChatPanel/index.tsx` | Inject context into every message | AI references FSM stage | TODO |
 | 5 | 15 | `studio/src/renderer/src/data/skills.json` | 14 skills with name+command+description | File valid JSON, all skills present | TODO |

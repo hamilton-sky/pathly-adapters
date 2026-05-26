@@ -79,8 +79,8 @@ No Ollama required. Models data and engine ported from zakamurai.
 | `studio/src/renderer/src/App.tsx` | 2 | MODIFY — add ChatPanel as flex child |
 | `studio/src/renderer/src/components/ChatPanel/MatchCard.tsx` | 3 | CREATE — match result + approval |
 | `studio/src/renderer/src/components/ChatPanel/OutputSnippet.tsx` | 3 | CREATE — live PTY output reader |
-| `studio/src/main/ipc/chat.ts` | 3 | CREATE — IPC handler for terminal write |
-| `studio/src/main/index.ts` | 3 | MODIFY — register chat IPC handler |
+| `studio/src/renderer/src/lib/launchTerminal.ts` | 3 | CREATE — shared auto-spawn utility |
+| `studio/src/renderer/src/store/chatStore.ts` | 3 | MODIFY — add targetKind field |
 | `studio/src/renderer/src/lib/pathlyContext.ts` | 4 | CREATE — FSM + screen context builder |
 | `studio/src/renderer/src/lib/embedRouter.ts` | 5 | CREATE — MiniLM wrapper + matchIntent() |
 | `studio/src/renderer/src/lib/skillsManifest.ts` | 5 | CREATE — typed skills.json loader |
@@ -109,7 +109,7 @@ No Ollama required. Models data and engine ported from zakamurai.
 |---|---|---|---|---|---|
 | 1 | Python Chat Agent Server | Core | S1.1, S1.2 | TODO | `http_server.py`, `chat_agent.py`, `chat_tools.py` |
 | 2 | Studio Chat UI + Skills Panel | Core | S2.1, S2.2, S2.3 | TODO | `chatStore.ts`, `ChatPanel/`, `App.tsx` |
-| 3 | MatchCard + IPC Terminal Write | Core | S3.1, S3.2 | TODO | `MatchCard.tsx`, `OutputSnippet.tsx`, `ipc/chat.ts` |
+| 3 | MatchCard + Terminal Write | Core | S3.1, S3.2 | TODO | `MatchCard.tsx`, `OutputSnippet.tsx`, `launchTerminal.ts` |
 | 4 | Context Injection | Core | S4.1, S4.2 | TODO | `pathlyContext.ts`, `ChatPanel/index.tsx` |
 | 5 | Embedding Router | Core | S5.1, S5.2, S5.3 | TODO | `embedRouter.ts`, `skillsManifest.ts`, `skills.json` |
 | 6 | Static Studio Schema + Context Injection | Track A | S6.1, S6.2 | TODO | `studioSchema.ts`, `pathlyContext.ts` |

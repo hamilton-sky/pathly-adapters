@@ -299,14 +299,16 @@ Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 9–11 for full d
 Implement Studio AI Chat Conversation 3 (Phases 9–11).
 
 **Before editing anything:** glob/read the live repo to confirm every file path below exists.
-Read studio/src/main/ipc/terminal.ts fully — pay attention to: `activePtys` is module-local (NOT exported), and `terminal:write` checks `ptyOwners` (only the spawning renderer can write). The Phase 11 plan tells you exactly how to work around both.
+Read studio/src/main/preload/index.ts — the actual terminal API surface is `window.pathly.terminal.*`.
+Read studio/src/renderer/src/store/terminalStore.ts and store/projectStore.ts — needed for launchTerminal.
 
 **Codebase files this conversation touches:**
 - `studio/src/renderer/src/components/ChatPanel/MatchCard.tsx` — CREATE
 - `studio/src/renderer/src/components/ChatPanel/OutputSnippet.tsx` — CREATE
-- `studio/src/main/ipc/chat.ts` — CREATE: IPC terminal write handler
-- `studio/src/main/index.ts` — MODIFY: register chat IPC handler
-- `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY: subscribe to IPC output
+- `studio/src/renderer/src/lib/launchTerminal.ts` — CREATE: shared auto-spawn utility
+- `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY: Run action + PTY subscription
+- `studio/src/renderer/src/store/chatStore.ts` — MODIFY: add targetKind field
+- `studio/src/renderer/src/components/ChatPanel/ConductorHeader.tsx` — MODIFY: host pill toggles targetKind
 
 Scope:
 - Phase 9: Create MatchCard.tsx.
@@ -390,7 +392,7 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 ```
 
 **Expected output:** MatchCard shows matched skill + confidence + Run/"Not this" buttons. Run writes the host-correct command (`/pathly <skill>` or `Use Pathly <skill>`) to the correct terminal tab via `window.pathly.terminal.write`. OutputSnippet shows live PTY lines.
-**Files touched:** `MatchCard.tsx`, `OutputSnippet.tsx`, `ipc/chat.ts`, `main/index.ts`, `ChatPanel/index.tsx`
+**Files touched:** `MatchCard.tsx`, `OutputSnippet.tsx`, `launchTerminal.ts`, `ChatPanel/index.tsx`, `chatStore.ts`, `ConductorHeader.tsx`
 
 ---
 

@@ -106,9 +106,9 @@ User types intent (plain English)
          │  user clicks ▶ Run
          ▼
 ┌─────────────────────────────────┐
-│  IPC: chat:write-terminal       │  ← Electron main process
-│  node-pty.write(cmd + '\n')     │  ← writes to named terminal tab
-│  target: Claude Code OR Codex   │  ← based on active tab
+│  window.pathly.terminal.write() │  ← renderer-side, no new IPC
+│  cmd + '\n' → PTY               │  ← writes to UUID-keyed tab
+│  target: chatStore.targetKind   │  ← driven by ConductorHeader pill
 └─────────────────────────────────┘
 ```
 
@@ -773,11 +773,14 @@ Step 3  User reviews MatchCard
         → User clicks ▶ Run
 
 Step 4  Command executes
-        → Renderer looks up terminalStore.tabs for tab with kind === 'claude'
-        → If no claude tab: renderer calls handleLaunch('claude') → addTab()
-        → Gets UUID tabId from that tab
-        → Generates host-correct command (Claude Code: "/pathly build", Codex: "Use Pathly build")
-        → IPC: chat:write-terminal({ command, tabId })
+        → Renderer reads chatStore.targetKind (set by ConductorHeader host pill)
+        → Looks up terminalStore.tabs for tab matching targetKind
+        → If no tab found: calls launchTerminal(targetKind) — opens dock, addTab, spawn
+        → Generates host-correct command:
+             Claude Code tab: "/pathly build"
+             Codex tab:       "Use Pathly build"
+        → Sanitizes command (strips ;, &&, ||, |, >, <)
+        → window.pathly.terminal.write(tab.id, cmd + '\n')
         → MatchCard transitions to SENT state: opacity → 0.4, pointer-events: none
         → OutputSnippet mounts (16px indent, --bg, left-border 2px --border)
         → Claude Code pill pulses (--t-pulse 1400ms ease-in-out)
@@ -908,8 +911,8 @@ interface ChatStore {
 | `studio/src/renderer/src/components/ChatPanel/MatchCard.tsx` | 3 | Match result card |
 | `studio/src/renderer/src/components/ChatPanel/OutputSnippet.tsx` | 3 | PTY output reader |
 | `studio/src/renderer/src/components/ChatPanel/ChatPanel.module.css` | 2 | All chat styles |
-| `studio/src/main/ipc/chat.ts` | 3 | IPC terminal write |
-| `studio/src/main/index.ts` | 3 | Register IPC handler |
+| `studio/src/renderer/src/lib/launchTerminal.ts` | 3 | Auto-spawn utility |
+| `studio/src/renderer/src/store/chatStore.ts` | 3 | Add targetKind field |
 | `studio/src/renderer/src/lib/embedRouter.ts` | 5 | MiniLM wrapper + matchIntent() |
 | `studio/src/renderer/src/lib/skillsManifest.ts` | 5 | Typed skills.json loader |
 | `studio/src/renderer/src/data/skills.json` | 5 | Skills name+command+description |

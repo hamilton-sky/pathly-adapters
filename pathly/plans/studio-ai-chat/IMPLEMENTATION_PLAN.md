@@ -312,47 +312,60 @@ ChatPanel can call these directly. The `ptyOwners` check in `terminal:write` pas
 ChatPanel and Terminal share the same `webContents.id` (same BrowserWindow renderer).
 
 **Create `launchTerminal.ts` (shared renderer utility):**
-```typescript
-import { v4 as uuid } from 'uuid'
-import { useTerminalStore } from '../store/terminalStore'
 
-export async function launchTerminal(
-  kind: 'claude' | 'codex',
-  cwd: string
-): Promise<string> {
-  const tabId = uuid()
+Mirrors exactly what `Terminal/index.tsx handleLaunch` does (lines 77–87):
+opens the dock if closed, generates a UUID, adds tab to store, spawns PTY.
+```typescript
+import { useTerminalStore } from '../store/terminalStore'
+import { useProjectStore } from '../store/projectStore'
+
+export async function launchTerminal(kind: 'claude' | 'codex'): Promise<string> {
+  const { open, toggle, addTab } = useTerminalStore.getState()
+  if (!open) toggle()                             // open the dock (mirrors handleLaunch:77)
+  const tabId = crypto.randomUUID()              // matches Terminal/index.tsx:78 — no uuid package
   const label = kind === 'claude' ? 'A Claude' : '✳ Codex'
-  useTerminalStore.getState().addTab(tabId, label, 'left', kind)
+  const cwd = useProjectStore.getState().projectPath  // must match project root (not userHome)
+  addTab(tabId, label, 'left', kind)
   await window.pathly.terminal.spawn(tabId, cwd, kind)
   return tabId
 }
 ```
-Calling `terminalStore.addTab()` before `spawn()` ensures the tab appears in the store
-immediately — the Terminal component renders it, and the PTY data starts flowing into it.
+`cwd` must be `projectPath` — Claude Code needs to run in the project root for `/pathly` commands
+to find the right FSM state. `userHome()` would disconnect commands from the active project.
+`crypto.randomUUID()` is already used in Terminal/index.tsx — do NOT add a `uuid` package.
+
+**Target terminal selection — chatStore `targetKind`:**
+Add `targetKind: 'claude' | 'codex'` to `chatStore` (default `'claude'`).
+The ConductorHeader host pill toggles it. The Run action reads it:
+```typescript
+// In chatStore:
+targetKind: 'claude' as 'claude' | 'codex',
+setTargetKind: (k) => set({ targetKind: k }),
+```
+This makes the pill the single source of truth — no ambiguity about which terminal Run targets.
 
 **Renderer side (ChatPanel/index.tsx):**
 ```typescript
 import { launchTerminal } from '../../lib/launchTerminal'
 
 // On Run click:
-const { tabs } = useTerminalStore()
-let claudeTab = tabs.find(t => t.kind === 'claude')
+const { tabs, targetKind } = useChatStore()  // targetKind driven by host pill
+let targetTab = tabs.find(t => t.kind === targetKind)
 
-if (!claudeTab) {
-  const cwd = await window.pathly.fs.userHome()
-  const tabId = await launchTerminal('claude', cwd)
-  claudeTab = useTerminalStore.getState().tabs.find(t => t.id === tabId)!
+if (!targetTab) {
+  const tabId = await launchTerminal(targetKind)
+  targetTab = useTerminalStore.getState().tabs.find(t => t.id === tabId)!
 }
 
 // Sanitize: strip ;, &&, ||, |, >, <
-const safe = command.replace(/[;&|><]/g, '').trim()
+const safe = skill.command.replace(/[;&|><]/g, '').trim()
 
-// Host-correct command format:
-const cmd = claudeTab.kind === 'claude'
-  ? `/pathly ${skill.name}`       // Claude Code: slash command
-  : `Use Pathly ${skill.name}`    // Codex: natural-language plugin prompt
+// Host-correct format:
+const cmd = targetTab.kind === 'claude'
+  ? `/pathly ${safe}`           // Claude Code: slash command
+  : `Use Pathly ${safe}`        // Codex: natural-language plugin prompt
 
-window.pathly.terminal.write(claudeTab.id, cmd + '\n')
+window.pathly.terminal.write(targetTab.id, cmd + '\n')
 ```
 
 **OutputSnippet PTY subscription:**

@@ -37,15 +37,14 @@ opening a terminal tab. The Conductor is the only interface they need to touch.
 ### Step 4: User clicks Run — terminal opens automatically
 - **User does:** Reads explanation, confirms it makes sense, clicks `▶ Run`
 - **System does:**
-  1. IPC `chat:write-terminal` fires with `{ command: "/pathly build", target: "claude-code" }`
-  2. Electron main checks `activePtys` — no Claude Code tab found
-  3. **Auto-spawns a new "A Claude" terminal tab** (same as clicking +, selecting Claude Code)
-  4. Waits for PTY ready signal, then writes `/pathly build\n`
+  1. ChatPanel reads `chatStore.targetKind` — set to `'claude'` (ConductorHeader pill)
+  2. Looks up `terminalStore.tabs` — no Claude Code tab found
+  3. **Calls `launchTerminal('claude')`** — opens the terminal dock, calls `addTab()`, calls `window.pathly.terminal.spawn()`
+  4. `window.pathly.terminal.write(tabId, '/pathly build\n')` — renderer-side, no new IPC
   5. Claude Code tab becomes visible in the terminal area — user can see it running
-  6. IPC returns `{ ok: true, spawned: true }`
-  7. ChatPanel shows hint: *"Opened a Claude Code tab to run this command."*
-  8. MatchCard dims to `✓ Sent` state
-  9. OutputSnippet appears — starts reading PTY `onData` events
+  6. ChatPanel shows hint: *"Opened a Claude Code tab to run this command."*
+  7. MatchCard dims to `✓ Sent` state
+  8. OutputSnippet appears — starts reading `window.pathly.terminal.onData` events
 - **State after:** Terminal running `/pathly build`, OutputSnippet showing live lines, Claude Code CLI pill pulsing
 
 ### Step 5: Build runs, output feeds back

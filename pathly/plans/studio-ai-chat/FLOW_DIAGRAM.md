@@ -20,14 +20,11 @@ USER                  RENDERER                    MAIN PROCESS         PYTHON SE
  │  sees explanation      │  appendToLastMessage()       │                    │                 │
  │◄──────────────────────│                              │                    │                 │
  │  clicks ▶ Run         │                              │                    │                 │
- │──────────────────────►│  ipcRenderer.invoke(         │                    │                 │
- │                       │    'chat:write-terminal',    │                    │                 │
- │                       │    { command, target } )     │                    │                 │
- │                       │─────────────────────────────►│                    │                 │
- │                       │                              │  sanitize(cmd)     │                 │
- │                       │                              │  activePtys        │                 │
- │                       │                              │    .get(target)    │                 │
- │                       │                              │    .write(cmd+\n)  │                 │
+ │──────────────────────►│  sanitize(cmd)               │                    │                 │
+ │                       │  launchTerminal() if needed  │                    │                 │
+ │                       │  window.pathly.terminal      │                    │                 │
+ │                       │    .write(tabId, cmd+'\n')   │                    │                 │
+ │                       │  (renderer-side, no new IPC) │                    │                 │
  │  sees cmd in terminal  │  OutputSnippet lines         │  PTY onData ──────►│                 │
  │◄──────────────────────│◄─────────────────────────────│                    │                 │
  │                       │  cmd completes → matchIntent │                    │                 │
@@ -45,10 +42,9 @@ ChatInput.tsx (renderer)
         │  buildPathlyContext()
         ▼
 pathlyContext.ts
-        │  fetch GET :8765/next_action  ──► FSM stage
-        │  analyzePageDirect()          ──► screen elements
+        │  fetch GET :8765/status       ──► FSM stage (read-only)
         │  KNOWN_SKILLS list
-        │  returns PathlyContext
+        │  returns PathlyContext  (no screenElements — static schema from Conv 6)
         ▼
 ChatInput.tsx
         │  fetch POST :8765/chat
@@ -86,23 +82,19 @@ User sees response word by word
 ## Command Approval Flow
 
 ```
-AI response contains fenced code block
-  ``` $ /pathly build ```
+MatchCard shows matched skill
         │
-        ├─ autoApprove = false ──► TerminalApproval.tsx renders
+        ├─ autoApprove = false ──► MatchCard renders with ▶ Run / Not this
         │                                │  Run clicked
         │                                ▼
-        │                         ipcRenderer.invoke('chat:write-terminal')
-        │                                │
-        │                                ▼
-        │                         ipc/chat.ts (Electron main)
-        │                                │  activePtys.get(tabId).write(cmd+"\n")
-        │                                ▼
-        │                         node-pty → Shell
-        │                         command executes in terminal
+        │                         look up targetTab by chatStore.targetKind
+        │                         launchTerminal(kind) if no tab exists
+        │                         sanitize command (strip ;&&||><)
+        │                         window.pathly.terminal.write(tabId, cmd+'\n')
+        │                         (renderer-side — no Electron main IPC needed)
         │
-        └─ autoApprove = true ───► skip banner
-                                   ipcRenderer.invoke directly
+        └─ autoApprove = true ───► skip MatchCard confirmation
+                                   write directly on match
                                    (after command sanitization)
 ```
 
@@ -241,4 +233,4 @@ USER                  RENDERER (WebLLM)
 | chat_agent.py | Explainer + automation step generator |
 | chatStore.ts | Zustand store; source of truth for all chat state |
 | MessageList.tsx | Renders messages; auto-scrolls; shows streaming cursor |
-| ipc/chat.ts | Electron main handler; writes to node-pty stdin |
+| launchTerminal.ts | Renderer utility; opens dock, addTab, spawn — used by ChatPanel |
