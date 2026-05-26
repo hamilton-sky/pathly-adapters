@@ -4,10 +4,17 @@ import { listDir, listDirs, readFile } from '../services/pathlyApi'
 import type { PathlyItem } from '../types'
 import { parseProgressMd } from './usePlanConversations'
 
+export interface PlanSubdir {
+  name: string
+  files: PathlyItem[]
+  open: boolean
+}
+
 export interface PlanFolder {
   name: string
   path: string
   files: PathlyItem[]
+  subdirs: PlanSubdir[]
   convTotal: number
   convDone: number
   open: boolean
@@ -40,6 +47,23 @@ export function usePlanFiles(): {
             type: 'plan' as const,
           }))
         } catch { /* empty folder */ }
+        let subdirs: PlanSubdir[] = []
+        try {
+          const subdirNames = await listDirs(folderPath)
+          for (const sdName of subdirNames) {
+            const sdPath = `${folderPath}/${sdName}`
+            let sdFiles: PathlyItem[] = []
+            try {
+              const sdFileNames = await listDir(sdPath)
+              sdFiles = sdFileNames.map((fname) => ({
+                name: fname,
+                path: `${sdPath}/${fname}`,
+                type: 'plan' as const,
+              }))
+            } catch { /* empty subdir */ }
+            subdirs.push({ name: sdName, files: sdFiles, open: false })
+          }
+        } catch { /* no subdirs */ }
         try {
           const md = await readFile(`${folderPath}/PROGRESS.md`)
           if (md) {
@@ -48,7 +72,7 @@ export function usePlanFiles(): {
             convDone = convs.filter((c) => c.status === 'DONE').length
           }
         } catch { /* no PROGRESS.md */ }
-        folders.push({ name, path: folderPath, files, convTotal, convDone, open: false })
+        folders.push({ name, path: folderPath, files, subdirs, convTotal, convDone, open: false })
       }
       setPlanFolders(folders)
     } catch {

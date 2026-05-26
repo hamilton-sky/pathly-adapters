@@ -4,6 +4,7 @@ import type { PathlyItem } from '../../../types'
 import type { PlanFolder } from '../../../hooks/usePlanFiles'
 import { IconButton } from '../../ui'
 import { SectionHeader } from '../shared/SectionHeader'
+import { SubdirRow } from './SubdirRow'
 import { WorkspaceItem } from './WorkspaceItem'
 import { InlineCreateInput } from '../shared/InlineCreateInput'
 import { ContextMenu } from '../shared/ContextMenu'
@@ -34,6 +35,7 @@ interface Props {
   onStartRename: (item: PathlyItem, itemDir: string) => void
   onStartDelete: (item: PathlyItem) => void
   onDeletePlanFolder?: (folderPath: string) => void
+  onTogglePlanSubdir?: (folderName: string, subdirName: string) => void
 }
 
 export function PlanSection({
@@ -60,6 +62,7 @@ export function PlanSection({
   onStartRename,
   onStartDelete,
   onDeletePlanFolder,
+  onTogglePlanSubdir,
 }: Props): JSX.Element {
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null)
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null)
@@ -204,6 +207,41 @@ export function PlanSection({
                           onStartRename={isProtected ? undefined : () => onStartRename(file, folder.path)}
                           onStartDelete={isProtected ? undefined : () => onStartDelete(file)}
                         />
+                      )
+                    })}
+                    {folder.subdirs.map((subdir) => {
+                      const subdirPath = `${folder.path}/${subdir.name}`
+                      const filteredSdFiles = lowerFilter
+                        ? subdir.files.filter((f) => f.name.toLowerCase().includes(lowerFilter))
+                        : subdir.files
+                      if (lowerFilter && filteredSdFiles.length === 0) return null
+                      return (
+                        <div key={subdir.name}>
+                          <SubdirRow
+                            name={subdir.name}
+                            open={subdir.open}
+                            onToggle={() => onTogglePlanSubdir?.(folder.name, subdir.name)}
+                          />
+                          {subdir.open && filteredSdFiles.map((file) => (
+                            <WorkspaceItem
+                              key={file.path}
+                              item={file}
+                              itemDir={subdirPath}
+                              isSelected={selectedItem?.path === file.path}
+                              isDirty={dirtyItems.has(file.path)}
+                              deep
+                              renamingPath={renamingPath}
+                              renameValue={renameValue}
+                              sectionId="plan"
+                              onSelect={() => onSelect(file)}
+                              onRenameChange={onRenameChange}
+                              onRenameCommit={() => onRenameCommit(file, subdirPath)}
+                              onRenameCancel={onRenameCancel}
+                              onStartRename={() => onStartRename(file, subdirPath)}
+                              onStartDelete={() => onStartDelete(file)}
+                            />
+                          ))}
+                        </div>
                       )
                     })}
                   </>
