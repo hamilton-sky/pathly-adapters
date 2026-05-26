@@ -31,6 +31,29 @@ const FAILURE_ARTIFACTS = new Set([
   'MORE_CONVS_NEEDED.md',
 ])
 
+// Shorten artifact names so self-loop labels fit inside the diagram
+const ARTIFACT_ABBREV: Record<string, string> = {
+  IMPLEMENTATION_PLAN: 'IMPL_PLAN',
+}
+function abbreviateArtifact(name: string): string {
+  const stem = name.replace(/\.md$/i, '')
+  return (ARTIFACT_ABBREV[stem] ?? stem)
+}
+
+// For a self-loop, show what artifact the state is WAITING for (the one that advances it out)
+function extractSelfLoopLabel(
+  rules: Record<string, unknown> | undefined,
+  source: string
+): string {
+  if (!rules) return 'retry'
+  const sourceRule = rules[source] as StateRule | undefined
+  if (!sourceRule?.on_artifact) return 'retry'
+  const advancing = Object.entries(sourceRule.on_artifact)
+    .filter(([, tgt]) => tgt !== source)
+    .map(([artifact]) => abbreviateArtifact(artifact))
+  return advancing.length > 0 ? 'no ' + advancing.join(' / ') : 'retry'
+}
+
 // Collect ALL artifacts that route from source→target (not just the first match)
 function extractEdgeLabel(
   rules: Record<string, unknown> | undefined,
@@ -171,7 +194,7 @@ export function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node<StateNodeDa
         targetHandle = 'top-tgt'    // enters top center — clean vertical line
       }
 
-      const selfLoopLabel = isSelfLoop ? (label || 'retry') : label
+      const selfLoopLabel = isSelfLoop ? extractSelfLoopLabel(rules, source) : label
 
       edges.push({
         id: edgeId,
