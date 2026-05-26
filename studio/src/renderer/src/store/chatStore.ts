@@ -11,25 +11,39 @@ export interface Message {
   tokens?: number
 }
 
+export type TerminalKind = 'claude' | 'codex'
+
+export interface TargetOutput {
+  lines: string[]
+  running: boolean
+}
+
 export interface ChatState {
   messages: Message[]
   isLoading: boolean
-  isCommandRunning: boolean
-  targetKind: 'claude' | 'codex'
-  outputLines: string[]
+  /** Which terminal target the Run button writes to */
+  targetKind: TerminalKind
+  /** Per-target PTY output — both claude and codex tracked independently */
+  outputByTarget: Record<TerminalKind, TargetOutput>
   currentMatch: MatchResult | null
   autoApprove: boolean
   altMatches: MatchResult[]
   isEmbedding: boolean
   embedReady: boolean
+
+  // ── message actions ──────────────────────────────────────
   addMessage: (msg: Message) => void
   updateLastMessage: (patch: Partial<Message>) => void
   clearMessages: () => void
   setLoading: (b: boolean) => void
-  setCommandRunning: (b: boolean) => void
-  setTargetKind: (kind: 'claude' | 'codex') => void
-  appendOutputLine: (line: string) => void
-  clearOutputLines: () => void
+
+  // ── target / output actions ───────────────────────────────
+  setTargetKind: (kind: TerminalKind) => void
+  appendOutputLine: (kind: TerminalKind, line: string) => void
+  clearOutputLines: (kind?: TerminalKind) => void
+  setCommandRunning: (kind: TerminalKind, b: boolean) => void
+
+  // ── match actions ─────────────────────────────────────────
   setCurrentMatch: (match: MatchResult | null) => void
   setAutoApprove: (b: boolean) => void
   setAltMatches: (matches: MatchResult[]) => void
@@ -37,12 +51,13 @@ export interface ChatState {
   setEmbedReady: (b: boolean) => void
 }
 
+const emptyTarget = (): TargetOutput => ({ lines: [], running: false })
+
 export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
   isLoading: false,
-  isCommandRunning: false,
   targetKind: 'claude',
-  outputLines: [],
+  outputByTarget: { claude: emptyTarget(), codex: emptyTarget() },
   currentMatch: null,
   autoApprove: false,
   altMatches: [],
@@ -63,17 +78,41 @@ export const useChatStore = create<ChatState>()((set) => ({
 
   setLoading: (b) => set({ isLoading: b }),
 
-  setCommandRunning: (b) => set({ isCommandRunning: b }),
-
   setTargetKind: (kind) => set({ targetKind: kind }),
 
-  appendOutputLine: (line) =>
-    set((s) => ({ outputLines: [...s.outputLines, line].slice(-200) })),
+  appendOutputLine: (kind, line) =>
+    set((s) => ({
+      outputByTarget: {
+        ...s.outputByTarget,
+        [kind]: {
+          ...s.outputByTarget[kind],
+          lines: [...s.outputByTarget[kind].lines, line].slice(-200),
+        },
+      },
+    })),
 
-  clearOutputLines: () => set({ outputLines: [] }),
+  clearOutputLines: (kind) =>
+    set((s) => {
+      if (kind) {
+        return {
+          outputByTarget: {
+            ...s.outputByTarget,
+            [kind]: emptyTarget(),
+          },
+        }
+      }
+      return { outputByTarget: { claude: emptyTarget(), codex: emptyTarget() } }
+    }),
+
+  setCommandRunning: (kind, b) =>
+    set((s) => ({
+      outputByTarget: {
+        ...s.outputByTarget,
+        [kind]: { ...s.outputByTarget[kind], running: b },
+      },
+    })),
 
   setCurrentMatch: (match) => set({ currentMatch: match }),
-
   setAutoApprove: (b) => set({ autoApprove: b }),
   setAltMatches: (matches) => set({ altMatches: matches }),
   setIsEmbedding: (b) => set({ isEmbedding: b }),

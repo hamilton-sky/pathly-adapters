@@ -45,7 +45,7 @@ export function ChatPanel(): JSX.Element {
   const updateLastMessage = useChatStore((s) => s.updateLastMessage)
   const currentMatch = useChatStore((s) => s.currentMatch)
   const altMatches = useChatStore((s) => s.altMatches)
-  const outputLines = useChatStore((s) => s.outputLines)
+  const outputByTarget = useChatStore((s) => s.outputByTarget)
   const targetKind = useChatStore((s) => s.targetKind)
   const autoApprove = useChatStore((s) => s.autoApprove)
   const appendOutputLine = useChatStore((s) => s.appendOutputLine)
@@ -57,8 +57,10 @@ export function ChatPanel(): JSX.Element {
   const setEmbedReady = useChatStore((s) => s.setEmbedReady)
   const setLoading = useChatStore((s) => s.setLoading)
   const isLoading = useChatStore((s) => s.isLoading)
-  const isCommandRunning = useChatStore((s) => s.isCommandRunning)
   const setCommandRunning = useChatStore((s) => s.setCommandRunning)
+
+  const claudeOutput = outputByTarget.claude
+  const codexOutput = outputByTarget.codex
 
   const tabs = useTerminalStore((s) => s.tabs)
   const addTab = useTerminalStore((s) => s.addTab)
@@ -74,43 +76,48 @@ export function ChatPanel(): JSX.Element {
 
   const t = useTheme()
   // Accumulates partial terminal data until a newline arrives
-  const terminalBuffer = useRef('')
-  // Auto-done timer: if no PTY output for 4s, mark command as finished
-  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Per-target buffers and idle timers
+  const terminalBuffers = useRef<Record<string, string>>({ claude: '', codex: '' })
+  const idleTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({ claude: null, codex: null })
 
-  // Only capture PTY output while a /pathly command is actively running
+  // Subscribe to BOTH claude and codex tabs simultaneously — each tracks independently
   useEffect(() => {
-    const matchingTab = tabs.find((tab) => tab.kind === targetKind)
-    if (!matchingTab) return
+    const kinds = ['claude', 'codex'] as const
+    const unsubs: Array<(() => void) | undefined> = []
 
-    const tabId = matchingTab.id
-    const unsub = window.pathly?.terminal?.onData(tabId, (data) => {
-      if (!useChatStore.getState().isCommandRunning) return
+    for (const kind of kinds) {
+      const matchingTab = tabs.find((tab) => tab.kind === kind)
+      if (!matchingTab) continue
 
-      // Reset the idle timer on every chunk of data
-      if (idleTimer.current) clearTimeout(idleTimer.current)
-      idleTimer.current = setTimeout(() => {
-        // No output for 12 seconds → assume command finished
-        // (Claude operations can take 5–10s between output bursts)
-        useChatStore.getState().setCommandRunning(false)
-      }, 12000)
+      const tabId = matchingTab.id
+      const unsub = window.pathly?.terminal?.onData(tabId, (data) => {
+        if (!useChatStore.getState().outputByTarget[kind].running) return
 
-      terminalBuffer.current += stripAnsi(data)
+        // Reset this target's idle timer
+        if (idleTimers.current[kind]) clearTimeout(idleTimers.current[kind]!)
+        idleTimers.current[kind] = setTimeout(() => {
+          useChatStore.getState().setCommandRunning(kind, false)
+        }, 12000)
 
-      // Flush complete lines; keep the trailing partial in the buffer
-      const parts = terminalBuffer.current.split('\n')
-      terminalBuffer.current = parts.pop() ?? ''
-      for (const line of parts) {
-        const trimmed = line.replace(/\r/g, '').trim()
-        if (trimmed.length > 0) appendOutputLine(trimmed)
-      }
-    })
-    return () => {
-      terminalBuffer.current = ''
-      if (idleTimer.current) clearTimeout(idleTimer.current)
-      unsub?.()
+        terminalBuffers.current[kind] = (terminalBuffers.current[kind] ?? '') + stripAnsi(data)
+        const parts = terminalBuffers.current[kind].split('\n')
+        terminalBuffers.current[kind] = parts.pop() ?? ''
+        for (const line of parts) {
+          const trimmed = line.replace(/\r/g, '').trim()
+          if (trimmed.length > 0) appendOutputLine(kind, trimmed)
+        }
+      })
+      unsubs.push(unsub)
     }
-  }, [targetKind, tabs, appendOutputLine])
+
+    return () => {
+      terminalBuffers.current = { claude: '', codex: '' }
+      for (const kind of kinds) {
+        if (idleTimers.current[kind]) clearTimeout(idleTimers.current[kind]!)
+      }
+      unsubs.forEach((u) => u?.())
+    }
+  }, [tabs, appendOutputLine])
 
   // Pre-embed all skill descriptions once on first mount
   useEffect(() => {
@@ -124,8 +131,8 @@ export function ChatPanel(): JSX.Element {
     if (!text) return
 
     // Stop any previous command capture when starting a new message
-    setCommandRunning(false)
-    clearOutputLines()
+    setCommandRunning(targetKind, false)
+    clearOutputLines(targetKind)
     setInputValue('')
 
     // /pathly commands are routed silently — don't add them as chat messages
@@ -237,24 +244,33 @@ export function ChatPanel(): JSX.Element {
     const cmd = currentMatch.command
     setCurrentMatch(null)   // dismiss card immediately
     setAltMatches([])
-    clearOutputLines()
-    setCommandRunning(true)
+    clearOutputLines(targetKind)
+    setCommandRunning(targetKind, true)
     await writeToTerminal(targetKind, cmd, projectPath, tabs, addTab, open, toggle)
   }
 
   function handleReject(): void {
     setCurrentMatch(null)
-    setCommandRunning(false)
-    clearOutputLines()
+    setCommandRunning(targetKind, false)
+    clearOutputLines(targetKind)
   }
 
   function handleSelectAlt(skill: string): void {
     setCurrentMatch({ skill, confidence: 1.0, command: `/pathly ${skill}`, description: '' })
-    setCommandRunning(false)
-    clearOutputLines()
+    setCommandRunning(targetKind, false)
+    clearOutputLines(targetKind)
   }
 
-  const outputStatus = isLoading ? 'running' : 'done'
+  /** Trash button — wipes everything visible in the panel */
+  function handleClearAll(): void {
+    clearMessages()
+    clearOutputLines()       // no arg = clears both targets
+    setCurrentMatch(null)
+    setAltMatches([])
+    setCommandRunning('claude', false)
+    setCommandRunning('codex', false)
+    setLoading(false)
+  }
 
   return (
     <div
@@ -264,7 +280,7 @@ export function ChatPanel(): JSX.Element {
     >
       {/* Left-edge drag handle — drag to resize */}
       <div className={styles.resizeHandle} onMouseDown={onDragStart} />
-      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} onToggleChat={toggleChat} onClearChat={clearMessages} />
+      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} onToggleChat={toggleChat} onClearChat={handleClearAll} />
       <SkillsPanel onSkillClick={handleSkillClick} />
       <MessageList />
       {currentMatch !== null && (
@@ -276,12 +292,19 @@ export function ChatPanel(): JSX.Element {
           onSelectAlt={handleSelectAlt}
         />
       )}
-      {/* Show snippet while running OR after done (until next message clears it) */}
-      {outputLines.length > 0 && (
+      {/* Show a snippet per target — both can be visible simultaneously */}
+      {claudeOutput.lines.length > 0 && (
         <OutputSnippet
-          target={targetKind === 'claude' ? 'claude-code' : 'codex'}
-          status={isCommandRunning ? 'running' : 'done'}
-          lines={outputLines}
+          target="claude-code"
+          status={claudeOutput.running ? 'running' : 'done'}
+          lines={claudeOutput.lines}
+        />
+      )}
+      {codexOutput.lines.length > 0 && (
+        <OutputSnippet
+          target="codex"
+          status={codexOutput.running ? 'running' : 'done'}
+          lines={codexOutput.lines}
         />
       )}
       <ChatInput
