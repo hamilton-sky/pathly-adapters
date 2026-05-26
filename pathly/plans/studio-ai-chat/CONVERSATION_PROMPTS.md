@@ -43,11 +43,26 @@ Implement Studio AI Chat Conversation 0 (Phases 0a–0c) — terminal dock impro
 
 Scope:
 
-Phase 0a — Fix ALLOWED_SHELLS (do this first, it unblocks everything):
-  Read terminal.ts line 13. ALLOWED_SHELLS only contains shell variants (bash, zsh, etc).
-  Add 'claude' and 'codex' to the set.
-  This is an existing bug: PaneTabBar passes 'claude'/'codex' as the command to terminal:spawn,
-  which the allowlist currently rejects with "Shell not allowed".
+Phase 0a — Fix Claude/Codex spawning (do this first, it unblocks everything):
+  There are TWO bugs in terminal.ts — both must be fixed:
+
+  Bug 1 — ALLOWED_SHELLS (line 13): Add 'claude' and 'codex' to the set.
+  PaneTabBar passes these as command to terminal:spawn; without them it returns "Shell not allowed".
+
+  Bug 2 — Windows always spawns powershell.exe (line 71):
+    CURRENT: const shell = process.platform === 'win32' ? 'powershell.exe' : (command ?? 'bash')
+    This ignores command on Windows. A Claude tab will open PowerShell, not Claude Code.
+  Fix by adding a resolveShell helper:
+    function resolveShell(command?: string): { shell: string; args: string[] } {
+      if (process.platform !== 'win32') return { shell: command ?? 'bash', args: [] }
+      if (command === 'claude') return { shell: 'cmd.exe', args: ['/k', 'claude'] }
+      if (command === 'codex')  return { shell: 'cmd.exe', args: ['/k', 'codex'] }
+      return { shell: 'powershell.exe', args: [] }
+    }
+  Replace the const shell/shellArgs lines with: const { shell, args: shellArgs } = resolveShell(command)
+  The rest of pty.spawn(...) is unchanged.
+
+  Done when: On Windows, A Claude tab opens Claude Code CLI and Codex tab opens Codex CLI.
 
 Phase 0b — Compact terminal dock height:
   Find where terminal height is set (reportedly 260px in index.tsx) — confirm the actual value.
@@ -278,7 +293,7 @@ Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 9–11 for full d
 Implement Studio AI Chat Conversation 3 (Phases 9–11).
 
 **Before editing anything:** glob/read the live repo to confirm every file path below exists.
-Also read studio/src/main/ipc/terminal.ts to understand how activePtys map and activeTabId are exported — match that exact pattern in the new chat.ts handler.
+Read studio/src/main/ipc/terminal.ts fully — pay attention to: `activePtys` is module-local (NOT exported), and `terminal:write` checks `ptyOwners` (only the spawning renderer can write). The Phase 11 plan tells you exactly how to work around both.
 
 **Codebase files this conversation touches:**
 - `studio/src/renderer/src/components/ChatPanel/MatchCard.tsx` — CREATE
@@ -307,26 +322,34 @@ Scope:
 
 - Phase 11: Read terminal.ts and Terminal/index.tsx thoroughly before writing anything.
 
-  PRE-FLIGHT FIX (do this first):
-  Read studio/src/main/ipc/terminal.ts line 13 — ALLOWED_SHELLS set.
-  Add 'claude' and 'codex' to ALLOWED_SHELLS. Without this, the existing Claude Code and
-  Codex terminal buttons are broken (they pass 'claude'/'codex' as the command, which the
-  allowlist rejects with "Shell not allowed").
+  NOTE: ALLOWED_SHELLS was fixed in Phase 0a (Conv 0). Do not repeat it here.
+
+  CRITICAL — terminal.ts has two constraints that affect how chat.ts must be written:
+  1. activePtys is module-local (line 15) — chat.ts cannot access it directly.
+  2. terminal:write IPC checks ptyOwners (line 103) — only the spawning renderer can write;
+     the chat IPC sender is a different context and will be silently ignored.
+
+  Fix: add exported helpers to terminal.ts (Phase 11 plan has the exact signatures):
+    export function writeToTab(tabId: string, data: string): boolean
+    export function spawnTab(tabId: string, cwd: string, command: string, win: BrowserWindow): void
+  Refactor the terminal:spawn IPC handler to call spawnTab() internally (no behavior change).
 
   IPC HANDLER (studio/src/main/ipc/chat.ts):
+  Import writeToTab and spawnTab from './terminal'.
   ipcMain.handle('chat:write-terminal', (event, { command, tabId }) => { ... })
   PTYs are keyed by UUID tabId (NOT by string names like "claude-code").
-  The renderer resolves tabId BEFORE calling this IPC — main process just does activePtys.get(tabId)?.write(command + '\n').
-  Sanitize command before write: strip ;, &&, ||, |, >, < characters. Log warning if stripped.
+  The renderer resolves tabId BEFORE calling this IPC.
+  Sanitize command: strip ;, &&, ||, |, >, < characters. Log warning if stripped.
+  Call writeToTab(tabId, sanitized + '\n') — returns false if tab not found.
   Return { ok: true } or { error: string }.
   Expose on preload: window.electronAPI.writeToTerminal(command: string, tabId: string): Promise<{ok?:boolean, error?:string}>
   Register in index.ts alongside other IPC handlers.
 
   RENDERER SIDE (ChatPanel/index.tsx):
   Before calling IPC, resolve the tab: const claudeTab = terminalStore.tabs.find(t => t.kind === 'claude')
-  AUTO-SPAWN if no tab found: call handleLaunch('claude') — same function the + button uses,
-  lives in Terminal/index.tsx. Lift or export it so ChatPanel can call it.
-  Wait for tab to appear in terminalStore (watch with useEffect + tabs dependency).
+  AUTO-SPAWN if no tab found: call window.electronAPI.spawnTerminal(newTabId, cwd, 'claude')
+  directly — do NOT call handleLaunch (that is internal to Terminal/index.tsx React component).
+  Wait for tab to appear in terminalStore (useEffect + tabs dependency), then write.
   HOST-CORRECT COMMAND:
     Claude Code tab (kind === 'claude') → "/pathly <skill>"
     Codex tab (kind === 'codex')        → "Use Pathly <skill>"

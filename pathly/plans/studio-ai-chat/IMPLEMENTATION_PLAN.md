@@ -20,16 +20,39 @@ Record any pre-existing failures as baseline. Conv 0 must not introduce new erro
 
 ---
 
-## Phase 0a: Fix ALLOWED_SHELLS   ← Conversation 0
+## Phase 0a: Fix Claude/Codex spawning on Windows   ← Conversation 0
 
 **File:** `studio/src/main/ipc/terminal.ts` — MODIFY
-**Done when:** Clicking `A Claude` and `✳ Codex` buttons in Studio launches terminal tabs without error
+**Done when:** Clicking `A Claude` and `✳ Codex` buttons in Studio opens a real Claude Code / Codex session (not PowerShell) on Windows
 **Delivers:** S0.3
-**Details:**
-- Line 13: `ALLOWED_SHELLS` only contains bash/zsh/shell variants — add `'claude'` and `'codex'`
-- This is an existing bug: the PaneTabBar passes `'claude'`/`'codex'` as the command to `terminal:spawn`,
-  which the allowlist rejects with "Shell not allowed"
-- After this fix, Claude Code and Codex tabs will open correctly
+
+**There are two bugs to fix — both are required:**
+
+**Bug 1 — ALLOWED_SHELLS rejects 'claude'/'codex' (line 13):**
+Add `'claude'` and `'codex'` to the `ALLOWED_SHELLS` set.
+PaneTabBar passes these as the `command` argument to `terminal:spawn`; without them in the set
+the handler returns `'Shell not allowed'` before spawning anything.
+
+**Bug 2 — Windows always spawns powershell.exe regardless of command (line 71):**
+```ts
+// CURRENT (broken on Windows):
+const shell = process.platform === 'win32' ? 'powershell.exe' : (command ?? 'bash')
+```
+This ignores `command` on Windows entirely. Fix by resolving the correct binary per command:
+```ts
+function resolveShell(command: string | undefined): { shell: string; args: string[] } {
+  if (process.platform !== 'win32') return { shell: command ?? 'bash', args: [] }
+  // On Windows, CLI tools need cmd.exe /k so the window stays open after launch
+  if (command === 'claude') return { shell: 'cmd.exe', args: ['/k', 'claude'] }
+  if (command === 'codex')  return { shell: 'cmd.exe', args: ['/k', 'codex'] }
+  return { shell: 'powershell.exe', args: [] }
+}
+const { shell, shellArgs } = resolveShell(command)  // replace the hardcoded shell/shellArgs lines
+```
+Replace the existing `const shell = ...` and `const shellArgs: string[] = []` lines with a call to `resolveShell`.
+The rest of the `pty.spawn(shell, shellArgs, ...)` call is unchanged.
+
+**Done when:** On Windows, A Claude tab opens Claude Code CLI (not PowerShell), Codex tab opens Codex CLI.
 
 ---
 
@@ -256,12 +279,37 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 
 > Note: `ALLOWED_SHELLS` was already fixed in Phase 0a (Conv 0). No need to touch `terminal.ts` again here.
 
-**IPC handler design:**
+**Pre-flight: export a write helper from terminal.ts (do this first)**
+
+`activePtys` is module-local in `terminal.ts` — `chat.ts` cannot access it directly.
+Also, the existing `terminal:write` IPC handler checks `ptyOwners` (line 103) — only the
+renderer that spawned the tab can write to it. The chat IPC sender is a different context and
+will be silently ignored.
+
+Fix: add a trusted write export to `terminal.ts`:
+```ts
+// In terminal.ts — add after the activePtys declaration:
+export function writeToTab(tabId: string, data: string): boolean {
+  const p = activePtys.get(tabId)
+  if (!p) return false
+  p.write(data)
+  return true
+}
+
+export function spawnTab(tabId: string, cwd: string, command: string, win: BrowserWindow): void {
+  // Same logic as the terminal:spawn handler body — extract it into this function.
+  // The IPC handler calls spawnTab(); chat.ts also calls spawnTab() for auto-spawn.
+}
+```
+Refactor `terminal:spawn` IPC handler to call `spawnTab()` internally (no behavior change).
+This gives `chat.ts` a clean, tested path to both spawn and write without accessing private state.
+
+**IPC handler design (chat.ts):**
+- Import `writeToTab` and `spawnTab` from `./terminal`
 - `ipcMain.handle('chat:write-terminal', (event, { command, tabId }) => { ... })`
-- PTYs are keyed by **UUID tabId** in `activePtys` — NOT by string names like "claude-code"
-- The renderer is responsible for resolving `tabId` from `terminalStore` before calling this IPC
-- Main process simply does: `activePtys.get(tabId)?.write(command + '\n')`
-- Sanitize command before write: strip `;`, `&&`, `||`, `|`, `>`, `<`. Log warning if stripped.
+- PTYs are keyed by **UUID tabId** — the renderer resolves `tabId` from `terminalStore` before calling
+- Sanitize command: strip `;`, `&&`, `||`, `|`, `>`, `<`. Log warning if stripped.
+- Call `writeToTab(tabId, sanitized + '\n')` — returns false if tab not found
 - Return `{ ok: true }` or `{ error: string }`
 - Expose on preload: `window.electronAPI.writeToTerminal(command: string, tabId: string): Promise<{ok?:boolean, error?:string}>`
 - Register in `index.ts` alongside other IPC handlers
@@ -269,12 +317,13 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 **Renderer side (in ChatPanel/index.tsx):**
 - Before calling IPC, look up target tab from `terminalStore`:
   ```typescript
-  const { tabs, activeTabIdLeft } = useTerminalStore()
+  const { tabs } = useTerminalStore()
   const claudeTab = tabs.find(t => t.kind === 'claude')
   ```
-- **Auto-spawn if no claude tab:** call `handleLaunch('claude')` — this is the same function
-  the terminal `+` button uses. It lives in the renderer (Terminal/index.tsx). Import or
-  lift it so ChatPanel can call it. Wait for the tab to appear in terminalStore.
+- **Auto-spawn if no claude tab:** call `ipcRenderer.invoke('terminal:spawn', newTabId, cwd, 'claude')`
+  directly — do NOT call `handleLaunch` (that is a React component internal). The preload already
+  exposes `window.electronAPI.spawnTerminal(tabId, cwd, command)`. Wait for `terminalStore` to
+  update (listen for the tab to appear) before writing the command.
 - Generate **host-correct command**:
   ```typescript
   const command = tab.kind === 'claude'
