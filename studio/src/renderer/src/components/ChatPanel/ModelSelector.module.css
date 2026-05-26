@@ -19,7 +19,7 @@
   border-radius: 8px;
   padding: 2px 7px;
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--text-primary);
   font-family: var(--font-family-mono);
   cursor: pointer;
   transition: opacity 150ms ease-out;
