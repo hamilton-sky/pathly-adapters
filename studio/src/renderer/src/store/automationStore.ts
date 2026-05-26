@@ -1,20 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { AutomationStep, AutomationStepStatus } from '../types/automation'
 
-export type AutomationStepStatus = 'pending' | 'approved' | 'skipped' | 'done' | 'error'
-
-export interface AutomationStep {
-  id: string
-  description: string
-  action: {
-    type: 'click' | 'fill' | 'select' | 'navigate'
-    label: string
-    value?: string
-    screen?: string
-  }
-  status: AutomationStepStatus
-  errorMessage?: string
-}
+export type { AutomationStep, AutomationStepStatus }
 
 export interface AutomationState {
   steps: AutomationStep[]
@@ -24,6 +12,7 @@ export interface AutomationState {
   setSteps: (steps: AutomationStep[]) => void
   approveStep: (id: string) => void
   skipStep: (id: string) => void
+  setStepError: (id: string, errorMessage: string) => void
   setMode: (mode: 'staged' | 'auto') => void
   setStatus: (status: AutomationState['status']) => void
   advanceToNext: () => void
@@ -56,6 +45,13 @@ export const useAutomationStore = create<AutomationState>()(
             step.id === id ? { ...step, status: 'skipped' as AutomationStepStatus } : step
           ),
           currentStepIndex: s.currentStepIndex + 1,
+        })),
+
+      setStepError: (id, errorMessage) =>
+        set((s) => ({
+          steps: s.steps.map((step) =>
+            step.id === id ? { ...step, status: 'error' as AutomationStepStatus, errorMessage } : step
+          ),
         })),
 
       setMode: (mode) => set({ mode }),

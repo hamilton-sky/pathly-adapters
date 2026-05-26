@@ -1,5 +1,5 @@
 import { useAutomationStore } from '../../store/automationStore'
-import type { AutomationStep } from '../../store/automationStore'
+import type { AutomationStep } from '../../types/automation'
 import { useTheme } from '../../useTheme'
 import styles from './ChatPanel.module.css'
 
@@ -19,12 +19,7 @@ export function StepQueue(): JSX.Element {
         advanceToNext()
       } else {
         useAutomationStore.getState().setStatus('error')
-        const { steps: current } = useAutomationStore.getState()
-        useAutomationStore.setState({
-          steps: current.map((s) =>
-            s.id === step.id ? { ...s, status: 'error', errorMessage: result.error ?? 'Step failed' } : s
-          ),
-        })
+        useAutomationStore.getState().setStepError(step.id, result.error ?? 'Step failed')
       }
     } catch (err) {
       useAutomationStore.getState().setStatus('error')

@@ -173,8 +173,7 @@ export function ChatPanel(): JSX.Element {
     } catch {
       // Embedding failed (e.g. model download error) — continue with no match.
       // Always include the known skills list so the fallback response is useful.
-      const { loadSkills: _ls } = await import('../../lib/skillsManifest')
-      context = { fsmStage: 'unknown', featureName: '', skills: _ls().map((s) => s.name), studioSchema: [] }
+      context = { fsmStage: 'unknown', featureName: '', skills: loadSkills().map((s) => s.name), studioSchema: [] }
     } finally {
       setIsEmbedding(false)
     }
@@ -223,7 +222,7 @@ export function ChatPanel(): JSX.Element {
 
       if (res.ok) {
         usedServer = true
-        const json = await res.json() as { type: string; text?: string; intent?: string; steps?: import('../../store/automationStore').AutomationStep[] }
+        const json = await res.json() as { type: string; text?: string; intent?: string; steps?: import('../../types/automation').AutomationStep[] }
 
         if (json.type === 'automation' && json.steps) {
           useAutomationStore.getState().setSteps(json.steps)
@@ -266,7 +265,7 @@ export function ChatPanel(): JSX.Element {
     }
   }
 
-  async function handleRunAll(steps: import('../../store/automationStore').AutomationStep[]): Promise<void> {
+  async function handleRunAll(steps: import('../../types/automation').AutomationStep[]): Promise<void> {
     const { setStatus, advanceToNext, setMode } = useAutomationStore.getState()
     setMode('auto')
     setStatus('running')

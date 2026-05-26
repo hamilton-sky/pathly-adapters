@@ -12,7 +12,7 @@ export interface Message {
   mode?: 'chat' | 'automation'
   automationPlan?: {
     intent: string
-    steps: import('./automationStore').AutomationStep[]
+    steps: import('../types/automation').AutomationStep[]
   }
 }
 
