@@ -923,7 +923,7 @@ If verification fails and the fix requires out-of-scope changes, stop and report
 ```
 
 **Expected output:** User can describe a flow in plain English, see an action plan, approve steps one by one or run all at once, and see the flow created live in Studio.
-**Files touched:** `automationStore.ts`, `StepQueue.tsx`, `AutomationCard.tsx`, `ChatPanel.module.css`, `ChatPanel/index.tsx`, `chatStore.ts`, `chat_agent.py`
+**Files touched:** `studio/src/renderer/src/store/automationStore.ts`, `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx`, `studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx`, `studio/src/renderer/src/components/ChatPanel/ChatPanel.module.css`, `studio/src/renderer/src/components/ChatPanel/index.tsx`, `studio/src/renderer/src/store/chatStore.ts`, `src/pathly_orchestrator/chat_agent.py`, `src/pathly_orchestrator/http_server.py`
 
 ---
 

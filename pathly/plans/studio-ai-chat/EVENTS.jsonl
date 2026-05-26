@@ -81,3 +81,4 @@
 {"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":7,"result":"PASS","tokens_in":35626,"tokens_out":8907,"total_tokens":44533,"cost_usd":0.240483,"tool_uses":21,"wall_seconds":81,"ts":"2026-05-26T17:28:00Z","schema_version":1}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T20:47:11Z"}
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":8,"result":"DONE","tokens_in":45930,"tokens_out":11482,"total_tokens":57412,"cost_usd":0.310020,"tool_uses":40,"wall_seconds":248,"ts":"2026-05-26T17:38:00Z","schema_version":1}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T20:55:37Z"}
