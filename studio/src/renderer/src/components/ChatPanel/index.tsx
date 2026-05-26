@@ -15,6 +15,7 @@ import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { MatchCard } from './MatchCard'
 import { OutputSnippet } from './OutputSnippet'
+import { useChatResize } from './useChatResize'
 import styles from './index.module.css'
 
 function stripAnsi(raw: string): string {
@@ -37,6 +38,7 @@ function stripAnsi(raw: string): string {
 
 export function ChatPanel(): JSX.Element {
   const [inputValue, setInputValue] = useState('')
+  const { chatRef, onDragStart, width } = useChatResize()
 
   const messages = useChatStore((s) => s.messages)
   const addMessage = useChatStore((s) => s.addMessage)
@@ -73,6 +75,8 @@ export function ChatPanel(): JSX.Element {
   const t = useTheme()
   // Accumulates partial terminal data until a newline arrives
   const terminalBuffer = useRef('')
+  // Auto-done timer: if no PTY output for 4s, mark command as finished
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Only capture PTY output while a /pathly command is actively running
   useEffect(() => {
@@ -82,6 +86,13 @@ export function ChatPanel(): JSX.Element {
     const tabId = matchingTab.id
     const unsub = window.pathly?.terminal?.onData(tabId, (data) => {
       if (!useChatStore.getState().isCommandRunning) return
+
+      // Reset the idle timer on every chunk of data
+      if (idleTimer.current) clearTimeout(idleTimer.current)
+      idleTimer.current = setTimeout(() => {
+        // No output for 4 seconds → assume command finished
+        useChatStore.getState().setCommandRunning(false)
+      }, 4000)
 
       terminalBuffer.current += stripAnsi(data)
 
@@ -95,6 +106,7 @@ export function ChatPanel(): JSX.Element {
     })
     return () => {
       terminalBuffer.current = ''
+      if (idleTimer.current) clearTimeout(idleTimer.current)
       unsub?.()
     }
   }, [targetKind, tabs, appendOutputLine])
@@ -113,6 +125,16 @@ export function ChatPanel(): JSX.Element {
     // Stop any previous command capture when starting a new message
     setCommandRunning(false)
     clearOutputLines()
+    setInputValue('')
+
+    // /pathly commands are routed silently — don't add them as chat messages
+    if (text.startsWith('/pathly')) {
+      const parts = text.trim().split(/\s+/)
+      const skill = parts[1] || ''
+      const command = parts.slice(1).join(' ')
+      setCurrentMatch({ skill, confidence: 1.0, command: command ? `/pathly ${command}` : text, description: '' })
+      return
+    }
 
     const userMsg = {
       id: crypto.randomUUID(),
@@ -121,14 +143,6 @@ export function ChatPanel(): JSX.Element {
       status: 'done' as const,
     }
     addMessage(userMsg)
-    setInputValue('')
-
-    if (text.startsWith('/pathly')) {
-      const parts = text.split(' ')
-      const skill = parts[1] || ''
-      setCurrentMatch({ skill, confidence: 1.0, command: text, description: '' })
-      return
-    }
 
     // Run embed routing and POST /chat in parallel
     setIsEmbedding(true)
@@ -219,9 +233,12 @@ export function ChatPanel(): JSX.Element {
 
   async function handleRun(): Promise<void> {
     if (!currentMatch) return
+    const cmd = currentMatch.command
+    setCurrentMatch(null)   // dismiss card immediately
+    setAltMatches([])
     clearOutputLines()
     setCommandRunning(true)
-    await writeToTerminal(targetKind, currentMatch.command, projectPath, tabs, addTab, open, toggle)
+    await writeToTerminal(targetKind, cmd, projectPath, tabs, addTab, open, toggle)
   }
 
   function handleReject(): void {
@@ -240,9 +257,12 @@ export function ChatPanel(): JSX.Element {
 
   return (
     <div
+      ref={chatRef}
       className={styles.panel}
-      style={{ background: t.bgBase, borderLeft: t.border, fontFamily: t.fontFamilyBase }}
+      style={{ background: t.bgBase, borderLeft: t.border, fontFamily: t.fontFamilyBase, width }}
     >
+      {/* Left-edge drag handle — drag to resize */}
+      <div className={styles.resizeHandle} onMouseDown={onDragStart} />
       <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} onToggleChat={toggleChat} onClearChat={clearMessages} />
       <SkillsPanel onSkillClick={handleSkillClick} />
       <MessageList />
@@ -255,10 +275,11 @@ export function ChatPanel(): JSX.Element {
           onSelectAlt={handleSelectAlt}
         />
       )}
-      {isCommandRunning && outputLines.length > 0 && (
+      {/* Show snippet while running OR after done (until next message clears it) */}
+      {outputLines.length > 0 && (
         <OutputSnippet
           target={targetKind === 'claude' ? 'claude-code' : 'codex'}
-          status={outputStatus}
+          status={isCommandRunning ? 'running' : 'done'}
           lines={outputLines}
         />
       )}

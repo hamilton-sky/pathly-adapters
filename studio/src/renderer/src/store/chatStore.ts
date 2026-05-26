@@ -68,7 +68,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   setTargetKind: (kind) => set({ targetKind: kind }),
 
   appendOutputLine: (line) =>
-    set((s) => ({ outputLines: [...s.outputLines, line].slice(-5) })),
+    set((s) => ({ outputLines: [...s.outputLines, line].slice(-200) })),
 
   clearOutputLines: () => set({ outputLines: [] }),
 

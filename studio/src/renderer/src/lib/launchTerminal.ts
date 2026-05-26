@@ -47,11 +47,12 @@ export async function writeToTerminal(
 
   // Commands from skills.json already include the full "/pathly <skill>" prefix — write as-is.
   // For codex, strip the leading slash since Codex uses natural-language input.
+  // Use '\r' (carriage return) so the Windows PTY actually executes the command.
   if (kind === 'claude') {
-    window.pathly?.terminal?.write(tabId, sanitized + '\n')
+    window.pathly?.terminal?.write(tabId, sanitized + '\r')
   } else {
     const naturalCmd = sanitized.replace(/^\/pathly\s*/, '')
-    window.pathly?.terminal?.write(tabId, 'Use Pathly ' + naturalCmd + '\n')
+    window.pathly?.terminal?.write(tabId, 'Use Pathly ' + naturalCmd + '\r')
   }
 
   return tabId

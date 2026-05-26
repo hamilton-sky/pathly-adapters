@@ -730,19 +730,19 @@ Phase 21.5 — studio/src/renderer/src/lib/elementResolver.ts:
   // renderer replies on the :result channel).
 
   import { ipcRenderer } from 'electron'
-  // Re-use the MiniLM pipeline singleton from embedRouter.ts
-  import { getPipeline, cosineSim } from './embedRouter'
+  // Re-use the embed function and cosineSim from embedRouter.ts
+  // NOTE: embed() is exported from embedRouter.ts (added in Conv 6 review)
+  import { embed, cosineSim } from './embedRouter'
 
   export async function handleSemanticResolve(
     candidates: string[],
     target: string
   ): Promise<{ label: string; score: number }> {
-    const pipe = await getPipeline()
-    const targetEmb = await pipe(target, { pooling: 'mean', normalize: true })
+    const targetVec = await embed(target)
     let best = { label: '', score: -1 }
     for (const c of candidates) {
-      const emb = await pipe(c, { pooling: 'mean', normalize: true })
-      const score = cosineSim(targetEmb.data, emb.data)
+      const vec = await embed(c)
+      const score = cosineSim(targetVec, vec)
       if (score > best.score) best = { label: c, score }
     }
     return best

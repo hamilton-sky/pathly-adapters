@@ -239,6 +239,11 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 
 ## Phase 8: MessageList + ChatInput + Panel wiring + WebLLM engine   ← Conversation 2
 
+> **Resize added (post-Conv 6 hotfix):** `ChatPanel/useChatResize.ts` was created and wired into
+> `ChatPanel/index.tsx`. The panel has a draggable left-edge handle (260px–720px, persisted in
+> `localStorage['chat-panel-width']`). The CSS variable `--chat-width` drives the width.
+> No plan changes needed for Conv 7+; the resize is transparent to all other components.
+
 **Files:** `MessageList.tsx`, `ChatInput.tsx`, `ChatPanel/index.tsx`, `App.tsx` — CREATE/MODIFY,
 `studio/src/renderer/src/data/models.ts` — CREATE,
 `studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE
@@ -477,9 +482,12 @@ useEffect(() => {
 
 ---
 
-## Phase 19: Static Studio schema   ← Conversation 6
+## Phase 19: Static Studio schema   ← Conversation 6 ✓ DONE
 
-**File:** `studio/src/renderer/src/data/studioSchema.ts` — CREATE
+**Files (actual locations after Conv 6 review):**
+- `studio/src/renderer/src/lib/studioSchema.ts` — created (canonical location)
+- `studio/src/renderer/src/types/studio.ts` — created (`StudioElement` interface)
+- `studio/src/renderer/src/data/studioSchema.ts` — backward-compat re-export shim
 **Done when:** `getStudioSchema()` returns typed description of all key Studio UI elements
 **Delivers:** S6.1
 **Details:**
@@ -496,13 +504,13 @@ useEffect(() => {
 
 ---
 
-## Phase 20: Inject schema into AI context   ← Conversation 6
+## Phase 20: Inject schema into AI context   ← Conversation 6 ✓ DONE
 
 **File:** `studio/src/renderer/src/lib/pathlyContext.ts` — MODIFY
 **Done when:** POST /chat includes `studioSchema` and AI system prompt references element labels
 **Delivers:** S6.2
 **Details:**
-- Import `getStudioSchema` from `data/studioSchema.ts`
+- Import `getStudioSchema` from `./studioSchema` (i.e., `lib/studioSchema.ts`) — the `data/` shim re-exports it but use the canonical `lib/` path
 - Add `studioSchema: StudioElement[]` to `buildPathlyContext()` return type and value
 - Pass `studioSchema` in POST /chat body
 - In `src/pathly_orchestrator/chat_agent.py`: add `## Studio UI Elements` section to system prompt listing elements grouped by screen: "FlowEditor: [New Flow (button)], [Flow Name (input)]..."
@@ -584,9 +592,8 @@ The IPC layer (Phase 22) creates the singleton with real callbacks wired to the 
 **Details:**
 
 `handleSemanticResolve(candidates: string[], target: string): Promise<{label: string; score: number}>`
-- Lazy-inits the same MiniLM pipeline singleton from `embedRouter.ts` (reuse `preEmbedSkills`-style init)
-- Embeds `target` and all `candidates` with `pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2')`
-- Computes cosine similarity using `cosineSim` imported from `embedRouter.ts`
+- Uses `embed(text)` exported from `embedRouter.ts` (shares the same MiniLM singleton — no double-init)
+- Embeds `target` and all `candidates`, computes cosine similarity using `cosineSim` from `embedRouter.ts`
 - Returns `{ label, score }` for the top match
 
 `handleLLMResolve(candidates: string[], target: string): Promise<{label: string | null}>`
