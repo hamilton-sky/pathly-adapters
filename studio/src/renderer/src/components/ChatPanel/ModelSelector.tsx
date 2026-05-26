@@ -33,6 +33,7 @@ export function ModelSelector(): JSX.Element {
 
   const selectedModel = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)
   const shortName = selectedModel?.name ?? selectedModelId
+  const isSelectedCached = cachedModelIds.includes(selectedModelId)
 
   // Sync cached model list on mount
   useEffect(() => {
@@ -108,6 +109,7 @@ export function ModelSelector(): JSX.Element {
           onClick={() => setOpen((v) => !v)}
           title="Select local AI model"
         >
+          <span className={isSelectedCached ? styles.readyDot : styles.notReadyDot} />
           <span className={styles.triggerName}>{shortName}</span>
           <ChevronDown size={11} className={open ? styles.chevronOpen : styles.chevron} />
         </button>
@@ -202,7 +204,7 @@ export function ModelSelector(): JSX.Element {
                       void handleCacheToggle(model.id)
                     }}
                   >
-                    {isCached ? '✕ Remove from cache' : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}
+                    {isCached ? '✓ Downloaded & ready  —  click to remove' : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}
                   </button>
                 )}
               </div>

@@ -86,12 +86,12 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
           className={styles.modelPill}
           style={{
             background: t.bgSurface1,
-            color: t.textMuted,
+            color: isModelCached ? '#34D399' : t.textMuted,
             fontFamily: t.fontFamilyMono,
             opacity: isModelCached ? 1 : 0.5,
           }}
         >
-          {isModelCached ? modelShortName : `${modelShortName} — download required`}
+          {isModelCached ? `✓ ${modelShortName}` : `${modelShortName} — not downloaded`}
         </span>
         <span
           className={styles.modelPill}
