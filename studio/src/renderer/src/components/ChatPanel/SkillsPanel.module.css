@@ -26,6 +26,8 @@
   flex-wrap: wrap;
   gap: 5px;
   padding: 6px 12px 10px;
+  max-height: 100px;
+  overflow-y: auto;
 }
 
 .chip {

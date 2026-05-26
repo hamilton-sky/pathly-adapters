@@ -45,10 +45,13 @@ export async function writeToTerminal(
 
   if (!open) toggle()
 
+  // Commands from skills.json already include the full "/pathly <skill>" prefix — write as-is.
+  // For codex, strip the leading slash since Codex uses natural-language input.
   if (kind === 'claude') {
-    window.pathly?.terminal?.write(tabId, '/pathly ' + sanitized + '\n')
+    window.pathly?.terminal?.write(tabId, sanitized + '\n')
   } else {
-    window.pathly?.terminal?.write(tabId, 'Use Pathly ' + sanitized + '\n')
+    const naturalCmd = sanitized.replace(/^\/pathly\s*/, '')
+    window.pathly?.terminal?.write(tabId, 'Use Pathly ' + naturalCmd + '\n')
   }
 
   return tabId
