@@ -110,6 +110,16 @@ app = Flask(__name__)
 
 @app.before_request
 def _log_request():
+    # Handle CORS preflight (OPTIONS) before any routing or rate limiting.
+    # The browser sends this before every cross-origin POST with Content-Type: application/json.
+    if request.method == "OPTIONS":
+        from flask import Response as _Resp
+        resp = _Resp()
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        return resp
+
     if flags.rate_limiting and not _check_rate_limit(request.remote_addr or "unknown"):
         _inc("pathly_requests_rate_limited_total")
         return jsonify({"error": "Rate limit exceeded"}), 429
