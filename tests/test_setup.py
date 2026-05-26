@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from install_cli.detect import detect_hosts, _HOST_MARKERS
-from install_cli.materialize import materialize, uninstall, MANIFEST_NAME
+from install_cli.materialize import materialize, materialize_flows, uninstall, MANIFEST_NAME
 from install_cli.setup_command import main
 
 
@@ -104,6 +104,17 @@ def test_materialize_repair_removes_obsolete_owned_files(tmp_path):
     assert "obsolete/SKILL.md" not in manifest["files"]
 
 
+def test_materialize_flows_preserves_owned_agent_files(tmp_path):
+    materialize({"orchestrator.md": "agent", "old.flow.yaml": "old"}, tmp_path)
+
+    materialize_flows(tmp_path)
+
+    manifest = json.loads((tmp_path / MANIFEST_NAME).read_text(encoding="utf-8"))
+    assert (tmp_path / "orchestrator.md").read_text(encoding="utf-8") == "agent"
+    assert "orchestrator.md" in manifest["files"]
+    assert not (tmp_path / "old.flow.yaml").exists()
+
+
 # ---------------------------------------------------------------------------
 # setup_command
 # ---------------------------------------------------------------------------
@@ -170,6 +181,29 @@ def test_dry_run_real_codex_includes_plugin_manifest(capsys):
     assert "templates" in captured.out
     assert "flows" in captured.out
     assert "team.flow.yaml" in captured.out
+
+
+def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
+    from install_cli.orchestrate import _run_host
+
+    captured_plugin_files = {}
+
+    monkeypatch.setattr("install_cli.orchestrate.materialize", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        "install_cli.orchestrate.materialize_flows", lambda *args, **kwargs: []
+    )
+
+    def capture_plugin(files, **kwargs):
+        captured_plugin_files.update(files)
+
+    monkeypatch.setattr("install_cli.orchestrate.install_codex_plugin", capture_plugin)
+
+    _run_host("codex", dry_run=False, repair=True, force=False)
+
+    build_skill = captured_plugin_files["skills/pathly-build/SKILL.md"]
+    assert "## Codex Execution Contract" in build_skill
+    assert "Never block or claim failure solely because a named Pathly role" in build_skill
+    assert build_skill.index("## Codex Execution Contract") < build_skill.index("# build")
 
 
 # ---------------------------------------------------------------------------

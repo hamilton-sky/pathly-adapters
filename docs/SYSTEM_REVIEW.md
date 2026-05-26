@@ -34,7 +34,8 @@ Internal review of pathly-adapters' current shape and release posture.
 
 ## Design Decisions To Preserve
 
-- Keep `core/` content host-neutral — no slash-command syntax, no spawn calls.
+- Keep `core/` content host-neutral — no host-specific slash-command or
+  sub-agent API syntax.
 - Keep adapters thin — `_meta/*.yaml` adds host syntax on top; it does not
   duplicate core logic.
 - Keep the stitch pipeline deterministic — no user-controlled content in

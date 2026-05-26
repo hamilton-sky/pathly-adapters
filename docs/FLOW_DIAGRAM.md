@@ -20,7 +20,7 @@ flowchart TD
     B --> CP["Copilot\nCopilot-native skill invocation"]
 
     CC --> CA[claude adapter\n~/.claude/agents/ + ~/.claude/skills/]
-    CX --> XA[codex adapter\n~/.codex/agents/ + ~/.codex/skills/]
+    CX --> XA[codex adapter\n~/.codex/agents/ + ~/.agents/skills/]
     CP --> PA[copilot adapter\n~/.vscode/extensions/pathly/agents/ + skills/]
 ```
 
@@ -37,7 +37,7 @@ flowchart TD
     E --> H[stitch.py\ncore/ + codex/_meta/*.yaml]
     F --> I[stitch.py\ncore/ + copilot/_meta/*.yaml]
     G --> J[materialize.py\n→ ~/.claude/agents/\n→ ~/.claude/skills/]
-    H --> K[materialize.py\n→ ~/.codex/agents/\n→ ~/.codex/skills/]
+    H --> K[materialize.py\n→ ~/.codex/agents/\n→ ~/.agents/skills/]
     I --> L[materialize.py\n→ VS Code agents folder]
 ```
 
@@ -80,8 +80,11 @@ Plugin manifest: `src/pathly_data/adapters/claude/.claude-plugin/plugin.json`
 
 ```text
 ~/.codex/
-├── agents/                    ← stitched agent contracts (natural-language format)
-└── skills/                    ← stitched skill files (natural language, not slash commands)
+├── agents/                    ← stitched optional named role contracts (.toml)
+└── plugins/pathly/            ← local plugin bundle, templates, flows, skill copies
+
+~/.agents/
+└── skills/                    ← stitched Codex skills (natural language, not slash commands)
 ```
 
 Source: `src/pathly_data/adapters/codex/_meta/*.yaml` + `src/pathly_data/core/` content
@@ -151,6 +154,9 @@ Use Pathly to explore how checkout state flows
 Current Codex builds do not expose `/pathly` slash commands. Use explicit
 natural-language invocation. If Codex replies by inspecting the current repo
 instead of using Pathly, the plugin was not selected — retry with `Use Pathly ...`.
+Generated skills prepend a Codex execution contract: a named Pathly role is used
+only when exposed as callable; otherwise lifecycle work runs in the current
+agent, and generic delegation is used only when requested and permitted.
 
 ### Copilot
 
@@ -185,8 +191,9 @@ existing files that would be replaced, final start command per host.
 
 ## Stitch: Core + Adapter Metadata
 
-`src/pathly_data/core/skills/` contains skill *logic* in natural language. Each adapter's
-`_meta/*.yaml` adds only the tool-specific spawn call on top:
+`src/pathly_data/core/skills/` contains skill *logic* in natural language. Each
+adapter renders role directions for its host. Codex prepends
+`adapters/codex/SKILL_EXECUTION.md`; Claude may add tool-specific spawn calls:
 
 ```
 # src/pathly_data/core/skills/team.md

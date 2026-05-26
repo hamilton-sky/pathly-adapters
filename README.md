@@ -66,13 +66,13 @@ pathly-validate-flow <flow.yaml>    # validate a flow YAML against the FSM schem
 | Host | Detected by | Installed locations |
 |------|-------------|---------------------|
 | `claude` | `~/.claude/` directory exists | `~/.claude/agents/` (behavioral contracts)<br>`~/.claude/skills/` (skill folders) |
-| `codex` | Codex config directory exists | `~/.codex/agents/` + `~/.codex/skills/` + local plugin marketplace |
+| `codex` | Codex config directory exists | `~/.codex/agents/` + `~/.agents/skills/` + local plugin marketplace |
 | `copilot` | VS Code + Copilot detected | `~/.vscode/extensions/pathly/agents/`<br>`~/.vscode/extensions/pathly/skills/` |
 
 ## How It Works
 
 1. **Detect** — scans for installed hosts on the current machine.
-2. **Stitch** — combines `core/agents/` and `core/skills/` content with adapter-specific `_meta/<name>.yaml` to produce deployable agent and skill files (frontmatter + body + spawn section).
+2. **Stitch** — combines `core/agents/` and `core/skills/` content with adapter-specific `_meta/<name>.yaml` to produce deployable agent and skill files. Codex skills also receive a host execution contract that resolves host-neutral role directions against capabilities exposed in the active Codex session.
 3. **Materialize** — writes stitched files to the host config location. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back.
 4. **Register Codex plugin** - for Codex installs, writes `~/.codex/pathly-marketplace`, enables `pathly@pathly-local`, and refreshes the marketplace through the Codex CLI when available.
 
@@ -143,6 +143,8 @@ Stable (2.9.0). Core install path (`--dry-run`, `--apply`, `--uninstall`) is ver
 - **Windows: broken stub if you previously ran `pip install pathly-adapters` directly** — a bare `pip install` (outside pipx) leaves a `pathly-setup.exe` stub in the global Python Scripts directory that shadows the pipx version and throws `ModuleNotFoundError: No module named 'install_cli'`. Fix: delete the stub at `%LOCALAPPDATA%\Programs\Python\Python3XX\Scripts\pathly-setup.exe` and its matching `~athly_adapters-*.dist-info` folder in `site-packages`, then open a fresh terminal. Always use `pipx install pathly-adapters` as documented.
 
 - **Codex install unverified on a clean machine** — the Codex adapter is committed and `pathly-setup codex --apply` runs without error, but a full clean-machine smoke test has not been completed. Use Codex support at your own risk until this is confirmed.
+
+- **Codex lifecycle-role availability is session-dependent** — installed `agents/*.toml` preserve Pathly role contracts, but generated Codex skills execute a role in the current agent when the active session does not expose that named role as callable. Generic sub-agent delegation is used only when the Codex session permits it and the user has requested delegation.
 
 - **Copilot paths may need `--repair` after a VS Code update** — Pathly installs agent files to the VS Code Copilot agent spec path, which may change between VS Code versions. Run `pathly-setup --repair` after a VS Code update if Copilot agents stop appearing.
 

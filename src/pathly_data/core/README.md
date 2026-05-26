@@ -14,8 +14,9 @@ Adapters turn this core into tool-specific experiences:
 - future Cursor, Windsurf, BMAD, or generic prompt packs
 
 Current status: `core/` contains canonical prompt and agent contract copies.
-Adapter folders own host-specific wrappers. `.agents/skills/` is retained as a
-direct Codex-safe skill-discovery mirror of `adapters/codex/skills/`.
+Adapter folders own host-specific wrappers. For Codex, install-time stitching
+generates user-level skills under `~/.agents/skills/` from core content plus
+`adapters/codex/` metadata and execution instructions.
 
 ## Repository Boundaries
 
@@ -26,7 +27,7 @@ test, or execute Pathly in their own top-level folders.
 pathly/
 |-- core/          # shared prompts, workflow contracts, agent specs, templates
 |-- adapters/      # host-specific packaging for Codex, Claude Code, CLI, etc.
-|-- .agents/       # Codex marketplace metadata and direct skill mirror
+|-- .agents/       # Codex marketplace metadata when a repo marketplace is shipped
 |-- pathly/        # Python CLI package
 |-- orchestrator/  # filesystem state machine/runtime code
 |-- tests/         # automated quality gates
@@ -38,8 +39,8 @@ The target direction is:
 
 - `core/` owns canonical behavior and reusable content.
 - `adapters/` wrap `core/` for each host tool.
-- `.agents/skills/` mirrors `adapters/codex/skills/` exactly for direct skill
-  discovery compatibility.
+- Codex installation generates `~/.agents/skills/` rather than maintaining a
+  second source copy of each skill in this repository.
 
 Do not move install scripts, tests, Python package files, or runtime code into
 `core/` unless `core/` is deliberately redesigned as a runtime package.

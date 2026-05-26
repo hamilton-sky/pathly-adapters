@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import tomllib
 
 import pytest
 
@@ -40,3 +41,10 @@ def test_manifest_required_fields(manifest_path):
     if manifest_path.stem in _PLUGIN_JSON_STEMS:
         assert "author" in data, f"Required field 'author' missing from {manifest_path.name}"
         assert "skills" in data, f"Required field 'skills' missing from {manifest_path.name}"
+
+
+def test_codex_plugin_version_matches_distribution_version():
+    project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    plugin = json.loads(_PLUGIN_JSON_PATHS[1].read_text(encoding="utf-8"))
+
+    assert plugin["version"] == project["project"]["version"]

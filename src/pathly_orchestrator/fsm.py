@@ -527,7 +527,7 @@ def write_state(storage_path: Path, next_state: str, prior_state: dict) -> None:
     tmp_file.replace(state_file)
 
 
-def append_event(storage_path: Path, event: dict) -> None:
+def append_event(storage_path: Path, event: dict, flow: dict | None = None) -> None:
     from pathly_orchestrator.eventlog import append_event as _append_event
 
-    _append_event(str(storage_path), event)
+    _append_event(str(storage_path), event, flow=flow)

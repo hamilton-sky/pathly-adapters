@@ -235,13 +235,16 @@ Subagent spawning syntax: `Agent(subagent_type="builder")`
 src/pathly_data/adapters/codex/
 ├── .codex-plugin/
 │   └── plugin.json         ← Codex plugin manifest
+├── SKILL_EXECUTION.md      ← host contract for role directions in skills
 └── _meta/
     ├── builder.yaml        ← natural-language format (no slash commands)
     └── ...
 ```
 
-Stitched output → `~/.codex/agents/` + `~/.codex/skills/`
-Subagent spawning syntax: Agents SDK
+Stitched output → `~/.codex/agents/` + `~/.agents/skills/` + plugin bundle/cache
+Role execution: use a named Pathly role only when callable in the active
+Codex session; otherwise run the lifecycle role in the current agent, with
+generic delegation used only when requested and permitted.
 
 ### Copilot
 

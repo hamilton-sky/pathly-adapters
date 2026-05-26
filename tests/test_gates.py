@@ -232,7 +232,7 @@ def test_scope_gate_pass(tmp_path, monkeypatch):
 
     storage = _storage(tmp_path)
     (storage / "SCOPE.md").write_text(
-        "Files changed:\n- src/foo.py\n- src/bar.py\n", encoding="utf-8"
+        "Files changed:\n- `src/foo.py`\n- `src/bar.py`\n", encoding="utf-8"
     )
     state_sha = "abc123"
     (storage / "STATE.json").write_text(
@@ -259,7 +259,7 @@ def test_scope_gate_fail_undeclared_path(tmp_path, monkeypatch):
 
     storage = _storage(tmp_path)
     (storage / "SCOPE.md").write_text(
-        "Files:\n- src/foo.py\n", encoding="utf-8"
+        "Files:\n- `src/foo.py`\n", encoding="utf-8"
     )
     state_sha = "abc123"
     (storage / "STATE.json").write_text(
@@ -314,7 +314,7 @@ def test_scope_gate_no_baseline_sha(tmp_path):
     """STATE.json has no conv_start_sha — GATE_SKIPPED emitted, gate passes."""
     storage = _storage(tmp_path)
     (storage / "SCOPE.md").write_text(
-        "Files:\n- src/foo.py\n", encoding="utf-8"
+        "Files:\n- `src/foo.py`\n", encoding="utf-8"
     )
     # STATE.json without conv_start_sha
     (storage / "STATE.json").write_text(
