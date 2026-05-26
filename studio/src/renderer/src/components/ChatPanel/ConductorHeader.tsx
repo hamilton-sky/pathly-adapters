@@ -1,56 +1,36 @@
-import { X } from 'lucide-react'
-import { useUiStore } from '../../store/uiStore'
-import { useTerminalStore } from '../../store/terminalStore'
-import { useTheme } from '../../useTheme'
+import { X, Zap } from 'lucide-react'
 import styles from './ConductorHeader.module.css'
 
-export function ConductorHeader(): JSX.Element {
-  const toggleChat = useUiStore((s) => s.toggleChat)
-  const tabs = useTerminalStore((s) => s.tabs)
-  const t = useTheme()
+interface ConductorHeaderProps {
+  hasClaudeTab: boolean
+  hasCodexTab: boolean
+  onToggleChat: () => void
+}
 
-  const hasClaudeTab = tabs.some((tab) => tab.kind === 'claude')
-  const hasCodexTab = tabs.some((tab) => tab.kind === 'codex')
-
+export function ConductorHeader({ hasClaudeTab, hasCodexTab, onToggleChat }: ConductorHeaderProps): JSX.Element {
   return (
-    <div
-      className={styles.header}
-      style={{ borderBottom: t.border, background: t.bgMantle }}
-    >
+    <div className={styles.header}>
       <div className={styles.titleRow}>
-        <span className={styles.title} style={{ color: t.textPrimary, fontFamily: t.fontFamilyBase }}>
-          ⚡ Conductor
+        <span className={styles.title}>
+          <Zap size={13} /> Conductor
         </span>
       </div>
 
       <div className={styles.pills}>
-        <span
-          className={styles.pill}
-          style={{ background: t.bgSurface0, color: t.textSecondary, fontFamily: t.fontFamilyMono }}
-        >
-          <span
-            className={styles.dot}
-            style={{ background: hasClaudeTab ? t.green : t.textMuted }}
-          />
+        <span className={styles.pill}>
+          <span className={`${styles.dot} ${hasClaudeTab ? styles.dotActive : ''}`} />
           claude
         </span>
-        <span
-          className={styles.pill}
-          style={{ background: t.bgSurface0, color: t.textSecondary, fontFamily: t.fontFamilyMono }}
-        >
-          <span
-            className={styles.dot}
-            style={{ background: hasCodexTab ? t.green : t.textMuted }}
-          />
+        <span className={styles.pill}>
+          <span className={`${styles.dot} ${hasCodexTab ? styles.dotActive : ''}`} />
           codex
         </span>
       </div>
 
       <button
         className={styles.closeBtn}
-        onClick={toggleChat}
+        onClick={onToggleChat}
         aria-label="Close chat panel"
-        style={{ color: t.textMuted }}
       >
         <X size={14} />
       </button>
