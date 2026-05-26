@@ -48,3 +48,16 @@
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T13:17:44Z"}
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-26T13:24:21Z"}
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":4,"result":"DONE","tokens_in":0,"tokens_out":0,"total_tokens":0,"cost_usd":0.0,"tool_uses":0,"wall_seconds":167,"ts":"2026-05-26T13:25:58Z","schema_version":1}
+{"type": "RETRY", "key": "conv-4:REVIEW_FAILURES.md", "ts": "2026-05-26T13:59:44Z"}
+{"type": "FILE_CREATED", "file": "feedback/REVIEW_FAILURES.md", "ts": "2026-05-26T14:08:07Z"}
+{"type": "RETRY", "key": "conv-4:REVIEW_FAILURES.md", "ts": "2026-05-26T14:08:07Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 4, "result": "PASS", "tokens_in": 30484, "tokens_out": 7621, "total_tokens": 38105, "cost_usd": 0.205767, "tool_uses": 24, "wall_seconds": 138, "ts": "2026-05-26T14:16:25Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T14:44:29Z"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-26T14:45:34Z"}
+{"type": "FILE_CREATED", "file": "MORE_CONVS_NEEDED.md", "ts": "2026-05-26T14:45:34Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 5, "result": "DONE", "tokens_in": 24176, "tokens_out": 6044, "total_tokens": 30220, "cost_usd": 0.163188, "tool_uses": 28, "wall_seconds": 298, "ts": "2026-05-26T14:52:09Z", "schema_version": 1}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T14:52:53Z"}
+{"type": "RETRY", "key": "conv-5:SCOPE_VIOLATION.md", "ts": "2026-05-26T14:53:53Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T14:54:37Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T14:55:06Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-26T14:59:29Z"}

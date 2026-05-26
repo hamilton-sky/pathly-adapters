@@ -17,8 +17,8 @@
 | S2.4 | Empty state guides user to start a new flow | Conv 2 | TODO |
 | S3.1 | MatchCard shows matched skill + confidence | Conv 3 | TODO |
 | S3.2 | Run writes skill command to terminal tab | Conv 3 | TODO |
-| S4.1 | Context includes FSM stage + screen state | Conv 4 | TODO |
-| S4.2 | Skills list always in context | Conv 4 | TODO |
+| S4.1 | Context includes FSM stage + screen state | Conv 4 | DONE |
+| S4.2 | Skills list always in context | Conv 4 | DONE |
 | S5.1 | MiniLM loads at startup | Conv 5 | TODO |
 | S5.2 | Embedding matches intent to Pathly skill | Conv 5 | TODO |
 | S5.3 | Low-confidence state guides user to correct skill | Conv 5 | TODO |
@@ -44,7 +44,7 @@
 | 1 | 1 | Core | S1.1, S1.2 | DONE | `curl http://127.0.0.1:8765/status?project_root=.` |
 | 2 | 4–8 | Core | S2.1, S2.2, S2.3, S2.4 | DONE | `cd studio && npm run typecheck` |
 | 3 | 9–11 | Core | S3.1, S3.2 | DONE | `cd studio && npm run typecheck` |
-| 4 | 12–14 | Core | S4.1, S4.2 | TODO | `cd studio && npm run typecheck` |
+| 4 | 12–14 | Core | S4.1, S4.2 | DONE | `cd studio && npm run typecheck` |
 | 5 | 15–18 | Core | S5.1, S5.2, S5.3 | TODO | `cd studio && npm run typecheck` |
 | 6 | 19–20 | Track A | S6.1, S6.2 | TODO | `cd studio && npm run typecheck` + inspect POST /chat body includes studioSchema |
 | 7 | 21–22 | Track A | S7.1, S7.2, S7.3 | TODO | `cd studio && npm run typecheck` + devtools: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` |
@@ -69,9 +69,9 @@
 | 3 | 9 | `ChatPanel/MatchCard.tsx` | Match result card | Green/amber states, Run/Not this work | TODO |
 | 3 | 10 | `ChatPanel/OutputSnippet.tsx` | Live PTY output reader | Shows last 5 lines in real-time | TODO |
 | 3 | 11 | `lib/launchTerminal.ts` + `chatStore.targetKind` | Terminal write + auto-spawn utility | Run writes host-correct cmd; auto-spawns + opens dock | TODO |
-| 4 | 12 | `studio/src/renderer/src/lib/pathlyContext.ts` | Context builder | Returns { fsmStage, featureName, skills } | TODO |
+| 4 | 12 | `studio/src/renderer/src/lib/pathlyContext.ts` | Context builder | Returns { fsmStage, featureName, skills } | DONE |
 | 4 | ~~13~~ | ~~PageAnalyzer copy~~ | **REMOVED** — superseded by static schema (Conv 6) | — | REMOVED |
-| 4 | 14 | `ChatPanel/index.tsx` | Inject context into every message | AI references FSM stage | TODO |
+| 4 | 14 | `ChatPanel/index.tsx` | Inject context into every message | AI references FSM stage | DONE |
 | 5 | 15 | `studio/src/renderer/src/data/skills.json` | 14 skills with name+command+description | File valid JSON, all skills present | TODO |
 | 5 | 16 | `studio/src/renderer/src/lib/skillsManifest.ts` | Typed loader for skills.json | No TS errors | TODO |
 | 5 | 17 | `studio/src/renderer/src/lib/embedRouter.ts` | MiniLM wrapper + matchIntent() | Returns top-3 matches with scores | TODO |
