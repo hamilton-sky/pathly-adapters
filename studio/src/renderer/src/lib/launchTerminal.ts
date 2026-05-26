@@ -1,4 +1,4 @@
-import type { TerminalTab } from '../store/terminalStore'
+import type { TerminalTab } from '../types/terminal'
 
 export type TerminalKind = NonNullable<TerminalTab['kind']>
 
