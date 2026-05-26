@@ -28,7 +28,9 @@ export function StateNode({ data }: NodeProps<StateNodeData>): JSX.Element {
     <div
       style={{
         backgroundColor: t.bgSurface0,
-        border: `1px solid ${borderColor}`,
+        borderTop: `1px solid ${borderColor}`,
+        borderRight: `1px solid ${borderColor}`,
+        borderBottom: `1px solid ${borderColor}`,
         borderLeft: `3px solid ${accent}`,
         borderRadius: '6px',
         color: t.textPrimary,
