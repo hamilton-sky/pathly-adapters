@@ -9,7 +9,8 @@ import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
 import { PATHLY_API_BASE } from '../../lib/config'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
-import { askWebLLM } from '../../lib/webLLMEngine'
+import { askWebLLM, getEngine } from '../../lib/webLLMEngine'
+import { useModelStore } from '../../store/modelStore'
 import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
 import { SkillsPanel } from './SkillsPanel'
@@ -231,6 +232,8 @@ export function ChatPanel(): JSX.Element {
       // Local WebLLM path
       const systemPrompt = buildSystemPrompt(context, topMatch)
       try {
+        const selectedModelId = useModelStore.getState().selectedModelId
+        await getEngine(selectedModelId)
         let fullText = ''
         await askWebLLM(text, systemPrompt, (chunk) => {
           fullText += chunk

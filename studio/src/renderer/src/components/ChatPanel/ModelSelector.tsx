@@ -5,9 +5,24 @@ import { useModelStore } from '../../store/modelStore'
 import { cacheWebLLMModel, deleteCachedWebLLMModel, getCachedWebLLMModelIds } from '../../lib/webLLMEngine'
 import styles from './ModelSelector.module.css'
 
+function formatElapsed(secs: number): string {
+  if (secs < 60) return `${secs}s`
+  return `${Math.floor(secs / 60)}m ${secs % 60}s`
+}
+
+function parseShardLabel(text: string | undefined): string | null {
+  // WebLLM fires text like "Fetching param cache[3/12]: 340MB/s"
+  const m = text?.match(/\[(\d+)\/(\d+)\]/)
+  if (m) return `shard ${m[1]}/${m[2]}`
+  return null
+}
+
 export function ModelSelector(): JSX.Element {
   const [open, setOpen] = useState(false)
   const [showInfo, setShowInfo] = useState(false)
+  const [progressText, setProgressText] = useState<Record<string, string>>({})
+  const [downloadStart, setDownloadStart] = useState<Record<string, number>>({})
+  const [elapsed, setElapsed] = useState<Record<string, number>>({})
   const ref = useRef<HTMLDivElement>(null)
 
   const selectedModelId = useModelStore((s) => s.selectedModelId)
@@ -37,19 +52,44 @@ export function ModelSelector(): JSX.Element {
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [open])
 
+  // Tick elapsed timer while any model is downloading
+  useEffect(() => {
+    const active = Object.entries(downloadProgress)
+      .filter(([, p]) => p > 0 && p < 100)
+      .map(([id]) => id)
+    if (active.length === 0) return
+    const t = setInterval(() => {
+      const now = Date.now()
+      setElapsed(prev => {
+        const next = { ...prev }
+        for (const id of active) {
+          const start = downloadStart[id]
+          if (start) next[id] = Math.round((now - start) / 1000)
+        }
+        return next
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  }, [downloadProgress, downloadStart])
+
   async function handleCacheToggle(modelId: string): Promise<void> {
     const isCached = cachedModelIds.includes(modelId)
     if (isCached) {
       await deleteCachedWebLLMModel(modelId)
       setCached(cachedModelIds.filter((id) => id !== modelId))
+      setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
     } else {
+      const startMs = Date.now()
+      setDownloadStart(prev => ({ ...prev, [modelId]: startMs }))
       setProgress(modelId, 0)
-      await cacheWebLLMModel(modelId, (pct) => {
+      await cacheWebLLMModel(modelId, (pct, text) => {
         setProgress(modelId, pct)
+        if (text) setProgressText((prev) => ({ ...prev, [modelId]: text }))
       })
       const updated = await getCachedWebLLMModelIds()
       setCached(updated)
       setProgress(modelId, 100)
+      setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
     }
   }
 
@@ -84,7 +124,7 @@ export function ModelSelector(): JSX.Element {
             return (
               <div
                 key={model.id}
-                className={`${styles.card} ${isSelected ? styles.cardSelected : ''}`}
+                className={`${styles.card} ${isSelected ? styles.cardSelected : ''} ${isDownloading ? styles.cardDownloading : ''}`}
                 onClick={() => setSelectedModel(model.id)}
               >
                 <div className={styles.cardHeader}>
@@ -120,11 +160,30 @@ export function ModelSelector(): JSX.Element {
                 </div>
 
                 {isDownloading && (
-                  <div className={styles.progressTrack}>
-                    <div
-                      className={styles.progressFill}
-                      style={{ width: `${progress}%` }}
-                    />
+                  <div className={styles.downloadBlock}>
+                    {/* meta row: percent + shard label + elapsed */}
+                    <div className={styles.downloadMeta}>
+                      <span className={styles.downloadPct}>{progress}%</span>
+                      <span className={styles.downloadPhase}>
+                        {parseShardLabel(progressText[model.id]) ?? 'downloading…'}
+                      </span>
+                      <span className={styles.downloadElapsed}>
+                        {formatElapsed(elapsed[model.id] ?? 0)}
+                      </span>
+                    </div>
+
+                    {/* two-layer progress bar: stripes behind, solid fill on top */}
+                    <div className={styles.progressTrack}>
+                      <div className={styles.progressStripes} />
+                      <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+                    </div>
+
+                    {/* raw WebLLM status text — truncated to one line */}
+                    {progressText[model.id] && (
+                      <span className={styles.downloadStatus}>
+                        {progressText[model.id]}
+                      </span>
+                    )}
                   </div>
                 )}
 

@@ -7,7 +7,7 @@ let enginePromise: Promise<MLCEngine> | null = null
 
 export async function getEngine(
   modelId: string,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number, text?: string) => void
 ): Promise<MLCEngine> {
   if (engine && engineModelId === modelId) return engine
   if (enginePromise && engineModelId === modelId) return enginePromise
@@ -22,7 +22,9 @@ export async function getEngine(
       const mlc = await CreateMLCEngine(modelId, {
         initProgressCallback: (report) => {
           const pct = Math.round(report.progress * 100)
-          onProgress?.(pct)
+          // Append elapsed time so UI can show the download is alive
+          const elapsed = report.timeElapsed != null ? ` (${Math.round(report.timeElapsed)}s)` : ''
+          onProgress?.(pct, report.text ? `${report.text}${elapsed}` : undefined)
         },
       })
       engine = mlc
@@ -63,7 +65,7 @@ export async function getCachedWebLLMModelIds(): Promise<string[]> {
 
 export async function cacheWebLLMModel(
   modelId: string,
-  onProgress: (pct: number) => void
+  onProgress: (pct: number, text?: string) => void
 ): Promise<void> {
   await getEngine(modelId, onProgress)
 }

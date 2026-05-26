@@ -1,6 +1,6 @@
 # Studio AI Chat — Progress
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Story Status
 
@@ -31,10 +31,10 @@
 | S8.2 | Auto mode executes full plan | Conv 8 | DONE |
 | S8.3 | Auto mode blocked on low confidence | Conv 8 | DONE |
 | S8.4 | Full flow creation from plain-English description | Conv 8 | DONE |
-| S9.1 | Model selector shows all models with specs | Conv 9 | TODO |
-| S9.2 | Model download and cache via toggle | Conv 9 | TODO |
-| S9.3 | Selected model used for all AI responses | Conv 9 | TODO |
-| S9.4 | Model selection persists across restarts | Conv 9 | TODO |
+| S9.1 | Model selector shows all models with specs | Conv 9 | DONE |
+| S9.2 | Model download and cache via toggle | Conv 9 | DONE |
+| S9.3 | Selected model used for all AI responses | Conv 9 | DONE |
+| S9.4 | Model selection persists across restarts | Conv 9 | DONE |
 
 ## Conversation Breakdown
 
@@ -49,7 +49,7 @@
 | 6 | 19–20 | Track A | S6.1, S6.2 | DONE | `cd studio && npm run typecheck` + inspect POST /chat body includes studioSchema |
 | 7 | 21–22 | Track A | S7.1, S7.2, S7.3 | DONE | `cd studio && npm run typecheck` + devtools: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` |
 | 8 | 24–26 | Track A | S8.1, S8.2, S8.3, S8.4 | DONE | E2E: type "create a test flow" → approve steps → flow appears in Studio |
-| 9 | 27–29 | Track B | S9.1, S9.2, S9.3, S9.4 | TODO | Select Phi-4 Mini → download → send message → response streams from WebLLM |
+| 9 | 27–29 | Track B | S9.1, S9.2, S9.3, S9.4 | DONE | Select Phi-4 Mini → download → send message → response streams from WebLLM |
 
 ## Phase Detail
 
@@ -85,9 +85,9 @@
 | 8 | 24 | `store/automationStore.ts` | Step queue state | No TS errors | DONE |
 | 8 | 25 | `ChatPanel/StepQueue.tsx` + `AutomationCard.tsx` | Staged/auto UI components | Staged approve/skip works visually | DONE |
 | 8 | 26 | `ChatPanel/index.tsx` + `chat_agent.py` | Wire AI → action plan → execution | Full flow creation E2E works | DONE |
-| 9 | 27 | `data/models.ts` + `lib/webLLMEngine.ts` | WebLLM models data + engine | Phi-4 Mini loads and streams response | TODO |
-| 9 | 28 | `store/modelStore.ts` + `ChatPanel/ModelSelector.tsx` | Model selector UI | Download, cache, selection all work | TODO |
-| 9 | 29 | `ChatPanel/index.tsx` | Wire WebLLM into chat flow | Responses stream from local model | TODO |
+| 9 | 27 | `data/models.ts` + `lib/webLLMEngine.ts` | WebLLM models data + engine | Phi-4 Mini loads and streams response | DONE |
+| 9 | 28 | `store/modelStore.ts` + `ChatPanel/ModelSelector.tsx` | Model selector UI | Download, cache, selection all work | DONE |
+| 9 | 29 | `ChatPanel/index.tsx` | Wire WebLLM into chat flow | Responses stream from local model | DONE |
 
 ## Hotfixes Applied (post-pipeline)
 

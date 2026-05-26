@@ -87,3 +87,18 @@
 {"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":8,"result":"PASS","tokens_in":41936,"tokens_out":10484,"total_tokens":52420,"cost_usd":0.283068,"tool_uses":29,"wall_seconds":124,"ts":"2026-05-27T00:05:00Z","schema_version":1}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T21:19:50Z"}
 type:AGENT_DONE agent:builder model:claude-sonnet-4-6 conversation:9 result:DONE tokens_in:50738 tokens_out:12684 total_tokens:63422 cost_usd:0.342474 tool_uses:44 wall_seconds:268 ts:2026-05-27T00:20:00Z schema_version:1
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-26T21:31:35Z"}
+type:AGENT_DONE agent:reviewer model:claude-sonnet-4-6 conversation:9 result:PASS tokens_in:26041 tokens_out:6510 total_tokens:32551 cost_usd:0.175773 tool_uses:21 wall_seconds:74 ts:2026-05-27T00:25:00Z schema_version:1
+{"type":"HUMAN_RESPONSE","value":"auto-advance","ts":"2026-05-27T00:26:00Z"}
+{"type": "GATE_FAILED", "gate": "require_artifact", "transition": "REVIEWING->TESTING", "schema_version": 1, "ts": "2026-05-26T21:36:52Z"}
+{"type":"FILE_CREATED","file":"REVIEW.md","ts":"2026-05-27T00:27:00Z"}
+{"type":"FILE_DELETED","file":"feedback/HUMAN_QUESTIONS.md","ts":"2026-05-27T00:28:00Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "schema_version": 1, "ts": "2026-05-26T21:38:34Z"}
+{"type":"IMPLEMENT_COMPLETE","ts":"2026-05-27T00:29:00Z"}
+{"type":"FILE_CREATED","file":"feedback/TEST_FAILURES.md","ts":"2026-05-27T00:32:00Z"}
+{"type":"FILE_DELETED","file":"feedback/TEST_FAILURES.md","ts":"2026-05-27T00:34:00Z"}
+type:AGENT_DONE agent:tester model:claude-sonnet-4-6 conversation:0 result:PASS tokens_in:23291 tokens_out:5823 total_tokens:29114 cost_usd:0.157218 tool_uses:11 wall_seconds:89 ts:2026-05-27T00:35:00Z schema_version:1
+{"type":"HUMAN_RESPONSE","value":"auto-advance","ts":"2026-05-27T00:35:30Z"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "schema_version": 1, "ts": "2026-05-26T21:46:53Z"}
+type:AGENT_DONE agent:quick model:claude-sonnet-4-6 conversation:0 result:DONE tokens_in:17354 tokens_out:4339 total_tokens:21693 cost_usd:0.117147 tool_uses:3 wall_seconds:24 ts:2026-05-27T00:37:00Z schema_version:1
+{"type":"STATE_TRANSITION","from":"RETRO","to":"DONE","schema_version":1,"ts":"2026-05-27T00:40:00Z"}
