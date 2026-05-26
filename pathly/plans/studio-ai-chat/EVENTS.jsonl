@@ -61,3 +61,12 @@
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T14:54:37Z"}
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T14:55:06Z"}
 {"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-26T14:59:29Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-26T14:59:29Z"}
+{"type": "RETRY", "key": "conv-5:ARCH_FEEDBACK.md", "ts": "2026-05-26T15:03:11.094482Z"}
+{"type": "FILE_DELETED", "file": "ARCH_FEEDBACK.md", "ts": "2026-05-26T15:04:07.605166Z"}
+{"type": "RETRY", "key": "conv-5:REVIEW_FAILURES.md", "ts": "2026-05-26T15:04:15.319178Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 5, "result": "PASS", "tokens_in": 22535, "tokens_out": 5634, "total_tokens": 28169, "cost_usd": 0.152115, "tool_uses": 25, "wall_seconds": 92, "ts": "2026-05-26T15:12:57.329120Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T15:13:28Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 6, "result": "DONE", "tokens_in": 37077, "tokens_out": 9269, "total_tokens": 46346, "cost_usd": 0.250266, "tool_uses": 9, "wall_seconds": 76, "ts": "2026-05-26T15:16:46.210288Z", "schema_version": 1}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T15:16:55Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-26T15:17:23Z"}
