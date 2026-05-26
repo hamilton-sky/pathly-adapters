@@ -50,8 +50,12 @@ export function registerFsHandlers(): void {
     if (!isPathSafe(dir)) {
       throw new Error('Path outside home directory is not allowed')
     }
-    const entries = fs.readdirSync(dir, { withFileTypes: true })
-    return entries.filter((e) => e.isFile()).map((e) => e.name)
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      return entries.filter((e) => e.isFile()).map((e) => e.name)
+    } catch {
+      return []   // directory doesn't exist — not an error
+    }
   })
 
   ipcMain.handle('fs:listDirs', async (_event, dir: string): Promise<string[]> => {

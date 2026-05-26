@@ -7,6 +7,27 @@ import type { MatchResult } from '../types/chat'
 env.allowLocalModels = false
 env.useBrowserCache = true
 
+// Clear corrupted cache entries (HTML pages stored instead of model weights).
+// Runs once at module load — harmless if cache is clean.
+async function purgeBadCache(): Promise<void> {
+  try {
+    const cacheNames = await caches.keys()
+    for (const name of cacheNames) {
+      if (!name.includes('transformers')) continue
+      const cache = await caches.open(name)
+      const keys = await cache.keys()
+      for (const req of keys) {
+        const res = await cache.match(req)
+        const ct = res?.headers.get('content-type') ?? ''
+        if (ct.includes('text/html')) {
+          await cache.delete(req)
+        }
+      }
+    }
+  } catch { /* cache API unavailable — skip */ }
+}
+purgeBadCache()
+
 export type EmbedProgressCallback = (progress: number) => void
 
 let embedder: FeatureExtractionPipeline | null = null
