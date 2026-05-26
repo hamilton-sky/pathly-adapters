@@ -754,6 +754,14 @@ Read pathly/plans/studio-ai-chat/DESIGN_SPEC.md — REQUIRED for ModelSelector v
 
 Implement Studio AI Chat Conversation 9 (Phases 27–29) — Model Selector + WebLLM.
 
+CRITICAL PRE-FLIGHT — WebGPU must be enabled in Electron before any WebLLM code will work:
+Electron disables WebGPU by default. Without this, CreateMLCEngine() throws immediately.
+In studio/src/main/index.ts, add before app.whenReady():
+  app.commandLine.appendSwitch('enable-unsafe-webgpu')
+  app.commandLine.appendSwitch('enable-features', 'Vulkan')
+Also add experimentalFeatures: true to the BrowserWindow webPreferences.
+Do this FIRST, before writing any WebLLM code. Verify with: navigator.gpu !== undefined === true in renderer devtools.
+
 Source files to port (read these before writing anything):
   C:\Users\Yafit\brightsky-ai (check if WebLLM files exist) OR
   https://github.com/zakaihamilton/zakamurai/blob/main/src/components/AI/WebLLMModels.js
@@ -763,6 +771,7 @@ Read both files fully before writing any TypeScript.
 **Before editing anything:** glob/read every file path below.
 
 **Codebase files this conversation touches:**
+- `studio/src/main/index.ts` — MODIFY: add WebGPU command-line switches (pre-flight)
 - `studio/src/renderer/src/data/models.ts` — CREATE: model definitions (ported from WebLLMModels.js)
 - `studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE: engine wrapper (ported from WebLLMAPI.js)
 - `studio/src/renderer/src/store/modelStore.ts` — CREATE: selected model + cache state

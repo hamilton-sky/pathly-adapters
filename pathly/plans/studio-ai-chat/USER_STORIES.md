@@ -35,7 +35,7 @@ was matched to my intent, **so that** I understand what will happen before I cli
 and feature, **so that** it's specific to what I'm doing right now.
 
 **Acceptance Criteria:**
-- [ ] System prompt includes current FSM stage (read from `/next_action` on port 8765)
+- [ ] System prompt includes current FSM stage (read from `/status` on port 8765 via `read_state()` — **not** `/next_action`, which writes to disk)
 - [ ] System prompt includes active feature name (read from most-recently-modified `plans/*/FEATURE_INDEX.md`)
 - [ ] System prompt includes matched skill name and description (passed from renderer)
 - [ ] System prompt stays under 1,000 tokens (explainer context is smaller than general chat)

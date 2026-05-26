@@ -250,15 +250,11 @@ Renderer ──IPC 'chat:write-terminal'──► Electron Main
 
 ## Phase 11: IPC terminal write handler   ← Conversation 3
 
-**Files:** `studio/src/main/ipc/chat.ts` — CREATE, `studio/src/main/index.ts` — MODIFY,
-`studio/src/main/ipc/terminal.ts` — MODIFY (ALLOWED_SHELLS pre-flight fix)
+**Files:** `studio/src/main/ipc/chat.ts` — CREATE, `studio/src/main/index.ts` — MODIFY
 **Done when:** `ipcRenderer.invoke('chat:write-terminal', { command, tabId })` writes to the correct PTY tab
 **Delivers:** S3.2
 
-**Pre-flight fix (do this first):**
-Read `studio/src/main/ipc/terminal.ts` line 13. The `ALLOWED_SHELLS` set only contains bash/zsh/shell variants.
-Add `'claude'` and `'codex'` to `ALLOWED_SHELLS` — they are valid execution targets.
-Without this fix, the existing Claude Code and Codex terminal buttons are broken.
+> Note: `ALLOWED_SHELLS` was already fixed in Phase 0a (Conv 0). No need to touch `terminal.ts` again here.
 
 **IPC handler design:**
 - `ipcMain.handle('chat:write-terminal', (event, { command, tabId }) => { ... })`
@@ -293,7 +289,7 @@ Without this fix, the existing Claude Code and Codex terminal buttons are broken
 ## Phase 12: pathlyContext builder   ← Conversation 4
 
 **File:** `studio/src/renderer/src/lib/pathlyContext.ts` — CREATE
-**Done when:** `buildPathlyContext()` returns `{ fsmStage, featureName, screenElements, skills }`
+**Done when:** `buildPathlyContext()` returns `{ fsmStage, featureName, skills }` (no `screenElements` — static schema handles UI layout from Conv 6)
 **Delivers:** S4.1, S4.2
 **Details:**
 - Fetch `http://127.0.0.1:8765/status` (GET) → extract `current_state` and `feature`
@@ -301,21 +297,17 @@ Without this fix, the existing Claude Code and Codex terminal buttons are broken
   The `/status` endpoint was added in Phase 1 and is purely read-only.
 - `KNOWN_SKILLS`: static list from skills.json (will be dynamic in Conv 5)
 - Wrap FSM fetch in try/catch → fallback `fsmStage: "unknown"`
-- Cap screen elements at 20 buttons + 10 forms + 10 text blocks
 
 ---
 
-## Phase 13: Copy PageAnalyzer from BrightSky   ← Conversation 4
+## ~~Phase 13: Copy PageAnalyzer from BrightSky~~   ← REMOVED
 
-**File:** `studio/src/renderer/src/lib/pageAnalyzer/` — CREATE
-**Done when:** `import { analyzePageDirect } from '../lib/pageAnalyzer/utils/analyzePageDirect'` compiles
-**Delivers:** S4.1 (partial)
-**Details:**
-- Copy from `C:\Users\Yafit\brightsky-ai\frontend\src\components\PageAnalyzer\`:
-  `analyzePageDirect.ts`, `CacheManager.ts`, `DOMAnalyzer2.ts`, `ButtonAnalyzer.ts`,
-  `FormAnalyzer.ts`, `TextAnalyzer.ts`, `LinkAnalyzer.ts`
-- Fix imports referencing `@brightsky-ai/shared` — replace with inline types
-- Do NOT copy Redux-dependent files
+> **Dead code — do not implement.**
+> The architecture moved to a static Studio schema (Phase 19, Conv 6) and Playwright CDP
+> executor (Phase 21, Conv 7). `screenElements` (DOM-based) is no longer returned by
+> `buildPathlyContext()` and nothing in the final architecture consumes it.
+> `usePageAnalyzer`, `analyzePageDirect`, and `data-conductor-id` are explicitly prohibited
+> — see "What NOT to Build" in DESIGN_SPEC.md.
 
 ---
 
@@ -460,7 +452,7 @@ Without this fix, the existing Claude Code and Codex terminal buttons are broken
 
 ---
 
-## Phase 24: automationStore + step queue state   ← Conversation 8
+## Phase 23: automationStore + step queue state   ← Conversation 8
 
 **File:** `studio/src/renderer/src/store/automationStore.ts` — CREATE
 **Done when:** `useAutomationStore()` returns typed state without TS errors
@@ -516,9 +508,28 @@ Without this fix, the existing Claude Code and Codex terminal buttons are broken
 ## Phase 27: WebLLM models data + engine   ← Conversation 9
 
 **Files:** `studio/src/renderer/src/data/models.ts` — CREATE,
-`studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE
+`studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE,
+`studio/src/main/index.ts` — MODIFY (WebGPU flags)
 **Done when:** `getEngine()` loads Phi-4 Mini in Electron and `askWebLLM("hello")` streams a response
 **Delivers:** S9.3 (partial)
+
+**Pre-flight: Enable WebGPU in Electron (do this first)**
+Electron disables WebGPU by default. Without these switches `CreateMLCEngine()` throws immediately.
+In `studio/src/main/index.ts`, before `app.whenReady()`:
+```ts
+app.commandLine.appendSwitch('enable-unsafe-webgpu')
+app.commandLine.appendSwitch('enable-features', 'Vulkan')
+```
+Also add to the `BrowserWindow` `webPreferences`:
+```ts
+webPreferences: {
+  // existing options...
+  experimentalFeatures: true,
+}
+```
+Verify WebGPU is available in the renderer: `navigator.gpu !== undefined` should be `true`.
+If the user's GPU/driver doesn't support WebGPU, `CreateMLCEngine()` will throw — see EC-9.1 for the fallback.
+
 **Details:**
 - Port `WebLLMModels.js` from zakamurai (`src/components/AI/WebLLMModels.js`) to TypeScript:
   - `Model: { id: string; name: string; description: string; useCase: string; system: string; storage: string; speed: string; recommended?: boolean }`
@@ -572,6 +583,7 @@ Without this fix, the existing Claude Code and Codex terminal buttons are broken
 - WebLLM models download on first cache (Phi-4 Mini ~2GB, Qwen3 4B ~3GB, Qwen2.5 Coder ~5GB)
 - Pathly FSM server running on port 8765 before testing Conv 1
 - Ollama optional (legacy backend) — not required for Conv 9+
+- **Conv 9 requires WebGPU:** Electron disables it by default. Must add `--enable-unsafe-webgpu` switch and `experimentalFeatures: true` in webPreferences before Conv 9 will work — see Phase 27 pre-flight.
 
 ## Key Decisions
 - **Embedding over LLM for routing:** Zero hallucination, 22ms, deterministic. See ARCHITECTURE_PROPOSAL.md Decision 1.
