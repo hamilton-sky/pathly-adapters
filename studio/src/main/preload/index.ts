@@ -80,6 +80,10 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on('setup:progress', listener)
       return () => ipcRenderer.removeListener('setup:progress', listener)
     }
+  },
+  automation: {
+    executeStep: (step: { type: string; label: string; value?: string }): Promise<unknown> =>
+      ipcRenderer.invoke('automation:executeStep', step),
   }
 })
 
@@ -128,6 +132,9 @@ declare global {
         isNeeded: () => Promise<boolean>
         run: () => Promise<{ ok: boolean; error?: string }>
         onProgress: (cb: (msg: string) => void) => () => void
+      }
+      automation: {
+        executeStep: (step: { type: string; label: string; value?: string }) => Promise<unknown>
       }
     }
   }

@@ -9,6 +9,7 @@ import { spawn, ChildProcess } from 'child_process'
 import net from 'net'
 import { getPythonPath } from './python'
 import { registerSetupHandlers } from './setup'
+import { registerAutomationHandlers } from './ipc/automation'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -151,4 +152,5 @@ function registerIpcHandlers(win: BrowserWindow): void {
   registerShellHandlers(win)
   registerTerminalHandlers(win)
   registerSetupHandlers()
+  registerAutomationHandlers(win)
 }

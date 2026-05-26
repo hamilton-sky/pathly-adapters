@@ -2,31 +2,9 @@ import { pipeline, FeatureExtractionPipeline, env } from '@xenova/transformers'
 import type { Skill } from './skillsManifest'
 import type { MatchResult } from '../types/chat'
 
-// Force transformers.js to fetch from HuggingFace CDN directly,
-// not through the Vite dev server (which returns HTML for unknown paths).
+// Explicit CDN — never resolve relative to localhost (Vite dev server returns HTML for unknown paths)
 env.allowLocalModels = false
-env.useBrowserCache = true
-
-// Clear corrupted cache entries (HTML pages stored instead of model weights).
-// Runs once at module load — harmless if cache is clean.
-async function purgeBadCache(): Promise<void> {
-  try {
-    const cacheNames = await caches.keys()
-    for (const name of cacheNames) {
-      if (!name.includes('transformers')) continue
-      const cache = await caches.open(name)
-      const keys = await cache.keys()
-      for (const req of keys) {
-        const res = await cache.match(req)
-        const ct = res?.headers.get('content-type') ?? ''
-        if (ct.includes('text/html')) {
-          await cache.delete(req)
-        }
-      }
-    }
-  } catch { /* cache API unavailable — skip */ }
-}
-purgeBadCache()
+env.useBrowserCache = false   // disable cache entirely to avoid stale/corrupt entries in dev
 
 export type EmbedProgressCallback = (progress: number) => void
 
@@ -39,11 +17,13 @@ async function getEmbedder(onProgress?: EmbedProgressCallback): Promise<FeatureE
       'feature-extraction',
       'Xenova/all-MiniLM-L6-v2',
       {
-        progress_callback: (p: { status: string; progress?: number }) => {
-          // @xenova/transformers fires status='progress' (not 'downloading')
-          if (p.status === 'progress' && typeof p.progress === 'number') {
-            onProgress?.(Math.round(p.progress))
-          } else if (p.status === 'done' || p.status === 'ready') {
+        progress_callback: (p: Record<string, unknown>) => {
+          // Log every callback in dev so we can see the real status values
+          console.debug('[MiniLM]', p.status, p.progress ?? '')
+          const progress = typeof p.progress === 'number' ? p.progress : null
+          if (progress !== null) {
+            onProgress?.(Math.round(progress))
+          } else if (p.status === 'ready') {
             onProgress?.(100)
           }
         },

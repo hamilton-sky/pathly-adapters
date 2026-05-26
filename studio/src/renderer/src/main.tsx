@@ -6,6 +6,9 @@ import './styles/tokens.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { registerElementResolver } from './lib/elementResolver'
+
+registerElementResolver()
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
