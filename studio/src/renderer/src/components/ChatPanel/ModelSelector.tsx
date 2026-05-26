@@ -22,6 +22,8 @@ export function ModelSelector(): JSX.Element {
   const [progressText, setProgressText] = useState<Record<string, string>>({})
   const [downloadStart, setDownloadStart] = useState<Record<string, number>>({})
   const [elapsed, setElapsed] = useState<Record<string, number>>({})
+  const [downloadPhase, setDownloadPhase] = useState<Record<string, number>>({})
+  const [lastProgress, setLastProgress] = useState<Record<string, number>>({})
   const ref = useRef<HTMLDivElement>(null)
 
   const selectedModelId = useModelStore((s) => s.selectedModelId)
@@ -78,6 +80,8 @@ export function ModelSelector(): JSX.Element {
     setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
     setDownloadStart((prev) => { const n = { ...prev }; delete n[modelId]; return n })
     setElapsed((prev) => { const n = { ...prev }; delete n[modelId]; return n })
+    setDownloadPhase((prev) => { const n = { ...prev }; delete n[modelId]; return n })
+    setLastProgress((prev) => { const n = { ...prev }; delete n[modelId]; return n })
   }
 
   async function handleCacheToggle(modelId: string): Promise<void> {
@@ -89,15 +93,28 @@ export function ModelSelector(): JSX.Element {
     } else {
       const startMs = Date.now()
       setDownloadStart(prev => ({ ...prev, [modelId]: startMs }))
+      setDownloadPhase(prev => ({ ...prev, [modelId]: 1 }))
+      setLastProgress(prev => ({ ...prev, [modelId]: 0 }))
       setProgress(modelId, 0)
       await cacheWebLLMModel(modelId, (pct, text) => {
         setProgress(modelId, pct)
         if (text) setProgressText((prev) => ({ ...prev, [modelId]: text }))
+        // Detect phase reset: if progress drops from a high value back to low,
+        // WebLLM moved from setup phase → weights phase
+        setLastProgress(prev => {
+          const prev_ = prev[modelId] ?? 0
+          if (prev_ > 60 && pct < 20) {
+            setDownloadPhase(p => ({ ...p, [modelId]: 2 }))
+          }
+          return { ...prev, [modelId]: pct }
+        })
       })
       const updated = await getCachedWebLLMModelIds()
       setCached(updated)
       setProgress(modelId, 100)
       setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
+      setDownloadPhase((prev) => { const n = { ...prev }; delete n[modelId]; return n })
+      setLastProgress((prev) => { const n = { ...prev }; delete n[modelId]; return n })
     }
   }
 
@@ -169,10 +186,14 @@ export function ModelSelector(): JSX.Element {
                     <div className={styles.downloadMeta}>
                       <span className={styles.downloadPct}>{progress > 0 ? `${progress}%` : '…'}</span>
                       <span className={styles.downloadPhase}>
-                        {progress === 0 ? 'connecting…' : (parseShardLabel(progressText[model.id]) ?? 'downloading…')}
+                        {progress === 0
+                          ? 'connecting…'
+                          : downloadPhase[model.id] === 2
+                            ? `weights ${parseShardLabel(progressText[model.id]) ?? ''}`
+                            : `setup ${parseShardLabel(progressText[model.id]) ?? '…'}`}
                       </span>
                       <span className={styles.downloadElapsed}>
-                        {formatElapsed(elapsed[model.id] ?? 0)}
+                        {downloadPhase[model.id] === 2 ? '⬇ phase 2/2 · ' : ''}{formatElapsed(elapsed[model.id] ?? 0)}
                       </span>
                     </div>
 
