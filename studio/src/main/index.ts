@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu, globalShortcut } from 'electron'
 import { join } from 'path'
 import { registerFsHandlers } from './ipc/fs'
 import { registerWatcherHandlers } from './ipc/watcher'
@@ -11,6 +11,10 @@ import { getPythonPath } from './python'
 import { registerSetupHandlers } from './setup'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
+
+// WebGPU validation — temporary, remove after testing navigator.gpu in DevTools
+app.commandLine.appendSwitch('enable-unsafe-webgpu')
+app.commandLine.appendSwitch('enable-features', 'Vulkan')
 
 let fsmServer: ChildProcess | null = null
 
@@ -50,7 +54,8 @@ function createWindow(projectPath?: string): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      experimentalFeatures: true
     }
   })
   Menu.setApplicationMenu(null)
@@ -83,6 +88,14 @@ app.whenReady().then(async () => {
 
   const mainWin = createWindow()
   registerIpcHandlers(mainWin)
+
+  if (isDev) {
+    mainWin.webContents.openDevTools({ mode: 'detach' })
+    globalShortcut.register('F12', () => {
+      const focused = BrowserWindow.getFocusedWindow()
+      if (focused) focused.webContents.toggleDevTools()
+    })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

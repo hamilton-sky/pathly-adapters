@@ -144,63 +144,57 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 
 ---
 
-## Phase 1: POST /chat SSE endpoint skeleton + GET /status   ← Conversation 1
+## Phase 1: GET /status endpoint   ← Conversation 1
+
+> **WebGPU validated** (navigator.gpu confirmed available). Explanation layer moves to WebLLM in
+> the renderer (Conv 2). The Python server is now only needed for FSM state. No Ollama, no
+> chat_agent.py, no chat_tools.py.
 
 **File:** `src/pathly_orchestrator/http_server.py` — MODIFY
-**Done when:** `curl -X POST http://127.0.0.1:8765/chat ...` returns 200 AND `curl http://127.0.0.1:8765/status` returns current FSM stage without mutating state
-**Delivers:** S1.1 (partial), S1.2 (partial)
+**Done when:** `curl http://127.0.0.1:8765/status` returns current FSM stage without mutating state
+**Delivers:** S1.2
 **Details:**
-- Add route `/chat` accepting POST: `{ message, matchedSkill, skillDescription, history, context }`
-- Return `Content-Type: text/event-stream`
-- Static placeholder: `data: {"text": "chat endpoint ready"}\n\n`
-- Add `ollama>=0.3` to `pyproject.toml`
 - **Add route `GET /status`** — read-only FSM state endpoint:
   - Calls `read_state()` from `eventlog.py` (pure read, no write)
   - Returns `{ "current_state": str, "feature": str, "project_root": str }`
   - Returns `{ "current_state": "unknown" }` if no project loaded
   - **DO NOT call `/next_action` for context** — it writes `conv_start_sha` to disk on every call
-  - This endpoint is the safe replacement for context reads throughout the feature
+- Do NOT add a `/chat` route — explanation is handled entirely in the renderer via WebLLM
+- Do NOT add `ollama` to `pyproject.toml` — Ollama is not used
 
 ---
 
-## Phase 2: phi4-mini explainer agent   ← Conversation 1
+## ~~Phase 2: phi4-mini explainer agent~~   ← REMOVED
 
-**File:** `src/pathly_orchestrator/chat_agent.py` — CREATE
-**Done when:** `/chat` streams a 2-3 sentence explanation referencing the matched skill and FSM stage
-**Delivers:** S1.1
-**Details:**
-- `ChatAgent` class with `stream(message, matchedSkill, context, history) -> AsyncGenerator[str]`
-- System prompt: **explainer role** (see DESIGN_SPEC.md → phi4-mini System Prompt)
-- Calls `ollama.AsyncClient().chat()` with model from `PATHLY_CHAT_MODEL` (default `phi4-mini`)
-- Streams chunks as SSE: `data: {"text": "..."}\n\n`
-- On Ollama error: yield `data: {"error": "Ollama offline"}\n\n` — MatchCard still works without this
+> **Dead code — do not implement.**
+> WebGPU is confirmed available. The explanation layer runs entirely in the Electron renderer
+> via WebLLM (`@mlc-ai/web-llm`). `chat_agent.py`, `chat_tools.py`, and Ollama are not needed.
+> The Python server's only job is the read-only `/status` endpoint.
 
 ---
 
-## Phase 3: Context injection   ← Conversation 1
+## ~~Phase 3: Context injection (Python side)~~   ← REMOVED
 
-**File:** `src/pathly_orchestrator/chat_tools.py` — CREATE
-**Done when:** phi4-mini explanation mentions the current FSM stage by name
-**Delivers:** S1.2
-**Details:**
-- `get_fsm_state(project_root) -> dict` — calls `read_state()` from `eventlog.py` directly (pure read)
-  **DO NOT call `/next_action`** — it writes `conv_start_sha` to disk. Use `read_state()` only.
-- `read_plan_summary(project_root) -> str` — reads most-recently-modified `plans/*/FEATURE_INDEX.md`
-- Inject into system prompt: `Stage: {fsm_stage} | Feature: {feature_name} | Matched skill: {skill}`
-- Total system prompt cap: 1,000 tokens (explainer context is smaller than general chat)
+> **Dead code — do not implement.**
+> Context (FSM stage, feature name, matched skill) is injected into the WebLLM system prompt
+> directly in the renderer via `pathlyContext.ts` (Phase 12/14). No Python-side prompt building needed.
 
 ---
 
-## Phase 4: Zustand chat store   ← Conversation 2
+## Phase 4: Zustand chat store + model store   ← Conversation 2
 
-**File:** `studio/src/renderer/src/store/chatStore.ts` — CREATE
-**Done when:** `useChatStore()` returns all fields without TypeScript errors
-**Delivers:** S2.2 (partial)
+**Files:** `studio/src/renderer/src/store/chatStore.ts` — CREATE,
+`studio/src/renderer/src/store/modelStore.ts` — CREATE
+**Done when:** `useChatStore()` and `useModelStore()` return all fields without TypeScript errors
+**Delivers:** S2.2 (partial), S9.1 (partial)
 **Details:**
-- Follow pattern from existing `uiStore.ts`
-- Full state shape in DESIGN_SPEC.md → Zustand Store Shape
-- Key additions over a simple message store: `currentMatch`, `altMatches`, `isEmbedding`, `embedReady`
-- Persist: `autoApprove` only (matches and messages are session-only)
+- `chatStore`: follow pattern from existing `uiStore.ts`
+  - Full state shape in DESIGN_SPEC.md → Zustand Store Shape
+  - Key fields: `currentMatch`, `altMatches`, `isEmbedding`, `embedReady`
+  - Persist: `autoApprove` only (matches and messages are session-only)
+- `modelStore`: `selectedModelId: string`, `cachedModelIds: string[]`, `downloadProgress: Record<string, number>`
+  - Actions: `setSelectedModel(id)`, `setCached(ids)`, `setProgress(id, pct)`
+  - Persist: `selectedModelId` only (default `'Phi-4-mini-instruct-q4f16_1-MLC'`)
 
 ---
 
@@ -243,11 +237,13 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 
 ---
 
-## Phase 8: MessageList + ChatInput + Panel wiring   ← Conversation 2
+## Phase 8: MessageList + ChatInput + Panel wiring + WebLLM engine   ← Conversation 2
 
-**Files:** `MessageList.tsx`, `ChatInput.tsx`, `ChatPanel/index.tsx`, `App.tsx` — CREATE/MODIFY
-**Done when:** User can type a message, see it in the list, and see a placeholder MatchCard (static for now)
-**Delivers:** S2.1 (complete), S2.2
+**Files:** `MessageList.tsx`, `ChatInput.tsx`, `ChatPanel/index.tsx`, `App.tsx` — CREATE/MODIFY,
+`studio/src/renderer/src/data/models.ts` — CREATE,
+`studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE
+**Done when:** User can type a message, see it in the list, and receive a streaming WebLLM explanation (no Ollama, no placeholder)
+**Delivers:** S2.1 (complete), S2.2, S9.3 (partial)
 **Details:**
 - `MessageList`: maps messages + renders MatchCard and OutputSnippet inline (not as separate bubbles)
 - **EmptyState**: when `messages.length === 0`, render the empty state component instead of an empty list
@@ -255,9 +251,17 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
   - If feature is active but no messages: show feature name + stage + "Describe what you want to do next"
   - Quick-start chips bypass embedding — clicking one immediately sets `currentMatch` to that skill
   - See DESIGN_SPEC.md → EmptyState for full visual spec
-- `ChatInput`: textarea 1–3 rows, Enter = send, Shift+Enter = newline; `◈ MiniLM` pill (purple), `phi4-mini` pill (green); Send/Stop toggle
+- `ChatInput`: textarea 1–3 rows, Enter = send, Shift+Enter = newline; `◈ MiniLM` pill (purple), model name pill (green, reads `modelStore.selectedModelId` short name); Send/Stop toggle
 - `ChatPanel/index.tsx`: collapse animation `width 200ms ease-out`, 300px ↔ 36px
 - `App.tsx`: add `<ChatPanel />` after `<MainPanel />` in body flex row
+- **`data/models.ts`**: 4 model definitions — `Phi-4-mini-instruct-q4f16_1-MLC` (recommended, default), `Qwen3-4B-q4f16_1-MLC`, `Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC`, `Llama-3.2-3B-Instruct-q4f16_1-MLC`
+  - Each: `{ id, name, description, useCase, storage, speed, recommended? }`
+- **`lib/webLLMEngine.ts`**: `getEngine(modelId, onProgress)` singleton, `askWebLLM(prompt, system, onChunk)` streaming
+  - Add `@mlc-ai/web-llm` to `studio/package.json`
+  - Pre-warm engine at ChatPanel mount (background, no blocking)
+  - On message send: call `askWebLLM(input, systemPrompt, onChunk)` → stream into chatStore explanation field
+  - If engine not ready: show `◈ Loading model…` in explanation area
+- **No POST /chat call** — explanation is 100% local via WebLLM
 - Design: see DESIGN_SPEC.md → Full UI Layout (ASCII)
 
 ---
@@ -601,76 +605,12 @@ useEffect(() => {
 
 ---
 
-## Phase 27: WebLLM models data + engine   ← Conversation 9
+## ~~Phase 27–29: WebLLM engine + model store + wire into chat~~   ← MERGED INTO CONV 2
 
-**Files:** `studio/src/renderer/src/data/models.ts` — CREATE,
-`studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE,
-`studio/src/main/index.ts` — MODIFY (WebGPU flags)
-**Done when:** `getEngine()` loads Phi-4 Mini in Electron and `askWebLLM("hello")` streams a response
-**Delivers:** S9.3 (partial)
-
-**Pre-flight: Enable WebGPU in Electron (do this first)**
-Electron disables WebGPU by default. Without these switches `CreateMLCEngine()` throws immediately.
-In `studio/src/main/index.ts`, before `app.whenReady()`:
-```ts
-app.commandLine.appendSwitch('enable-unsafe-webgpu')
-app.commandLine.appendSwitch('enable-features', 'Vulkan')
-```
-Also add to the `BrowserWindow` `webPreferences`:
-```ts
-webPreferences: {
-  // existing options...
-  experimentalFeatures: true,
-}
-```
-Verify WebGPU is available in the renderer: `navigator.gpu !== undefined` should be `true`.
-If the user's GPU/driver doesn't support WebGPU, `CreateMLCEngine()` will throw — see EC-9.1 for the fallback.
-
-**Details:**
-- Port `WebLLMModels.js` from zakamurai (`src/components/AI/WebLLMModels.js`) to TypeScript:
-  - `Model: { id: string; name: string; description: string; useCase: string; system: string; storage: string; speed: string; recommended?: boolean }`
-  - 4 models: Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC, Qwen3-4B-q4f16_1-MLC, Phi-4-mini-instruct-q4f16_1-MLC (recommended), Llama-3.2-3B-Instruct-q4f16_1-MLC
-- Port `WebLLMAPI.js` from zakamurai to TypeScript:
-  - `getEngine(modelId, onProgress): Promise<MLCEngine>` — singleton, recreates if model changes
-  - `getCachedWebLLMModelIds(): Promise<string[]>` — checks browser cache storage
-  - `cacheWebLLMModel(modelId, onProgress): Promise<void>` — download + cache
-  - `deleteCachedWebLLMModel(modelId): Promise<void>`
-  - `askWebLLM(prompt, system, onChunk): Promise<string>` — streaming via callback
-- Add `@mlc-ai/web-llm` to `studio/package.json`
-
----
-
-## Phase 28: modelStore + ModelSelector UI   ← Conversation 9
-
-**Files:** `studio/src/renderer/src/store/modelStore.ts` — CREATE,
-`studio/src/renderer/src/components/ChatPanel/ModelSelector.tsx` — CREATE
-**Done when:** Model selector UI renders; selecting Phi-4 Mini downloads it with progress; selection persists
-**Delivers:** S9.1, S9.2, S9.4
-**Details:**
-- `modelStore`: `selectedModelId: string`, `cachedModelIds: string[]`, `downloadProgress: Record<string, number>`, `setSelectedModel(id)`, `setCached(ids)`, `setProgress(id, pct)`
-- Persist: `selectedModelId` only
-- `ModelSelector` UI (matches your screenshots):
-  - Dropdown trigger showing current model name + `▼` chevron + `ℹ` info button
-  - Dropdown panel: each model as an expandable card showing name, description, SYSTEM / STORAGE / SPEED rows
-  - Badges: `Recommended` (teal), `Cached` (green), `Selected` (blue)
-  - `Cache` toggle per model — calls `cacheWebLLMModel()` / `deleteCachedWebLLMModel()`
-  - Download progress: linear progress bar under the model card while downloading
-  - Wired into `ConductorHeader` — replace the `phi4-mini` pill with the `ModelSelector` dropdown
-
----
-
-## Phase 29: Wire WebLLM into chat flow   ← Conversation 9
-
-**Files:** `src/pathly_orchestrator/chat_agent.py` — MODIFY (make Ollama optional),
-`ChatPanel/index.tsx` — MODIFY, `chatStore.ts` — MODIFY
-**Done when:** phi4-mini explanation comes from WebLLM (selected model) instead of Ollama
-**Delivers:** S9.3 (complete)
-**Details:**
-- Replace `POST /chat` SSE call with local `askWebLLM()` call in the renderer (no server round-trip)
-- The Python `chat_agent.py` stays for teams using Ollama — make it optional via `PATHLY_CHAT_BACKEND=ollama|webllm`
-- Default to `webllm` — `askWebLLM(prompt, systemPrompt, onChunk)` streams into chatStore directly
-- Update `ChatInput` model pill: was `phi4-mini` hardcoded → now reads `modelStore.selectedModelId` short name
-- If WebLLM engine not loaded yet: show spinner in explanation area (same as "Ollama offline" fallback)
+> **WebGPU validated before Conv 1.** WebLLM engine, model definitions, and modelStore were
+> moved into Phase 8 (Conv 2) so the explanation layer is local from the very first message.
+> Conv 9 no longer exists as a separate track — it has been fully absorbed.
+> `chat_agent.py`, `chat_tools.py`, and Ollama are not part of this plan.
 
 ---
 
@@ -678,8 +618,8 @@ If the user's GPU/driver doesn't support WebGPU, `CreateMLCEngine()` will throw 
 - MiniLM will auto-download via transformers.js (~22MB, first launch only)
 - WebLLM models download on first cache (Phi-4 Mini ~2GB, Qwen3 4B ~3GB, Qwen2.5 Coder ~5GB)
 - Pathly FSM server running on port 8765 before testing Conv 1
-- Ollama optional (legacy backend) — not required for Conv 9+
-- **Conv 9 requires WebGPU:** Electron disables it by default. Must add `--enable-unsafe-webgpu` switch and `experimentalFeatures: true` in webPreferences before Conv 9 will work — see Phase 27 pre-flight.
+- **Ollama: not required.** Explanation runs via WebLLM in the renderer. No `chat_agent.py`, no Ollama install needed.
+- **WebGPU: already enabled** in `studio/src/main/index.ts` (validated before Conv 1 — `navigator.gpu` confirmed non-null). `--enable-unsafe-webgpu`, `enable-features=Vulkan`, and `experimentalFeatures: true` are already in place.
 
 ## Key Decisions
 - **Embedding over LLM for routing:** Zero hallucination, 22ms, deterministic. See ARCHITECTURE_PROPOSAL.md Decision 1.

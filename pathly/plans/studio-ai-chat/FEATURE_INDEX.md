@@ -64,11 +64,11 @@ No Ollama required. Models data and engine ported from zakamurai.
 
 | Codebase file | Conv | What changes |
 |---|---|---|
-| `src/pathly_orchestrator/http_server.py` | 1 | Add `POST /chat` SSE endpoint |
-| `src/pathly_orchestrator/chat_agent.py` | 1 | CREATE — phi4-mini explainer (NOT router) |
-| `src/pathly_orchestrator/chat_tools.py` | 1 | CREATE — get_fsm_state, read_plan_summary |
-| `pyproject.toml` | 1 | Add `ollama>=0.3` |
+| `src/pathly_orchestrator/http_server.py` | 1 | Add `GET /status` read-only FSM endpoint only |
 | `studio/src/renderer/src/store/chatStore.ts` | 2 | CREATE — messages, streaming, match state |
+| `studio/src/renderer/src/store/modelStore.ts` | 2 | CREATE — selected model, download progress, cache |
+| `studio/src/renderer/src/data/models.ts` | 2 | CREATE — 4 WebLLM model definitions |
+| `studio/src/renderer/src/lib/webLLMEngine.ts` | 2 | CREATE — WebLLM engine singleton + askWebLLM() |
 | `studio/src/renderer/src/store/uiStore.ts` | 2 | MODIFY — add chatOpen, skillsPanelOpen |
 | `studio/src/renderer/src/components/ChatPanel/index.tsx` | 2 | CREATE — panel container |
 | `studio/src/renderer/src/components/ChatPanel/ConductorHeader.tsx` | 2 | CREATE — header + CLI status pills |
@@ -94,10 +94,7 @@ No Ollama required. Models data and engine ported from zakamurai.
 | `studio/src/renderer/src/store/automationStore.ts` | 8 | CREATE — step queue, staged/auto state |
 | `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx` | 8 | CREATE — staged step UI with approve/skip |
 | `studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx` | 8 | CREATE — AI action plan display |
-| `studio/src/renderer/src/data/models.ts` | 9 | CREATE — model definitions (ported from zakamurai) |
-| `studio/src/renderer/src/lib/webLLMEngine.ts` | 9 | CREATE — WebLLM engine wrapper (ported from zakamurai) |
-| `studio/src/renderer/src/store/modelStore.ts` | 9 | CREATE — selected model, download progress, cache state |
-| `studio/src/renderer/src/components/ChatPanel/ModelSelector.tsx` | 9 | CREATE — model picker UI with system req cards |
+| `studio/src/renderer/src/components/ChatPanel/ModelSelector.tsx` | 2 | CREATE — model picker dropdown in ConductorHeader |
 
 > **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
 
@@ -107,15 +104,15 @@ No Ollama required. Models data and engine ported from zakamurai.
 
 | Conv | Title | Track | Stories | Status | Key files touched |
 |---|---|---|---|---|---|
-| 1 | Python Chat Agent Server | Core | S1.1, S1.2 | TODO | `http_server.py`, `chat_agent.py`, `chat_tools.py` |
-| 2 | Studio Chat UI + Skills Panel | Core | S2.1, S2.2, S2.3 | TODO | `chatStore.ts`, `ChatPanel/`, `App.tsx` |
+| 1 | Python /status endpoint | Core | S1.2 | TODO | `http_server.py` |
+| 2 | Studio Chat UI + WebLLM engine | Core | S2.1, S2.2, S2.3, S9.1, S9.3 | TODO | `chatStore.ts`, `modelStore.ts`, `ChatPanel/`, `models.ts`, `webLLMEngine.ts`, `App.tsx` |
 | 3 | MatchCard + Terminal Write | Core | S3.1, S3.2 | TODO | `MatchCard.tsx`, `OutputSnippet.tsx`, `launchTerminal.ts` |
 | 4 | Context Injection | Core | S4.1, S4.2 | TODO | `pathlyContext.ts`, `ChatPanel/index.tsx` |
 | 5 | Embedding Router | Core | S5.1, S5.2, S5.3 | TODO | `embedRouter.ts`, `skillsManifest.ts`, `skills.json` |
 | 6 | Static Studio Schema + Context Injection | Track A | S6.1, S6.2 | TODO | `studioSchema.ts`, `pathlyContext.ts` |
 | 7 | Playwright Executor | Track A | S7.1, S7.2, S7.3 | TODO | `playwrightExecutor.ts`, `ipc/automation.ts`, `studio/package.json` |
 | 8 | Staged / Auto Automation Mode | Track A | S8.1, S8.2, S8.3, S8.4 | TODO | `automationStore.ts`, `StepQueue.tsx`, `AutomationCard.tsx` |
-| 9 | Model Selector + WebLLM | Track B | S9.1, S9.2, S9.3, S9.4 | TODO | `models.ts`, `webLLMEngine.ts`, `modelStore.ts`, `ModelSelector.tsx` |
+| ~~9~~ | ~~Model Selector + WebLLM~~ | ~~Track B~~ | — | MERGED→Conv 2 | Absorbed into Conv 2 |
 
 ---
 
