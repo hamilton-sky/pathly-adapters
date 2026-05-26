@@ -132,3 +132,12 @@ export function interruptWebLLM(): void {
   interrupted = true
   engine?.interruptGenerate?.()
 }
+
+export function cancelEngineLoad(): void {
+  // Resets engine state so the user can switch models immediately.
+  // The underlying CreateMLCEngine fetch cannot be aborted via WebLLM's API,
+  // but resetting here allows a fresh load on the next send.
+  engine = null
+  enginePromise = null
+  engineModelId = null
+}

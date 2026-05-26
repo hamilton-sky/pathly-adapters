@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, Info } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { WEB_LLM_MODELS } from '../../data/models'
 import { useModelStore } from '../../store/modelStore'
-import { cacheWebLLMModel, deleteCachedWebLLMModel, getCachedWebLLMModelIds } from '../../lib/webLLMEngine'
+import { cacheWebLLMModel, cancelEngineLoad, deleteCachedWebLLMModel, getCachedWebLLMModelIds } from '../../lib/webLLMEngine'
 import styles from './ModelSelector.module.css'
 
 function formatElapsed(secs: number): string {
@@ -19,7 +19,6 @@ function parseShardLabel(text: string | undefined): string | null {
 
 export function ModelSelector(): JSX.Element {
   const [open, setOpen] = useState(false)
-  const [showInfo, setShowInfo] = useState(false)
   const [progressText, setProgressText] = useState<Record<string, string>>({})
   const [downloadStart, setDownloadStart] = useState<Record<string, number>>({})
   const [elapsed, setElapsed] = useState<Record<string, number>>({})
@@ -72,6 +71,14 @@ export function ModelSelector(): JSX.Element {
     return () => clearInterval(t)
   }, [downloadProgress, downloadStart])
 
+  function handleCancelDownload(modelId: string): void {
+    cancelEngineLoad()
+    setProgress(modelId, 0)
+    setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
+    setDownloadStart((prev) => { const n = { ...prev }; delete n[modelId]; return n })
+    setElapsed((prev) => { const n = { ...prev }; delete n[modelId]; return n })
+  }
+
   async function handleCacheToggle(modelId: string): Promise<void> {
     const isCached = cachedModelIds.includes(modelId)
     if (isCached) {
@@ -103,13 +110,6 @@ export function ModelSelector(): JSX.Element {
         >
           <span className={styles.triggerName}>{shortName}</span>
           <ChevronDown size={11} className={open ? styles.chevronOpen : styles.chevron} />
-        </button>
-        <button
-          className={styles.infoBtn}
-          onClick={() => setShowInfo((v) => !v)}
-          title="Model info"
-        >
-          <Info size={11} />
         </button>
       </div>
 
@@ -187,16 +187,24 @@ export function ModelSelector(): JSX.Element {
                   </div>
                 )}
 
-                <button
-                  className={`${styles.cacheBtn} ${isCached ? styles.cacheBtnOn : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void handleCacheToggle(model.id)
-                  }}
-                  disabled={isDownloading}
-                >
-                  {isCached ? '✕ Remove from cache' : isDownloading ? `Downloading ${progress}%…` : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}
-                </button>
+                {isDownloading ? (
+                  <button
+                    className={`${styles.cacheBtn} ${styles.cacheBtnCancel}`}
+                    onClick={(e) => { e.stopPropagation(); handleCancelDownload(model.id) }}
+                  >
+                    ✕ Cancel download
+                  </button>
+                ) : (
+                  <button
+                    className={`${styles.cacheBtn} ${isCached ? styles.cacheBtnOn : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void handleCacheToggle(model.id)
+                    }}
+                  >
+                    {isCached ? '✕ Remove from cache' : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}
+                  </button>
+                )}
               </div>
             )
           })}
