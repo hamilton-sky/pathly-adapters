@@ -40,7 +40,7 @@ export async function writeToTerminal(
   } else {
     tabId = crypto.randomUUID()
     addTab(tabId, kind === 'claude' ? 'claude' : 'codex', 'left', kind)
-    await window.pathly?.terminal?.spawn(tabId, projectPath)
+    await window.pathly?.terminal?.spawn(tabId, projectPath, kind)
   }
 
   if (!open) toggle()

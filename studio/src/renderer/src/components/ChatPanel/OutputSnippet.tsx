@@ -7,8 +7,9 @@ interface OutputSnippetProps {
   lines: string[]
 }
 
-export function OutputSnippet({ target, status, lines }: OutputSnippetProps): JSX.Element {
+export function OutputSnippet({ target, status, lines: rawLines }: OutputSnippetProps): JSX.Element {
   const t = useTheme()
+  const lines = rawLines.slice(-5)
 
   const targetColor = target === 'claude-code' ? '#38BDF8' : '#F59E0B'
   const targetLabel = target === 'claude-code' ? 'claude' : 'codex'

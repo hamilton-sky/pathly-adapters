@@ -1,11 +1,6 @@
+import type { MatchResult } from '../../store/chatStore'
 import { useTheme } from '../../useTheme'
 import styles from './MatchCard.module.css'
-
-export interface MatchResult {
-  skill: string
-  confidence: number
-  command: string
-}
 
 interface MatchCardProps {
   match: MatchResult

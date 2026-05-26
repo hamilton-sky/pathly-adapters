@@ -44,7 +44,7 @@ export function ChatPanel(): JSX.Element {
     if (!matchingTab) return
 
     const tabId = matchingTab.id
-    const unsub = window.pathly.terminal.onData(tabId, (data) => {
+    const unsub = window.pathly?.terminal?.onData(tabId, (data) => {
       appendOutputLine(stripAnsi(data))
     })
     return unsub
