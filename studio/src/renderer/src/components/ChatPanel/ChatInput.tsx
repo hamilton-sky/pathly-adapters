@@ -32,7 +32,7 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (!disabled && value.trim() && isModelCached) {
+      if (!disabled && value.trim()) {
         onSend()
       }
     }
@@ -70,8 +70,8 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        disabled={disabled || isDownloading || !isModelCached}
-        placeholder={isDownloading ? 'Waiting for MiniLM to download…' : !isModelCached ? `Download ${modelShortName} to start chatting…` : 'Message Conductor…'}
+        disabled={disabled || isDownloading}
+        placeholder={isDownloading ? 'Waiting for MiniLM to download…' : !isModelCached ? `Send to auto-download & start ${modelShortName}…` : 'Message Conductor…'}
         rows={1}
         style={{
           color: t.textPrimary,
@@ -111,12 +111,12 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
         </span>
         <button
           className={styles.sendButton}
-          onClick={() => { if (!disabled && value.trim() && isModelCached) onSend() }}
-          disabled={disabled || !value.trim() || isDownloading || !isModelCached}
+          onClick={() => { if (!disabled && value.trim()) onSend() }}
+          disabled={disabled || !value.trim() || isDownloading}
           title="Send (Enter)"
           style={{
-            background: value.trim() && !disabled && !isDownloading && isModelCached ? t.accent : t.bgSurface1,
-            color: value.trim() && !disabled && !isDownloading && isModelCached ? '#000' : t.textMuted,
+            background: value.trim() && !disabled && !isDownloading ? t.accent : t.bgSurface1,
+            color: value.trim() && !disabled && !isDownloading ? '#000' : t.textMuted,
           }}
         >
           <Send size={13} />

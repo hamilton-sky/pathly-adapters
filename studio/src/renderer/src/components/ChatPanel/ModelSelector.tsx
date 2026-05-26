@@ -195,7 +195,7 @@ export function ModelSelector(): JSX.Element {
                   }}
                   disabled={isDownloading}
                 >
-                  {isCached ? '✓ Cached — click to remove' : isDownloading ? `Downloading ${progress}%…` : '↓ Download & cache'}
+                  {isCached ? '✕ Remove from cache' : isDownloading ? `Downloading ${progress}%…` : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}
                 </button>
               </div>
             )

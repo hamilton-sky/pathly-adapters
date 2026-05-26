@@ -9,7 +9,7 @@ import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
 import { PATHLY_API_BASE } from '../../lib/config'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
-import { askWebLLM, getEngine } from '../../lib/webLLMEngine'
+import { askWebLLM, getEngine, getCachedWebLLMModelIds } from '../../lib/webLLMEngine'
 import { useModelStore } from '../../store/modelStore'
 import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
@@ -233,7 +233,26 @@ export function ChatPanel(): JSX.Element {
       const systemPrompt = buildSystemPrompt(context, topMatch)
       try {
         const selectedModelId = useModelStore.getState().selectedModelId
-        await getEngine(selectedModelId)
+        const isCached = useModelStore.getState().cachedModelIds.includes(selectedModelId)
+        if (!isCached) {
+          // Model not downloaded yet — auto-download and show progress in the chat bubble
+          updateLastMessage({ content: '⬇ Downloading model — this may take a few minutes…', status: 'streaming' })
+          await getEngine(selectedModelId, (pct, progressText) => {
+            useModelStore.getState().setProgress(selectedModelId, pct)
+            const shardMatch = progressText?.match(/\[(\d+)\/(\d+)\]/)
+            const shardLabel = shardMatch ? ` · shard ${shardMatch[1]}/${shardMatch[2]}` : ''
+            updateLastMessage({
+              content: `⬇ Downloading model… **${pct}%**${shardLabel}`,
+              status: 'streaming',
+            })
+          })
+          const updated = await getCachedWebLLMModelIds()
+          useModelStore.getState().setCached(updated)
+          useModelStore.getState().setProgress(selectedModelId, 100)
+          updateLastMessage({ content: '', status: 'streaming' })
+        } else {
+          await getEngine(selectedModelId)
+        }
         let fullText = ''
         await askWebLLM(text, systemPrompt, (chunk) => {
           fullText += chunk
