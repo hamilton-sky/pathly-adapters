@@ -34,7 +34,7 @@ export function WizardFooter({
         {step > 1 && (
           <button style={styles.backBtn} onClick={onBack}>← Back</button>
         )}
-        {step < 5 ? (
+        {step < 8 ? (
           <button style={saveNextStyle} onClick={onNext} disabled={isNextDisabled}>
             Next →
           </button>

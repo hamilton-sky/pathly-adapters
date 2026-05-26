@@ -31,6 +31,12 @@ agent_map:
   BUILDING: team/build
   REVIEWING: team/review
   TESTING: team/test
+role_map:
+  STORMING: discoverer
+  PLANNING: planner
+  BUILDING: builder
+  REVIEWING: reviewer
+  TESTING: tester
 
 # Priority order is fixed: HUMAN_QUESTIONS > BLOCKED_ON_HUMAN > ARCH_FEEDBACK >
 # DESIGN_QUESTIONS > IMPL_QUESTIONS > REVIEW_FAILURES > TEST_FAILURES.

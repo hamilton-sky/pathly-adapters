@@ -18,7 +18,7 @@ export function Step1Name({
   return (
     <div>
       <div style={styles.stepHeader}>Create a new flow</div>
-      <div style={styles.stepSub}>Step 1 / 5 — Name &amp; Description</div>
+      <div style={styles.stepSub}>Step 1 / 8 — Name &amp; Description</div>
       <label htmlFor="flow-name" style={styles.label}>Flow name *</label>
       <input
         id="flow-name"

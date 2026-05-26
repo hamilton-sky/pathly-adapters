@@ -15,6 +15,10 @@ transitions:
     - PLANNING
   PLANNING:
     - DESIGNING
+    - PLANNING
+  DESIGNING:
+    - BUILDING
+    - DESIGNING
   BUILDING:
     - REVIEWING
   REVIEWING:
@@ -26,8 +30,6 @@ transitions:
   RETRO:
     - DONE
   DONE: []
-  DESIGNING:
-    - BUILDING
 agent_map:
   STORMING: team/discover
   PLANNING: team/plan
@@ -36,6 +38,14 @@ agent_map:
   REVIEWING: team/review
   TESTING: team/test
   RETRO: team/retro
+role_map:
+  STORMING: discoverer
+  PLANNING: planner
+  DESIGNING: designer
+  BUILDING: builder
+  REVIEWING: reviewer
+  TESTING: tester
+  RETRO: retro
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
@@ -63,7 +73,7 @@ transition_rules:
     default: TESTING
   TESTING:
     on_artifact:
-      TEST_FAILURES.md: TESTING
+      TEST_FAILURES.md: BUILDING
     default: RETRO
 transition_actions:
   BUILDING->REVIEWING:

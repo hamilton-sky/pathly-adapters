@@ -7,16 +7,16 @@ const NODE_HEIGHT = 72
 export function applyDagreLayout(
   nodes: Node[],
   edges: Edge[],
-  direction: 'LR' | 'TB' = 'LR'
+  direction: 'LR' | 'TB' = 'TB'
 ): Node[] {
   const g = new dagre.graphlib.Graph()
   g.setGraph({
     rankdir: direction,
-    ranksep: 100,  // space between ranks (columns in LR mode)
-    nodesep: 50,   // space between nodes in the same rank
+    ranksep: direction === 'TB' ? 80 : 100,
+    nodesep: direction === 'TB' ? 80 : 50,
     edgesep: 20,
-    marginx: 32,
-    marginy: 32,
+    marginx: 48,
+    marginy: 48,
   })
   g.setDefaultEdgeLabel(() => ({}))
 

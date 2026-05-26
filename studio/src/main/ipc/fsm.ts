@@ -12,12 +12,12 @@ export function registerFsmHandlers(): void {
     }
   })
 
-  ipcMain.handle('fsm:state', async (_event, topic: string, projectRoot: string) => {
+  ipcMain.handle('fsm:state', async (_event, topic: string, projectRoot: string, flow: string = 'team') => {
     try {
       const res = await fetch(`${FSM_BASE}/next_action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flow: 'team', topic, project_root: projectRoot }),
+        body: JSON.stringify({ flow, topic, project_root: projectRoot }),
         signal: AbortSignal.timeout(2000),
       })
       return res.ok ? res.json() : null
