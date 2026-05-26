@@ -1,3 +1,6 @@
+---
+
+---
 # Studio AI Chat — Architecture Proposal
 
 ## Problem Statement

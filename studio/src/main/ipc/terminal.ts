@@ -36,7 +36,12 @@ function isValidCwd(dir: string): boolean {
 }
 
 function resolveShell(command: string | undefined): { shell: string; args: string[] } {
-  if (process.platform !== 'win32') return { shell: command ?? 'bash', args: [] }
+  if (process.platform !== 'win32') {
+    if (command === 'claude' || command === 'codex') {
+      return { shell: 'bash', args: ['-c', `exec ${command}`] }
+    }
+    return { shell: command ?? 'bash', args: [] }
+  }
   if (command === 'claude') return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'claude'] }
   if (command === 'codex')  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'codex'] }
   return { shell: 'powershell.exe', args: [] }
@@ -106,12 +111,16 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
   ipcMain.on('terminal:write', (event, tabId: string, data: string) => {
     // Phase 2: only allow the owning sender to write
     if (ptyOwners.get(tabId) !== event.sender.id) return
+    const MAX_WRITE = 65536 // 64KB
+    if (typeof data !== 'string' || data.length > MAX_WRITE) return
     activePtys.get(tabId)?.write(data)
   })
 
   ipcMain.handle('terminal:resize', (event, tabId: string, cols: number, rows: number) => {
     if (ptyOwners.get(tabId) !== event.sender.id) return
-    activePtys.get(tabId)?.resize(cols, rows)
+    const safeCols = Math.max(1, Math.min(500, Math.floor(Number(cols))))
+    const safeRows = Math.max(1, Math.min(500, Math.floor(Number(rows))))
+    activePtys.get(tabId)?.resize(safeCols, safeRows)
   })
 
   ipcMain.handle('terminal:kill', (event, tabId: string) => {
@@ -130,10 +139,12 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     const ptyProcess = activePtys.get(tabId)
     if (!ptyProcess) throw new Error(`No PTY for tab ${tabId}`)
 
+    const safeLabel = String(label ?? '').replace(/[\x00-\x1F\x7F]/g, '').slice(0, 100) || 'Terminal'
+
     const popupWin = new BrowserWindow({
       width: 900,
       height: 600,
-      title: label,
+      title: safeLabel,
       backgroundColor: '#1e1e2e',
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),

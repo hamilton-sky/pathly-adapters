@@ -41,7 +41,7 @@
 | Conv | Phases | Track | Stories | Status | Verify |
 |------|--------|-------|---------|--------|--------|
 | 0 | 0a–0c | Core | S0.1, S0.2, S0.3 | DONE | `cd studio && npm run typecheck` + visual check in Studio |
-| 1 | 1–3 | Core | S1.1, S1.2 | TODO | `curl -X POST http://127.0.0.1:8765/chat -d '{"message":"explain /pathly build","matchedSkill":"build","history":[]}'` |
+| 1 | 1 | Core | S1.1, S1.2 | TODO | `curl http://127.0.0.1:8765/status?project_root=.` |
 | 2 | 4–8 | Core | S2.1, S2.2, S2.3, S2.4 | TODO | `cd studio && npm run typecheck` |
 | 3 | 9–11 | Core | S3.1, S3.2 | TODO | `cd studio && npm run typecheck` |
 | 4 | 12–14 | Core | S4.1, S4.2 | TODO | `cd studio && npm run typecheck` |
@@ -58,9 +58,9 @@
 | 0 | 0a | `studio/src/main/ipc/terminal.ts` | Add claude+codex to ALLOWED_SHELLS | Terminal tabs launch without "Shell not allowed" | DONE |
 | 0 | 0b | `Terminal/index.tsx` + CSS | Compact dock: 180px default, 72px empty, inline launchers | No blank dead zone, launch buttons visible | DONE |
 | 0 | 0c | `Terminal/PaneTabBar.tsx` + CSS | Sessions vs launchers hierarchy, active tab styling | Clear visual separation, active tab legible | DONE |
-| 1 | 1 | `src/pathly_orchestrator/http_server.py` | Add POST /chat SSE skeleton + GET /status | curl returns 200, /status returns stage | TODO |
-| 1 | 2 | `src/pathly_orchestrator/chat_agent.py` | phi4-mini explainer agent | Streams 2-3 sentence explanation | TODO |
-| 1 | 3 | `src/pathly_orchestrator/chat_tools.py` | get_fsm_state, read_plan_summary | AI references FSM stage by name | TODO |
+| 1 | 1 | `src/pathly_orchestrator/http_server.py` | Add GET /status (read-only FSM state, no side effects) | curl returns { current_state, feature, project_root } | TODO |
+| 1 | ~~2~~ | ~~chat_agent.py~~ | **REMOVED** — WebLLM pivot: explanation runs in renderer, not Python | — | REMOVED |
+| 1 | ~~3~~ | ~~chat_tools.py~~ | **REMOVED** — WebLLM pivot: renderer calls GET /status directly | — | REMOVED |
 | 2 | 4 | `studio/src/renderer/src/store/chatStore.ts` | Zustand store — messages + match state | No TS errors | TODO |
 | 2 | 5 | `studio/src/renderer/src/store/uiStore.ts` | Add chatOpen, skillsPanelOpen | State persists across remounts | TODO |
 | 2 | 6 | `ChatPanel/ConductorHeader.tsx` | Header + CLI pills | Pills show active/idle state | TODO |

@@ -7,6 +7,8 @@
 
 /* ── Panel shell ── */
 .panel {
+  --t-claude-hover: rgba(167, 139, 250, 0.1);
+  --t-codex-hover: rgba(96, 170, 255, 0.1);
   display: flex;
   flex-direction: column;
   background: var(--t-bg);
@@ -229,7 +231,7 @@
 }
 
 .iconBtnClaude:hover {
-  background: rgba(167, 139, 250, 0.1) !important;
+  background: var(--t-claude-hover) !important;
   color: var(--t-accent) !important;
 }
 
@@ -242,7 +244,7 @@
 }
 
 .iconBtnCodex:hover {
-  background: rgba(96, 170, 255, 0.1) !important;
+  background: var(--t-codex-hover) !important;
   color: var(--t-blue) !important;
 }
 
@@ -350,7 +352,7 @@
   flex: 1;
   overflow: hidden;
   position: relative;
-  background: #0f0f1a;
+  background: var(--t-mantle);
 }
 
 .emptyHint {
@@ -429,11 +431,11 @@
   background: transparent;
 }
 .tabViewActive .xterm-viewport::-webkit-scrollbar-thumb {
-  background: #343452;
+  background: var(--t-surface1);
   border-radius: 3px;
 }
 .tabViewActive .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: #5a5d8a;
+  background: var(--t-text-muted);
 }
 
 /* ── Agent status dot ── */

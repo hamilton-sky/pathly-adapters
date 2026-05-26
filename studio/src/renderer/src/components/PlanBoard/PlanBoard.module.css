@@ -22,23 +22,25 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 12px 16px 10px;
   border-bottom: 1px solid var(--bg-surface0);
   flex-shrink: 0;
 }
 
 .planName {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
 .fsmBadge {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
   color: var(--bg-base);
-  padding: 2px 10px;
-  border-radius: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
   background-color: var(--text-muted);
 }
 
@@ -47,12 +49,43 @@
 .fsmBadge[data-fsm-state="reviewing"] { background-color: var(--runtime); }
 .fsmBadge[data-fsm-state="blocked"]   { background-color: var(--red); }
 
+/* ─── Progress bar ───────────────────────────────── */
+.progressSection {
+  padding: 8px 16px 6px;
+  border-bottom: 1px solid var(--bg-surface0);
+  flex-shrink: 0;
+}
+
+.progressBar {
+  height: 3px;
+  background: var(--bg-surface0);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+  min-width: 3px;
+}
+
+.progressMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── Card list ──────────────────────────────────── */
 .cardList {
-  padding: 16px 24px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
 }
 
 /* ─── Conv card ──────────────────────────────────── */
@@ -62,23 +95,23 @@
 }
 
 .card {
-  border-radius: 6px;
+  border-radius: 7px;
   overflow: hidden;
-  min-height: 52px;
-  border-left: 3px solid var(--text-muted);
-  background-color: rgba(108, 112, 134, 0.05);
+  border-left: 3px solid transparent;
+  background-color: transparent;
   cursor: pointer;
   outline: none;
+  transition: background 0.1s;
 }
 
 .card[data-status="done"] {
-  border-left-color: #16a34a;
-  background-color: rgba(166, 227, 161, 0.05);
+  border-left-color: #22c55e;
+  background-color: rgba(34, 197, 94, 0.06);
 }
 
 .card[data-status="active"] {
   border-left-color: #06b6d4;
-  background-color: rgba(34, 211, 238, 0.05);
+  background-color: rgba(6, 182, 212, 0.05);
 }
 
 .card[data-status="blocked"] {
@@ -86,13 +119,31 @@
   background-color: rgba(243, 139, 168, 0.05);
 }
 
+.card[data-next="true"] {
+  border-left-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.card[data-future="true"] {
+  opacity: 0.45;
+}
+
 .card[data-selected="true"] {
-  border-left-color: var(--accent);
-  background-color: var(--bg-surface1);
+  border-left-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.card[data-selected="true"][data-status="done"] {
+  border-left-color: #22c55e;
+  background-color: rgba(34, 197, 94, 0.1);
 }
 
 .card[data-hovered="true"]:not([data-selected="true"]) {
   background-color: var(--bg-surface1);
+}
+
+.card[data-future="true"]:hover {
+  opacity: 0.75;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -106,13 +157,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 7px 10px;
   gap: 8px;
 }
 
 .cardLeft {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   flex: 1;
   overflow: hidden;
@@ -121,13 +172,16 @@
 .statusIcon {
   font-weight: 700;
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-muted);
+  width: 14px;
+  text-align: center;
 }
 
-.statusIcon[data-status="done"]    { color: #16a34a; }
+.statusIcon[data-status="done"]    { color: #22c55e; }
 .statusIcon[data-status="active"]  { color: #06b6d4; }
 .statusIcon[data-status="blocked"] { color: var(--red); }
+.statusIcon[data-next="true"]      { color: #60a5fa; font-size: 10px; }
 
 .textBlock {
   flex: 1;
@@ -135,72 +189,81 @@
 }
 
 .cardTitle {
-  font-size: 14px;
-  color: var(--text-primary);
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.3;
 }
 
-.cardMeta {
-  font-size: 12px;
+.convNum {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.convNum[data-status="done"]         { color: #4ade80; }
+.convNum[data-status="active"]       { color: #22d3ee; }
+.convNum[data-status="blocked"]      { color: var(--red); }
+.convNum[data-selected="true"]       { color: #93c5fd; }
+.convNum[data-next="true"]           { color: var(--text-primary); }
+
+.convPhase {
+  font-weight: 400;
   color: var(--text-muted);
-  font-family: var(--font-family-mono);
-  margin-top: 2px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  font-size: 11px;
 }
 
-.cardCost {
-  font-size: 12px;
+.cardStats {
+  font-size: 10px;
   color: var(--text-muted);
   font-family: var(--font-family-mono);
   font-variant-numeric: tabular-nums;
-  margin-top: 2px;
+  margin-top: 1px;
+  opacity: 0.75;
 }
 
+/* ─── Status badge (pill) ────────────────────────── */
 .statusBadge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 99px;
   flex-shrink: 0;
+  text-transform: lowercase;
+  border: 1px solid transparent;
+}
+
+.statusBadge[data-badge="done"] {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.statusBadge[data-badge="active"],
+.statusBadge[data-badge="in progress"],
+.statusBadge[data-badge="reviewing"],
+.statusBadge[data-badge="building"] {
+  color: #22d3ee;
+  background: rgba(6, 182, 212, 0.1);
+  border-color: rgba(6, 182, 212, 0.2);
+}
+
+.statusBadge[data-badge="next"] {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.statusBadge[data-badge="todo"] {
   color: var(--text-muted);
+  background: rgba(108, 112, 134, 0.08);
+  border-color: rgba(108, 112, 134, 0.15);
 }
 
-.statusBadge[data-status="done"]    { color: #16a34a; }
-.statusBadge[data-status="active"]  { color: #06b6d4; }
-.statusBadge[data-status="blocked"] { color: var(--red); }
-
-/* ─── Events section ─────────────────────────────── */
-.recentEventsSection {
-  padding: 0 24px 16px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.statusBadge[data-badge="blocked"] {
+  color: var(--red);
+  background: rgba(243, 139, 168, 0.1);
+  border-color: rgba(243, 139, 168, 0.2);
 }
 
-.recentEventsHeader {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 6px;
-}
-
-.eventRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  font-family: monospace;
-  color: var(--text-secondary);
-  padding: 2px 0;
-}
-
-.eventType   { color: var(--blue);      font-weight: 600; flex-shrink: 0; }
-.eventAgent  { color: var(--accent);    flex-shrink: 0; }
-.eventResult { color: var(--green);     flex-shrink: 0; }
-.eventCost   { color: var(--yellow);    flex-shrink: 0; }
-.eventTime   { color: var(--text-muted); font-size: 11px; margin-left: auto; }

@@ -6,6 +6,7 @@ import { useTheme } from '../../useTheme'
 import type { TabInstance } from './types'
 import { TerminalTabView } from './TerminalTabView'
 import { PaneTabBar } from './PaneTabBar'
+import { launchTerminal } from '../../lib/launchTerminal'
 import styles from './Terminal.module.css'
 
 export function Terminal(): JSX.Element {
@@ -74,16 +75,9 @@ export function Terminal(): JSX.Element {
   }, [])
 
   const handleLaunch = async (command: string | undefined, label: string, pane: 'left' | 'right' = 'left'): Promise<void> => {
-    if (!open) toggle()
-    const id = crypto.randomUUID()
-    const kind = command === 'claude' ? 'claude' : command === 'codex' ? 'codex' : 'shell'
-    addTab(id, label, pane, kind)
     try {
-      await window.pathly?.terminal?.spawn(id, projectPath, command)
-    } catch (err) {
-      const instance = tabInstancesRef.current.get(id)
-      if (instance) instance.xterm.write(`\r\nError: could not start terminal — ${String(err)}\r\n`)
-    }
+      await launchTerminal({ command, label, pane, projectPath, open, toggle, addTab })
+    } catch { /* PTY errors surface in terminal */ }
   }
 
   const handleCloseTab = async (id: string, e: React.MouseEvent): Promise<void> => {

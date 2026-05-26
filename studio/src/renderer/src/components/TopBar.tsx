@@ -7,6 +7,7 @@ import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
 import { IconButton, Tooltip } from './ui'
 import { ClaudeIcon, CodexIcon } from './Terminal/BrandIcons'
+import { launchTerminal } from '../lib/launchTerminal'
 import styles from './TopBar.module.css'
 
 export function TopBar(): JSX.Element {
@@ -101,12 +102,16 @@ export function TopBar(): JSX.Element {
 
   async function launchTerminalWithKind(cmd: string | undefined, label: string): Promise<void> {
     setTerminalDropdownOpen(false)
-    if (!terminalOpen) toggleTerminal()
-    const id = crypto.randomUUID()
-    const kind: 'claude' | 'codex' | 'shell' = cmd === 'claude' ? 'claude' : cmd === 'codex' ? 'codex' : 'shell'
-    addTab(id, label, 'left', kind)
     try {
-      await window.pathly?.terminal?.spawn(id, projectPath, cmd)
+      await launchTerminal({
+        command: cmd,
+        label,
+        pane: 'left',
+        projectPath,
+        open: terminalOpen,
+        toggle: toggleTerminal,
+        addTab,
+      })
     } catch { /* PTY errors surface in terminal */ }
   }
 
