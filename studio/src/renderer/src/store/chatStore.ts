@@ -30,6 +30,7 @@ export interface ChatState {
   altMatches: MatchResult[]
   isEmbedding: boolean
   embedReady: boolean
+  embedProgress: number   // 0–100 while model downloads, 100 when ready
 
   // ── message actions ──────────────────────────────────────
   addMessage: (msg: Message) => void
@@ -49,6 +50,7 @@ export interface ChatState {
   setAltMatches: (matches: MatchResult[]) => void
   setIsEmbedding: (b: boolean) => void
   setEmbedReady: (b: boolean) => void
+  setEmbedProgress: (n: number) => void
 }
 
 const emptyTarget = (): TargetOutput => ({ lines: [], running: false })
@@ -63,6 +65,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   altMatches: [],
   isEmbedding: false,
   embedReady: false,
+  embedProgress: 0,
 
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
@@ -117,4 +120,5 @@ export const useChatStore = create<ChatState>()((set) => ({
   setAltMatches: (matches) => set({ altMatches: matches }),
   setIsEmbedding: (b) => set({ isEmbedding: b }),
   setEmbedReady: (b) => set({ embedReady: b }),
+  setEmbedProgress: (n) => set({ embedProgress: n }),
 }))

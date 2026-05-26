@@ -55,6 +55,7 @@ export function ChatPanel(): JSX.Element {
   const setAltMatches = useChatStore((s) => s.setAltMatches)
   const setIsEmbedding = useChatStore((s) => s.setIsEmbedding)
   const setEmbedReady = useChatStore((s) => s.setEmbedReady)
+  const setEmbedProgress = useChatStore((s) => s.setEmbedProgress)
   const setLoading = useChatStore((s) => s.setLoading)
   const isLoading = useChatStore((s) => s.isLoading)
   const setCommandRunning = useChatStore((s) => s.setCommandRunning)
@@ -119,12 +120,13 @@ export function ChatPanel(): JSX.Element {
     }
   }, [tabs, appendOutputLine])
 
-  // Pre-embed all skill descriptions once on first mount
+  // Pre-embed all skill descriptions once on first mount.
+  // Progress callback updates embedProgress (0–100) so the UI can show download state.
   useEffect(() => {
-    preEmbedSkills(loadSkills())
-      .then(() => setEmbedReady(true))
-      .catch(() => setEmbedReady(false))
-  }, [setEmbedReady])
+    preEmbedSkills(loadSkills(), (pct) => setEmbedProgress(pct))
+      .then(() => { setEmbedProgress(100); setEmbedReady(true) })
+      .catch(() => { setEmbedProgress(0); setEmbedReady(false) })
+  }, [setEmbedReady, setEmbedProgress])
 
   async function handleSend(): Promise<void> {
     const text = inputValue.trim()

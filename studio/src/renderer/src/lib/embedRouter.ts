@@ -2,12 +2,26 @@ import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers'
 import type { Skill } from './skillsManifest'
 import type { MatchResult } from '../types/chat'
 
+export type EmbedProgressCallback = (progress: number) => void
+
 let embedder: FeatureExtractionPipeline | null = null
 let embeddedSkills: Skill[] = []
 
-async function getEmbedder(): Promise<FeatureExtractionPipeline> {
+async function getEmbedder(onProgress?: EmbedProgressCallback): Promise<FeatureExtractionPipeline> {
   if (!embedder) {
-    embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2') as FeatureExtractionPipeline
+    embedder = await pipeline(
+      'feature-extraction',
+      'Xenova/all-MiniLM-L6-v2',
+      {
+        progress_callback: (p: { status: string; progress?: number }) => {
+          if (p.status === 'downloading' && typeof p.progress === 'number') {
+            onProgress?.(Math.round(p.progress))
+          } else if (p.status === 'done' || p.status === 'ready') {
+            onProgress?.(100)
+          }
+        },
+      }
+    ) as FeatureExtractionPipeline
   }
   return embedder
 }
@@ -31,8 +45,8 @@ export function cosineSim(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom
 }
 
-export async function preEmbedSkills(skills: Skill[]): Promise<void> {
-  const ext = await getEmbedder()
+export async function preEmbedSkills(skills: Skill[], onProgress?: EmbedProgressCallback): Promise<void> {
+  const ext = await getEmbedder(onProgress)
   for (const skill of skills) {
     const output = await ext(skill.description, { pooling: 'mean', normalize: true })
     skill.vector = Array.from(output.data as Float32Array)
