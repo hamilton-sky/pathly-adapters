@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../../store'
 import { writeFile } from '../../services/pathlyApi'
 import { useTheme } from '../../useTheme'
-import type { Props, Transition } from './types'
+import type { Props, Transition, Gate, TransitionRule, FeedbackRoute } from './types'
 import { makeStyles } from './FlowWizard.styles'
 import { generateYaml } from './utils'
 import { StepIndicator } from './StepIndicator'
@@ -11,6 +11,9 @@ import { Step1Name } from './Step1Name'
 import { Step2States } from './Step2States'
 import { Step3Transitions } from './Step3Transitions'
 import { Step4Agents } from './Step4Agents'
+import { Step5Gates } from './Step5Gates'
+import { Step6FeedbackRouting } from './Step6FeedbackRouting'
+import { Step7TransitionRules } from './Step7TransitionRules'
 import { Step5Review } from './Step5Review'
 import { validateStep } from './FlowWizard.validation'
 import { FieldError } from '../ui'
@@ -26,6 +29,15 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const [states, setStates] = useState(['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'TESTING', 'DONE'])
   const [transitions, setTransitions] = useState<Transition[]>([])
   const [agentMap, setAgentMap] = useState<Record<string, string>>({})
+  const [gates, setGates] = useState<Record<string, Gate[]>>({})
+  const [feedbackRoutes, setFeedbackRoutes] = useState<FeedbackRoute[]>([
+    { tag: 'HUMAN_QUESTIONS', agent: 'human' },
+    { tag: 'BLOCKED_ON_HUMAN', agent: 'human' },
+    { tag: 'ARCH_FEEDBACK', agent: 'architect' },
+    { tag: 'REVIEW_FAILURES', agent: 'builder' },
+    { tag: 'TEST_FAILURES', agent: 'builder' },
+  ])
+  const [transitionRules, setTransitionRules] = useState<Record<string, TransitionRule>>({})
   const [storagePath, setStoragePath] = useState('pathly/plans/{topic}/')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -117,7 +129,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   async function handleSave(): Promise<void> {
     if (!projectPath) return
     const trimmedName = flowName.trim()
-    const yaml = generateYaml(trimmedName, storagePath, states.filter((s) => s.trim()), agentMap, transitions)
+    const yaml = generateYaml(trimmedName, storagePath, states.filter((s) => s.trim()), agentMap, transitions, gates, feedbackRoutes, transitionRules)
     const filePath = `${projectPath}/src/pathly_data/core/flows/${trimmedName}.flow.yaml`
     setSaving(true)
     try {
@@ -139,7 +151,10 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     storagePath,
     validStates,
     agentMap,
-    transitions
+    transitions,
+    gates,
+    feedbackRoutes,
+    transitionRules
   )
 
   const nextDisabled = touched[step] && Object.keys(stepErrors[step] ?? {}).length > 0
@@ -148,7 +163,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     <div style={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div style={styles.card}>
         <span style={styles.stepCounter}>
-          Step {step} of 5
+          Step {step} of 8
         </span>
         <StepIndicator step={step} t={t} styles={styles} />
 
@@ -197,6 +212,30 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
             />
           )}
           {step === 5 && (
+            <Step5Gates
+              transitions={transitions.filter((tr) => tr.from.trim() && tr.to.trim())}
+              gates={gates}
+              onSetGates={setGates}
+              styles={styles}
+            />
+          )}
+          {step === 6 && (
+            <Step6FeedbackRouting
+              feedbackRoutes={feedbackRoutes}
+              onSetRoutes={setFeedbackRoutes}
+              styles={styles}
+            />
+          )}
+          {step === 7 && (
+            <Step7TransitionRules
+              nonTerminalStates={nonTerminalStates.filter((s) => s.trim())}
+              validStates={states.filter((s) => s.trim())}
+              transitionRules={transitionRules}
+              onSetRules={setTransitionRules}
+              styles={styles}
+            />
+          )}
+          {step === 8 && (
             <Step5Review
               yamlPreview={yamlPreview}
               storagePath={storagePath}

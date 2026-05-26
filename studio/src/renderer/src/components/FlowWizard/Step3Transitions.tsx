@@ -21,7 +21,7 @@ export function Step3Transitions({
   return (
     <div>
       <div style={styles.stepHeader}>Define transitions</div>
-      <div style={styles.stepSub}>Step 3 / 5</div>
+      <div style={styles.stepSub}>Step 3 / 8</div>
       {transitions.map((tr, idx) => (
         <div key={idx} style={styles.transitionRow}>
           <select

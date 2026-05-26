@@ -4,7 +4,7 @@ import { StateNode } from './StateNode'
 export const nodeTypes = { stateNode: StateNode }
 
 export const EXPORT_TARGET_LABELS: Record<FlowExportTarget, string> = {
-  'pathly-package': 'Pathly package',
+  'pathly-package': 'FSM Runtime',
   'claude-code': 'Claude Code',
   codex: 'Codex',
 }

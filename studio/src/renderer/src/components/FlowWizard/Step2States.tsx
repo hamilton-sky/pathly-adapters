@@ -18,7 +18,7 @@ export function Step2States({
   return (
     <div>
       <div style={styles.stepHeader}>Define states</div>
-      <div style={styles.stepSub}>Step 2 / 5 — First = initial, last = terminal</div>
+      <div style={styles.stepSub}>Step 2 / 8 — First = initial, last = terminal</div>
       {states.map((state, idx) => (
         <div key={idx} style={styles.stateRow}>
           <input

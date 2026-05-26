@@ -14,7 +14,7 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
     },
     card: {
       width: '600px',
-      maxHeight: '80vh',
+      maxHeight: '88vh',
       backgroundColor: t.bgMantle,
       border: `1px solid ${t.bgSurface0}`,
       borderRadius: '8px',

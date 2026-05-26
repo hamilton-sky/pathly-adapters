@@ -25,6 +25,11 @@ agent_map:
   ANALYZING: explorer
   TRACING: explorer
   CONCLUDING: explorer
+role_map:
+  FRAMING: explorer
+  ANALYZING: explorer
+  TRACING: explorer
+  CONCLUDING: explorer
 
 feedback_routing:
   HUMAN_QUESTIONS: human

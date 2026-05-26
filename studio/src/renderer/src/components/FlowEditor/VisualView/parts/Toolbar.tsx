@@ -47,7 +47,7 @@ export function Toolbar({
       <Tooltip label="Add a new state node" placement="bottom">
         <button style={s.ghostBtn} onClick={onAddState}>+ Add state</button>
       </Tooltip>
-      <Tooltip label="Auto-arrange nodes left-to-right" placement="bottom">
+      <Tooltip label="Auto-arrange nodes top-to-bottom" placement="bottom">
         <button style={s.ghostBtn} onClick={onAutoLayout}>Auto-layout</button>
       </Tooltip>
 

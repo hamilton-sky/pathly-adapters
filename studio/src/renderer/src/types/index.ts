@@ -88,6 +88,7 @@ export interface FlowYaml {
   transition_actions?: Record<string, unknown>
   storage_path?: string
   feedback_routing?: Record<string, unknown>
+  role_map?: Record<string, string>
 }
 
 export interface FsmState {

@@ -18,7 +18,7 @@ export function Step4Agents({
   return (
     <div>
       <div style={styles.stepHeader}>Assign agents</div>
-      <div style={styles.stepSub}>Step 4 / 5 — Map agents to non-terminal states</div>
+      <div style={styles.stepSub}>Step 4 / 8 — Map agents to non-terminal states</div>
       {nonTerminalStates.filter((s) => s.trim()).map((state) => (
         <div key={state} style={styles.agentRow}>
           <span style={styles.agentStateName}>{state}</span>

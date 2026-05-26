@@ -27,6 +27,12 @@ agent_map:
   ROOT_CAUSE_FOUND: README_routing
   FIXING: builder
   VERIFYING: review
+role_map:
+  INVESTIGATING: scout
+  REPRODUCING: tester
+  ROOT_CAUSE_FOUND: router
+  FIXING: builder
+  VERIFYING: reviewer
 feedback_routing:
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
