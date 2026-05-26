@@ -64,6 +64,12 @@ Phase 0a — Fix Claude/Codex spawning (do this first, it unblocks everything):
 
   Done when: On Windows, A Claude tab opens Claude Code CLI and Codex tab opens Codex CLI.
 
+  Mac/Linux note: resolveShell spawns 'claude'/'codex' directly — no wrapper needed. But
+  Electron's main process has a restricted PATH (not the user's full shell PATH). If the CLI
+  is in a user-local path (e.g. /opt/homebrew/bin, ~/.npm-global/bin) and the spawn fails
+  with "command not found", see the fallback in Phase 0a: resolve the full path with `which`
+  at startup and cache it. Only add this if bare-name spawn fails in testing.
+
 Phase 0b — Compact terminal dock height:
   Find where terminal height is set (reportedly 260px in index.tsx) — confirm the actual value.
   Change default open height to 180px.

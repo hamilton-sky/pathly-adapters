@@ -54,6 +54,25 @@ The rest of the `pty.spawn(shell, shellArgs, ...)` call is unchanged.
 
 **Done when:** On Windows, A Claude tab opens Claude Code CLI (not PowerShell), Codex tab opens Codex CLI.
 
+**Mac/Linux note — PATH may be restricted:**
+On Mac and Linux, `resolveShell` spawns `claude`/`codex` directly (no wrapper needed).
+However, Electron's main process inherits a restricted PATH — not the user's full shell PATH.
+If the CLI was installed to a user-local path (e.g. `~/.npm-global/bin/claude`, `/opt/homebrew/bin/claude`)
+that isn't in the system PATH, the spawn will fail with "command not found" even after this fix.
+This is a pre-existing issue, not introduced here. If it surfaces during testing, the fix is to
+resolve the full binary path at startup and pass it to `resolveShell`:
+```ts
+import { execSync } from 'child_process'
+function findBin(name: string): string {
+  try { return execSync(`which ${name}`, { encoding: 'utf8' }).trim() } catch { return name }
+}
+// Call once at app startup, cache results:
+const CLAUDE_BIN = process.platform !== 'win32' ? findBin('claude') : 'claude'
+const CODEX_BIN  = process.platform !== 'win32' ? findBin('codex')  : 'codex'
+```
+Then use `CLAUDE_BIN`/`CODEX_BIN` in `resolveShell` instead of the bare string `'claude'`/`'codex'`.
+Only implement this if bare-name spawning fails in testing — don't pre-optimise.
+
 ---
 
 ## Phase 0b: Compact terminal dock   ← Conversation 0
