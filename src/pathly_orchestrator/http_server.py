@@ -135,6 +135,10 @@ def _log_response(response):
     )
     if response.status_code >= 500:
         _inc("pathly_request_errors_total")
+    # Allow renderer (Vite dev server at localhost:5173 or Electron) to call the API
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
 

@@ -1,6 +1,11 @@
-import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers'
+import { pipeline, FeatureExtractionPipeline, env } from '@xenova/transformers'
 import type { Skill } from './skillsManifest'
 import type { MatchResult } from '../types/chat'
+
+// Force transformers.js to fetch from HuggingFace CDN directly,
+// not through the Vite dev server (which returns HTML for unknown paths).
+env.allowLocalModels = false
+env.useBrowserCache = true
 
 export type EmbedProgressCallback = (progress: number) => void
 
