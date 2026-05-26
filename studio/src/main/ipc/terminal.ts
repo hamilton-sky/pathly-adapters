@@ -37,8 +37,8 @@ function isValidCwd(dir: string): boolean {
 
 function resolveShell(command: string | undefined): { shell: string; args: string[] } {
   if (process.platform !== 'win32') return { shell: command ?? 'bash', args: [] }
-  if (command === 'claude') return { shell: 'cmd.exe', args: ['/k', 'claude'] }
-  if (command === 'codex')  return { shell: 'cmd.exe', args: ['/k', 'codex'] }
+  if (command === 'claude') return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'claude'] }
+  if (command === 'codex')  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'codex'] }
   return { shell: 'powershell.exe', args: [] }
 }
 
