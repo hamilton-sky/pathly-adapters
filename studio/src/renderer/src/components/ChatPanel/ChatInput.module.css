@@ -31,6 +31,11 @@
   transition: width 300ms ease-out;
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 0.2; }
+  50%       { opacity: 0.5; }
+}
+
 .textarea {
   width: 100%;
   resize: none;

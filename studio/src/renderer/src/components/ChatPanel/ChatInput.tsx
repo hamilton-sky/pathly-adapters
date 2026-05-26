@@ -16,7 +16,10 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
   const embedReady = useChatStore((s) => s.embedReady)
   const embedProgress = useChatStore((s) => s.embedProgress)
 
-  const isDownloading = !embedReady && embedProgress > 0 && embedProgress < 100
+  // Show loading state as soon as the component mounts and model isn't ready yet.
+  // embedProgress=0 means "started but first callback not fired yet" — still loading.
+  const isModelLoading = !embedReady
+  const isDownloading = isModelLoading  // kept as alias for clarity below
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -32,16 +35,23 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
       className={styles.container}
       style={{ borderTop: t.border, background: t.bgSurface0 }}
     >
-      {/* Model download progress bar — only shown while downloading */}
-      {isDownloading && (
+      {/* Model loading bar — shown from first mount until model is ready */}
+      {isModelLoading && (
         <div className={styles.downloadBar}>
           <div className={styles.downloadLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyMono }}>
-            ⬇ Downloading MiniLM… {embedProgress}%
+            {embedProgress > 0
+              ? `⬇ Downloading MiniLM… ${embedProgress}%`
+              : '⬇ Loading MiniLM routing model…'}
           </div>
           <div className={styles.progressTrack} style={{ background: t.bgSurface1 }}>
             <div
               className={styles.progressFill}
-              style={{ width: `${embedProgress}%`, background: t.accent }}
+              style={{
+                width: embedProgress > 0 ? `${embedProgress}%` : '100%',
+                background: t.accent,
+                opacity: embedProgress > 0 ? 1 : 0.35,
+                animation: embedProgress === 0 ? 'pulse 1.5s ease-in-out infinite' : 'none',
+              }}
             />
           </div>
         </div>
