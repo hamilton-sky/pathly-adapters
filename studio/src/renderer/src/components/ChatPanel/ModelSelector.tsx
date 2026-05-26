@@ -121,7 +121,9 @@ export function ModelSelector(): JSX.Element {
             const isCached = cachedModelIds.includes(model.id)
             const isSelected = model.id === selectedModelId
             const progress = downloadProgress[model.id] ?? 0
-            const isDownloading = progress > 0 && progress < 100
+            // Show downloading state from the moment the download starts (downloadStart set),
+            // not only after the first shard callback fires (progress > 0).
+            const isDownloading = (downloadStart[model.id] !== undefined && !isCached) && progress < 100
 
             return (
               <div
@@ -165,9 +167,9 @@ export function ModelSelector(): JSX.Element {
                   <div className={styles.downloadBlock}>
                     {/* meta row: percent + shard label + elapsed */}
                     <div className={styles.downloadMeta}>
-                      <span className={styles.downloadPct}>{progress}%</span>
+                      <span className={styles.downloadPct}>{progress > 0 ? `${progress}%` : '…'}</span>
                       <span className={styles.downloadPhase}>
-                        {parseShardLabel(progressText[model.id]) ?? 'downloading…'}
+                        {progress === 0 ? 'connecting…' : (parseShardLabel(progressText[model.id]) ?? 'downloading…')}
                       </span>
                       <span className={styles.downloadElapsed}>
                         {formatElapsed(elapsed[model.id] ?? 0)}

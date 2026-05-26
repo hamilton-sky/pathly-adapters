@@ -4,27 +4,39 @@ import { RECOMMENDED_MODEL_ID } from '../data/models'
 let engine: MLCEngine | null = null
 let engineModelId: string | null = null
 let enginePromise: Promise<MLCEngine> | null = null
+// Module-level callback — always points to the most recently registered listener.
+// Updated by every getEngine() call so late subscribers (e.g. ModelSelector opening
+// mid-download) still receive progress events.
+let activeOnProgress: ((pct: number, text?: string) => void) | undefined
 
 export async function getEngine(
   modelId: string,
   onProgress?: (pct: number, text?: string) => void
 ): Promise<MLCEngine> {
+  // Always update the active callback so the latest caller gets progress events,
+  // even if the engine is already loading.
+  if (onProgress) activeOnProgress = onProgress
+
   if (engine && engineModelId === modelId) return engine
-  if (enginePromise && engineModelId === modelId) return enginePromise
+
+  if (enginePromise && engineModelId === modelId) {
+    // Engine already loading — re-use the promise; callback updated above.
+    return enginePromise
+  }
 
   // New model requested — reset
   engine = null
   enginePromise = null
   engineModelId = modelId
+  activeOnProgress = onProgress
 
   enginePromise = (async () => {
     try {
       const mlc = await CreateMLCEngine(modelId, {
         initProgressCallback: (report) => {
           const pct = Math.round(report.progress * 100)
-          // Append elapsed time so UI can show the download is alive
           const elapsed = report.timeElapsed != null ? ` (${Math.round(report.timeElapsed)}s)` : ''
-          onProgress?.(pct, report.text ? `${report.text}${elapsed}` : undefined)
+          activeOnProgress?.(pct, report.text ? `${report.text}${elapsed}` : undefined)
         },
       })
       engine = mlc
