@@ -154,8 +154,9 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       },
     })
 
-    // Route PTY data to popup window from now on
+    // Route PTY data to popup window and transfer ownership
     ptyWindows.set(tabId, popupWin)
+    ptyOwners.set(tabId, popupWin.webContents.id)
 
     // Load same app with a ?terminal=<tabId> param so renderer shows popup mode
     if (app.isPackaged) {

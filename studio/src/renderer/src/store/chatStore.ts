@@ -24,6 +24,7 @@ export interface ChatState {
   messages: Message[]
   matchState: MatchState
   isLoading: boolean
+  isCommandRunning: boolean
   targetKind: 'claude' | 'codex'
   outputLines: string[]
   currentMatch: MatchResult | null
@@ -32,6 +33,7 @@ export interface ChatState {
   clearMessages: () => void
   setMatchState: (ms: MatchState) => void
   setLoading: (b: boolean) => void
+  setCommandRunning: (b: boolean) => void
   setTargetKind: (kind: 'claude' | 'codex') => void
   appendOutputLine: (line: string) => void
   clearOutputLines: () => void
@@ -42,6 +44,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
   matchState: null,
   isLoading: false,
+  isCommandRunning: false,
   targetKind: 'claude',
   outputLines: [],
   currentMatch: null,
@@ -61,6 +64,8 @@ export const useChatStore = create<ChatState>()((set) => ({
   setMatchState: (ms) => set({ matchState: ms }),
 
   setLoading: (b) => set({ isLoading: b }),
+
+  setCommandRunning: (b) => set({ isCommandRunning: b }),
 
   setTargetKind: (kind) => set({ targetKind: kind }),
 
