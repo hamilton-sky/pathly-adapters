@@ -35,7 +35,7 @@ was matched to my intent, **so that** I understand what will happen before I cli
 and feature, **so that** it's specific to what I'm doing right now.
 
 **Acceptance Criteria:**
-- [ ] System prompt includes current FSM stage (read from `/next_action` on port 8765)
+- [ ] System prompt includes current FSM stage (read from `/status` on port 8765 via `read_state()` — **not** `/next_action`, which writes to disk)
 - [ ] System prompt includes active feature name (read from most-recently-modified `plans/*/FEATURE_INDEX.md`)
 - [ ] System prompt includes matched skill name and description (passed from renderer)
 - [ ] System prompt stays under 1,000 tokens (explainer context is smaller than general chat)
@@ -135,15 +135,14 @@ or know CLI syntax differences.
 
 **Acceptance Criteria:**
 - [ ] Renderer looks up active tab from `terminalStore.tabs` by `kind` ('claude' or 'codex')
-- [ ] If no tab of the target kind exists: renderer auto-spawns one via `handleLaunch(kind)` before writing
+- [ ] If no tab of the target kind exists: renderer calls `launchTerminal(kind, cwd)` to auto-spawn one, then writes
 - [ ] Command is generated in the **host-correct format**:
   - Claude Code tab (`kind === 'claude'`): `/pathly <skill>` (e.g. `/pathly build`)
   - Codex tab (`kind === 'codex'`): `Use Pathly <skill>` (e.g. `Use Pathly build`)
-- [ ] Renderer passes `{ command, tabId }` (UUID) to IPC handler `chat:write-terminal`
-- [ ] IPC handler writes `command + "\n"` to `activePtys.get(tabId)`
+- [ ] Renderer sanitizes command (strips `;`, `&&`, `||`, `|`, `>`, `<`) before writing
+- [ ] Renderer calls `window.pathly.terminal.write(tabId, command + '\n')` directly — no new IPC channel
 - [ ] MatchCard dims to "✓ Sent" state after Run
-- [ ] If no terminal tab is open: IPC returns error, ChatPanel shows inline toast "Open a terminal tab first"
-- [ ] OutputSnippet appears below MatchCard showing live PTY output lines
+- [ ] OutputSnippet appears below MatchCard showing live PTY output lines (via `window.pathly.terminal.onData`)
 
 **Delivered by:** Conv 3
 
@@ -156,8 +155,7 @@ and what stage I'm in, **so that** the explanation is specific not generic.
 
 **Acceptance Criteria:**
 - [ ] `buildPathlyContext()` runs before each message send
-- [ ] Returns `{ fsmStage, featureName, screenElements, skills }`
-- [ ] Screen context capped at 500 tokens
+- [ ] Returns `{ fsmStage, featureName, skills }` (no `screenElements` — static schema handles UI layout from Conv 6)
 - [ ] If FSM server unreachable, `fsmStage` defaults to `"unknown"`
 
 **Delivered by:** Conv 4
@@ -226,3 +224,202 @@ Pathly skill suggested immediately, **so that** I never need to remember skill n
 - [ ] Clicking an alternative skill chip replaces the current MatchCard with a new one for that skill
 
 **Delivered by:** Conv 5
+
+---
+
+## Story S6.1: AI receives a static schema of Studio's key UI elements
+
+**As a** Pathly Studio user, **I want** the AI to know what's in Studio without runtime scanning,
+**so that** it can generate accurate automation steps based on a reliable, always-correct element map.
+
+**Acceptance Criteria:**
+- [ ] `getStudioSchema()` returns a typed list of elements, each with `screen`, `type`, `label`, `description`
+- [ ] Schema is included in every POST /chat request as `studioSchema`
+- [ ] AI references element labels (not IDs) when generating automation steps
+- [ ] Schema covers FlowEditor, StepEditor, ChatPanel, and modal CTAs
+- [ ] `studioSchema.ts` is a typed constant — no hooks, no subscriptions, no runtime scanning
+
+**Delivered by:** Conv 6
+
+---
+
+## Story S6.2: AI system prompt includes Studio UI context
+
+**As a** Pathly Studio user, **I want** the AI's system prompt to describe what Studio's interface looks like,
+**so that** the AI generates steps that reference real, accessible element labels.
+
+**Acceptance Criteria:**
+- [ ] System prompt includes a `## Studio UI Elements` section listing elements grouped by screen
+- [ ] AI-generated automation steps reference only labels from this list
+- [ ] Schema contribution to system prompt is capped at 400 tokens
+
+**Delivered by:** Conv 6
+
+---
+
+## Story S7.1: Playwright executor connects to Electron window
+
+**As a** Pathly Studio user, **I want** the automation executor to be ready when Studio starts,
+**so that** the first automation request can run without setup delay.
+
+**Acceptance Criteria:**
+- [ ] `PlaywrightExecutor.connect(cdpUrl)` establishes a CDP connection to the running Studio window
+- [ ] Executed at app startup (after `app.ready`), available before first automation request
+- [ ] CDP remote debugging port is set before `BrowserWindow` is created
+
+**Delivered by:** Conv 7
+
+---
+
+## Story S7.2: AI can click, fill, or select any Studio element by label
+
+**As a** Pathly Studio user, **I want** the AI to interact with Studio UI elements using their visible labels,
+**so that** automation works without fragile DOM IDs or injected attributes.
+
+**Acceptance Criteria:**
+- [ ] `executeStep({ type: 'click', label: 'New Flow' })` finds and clicks the matching element
+- [ ] Element resolution cascade: `getByRole` → `getByLabel` → `getByPlaceholder` → `getByText`
+- [ ] If not found: returns `{ ok: false, error: 'element not found: New Flow' }` — no crash
+- [ ] Disabled element check: returns `{ ok: false, error: 'element disabled: Save' }`
+- [ ] Works for click, fill (React synthetic events), and selectOption
+
+**Delivered by:** Conv 7
+
+---
+
+## Story S7.3: Step execution is reliable across UI changes
+
+**As a** Pathly Studio user, **I want** automation steps to degrade gracefully if a label changes,
+**so that** a renamed button gives a clear error instead of silently breaking the flow.
+
+**Acceptance Criteria:**
+- [ ] If an element label changes (e.g. "New Flow" → "Create Flow"), the `getByText` fallback tries a partial match
+- [ ] If still not found: step returns a clear error with the label that wasn't found
+- [ ] No silent failures — every failed step produces an actionable error message
+- [ ] Fix path is simple: update the label in `studioSchema.ts`
+
+**Delivered by:** Conv 7
+
+---
+
+## Story S8.1: Staged mode shows each AI action step and waits for approval
+
+**As a** Pathly Studio user, **I want** the AI to show me each action it plans to take before executing it,
+**so that** I stay in control and can catch mistakes.
+
+**Acceptance Criteria:**
+- [ ] After AI generates an action plan, `AutomationCard` appears showing the intent and step count
+- [ ] `[Step by Step]` button activates staged mode
+- [ ] `StepQueue` renders each step as a card with description and action preview
+- [ ] Current step is highlighted with `[✓ Approve]` and `[→ Skip]` buttons
+- [ ] Approve executes the action and advances to the next step
+- [ ] Skip marks step as skipped and advances without executing
+- [ ] Completed steps remain visible, dimmed, with `✓` or `→` badge
+
+**Delivered by:** Conv 8
+
+---
+
+## Story S8.2: Auto mode executes the full action plan without interruption
+
+**As a** Pathly Studio user, **I want** to hand off a full flow creation to the AI and have it complete everything automatically,
+**so that** I can describe what I want once and walk away.
+
+**Acceptance Criteria:**
+- [ ] `[▶ Run All]` button activates auto mode
+- [ ] All steps execute in sequence with 300ms delay between each
+- [ ] Progress bar shows `n / total` steps completed
+- [ ] `[■ Stop]` button halts execution at the current step
+- [ ] After completion: AI sends a summary message listing what was created
+
+**Delivered by:** Conv 8
+
+---
+
+## Story S8.3: Auto mode is blocked when confidence is low
+
+**As a** Pathly Studio user, **I want** the AI to force step-by-step review when it's uncertain,
+**so that** I don't end up with a wrong flow created automatically.
+
+**Acceptance Criteria:**
+- [ ] If AI confidence in the action plan is below threshold: `[▶ Run All]` button is disabled
+- [ ] Tooltip on disabled Run All: "Confidence too low for auto mode — use Step by Step"
+- [ ] Staged mode is always available regardless of confidence
+
+**Delivered by:** Conv 8
+
+---
+
+## Story S8.4: User can create a complete flow from a plain-English description
+
+**As a** Pathly Studio user, **I want** to describe what I want to build in plain English and have the AI create the flow in Studio for me,
+**so that** I never have to manually navigate menus, fill forms, or remember step types.
+
+**Acceptance Criteria:**
+- [ ] User types "create a checkout flow with an HTTP step to Stripe and a condition step" → AI generates a complete action plan
+- [ ] Action plan covers: create flow, name it, add each step, configure step type, fill required fields
+- [ ] Staged or Auto mode executes the plan in Studio
+- [ ] After completion: flow exists in Studio with the correct structure
+
+**Delivered by:** Conv 8
+
+---
+
+## Story S9.1: User can see all available AI models with system requirements
+
+**As a** Pathly Studio user, **I want** to see what local AI models are available and what hardware they need,
+**so that** I can pick the right one for my device.
+
+**Acceptance Criteria:**
+- [ ] Model selector dropdown shows in the Conductor header (replaces the `phi4-mini` pill)
+- [ ] Dropdown lists 4 models: Qwen2.5 Coder 7B, Qwen3 4B, Phi-4 Mini, Llama 3.2 3B
+- [ ] Each model card shows: name, description, use case, SYSTEM / STORAGE / SPEED specs
+- [ ] `Recommended` badge on Phi-4 Mini
+- [ ] `Cached` badge on models already downloaded
+
+**Delivered by:** Conv 9
+
+---
+
+## Story S9.2: User can download and cache a model with a toggle
+
+**As a** Pathly Studio user, **I want** to download and cache a model with one click,
+**so that** it loads instantly on future app starts.
+
+**Acceptance Criteria:**
+- [ ] Each model card has a `Cache` toggle
+- [ ] Turning toggle on starts download — linear progress bar appears under the card
+- [ ] After download: toggle shows green, `Cached` badge appears
+- [ ] Turning toggle off deletes the cached model after confirmation
+- [ ] Download progress persists if the panel is closed and reopened
+
+**Delivered by:** Conv 9
+
+---
+
+## Story S9.3: Selected model is used for all AI responses in the Conductor
+
+**As a** Pathly Studio user, **I want** the Conductor to use my chosen model for all explanations and action planning,
+**so that** I get responses that match my device capability.
+
+**Acceptance Criteria:**
+- [ ] Changing model selection immediately uses the new model for the next message
+- [ ] If selected model is not cached: Conductor shows "Download this model to use it" inline
+- [ ] ChatInput model pill shows the short name of the currently selected model
+- [ ] WebLLM streams responses the same way Ollama did — character by character in the message bubble
+
+**Delivered by:** Conv 9
+
+---
+
+## Story S9.4: Model selection persists across app restarts
+
+**As a** Pathly Studio user, **I want** my model choice to be remembered,
+**so that** I don't have to re-select it every time I open Studio.
+
+**Acceptance Criteria:**
+- [ ] `modelStore.selectedModelId` persists via Zustand persist middleware
+- [ ] On app start: selected model loads automatically if cached
+- [ ] If selected model is no longer cached (user cleared storage): falls back to Phi-4 Mini (recommended default)
+
+**Delivered by:** Conv 9

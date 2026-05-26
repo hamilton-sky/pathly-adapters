@@ -106,9 +106,9 @@ User types intent (plain English)
          │  user clicks ▶ Run
          ▼
 ┌─────────────────────────────────┐
-│  IPC: chat:write-terminal       │  ← Electron main process
-│  node-pty.write(cmd + '\n')     │  ← writes to named terminal tab
-│  target: Claude Code OR Codex   │  ← based on active tab
+│  window.pathly.terminal.write() │  ← renderer-side, no new IPC
+│  cmd + '\n' → PTY               │  ← writes to UUID-keyed tab
+│  target: chatStore.targetKind   │  ← driven by ConductorHeader pill
 └─────────────────────────────────┘
 ```
 
@@ -773,11 +773,14 @@ Step 3  User reviews MatchCard
         → User clicks ▶ Run
 
 Step 4  Command executes
-        → Renderer looks up terminalStore.tabs for tab with kind === 'claude'
-        → If no claude tab: renderer calls handleLaunch('claude') → addTab()
-        → Gets UUID tabId from that tab
-        → Generates host-correct command (Claude Code: "/pathly build", Codex: "Use Pathly build")
-        → IPC: chat:write-terminal({ command, tabId })
+        → Renderer reads chatStore.targetKind (set by ConductorHeader host pill)
+        → Looks up terminalStore.tabs for tab matching targetKind
+        → If no tab found: calls launchTerminal(targetKind) — opens dock, addTab, spawn
+        → Generates host-correct command:
+             Claude Code tab: "/pathly build"
+             Codex tab:       "Use Pathly build"
+        → Sanitizes command (strips ;, &&, ||, |, >, <)
+        → window.pathly.terminal.write(tab.id, cmd + '\n')
         → MatchCard transitions to SENT state: opacity → 0.4, pointer-events: none
         → OutputSnippet mounts (16px indent, --bg, left-border 2px --border)
         → Claude Code pill pulses (--t-pulse 1400ms ease-in-out)
@@ -908,13 +911,170 @@ interface ChatStore {
 | `studio/src/renderer/src/components/ChatPanel/MatchCard.tsx` | 3 | Match result card |
 | `studio/src/renderer/src/components/ChatPanel/OutputSnippet.tsx` | 3 | PTY output reader |
 | `studio/src/renderer/src/components/ChatPanel/ChatPanel.module.css` | 2 | All chat styles |
-| `studio/src/main/ipc/chat.ts` | 3 | IPC terminal write |
-| `studio/src/main/index.ts` | 3 | Register IPC handler |
+| `studio/src/renderer/src/lib/launchTerminal.ts` | 3 | Auto-spawn utility |
+| `studio/src/renderer/src/store/chatStore.ts` | 3 | Add targetKind field |
 | `studio/src/renderer/src/lib/embedRouter.ts` | 5 | MiniLM wrapper + matchIntent() |
 | `studio/src/renderer/src/lib/skillsManifest.ts` | 5 | Typed skills.json loader |
 | `studio/src/renderer/src/data/skills.json` | 5 | Skills name+command+description |
 | `studio/src/renderer/src/lib/pathlyContext.ts` | 4 | FSM + screen context builder |
 | `studio/src/renderer/src/App.tsx` | 2 | Add ChatPanel to layout |
+| `studio/src/renderer/src/data/studioSchema.ts` | 6 | Static Studio UI element definitions |
+| `studio/src/renderer/src/lib/pathlyContext.ts` | 6 | MODIFY — inject studioSchema into AI context |
+| `studio/src/main/automation/playwrightExecutor.ts` | 7 | Playwright element resolver + executor |
+| `studio/src/main/ipc/automation.ts` | 7 | IPC handler for step execution |
+| `studio/package.json` | 7 | MODIFY — add @playwright/test |
+| `studio/src/renderer/src/store/automationStore.ts` | 8 | Step queue state |
+| `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx` | 8 | Staged/auto step UI |
+| `studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx` | 8 | Plan summary card |
+| `studio/src/renderer/src/data/models.ts` | 9 | WebLLM model definitions |
+| `studio/src/renderer/src/lib/webLLMEngine.ts` | 9 | WebLLM engine wrapper |
+| `studio/src/renderer/src/store/modelStore.ts` | 9 | Model selection + cache state |
+| `studio/src/renderer/src/components/ChatPanel/ModelSelector.tsx` | 9 | Model picker UI |
+
+---
+
+### AutomationCard
+Appears in MessageList after AI generates an action plan. Shows intent + step count + mode buttons.
+
+```
+┌──────────────────────────────────────────┐  ← border-left: 3px solid --embed-purple
+│  ⚡ Action Plan                    5 steps│
+│  Create checkout flow with HTTP + cond…  │  ← intent, --sans 11px --muted
+│  ──────────────────────────────────────  │
+│  [▶ Run All]          [Step by Step]     │
+└──────────────────────────────────────────┘
+```
+
+- Border-left: `--embed-purple` (#C084FC) — distinct from MatchCard (green) and UNSURE (amber)
+- `[▶ Run All]`: accent bg, same style as MatchCard Run button
+- `[Step by Step]`: surface2 bg, --fg text, --border border
+- `[▶ Run All]` disabled when no page context: tooltip "No UI elements registered"
+
+### StepQueue
+Renders below AutomationCard when staged or auto mode is active.
+
+**Staged mode:**
+```
+┌──────────────────────────────────────────┐
+│  Step 1 of 5                             │
+│  ┌──────────────────────────────────┐    │
+│  │ ▶ click "New Flow"               │    │  ← current step, --surface2 bg
+│  │ Creates a new flow in the editor │    │
+│  │ [✓ Approve]        [→ Skip]      │    │
+│  └──────────────────────────────────┘    │
+│  ┌──────────────────────────────────┐    │
+│  │ ✓ fill "Checkout Flow"           │    │  ← done step, opacity 0.5
+│  └──────────────────────────────────┘    │
+│  ┌──────────────────────────────────┐    │
+│  │ ○ click "Add Step"               │    │  ← pending step, --surface bg
+│  └──────────────────────────────────┘    │
+└──────────────────────────────────────────┘
+```
+
+**Auto mode:**
+```
+┌──────────────────────────────────────────┐
+│  Running — 2 / 5 steps                   │
+│  ████████░░░░░░░░░░░░░░░░░░░░░░░░  40%   │
+│                             [■ Stop]     │
+└──────────────────────────────────────────┘
+```
+
+- Step icons: `▶` pending (muted), `✓` done (green), `→` skipped (muted), `✗` error (red)
+- [✓ Approve]: accent bg, same as Run button
+- [→ Skip]: muted text link, no border — same pattern as "Not this" in MatchCard
+- [■ Stop]: destructive bg, --fg text
+- Progress bar: same token as confidence bar (`--t-bar` transition, `--ease-out-expo`)
+
+### ModelSelector
+Replaces the `phi4-mini` pill in ConductorHeader. Opens as an inline dropdown panel.
+
+**Trigger (in ConductorHeader):**
+```
+[Phi-4 Mini  ▼]  [ℹ]
+```
+- Shows selected model short name + chevron
+- `ℹ` button toggles model info tooltip
+- Matches CLI pill style (--mono 10px, --surface bg, --border)
+
+**Dropdown panel (matches user screenshots):**
+```
+┌──────────────────────────────────────────────┐
+│  AI Models                               [×]  │
+│                                              │
+│  ╔══════════════════════════════════════╗    │
+│  ║ ^ Qwen2.5 Coder 7B              [Cache]║   │  ← collapsed header
+│  ║   Qwen2.5-Coder-7B-Instruct...        ║   │
+│  ║   Best code quality…                  ║   │
+│  ║   Complex refactors, multi-file edits ║   │
+│  ║  ┌───────────────────────────────┐   ║   │
+│  ║  │ SYSTEM  High-end, WebGPU      │   ║   │
+│  ║  │ STORAGE Largest footprint     │   ║   │
+│  ║  │ SPEED   Slower, strongest     │   ║   │
+│  ║  └───────────────────────────────┘   ║   │
+│  ╚══════════════════════════════════════╝    │
+│                                              │
+│  ╔══════════════════════════════════════╗    │
+│  ║ ^ Phi-4 Mini  [Recommended] [Cached] ║   │  ← selected + expanded
+│  ║  ...                            [▓▓▓]║   │  ← download progress if active
+│  ╚══════════════════════════════════════╝    │
+└──────────────────────────────────────────────┘
+```
+
+- Each model card: `--surface` bg, `1px solid --border`, border-radius 6px
+- Selected card: `border-color: --accent`, slightly elevated bg (`--surface2`)
+- Badges:
+  - `Recommended`: teal (#2DD4BF) bg, dark text — used only on the recommended model
+  - `Cached`: `--accent` (#22C55E) bg, dark text
+  - `Selected`: `--claude-blue` bg, dark text
+- `Cache` toggle: matches existing Studio toggle pattern
+- Download progress: `--accent` fill, same progress bar component as confidence bar
+- Spec table rows (SYSTEM / STORAGE / SPEED): `--mono` 10px, `--muted` labels, `--fg` values
+
+---
+
+## UI Automation — Interaction Model
+
+### How the AI knows what to click
+
+The AI receives a static schema of Studio's key UI elements with every message. This schema is a typed constant in `studioSchema.ts` — not a runtime registry, not DOM scanning.
+
+The AI must only reference labels from this schema when generating steps. If a user requests something that requires an element not in the schema, the AI says so instead of inventing a label.
+
+```
+studioSchema.ts → getStudioSchema() → injected into pathlyContext → POST /chat body
+→ AI system prompt: "## Studio UI Elements: [New Flow (button, FlowEditor)], ..."
+→ AI generates: { "action": "click", "label": "New Flow", "screen": "FlowEditor" }
+```
+
+### How steps are executed
+
+Playwright runs in the Electron main process. It connects to the app window via CDP (remote debugging). Element resolution uses a semantic cascade — no brittle IDs, no DOM attribute pollution:
+
+1. `getByRole(type, { name: label })` — most reliable
+2. `getByLabel(label)` — form elements
+3. `getByPlaceholder(label)` — inputs with placeholder text
+4. `getByText(label, { exact: false })` — visible text fallback
+
+This is the same pattern as playwright-stepper-framework's ElementResolver, implemented in TypeScript using Playwright's native locator API.
+
+### Automation modes
+
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| Staged | `[Step by Step]` | Shows each step card, waits for user `[✓ Approve]` or `[→ Skip]` |
+| Auto | `[▶ Run All]` | Executes all steps with 300ms delay between each, shows progress bar |
+
+### Automation vs Skill Routing
+
+The same chat input triggers different behavior based on intent:
+
+| User types | Detected as | Response |
+|---|---|---|
+| "I want to build" | skill routing | MatchCard + phi4-mini explanation |
+| "create a checkout flow" | automation | AutomationCard + StepQueue |
+
+Detection heuristic: presence of creation/modification verbs + Studio nouns ("flow", "step", "create", "add"). When ambiguous, show MatchCard (safer default).
 
 ---
 
@@ -933,3 +1093,12 @@ interface ChatStore {
 - Glassmorphism / backdrop-filter — no background to blur, GPU overdraw
 - Tailwind — fights the CSS custom property token system
 - Gradient backgrounds — flat surfaces only, per Linear chrome-reduction principle
+- Runtime DOM scanning for automation context — use the static `studioSchema.ts` constant, not DOM queries
+- `usePageAnalyzer` hooks on Studio components — the static schema replaces runtime registration entirely
+- `data-conductor-id` attributes on DOM nodes — Playwright resolves elements by semantic label, not injected IDs
+- `webContents.executeJavaScript` for automation — Playwright CDP connection is the execution path
+- `window.__uiExecutor` or renderer-side action dispatch — execution happens in main process via Playwright
+- Drag-and-drop automation — click/fill/select only for v1
+- Generating automation steps without studioSchema — AI must see the schema before generating actions
+- Ollama as required dependency — it is optional/legacy; WebLLM is the default from Conv 9
+- Removing the Python backend — keep for teams that prefer Ollama

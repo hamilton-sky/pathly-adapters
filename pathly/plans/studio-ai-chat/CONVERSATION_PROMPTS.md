@@ -1,7 +1,11 @@
 # Studio AI Chat — Conversation Prompts
 
-Split into **6 conversations** (Conv 0 through Conv 5). Each produces runnable, testable code.
+Split into **10 conversations** (Conv 0 through Conv 9). Each produces runnable, testable code.
 After each conversation, **commit your changes** before starting the next.
+
+**Two parallel build tracks after Conv 5:**
+- **Track A** (Convs 6–8): UI Automation — page analyzer, action executor, staged/auto mode
+- **Track B** (Conv 9): Model Selector — WebLLM engine + model picker UI (independent, no dependencies on Track A)
 
 **Before building any UI:** read `pathly/plans/studio-ai-chat/DESIGN_SPEC.md` — it is the builder's bible: ASCII layouts, design tokens, component specs, interaction model, and what NOT to build.
 
@@ -39,11 +43,32 @@ Implement Studio AI Chat Conversation 0 (Phases 0a–0c) — terminal dock impro
 
 Scope:
 
-Phase 0a — Fix ALLOWED_SHELLS (do this first, it unblocks everything):
-  Read terminal.ts line 13. ALLOWED_SHELLS only contains shell variants (bash, zsh, etc).
-  Add 'claude' and 'codex' to the set.
-  This is an existing bug: PaneTabBar passes 'claude'/'codex' as the command to terminal:spawn,
-  which the allowlist currently rejects with "Shell not allowed".
+Phase 0a — Fix Claude/Codex spawning (do this first, it unblocks everything):
+  There are TWO bugs in terminal.ts — both must be fixed:
+
+  Bug 1 — ALLOWED_SHELLS (line 13): Add 'claude' and 'codex' to the set.
+  PaneTabBar passes these as command to terminal:spawn; without them it returns "Shell not allowed".
+
+  Bug 2 — Windows always spawns powershell.exe (line 71):
+    CURRENT: const shell = process.platform === 'win32' ? 'powershell.exe' : (command ?? 'bash')
+    This ignores command on Windows. A Claude tab will open PowerShell, not Claude Code.
+  Fix by adding a resolveShell helper:
+    function resolveShell(command?: string): { shell: string; args: string[] } {
+      if (process.platform !== 'win32') return { shell: command ?? 'bash', args: [] }
+      if (command === 'claude') return { shell: 'cmd.exe', args: ['/k', 'claude'] }
+      if (command === 'codex')  return { shell: 'cmd.exe', args: ['/k', 'codex'] }
+      return { shell: 'powershell.exe', args: [] }
+    }
+  Replace the const shell/shellArgs lines with: const { shell, args: shellArgs } = resolveShell(command)
+  The rest of pty.spawn(...) is unchanged.
+
+  Done when: On Windows, A Claude tab opens Claude Code CLI and Codex tab opens Codex CLI.
+
+  Mac/Linux note: resolveShell spawns 'claude'/'codex' directly — no wrapper needed. But
+  Electron's main process has a restricted PATH (not the user's full shell PATH). If the CLI
+  is in a user-local path (e.g. /opt/homebrew/bin, ~/.npm-global/bin) and the spawn fails
+  with "command not found", see the fallback in Phase 0a: resolve the full path with `which`
+  at startup and cache it. Only add this if bare-name spawn fails in testing.
 
 Phase 0b — Compact terminal dock height:
   Find where terminal height is set (reportedly 260px in index.tsx) — confirm the actual value.
@@ -76,8 +101,8 @@ Design tokens already in Studio (use these, do not invent new ones):
   --codex-amber: #F59E0B (or check what the existing Codex tab uses)
 
 Architectural rules:
-  - Do NOT touch any IPC handlers beyond the ALLOWED_SHELLS line
-  - Do NOT touch PTY spawning logic, data flow, or FSM code
+  - Do NOT touch PTY spawning logic beyond the resolveShell fix in Phase 0a
+  - Do NOT touch any other IPC handlers, data flow, or FSM code
   - Do NOT touch App.tsx, the sidebar, main content area, or any Conductor/chat files
   - Match the existing CSS Modules pattern — no inline styles, no Tailwind
 
@@ -122,7 +147,7 @@ Scope:
   Static placeholder first: data: {"text": "chat endpoint ready"}\n\n
   Add ollama>=0.3 to pyproject.toml.
   ALSO add GET /status endpoint — read-only FSM state:
-    Calls read_state() from fsm_ops.py (pure read, NO write).
+    Calls read_state() from eventlog.py (pure read, NO write).
     Returns { "current_state": str, "feature": str, "project_root": str } or { "current_state": "unknown" }.
     DO NOT call next_action() here — it writes conv_start_sha to disk on every invocation.
     This endpoint replaces /next_action for all context reads in this feature.
@@ -137,7 +162,7 @@ Scope:
   On model not found: yield data: {"error": "Model 'phi4-mini' not found — run: ollama pull phi4-mini"}\n\n
 
 - Phase 3: Create chat_tools.py.
-  get_fsm_state(project_root) -> dict — calls read_state() from fsm_ops.py directly (pure read).
+  get_fsm_state(project_root) -> dict — calls read_state() from eventlog.py directly (pure read).
   DO NOT call next_action() — it mutates FSM state by writing conv_start_sha to disk.
   read_plan_summary(project_root) -> str — reads most-recently-modified plans/*/FEATURE_INDEX.md.
   Inject into system prompt: Stage: {fsm_stage} | Feature: {feature_name} | Matched skill: {skill}.
@@ -274,14 +299,16 @@ Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 9–11 for full d
 Implement Studio AI Chat Conversation 3 (Phases 9–11).
 
 **Before editing anything:** glob/read the live repo to confirm every file path below exists.
-Also read studio/src/main/ipc/terminal.ts to understand how activePtys map and activeTabId are exported — match that exact pattern in the new chat.ts handler.
+Read studio/src/main/preload/index.ts — the actual terminal API surface is `window.pathly.terminal.*`.
+Read studio/src/renderer/src/store/terminalStore.ts and store/projectStore.ts — needed for launchTerminal.
 
 **Codebase files this conversation touches:**
 - `studio/src/renderer/src/components/ChatPanel/MatchCard.tsx` — CREATE
 - `studio/src/renderer/src/components/ChatPanel/OutputSnippet.tsx` — CREATE
-- `studio/src/main/ipc/chat.ts` — CREATE: IPC terminal write handler
-- `studio/src/main/index.ts` — MODIFY: register chat IPC handler
-- `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY: subscribe to IPC output
+- `studio/src/renderer/src/lib/launchTerminal.ts` — CREATE: shared auto-spawn utility
+- `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY: Run action + PTY subscription
+- `studio/src/renderer/src/store/chatStore.ts` — MODIFY: add targetKind field
+- `studio/src/renderer/src/components/ChatPanel/ConductorHeader.tsx` — MODIFY: host pill toggles targetKind
 
 Scope:
 - Phase 9: Create MatchCard.tsx.
@@ -301,37 +328,60 @@ Scope:
   ChatPanel/index.tsx subscribes to an IPC output event and pipes lines to chatStore.
   See DESIGN_SPEC.md OutputSnippet section for ASCII layout.
 
-- Phase 11: Read terminal.ts and Terminal/index.tsx thoroughly before writing anything.
+- Phase 11: Read terminal.ts, preload/index.ts, and terminalStore.ts before writing anything.
 
-  PRE-FLIGHT FIX (do this first):
-  Read studio/src/main/ipc/terminal.ts line 13 — ALLOWED_SHELLS set.
-  Add 'claude' and 'codex' to ALLOWED_SHELLS. Without this, the existing Claude Code and
-  Codex terminal buttons are broken (they pass 'claude'/'codex' as the command, which the
-  allowlist rejects with "Shell not allowed").
+  NOTE: ALLOWED_SHELLS and Windows spawning were fixed in Phase 0a (Conv 0). Do not repeat here.
+  NO new Electron main-process IPC file (chat.ts) is needed — the existing terminal API covers everything.
 
-  IPC HANDLER (studio/src/main/ipc/chat.ts):
-  ipcMain.handle('chat:write-terminal', (event, { command, tabId }) => { ... })
-  PTYs are keyed by UUID tabId (NOT by string names like "claude-code").
-  The renderer resolves tabId BEFORE calling this IPC — main process just does activePtys.get(tabId)?.write(command + '\n').
-  Sanitize command before write: strip ;, &&, ||, |, >, < characters. Log warning if stripped.
-  Return { ok: true } or { error: string }.
-  Expose on preload: window.electronAPI.writeToTerminal(command: string, tabId: string): Promise<{ok?:boolean, error?:string}>
-  Register in index.ts alongside other IPC handlers.
+  KEY FACTS about the existing API (read preload/index.ts to verify):
+  - window.pathly.terminal.spawn(tabId, cwd, command?) — spawns a PTY
+  - window.pathly.terminal.write(tabId, data) — writes to a PTY (ipcRenderer.send, not invoke)
+  - window.pathly.terminal.onData(tabId, cb) — subscribes to PTY output
+  - window.pathly.terminal.onExit(cb) — subscribes to tab exit events
+  ChatPanel is in the same BrowserWindow renderer as Terminal — same webContentsId — so
+  terminal:write's ptyOwners check (terminal.ts:103) passes transparently. No bypass needed.
+
+  CREATE studio/src/renderer/src/lib/launchTerminal.ts:
+    import { useTerminalStore } from '../store/terminalStore'
+    import { useProjectStore } from '../store/projectStore'
+    export async function launchTerminal(kind: 'claude' | 'codex'): Promise<string> {
+      const { open, toggle, addTab } = useTerminalStore.getState()
+      if (!open) toggle()                              // open dock (mirrors Terminal/index.tsx:77)
+      const tabId = crypto.randomUUID()               // no uuid package — already in codebase
+      const label = kind === 'claude' ? 'A Claude' : '✳ Codex'
+      const cwd = useProjectStore.getState().projectPath  // must be project root, not userHome
+      addTab(tabId, label, 'left', kind)
+      await window.pathly.terminal.spawn(tabId, cwd, kind)
+      return tabId
+    }
+  Calling addTab() before spawn() ensures the tab is in the store before PTY data starts flowing.
 
   RENDERER SIDE (ChatPanel/index.tsx):
-  Before calling IPC, resolve the tab: const claudeTab = terminalStore.tabs.find(t => t.kind === 'claude')
-  AUTO-SPAWN if no tab found: call handleLaunch('claude') — same function the + button uses,
-  lives in Terminal/index.tsx. Lift or export it so ChatPanel can call it.
-  Wait for tab to appear in terminalStore (watch with useEffect + tabs dependency).
-  HOST-CORRECT COMMAND:
-    Claude Code tab (kind === 'claude') → "/pathly <skill>"
-    Codex tab (kind === 'codex')        → "Use Pathly <skill>"
-  Then call window.electronAPI.writeToTerminal(command, tab.id).
+  const { targetKind } = useChatStore()           // targetKind driven by ConductorHeader host pill
+  const { tabs } = useTerminalStore()             // tabs live in terminalStore, not chatStore
+  let targetTab = tabs.find(t => t.kind === targetKind)
+  if (!targetTab) {
+    const tabId = await launchTerminal(targetKind)
+    targetTab = useTerminalStore.getState().tabs.find(t => t.id === tabId)!
+  }
+  // Sanitize command (renderer-side):
+  const safe = skill.command.replace(/[;&|><]/g, '').trim()
+  // Host-correct format:
+  const cmd = targetTab.kind === 'claude' ? `/pathly ${safe}` : `Use Pathly ${safe}`
+  window.pathly.terminal.write(targetTab.id, cmd + '\n')
+
+  OutputSnippet PTY subscription:
+  useEffect(() => {
+    if (!activeTabId) return
+    return window.pathly.terminal.onData(activeTabId, (data) => {
+      // strip ANSI codes, append to outputLines in chatStore
+    })
+  }, [activeTabId])
 
 Architectural rules:
-- MatchCard replaces the old TerminalApproval concept entirely — do NOT create a TerminalApproval component.
-- Read terminal.ts before writing chat.ts — the PTY map keying must match exactly.
-- Preload must be updated if window.electronAPI doesn't already have writeToTerminal.
+- MatchCard replaces the old TerminalApproval concept — do NOT create a TerminalApproval component.
+- Do NOT create main/ipc/chat.ts — no new main-process IPC is needed.
+- Do NOT modify terminal.ts in this conversation — Phase 0a already handled it.
 - Do NOT modify FSM IPC handlers or Python backend.
 
 Verify: cd studio && npm run typecheck
@@ -343,8 +393,8 @@ If verification fails and the fix requires out-of-scope changes, stop and report
 If fundamentally broken, rollback with git checkout on affected files and retry.
 ```
 
-**Expected output:** MatchCard shows matched skill + confidence + Run/"Not this" buttons. Run writes the `/pathly <skill>` command to the correct terminal tab. OutputSnippet shows live PTY lines.
-**Files touched:** `MatchCard.tsx`, `OutputSnippet.tsx`, `ipc/chat.ts`, `main/index.ts`, `ChatPanel/index.tsx`
+**Expected output:** MatchCard shows matched skill + confidence + Run/"Not this" buttons. Run writes the host-correct command (`/pathly <skill>` or `Use Pathly <skill>`) to the correct terminal tab via `window.pathly.terminal.write`. OutputSnippet shows live PTY lines.
+**Files touched:** `MatchCard.tsx`, `OutputSnippet.tsx`, `launchTerminal.ts`, `ChatPanel/index.tsx`, `chatStore.ts`, `ConductorHeader.tsx`
 
 ---
 
@@ -359,55 +409,53 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
 Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 12–14 for full details.
 
-Implement Studio AI Chat Conversation 4 (Phases 12–14).
+Implement Studio AI Chat Conversation 4 (Phases 12 and 14 only — Phase 13 is removed).
 
-**Before editing anything:** glob/read the live repo to confirm every file path below exists.
-Also read the source files in C:\Users\Yafit\brightsky-ai\frontend\src\components\PageAnalyzer\ to understand which files to copy.
+**Before editing anything:** glob/read every file path below to confirm it exists.
 
 **Codebase files this conversation touches:**
-- `studio/src/renderer/src/lib/pageAnalyzer/` — CREATE directory + copy pure TS analyzers from BrightSky
-- `studio/src/renderer/src/lib/pathlyContext.ts` — CREATE: context builder
+- `studio/src/renderer/src/lib/pathlyContext.ts` — CREATE: FSM context builder
 - `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY: inject context per message
+
+**Phase 13 is intentionally skipped — do not implement it.**
+Phase 13 was a PageAnalyzer copy from BrightSky. The architecture moved to a static Studio
+schema (Conv 6, Phase 19) and Playwright executor (Conv 7). Do NOT create a pageAnalyzer/
+directory, do NOT copy any BrightSky files, do NOT add usePageAnalyzer hooks or
+data-conductor-id attributes anywhere.
 
 Scope:
 - Phase 12: Create studio/src/renderer/src/lib/pathlyContext.ts.
-  buildPathlyContext() fetches FSM state from GET http://127.0.0.1:8765/status → extract current_state and feature.
-  DO NOT use /next_action — it mutates FSM state. Use /status (added in Conv 1 Phase 1).
-  KNOWN_SKILLS: static list for now (will be dynamic in Conv 5).
-  Wrap FSM fetch in try/catch → fallback fsmStage: "unknown".
-  Cap screen elements at 20 buttons + 10 forms + 10 text blocks.
-  Returns: { fsmStage, featureName, screenElements, skills }
-
-- Phase 13: Copy these files from C:\Users\Yafit\brightsky-ai\frontend\src\components\PageAnalyzer\
-  to studio/src/renderer/src/lib/pageAnalyzer/:
-  analyzePageDirect.ts, CacheManager.ts, DOMAnalyzer2.ts, ButtonAnalyzer.ts,
-  FormAnalyzer.ts, TextAnalyzer.ts, LinkAnalyzer.ts
-  Replace any @brightsky-ai/shared imports with inline type definitions.
-  Do NOT copy Redux-dependent files.
-  Verify: import { analyzePageDirect } from '../lib/pageAnalyzer/analyzePageDirect' compiles.
+  export async function buildPathlyContext(): Promise<PathlyContext>
+  Fetch FSM state from GET http://127.0.0.1:8765/status → extract current_state and feature.
+  CRITICAL: DO NOT call /next_action — it writes conv_start_sha to disk on every call.
+  /status is the read-only replacement (added in Conv 1 Phase 1).
+  KNOWN_SKILLS: static list for now (will be MiniLM-powered in Conv 5).
+  Wrap FSM fetch in try/catch → fallback { fsmStage: "unknown", featureName: "" }.
+  Returns: { fsmStage: string, featureName: string, skills: string[] }
+  Note: NO screenElements field — static schema (Conv 6) handles UI layout separately.
 
 - Phase 14: Modify ChatPanel/index.tsx.
   Call buildPathlyContext() before each POST /chat.
-  Add context field to request body.
+  Add context field to the request body sent to /chat.
   phi4-mini explanation should now reference the current FSM stage and feature.
 
 Architectural rules:
-- Only copy pure TS files — no Chrome extension APIs, no Redux, no @brightsky-ai/shared.
-- Screen context cap: 500 tokens max. Truncate items list if exceeded.
-- Do NOT add new IPC calls. Context is gathered in the renderer via fetch + DOM APIs only.
+- Do NOT create pageAnalyzer/, lib/pageAnalyzer/, or any runtime DOM scanner.
+- Do NOT add screenElements to PathlyContext — it was removed from the architecture.
+- Do NOT add new IPC calls.
 - Do NOT touch MatchCard, chatStore approval logic, or any Conv 3 work.
 
 Verify: cd studio && npm run typecheck
 Expected: zero TypeScript errors. phi4-mini explanation mentions current FSM stage by name.
 
-After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 12–14 to DONE.
+After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 12 and 14 to DONE (13 stays as REMOVED).
 
 If verification fails and the fix requires out-of-scope changes, stop and report.
 If fundamentally broken, rollback with git checkout on affected files and retry.
 ```
 
 **Expected output:** phi4-mini explanation knows the current FSM stage, feature name, and available skills.
-**Files touched:** `lib/pageAnalyzer/` (7 files), `pathlyContext.ts`, `ChatPanel/index.tsx`
+**Files touched:** `pathlyContext.ts`, `ChatPanel/index.tsx`
 
 ---
 
@@ -488,3 +536,358 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 
 **Expected output:** MatchCard renders instantly on send (~22ms), MiniLM routes to the correct skill, phi4-mini explains async. All 5 test phrases match correctly.
 **Files touched:** `skills.json`, `skillsManifest.ts`, `embedRouter.ts`, `ChatPanel/index.tsx`, `chatStore.ts`
+
+---
+
+## Conversation 6: Static Studio Schema + Context Injection (Phases 19–20) — Track A
+
+**Stories delivered:** S6.1, S6.2
+**Requires:** Conversation 5 complete.
+**Verify:** `cd studio && npm run typecheck` — zero errors. Send a message, check POST /chat body includes `studioSchema` array with 10+ elements.
+
+**Prompt to paste:**
+```
+Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first.
+Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 19–20.
+
+Implement Studio AI Chat Conversation 6 (Phases 19–20) — Static Studio Schema.
+
+Files:
+- studio/src/renderer/src/data/studioSchema.ts — CREATE
+- studio/src/renderer/src/lib/pathlyContext.ts — MODIFY
+
+Phase 19 — studioSchema.ts:
+  interface StudioElement { id: string; screen: string; type: 'button'|'input'|'select'|'panel'; label: string; description: string }
+
+  Define elements for these screens (read the actual Studio source to get real labels):
+    FlowEditor screen: "New Flow" button, flow name input, flow list panel
+    StepEditor screen: "Add Step" button, step type selector, step name input, URL input field, "Save" button
+    ChatPanel screen: send button, message input
+    Modals: "Save" button, "Cancel" button, "Delete" button
+
+  export function getStudioSchema(): StudioElement[]
+  export function getSchemaForScreen(screen: string): StudioElement[]
+
+Phase 20 — pathlyContext.ts:
+  Import getStudioSchema from data/studioSchema.ts
+  Add studioSchema to buildPathlyContext() return type and value
+  Pass studioSchema in POST /chat body
+
+  In src/pathly_orchestrator/chat_agent.py:
+    Add ## Studio UI Elements section to system prompt
+    List elements grouped by screen: "FlowEditor: [New Flow (button)], [Flow Name (input)]..."
+    Cap at 400 tokens
+    AI instruction: "When generating automation steps, use only labels from this list"
+
+Architectural rules:
+- This is a static constant, NOT a runtime registry — no hooks, no subscriptions
+- Read actual Studio component source to find real button/input labels before writing the schema
+- Do NOT add usePageAnalyzer hooks or data-conductor-id anywhere
+- Do NOT touch MatchCard, embedRouter, or any Conv 1–5 work
+
+Verify: npm run typecheck. Send a message to /chat, inspect request body — studioSchema must be present.
+After done, update PROGRESS.md phases 19–20 to DONE.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+```
+
+**Expected output:** `studioSchema.ts` exports a typed constant describing all key Studio UI elements. AI system prompt includes a `## Studio UI Elements` section. POST /chat body includes the schema.
+**Files touched:** `data/studioSchema.ts`, `lib/pathlyContext.ts`, `src/pathly_orchestrator/chat_agent.py`
+
+---
+
+## Conversation 7: Playwright Executor (Phases 21–22) — Track A
+
+**Stories delivered:** S7.1, S7.2, S7.3
+**Requires:** Conversation 6 complete.
+**Verify:** `cd studio && npm run typecheck` — zero errors. Open Studio devtools console: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` — New Flow button clicks.
+
+**Prompt to paste:**
+```
+Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first.
+Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 21–22.
+
+Implement Studio AI Chat Conversation 7 (Phases 21–22) — Playwright Executor.
+
+Files:
+- studio/package.json — MODIFY: add @playwright/test
+- studio/src/main/automation/playwrightExecutor.ts — CREATE
+- studio/src/main/ipc/automation.ts — CREATE
+- studio/src/main/index.ts — MODIFY: init executor + register IPC
+
+Phase 21 — playwrightExecutor.ts:
+  import { chromium, Page } from '@playwright/test'
+
+  type AutomationStep = { type: 'click'|'fill'|'select'; label: string; value?: string; screen?: string }
+  type StepResult = { ok: boolean; error?: string }
+
+  export class PlaywrightExecutor {
+    private page: Page | null = null
+
+    async connect(cdpUrl: string): Promise<void> {
+      const browser = await chromium.connectOverCDP(cdpUrl)
+      const context = browser.contexts()[0]
+      this.page = context.pages()[0]
+    }
+
+    async executeStep(step: AutomationStep): Promise<StepResult> {
+      if (!this.page) return { ok: false, error: 'Playwright not connected' }
+      const { type, label, value } = step
+
+      // Resolution cascade
+      const locator = await this.resolveElement(label)
+      if (!locator) return { ok: false, error: `element not found: ${label}` }
+
+      const isDisabled = await locator.isDisabled()
+      if (isDisabled) return { ok: false, error: `element disabled: ${label}` }
+
+      if (type === 'click') await locator.click()
+      if (type === 'fill') await locator.fill(value ?? '')
+      if (type === 'select') await locator.selectOption(value ?? '')
+
+      return { ok: true }
+    }
+
+    private async resolveElement(label: string) {
+      if (!this.page) return null
+      // Try in order: role+name, label, placeholder, text
+      const strategies = [
+        () => this.page!.getByRole('button', { name: label }),
+        () => this.page!.getByRole('combobox', { name: label }),
+        () => this.page!.getByRole('textbox', { name: label }),
+        () => this.page!.getByLabel(label),
+        () => this.page!.getByPlaceholder(label),
+        () => this.page!.getByText(label, { exact: false }),
+      ]
+      for (const strategy of strategies) {
+        try {
+          const loc = strategy()
+          if (await loc.count() > 0) return loc.first()
+        } catch {}
+      }
+      return null
+    }
+  }
+
+  export const playwrightExecutor = new PlaywrightExecutor()
+
+Phase 22 — ipc/automation.ts + index.ts:
+  ipcMain.handle('automation:execute-step', async (event, step) => playwrightExecutor.executeStep(step))
+
+  In index.ts: get the CDP URL for the Electron window
+    app.commandLine.appendSwitch('remote-debugging-port', '9222') — MUST be before BrowserWindow creation
+    After app ready: await playwrightExecutor.connect('http://localhost:9222')
+
+  Preload: window.electronAPI.executeAutomationStep(step: AutomationStep): Promise<StepResult>
+
+Architectural rules:
+- Playwright runs in main process (Node.js) — not renderer
+- CDP remote debugging port must be set BEFORE BrowserWindow is created
+- Do NOT use executeJavaScript, data-conductor-id, or any DOM manipulation
+- Do NOT modify the existing terminal IPC or FSM IPC
+
+Verify: npm run typecheck. Open Studio devtools console: window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' }) — button should click.
+After done, update PROGRESS.md phases 21–22 to DONE.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+```
+
+**Expected output:** Playwright connects to the Electron window via CDP. `executeStep` resolves elements by semantic label cascade (role → label → placeholder → text) and clicks/fills/selects them. IPC bridge exposes this to the renderer.
+**Files touched:** `studio/package.json`, `main/automation/playwrightExecutor.ts`, `main/ipc/automation.ts`, `main/index.ts`
+
+---
+
+## Conversation 8: Staged / Auto Automation Mode (Phases 24–26) — Track A
+
+**Stories delivered:** S8.1, S8.2, S8.3, S8.4
+**Requires:** Conversations 6 + 7 complete.
+**Verify:** Type "create a test flow" → AutomationCard appears → approve each step → flow created in Studio.
+
+**Prompt to paste:**
+```
+Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 24–26 for full details.
+Read pathly/plans/studio-ai-chat/DESIGN_SPEC.md — REQUIRED for StepQueue and AutomationCard visual spec.
+
+Implement Studio AI Chat Conversation 8 (Phases 24–26) — Staged/Auto Automation Mode.
+
+**Before editing anything:** glob/read every file path below.
+
+**Codebase files this conversation touches:**
+- `studio/src/renderer/src/store/automationStore.ts` — CREATE: step queue state
+- `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx` — CREATE: staged/auto UI
+- `studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx` — CREATE: plan summary
+- `studio/src/renderer/src/components/ChatPanel/ChatPanel.module.css` — MODIFY: add automation styles
+- `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY: wire plan flow
+- `studio/src/renderer/src/store/chatStore.ts` — MODIFY: add mode: 'chat'|'automation' to message shape
+- `src/pathly_orchestrator/chat_agent.py` — MODIFY: add automation response type
+
+Scope:
+
+Phase 24 — automationStore:
+  type AutomationStep = { id: string; description: string; action: { type: 'click'|'fill'|'select'; label: string; value?: string; screen?: string }; status: 'pending'|'approved'|'skipped'|'done'|'error'; errorMessage?: string }
+  state: steps[], currentStepIndex, mode: 'staged'|'auto', status: 'idle'|'running'|'paused'|'done'|'error'
+  actions: setSteps, approveStep, skipStep, setMode, advanceToNext, reset
+  persist: mode only
+
+Phase 25 — AutomationCard + StepQueue:
+  AutomationCard:
+    Shows: intent description + step count ("5 steps planned")
+    [▶ Run All] button → setMode('auto') + start execution
+    [Step by Step] button → setMode('staged') + show StepQueue
+    [▶ Run All] disabled when studioSchema is not present in context (tooltip: "Studio schema unavailable")
+  StepQueue (staged mode):
+    Each step as a card: step number, description, action preview ("click 'Add Step'")
+    Current step (index === currentStepIndex): highlighted surface2 bg, [✓ Approve] [→ Skip] buttons
+    Done step: dimmed opacity 0.5, ✓ badge (green) or → badge (muted)
+    Pending step: surface bg, no buttons, muted text
+  StepQueue (auto mode):
+    Single progress bar: "2 / 5 steps" label + linear bar fill
+    [■ Stop] button calls automationStore.status = 'paused'
+  Both: show inline error for failed steps: "Step 4 failed — element not found"
+  See DESIGN_SPEC.md for token/typography rules — match existing Conductor visual system
+
+Phase 26 — Wire AI → action plan in chat flow:
+  Extend POST /chat request: add studioSchema and mode: 'automation' when intent seems like flow creation
+  Detection heuristic: if message contains "create", "make", "build a flow", "add a step" → mode automation
+  Otherwise → mode chat (existing explain behavior)
+  chat_agent.py automation response format:
+    { "type": "automation", "intent": "...", "steps": [{ "id": "step-1", "description": "...", "action": { "type": "click", "label": "New Flow", "screen": "FlowEditor" } }] }
+  AI must only use labels from studioSchema — include this constraint in system prompt
+  Chat response format (existing):
+    { "type": "chat", "text": "..." }
+  On receive:
+    If type === 'automation': automationStore.setSteps(steps) → render AutomationCard in MessageList
+    If type === 'chat': existing message append behavior
+  Staged execution: approveStep(id) → window.electronAPI.executeAutomationStep(step.action) → advance index
+  Auto execution: loop steps with 300ms delay, calling window.electronAPI.executeAutomationStep, updating status each step
+  After all done: AI sends summary "Flow created — N steps executed" as a chat message
+
+Architectural rules:
+- studioSchema is REQUIRED context for automation mode — never generate action steps without it
+- AI must reference only labels from studioSchema — add this to system prompt
+- Do NOT use executeAction(), actionExecutor.ts, data-conductor-id, or window.__uiExecutor
+- Do NOT change the existing chat flow for normal skill-routing messages
+- Do NOT add new IPC beyond what Conv 7 established
+
+Verify: cd studio && npm run typecheck
+E2E test: type "create a simple test flow" → AutomationCard appears → [Step by Step] → approve each step → flow visible in Studio.
+
+After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 24–26 to DONE.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+```
+
+**Expected output:** User can describe a flow in plain English, see an action plan, approve steps one by one or run all at once, and see the flow created live in Studio.
+**Files touched:** `automationStore.ts`, `StepQueue.tsx`, `AutomationCard.tsx`, `ChatPanel.module.css`, `ChatPanel/index.tsx`, `chatStore.ts`, `chat_agent.py`
+
+---
+
+## Conversation 9: Model Selector + WebLLM (Phases 27–29) — Track B
+
+**Stories delivered:** S9.1, S9.2, S9.3, S9.4
+**Requires:** Conversations 1–5 complete (can run in parallel with Track A after Conv 5).
+**Source:** Port `WebLLMModels.js` and `WebLLMAPI.js` from `https://github.com/zakaihamilton/zakamurai` (`src/components/AI/`).
+**Verify:** Select Phi-4 Mini → download/cache → send message → response streams from WebLLM (not Ollama).
+
+**Prompt to paste:**
+```
+Read pathly/plans/studio-ai-chat/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+Read pathly/plans/studio-ai-chat/IMPLEMENTATION_PLAN.md Phases 27–29 for full details.
+Read pathly/plans/studio-ai-chat/DESIGN_SPEC.md — REQUIRED for ModelSelector visual spec.
+
+Implement Studio AI Chat Conversation 9 (Phases 27–29) — Model Selector + WebLLM.
+
+CRITICAL PRE-FLIGHT — WebGPU must be enabled in Electron before any WebLLM code will work:
+Electron disables WebGPU by default. Without this, CreateMLCEngine() throws immediately.
+In studio/src/main/index.ts, add before app.whenReady():
+  app.commandLine.appendSwitch('enable-unsafe-webgpu')
+  app.commandLine.appendSwitch('enable-features', 'Vulkan')
+Also add experimentalFeatures: true to the BrowserWindow webPreferences.
+Do this FIRST, before writing any WebLLM code. Verify with: navigator.gpu !== undefined === true in renderer devtools.
+
+Source files to port (read these before writing anything):
+  C:\Users\Yafit\brightsky-ai (check if WebLLM files exist) OR
+  https://github.com/zakaihamilton/zakamurai/blob/main/src/components/AI/WebLLMModels.js
+  https://github.com/zakaihamilton/zakamurai/blob/main/src/components/AI/WebLLMAPI.js
+Read both files fully before writing any TypeScript.
+
+**Before editing anything:** glob/read every file path below.
+
+**Codebase files this conversation touches:**
+- `studio/src/main/index.ts` — MODIFY: add WebGPU command-line switches (pre-flight)
+- `studio/src/renderer/src/data/models.ts` — CREATE: model definitions (ported from WebLLMModels.js)
+- `studio/src/renderer/src/lib/webLLMEngine.ts` — CREATE: engine wrapper (ported from WebLLMAPI.js)
+- `studio/src/renderer/src/store/modelStore.ts` — CREATE: selected model + cache state
+- `studio/src/renderer/src/components/ChatPanel/ModelSelector.tsx` — CREATE: model picker UI
+- `studio/src/renderer/src/components/ChatPanel/ConductorHeader.tsx` — MODIFY: add ModelSelector
+- `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx` — MODIFY: model pill reads modelStore
+- `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY: replace Ollama SSE with WebLLM
+- `studio/package.json` — MODIFY: add @mlc-ai/web-llm
+
+Scope:
+
+Phase 27 — models.ts + webLLMEngine.ts:
+  models.ts (port from WebLLMModels.js):
+    interface Model { id: string; name: string; description: string; useCase: string; system: string; storage: string; speed: string; recommended?: boolean }
+    4 models (use exact MLC model IDs):
+      Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC — best code quality
+      Qwen3-4B-q4f16_1-MLC — balanced
+      Phi-4-mini-instruct-q4f16_1-MLC — recommended, lower memory
+      Llama-3.2-3B-Instruct-q4f16_1-MLC — small fallback
+    export RECOMMENDED_MODEL_ID = 'Phi-4-mini-instruct-q4f16_1-MLC'
+
+  webLLMEngine.ts (port from WebLLMAPI.js to TypeScript):
+    getEngine(modelId: string, onProgress?: (pct: number) => void): Promise<MLCEngine> — singleton
+    getCachedWebLLMModelIds(): Promise<string[]>
+    cacheWebLLMModel(modelId: string, onProgress: (pct: number) => void): Promise<void>
+    deleteCachedWebLLMModel(modelId: string): Promise<void>
+    askWebLLM(prompt: string, systemPrompt: string, onChunk: (text: string) => void): Promise<string>
+    Handle WebGPU not available: catch CreateMLCEngine error → throw { error: 'WebGPU not supported' }
+
+Phase 28 — modelStore + ModelSelector UI:
+  modelStore:
+    selectedModelId: string (default RECOMMENDED_MODEL_ID)
+    cachedModelIds: string[]
+    downloadProgress: Record<string, number>
+    setSelectedModel(id), setCached(ids), setProgress(id, pct)
+    Persist: selectedModelId only
+
+  ModelSelector (match the screenshots provided by user):
+    Dropdown trigger in ConductorHeader: shows selected model short name + ▼ chevron + ℹ button
+    Dropdown panel:
+      Each model as a collapsible card: name, description, SYSTEM / STORAGE / SPEED rows (table)
+      Badges: Recommended (teal), Cached (green), Selected (blue highlight on card)
+      Cache toggle per card — on: calls cacheWebLLMModel() → shows linear progress bar
+      Toggling off: calls deleteCachedWebLLMModel() after confirm
+    Close on outside click
+    Design tokens: match existing Conductor system (--bg, --surface, --accent, --border, --mono/--sans)
+    Badges: use small pill style consistent with CLI pills in ConductorHeader
+
+Phase 29 — Wire WebLLM into chat flow:
+  Modify ChatPanel/index.tsx:
+    Replace POST /chat SSE flow with local WebLLM call:
+      const response = await askWebLLM(userMessage, buildSystemPrompt(context), onChunk)
+      onChunk updates chatStore message stream (same as SSE chunks did)
+    Keep POST /chat path as fallback when PATHLY_CHAT_BACKEND=ollama env var is set
+    Default to WebLLM (no env var needed)
+  ChatInput.tsx: model pill reads modelStore.selectedModelId short name
+    If not cached: pill shows "[model] — download required" at 0.5 opacity, send disabled
+  Handle WebGPU unavailable gracefully: show "WebGPU required" in explanation area
+
+Architectural rules:
+- WebLLM runs entirely in the renderer — no main process involvement
+- Do NOT remove the Ollama/Python backend — keep it as optional legacy (PATHLY_CHAT_BACKEND=ollama)
+- Do NOT change the MiniLM embedding router — it stays as-is
+- Match the visual design from the screenshots: expandable model cards, SYSTEM/STORAGE/SPEED table rows
+
+Verify: cd studio && npm run typecheck
+Test: open ModelSelector → verify all 4 models listed with correct spec info → toggle Cache on Phi-4 Mini → wait for download → select it → send a message → response streams from WebLLM.
+
+After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 27–29 to DONE.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+```
+
+**Expected output:** User can pick their local AI model, download it with one toggle, and all Conductor responses stream from WebLLM with no Ollama required.
+**Files touched:** `models.ts`, `webLLMEngine.ts`, `modelStore.ts`, `ModelSelector.tsx`, `ConductorHeader.tsx`, `ChatInput.tsx`, `ChatPanel/index.tsx`, `studio/package.json`

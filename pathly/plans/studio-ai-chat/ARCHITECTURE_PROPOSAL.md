@@ -50,9 +50,9 @@ accurate, and unable to hallucinate skill names.
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  EXECUTION LAYER                                                            │
 │                                                                             │
-│  IPC: chat:write-terminal(command, target)                                  │
-│       │  target: "claude-code" | "codex"                                    │
-│       │  node-pty.write("/pathly build\n")                                  │
+│  window.pathly.terminal.write(tabId, command + '\n')                        │
+│       │  Claude Code tab: "/pathly build\n"                                 │
+│       │  Codex tab:       "Use Pathly build\n"                              │
 │       ▼                                                                     │
 │  OutputSnippet reads PTY onData → shows last 5 lines in chat               │
 │  When command completes → AI embed-matches next suggested skill             │
@@ -83,14 +83,15 @@ Studio Renderer (React 18 + Zustand + CSS Modules + JetBrains Mono)
   (MiniLM, transformers.js)        chat_agent.py → Ollama :11434
   skills.json vectors              phi4-mini explainer
          │
-         │ IPC on Run
+         │ Run click
          ▼
-  Electron Main (ipc/chat.ts)
-  node-pty.write(command + '\n')
+  window.pathly.terminal.write(tabId, cmd + '\n')
+  (renderer-side — no new main-process IPC needed;
+   same webContentsId passes ptyOwners check)
          │
          ▼
-  Claude Code terminal tab   OR   Codex terminal tab
-  (named PTY via activePtys map)
+  Claude Code tab: "/pathly <skill>\n"
+  Codex tab:       "Use Pathly <skill>\n"
 ```
 
 ## Key Design Decisions
@@ -110,13 +111,14 @@ Studio Renderer (React 18 + Zustand + CSS Modules + JetBrains Mono)
   phi4-mini is good at natural-language explanation with context. Mixing the two roles makes the
   system unpredictable — phi4-mini might suggest a different skill than MiniLM matched.
 
-### Decision 3: Skills as the command vocabulary
+### Decision 3: Skills as the command vocabulary, host-correct format per terminal
 - **Options:** Free-form CLI commands, fixed Pathly skills only, hybrid
-- **Chosen:** Pathly skills only (`/pathly <skill>`)
+- **Chosen:** Pathly skills only — but written in the format the target terminal understands:
+  - Claude Code tab: `/pathly <skill>` (e.g. `/pathly review`)
+  - Codex tab: `Use Pathly <skill>` (e.g. `Use Pathly review`)
 - **Rationale:** All user actions in the pipeline are Pathly skills. Claude Code and Codex are
-  the execution surfaces (the terminals the skills run in), not separate routing targets.
-  The user doesn't need to know Claude Code syntax — they say "I want to review the code"
-  and `/pathly review` runs in whichever terminal is active.
+  the execution surfaces, not separate routing targets. The user says "I want to review the code"
+  and the Conductor generates the right syntax for whichever terminal is active.
 
 ### Decision 4: Pre-embed skills at startup
 - **Options:** Embed on first message, embed at startup, pre-computed and bundled
@@ -145,9 +147,9 @@ Studio Renderer (React 18 + Zustand + CSS Modules + JetBrains Mono)
 | `ChatInput` | `ChatPanel/ChatInput.tsx` | Textarea, Send/Stop, MiniLM + phi4-mini pills |
 | `embedRouter` | `lib/embedRouter.ts` | MiniLM wrapper, startup pre-embedding, matchIntent() |
 | `skillsManifest` | `lib/skillsManifest.ts` | Typed loader for skills.json |
-| `pathlyContext` | `lib/pathlyContext.ts` | FSM state + screen elements context builder |
+| `pathlyContext` | `lib/pathlyContext.ts` | FSM state context builder |
+| `launchTerminal` | `lib/launchTerminal.ts` | Renderer utility: addTab + spawn in one call |
 | `chatStore` | `store/chatStore.ts` | All chat state: messages, match, streaming, autoApprove |
-| `chat IPC` | `main/ipc/chat.ts` | Electron main: writes command to named PTY tab |
 
 ## Risks
 
@@ -162,3 +164,70 @@ Studio Renderer (React 18 + Zustand + CSS Modules + JetBrains Mono)
   ANSI from OutputSnippet display lines before showing in chat.
 - **Auto-approve + wrong match:** If autoApprove is on and confidence is low, wrong skill
   runs. Mitigate: auto-approve is disabled for matches below 65% confidence regardless of setting.
+
+---
+
+## Automation Architecture (Track A — Convs 6–8)
+
+### Static Studio schema (not a runtime registry)
+
+Studio is our own app with a fixed layout. Rather than scanning the DOM at runtime or requiring
+every component to register itself, we describe Studio's key UI elements once as a typed constant
+in `studioSchema.ts`.
+
+**Why static:**
+- Fixed app — the layout doesn't change at runtime (no user-configurable panels, no plugin slots)
+- Always accurate — no stale registry state, no mount/unmount race conditions
+- Zero runtime overhead — no hooks, no Zustand subscriptions, no event bus
+- One file to update — if a label changes, one edit in `studioSchema.ts` reflects everywhere
+
+### Playwright in Electron main process
+
+UI interactions are executed by Playwright's Node.js API (`@playwright/test`) running in the
+Electron main process. Playwright connects to the live Electron window via Chrome DevTools
+Protocol (CDP) on a fixed debug port.
+
+**Why Playwright:**
+- Semantic element resolution — no fragile DOM IDs, no `data-conductor-id` pollution
+- Self-healing — if a label changes, the cascade tries alternatives before failing
+- Reliable React input handling — Playwright's `.fill()` triggers React synthetic events correctly
+- Native Electron support via `chromium.connectOverCDP`
+
+### Element resolution cascade
+
+When executing a step, Playwright tries each strategy in order until an element is found:
+
+1. `page.getByRole(type, { name: label })` — most reliable; ARIA role + accessible name
+2. `page.getByLabel(label)` — form elements with associated `<label>`
+3. `page.getByPlaceholder(label)` — inputs with placeholder text
+4. `page.getByText(label, { exact: false })` — visible text fallback
+
+This pattern is inspired by the playwright-stepper-framework's ElementResolver, implemented
+in TypeScript using Playwright's native locator API (no Python subprocess).
+
+### Plan preview UX pattern
+
+The AI generates all steps first. The user sees the complete plan in an `AutomationCard` before
+any execution begins. This is the same pattern as Cursor's diff preview: show intent, get
+approval, then act.
+
+Two approval modes:
+- **Auto** (`[▶ Run All]`): executes all steps with 300ms delay between each
+- **Staged** (`[Step by Step]`): user approves each step individually via `[✓ Approve]` / `[→ Skip]`
+
+**Why plan-first:** Trust before execution. Users who can see and cancel a plan are far more
+willing to use automation than users who watch actions happen without warning.
+
+### Decision: No page analyzer hook
+
+**Previous approach:** `usePageAnalyzer` hook on every React component — registers elements on
+mount, unregisters on unmount. Requires `data-conductor-id` DOM attributes everywhere.
+
+**Rejected because:**
+- Invasive — every component needs to be modified
+- Brittle — registry can be stale if a component doesn't unregister cleanly
+- Unnecessary — Studio is our own app; we know what's in it without scanning at runtime
+
+**New approach:** Static schema in `studioSchema.ts`. The AI knows what's in Studio because
+we told it once, not because Studio told the AI at runtime. Playwright finds elements by
+semantic label — no DOM attribute required.

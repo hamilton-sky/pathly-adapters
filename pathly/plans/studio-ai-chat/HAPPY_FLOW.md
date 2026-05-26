@@ -37,15 +37,14 @@ opening a terminal tab. The Conductor is the only interface they need to touch.
 ### Step 4: User clicks Run — terminal opens automatically
 - **User does:** Reads explanation, confirms it makes sense, clicks `▶ Run`
 - **System does:**
-  1. IPC `chat:write-terminal` fires with `{ command: "/pathly build", target: "claude-code" }`
-  2. Electron main checks `activePtys` — no Claude Code tab found
-  3. **Auto-spawns a new "A Claude" terminal tab** (same as clicking +, selecting Claude Code)
-  4. Waits for PTY ready signal, then writes `/pathly build\n`
+  1. ChatPanel reads `chatStore.targetKind` — set to `'claude'` (ConductorHeader pill)
+  2. Looks up `terminalStore.tabs` — no Claude Code tab found
+  3. **Calls `launchTerminal('claude')`** — opens the terminal dock, calls `addTab()`, calls `window.pathly.terminal.spawn()`
+  4. `window.pathly.terminal.write(tabId, '/pathly build\n')` — renderer-side, no new IPC
   5. Claude Code tab becomes visible in the terminal area — user can see it running
-  6. IPC returns `{ ok: true, spawned: true }`
-  7. ChatPanel shows hint: *"Opened a Claude Code tab to run this command."*
-  8. MatchCard dims to `✓ Sent` state
-  9. OutputSnippet appears — starts reading PTY `onData` events
+  6. ChatPanel shows hint: *"Opened a Claude Code tab to run this command."*
+  7. MatchCard dims to `✓ Sent` state
+  8. OutputSnippet appears — starts reading `window.pathly.terminal.onData` events
 - **State after:** Terminal running `/pathly build`, OutputSnippet showing live lines, Claude Code CLI pill pulsing
 
 ### Step 5: Build runs, output feeds back
@@ -80,3 +79,85 @@ The Conductor panel guided the entire sequence from one place.
 - [ ] OutputSnippet shows live lines with no more than 500ms lag
 - [ ] Automatic next-step suggestion appears after command completes
 - [ ] `~ UNSURE` state appears when intent is ambiguous
+
+---
+
+## Happy Flow 2: UI Automation — Create a Flow from Plain English
+
+A developer wants to create a new BrightSky workflow but doesn't want to manually navigate the Studio forms.
+
+### Step 1: User describes the flow they want
+
+- **User does:** Types "create a checkout flow with an HTTP step to Stripe and a condition step"
+- **System does:**
+  1. `buildPathlyContext()` runs — includes `studioSchema` describing all key Studio UI elements
+  2. POST /chat fires with `mode: 'automation'` and the studio schema
+  3. AI (WebLLM model) reads the schema: sees "New Flow" button (FlowEditor), flow name input, step type selector (StepEditor)
+  4. AI generates a structured action plan: 5 steps covering create → name → add HTTP → configure → add condition
+- **State after:** `automationStore.steps` populated with 5 steps, `AutomationCard` appears in chat
+
+### Step 2: AutomationCard shows the plan
+
+- **User does:** Reads the AutomationCard: *"Checkout flow — 5 steps: create flow, name it, add HTTP step, set URL, add condition step"*
+- **System does:** Renders `AutomationCard` with intent summary, step count, `[▶ Run All]` and `[Step by Step]` buttons
+- **User does:** Clicks `[Step by Step]` (wants to review each action)
+- **State after:** `automationStore.mode = 'staged'`, StepQueue renders with step 1 highlighted
+
+### Step 3: Staged execution — step by step
+
+- **User does:** Reads step 1 card: *"Click 'New Flow' button"* — clicks `[✓ Approve]`
+- **System does:** `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow', screen: 'FlowEditor' })` — Playwright resolves the element and clicks it. New flow modal opens in Studio.
+- **User does:** Reads step 2: *"Fill flow name with 'Checkout Flow'"* — clicks `[✓ Approve]`
+- **System does:** `window.electronAPI.executeAutomationStep({ type: 'fill', label: 'Flow Name', value: 'Checkout Flow' })` — Playwright fills the input. User can see it update in the open modal.
+- **... continues through 3 more steps ...**
+- **State after:** All 5 steps executed, flow "Checkout Flow" exists in Studio with correct structure
+
+### Step 4: Completion
+
+- **User does:** Sees summary in chat: *"Done — Checkout Flow created with 2 steps (HTTP → Stripe, Condition)."* Sees the new flow highlighted in the Studio canvas.
+- **System does:** All steps marked `done` in StepQueue. AI sends a summary message. StepQueue shows all steps dimmed with `✓` badges.
+
+### End State
+
+The user described a flow in one sentence and the AI built it in Studio — no menu navigation, no form-filling, no step type memorization.
+
+**Success indicators for Flow 2:**
+- [ ] AutomationCard appears after user describes a flow
+- [ ] Each staged step executes on approve and shows visual feedback (element flash)
+- [ ] Flow exists in Studio after all steps complete
+- [ ] Summary message appears with correct step count
+- [ ] `[■ Stop]` in auto mode halts immediately
+
+---
+
+## Happy Flow 3: Model Selection — Pick and Use a New Model
+
+A developer wants better code-related explanations and decides to switch to Qwen2.5 Coder 7B.
+
+### Step 1: Open model selector
+
+- **User does:** Clicks the model pill in ConductorHeader — currently showing `Phi-4 Mini`
+- **System does:** ModelSelector dropdown opens showing 4 model cards with specs, `Recommended` badge on Phi-4 Mini, `Cached` badge on Phi-4 Mini (already downloaded)
+
+### Step 2: Download and cache a new model
+
+- **User does:** Expands Qwen2.5 Coder 7B card — reads SYSTEM/STORAGE/SPEED specs. Toggles Cache on.
+- **System does:** `cacheWebLLMModel('Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC', onProgress)` — progress bar appears. `modelStore.setProgress(id, pct)` updates every few seconds.
+- **User does:** Waits while it downloads (~5GB). Can use Studio normally during download.
+- **System does:** Download completes. `Cached` badge appears on Qwen2.5 Coder 7B card.
+
+### Step 3: Select the model
+
+- **User does:** Clicks Qwen2.5 Coder 7B card to select it
+- **System does:** `modelStore.setSelectedModel(id)`. ConductorHeader pill updates to show `Qwen2.5 Coder`. `getEngine(id)` initializes the WebLLM engine with the new model.
+
+### Step 4: Use the model
+
+- **User does:** Types "my plan is ready, time to build"
+- **System does:** `askWebLLM(prompt, systemPrompt, onChunk)` — response streams from Qwen2.5 Coder 7B. Explanation is more code-specific than Phi-4 Mini's response.
+
+**Success indicators for Flow 3:**
+- [ ] Model selector opens from header pill
+- [ ] Download progress visible and accurate
+- [ ] Model switch takes effect on next message (not mid-stream)
+- [ ] Selection persists after app restart
