@@ -21,13 +21,24 @@
   letter-spacing: 0.06em;
 }
 
+.sections {
+  padding-bottom: 8px;
+}
+
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 4px 12px 2px;
+  opacity: 0.6;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 6px 12px 10px;
-  max-height: 100px;
-  overflow-y: auto;
+  padding: 2px 12px 6px;
 }
 
 .chip {

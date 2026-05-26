@@ -3,7 +3,8 @@ import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import styles from './SkillsPanel.module.css'
 
-const SKILLS = ['plan', 'po', 'storm', 'build', 'review', 'test', 'retro', 'explore', 'debug', 'design', 'fix', 'status', 'log', 'end'] as const
+const PIPELINE_SKILLS = ['plan', 'po', 'storm', 'build', 'review', 'test', 'retro', 'explore', 'debug', 'design', 'fix', 'status', 'log', 'end'] as const
+const CONTROL_SKILLS  = ['start', 'go', 'pause', 'ff', 'help', 'team', 'end'] as const
 
 interface SkillsPanelProps {
   onSkillClick: (command: string) => void
@@ -33,22 +34,50 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
       </button>
 
       {skillsPanelOpen && (
-        <div className={styles.chips}>
-          {SKILLS.map((skill) => (
-            <button
-              key={skill}
-              className={styles.chip}
-              onClick={() => onSkillClick(`/pathly ${skill}`)}
-              style={{
-                background: t.bgSurface1,
-                color: t.textSecondary,
-                fontFamily: t.fontFamilyMono,
-                border: `1px solid ${t.bgSurface1}`,
-              }}
-            >
-              {skill}
-            </button>
-          ))}
+        <div className={styles.sections}>
+          {/* Pipeline skills */}
+          <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
+            Pipeline
+          </div>
+          <div className={styles.chips}>
+            {PIPELINE_SKILLS.map((skill) => (
+              <button
+                key={skill}
+                className={styles.chip}
+                onClick={() => onSkillClick(`/pathly ${skill}`)}
+                style={{
+                  background: t.bgSurface1,
+                  color: t.textSecondary,
+                  fontFamily: t.fontFamilyMono,
+                  border: `1px solid ${t.bgSurface1}`,
+                }}
+              >
+                {skill}
+              </button>
+            ))}
+          </div>
+
+          {/* Control commands */}
+          <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
+            Control
+          </div>
+          <div className={styles.chips}>
+            {CONTROL_SKILLS.map((skill) => (
+              <button
+                key={skill}
+                className={styles.chip}
+                onClick={() => onSkillClick(`/pathly ${skill}`)}
+                style={{
+                  background: t.bgSurface1,
+                  color: t.accent + '33',
+                  fontFamily: t.fontFamilyMono,
+                  border: `1px solid ${t.bgSurface1}`,
+                }}
+              >
+                {skill}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

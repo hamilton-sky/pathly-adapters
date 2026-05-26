@@ -6,7 +6,6 @@ import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
-import { PATHLY_API_BASE } from '../../lib/config'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
 import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
@@ -180,52 +179,19 @@ export function ChatPanel(): JSX.Element {
     addMessage(assistantMsg)
     setLoading(true)
 
-    let streamedContent = ''
+    // Build response locally from match data — no server needed.
+    // WebLLM richer explanation will layer on top in a future conv.
     try {
-      const res = await fetch(`${PATHLY_API_BASE}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          context,
-          history: messages.map((m) => ({ role: m.role, content: m.content })),
-          ...(topMatch && topMatch.confidence >= 0.4
-            ? { matchedSkill: topMatch.skill, skillDescription: topMatch.description }
-            : {}),
-        }),
-      })
-
-      const reader = res.body?.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      if (!topMatch || topMatch.confidence < 0.4) {
-        streamedContent = 'No matching skill found. '
-        updateLastMessage({ content: streamedContent })
+      let response: string
+      if (topMatch && topMatch.confidence >= 0.4) {
+        const pct = Math.round(topMatch.confidence * 100)
+        const stage = context.fsmStage !== 'unknown' && context.fsmStage
+          ? ` Current pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.` : ''
+        response = `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.`
+      } else {
+        response = `No skill matched your message (best score < 40%).\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable skills: ${context.skills.join(', ')}.`
       }
-
-      while (reader) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const payload = JSON.parse(line.slice(6)) as { text?: string; error?: string }
-            if (payload.text) {
-              streamedContent += payload.text
-              updateLastMessage({ content: streamedContent })
-            } else if (payload.error) {
-              updateLastMessage({ content: payload.error, status: 'done' })
-            }
-          } catch { /* malformed SSE chunk — skip */ }
-        }
-      }
-      updateLastMessage({ status: 'done' })
-    } catch {
-      updateLastMessage({ content: 'Chat server unavailable.', status: 'done' })
+      updateLastMessage({ content: response, status: 'done' })
     } finally {
       setLoading(false)
     }
