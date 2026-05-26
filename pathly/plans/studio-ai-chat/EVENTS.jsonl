@@ -23,3 +23,17 @@
 {"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-26T12:12:51Z"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T12:13:11Z"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-26T12:13:30Z"}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":2,"result":"DONE","tokens_in":33035,"tokens_out":8259,"total_tokens":41294,"cost_usd":0.222988,"tool_uses":38,"wall_seconds":225,"ts":"2026-05-26T14:22:01Z","schema_version":1}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:26:58Z"}
+{"type": "RETRY", "key": "conv-2:SCOPE_VIOLATION.md", "ts": "2026-05-26T12:27:42Z"}
+{"type": "FILE_DELETED", "file": "SCOPE_VIOLATION.md", "ts": "2026-05-26T12:30:09Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:30:13Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:30:38Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-26T12:31:10Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:31:10Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-26T12:34:03Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:34:03Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-26T12:35:31Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:35:32Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-26T12:36:29Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:36:29Z"}

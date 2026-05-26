@@ -1,6 +1,7 @@
 import { Component, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useStore } from './store'
+import { useUiStore } from './store/uiStore'
 import { readFile } from './services/pathlyApi'
 import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/sidebar'
@@ -13,6 +14,7 @@ import { Settings } from './components/Settings'
 import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
+import { ChatPanel } from './components/ChatPanel'
 import { themes } from './theme'
 import appStyles from './App.module.css'
 
@@ -73,6 +75,8 @@ function MainApp(): JSX.Element | null {
   const lastUsedFlowPath = useStore((s) => s.lastUsedFlowPath)
   const setLastUsedFlowPath = useStore((s) => s.setLastUsedFlowPath)
   const setSelectedItem = useStore((s) => s.setSelectedItem)
+  const chatOpen = useUiStore((s) => s.chatOpen)
+  const toggleChat = useUiStore((s) => s.toggleChat)
 
   const [setupDone, setSetupDone] = useState<boolean | null>(null)
 
@@ -143,8 +147,34 @@ function MainApp(): JSX.Element | null {
       <div className={appStyles.body}>
         <PanelErrorBoundary><Sidebar /></PanelErrorBoundary>
         <PanelErrorBoundary><MainPanel /></PanelErrorBoundary>
+        {chatOpen && (
+          <PanelErrorBoundary><ChatPanel /></PanelErrorBoundary>
+        )}
       </div>
       <PanelErrorBoundary><Terminal /></PanelErrorBoundary>
+      <button
+        onClick={toggleChat}
+        title="Toggle Conductor chat"
+        style={{
+          position: 'fixed',
+          bottom: 16,
+          right: 16,
+          zIndex: 1000,
+          width: 36,
+          height: 36,
+          borderRadius: '50%',
+          border: 'none',
+          background: chatOpen ? 'var(--theme-accent)' : 'var(--theme-bg-surface0)',
+          color: 'var(--theme-text-primary)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 14,
+        }}
+      >
+        AI
+      </button>
     </div>
   )
 }
