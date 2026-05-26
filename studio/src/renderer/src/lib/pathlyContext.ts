@@ -1,5 +1,6 @@
 import { PATHLY_API_BASE } from './config'
-import { getStudioSchema, StudioElement } from '../data/studioSchema'
+import { getStudioSchema } from './studioSchema'
+import { StudioElement } from '../types/studio'
 
 export interface PathlyContext {
   fsmStage: string
