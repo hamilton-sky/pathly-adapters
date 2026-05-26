@@ -14,21 +14,37 @@ export type MatchState = {
   command: string
 } | null
 
+export interface MatchResult {
+  skill: string
+  confidence: number
+  command: string
+}
+
 export interface ChatState {
   messages: Message[]
   matchState: MatchState
   isLoading: boolean
+  targetKind: 'claude' | 'codex'
+  outputLines: string[]
+  currentMatch: MatchResult | null
   addMessage: (msg: Message) => void
   updateLastMessage: (patch: Partial<Message>) => void
   clearMessages: () => void
   setMatchState: (ms: MatchState) => void
   setLoading: (b: boolean) => void
+  setTargetKind: (kind: 'claude' | 'codex') => void
+  appendOutputLine: (line: string) => void
+  clearOutputLines: () => void
+  setCurrentMatch: (match: MatchResult | null) => void
 }
 
 export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
   matchState: null,
   isLoading: false,
+  targetKind: 'claude',
+  outputLines: [],
+  currentMatch: null,
 
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
@@ -45,4 +61,13 @@ export const useChatStore = create<ChatState>()((set) => ({
   setMatchState: (ms) => set({ matchState: ms }),
 
   setLoading: (b) => set({ isLoading: b }),
+
+  setTargetKind: (kind) => set({ targetKind: kind }),
+
+  appendOutputLine: (line) =>
+    set((s) => ({ outputLines: [...s.outputLines, line].slice(-5) })),
+
+  clearOutputLines: () => set({ outputLines: [] }),
+
+  setCurrentMatch: (match) => set({ currentMatch: match }),
 }))

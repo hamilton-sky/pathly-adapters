@@ -1,0 +1,133 @@
+.card {
+  margin: 8px 12px;
+  border-radius: 6px;
+  padding: 10px 12px;
+  border: 1.5px solid;
+}
+
+.cardMatched {
+  border-color: #22C55E;
+}
+
+.cardUnsure {
+  border-color: #F59E0B;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.skillName {
+  font-family: monospace;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.badgeMatched {
+  background: #22C55E22;
+  color: #22C55E;
+}
+
+.badgeUnsure {
+  background: #F59E0B22;
+  color: #F59E0B;
+}
+
+.confidence {
+  font-size: 11px;
+  margin-bottom: 4px;
+  opacity: 0.75;
+}
+
+.barTrack {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(128, 128, 128, 0.2);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 300ms ease;
+}
+
+.barFillMatched {
+  background: #22C55E;
+}
+
+.barFillUnsure {
+  background: #F59E0B;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.btnRun {
+  flex: 1;
+  padding: 5px 0;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  background: #22C55E;
+  color: #fff;
+}
+
+.btnRun:hover {
+  opacity: 0.85;
+}
+
+.btnReject {
+  flex: 1;
+  padding: 5px 0;
+  border-radius: 4px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  cursor: pointer;
+  font-size: 12px;
+  background: transparent;
+}
+
+.btnReject:hover {
+  opacity: 0.7;
+}
+
+.alts {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.altLabel {
+  margin-right: 4px;
+}
+
+.altChip {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(128, 128, 128, 0.15);
+  cursor: pointer;
+  font-family: monospace;
+}
+
+.altChip:hover {
+  opacity: 0.7;
+}
