@@ -40,7 +40,8 @@ async function getEmbedder(onProgress?: EmbedProgressCallback): Promise<FeatureE
       'Xenova/all-MiniLM-L6-v2',
       {
         progress_callback: (p: { status: string; progress?: number }) => {
-          if (p.status === 'downloading' && typeof p.progress === 'number') {
+          // @xenova/transformers fires status='progress' (not 'downloading')
+          if (p.status === 'progress' && typeof p.progress === 'number') {
             onProgress?.(Math.round(p.progress))
           } else if (p.status === 'done' || p.status === 'ready') {
             onProgress?.(100)
