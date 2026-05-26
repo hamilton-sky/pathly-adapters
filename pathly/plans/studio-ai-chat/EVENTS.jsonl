@@ -76,3 +76,5 @@
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T15:22:42Z"}
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":7,"result":"DONE","tokens_in":20562,"tokens_out":5141,"total_tokens":25703,"cost_usd":0.138801,"tool_uses":19,"wall_seconds":108,"ts":"2026-05-26T17:12:00Z","schema_version":1}
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T20:35:21Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-26T20:40:30Z"}
+{"type":"RETRY","key":"conv-7:REVIEW_FAILURES.md","ts":"2026-05-26T17:22:00Z"}

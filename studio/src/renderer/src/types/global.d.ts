@@ -50,6 +50,9 @@ declare global {
       window?: {
         setTitleBarOverlay: (bgColor: string, symbolColor: string) => void
       }
+      automation: {
+        executeStep: (step: { type: 'click' | 'fill' | 'select' | 'navigate'; label: string; value?: string }) => Promise<{ success: boolean; tier: 1 | 2 | 3; error?: string; resolvedSelector?: string }>
+      }
     }
   }
 }

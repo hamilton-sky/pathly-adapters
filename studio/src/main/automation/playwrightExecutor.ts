@@ -118,6 +118,8 @@ export class PlaywrightExecutor {
           })()
         `)
         break
+      case 'navigate':
+        throw new Error('navigate not yet implemented: use fill or click for navigation')
     }
   }
 }
