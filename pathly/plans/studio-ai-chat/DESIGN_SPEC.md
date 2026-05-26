@@ -915,6 +915,155 @@ interface ChatStore {
 | `studio/src/renderer/src/data/skills.json` | 5 | Skills name+command+description |
 | `studio/src/renderer/src/lib/pathlyContext.ts` | 4 | FSM + screen context builder |
 | `studio/src/renderer/src/App.tsx` | 2 | Add ChatPanel to layout |
+| `studio/src/renderer/src/hooks/usePageAnalyzer.ts` | 6 | Self-registration hook |
+| `studio/src/renderer/src/store/pageAnalyzerStore.ts` | 6 | Live element registry |
+| `studio/src/renderer/src/lib/pageAnalyzer/index.ts` | 6 | getPageContext() |
+| `studio/src/renderer/src/lib/actionExecutor.ts` | 7 | Renderer-side click/fill/select |
+| `studio/src/main/ipc/uiActions.ts` | 7 | IPC action handler |
+| `studio/src/renderer/src/store/automationStore.ts` | 8 | Step queue state |
+| `studio/src/renderer/src/components/ChatPanel/StepQueue.tsx` | 8 | Staged/auto step UI |
+| `studio/src/renderer/src/components/ChatPanel/AutomationCard.tsx` | 8 | Plan summary card |
+| `studio/src/renderer/src/data/models.ts` | 9 | WebLLM model definitions |
+| `studio/src/renderer/src/lib/webLLMEngine.ts` | 9 | WebLLM engine wrapper |
+| `studio/src/renderer/src/store/modelStore.ts` | 9 | Model selection + cache state |
+| `studio/src/renderer/src/components/ChatPanel/ModelSelector.tsx` | 9 | Model picker UI |
+
+---
+
+### AutomationCard
+Appears in MessageList after AI generates an action plan. Shows intent + step count + mode buttons.
+
+```
+┌──────────────────────────────────────────┐  ← border-left: 3px solid --embed-purple
+│  ⚡ Action Plan                    5 steps│
+│  Create checkout flow with HTTP + cond…  │  ← intent, --sans 11px --muted
+│  ──────────────────────────────────────  │
+│  [▶ Run All]          [Step by Step]     │
+└──────────────────────────────────────────┘
+```
+
+- Border-left: `--embed-purple` (#C084FC) — distinct from MatchCard (green) and UNSURE (amber)
+- `[▶ Run All]`: accent bg, same style as MatchCard Run button
+- `[Step by Step]`: surface2 bg, --fg text, --border border
+- `[▶ Run All]` disabled when no page context: tooltip "No UI elements registered"
+
+### StepQueue
+Renders below AutomationCard when staged or auto mode is active.
+
+**Staged mode:**
+```
+┌──────────────────────────────────────────┐
+│  Step 1 of 5                             │
+│  ┌──────────────────────────────────┐    │
+│  │ ▶ click "New Flow"               │    │  ← current step, --surface2 bg
+│  │ Creates a new flow in the editor │    │
+│  │ [✓ Approve]        [→ Skip]      │    │
+│  └──────────────────────────────────┘    │
+│  ┌──────────────────────────────────┐    │
+│  │ ✓ fill "Checkout Flow"           │    │  ← done step, opacity 0.5
+│  └──────────────────────────────────┘    │
+│  ┌──────────────────────────────────┐    │
+│  │ ○ click "Add Step"               │    │  ← pending step, --surface bg
+│  └──────────────────────────────────┘    │
+└──────────────────────────────────────────┘
+```
+
+**Auto mode:**
+```
+┌──────────────────────────────────────────┐
+│  Running — 2 / 5 steps                   │
+│  ████████░░░░░░░░░░░░░░░░░░░░░░░░  40%   │
+│                             [■ Stop]     │
+└──────────────────────────────────────────┘
+```
+
+- Step icons: `▶` pending (muted), `✓` done (green), `→` skipped (muted), `✗` error (red)
+- [✓ Approve]: accent bg, same as Run button
+- [→ Skip]: muted text link, no border — same pattern as "Not this" in MatchCard
+- [■ Stop]: destructive bg, --fg text
+- Progress bar: same token as confidence bar (`--t-bar` transition, `--ease-out-expo`)
+
+### ModelSelector
+Replaces the `phi4-mini` pill in ConductorHeader. Opens as an inline dropdown panel.
+
+**Trigger (in ConductorHeader):**
+```
+[Phi-4 Mini  ▼]  [ℹ]
+```
+- Shows selected model short name + chevron
+- `ℹ` button toggles model info tooltip
+- Matches CLI pill style (--mono 10px, --surface bg, --border)
+
+**Dropdown panel (matches user screenshots):**
+```
+┌──────────────────────────────────────────────┐
+│  AI Models                               [×]  │
+│                                              │
+│  ╔══════════════════════════════════════╗    │
+│  ║ ^ Qwen2.5 Coder 7B              [Cache]║   │  ← collapsed header
+│  ║   Qwen2.5-Coder-7B-Instruct...        ║   │
+│  ║   Best code quality…                  ║   │
+│  ║   Complex refactors, multi-file edits ║   │
+│  ║  ┌───────────────────────────────┐   ║   │
+│  ║  │ SYSTEM  High-end, WebGPU      │   ║   │
+│  ║  │ STORAGE Largest footprint     │   ║   │
+│  ║  │ SPEED   Slower, strongest     │   ║   │
+│  ║  └───────────────────────────────┘   ║   │
+│  ╚══════════════════════════════════════╝    │
+│                                              │
+│  ╔══════════════════════════════════════╗    │
+│  ║ ^ Phi-4 Mini  [Recommended] [Cached] ║   │  ← selected + expanded
+│  ║  ...                            [▓▓▓]║   │  ← download progress if active
+│  ╚══════════════════════════════════════╝    │
+└──────────────────────────────────────────────┘
+```
+
+- Each model card: `--surface` bg, `1px solid --border`, border-radius 6px
+- Selected card: `border-color: --accent`, slightly elevated bg (`--surface2`)
+- Badges:
+  - `Recommended`: teal (#2DD4BF) bg, dark text — used only on the recommended model
+  - `Cached`: `--accent` (#22C55E) bg, dark text
+  - `Selected`: `--claude-blue` bg, dark text
+- `Cache` toggle: matches existing Studio toggle pattern
+- Download progress: `--accent` fill, same progress bar component as confidence bar
+- Spec table rows (SYSTEM / STORAGE / SPEED): `--mono` 10px, `--muted` labels, `--fg` values
+
+---
+
+## UI Automation — Interaction Model
+
+### How the AI knows what to click
+
+Every interactive Studio component registers itself with `usePageAnalyzer`. The AI receives a structured element map with every message. The AI must reference only element IDs present in that map.
+
+```
+Component mounts → usePageAnalyzer({ id, type, label }) → pageAnalyzerStore
+                                                                    │
+User sends message → getPageContext() → { elements: [...] } ────────┘
+                                                    │
+                                          POST /chat body
+                                          AI sees: "Current UI: btn-new-flow (button, 'New Flow'), ..."
+                                                    │
+                                          AI returns: { type: 'automation', steps: [{action: {elementId: 'btn-new-flow', ...}}] }
+```
+
+### Automation modes
+
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| Staged | `[Step by Step]` | Shows each step card, waits for user `[✓ Approve]` or `[→ Skip]` |
+| Auto | `[▶ Run All]` | Executes all steps with 300ms delay between each, shows progress bar |
+
+### Automation vs Skill Routing
+
+The same chat input triggers different behavior based on intent:
+
+| User types | Detected as | Response |
+|---|---|---|
+| "I want to build" | skill routing | MatchCard + phi4-mini explanation |
+| "create a checkout flow" | automation | AutomationCard + StepQueue |
+
+Detection heuristic: presence of creation/modification verbs + Studio nouns ("flow", "step", "create", "add"). When ambiguous, show MatchCard (safer default).
 
 ---
 
@@ -933,3 +1082,8 @@ interface ChatStore {
 - Glassmorphism / backdrop-filter — no background to blur, GPU overdraw
 - Tailwind — fights the CSS custom property token system
 - Gradient backgrounds — flat surfaces only, per Linear chrome-reduction principle
+- Scraping DOM for page context — use the component registry (`usePageAnalyzer`), never raw DOM queries
+- Drag-and-drop automation — click/fill/select only for v1
+- Generating automation steps without page context — AI must see the registry before generating actions
+- Ollama as required dependency — it is optional/legacy; WebLLM is the default from Conv 9
+- Removing the Python backend — keep for teams that prefer Ollama

@@ -130,17 +130,127 @@ fetch POST :8765/chat
                                partial message frozen with [stopped]
 ```
 
+## UI Automation Flow (Conv 6–8)
+
+```
+USER                  RENDERER                     MAIN PROCESS
+ │                       │                              │
+ │  types "create a      │                              │
+ │  checkout flow"        │                              │
+ │──────────────────────►│                              │
+ │                       │  buildPathlyContext()         │
+ │                       │  → getPageContext()           │
+ │                       │    reads pageAnalyzerStore    │
+ │                       │    returns { elements[] }     │
+ │                       │                              │
+ │                       │  POST /chat (mode:'automation')
+ │                       │  body: { message, pageContext }
+ │                       │──────────────────────────────►
+ │                       │                              │  WebLLM / phi4-mini
+ │                       │  ◄── SSE: { type:'automation', steps:[] }
+ │                       │                              │
+ │  sees AutomationCard   │  setSteps(steps)             │
+ │  "5 steps planned"     │  render AutomationCard       │
+ │◄──────────────────────│                              │
+ │                       │                              │
+ │  [Step by Step] or     │                              │
+ │  [▶ Run All]          │                              │
+ │──────────────────────►│                              │
+ │                       │                              │
+ │                     STAGED MODE                       │
+ │                       │  show StepQueue              │
+ │  sees step 1 card      │  current step highlighted    │
+ │◄──────────────────────│                              │
+ │  [✓ Approve]          │                              │
+ │──────────────────────►│  executeAction(step.action)  │
+ │                       │─────────────────────────────►│
+ │                       │  ipc: ui:execute-action       │
+ │                       │  webContents.executeJavaScript│
+ │                       │  window.__uiExecutor.execute()│
+ │  sees element flash    │◄─────────────────────────────│
+ │  accent color 400ms    │  { ok: true }                │
+ │◄──────────────────────│  advance to step 2           │
+ │  ...repeats per step   │                              │
+ │                       │                              │
+ │  sees "Flow created —  │  AI sends summary message    │
+ │  5 steps executed"     │                              │
+ │◄──────────────────────│                              │
+```
+
+## Page Analyzer Registration Flow (Conv 6)
+
+```
+React component mounts
+        │
+        │  usePageAnalyzer({ id: 'btn-add-step', type: 'button', label: 'Add Step' })
+        ▼
+pageAnalyzerStore.register(meta)
+        │  adds to Map<id, ElementMeta>
+        ▼
+DOM node gets data-conductor-id="btn-add-step" attribute
+
+User sends message
+        │
+        │  getPageContext()
+        ▼
+Returns { elements: ElementMeta[] }  ← always live, zero staleness
+        │
+        │  added to POST /chat body as pageContext
+        ▼
+AI receives: "Current UI: [Add Step (button)], [Flow Name (input)], [Step Type (select)]..."
+```
+
+## Model Selection Flow (Conv 9)
+
+```
+USER                  RENDERER (WebLLM)
+ │                       │
+ │  opens ModelSelector   │
+ │──────────────────────►│  getCachedWebLLMModelIds()
+ │                       │  checks browser cache storage
+ │  sees model cards      │  badges: Cached / Recommended
+ │◄──────────────────────│
+ │                       │
+ │  toggles Cache on      │
+ │  "Qwen3 4B"            │
+ │──────────────────────►│  cacheWebLLMModel(id, onProgress)
+ │                       │  @mlc-ai/web-llm → WebGPU download
+ │  sees progress bar     │  modelStore.setProgress(id, pct)
+ │  "Downloading 34%"     │
+ │◄──────────────────────│
+ │                       │  download complete
+ │  sees "Cached" badge   │  modelStore.setCached([...ids])
+ │◄──────────────────────│
+ │                       │
+ │  selects "Qwen3 4B"    │
+ │──────────────────────►│  modelStore.setSelectedModel(id)
+ │                       │  getEngine(id) → CreateMLCEngine
+ │                       │  (replaces phi4-mini singleton)
+ │  next message uses     │
+ │  Qwen3 4B              │
+ │                       │  askWebLLM(prompt, system, onChunk)
+ │  sees response stream  │  → streams via modelStore callback
+ │◄──────────────────────│
+```
+
 ## Component Legend
 
 | Symbol | Meaning |
 |--------|---------|
 | ChatInput.tsx | User input bar; initiates send flow |
-| pathlyContext.ts | Gathers FSM state + screen + skills before every send |
-| http_server.py | Python Flask server; routes /chat to ChatAgent |
-| chat_agent.py | Builds system prompt; calls Ollama; streams tokens |
-| chat_tools.py | Reads FSM state, plan summary, skills from filesystem |
-| Ollama :11434 | Local model inference — no internet required |
+| pathlyContext.ts | Gathers FSM state + page context + skills before every send |
+| pageAnalyzerStore.ts | Live registry of all registered UI elements |
+| usePageAnalyzer.ts | Hook — components call this to register themselves |
+| actionExecutor.ts | Renderer-side dispatcher — executes click/fill/select on DOM |
+| automationStore.ts | Step queue state for staged and auto modes |
+| StepQueue.tsx | Per-step approval UI (staged) or progress bar (auto) |
+| AutomationCard.tsx | AI action plan summary — shows intent + step count, mode buttons |
+| webLLMEngine.ts | WebLLM singleton engine — download, cache, stream |
+| modelStore.ts | Selected model, cached model IDs, download progress |
+| ModelSelector.tsx | Model picker UI with spec cards and cache toggles |
+| http_server.py | Python server (optional legacy backend for Ollama users) |
+| chat_agent.py | Explainer + automation step generator |
 | chatStore.ts | Zustand store; source of truth for all chat state |
 | MessageList.tsx | Renders messages; auto-scrolls; shows streaming cursor |
-| TerminalApproval.tsx | Approval banner for AI-proposed commands |
 | ipc/chat.ts | Electron main handler; writes to node-pty stdin |
+| ipc/uiActions.ts | Electron main handler; forwards actions to renderer DOM |
