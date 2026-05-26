@@ -209,7 +209,10 @@ def status_endpoint():
     if not project_root:
         return jsonify({"current_state": "unknown"}), 200
 
-    plans_dir = Path(project_root) / "pathly" / "plans"
+    resolved_root = Path(project_root).resolve()
+    plans_dir = resolved_root / "pathly" / "plans"
+    if not plans_dir.resolve().is_relative_to(resolved_root):
+        return jsonify({"error": "Invalid project_root"}), 400
     if not plans_dir.exists():
         return jsonify({"current_state": "unknown"}), 200
 
@@ -218,6 +221,8 @@ def status_endpoint():
     best_mtime: float = -1.0
     try:
         for state_file in plans_dir.glob("*/STATE.json"):
+            if not state_file.resolve().is_relative_to(resolved_root):
+                continue
             try:
                 mtime = state_file.stat().st_mtime
                 if mtime > best_mtime:

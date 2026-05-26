@@ -15,3 +15,11 @@
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "tokens_in": 20018, "tokens_out": 5004, "total_tokens": 25022, "cost_usd": 0.135114, "tool_uses": 14, "wall_seconds": 82, "ts": "2026-05-26T12:07:03Z", "schema_version": 1}
 {"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:07:20Z"}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_baseline_sha", "schema_version": 1, "ts": "2026-05-26T12:08:01Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-26T12:08:02Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-26T12:08:15Z"}
+{"type": "FILE_CREATED", "file": "feedback/REVIEW_FAILURES.md", "ts": "2026-05-26T12:10:41Z"}
+{"type": "RETRY", "key": "conv-1:REVIEW_FAILURES.md", "ts": "2026-05-26T12:10:41Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "tokens_in": 8872, "tokens_out": 2218, "total_tokens": 11090, "cost_usd": 0.059886, "tool_uses": 12, "wall_seconds": 276, "ts": "2026-05-26T12:12:51Z", "schema_version": 1}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-26T12:12:51Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-26T12:13:11Z"}
+{"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-26T12:13:30Z"}
