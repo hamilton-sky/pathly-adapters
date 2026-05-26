@@ -90,9 +90,10 @@ export function ChatPanel(): JSX.Element {
       // Reset the idle timer on every chunk of data
       if (idleTimer.current) clearTimeout(idleTimer.current)
       idleTimer.current = setTimeout(() => {
-        // No output for 4 seconds → assume command finished
+        // No output for 12 seconds → assume command finished
+        // (Claude operations can take 5–10s between output bursts)
         useChatStore.getState().setCommandRunning(false)
-      }, 4000)
+      }, 12000)
 
       terminalBuffer.current += stripAnsi(data)
 

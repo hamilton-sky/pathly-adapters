@@ -45,15 +45,27 @@ export async function writeToTerminal(
 
   if (!open) toggle()
 
-  // Commands from skills.json already include the full "/pathly <skill>" prefix — write as-is.
-  // For codex, strip the leading slash since Codex uses natural-language input.
-  // Use '\r' (carriage return) so the Windows PTY actually executes the command.
-  if (kind === 'claude') {
-    window.pathly?.terminal?.write(tabId, sanitized + '\r')
-  } else {
-    const naturalCmd = sanitized.replace(/^\/pathly\s*/, '')
-    window.pathly?.terminal?.write(tabId, 'Use Pathly ' + naturalCmd + '\r')
+  // If we just spawned a new tab, wait for the shell + Claude to finish starting up
+  // before writing (PowerShell → claude startup takes ~1–2s on Windows).
+  if (!existingTab) {
+    await new Promise<void>((r) => setTimeout(r, 2000))
   }
+
+  // Build the command text and the Enter sequence separately.
+  // Two-write pattern: text first, then Enter — this matches how xterm.js sends
+  // keystrokes one-at-a-time and avoids readline swallowing the newline on Windows ConPTY.
+  const cmdText = kind === 'claude'
+    ? sanitized
+    : 'Use Pathly ' + sanitized.replace(/^\/pathly\s*/, '')
+
+  window.pathly?.terminal?.write(tabId, cmdText)
+
+  // Small pause so readline buffers the text before seeing Enter
+  await new Promise<void>((r) => setTimeout(r, 80))
+
+  // '\r\n' covers Windows ConPTY (needs CR+LF), and '\r' alone is sufficient for
+  // Unix PTY — sending both is safe and universally triggers readline execution.
+  window.pathly?.terminal?.write(tabId, '\r\n')
 
   return tabId
 }
