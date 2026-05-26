@@ -254,12 +254,27 @@ export function ChatPanel(): JSX.Element {
           await getEngine(selectedModelId)
         }
         let fullText = ''
-        await askWebLLM(text, systemPrompt, (chunk) => {
-          fullText += chunk
-          updateLastMessage({ content: fullText, status: 'streaming' })
-        })
-        updateLastMessage({ content: fullText, status: 'done' })
+        try {
+          await askWebLLM(text, systemPrompt, (chunk) => {
+            fullText += chunk
+            updateLastMessage({ content: fullText, status: 'streaming' })
+          })
+        } catch (llmErr) {
+          console.error('[WebLLM] askWebLLM error:', llmErr)
+          throw llmErr // re-throw so outer catch handles it
+        }
+        if (fullText.trim()) {
+          updateLastMessage({ content: fullText, status: 'done' })
+        } else {
+          // Model loaded but returned empty — surface a clear message
+          console.warn('[WebLLM] empty response from model')
+          updateLastMessage({
+            content: '⚠️ The model returned an empty response. This usually means WebGPU is not fully available in this window, or the model needs to be re-downloaded.\n\nTry: open DevTools → Console for details, or switch to Phi-4 Mini.',
+            status: 'done',
+          })
+        }
       } catch (err) {
+        console.error('[WebLLM] chat error:', err)
         const msg = err instanceof Error ? err.message : String(err)
         if (msg === 'WebGPU not supported') {
           updateLastMessage({
