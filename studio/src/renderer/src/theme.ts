@@ -17,6 +17,7 @@ export interface Theme {
   green: string
   red: string
   yellow: string
+  purple?: string
   runtime: string
   fontFamilyBase: string
   fontFamilyMono: string

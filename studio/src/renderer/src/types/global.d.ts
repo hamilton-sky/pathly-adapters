@@ -47,6 +47,9 @@ declare global {
         write: (text: string) => Promise<void>
         readImagePath: () => Promise<string | null>
       }
+      window?: {
+        setTitleBarOverlay: (bgColor: string, symbolColor: string) => void
+      }
     }
   }
 }
