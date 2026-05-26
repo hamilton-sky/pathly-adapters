@@ -349,7 +349,8 @@ This makes the pill the single source of truth — no ambiguity about which term
 import { launchTerminal } from '../../lib/launchTerminal'
 
 // On Run click:
-const { tabs, targetKind } = useChatStore()  // targetKind driven by host pill
+const { targetKind } = useChatStore()              // targetKind driven by host pill
+const { tabs } = useTerminalStore()                // tabs live in terminalStore, not chatStore
 let targetTab = tabs.find(t => t.kind === targetKind)
 
 if (!targetTab) {

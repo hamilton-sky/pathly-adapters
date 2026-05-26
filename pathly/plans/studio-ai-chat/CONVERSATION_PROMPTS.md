@@ -342,31 +342,33 @@ Scope:
   terminal:write's ptyOwners check (terminal.ts:103) passes transparently. No bypass needed.
 
   CREATE studio/src/renderer/src/lib/launchTerminal.ts:
-    import { v4 as uuid } from 'uuid'
     import { useTerminalStore } from '../store/terminalStore'
-    export async function launchTerminal(kind: 'claude' | 'codex', cwd: string): Promise<string> {
-      const tabId = uuid()
+    import { useProjectStore } from '../store/projectStore'
+    export async function launchTerminal(kind: 'claude' | 'codex'): Promise<string> {
+      const { open, toggle, addTab } = useTerminalStore.getState()
+      if (!open) toggle()                              // open dock (mirrors Terminal/index.tsx:77)
+      const tabId = crypto.randomUUID()               // no uuid package — already in codebase
       const label = kind === 'claude' ? 'A Claude' : '✳ Codex'
-      useTerminalStore.getState().addTab(tabId, label, 'left', kind)
+      const cwd = useProjectStore.getState().projectPath  // must be project root, not userHome
+      addTab(tabId, label, 'left', kind)
       await window.pathly.terminal.spawn(tabId, cwd, kind)
       return tabId
     }
-  This is the shared utility both ChatPanel and (optionally) Terminal component use for auto-spawn.
   Calling addTab() before spawn() ensures the tab is in the store before PTY data starts flowing.
 
   RENDERER SIDE (ChatPanel/index.tsx):
-  const { tabs } = useTerminalStore()
-  let claudeTab = tabs.find(t => t.kind === 'claude')
-  if (!claudeTab) {
-    const cwd = await window.pathly.fs.userHome()
-    const tabId = await launchTerminal('claude', cwd)
-    claudeTab = useTerminalStore.getState().tabs.find(t => t.id === tabId)!
+  const { targetKind } = useChatStore()           // targetKind driven by ConductorHeader host pill
+  const { tabs } = useTerminalStore()             // tabs live in terminalStore, not chatStore
+  let targetTab = tabs.find(t => t.kind === targetKind)
+  if (!targetTab) {
+    const tabId = await launchTerminal(targetKind)
+    targetTab = useTerminalStore.getState().tabs.find(t => t.id === tabId)!
   }
   // Sanitize command (renderer-side):
-  const safe = command.replace(/[;&|><]/g, '').trim()
+  const safe = skill.command.replace(/[;&|><]/g, '').trim()
   // Host-correct format:
-  const cmd = claudeTab.kind === 'claude' ? `/pathly ${skill.name}` : `Use Pathly ${skill.name}`
-  window.pathly.terminal.write(claudeTab.id, cmd + '\n')
+  const cmd = targetTab.kind === 'claude' ? `/pathly ${safe}` : `Use Pathly ${safe}`
+  window.pathly.terminal.write(targetTab.id, cmd + '\n')
 
   OutputSnippet PTY subscription:
   useEffect(() => {
