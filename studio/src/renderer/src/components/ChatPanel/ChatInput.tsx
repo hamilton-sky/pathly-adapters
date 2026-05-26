@@ -1,6 +1,8 @@
 import { Send } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import { useChatStore } from '../../store/chatStore'
+import { useModelStore } from '../../store/modelStore'
+import { WEB_LLM_MODELS } from '../../data/models'
 import styles from './ChatInput.module.css'
 
 interface ChatInputProps {
@@ -16,6 +18,12 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
   const embedReady = useChatStore((s) => s.embedReady)
   const embedProgress = useChatStore((s) => s.embedProgress)
 
+  const selectedModelId = useModelStore((s) => s.selectedModelId)
+  const cachedModelIds = useModelStore((s) => s.cachedModelIds)
+  const isModelCached = cachedModelIds.includes(selectedModelId)
+  const selectedModel = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)
+  const modelShortName = selectedModel?.name ?? selectedModelId
+
   // Show loading state as soon as the component mounts and model isn't ready yet.
   // embedProgress=0 means "started but first callback not fired yet" — still loading.
   const isModelLoading = !embedReady
@@ -24,7 +32,7 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (!disabled && value.trim()) {
+      if (!disabled && value.trim() && isModelCached) {
         onSend()
       }
     }
@@ -62,8 +70,8 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        disabled={disabled || isDownloading}
-        placeholder={isDownloading ? 'Waiting for MiniLM to download…' : 'Message Conductor…'}
+        disabled={disabled || isDownloading || !isModelCached}
+        placeholder={isDownloading ? 'Waiting for MiniLM to download…' : !isModelCached ? `Download ${modelShortName} to start chatting…` : 'Message Conductor…'}
         rows={1}
         style={{
           color: t.textPrimary,
@@ -80,9 +88,10 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
             background: t.bgSurface1,
             color: t.textMuted,
             fontFamily: t.fontFamilyMono,
+            opacity: isModelCached ? 1 : 0.5,
           }}
         >
-          phi-4 mini
+          {isModelCached ? modelShortName : `${modelShortName} — download required`}
         </span>
         <span
           className={styles.modelPill}
@@ -102,12 +111,12 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
         </span>
         <button
           className={styles.sendButton}
-          onClick={() => { if (!disabled && value.trim()) onSend() }}
-          disabled={disabled || !value.trim() || isDownloading}
+          onClick={() => { if (!disabled && value.trim() && isModelCached) onSend() }}
+          disabled={disabled || !value.trim() || isDownloading || !isModelCached}
           title="Send (Enter)"
           style={{
-            background: value.trim() && !disabled && !isDownloading ? t.accent : t.bgSurface1,
-            color: value.trim() && !disabled && !isDownloading ? '#000' : t.textMuted,
+            background: value.trim() && !disabled && !isDownloading && isModelCached ? t.accent : t.bgSurface1,
+            color: value.trim() && !disabled && !isDownloading && isModelCached ? '#000' : t.textMuted,
           }}
         >
           <Send size={13} />

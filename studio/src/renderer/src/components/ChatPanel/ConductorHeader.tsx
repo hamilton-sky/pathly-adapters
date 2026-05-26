@@ -1,4 +1,5 @@
 import { X, Zap, Trash2 } from 'lucide-react'
+import { ModelSelector } from './ModelSelector'
 import styles from './ConductorHeader.module.css'
 
 interface ConductorHeaderProps {
@@ -27,6 +28,7 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, onToggleChat, onCle
           <span className={`${styles.dot} ${hasCodexTab ? styles.dotActive : ''}`} />
           codex
         </span>
+        <ModelSelector />
       </div>
 
       <button

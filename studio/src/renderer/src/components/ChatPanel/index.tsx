@@ -9,6 +9,7 @@ import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
 import { PATHLY_API_BASE } from '../../lib/config'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
+import { askWebLLM } from '../../lib/webLLMEngine'
 import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
 import { SkillsPanel } from './SkillsPanel'
@@ -37,6 +38,32 @@ function stripAnsi(raw: string): string {
     .replace(/[-]/g, '')
     // Lone carriage returns (without following newline)
     .replace(/\r(?!\n)/g, '')
+}
+
+function buildSystemPrompt(
+  context: Awaited<ReturnType<typeof buildPathlyContext>>,
+  topMatch: { skill: string; confidence: number; command: string; description: string } | null
+): string {
+  const skillList = context.skills.join(', ')
+  const stageInfo = context.fsmStage !== 'unknown' && context.fsmStage
+    ? `Current pipeline stage: ${context.fsmStage}${context.featureName ? ` (feature: ${context.featureName})` : ''}.`
+    : 'No active pipeline stage.'
+  const matchInfo = topMatch && topMatch.confidence >= 0.4
+    ? `Best skill match: ${topMatch.command} (${Math.round(topMatch.confidence * 100)}% confidence) — ${topMatch.description}`
+    : 'No strong skill match found.'
+  const schemaInfo = context.studioSchema && context.studioSchema.length > 0
+    ? `\n\n## Studio UI Elements\n${context.studioSchema.slice(0, 20).map((el) => `- ${el.screen}: ${el.label} (${el.type})`).join('\n')}`
+    : ''
+
+  return `You are the Conductor — a helpful AI assistant built into Pathly Studio.
+Your job is to help users run Pathly pipeline skills and navigate the Studio UI.
+
+${stageInfo}
+Available skills: ${skillList}
+${matchInfo}${schemaInfo}
+
+When a user asks about running a skill, explain what it does and confirm the match.
+Be concise (2-3 sentences). Do not invent skills that are not in the available list.`
 }
 
 export function ChatPanel(): JSX.Element {
@@ -200,61 +227,96 @@ export function ChatPanel(): JSX.Element {
     addMessage(assistantMsg)
     setLoading(true)
 
-    // Try the Python server for an LLM explanation / automation plan first.
-    // If the server is down, fall back to a local response — never show "Chat server unavailable."
-    let usedServer = false
-    try {
-      const res = await fetch(`${PATHLY_API_BASE}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          message: text,
-          context,
-          mode: isAutomationIntent ? 'automation' : 'chat',
-          studioSchema: context.studioSchema,
-          history: messages.map((m) => ({ role: m.role, content: m.content })),
-          ...(topMatch && topMatch.confidence >= 0.4
-            ? { matchedSkill: topMatch.skill, skillDescription: topMatch.description }
-            : {}),
-        }),
-      })
-
-      if (res.ok) {
-        usedServer = true
-        const json = await res.json() as { type: string; text?: string; intent?: string; steps?: import('../../types/automation').AutomationStep[] }
-
-        if (json.type === 'automation' && json.steps) {
-          useAutomationStore.getState().setSteps(json.steps)
+    if (process.env.PATHLY_CHAT_BACKEND !== 'ollama') {
+      // Local WebLLM path
+      const systemPrompt = buildSystemPrompt(context, topMatch)
+      try {
+        let fullText = ''
+        await askWebLLM(text, systemPrompt, (chunk) => {
+          fullText += chunk
+          updateLastMessage({ content: fullText, status: 'streaming' })
+        })
+        updateLastMessage({ content: fullText, status: 'done' })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg === 'WebGPU not supported') {
           updateLastMessage({
-            content: '',
+            content: '⚠️ WebGPU is required for local AI. Enable it in Electron or set PATHLY_CHAT_BACKEND=ollama.',
             status: 'done',
-            mode: 'automation',
-            automationPlan: { intent: json.intent ?? text, steps: json.steps },
           })
         } else {
-          updateLastMessage({ content: json.text ?? '', status: 'done' })
+          // WebLLM failed — fall back to local match response
+          if (topMatch && topMatch.confidence >= 0.4) {
+            const pct = Math.round(topMatch.confidence * 100)
+            const stage = context.fsmStage !== 'unknown' && context.fsmStage
+              ? `\n\nCurrent pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.`
+              : ''
+            updateLastMessage({
+              content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.`,
+              status: 'done',
+            })
+          } else {
+            updateLastMessage({
+              content: `No skill matched your message (best score < 40%).\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable: ${context.skills.join(', ')}.`,
+              status: 'done',
+            })
+          }
         }
       }
-    } catch { /* server unreachable — fall through to local response */ }
+    } else {
+      // Ollama/Python backend path (PATHLY_CHAT_BACKEND=ollama)
+      let usedServer = false
+      try {
+        const res = await fetch(`${PATHLY_API_BASE}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            message: text,
+            context,
+            mode: isAutomationIntent ? 'automation' : 'chat',
+            studioSchema: context.studioSchema,
+            history: messages.map((m) => ({ role: m.role, content: m.content })),
+            ...(topMatch && topMatch.confidence >= 0.4
+              ? { matchedSkill: topMatch.skill, skillDescription: topMatch.description }
+              : {}),
+          }),
+        })
 
-    // Fallback: server was down, returned non-ok, or has no /chat route.
-    // Build a useful response locally from match data — no error shown.
-    if (!usedServer) {
-      if (topMatch && topMatch.confidence >= 0.4) {
-        const pct = Math.round(topMatch.confidence * 100)
-        const stage = context.fsmStage !== 'unknown' && context.fsmStage
-          ? `\n\nCurrent pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.`
-          : ''
-        updateLastMessage({
-          content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.`,
-          status: 'done',
-        })
-      } else {
-        updateLastMessage({
-          content: `No skill matched your message (best score < 40%).\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable: ${context.skills.join(', ')}.`,
-          status: 'done',
-        })
+        if (res.ok) {
+          usedServer = true
+          const json = await res.json() as { type: string; text?: string; intent?: string; steps?: import('../../types/automation').AutomationStep[] }
+
+          if (json.type === 'automation' && json.steps) {
+            useAutomationStore.getState().setSteps(json.steps)
+            updateLastMessage({
+              content: '',
+              status: 'done',
+              mode: 'automation',
+              automationPlan: { intent: json.intent ?? text, steps: json.steps },
+            })
+          } else {
+            updateLastMessage({ content: json.text ?? '', status: 'done' })
+          }
+        }
+      } catch { /* server unreachable — fall through to local response */ }
+
+      if (!usedServer) {
+        if (topMatch && topMatch.confidence >= 0.4) {
+          const pct = Math.round(topMatch.confidence * 100)
+          const stage = context.fsmStage !== 'unknown' && context.fsmStage
+            ? `\n\nCurrent pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.`
+            : ''
+          updateLastMessage({
+            content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.`,
+            status: 'done',
+          })
+        } else {
+          updateLastMessage({
+            content: `No skill matched your message (best score < 40%).\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable: ${context.skills.join(', ')}.`,
+            status: 'done',
+          })
+        }
       }
     }
 
