@@ -10,7 +10,7 @@ try {
   console.warn('[terminal] node-pty not available')
 }
 
-const ALLOWED_SHELLS = new Set(['bash', 'zsh', 'sh', 'pwsh', 'powershell.exe', 'cmd.exe'])
+const ALLOWED_SHELLS = new Set(['bash', 'zsh', 'sh', 'pwsh', 'powershell.exe', 'cmd.exe', 'claude', 'codex'])
 
 const activePtys = new Map<string, import('node-pty').IPty>()
 // Maps tabId → the BrowserWindow that should receive PTY data for that tab
@@ -33,6 +33,13 @@ function isValidCwd(dir: string): boolean {
   } catch {
     return false
   }
+}
+
+function resolveShell(command: string | undefined): { shell: string; args: string[] } {
+  if (process.platform !== 'win32') return { shell: command ?? 'bash', args: [] }
+  if (command === 'claude') return { shell: 'cmd.exe', args: ['/k', 'claude'] }
+  if (command === 'codex')  return { shell: 'cmd.exe', args: ['/k', 'codex'] }
+  return { shell: 'powershell.exe', args: [] }
 }
 
 export function killAllPtys(): void {
@@ -67,9 +74,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       return
     }
 
-    // Phase 1: on Windows always use powershell.exe with no user-supplied args
-    const shell = process.platform === 'win32' ? 'powershell.exe' : (command ?? 'bash')
-    const shellArgs: string[] = []
+    const { shell, args: shellArgs } = resolveShell(command)
 
     const ptyProcess = pty.spawn(shell, shellArgs, {
       name: 'xterm-color',

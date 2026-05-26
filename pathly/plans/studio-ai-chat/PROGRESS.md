@@ -1,6 +1,6 @@
 # Studio AI Chat — Progress
 
-## Status: NOT STARTED
+## Status: IN PROGRESS
 
 ## Story Status
 
@@ -40,7 +40,7 @@
 
 | Conv | Phases | Track | Stories | Status | Verify |
 |------|--------|-------|---------|--------|--------|
-| 0 | 0a–0c | Core | S0.1, S0.2, S0.3 | TODO | `cd studio && npm run typecheck` + visual check in Studio |
+| 0 | 0a–0c | Core | S0.1, S0.2, S0.3 | DONE | `cd studio && npm run typecheck` + visual check in Studio |
 | 1 | 1–3 | Core | S1.1, S1.2 | TODO | `curl -X POST http://127.0.0.1:8765/chat -d '{"message":"explain /pathly build","matchedSkill":"build","history":[]}'` |
 | 2 | 4–8 | Core | S2.1, S2.2, S2.3, S2.4 | TODO | `cd studio && npm run typecheck` |
 | 3 | 9–11 | Core | S3.1, S3.2 | TODO | `cd studio && npm run typecheck` |
@@ -55,9 +55,9 @@
 
 | Conv | Phase | File | Description | Done when | Status |
 |------|-------|------|-------------|-----------|--------|
-| 0 | 0a | `studio/src/main/ipc/terminal.ts` | Add claude+codex to ALLOWED_SHELLS | Terminal tabs launch without "Shell not allowed" | TODO |
-| 0 | 0b | `Terminal/index.tsx` + CSS | Compact dock: 180px default, 72px empty, inline launchers | No blank dead zone, launch buttons visible | TODO |
-| 0 | 0c | `Terminal/PaneTabBar.tsx` + CSS | Sessions vs launchers hierarchy, active tab styling | Clear visual separation, active tab legible | TODO |
+| 0 | 0a | `studio/src/main/ipc/terminal.ts` | Add claude+codex to ALLOWED_SHELLS | Terminal tabs launch without "Shell not allowed" | DONE |
+| 0 | 0b | `Terminal/index.tsx` + CSS | Compact dock: 180px default, 72px empty, inline launchers | No blank dead zone, launch buttons visible | DONE |
+| 0 | 0c | `Terminal/PaneTabBar.tsx` + CSS | Sessions vs launchers hierarchy, active tab styling | Clear visual separation, active tab legible | DONE |
 | 1 | 1 | `src/pathly_orchestrator/http_server.py` | Add POST /chat SSE skeleton + GET /status | curl returns 200, /status returns stage | TODO |
 | 1 | 2 | `src/pathly_orchestrator/chat_agent.py` | phi4-mini explainer agent | Streams 2-3 sentence explanation | TODO |
 | 1 | 3 | `src/pathly_orchestrator/chat_tools.py` | get_fsm_state, read_plan_summary | AI references FSM stage by name | TODO |

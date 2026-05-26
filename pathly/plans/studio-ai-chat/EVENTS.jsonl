@@ -1,0 +1,2 @@
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-05-26T10:37:45Z"}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":24282,"tokens_out":6071,"total_tokens":30353,"cost_usd":0.163911,"tool_uses":38,"wall_seconds":858,"ts":"2026-05-26T10:37:45Z","schema_version":1}

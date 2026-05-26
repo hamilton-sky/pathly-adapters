@@ -15,7 +15,7 @@ export function Terminal(): JSX.Element {
   } = useTerminalStore()
   const projectPath = useStore((s) => s.projectPath)
   const theme = useTheme()
-  const [panelHeight, setPanelHeight] = useState(260)
+  const [panelHeight, setPanelHeight] = useState(180)
   const [splitRatio, setSplitRatio] = useState(0.5)
   const panelRef = useRef<HTMLDivElement>(null)
   const vDragRef = useRef<{ x: number; ratio: number } | null>(null)
@@ -154,11 +154,14 @@ export function Terminal(): JSX.Element {
     </div>
   )
 
+  const isEmpty = !splitEnabled && leftTabs.length === 0
+  const effectiveHeight = isEmpty ? 72 : panelHeight
+
   return (
     <div
       ref={panelRef}
       className={styles.panel}
-      style={{ ...themeVars, height: `${panelHeight}px`, display: open ? 'flex' : 'none' }}
+      style={{ ...themeVars, height: `${effectiveHeight}px`, display: open ? 'flex' : 'none', transition: 'height 150ms ease-out' }}
     >
       <div onMouseDown={onDragMouseDown} className={styles.dragHandle} />
 
@@ -211,7 +214,9 @@ export function Terminal(): JSX.Element {
         </div>
       ) : (
         <div className={styles.contentArea}>
-          {leftTabs.length === 0 && <div className={styles.emptyHint}>Press + to open a terminal</div>}
+          {leftTabs.length === 0 && (
+            <div className={styles.emptyHint}>No terminal open.</div>
+          )}
           {leftTabs.map((tab) => (
             <TerminalTabView key={tab.id} tabId={tab.id} active={tab.id === activeTabIdLeft} tabInstancesRef={tabInstancesRef} />
           ))}
