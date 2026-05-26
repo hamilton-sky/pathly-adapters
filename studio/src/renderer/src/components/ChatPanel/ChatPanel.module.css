@@ -1,0 +1,90 @@
+.automationCard {
+  flex-shrink: 0;
+  margin: 8px 12px;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.automationBtnRun {
+  flex: 1;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.automationBtnStep {
+  flex: 1;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid;
+  font-size: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.automationBtnStop {
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid;
+  font-size: 11px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.automationBtnApprove {
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.automationBtnSkipStep {
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid;
+  font-size: 11px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.stepQueue {
+  flex-shrink: 0;
+  margin: 4px 12px 8px;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.stepItem {
+  border-radius: 4px;
+  padding: 8px 10px;
+  transition: background 150ms ease-out;
+}
+
+.stepItemCurrent {
+  /* highlighted state — color applied via inline style */
+}
+
+.stepItemDone {
+  /* done state — opacity applied via inline style */
+}
+
+.progressBar {
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 300ms ease-out;
+}

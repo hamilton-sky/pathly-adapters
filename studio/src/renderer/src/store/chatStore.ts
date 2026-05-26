@@ -9,6 +9,11 @@ export interface Message {
   content: string
   status: 'idle' | 'streaming' | 'done'
   tokens?: number
+  mode?: 'chat' | 'automation'
+  automationPlan?: {
+    intent: string
+    steps: import('./automationStore').AutomationStep[]
+  }
 }
 
 export type TerminalKind = 'claude' | 'codex'

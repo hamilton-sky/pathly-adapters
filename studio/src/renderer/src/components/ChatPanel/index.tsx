@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useChatStore } from '../../store/chatStore'
+import { useAutomationStore } from '../../store/automationStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
@@ -15,6 +16,8 @@ import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { MatchCard } from './MatchCard'
 import { OutputSnippet } from './OutputSnippet'
+import { AutomationCard } from './AutomationCard'
+import { StepQueue } from './StepQueue'
 import { useChatResize } from './useChatResize'
 import styles from './index.module.css'
 
@@ -59,6 +62,9 @@ export function ChatPanel(): JSX.Element {
   const setLoading = useChatStore((s) => s.setLoading)
   const isLoading = useChatStore((s) => s.isLoading)
   const setCommandRunning = useChatStore((s) => s.setCommandRunning)
+
+  const automationStatus = useAutomationStore((s) => s.status)
+  const automationMessages = messages.filter((m) => m.mode === 'automation')
 
   const claudeOutput = outputByTarget.claude
   const codexOutput = outputByTarget.codex
@@ -184,6 +190,8 @@ export function ChatPanel(): JSX.Element {
       setAltMatches([])
     }
 
+    const isAutomationIntent = /\b(create|make|build|add|new)\b.*\b(flow|step|state|transition)\b/i.test(text)
+
     const assistantMsg = {
       id: crypto.randomUUID(),
       role: 'assistant' as const,
@@ -193,17 +201,19 @@ export function ChatPanel(): JSX.Element {
     addMessage(assistantMsg)
     setLoading(true)
 
-    // Try the Python server for an LLM explanation first.
-    // If the server is down or has no /chat route, fall back to a local
-    // response built from match data — never show "Chat server unavailable."
+    // Try the Python server for an LLM explanation / automation plan first.
+    // If the server is down, fall back to a local response — never show "Chat server unavailable."
     let usedServer = false
     try {
       const res = await fetch(`${PATHLY_API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          text,
           message: text,
           context,
+          mode: isAutomationIntent ? 'automation' : 'chat',
+          studioSchema: context.studioSchema,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
           ...(topMatch && topMatch.confidence >= 0.4
             ? { matchedSkill: topMatch.skill, skillDescription: topMatch.description }
@@ -213,36 +223,19 @@ export function ChatPanel(): JSX.Element {
 
       if (res.ok) {
         usedServer = true
-        const reader = res.body?.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        let streamedContent = ''
+        const json = await res.json() as { type: string; text?: string; intent?: string; steps?: import('../../store/automationStore').AutomationStep[] }
 
-        if (!topMatch || topMatch.confidence < 0.4) {
-          streamedContent = 'No matching skill found. '
-          updateLastMessage({ content: streamedContent })
+        if (json.type === 'automation' && json.steps) {
+          useAutomationStore.getState().setSteps(json.steps)
+          updateLastMessage({
+            content: '',
+            status: 'done',
+            mode: 'automation',
+            automationPlan: { intent: json.intent ?? text, steps: json.steps },
+          })
+        } else {
+          updateLastMessage({ content: json.text ?? '', status: 'done' })
         }
-
-        while (reader) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() ?? ''
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            try {
-              const payload = JSON.parse(line.slice(6)) as { text?: string; error?: string }
-              if (payload.text) {
-                streamedContent += payload.text
-                updateLastMessage({ content: streamedContent })
-              } else if (payload.error) {
-                updateLastMessage({ content: payload.error, status: 'done' })
-              }
-            } catch { /* malformed SSE chunk — skip */ }
-          }
-        }
-        updateLastMessage({ status: 'done' })
       }
     } catch { /* server unreachable — fall through to local response */ }
 
@@ -271,6 +264,36 @@ export function ChatPanel(): JSX.Element {
     if (autoApprove && topMatch && topMatch.confidence >= 0.65) {
       await handleRun()
     }
+  }
+
+  async function handleRunAll(steps: import('../../store/automationStore').AutomationStep[]): Promise<void> {
+    const { setStatus, advanceToNext, setMode } = useAutomationStore.getState()
+    setMode('auto')
+    setStatus('running')
+    for (const step of steps) {
+      try {
+        const result = await window.pathly.automation.executeStep(step.action)
+        if (result.success) {
+          advanceToNext()
+        } else {
+          setStatus('error')
+          break
+        }
+      } catch {
+        setStatus('error')
+        break
+      }
+      await new Promise<void>((r) => setTimeout(r, 300))
+    }
+    const currentStatus = useAutomationStore.getState().status
+    if (currentStatus === 'running') {
+      setStatus('done')
+    }
+  }
+
+  function handleStepByStep(): void {
+    useAutomationStore.getState().setMode('staged')
+    useAutomationStore.getState().setStatus('running')
   }
 
   function handleSkillClick(command: string): void {
@@ -321,6 +344,18 @@ export function ChatPanel(): JSX.Element {
       <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} onToggleChat={toggleChat} onClearChat={handleClearAll} />
       <SkillsPanel onSkillClick={handleSkillClick} />
       <MessageList />
+      {automationMessages.length > 0 && automationMessages[automationMessages.length - 1].automationPlan && (
+        <>
+          <AutomationCard
+            intent={automationMessages[automationMessages.length - 1].automationPlan!.intent}
+            stepCount={automationMessages[automationMessages.length - 1].automationPlan!.steps.length}
+            schemaAvailable={(automationMessages[automationMessages.length - 1].automationPlan!.steps.length > 0)}
+            onRunAll={() => void handleRunAll(automationMessages[automationMessages.length - 1].automationPlan!.steps)}
+            onStepByStep={handleStepByStep}
+          />
+          {automationStatus !== 'idle' && <StepQueue />}
+        </>
+      )}
       {currentMatch !== null && (
         <MatchCard
           match={currentMatch}

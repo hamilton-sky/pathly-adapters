@@ -37,6 +37,7 @@ from pathly_orchestrator.config import Settings
 from pathly_orchestrator.eventlog import read_state
 from pathly_orchestrator.feature_flags import flags
 from pathly_orchestrator.fsm_ops import next_action, complete_stage
+from pathly_orchestrator.chat_agent import handle_chat
 from pathly_telemetry.storage import append_activity
 
 
@@ -581,6 +582,18 @@ def record_activity_endpoint():
     except Exception as e:
         logging.exception("record_activity error")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
+@app.route("/chat", methods=["POST", "OPTIONS"])
+def chat():
+    if request.method == "OPTIONS":
+        from flask import Response as _Resp
+        resp = _Resp()
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        return resp
+    return handle_chat(request)
 
 
 @app.route("/events/stream", methods=["GET"])
