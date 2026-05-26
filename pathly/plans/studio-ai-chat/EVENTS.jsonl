@@ -84,3 +84,4 @@
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-26T20:55:37Z"}
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-26T20:56:20Z"}
 {"type":"RETRY","key":"conv-8:REVIEW_FAILURES.md","ts":"2026-05-27T00:00:00Z"}
+{"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":8,"result":"PASS","tokens_in":41936,"tokens_out":10484,"total_tokens":52420,"cost_usd":0.283068,"tool_uses":29,"wall_seconds":124,"ts":"2026-05-27T00:05:00Z","schema_version":1}
