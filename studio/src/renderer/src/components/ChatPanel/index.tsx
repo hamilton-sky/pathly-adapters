@@ -6,6 +6,7 @@ import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
+import { PATHLY_API_BASE } from '../../lib/config'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
 import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
@@ -179,22 +180,80 @@ export function ChatPanel(): JSX.Element {
     addMessage(assistantMsg)
     setLoading(true)
 
-    // Build response locally from match data — no server needed.
-    // WebLLM richer explanation will layer on top in a future conv.
+    // Try the Python server for an LLM explanation first.
+    // If the server is down or has no /chat route, fall back to a local
+    // response built from match data — never show "Chat server unavailable."
+    let usedServer = false
     try {
-      let response: string
+      const res = await fetch(`${PATHLY_API_BASE}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          context,
+          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          ...(topMatch && topMatch.confidence >= 0.4
+            ? { matchedSkill: topMatch.skill, skillDescription: topMatch.description }
+            : {}),
+        }),
+      })
+
+      if (res.ok) {
+        usedServer = true
+        const reader = res.body?.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let streamedContent = ''
+
+        if (!topMatch || topMatch.confidence < 0.4) {
+          streamedContent = 'No matching skill found. '
+          updateLastMessage({ content: streamedContent })
+        }
+
+        while (reader) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            try {
+              const payload = JSON.parse(line.slice(6)) as { text?: string; error?: string }
+              if (payload.text) {
+                streamedContent += payload.text
+                updateLastMessage({ content: streamedContent })
+              } else if (payload.error) {
+                updateLastMessage({ content: payload.error, status: 'done' })
+              }
+            } catch { /* malformed SSE chunk — skip */ }
+          }
+        }
+        updateLastMessage({ status: 'done' })
+      }
+    } catch { /* server unreachable — fall through to local response */ }
+
+    // Fallback: server was down, returned non-ok, or has no /chat route.
+    // Build a useful response locally from match data — no error shown.
+    if (!usedServer) {
       if (topMatch && topMatch.confidence >= 0.4) {
         const pct = Math.round(topMatch.confidence * 100)
         const stage = context.fsmStage !== 'unknown' && context.fsmStage
-          ? ` Current pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.` : ''
-        response = `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.`
+          ? `\n\nCurrent pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.`
+          : ''
+        updateLastMessage({
+          content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.`,
+          status: 'done',
+        })
       } else {
-        response = `No skill matched your message (best score < 40%).\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable skills: ${context.skills.join(', ')}.`
+        updateLastMessage({
+          content: `No skill matched your message (best score < 40%).\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable: ${context.skills.join(', ')}.`,
+          status: 'done',
+        })
       }
-      updateLastMessage({ content: response, status: 'done' })
-    } finally {
-      setLoading(false)
     }
+
+    setLoading(false)
 
     if (autoApprove && topMatch && topMatch.confidence >= 0.65) {
       await handleRun()
