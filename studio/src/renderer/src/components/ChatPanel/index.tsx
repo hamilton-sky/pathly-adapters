@@ -165,8 +165,10 @@ export function ChatPanel(): JSX.Element {
         buildPathlyContext(),
       ])
     } catch {
-      // Embedding failed (e.g. model download error) — continue with no match
-      context = { fsmStage: 'unknown', featureName: '', skills: [], studioSchema: [] }
+      // Embedding failed (e.g. model download error) — continue with no match.
+      // Always include the known skills list so the fallback response is useful.
+      const { loadSkills: _ls } = await import('../../lib/skillsManifest')
+      context = { fsmStage: 'unknown', featureName: '', skills: _ls().map((s) => s.name), studioSchema: [] }
     } finally {
       setIsEmbedding(false)
     }

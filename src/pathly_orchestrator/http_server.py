@@ -643,7 +643,7 @@ def events_stream():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": os.environ.get("PATHLY_CORS_ORIGIN", "null"),
+            "Access-Control-Allow-Origin": os.environ.get("PATHLY_CORS_ORIGIN", "*"),
         },
     )
 
