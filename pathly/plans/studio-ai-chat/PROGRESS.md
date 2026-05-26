@@ -24,9 +24,9 @@
 | S5.3 | Low-confidence state guides user to correct skill | Conv 5 | DONE |
 | S6.1 | AI receives static schema of Studio UI elements | Conv 6 | DONE |
 | S6.2 | AI system prompt includes Studio UI context | Conv 6 | DONE |
-| S7.1 | Playwright executor connects to Electron window | Conv 7 | TODO |
-| S7.2 | AI can click, fill, or select any Studio element by label | Conv 7 | TODO |
-| S7.3 | Step execution is reliable across UI changes | Conv 7 | TODO |
+| S7.1 | Playwright executor connects to Electron window | Conv 7 | DONE |
+| S7.2 | AI can click, fill, or select any Studio element by label | Conv 7 | DONE |
+| S7.3 | Step execution is reliable across UI changes | Conv 7 | DONE |
 | S8.1 | Staged mode with per-step approval | Conv 8 | TODO |
 | S8.2 | Auto mode executes full plan | Conv 8 | TODO |
 | S8.3 | Auto mode blocked on low confidence | Conv 8 | TODO |
@@ -47,7 +47,7 @@
 | 4 | 12–14 | Core | S4.1, S4.2 | DONE | `cd studio && npm run typecheck` |
 | 5 | 15–18 | Core | S5.1, S5.2, S5.3 | DONE | `cd studio && npm run typecheck` |
 | 6 | 19–20 | Track A | S6.1, S6.2 | DONE | `cd studio && npm run typecheck` + inspect POST /chat body includes studioSchema |
-| 7 | 21–22 | Track A | S7.1, S7.2, S7.3 | TODO | `cd studio && npm run typecheck` + devtools: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` |
+| 7 | 21–22 | Track A | S7.1, S7.2, S7.3 | DONE | `cd studio && npm run typecheck` + devtools: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` |
 | 8 | 24–26 | Track A | S8.1, S8.2, S8.3, S8.4 | TODO | E2E: type "create a test flow" → approve steps → flow appears in Studio |
 | 9 | 27–29 | Track B | S9.1, S9.2, S9.3, S9.4 | TODO | Select Phi-4 Mini → download → send message → response streams from WebLLM |
 
@@ -79,9 +79,9 @@
 | 5 | 18 | `ChatPanel/index.tsx` + `chatStore.ts` | Wire embedding into send flow; /pathly commands route silently | MatchCard renders < 50ms; no YOU message for /pathly | DONE |
 | 6 | 19 | `lib/studioSchema.ts` + `types/studio.ts` | Static Studio UI schema (lib canonical; data/ is re-export shim) | No TS errors, schema covers all key elements | DONE |
 | 6 | 20 | `lib/pathlyContext.ts` | Inject schema into AI context | POST /chat body includes studioSchema | DONE |
-| 7 | 21 | `main/automation/playwrightExecutor.ts` | Playwright executor — 3-tier cascade + self-healing | executeStep click/fill/select works | TODO |
-| 7 | 21.5 | `lib/elementResolver.ts` | Renderer-side semantic+LLM resolution (uses embed+cosineSim from embedRouter) | IPC listeners registered at startup | TODO |
-| 7 | 22 | `main/ipc/automation.ts` | IPC handler + round-trip for Tier 2/3 | ipcRenderer.invoke executes step via Playwright | TODO |
+| 7 | 21 | `main/automation/playwrightExecutor.ts` | Playwright executor — 3-tier cascade + self-healing | executeStep click/fill/select works | DONE |
+| 7 | 21.5 | `lib/elementResolver.ts` | Renderer-side semantic+LLM resolution (uses embed+cosineSim from embedRouter) | IPC listeners registered at startup | DONE |
+| 7 | 22 | `main/ipc/automation.ts` | IPC handler + round-trip for Tier 2/3 | ipcRenderer.invoke executes step via Playwright | DONE |
 | 8 | 24 | `store/automationStore.ts` | Step queue state | No TS errors | TODO |
 | 8 | 25 | `ChatPanel/StepQueue.tsx` + `AutomationCard.tsx` | Staged/auto UI components | Staged approve/skip works visually | TODO |
 | 8 | 26 | `ChatPanel/index.tsx` + `chat_agent.py` | Wire AI → action plan → execution | Full flow creation E2E works | TODO |
