@@ -1,106 +1,82 @@
-# Chat/Automate Mode Toggle — Architecture Proposal
+# AI-Assisted Flow Wizard - Architecture Proposal
 
-## Problem Statement
+## Recommendation
 
-The `AutomationCard` + `StepQueue` + `automationStore` + Playwright executor are all built and
-functional, but the pipeline that feeds them is missing. The chat flow never generates a
-structured action plan — `isAutomationIntent` is defined but unused, and `automationStore.setSteps()`
-is never called from `handleSend()`. The AutomationCard is an orphan UI.
+Implement option 2 as a full-schema AI drafting capability inside `FlowWizard`, after upgrading the wizard so it can round-trip the runtime flow format. Do not build it as ChatPanel automation that clicks Studio controls.
 
-This feature closes that gap with the simplest possible addition: an explicit mode toggle that
-routes the LLM call and its response handling down the correct path. A named action registry
-(Conv 3) then lifts the step vocabulary from brittle raw labels to stable, parameterized action names.
+## Why the wizard must come first
 
-## Proposed Solution
+The current wizard is not a complete editor for the live Pathly schema:
 
-A `chatMode: 'chat' | 'automate'` field in `chatStore`. The toggle pill in `ChatInput` sets it.
-`handleSend` branches on it. A `pathlyActionRegistry.ts` maps named actions to concrete Playwright
-steps so the LLM picks from a stable vocabulary instead of inventing raw element labels.
+- It hand-builds YAML and omits `role_map` and `transition_actions`, which exist in shipped flows.
+- It collects a description but does not serialize it.
+- Its validation is limited compared with `FlowEditor/utils/validateFlow.ts`.
+- Its review component still reflects older step numbering.
 
-## Layer Breakdown
+An LLM generating drafts into this surface today would create flows that appear valid in the UI while losing runtime behavior on save.
 
-```
-ChatInput (renderer — UI layer)
-     |  onClick -> chatStore.setChatMode('automate')
-     v
-chatStore.ts (renderer — state layer)
-     |  chatMode: 'chat' | 'automate'
-     v
-ChatPanel/index.tsx (renderer — orchestration layer)
-     |  handleSend reads chatMode once at start
-     |
-     +-- chatMode === 'chat'  -> existing flow (unchanged)
-     |                          matchIntent -> MatchCard
-     |                          buildSystemPrompt -> LLM -> chat bubble
-     |
-     +-- chatMode === 'automate' -> new branch
-          |  setCurrentMatch(null), setAltMatches([])
-          |  buildAutomationPrompt()   [uses REGISTRY_PROMPT_BLOCK]
-          |  LLM call (Ollama or node-llama-cpp, same IPC)
-          |  on done: parseAutomationResponse(fullText)
-          |     +-- success: expandAction() per step -> concrete AutomationStep[]
-          |     |            automationStore.reset() + setSteps()
-          |     |            updateLastMessage({ automationPlan })
-          |     +-- failure: updateLastMessage({ content: fullText })  [chat fallback]
-          v
-     AutomationCard (existing) <- renders when msg.automationPlan exists
-     StepQueue (existing) <- reads automationStore.steps
-     PlaywrightExecutor (existing) <- executes approved steps
+## Target architecture
 
-pathlyActionRegistry.ts (new — Conv 3)
-     PATHLY_ACTIONS[]     -> named action defs with {{param}} templates
-     expandAction(name, params) -> concrete step array
-     REGISTRY_PROMPT_BLOCK -> LLM vocabulary string injected into buildAutomationPrompt
+```text
+User intent text
+      |
+      v
+AiDraftPanel inside FlowWizard
+      |
+      v
+Existing LLM bridge -> constrained FlowYaml response
+      |
+      v
+parse + canonical validation
+      |
+      +-- invalid: preserve current wizard data, show issues
+      |
+      +-- valid: populate editable wizard draft
+                       |
+                       v
+              User reviews/edits full schema
+                       |
+                       v
+              canonical YAML dump + save
 ```
 
-## Key Design Decisions
+## Schema boundary
 
-### Decision 1: Explicit toggle, not intent detection
-- **Options considered**: regex detection (`isAutomationIntent`), LLM classification, explicit toggle
-- **Chosen**: Explicit toggle
-- **Rationale**: Regex fires on ambiguous phrases ("create a new step" in a planning conversation). LLM classification adds a round-trip. Explicit toggle is zero-latency, zero-false-positives, and immediately understandable to the user. The `isAutomationIntent` regex is removed.
+`FlowYaml` is the internal contract. It must cover the fields already consumed by the application and shipped configuration:
 
-### Decision 2: Mode read once at send, not reactive during stream
-- **Options considered**: Read mode reactively via hook, read via `getState()` at send time
-- **Chosen**: `useChatStore.getState().chatMode` read once at the start of `handleSend`
-- **Rationale**: The mode that was active when the user pressed Send is the correct mode for that message. Reactive reading would allow the mode to change mid-stream, producing partially-handled responses.
+```text
+version, flow, storage_path, states, transitions,
+agent_map, role_map, feedback_routing,
+transition_rules, transition_actions, gates
+```
 
-### Decision 3: JSON fallback to chat, not crash
-- **Options considered**: Show error, crash, show chat response
-- **Chosen**: Show plain text as chat message
-- **Rationale**: Small local models may not reliably follow JSON prompts 100% of the time. A safe fallback keeps the UX recoverable — user sees the response and can retry.
+The wizard and FlowEditor should share the same typed parsing, serialization, and validation behavior. The AI layer supplies a candidate `FlowYaml`; it does not invent a second automation schema.
 
-### Decision 4: No streaming JSON parsing
-- **Options considered**: Parse incrementally as tokens arrive, parse only on done
-- **Chosen**: Parse only on `done`
-- **Rationale**: Partial JSON is unparseable. Attempting incremental parse would require a custom JSON streaming library. Parse-on-done is correct and simple. The streaming dots already indicate progress.
+## Stepper comparison
 
-### Decision 5: Named action registry over raw click/fill/select (Conv 3)
-- **Options considered**: Keep raw `{ type: "click", label: "Run Storm" }` steps; introduce a registry
-- **Chosen**: Named action registry (`pathlyActionRegistry.ts`)
-- **Rationale**: Raw label steps are brittle — a single label rename in Studio breaks every past automation. The registry decouples the LLM vocabulary (stable action names like `pathly_run_storm`) from the Playwright implementation (editable step arrays in one file). The LLM picks from a documented, constrained list; `expandAction` resolves params and produces the concrete steps. Inspired by the stepper framework's pattern of named compound actions backed by Page Object methods.
+`playwright-stepper-framework` is a good reference for boundaries, not the executor for this feature:
 
-### Decision 6: Template params in registry steps
-- **Options considered**: Separate step array per param combination; `{{param}}` templates
-- **Chosen**: `{{paramName}}` template strings in step `value` fields
-- **Rationale**: Allows parameterized actions (e.g., `pathly_plan_feature(featureName)`) without duplicating step definitions. `expandAction` resolves them at parse time before steps reach the executor.
+| Stepper pattern | Use here |
+|---|---|
+| Stable action/config contract before execution | Generate and validate a stable `FlowYaml` draft |
+| Resolver cascade isolated from actions | Keep AI generation isolated from save/runtime execution |
+| Healing only when target UI locators fail | Defer; creating Studio-internal flow data does not require locator recovery |
 
-## Key Components
+If Studio later tests a flow against a third-party web application, cascade resolution and healing belong in that external execution layer.
 
-| Component | Status | Role in this feature |
-|---|---|---|
-| `chatStore.chatMode` | NEW — Conv 1 | Source of truth for current mode |
-| `ChatInput` toggle pill | NEW — Conv 1 | User-facing mode switch |
-| `pathlyActionRegistry.ts` | NEW — Conv 3 | Named action defs, param templates, expandAction |
-| `buildAutomationPrompt()` | NEW — Conv 2, updated Conv 3 | Prompt with registry vocabulary |
-| `parseAutomationResponse()` | NEW — Conv 2, updated Conv 3 | JSON parser + expandAction per step |
-| `AutomationCard` | EXISTING — no changes | Renders when `msg.automationPlan` is set |
-| `StepQueue` | EXISTING — no changes | Reads `automationStore.steps` |
-| `automationStore` | EXISTING — no changes | `setSteps()` + `reset()` called from new branch |
-| `playwrightExecutor` | EXISTING — no changes | Executes steps on approval |
+## Key decisions
+
+1. **Wizard integration, not ChatPanel mode toggle.** The user is building a flow; the wizard is the correct editing and approval context.
+2. **Draft first, save only after user approval.** The model can assist design but cannot persist or run a flow automatically.
+3. **Canonical serializer shared with editor behavior.** `js-yaml` is already used by FlowEditor and avoids partial handcrafted output.
+4. **Full-schema support precedes AI.** A partial editor is not a safe destination for model-generated workflow definitions.
+5. **Fix current LLM typing prerequisite.** The existing `ollamaChat(..., think)` type mismatch is part of the path exercised by AI drafting and must be repaired or explicitly resolved before acceptance.
 
 ## Risks
 
-- **Model JSON compliance**: Small models (phi-4-mini, deepseek-r1:1.5b) may not consistently follow the JSON schema. Mitigation: JSON fallback to chat display; user can retry or switch to a larger model (qwen3-4b is recommended for automation).
-- **Registry coverage gaps**: If a user asks for a flow that has no matching named action, `expandAction` returns null and the step is silently skipped, producing an empty plan (fallback to chat). Mitigation: expand the registry as new flows are needed — one entry per action.
-- **studioSchema staleness (Conv 2 only)**: Raw labels in the Conv 2 prompt can drift if Studio UI changes. Fully resolved in Conv 3 when the registry becomes the single source of truth for labels.
+| Risk | Mitigation |
+|---|---|
+| Model emits malformed structure | Parse and validate before applying; preserve current wizard state on failure |
+| Generated graph references missing states/roles | Shared full-schema validation blocks Save |
+| AI drafting overwrites manual edits | Apply only after a confirmed successful draft generation; never auto-save |
+| Wizard diverges from FlowEditor again | Centralize model/serialization/validation and add round-trip tests |

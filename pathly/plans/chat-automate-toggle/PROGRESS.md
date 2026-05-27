@@ -1,47 +1,34 @@
-# Chat/Automate Mode Toggle — Progress
+# AI-Assisted Flow Wizard - Progress
 
-## Status: NOT STARTED
+## Status: PLAN UPDATED - IMPLEMENTATION NOT STARTED
 
-## Story Status
+The previous Chat/Automate Playwright plan has been superseded after inspection of the live wizard and FlowEditor schema handling.
+
+## Story status
 
 | Story | Title | Delivered by | Status |
-|-------|-------|--------------|--------|
-| S1.1 | Mode toggle pill in footer | Conv 1 | TODO |
-| S1.2 | chatMode field in chatStore | Conv 1 | TODO |
-| S2.1 | Automation system prompt with studioSchema | Conv 2 | TODO |
-| S2.2 | JSON response parsed into AutomationCard | Conv 2 | TODO |
-| S2.3 | Parsed steps wired to automationStore | Conv 2 | TODO |
-| S2.4 | Chat mode unaffected (no regression) | Conv 2 | TODO |
-| S3.1 | Named action registry | Conv 3 | TODO |
-| S3.2 | LLM prompt uses registry vocabulary; steps expand before execution | Conv 3 | TODO |
+|---|---|---|---|
+| S1 | Wizard represents shipped Pathly flows | Conv 1-2 | TODO |
+| S2 | Full-flow validation before save | Conv 1-2 | TODO |
+| S3 | LLM creates structured drafts inside wizard | Conv 3 | TODO |
+| S4 | Draft failure preserves user work | Conv 3 | TODO |
+| S5 | Draft/review status is clear | Conv 4 | TODO |
 
-## Conversation Breakdown
+## Conversation status
 
-| Conv | Phases | Stories | Status | Verify |
-|------|--------|---------|--------|--------|
-| 1 | Pre-flight, 1, 2 | S1.1, S1.2 | TODO | `cd studio && npx tsc --noEmit` |
-| 2 | 3, 4 | S2.1, S2.2, S2.3, S2.4 | TODO | `cd studio && npx tsc --noEmit` |
-| 3 | 5, 6 | S3.1, S3.2 | TODO | `cd studio && npx tsc --noEmit` |
+| Conv | Work package | Status | Verification focus |
+|---|---|---|---|
+| 1 | Canonical model, serialization, validation, LLM bridge prerequisite | TODO | Focused tests plus TypeScript baseline repair |
+| 2 | Full-schema wizard fields and round-trip behavior | TODO | Representative shipped-flow round trip |
+| 3 | AI draft panel and structured generation | TODO | Valid/invalid/abort generation tests |
+| 4 | Review UX, integration verification, regression checks | TODO | Manual happy flow plus relevant automated suite |
 
-See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
+## Verified baseline observations
 
-## Phase Detail
+- The existing wizard does not serialize all fields used by shipped flows.
+- FlowEditor already handles `role_map` and `transition_actions` in graph/validation logic.
+- Current TypeScript verification is not a clean zero-error baseline because `llmBridge.ts` passes a fourth argument to `ollamaChat` while its declared surface accepts three.
 
-| Conv | Phase | File | Description | Done when | Status |
-|------|-------|------|-------------|-----------|--------|
-| 1 | Pre-flight | `ChatPanel/index.tsx` | Verify isAutomationIntent unused, baseline TS check | 0 TS errors recorded | TODO |
-| 1 | 1 | `store/chatStore.ts` | Add chatMode field + setChatMode action | useChatStore returns chatMode without TS errors | TODO |
-| 1 | 2 | `ChatInput.tsx` + `ChatInput.module.css` | Mode toggle pill in footer | Pill renders, clicking updates store, active styling works | TODO |
-| 2 | 3 | `ChatPanel/index.tsx` | Automation system prompt branch | Automate mode sends different prompt; chat mode unchanged | TODO |
-| 2 | 4 | `ChatPanel/index.tsx` | Parse JSON response + wire stores | AutomationCard appears; automationStore.steps populated | TODO |
-| 3 | 5 | `automation/pathlyActionRegistry.ts` | Named action registry | PATHLY_ACTIONS, expandAction, REGISTRY_PROMPT_BLOCK all compile | TODO |
-| 3 | 6 | `ChatPanel/index.tsx` | Update prompt + expand registry steps | LLM uses registry vocab; expandAction resolves steps before setSteps | TODO |
+## Blocked by
 
-## Prerequisites
-- [x] `automationStore.ts` exists with `setSteps` and `reset`
-- [x] `AutomationCard` renders when `msg.automationPlan` is set
-- [x] `buildPathlyContext()` returns `studioSchema`
-- [ ] Baseline TS errors recorded (run in pre-flight)
-
-## Blocked By
-- Nothing
+Nothing for planning. Conversation 1 must resolve or accurately record the LLM bridge type contract before AI generation is accepted.

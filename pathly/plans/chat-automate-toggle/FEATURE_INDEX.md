@@ -1,69 +1,66 @@
-# Chat/Automate Mode Toggle — Feature Index
+# AI-Assisted Flow Wizard - Feature Index
 
-> **Read this first.** Every agent working on this feature should load this file before any other plan file.
-> It maps every file in this folder so you can fetch only what you need in one read.
+> Read this first. This plan folder is retained for continuity, but the former Chat/Automate Playwright scope is superseded.
 
----
+## Goal
+
+Let a user describe a Pathly workflow in natural language inside the Studio Flow Wizard, receive a structured draft, edit it, validate it, and save a canonical `.flow.yaml` file.
+
+This is option 2: a full flow assistant, implemented through the wizard's data model rather than UI-click automation.
+
+## Live-code findings that shape the plan
+
+| Finding | Consequence |
+|---|---|
+| `FlowWizard/utils.ts` serializes only part of the shipped YAML schema. | Fix wizard round-trip support before adding AI drafting. |
+| Shipped flows use `role_map` and `transition_actions`; `FlowYaml`/FlowEditor already reference them. | The wizard must expose and preserve these fields. |
+| Wizard captures `description` but does not write it to YAML. | Remove the misleading saved-field behavior or label it as draft-only intent. |
+| FlowEditor uses `js-yaml` plus `validateFlow`; wizard hand-builds YAML. | Consolidate on structured parse/dump and shared validation. |
+| `llmBridge.ts` currently calls `ollamaChat` with a fourth `think` argument rejected by its exposed type. | Fix the existing bridge typing before making LLM generation an acceptance gate. |
 
 ## Plan files
 
-| File | Written by | Read by | Purpose |
-|---|---|---|---|
-| `FEATURE_INDEX.md` | Planner | All agents | This file — single entry point for feature context |
-| `USER_STORIES.md` | Planner | Tester, Reviewer | Acceptance criteria — the contract |
-| `IMPLEMENTATION_PLAN.md` | Planner | Builder, Architect | Phase-by-phase design — the what and how |
-| `CONVERSATION_PROMPTS.md` | Planner | Builder | Exact builder prompts — one section per conversation |
-| `PROGRESS.md` | Builder, Orchestrator | Orchestrator, Builder | Conversation status — the checkpoint |
-| `HAPPY_FLOW.md` | Planner | Builder | Golden-path narrative |
-| `EDGE_CASES.md` | Planner | Tester | Failure modes |
-| `ARCHITECTURE_PROPOSAL.md` | Planner | Architect | Design decisions |
-| `FLOW_DIAGRAM.md` | Planner | Builder | ASCII flow of the new send path |
-
-### Optional plan files
-
-| File | Present? | Purpose |
-|---|---|---|
-| `ARCHITECTURE_PROPOSAL.md` | yes | Cross-layer design decisions |
-| `EDGE_CASES.md` | yes | Failure modes and risk scenarios |
-| `HAPPY_FLOW.md` | yes | Golden-path narrative |
-| `FLOW_DIAGRAM.md` | yes | Multi-component interaction diagram |
-
----
+| File | Purpose |
+|---|---|
+| `FEATURE_INDEX.md` | Entry point and verified scope |
+| `USER_STORIES.md` | Product contract and acceptance criteria |
+| `IMPLEMENTATION_PLAN.md` | Four-conversation delivery plan |
+| `CONVERSATION_PROMPTS.md` | Builder prompts for each conversation |
+| `PROGRESS.md` | Implementation checkpoint |
+| `HAPPY_FLOW.md` | Primary user journey |
+| `EDGE_CASES.md` | Failure and safety cases |
+| `ARCHITECTURE_PROPOSAL.md` | Design decisions and Stepper comparison |
+| `FLOW_DIAGRAM.md` | Component/data flow |
 
 ## Codebase touchpoints
 
-Files in the live repo that this feature reads or modifies.
-
-| Codebase file | Conversation | What changes |
-|---|---|---|
-| `studio/src/renderer/src/store/chatStore.ts` | Conv 1 | Add `chatMode: 'chat' \| 'automate'` field and `setChatMode` action to `ChatState` |
-| `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx` | Conv 1 | Add mode toggle pill `[Chat \| Automate]` to footer row; reads `chatStore.chatMode` |
-| `studio/src/renderer/src/components/ChatPanel/ChatInput.module.css` | Conv 1 | Add `.modeToggle`, `.modeBtn`, `.modeBtnActive` styles |
-| `studio/src/renderer/src/components/ChatPanel/index.tsx` | Conv 2 + Conv 3 | Conv 2: automation system prompt branch + JSON parse + store wiring. Conv 3: update to registry vocab + expandAction |
-| `studio/src/renderer/src/automation/pathlyActionRegistry.ts` | Conv 3 | CREATE — named action defs, expandAction, REGISTRY_PROMPT_BLOCK |
-
-> **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
-
----
+| Codebase file or area | Planned change |
+|---|---|
+| `studio/src/renderer/src/types/index.ts` | Extend canonical `FlowYaml` coverage, including `gates` if absent |
+| `studio/src/renderer/src/components/FlowEditor/hooks/useFlowFile.ts` | Reuse structured YAML parse/dump boundary where needed |
+| `studio/src/renderer/src/components/FlowEditor/utils/validateFlow.ts` | Extend full-schema validation used by wizard drafts |
+| `studio/src/renderer/src/components/FlowWizard/FlowWizard.tsx` | Host full-schema editing and AI draft application |
+| `studio/src/renderer/src/components/FlowWizard/types.ts` | Align wizard state with canonical flow model |
+| `studio/src/renderer/src/components/FlowWizard/utils.ts` | Replace partial hand-built YAML with canonical conversion/serialization |
+| `studio/src/renderer/src/components/FlowWizard/FlowWizard.validation.ts` | Validate references and schema consistency |
+| `studio/src/renderer/src/components/FlowWizard/Step*.tsx` | Add role/action support and correct step/review UX |
+| `studio/src/renderer/src/lib/llmBridge.ts` and exposed IPC typings | Repair Ollama typing required by generation |
+| `studio/src/renderer/src/components/FlowWizard/AiDraftPanel.tsx` | Create natural-language draft UI |
 
 ## Conversation map
 
-| Conv | Title | Stories | Status | Key files touched |
-|---|---|---|---|---|
-| 1 | Store field + toggle pill UI | S1.1, S1.2 | TODO | `chatStore.ts`, `ChatInput.tsx`, `ChatInput.module.css` |
-| 2 | Automation prompt + response wiring | S2.1, S2.2, S2.3, S2.4 | TODO | `ChatPanel/index.tsx` |
-| 3 | Named action registry | S3.1, S3.2 | TODO | `automation/pathlyActionRegistry.ts` (new), `ChatPanel/index.tsx` |
+| Conv | Title | Delivers | Status |
+|---|---|---|---|
+| 1 | Canonical flow model and validation baseline | S1, S2 prerequisite | TODO |
+| 2 | Lossless full-schema wizard | S1, S2 | TODO |
+| 3 | LLM-generated wizard drafts | S3, S4 | TODO |
+| 4 | Safety UX and verification | S5, regression coverage | TODO |
 
----
+## Explicitly out of scope
 
-## Feedback files (transient — deleted after resolution)
+- A `[Chat | Automate]` toggle in Conductor.
+- Generating Playwright clicks to fill Studio's own wizard.
+- Executing Pathly phases by guessed UI labels.
+- Stepper-style locator healing inside this feature.
 
-Live in `pathly/plans/chat-automate-toggle/feedback/`. A file existing = issue open.
-
-| File | Written by | Resolved by |
-|---|---|---|
-| `REVIEW_FAILURES.md` | Reviewer | Builder |
-| `TEST_FAILURES.md` | Tester | Builder |
-| `IMPL_QUESTIONS.md` | Builder [REQ] | Planner |
-| `DESIGN_QUESTIONS.md` | Builder [ARCH] | Architect |
-| `HUMAN_QUESTIONS.md` | Any agent | User |
+Stepper remains useful as an architecture reference: stable structured intent should be separated from execution. Healing only becomes relevant in a later feature that runs flows against an external UI.
