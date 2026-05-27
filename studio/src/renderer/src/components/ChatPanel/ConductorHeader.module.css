@@ -29,6 +29,8 @@
   gap: 6px;
   margin-left: 8px;
   flex: 1;
+  min-width: 0;        /* allow shrinking below content size */
+  overflow: hidden;    /* clip instead of pushing buttons off screen */
 }
 
 .pill {
@@ -73,6 +75,7 @@
   border-radius: 4px;
   transition: opacity 150ms ease-out;
   color: var(--text-primary);
+  flex-shrink: 0;    /* never get squeezed off-screen by pills */
 }
 
 .closeBtn:hover {

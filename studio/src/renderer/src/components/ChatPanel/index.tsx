@@ -13,6 +13,7 @@ import { useModelStore } from '../../store/modelStore'
 import { WEB_LLM_MODELS } from '../../data/models'
 import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
+import { ModelSelector } from './ModelSelector'
 import { SkillsPanel } from './SkillsPanel'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
@@ -85,9 +86,27 @@ function buildSystemPrompt(
   const stageInfo = context.fsmStage !== 'unknown' && context.fsmStage
     ? `Current pipeline stage: ${context.fsmStage}${context.featureName ? ` (feature: ${context.featureName})` : ''}.`
     : 'No active pipeline stage.'
-  const matchInfo = topMatch && topMatch.confidence >= 0.4
-    ? `Best skill match: ${topMatch.command} (${Math.round(topMatch.confidence * 100)}% confidence) — ${topMatch.description}`
-    : 'No strong skill match found.'
+
+  if (topMatch && topMatch.confidence >= 0.4) {
+    const pct = Math.round(topMatch.confidence * 100)
+    return `You are the Conductor — a helpful AI assistant built into Pathly Studio.
+
+## MATCHED SKILL (${pct}% confidence): ${topMatch.command}
+
+IMPORTANT: The user's message matched the Pathly skill below. Base your entire response ONLY on this description — do NOT add, invent, or guess any details not stated here.
+
+Skill command: ${topMatch.command}
+What it does: ${topMatch.description}
+
+Instructions:
+- In 1-2 sentences, explain what this skill does using ONLY the description above.
+- Confirm it was matched and invite the user to click Run, or ask a follow-up question.
+- Do NOT mention Java, Maven, CI systems, or any technology not named in the description above.
+
+${stageInfo}
+Available skills: ${skillList}`
+  }
+
   const schemaInfo = context.studioSchema && context.studioSchema.length > 0
     ? `\n\n## Studio UI Elements\n${context.studioSchema.slice(0, 20).map((el) => `- ${el.screen}: ${el.label} (${el.type})`).join('\n')}`
     : ''
@@ -97,7 +116,7 @@ Your job is to help users run Pathly pipeline skills and navigate the Studio UI.
 
 ${stageInfo}
 Available skills: ${skillList}
-${matchInfo}${schemaInfo}
+No strong skill match found.${schemaInfo}
 
 When a user asks about running a skill, explain what it does and confirm the match.
 Be concise (2-3 sentences). Do not invent skills that are not in the available list.`
@@ -273,27 +292,6 @@ export function ChatPanel(): JSX.Element {
     } else {
       setCurrentMatch(null)
       setAltMatches([])
-    }
-
-    // ── Strong skill match: respond instantly from skill data, no LLM needed ──
-    // Phi-4-mini (and small local models) have no knowledge of Pathly skills
-    // and will hallucinate descriptions. When confidence ≥ 0.45 we already
-    // know exactly what the skill does — just show it.
-    if (topMatch && topMatch.confidence >= 0.45) {
-      const pct = Math.round(topMatch.confidence * 100)
-      const stage = context.fsmStage !== 'unknown' && context.fsmStage
-        ? `\n\nCurrent pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.`
-        : ''
-      addMessage({
-        id: crypto.randomUUID(),
-        role: 'assistant' as const,
-        content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to execute, or ask me anything.`,
-        status: 'done' as const,
-      })
-      if (autoApprove && topMatch.confidence >= 0.65) {
-        await handleRun()
-      }
-      return
     }
 
     const isAutomationIntent = /\b(create|make|build|add|new)\b.*\b(flow|step|state|transition)\b/i.test(text)
@@ -531,6 +529,9 @@ export function ChatPanel(): JSX.Element {
           lines={shellOutput.lines}
         />
       )}
+      <div style={{ padding: '0 12px 4px', display: 'flex', alignItems: 'center' }}>
+        <ModelSelector />
+      </div>
       <ChatInput
         value={inputValue}
         onChange={setInputValue}

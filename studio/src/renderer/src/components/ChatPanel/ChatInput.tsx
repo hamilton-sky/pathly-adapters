@@ -1,9 +1,8 @@
 import { Send } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import { useChatStore } from '../../store/chatStore'
-import { useModelStore } from '../../store/modelStore'
-import { WEB_LLM_MODELS } from '../../data/models'
 import styles from './ChatInput.module.css'
+
 
 interface ChatInputProps {
   value: string
@@ -18,16 +17,8 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
   const embedReady = useChatStore((s) => s.embedReady)
   const embedProgress = useChatStore((s) => s.embedProgress)
 
-  const selectedModelId = useModelStore((s) => s.selectedModelId)
-  const cachedModelIds = useModelStore((s) => s.cachedModelIds)
-  const isModelCached = cachedModelIds.includes(selectedModelId)
-  const selectedModel = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)
-  const modelShortName = selectedModel?.name ?? selectedModelId
-
-  // Show loading state as soon as the component mounts and model isn't ready yet.
-  // embedProgress=0 means "started but first callback not fired yet" — still loading.
   const isModelLoading = !embedReady
-  const isDownloading = isModelLoading  // kept as alias for clarity below
+  const isDownloading = isModelLoading
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -71,7 +62,7 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled || isDownloading}
-        placeholder={isDownloading ? 'Waiting for MiniLM to download…' : !isModelCached ? `Send to auto-download & start ${modelShortName}…` : 'Message Conductor…'}
+        placeholder={isDownloading ? 'Waiting for MiniLM to download…' : 'Message Conductor…'}
         rows={1}
         style={{
           color: t.textPrimary,
@@ -82,17 +73,6 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
         }}
       />
       <div className={styles.footer}>
-        <span
-          className={styles.modelPill}
-          style={{
-            background: t.bgSurface1,
-            color: isModelCached ? '#34D399' : t.textMuted,
-            fontFamily: t.fontFamilyMono,
-            opacity: isModelCached ? 1 : 0.5,
-          }}
-        >
-          {isModelCached ? `✓ ${modelShortName}` : `${modelShortName} — not downloaded`}
-        </span>
         <span
           className={styles.modelPill}
           style={{

@@ -1,5 +1,4 @@
 import { X, Zap, Trash2 } from 'lucide-react'
-import { ModelSelector } from './ModelSelector'
 import type { TerminalKind } from '../../store/chatStore'
 import styles from './ConductorHeader.module.css'
 
@@ -44,7 +43,6 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, targetKind, onSetTa
           <span className={styles.dot} />
           shell
         </button>
-        <ModelSelector />
       </div>
 
       <button
