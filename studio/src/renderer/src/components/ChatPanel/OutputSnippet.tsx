@@ -4,7 +4,7 @@ import { useTheme } from '../../useTheme'
 import styles from './OutputSnippet.module.css'
 
 interface OutputSnippetProps {
-  target: 'claude-code' | 'codex'
+  target: 'claude-code' | 'codex' | 'shell'
   status: 'running' | 'done' | 'error'
   lines: string[]
 }
@@ -13,8 +13,8 @@ export function OutputSnippet({ target, status, lines }: OutputSnippetProps): JS
   const t = useTheme()
   const [expanded, setExpanded] = useState(false)
 
-  const targetColor = target === 'claude-code' ? '#38BDF8' : '#F59E0B'
-  const targetLabel = target === 'claude-code' ? 'claude' : 'codex'
+  const targetColor = target === 'claude-code' ? '#38BDF8' : target === 'codex' ? '#F59E0B' : '#86EFAC'
+  const targetLabel = target === 'claude-code' ? 'claude' : target === 'codex' ? 'codex' : 'shell'
 
   // Collapsed: show only the last line as a preview
   const previewLine = lines[lines.length - 1] ?? ''

@@ -35,10 +35,46 @@ function stripAnsi(raw: string): string {
     .replace(/\x1b./g, '')
     // C0 control chars except CR (\r), LF (\n), TAB (\t)
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
-    // Private Use Area Unicode (icon glyphs that show as □)
-    .replace(/[-]/g, '')
-    // Lone carriage returns (without following newline)
-    .replace(/\r(?!\n)/g, '')
+    // NOTE: \r is intentionally NOT stripped here — handled in feedBuffer below
+}
+
+/** Returns true for noisy progress/spinner lines that should not appear in the snippet */
+function isNoisyLine(line: string): boolean {
+  if (line.length <= 2) return true
+  if (/^Working\s*\(/.test(line)) return true
+  if (/^[-─-╿\s]+$/.test(line)) return true
+  return false
+}
+
+/**
+ * Feed a raw PTY chunk into a per-target line buffer with correct \r semantics.
+ * \r alone = "go to start of current line" (overwrite), not a line terminator.
+ * This prevents partial-word artifacts from spinner/progress lines.
+ */
+function feedBuffer(buf: string, data: string): { buf: string; lines: string[] } {
+  const stripped = stripAnsi(data)
+  // Normalise Windows \r\n → \n first, then handle lone \r as overwrite
+  const normalized = stripped.replace(/\r\n/g, '\n')
+  const segments = normalized.split('\r')
+
+  let current = buf
+  for (let i = 0; i < segments.length; i++) {
+    if (i > 0) {
+      // Lone \r: discard current partial line back to last \n
+      const lastNl = current.lastIndexOf('\n')
+      current = lastNl >= 0 ? current.slice(0, lastNl + 1) : ''
+    }
+    current += segments[i]
+  }
+
+  const parts = current.split('\n')
+  const remaining = parts.pop() ?? ''
+  const lines: string[] = []
+  for (const line of parts) {
+    const trimmed = line.trim()
+    if (trimmed.length > 0 && !isNoisyLine(trimmed)) lines.push(trimmed)
+  }
+  return { buf: remaining, lines }
 }
 
 function buildSystemPrompt(
@@ -102,6 +138,7 @@ export function ChatPanel(): JSX.Element {
 
   const claudeOutput = outputByTarget.claude
   const codexOutput = outputByTarget.codex
+  const shellOutput = outputByTarget.shell
 
   const tabs = useTerminalStore((s) => s.tabs)
   const addTab = useTerminalStore((s) => s.addTab)
@@ -118,12 +155,12 @@ export function ChatPanel(): JSX.Element {
   const t = useTheme()
   // Accumulates partial terminal data until a newline arrives
   // Per-target buffers and idle timers
-  const terminalBuffers = useRef<Record<string, string>>({ claude: '', codex: '' })
-  const idleTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({ claude: null, codex: null })
+  const terminalBuffers = useRef<Record<string, string>>({ claude: '', codex: '', shell: '' })
+  const idleTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({ claude: null, codex: null, shell: null })
 
-  // Subscribe to BOTH claude and codex tabs simultaneously — each tracks independently
+  // Subscribe to claude, codex AND shell tabs simultaneously
   useEffect(() => {
-    const kinds = ['claude', 'codex'] as const
+    const kinds = ['claude', 'codex', 'shell'] as const
     const unsubs: Array<(() => void) | undefined> = []
 
     for (const kind of kinds) {
@@ -140,19 +177,17 @@ export function ChatPanel(): JSX.Element {
           useChatStore.getState().setCommandRunning(kind, false)
         }, 12000)
 
-        terminalBuffers.current[kind] = (terminalBuffers.current[kind] ?? '') + stripAnsi(data)
-        const parts = terminalBuffers.current[kind].split('\n')
-        terminalBuffers.current[kind] = parts.pop() ?? ''
-        for (const line of parts) {
-          const trimmed = line.replace(/\r/g, '').trim()
-          if (trimmed.length > 0) appendOutputLine(kind, trimmed)
+        const result = feedBuffer(terminalBuffers.current[kind] ?? '', data)
+        terminalBuffers.current[kind] = result.buf
+        for (const line of result.lines) {
+          appendOutputLine(kind, line)
         }
       })
       unsubs.push(unsub)
     }
 
     return () => {
-      terminalBuffers.current = { claude: '', codex: '' }
+      terminalBuffers.current = { claude: '', codex: '', shell: '' }
       for (const kind of kinds) {
         if (idleTimers.current[kind]) clearTimeout(idleTimers.current[kind]!)
       }
@@ -466,6 +501,13 @@ export function ChatPanel(): JSX.Element {
           target="codex"
           status={codexOutput.running ? 'running' : 'done'}
           lines={codexOutput.lines}
+        />
+      )}
+      {shellOutput.lines.length > 0 && (
+        <OutputSnippet
+          target="shell"
+          status={shellOutput.running ? 'running' : 'done'}
+          lines={shellOutput.lines}
         />
       )}
       <ChatInput
