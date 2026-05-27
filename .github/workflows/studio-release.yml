@@ -66,9 +66,10 @@ jobs:
         run: npx electron-builder ${{ matrix.eb_flag }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Set WIN_CSC_LINK + WIN_CSC_KEY_PASSWORD secrets to enable code signing
-          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # To enable code signing add WIN_CSC_LINK (base64 .pfx) and
+          # WIN_CSC_KEY_PASSWORD as GitHub secrets, then uncomment:
+          # CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
       - name: Package and publish (macOS)
         if: runner.os == 'macOS'

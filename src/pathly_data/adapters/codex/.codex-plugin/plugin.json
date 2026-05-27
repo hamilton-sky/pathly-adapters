@@ -1,6 +1,6 @@
 {
   "name": "pathly",
-  "version": "2.11.5",
+  "version": "2.11.6",
   "description": "Guided agent workflows for planning, building, reviewing, debugging, testing, and learning from software changes.",
   "author": {
     "name": "hamilton",
