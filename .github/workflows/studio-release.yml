@@ -66,6 +66,7 @@ jobs:
         run: npx electron-builder ${{ matrix.eb_flag }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Set WIN_CSC_LINK + WIN_CSC_KEY_PASSWORD secrets to enable code signing
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
@@ -75,8 +76,11 @@ jobs:
         run: npx electron-builder ${{ matrix.eb_flag }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          # Disable keychain auto-discovery — prevents crash when no cert is configured.
+          # To enable signing: add MAC_CSC_LINK + MAC_CSC_KEY_PASSWORD secrets and
+          # remove the CSC_IDENTITY_AUTO_DISCOVERY line below.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # To enable notarization: add APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID secrets
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
