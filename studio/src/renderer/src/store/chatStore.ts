@@ -16,7 +16,7 @@ export interface Message {
   }
 }
 
-export type TerminalKind = 'claude' | 'codex'
+export type TerminalKind = 'claude' | 'codex' | 'shell'
 
 export interface TargetOutput {
   lines: string[]
@@ -64,7 +64,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
   isLoading: false,
   targetKind: 'claude',
-  outputByTarget: { claude: emptyTarget(), codex: emptyTarget() },
+  outputByTarget: { claude: emptyTarget(), codex: emptyTarget(), shell: emptyTarget() },
   currentMatch: null,
   autoApprove: false,
   altMatches: [],
@@ -109,7 +109,7 @@ export const useChatStore = create<ChatState>()((set) => ({
           },
         }
       }
-      return { outputByTarget: { claude: emptyTarget(), codex: emptyTarget() } }
+      return { outputByTarget: { claude: emptyTarget(), codex: emptyTarget(), shell: emptyTarget() } }
     }),
 
   setCommandRunning: (kind, b) =>

@@ -87,6 +87,7 @@ export function ChatPanel(): JSX.Element {
   const appendOutputLine = useChatStore((s) => s.appendOutputLine)
   const clearOutputLines = useChatStore((s) => s.clearOutputLines)
   const clearMessages = useChatStore((s) => s.clearMessages)
+  const setTargetKind = useChatStore((s) => s.setTargetKind)
   const setCurrentMatch = useChatStore((s) => s.setCurrentMatch)
   const setAltMatches = useChatStore((s) => s.setAltMatches)
   const setIsEmbedding = useChatStore((s) => s.setIsEmbedding)
@@ -416,6 +417,7 @@ export function ChatPanel(): JSX.Element {
     setAltMatches([])
     setCommandRunning('claude', false)
     setCommandRunning('codex', false)
+    setCommandRunning('shell', false)
     setLoading(false)
   }
 
@@ -427,7 +429,7 @@ export function ChatPanel(): JSX.Element {
     >
       {/* Left-edge drag handle — drag to resize */}
       <div className={styles.resizeHandle} onMouseDown={onDragStart} />
-      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} onToggleChat={toggleChat} onClearChat={handleClearAll} />
+      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} targetKind={targetKind} onSetTarget={setTargetKind} onToggleChat={toggleChat} onClearChat={handleClearAll} />
       <SkillsPanel onSkillClick={handleSkillClick} />
       <MessageList />
       {automationMessages.length > 0 && automationMessages[automationMessages.length - 1].automationPlan && (
