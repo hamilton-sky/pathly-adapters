@@ -85,9 +85,19 @@
 | 8 | 24 | `store/automationStore.ts` | Step queue state | No TS errors | DONE |
 | 8 | 25 | `ChatPanel/StepQueue.tsx` + `AutomationCard.tsx` | Staged/auto UI components | Staged approve/skip works visually | DONE |
 | 8 | 26 | `ChatPanel/index.tsx` + `chat_agent.py` | Wire AI → action plan → execution | Full flow creation E2E works | DONE |
-| 9 | 27 | `data/models.ts` + `lib/webLLMEngine.ts` | WebLLM models data + engine | Phi-4 Mini loads and streams response | DONE |
+| 9 | 27 | `data/models.ts` | Model definitions (Ollama + node-llama-cpp GGUF) | Models list correct, recommended set | DONE |
 | 9 | 28 | `store/modelStore.ts` + `ChatPanel/ModelSelector.tsx` | Model selector UI | Download, cache, selection all work | DONE |
-| 9 | 29 | `ChatPanel/index.tsx` | Wire WebLLM into chat flow | Responses stream from local model | DONE |
+| 9 | 29 | `ChatPanel/index.tsx` | Wire Ollama/node-llama-cpp into chat flow | Responses stream from local model | DONE |
+
+## Post-Pipeline Additions
+
+| Addition | Files | Description | Status |
+|----------|-------|-------------|--------|
+| Reasoning/ThinkingBlock | `lib/thinkingParser.ts`, `ChatPanel/ThinkingBlock.tsx`, `ChatPanel/ThinkingBlock.module.css` | Inline collapsible `<think>` block; parses DeepSeek-R1 / Qwen3 reasoning tokens from stream | DONE |
+| `thinking` field on Message | `store/chatStore.ts` | `thinking?: string` added to Message type | DONE |
+| Stream parser wired to both LLM paths | `ChatPanel/index.tsx` | `splitThinkingContent()` called on every chunk for Ollama + node-llama-cpp | DONE |
+| Model lineup updated | `data/models.ts`, `main/ipc/llm.ts` | llama-3.2-3b replaced with deepseek-r1-1.5b; qwen3-4b is now recommended; `thinking` field added to Model interface | DONE |
+| phi-4-mini GGUF URI corrected | `main/ipc/llm.ts` | Removed erroneous `microsoft_` prefix from bartowski repo path | DONE |
 
 ## Hotfixes Applied (post-pipeline)
 
@@ -97,9 +107,10 @@
 | Windows PTY not executing commands | `lib/launchTerminal.ts` | `\n` → `\r` for Windows PTY Enter | FIXED |
 | ChatInput hidden by SkillsPanel | `ChatPanel/SkillsPanel.module.css` | Added `max-height: 100px; overflow-y: auto` to `.chips` | FIXED |
 | Doubled /pathly prefix in terminal | `lib/launchTerminal.ts` | Removed prepend — skills.json commands already include it | FIXED |
+| ModelSelector moved inline to footer | `ChatPanel/index.tsx` | Placed beside MiniLM status pill in input footer row | FIXED |
 
 ## Prerequisites
 - [x] FSM server running (port 8765) — Conv 1 done
 - [x] MiniLM auto-downloads on first launch (~22MB, transformers.js) — Conv 5 done
-- [ ] @playwright/test — add to studio/package.json in Conv 7
+- [x] @playwright/test — added to studio/package.json in Conv 7
 - [ ] WebLLM models download on first cache (Phi-4 Mini ~2GB) — Conv 9

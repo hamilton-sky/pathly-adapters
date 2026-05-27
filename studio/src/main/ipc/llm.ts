@@ -16,21 +16,22 @@ interface ModelInfo {
 }
 
 const MODEL_REGISTRY: Record<string, ModelInfo> = {
-  'qwen2.5-coder-7b': {
-    uri: 'hf:bartowski/Qwen2.5-Coder-7B-Instruct-GGUF/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf',
-    filename: 'Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf',
-  },
   'qwen3-4b': {
     uri: 'hf:unsloth/Qwen3-4B-GGUF/Qwen3-4B-Q4_K_M.gguf',
     filename: 'Qwen3-4B-Q4_K_M.gguf',
   },
+  'qwen2.5-coder-7b': {
+    uri: 'hf:bartowski/Qwen2.5-Coder-7B-Instruct-GGUF/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf',
+    filename: 'Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf',
+  },
   'phi-4-mini': {
-    uri: 'hf:bartowski/microsoft_Phi-4-mini-instruct-GGUF/Phi-4-mini-instruct-Q4_K_M.gguf',
+    // bartowski uses org_model-GGUF naming convention for Microsoft models
+    uri: 'hf:bartowski/Phi-4-mini-instruct-GGUF/Phi-4-mini-instruct-Q4_K_M.gguf',
     filename: 'Phi-4-mini-instruct-Q4_K_M.gguf',
   },
-  'llama-3.2-3b': {
-    uri: 'hf:bartowski/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-    filename: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+  'deepseek-r1-1.5b': {
+    uri: 'hf:bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
+    filename: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
   },
 }
 
@@ -262,15 +263,16 @@ export function registerLlmHandlers(): void {
 
   ipcMain.handle('llm:ollamaChat', async (
     event,
-    { prompt, systemPrompt, modelId }: { prompt: string; systemPrompt: string; modelId: string }
+    { prompt, systemPrompt, modelId, think }: { prompt: string; systemPrompt: string; modelId: string; think?: boolean }
   ): Promise<void> => {
     activeAbortController = new AbortController()
     let fullText = ''
+    let inThinking = false
     try {
       const res = await fetch('http://localhost:11434/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: modelId, prompt, system: systemPrompt, stream: true }),
+        body: JSON.stringify({ model: modelId, prompt, system: systemPrompt, stream: true, ...(think ? { think: true } : {}) }),
         signal: activeAbortController.signal,
       })
       if (!res.ok) throw new Error(`Ollama error ${res.status}: ${await res.text()}`)
@@ -287,13 +289,35 @@ export function registerLlmHandlers(): void {
         for (const line of lines) {
           if (!line.trim()) continue
           try {
-            const obj = JSON.parse(line) as { response?: string; done?: boolean }
-            if (obj.response) {
+            const obj = JSON.parse(line) as { response?: string; thinking?: string; done?: boolean }
+            if (obj.thinking) {
+              if (!inThinking) {
+                // Open a single <think> block for all thinking chunks
+                const token = `<think>${obj.thinking}`
+                fullText += token
+                event.sender.send('llm:token', token)
+                inThinking = true
+              } else {
+                fullText += obj.thinking
+                event.sender.send('llm:token', obj.thinking)
+              }
+            } else if (obj.response) {
+              if (inThinking) {
+                // Close the think block when response starts
+                const closeToken = `</think>`
+                fullText += closeToken
+                event.sender.send('llm:token', closeToken)
+                inThinking = false
+              }
               fullText += obj.response
               event.sender.send('llm:token', obj.response)
             }
           } catch { /* skip */ }
         }
+      }
+      // Close unclosed think block if stream ended mid-thinking
+      if (inThinking) {
+        fullText += '</think>'
       }
       event.sender.send('llm:done', fullText)
     } catch (err: unknown) {

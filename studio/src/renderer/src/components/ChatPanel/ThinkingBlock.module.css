@@ -1,0 +1,71 @@
+.container {
+  border-left: 2px solid rgba(139, 92, 246, 0.35);
+  border-radius: 0 4px 4px 0;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.toggle:hover .label,
+.toggle:hover .chevron {
+  color: #9ca3af;
+}
+
+.label {
+  font-size: 11px;
+  color: #6b7280;
+  font-family: monospace;
+  letter-spacing: 0.03em;
+  transition: color 120ms;
+}
+
+.chevron {
+  color: #6b7280;
+  flex-shrink: 0;
+  transition: transform 180ms ease-out, color 120ms;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Grid trick for smooth height animation without JS measuring */
+.bodyWrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 200ms ease-out;
+}
+
+.bodyWrapper.collapsed {
+  grid-template-rows: 0fr;
+}
+
+.body {
+  overflow: hidden;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #8a8f98;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* Add bottom padding only when visible to avoid gap when collapsed */
+.bodyWrapper:not(.collapsed) .body {
+  padding-bottom: 8px;
+}

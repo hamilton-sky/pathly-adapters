@@ -104,7 +104,8 @@ export async function askOllama(
   prompt: string,
   systemPrompt: string,
   ollamaModelId: string,
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  think = false
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const removeToken = window.pathly.llm.onToken(onChunk)
@@ -116,7 +117,7 @@ export async function askOllama(
       removeToken(); removeDone(); removeError()
       reject(new Error(msg))
     })
-    window.pathly.llm.ollamaChat(prompt, systemPrompt, ollamaModelId).catch((err) => {
+    window.pathly.llm.ollamaChat(prompt, systemPrompt, ollamaModelId, think).catch((err) => {
       removeToken(); removeDone(); removeError()
       reject(err)
     })

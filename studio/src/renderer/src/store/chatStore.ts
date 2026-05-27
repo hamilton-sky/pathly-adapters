@@ -7,6 +7,7 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  thinking?: string
   status: 'idle' | 'streaming' | 'done'
   tokens?: number
   mode?: 'chat' | 'automation'

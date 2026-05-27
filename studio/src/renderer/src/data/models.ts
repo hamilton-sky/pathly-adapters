@@ -7,14 +7,28 @@ export interface Model {
   storage: string
   speed: string
   recommended?: boolean
+  /** Model emits <think>...</think> reasoning tokens — ThinkingBlock will render them */
+  thinking?: boolean
   /** Ollama model tag — pass to `ollama pull` or `ollama run` */
   ollamaId: string
 }
 
-export const RECOMMENDED_MODEL_ID = 'phi-4-mini'
+export const RECOMMENDED_MODEL_ID = 'qwen3-4b'
 
 // IDs must match the keys in MODEL_REGISTRY in studio/src/main/ipc/llm.ts
 export const WEB_LLM_MODELS: Model[] = [
+  {
+    id: 'qwen3-4b',
+    name: 'Qwen3 4B',
+    description: 'Best for Pathly — reasoning + automation planning. Emits thinking steps before answering. Strong at structured JSON output for automation flows.',
+    useCase: 'Automation + general',
+    system: 'CPU / GPU',
+    storage: '~2.6 GB',
+    speed: 'Medium',
+    recommended: true,
+    thinking: true,
+    ollamaId: 'qwen3:4b',
+  },
   {
     id: 'qwen2.5-coder-7b',
     name: 'Qwen2.5 Coder 7B',
@@ -26,34 +40,24 @@ export const WEB_LLM_MODELS: Model[] = [
     ollamaId: 'qwen2.5-coder:7b',
   },
   {
-    id: 'qwen3-4b',
-    name: 'Qwen3 4B',
-    description: 'Balanced general-purpose model — good reasoning and instruction following.',
-    useCase: 'General purpose',
-    system: 'CPU / GPU',
-    storage: '~2.6 GB',
-    speed: 'Medium',
-    ollamaId: 'qwen3:4b',
-  },
-  {
     id: 'phi-4-mini',
     name: 'Phi-4 Mini',
-    description: 'Recommended — lower memory usage with strong instruction following capability.',
-    useCase: 'Instruction following',
+    description: 'Fast and light — lower memory usage with strong instruction following. No reasoning mode.',
+    useCase: 'Quick responses',
     system: 'CPU / GPU',
     storage: '~2.5 GB',
     speed: 'Fast',
-    recommended: true,
     ollamaId: 'phi4-mini:latest',
   },
   {
-    id: 'llama-3.2-3b',
-    name: 'Llama 3.2 3B',
-    description: 'Small fallback model — minimal memory footprint, suitable for low-spec hardware.',
-    useCase: 'Low-spec fallback',
+    id: 'deepseek-r1-1.5b',
+    name: 'DeepSeek-R1 1.5B',
+    description: 'Tiny reasoning model — shows thinking steps before answering. Best for low-RAM machines that still need reasoning capability.',
+    useCase: 'Low-RAM reasoning',
     system: 'CPU / GPU',
-    storage: '~2.0 GB',
+    storage: '~1.1 GB',
     speed: 'Fastest',
-    ollamaId: 'llama3.2:3b',
+    thinking: true,
+    ollamaId: 'deepseek-r1:1.5b',
   },
 ]

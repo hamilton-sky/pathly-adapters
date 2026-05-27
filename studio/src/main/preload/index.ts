@@ -132,8 +132,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('llm:ollamaPull', ollamaId),
     ollamaDelete: (ollamaId: string): Promise<void> =>
       ipcRenderer.invoke('llm:ollamaDelete', ollamaId),
-    ollamaChat: (prompt: string, systemPrompt: string, modelId: string): Promise<void> =>
-      ipcRenderer.invoke('llm:ollamaChat', { prompt, systemPrompt, modelId }),
+    ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean): Promise<void> =>
+      ipcRenderer.invoke('llm:ollamaChat', { prompt, systemPrompt, modelId, think }),
   },
 })
 
@@ -201,7 +201,7 @@ declare global {
         ollamaAvailable: () => Promise<{ available: boolean; models: string[] }>
         ollamaPull: (ollamaId: string) => Promise<void>
         ollamaDelete: (ollamaId: string) => Promise<void>
-        ollamaChat: (prompt: string, systemPrompt: string, modelId: string) => Promise<void>
+        ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean) => Promise<void>
       }
     }
   }

@@ -341,7 +341,7 @@ export function ChatPanel(): JSX.Element {
             fullText += chunk
             const { thinking, content } = splitThinkingContent(fullText)
             updateLastMessage({ content, thinking, status: 'streaming' })
-          })
+          }, selectedModel?.thinking ?? false)
           const { thinking: doneThinking, content: doneContent } = splitThinkingContent(fullText)
           updateLastMessage({
             content: doneContent || '_(empty response — try a different model)_',

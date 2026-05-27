@@ -49,6 +49,15 @@
   word-break: break-word;
 }
 
+/* Elapsed time during streaming */
+.timer {
+  font-size: 11px;
+  color: #6b7280;
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
 /* Thinking indicator — three bouncing dots */
 .thinking {
   display: inline-flex;

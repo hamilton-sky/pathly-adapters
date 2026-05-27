@@ -270,8 +270,10 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 - `ChatInput`: textarea 1–3 rows, Enter = send, Shift+Enter = newline; `◈ MiniLM` pill (purple), model name pill (green, reads `modelStore.selectedModelId` short name); Send/Stop toggle
 - `ChatPanel/index.tsx`: collapse animation `width 200ms ease-out`, 300px ↔ 36px
 - `App.tsx`: add `<ChatPanel />` after `<MainPanel />` in body flex row
-- **`data/models.ts`**: 4 model definitions — `Phi-4-mini-instruct-q4f16_1-MLC` (recommended, default), `Qwen3-4B-q4f16_1-MLC`, `Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC`, `Llama-3.2-3B-Instruct-q4f16_1-MLC`
-  - Each: `{ id, name, description, useCase, storage, speed, recommended? }`
+- **`data/models.ts`**: 4 model definitions — `qwen3-4b` (recommended, default), `qwen2.5-coder-7b`, `phi-4-mini`, `deepseek-r1-1.5b`
+  - Each: `{ id, name, description, useCase, storage, speed, recommended?, thinking?, ollamaId }`
+  - `thinking: true` on models that emit `<think>...</think>` blocks (qwen3-4b, deepseek-r1-1.5b)
+  - GGUF URIs in `main/ipc/llm.ts` MODEL_REGISTRY; Ollama IDs in `ollamaId` field
 - **`lib/llmBridge.ts`**: `askOllama(prompt, system, ollamaModelId, onChunk)` streaming via Ollama IPC,
   `askLlm(prompt, system, onChunk)` for node-llama-cpp (Electron 33+)
   - On message send: check Ollama availability → stream response via `llm:ollamaChat` IPC
@@ -727,18 +729,45 @@ Note: the singleton is created here (not in `playwrightExecutor.ts`) so callback
 
 ## Prerequisites
 - MiniLM auto-downloads via transformers.js (~22MB, first launch only) — always works
-- **Ollama (recommended):** Install from https://ollama.ai, then `ollama pull phi4-mini`.
+- **Ollama (recommended):** Install from https://ollama.ai, then `ollama pull qwen3:4b`.
   Ollama is auto-detected at localhost:11434. No env-var needed.
-  Available models: `phi4-mini:latest` (~2.5GB), `qwen3:4b` (~2.6GB), `qwen2.5-coder:7b` (~4.7GB), `llama3.2:3b` (~2GB)
+  Available models:
+  - `qwen3:4b` (~2.6GB) — **recommended** — reasoning + automation planning, thinking mode
+  - `qwen2.5-coder:7b` (~4.7GB) — best for code-heavy tasks
+  - `phi4-mini:latest` (~2.5GB) — fast, light, no reasoning
+  - `deepseek-r1:1.5b` (~1.1GB) — tiny reasoning model for low-RAM machines, thinking mode
 - **node-llama-cpp (future):** Requires upgrading `electron` to `^33.0.0` in devDependencies.
   Run `npm install` after upgrade. All IPC handlers already exist in `studio/src/main/ipc/llm.ts`.
 - **WebGPU / WebLLM: NOT usable.** WebLLM was removed — WebGPU is disabled inside Electron's
   renderer process and cannot run the compute shaders required by WebLLM. Do not re-add WebLLM.
 - Pathly FSM server running on port 8765 before testing Conv 1
 
+---
+
+## Phase 30: ThinkingBlock — inline reasoning display   ← Post-pipeline (DONE)
+
+**Files:** `lib/thinkingParser.ts` — CREATE, `ChatPanel/ThinkingBlock.tsx` — CREATE,
+`ChatPanel/ThinkingBlock.module.css` — CREATE, `store/chatStore.ts` — MODIFY,
+`ChatPanel/index.tsx` — MODIFY, `ChatPanel/MessageList.tsx` — MODIFY
+**Done when:** Models that emit `<think>...</think>` show a collapsible reasoning block above the message
+**Delivers:** S10.1 (reasoning transparency)
+
+**Details:**
+- `thinkingParser.ts`: `splitThinkingContent(text)` — splits accumulated stream into `{ thinking, content }`. Handles mid-tag streaming by tracking the last unclosed `<think>` block.
+- `Message.thinking?: string` — added to Message interface in chatStore
+- Both Ollama and node-llama-cpp streaming paths call `splitThinkingContent` on every chunk
+- `ThinkingBlock` component: minimal dark style, purple left-border `rgba(139,92,246,0.35)`, monospace 11px muted text, chevron toggle
+- Animation: CSS grid `grid-template-rows: 1fr → 0fr` for smooth height collapse without JS measuring
+- Auto-collapses 800ms after stream ends (`status === 'done'`)
+- `MessageList` renders `<ThinkingBlock>` above message content when `msg.thinking` exists
+- Only triggered by models with `thinking: true` in `data/models.ts` (qwen3-4b, deepseek-r1-1.5b)
+
+---
+
 ## Key Decisions
 - **Embedding over LLM for routing:** Zero hallucination, 22ms, deterministic. See ARCHITECTURE_PROPOSAL.md Decision 1.
-- **phi4-mini as explainer only:** Routing and explaining are separate concerns with different latency needs.
+- **qwen3-4b as default explainer:** Best for Pathly automation use-case — reasoning mode + strong structured JSON output for action plan generation. Replaces phi4-mini as default.
 - **Skills are the command vocabulary:** All commands are Pathly skills. Claude Code and Codex are terminal surfaces, not routing targets.
 - **Pre-embed at startup:** Ensures first-message latency is instant. 14 skills × ~384 dimensions = negligible memory.
 - **Confidence threshold UI:** Users need to see and understand match quality to trust the system.
+- **ThinkingBlock for transparency:** Reasoning models emit `<think>` tokens before the answer. Showing this (collapsed by default) builds user trust in automation decisions.
