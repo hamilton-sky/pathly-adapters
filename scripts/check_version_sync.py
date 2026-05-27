@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Verify that pyproject.toml, studio/package.json, and docs/SECURITY.md
-all reference the same version. Exits non-zero if they diverge."""
+"""Verify that pyproject.toml, studio/package.json, docs/SECURITY.md, and
+the Codex plugin.json all reference the same version. Exits non-zero if they diverge."""
 import json
 import re
 import sys
@@ -34,16 +34,27 @@ def get_security_doc_version() -> str | None:
     return m.group(1) if m else None
 
 
+def get_codex_plugin_version() -> str | None:
+    p = ROOT / "src/pathly_data/adapters/codex/.codex-plugin/plugin.json"
+    if not p.exists():
+        return None
+    data = json.loads(p.read_text(encoding="utf-8"))
+    return data.get("version")
+
+
 def main() -> int:
     pyproject = get_pyproject_version()
     studio = get_studio_version()
     sec_doc = get_security_doc_version()
+    codex_plugin = get_codex_plugin_version()
 
     mismatches = []
     if studio and studio != pyproject:
         mismatches.append(f"studio/package.json={studio!r} != pyproject.toml={pyproject!r}")
     if sec_doc and sec_doc != pyproject:
         mismatches.append(f"docs/SECURITY.md={sec_doc!r} != pyproject.toml={pyproject!r}")
+    if codex_plugin and codex_plugin != pyproject:
+        mismatches.append(f"codex plugin.json={codex_plugin!r} != pyproject.toml={pyproject!r}")
 
     if mismatches:
         print("Version sync check FAILED:")
