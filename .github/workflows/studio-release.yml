@@ -15,13 +15,10 @@ jobs:
         include:
           - os: windows-latest
             eb_flag: --win
-            artifact: studio/dist/*.exe
           - os: macos-latest
             eb_flag: --mac
-            artifact: studio/dist/*.dmg
           - os: ubuntu-latest
             eb_flag: --linux
-            artifact: studio/dist/*.AppImage
 
     runs-on: ${{ matrix.os }}
 
@@ -30,13 +27,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: studio/package-lock.json
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.11"
 
       - name: Install Python build deps
         run: pip install build
@@ -55,22 +52,38 @@ jobs:
         working-directory: studio
         run: node -e "const fs=require('fs'); fs.mkdirSync('resources/python',{recursive:true}); fs.mkdirSync('resources/wheels',{recursive:true});"
 
-      - name: Prepare resources (bundle Python + wheel)
+      - name: Prepare resources (bundle Python + wheels)
         working-directory: studio
         run: node scripts/prepare-resources.mjs
-        continue-on-error: true
 
       - name: Build renderer
         working-directory: studio
         run: npm run build
 
-      - name: Package installer
+      - name: Package and publish (Windows)
+        if: runner.os == 'Windows'
         working-directory: studio
-        run: npx electron-builder ${{ matrix.eb_flag }}
-
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ matrix.artifact }}
+        run: npx electron-builder ${{ matrix.eb_flag }} --publish always
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Package and publish (macOS)
+        if: runner.os == 'macOS'
+        working-directory: studio
+        run: npx electron-builder ${{ matrix.eb_flag }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Package and publish (Linux)
+        if: runner.os == 'Linux'
+        working-directory: studio
+        run: npx electron-builder ${{ matrix.eb_flag }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

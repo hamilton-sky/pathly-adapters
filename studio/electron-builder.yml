@@ -26,6 +26,8 @@ win:
     - target: nsis
       arch: [x64]
   icon: resources/icon.ico
+  signingHashAlgorithms: [sha256]
+  # CSC_LINK and CSC_KEY_PASSWORD read from env (GitHub secret WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD)
 
 nsis:
   oneClick: false
@@ -37,9 +39,17 @@ mac:
       arch: [x64, arm64]
   category: public.app-category.developer-tools
   icon: resources/icon.icns
+  # CSC_LINK / CSC_KEY_PASSWORD read from env (MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD)
+  # Notarization: set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID as GitHub secrets
+  notarize:
+    teamId: ${APPLE_TEAM_ID}
 
 linux:
   target: AppImage
   category: Development
 
-publish: []
+publish:
+  provider: github
+  owner: hamilton-sky
+  repo: pathly-adapters
+  releaseType: release

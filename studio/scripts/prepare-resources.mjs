@@ -168,10 +168,13 @@ function buildWheel() {
     )
     console.log('Wheel built successfully.')
 
-    // Download all dependency wheels so the offline --no-index install works
+    // Download dependency wheels using the BUNDLED Python so platform tags match
     console.log('Downloading dependency wheels...')
+    const bundledPython = process.platform === 'win32'
+      ? path.join(pythonDir, 'python.exe')
+      : path.join(pythonDir, 'bin', 'python3')
     execSync(
-      `${systemPython} -m pip download --dest "${wheelsDir}" pyyaml flask --only-binary=:all:`,
+      `"${bundledPython}" -m pip download --dest "${wheelsDir}" pyyaml flask --only-binary=:all:`,
       { stdio: 'inherit' }
     )
     console.log('Dependency wheels downloaded.')

@@ -11,6 +11,7 @@ import { getPythonPath } from './python'
 import { registerSetupHandlers } from './setup'
 import { registerAutomationHandlers } from './ipc/automation'
 import { registerLlmHandlers } from './ipc/llm'
+import { autoUpdater } from 'electron-updater'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -86,6 +87,11 @@ app.whenReady().then(async () => {
 
   const mainWin = createWindow()
   registerIpcHandlers(mainWin)
+
+  // Check for updates in production (silent — notifies user only when update is ready)
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify()
+  }
 
   if (isDev) {
     mainWin.webContents.openDevTools({ mode: 'detach' })
