@@ -1,6 +1,7 @@
 import { Send } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import { useChatStore } from '../../store/chatStore'
+import { ModelSelector } from './ModelSelector'
 import styles from './ChatInput.module.css'
 
 
@@ -73,6 +74,7 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
         }}
       />
       <div className={styles.footer}>
+        <ModelSelector />
         <span
           className={styles.modelPill}
           style={{

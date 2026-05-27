@@ -13,7 +13,6 @@ import { useModelStore } from '../../store/modelStore'
 import { WEB_LLM_MODELS } from '../../data/models'
 import { loadSkills } from '../../lib/skillsManifest'
 import { ConductorHeader } from './ConductorHeader'
-import { ModelSelector } from './ModelSelector'
 import { SkillsPanel } from './SkillsPanel'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
@@ -535,9 +534,6 @@ export function ChatPanel(): JSX.Element {
         onSend={handleSend}
         disabled={isLoading}
       />
-      <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center' }}>
-        <ModelSelector />
-      </div>
     </div>
   )
 }
