@@ -225,7 +225,9 @@ export function HomeScreen(): JSX.Element {
       for (const project of projects) {
         try {
           listDir(`${project.path}/src/pathly_data/core/flows`)
-            .then(() => setPathlyRoot(project.path))
+            .then((files) => {
+              if (files.length > 0) setPathlyRoot(project.path)
+            })
             .catch(() => { /* not a pathly installation */ })
 
           const allRows: PlanRow[] = []

@@ -2,8 +2,7 @@ import { ipcMain, app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 
-function isPathSafe(filePath: string): boolean {
-  const home = path.resolve(app.getPath('home'))
+function resolvePath(filePath: string): string {
   let resolved: string
   try {
     resolved = fs.realpathSync(filePath)
@@ -16,16 +15,34 @@ function isPathSafe(filePath: string): boolean {
       resolved = path.resolve(filePath)
     }
   }
+  return resolved
+}
+
+function isWithin(filePath: string, rootPath: string): boolean {
   // Windows paths are case-insensitive; normalize before comparing
   const norm = (p: string): string => process.platform === 'win32' ? p.toLowerCase() : p
-  const r = norm(resolved)
-  const h = norm(home)
-  return r.startsWith(h + path.sep) || r === h
+  const resolved = norm(resolvePath(filePath))
+  const root = norm(path.resolve(rootPath))
+  return resolved.startsWith(root + path.sep) || resolved === root
+}
+
+function isPathSafe(filePath: string): boolean {
+  return isWithin(filePath, app.getPath('home'))
+}
+
+function libraryRoot(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'pathly-library')
+    : path.resolve(app.getAppPath(), '..')
+}
+
+function isReadablePathSafe(filePath: string): boolean {
+  return isPathSafe(filePath) || (app.isPackaged && isWithin(filePath, libraryRoot()))
 }
 
 export function registerFsHandlers(): void {
   ipcMain.handle('fs:read', async (_event, filePath: string): Promise<string | null> => {
-    if (!isPathSafe(filePath)) {
+    if (!isReadablePathSafe(filePath)) {
       throw new Error('Path outside home directory is not allowed')
     }
     try {
@@ -47,7 +64,7 @@ export function registerFsHandlers(): void {
   })
 
   ipcMain.handle('fs:list', async (_event, dir: string): Promise<string[]> => {
-    if (!isPathSafe(dir)) {
+    if (!isReadablePathSafe(dir)) {
       throw new Error('Path outside home directory is not allowed')
     }
     try {
@@ -59,7 +76,7 @@ export function registerFsHandlers(): void {
   })
 
   ipcMain.handle('fs:listDirs', async (_event, dir: string): Promise<string[]> => {
-    if (!isPathSafe(dir)) {
+    if (!isReadablePathSafe(dir)) {
       throw new Error('Path outside home directory is not allowed')
     }
     try {
@@ -98,7 +115,6 @@ export function registerFsHandlers(): void {
   })
 
   ipcMain.handle('fs:appRoot', async (): Promise<string> => {
-    // app.getAppPath() returns the studio/ directory; parent is the repo root
-    return path.resolve(app.getAppPath(), '..')
+    return libraryRoot()
   })
 }

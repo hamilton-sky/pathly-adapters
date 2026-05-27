@@ -44,24 +44,32 @@ export function Sidebar(): JSX.Element | null {
     fn().then(setPathlyUserHome).catch(() => {})
   }, [pathlyUserHome, setPathlyUserHome])
 
-  // Find the pathly installation (src/pathly_data/core) across all known paths.
-  // Always re-validates: checks the stored pathlyRoot first; if it no longer has
-  // the core data (stale path), probes projectPath and all saved projects to find it.
+  // Find the Pathly source installation (src/pathly_data/core) across all known paths.
+  // Include the application checkout so Library works before a Pathly project has
+  // been opened or saved in Studio.
   useEffect(() => {
-    const candidates = [
-      ...(pathlyRoot ? [pathlyRoot] : []),
-      ...(projectPath ? [projectPath] : []),
-      ...projects.map((p) => p.path),
-    ]
-    // Deduplicate while preserving order
-    const seen = new Set<string>()
-    const unique = candidates.filter((p) => { if (seen.has(p)) return false; seen.add(p); return true })
+    let cancelled = false
     const probe = async (): Promise<void> => {
+      const appRoot = typeof window.pathly.fs.appRoot === 'function'
+        ? await window.pathly.fs.appRoot().catch(() => '')
+        : ''
+      const candidates = [
+        ...(pathlyRoot ? [pathlyRoot] : []),
+        ...(appRoot ? [appRoot] : []),
+        ...(projectPath ? [projectPath] : []),
+        ...projects.map((p) => p.path),
+      ]
+      const seen = new Set<string>()
+      const unique = candidates.filter((p) => {
+        if (seen.has(p)) return false
+        seen.add(p)
+        return true
+      })
       for (const p of unique) {
         try {
           const files = await listDir(`${p}/src/pathly_data/core/flows`)
           // listDir returns [] for missing dirs, so require at least one flow file
-          if (files.length > 0) {
+          if (!cancelled && files.length > 0) {
             if (p !== pathlyRoot) setPathlyRoot(p)
             return
           }
@@ -69,6 +77,7 @@ export function Sidebar(): JSX.Element | null {
       }
     }
     void probe()
+    return () => { cancelled = true }
   }, [pathlyRoot, projectPath, projects, setPathlyRoot])
 
   const { sidebarRef, onDragStart } = useSidebarResize()

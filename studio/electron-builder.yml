@@ -20,6 +20,9 @@ extraResources:
   - from: resources/wheels
     to: wheels
     filter: "*.whl"
+  - from: ../src/pathly_data/core
+    to: pathly-library/src/pathly_data/core
+    filter: "**/*"
 
 win:
   target:

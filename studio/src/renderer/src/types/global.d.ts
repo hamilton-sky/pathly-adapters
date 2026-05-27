@@ -12,6 +12,7 @@ declare global {
         moveToParent: (filePath: string) => Promise<string>
         pickFolder: () => Promise<string | null>
         userHome: () => Promise<string>
+        appRoot: () => Promise<string>
       }
       shell: {
         openWindow: (path: string) => Promise<void>
@@ -69,7 +70,7 @@ declare global {
         ollamaAvailable: () => Promise<{ available: boolean; models: string[] }>
         ollamaPull: (ollamaId: string) => Promise<void>
         ollamaDelete: (ollamaId: string) => Promise<void>
-        ollamaChat: (prompt: string, systemPrompt: string, modelId: string) => Promise<void>
+        ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean) => Promise<void>
       }
     }
   }
