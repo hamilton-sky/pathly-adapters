@@ -439,12 +439,21 @@ export function ChatPanel(): JSX.Element {
 
   async function handleRun(): Promise<void> {
     if (!currentMatch) return
+    if (!projectPath) {
+      console.error('[handleRun] no project path set — open a project before running a skill')
+      return
+    }
     const cmd = currentMatch.command
     setCurrentMatch(null)   // dismiss card immediately
     setAltMatches([])
     clearOutputLines(targetKind)
     setCommandRunning(targetKind, true)
-    await writeToTerminal(targetKind, cmd, projectPath, tabs, addTab, open, toggle)
+    try {
+      await writeToTerminal(targetKind, cmd, projectPath, tabs, addTab, open, toggle)
+    } catch (err) {
+      console.error('[handleRun] terminal write failed:', err)
+      setCommandRunning(targetKind, false)
+    }
   }
 
   function handleReject(): void {

@@ -50,10 +50,23 @@ export async function writeToTerminal(
 
   if (!open) toggle()
 
-  // If we just spawned a new tab, wait for the shell + Claude to finish starting up
-  // before writing (PowerShell → claude startup takes ~1–2s on Windows).
+  // If we just spawned a new tab, wait for the first PTY output before writing.
+  // Data-based wait is more reliable than a fixed sleep on slow machines.
+  // Falls back to 4s so we never hang forever.
   if (!existingTab) {
-    await new Promise<void>((r) => setTimeout(r, 2000))
+    await new Promise<void>((resolve) => {
+      const fallback = setTimeout(resolve, 4000)
+      const unsub = window.pathly?.terminal?.onData(tabId, () => {
+        clearTimeout(fallback)
+        unsub?.()
+        // Small pause after first output so readline is fully ready
+        setTimeout(resolve, 300)
+      })
+      if (!unsub) {
+        clearTimeout(fallback)
+        resolve()
+      }
+    })
   }
 
   // Build the command text and the Enter sequence separately.

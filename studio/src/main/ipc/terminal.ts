@@ -58,25 +58,21 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
   ipcMain.handle('terminal:spawn', (event, tabId: string, cwd: string, command?: string) => {
     if (!pty) throw new Error('node-pty is not available')
     if (activePtys.has(tabId)) {
-      event.sender.send('terminal:error', tabId, 'Tab already exists')
-      return
+      throw new Error('Tab already exists')
     }
 
     // Phase 1: validate command against allowlist
     if (command !== undefined && !ALLOWED_SHELLS.has(command)) {
-      event.sender.send('terminal:error', tabId, 'Shell not allowed')
-      return
+      throw new Error('Shell not allowed: ' + command)
     }
 
     if (!cwd) {
-      event.sender.send('terminal:error', tabId, 'Working directory is required')
-      return
+      throw new Error('Working directory is required')
     }
 
     // Phase 2: validate cwd is within the user's home directory
     if (!isValidCwd(cwd)) {
-      event.sender.send('terminal:error', tabId, 'Invalid working directory')
-      return
+      throw new Error('Invalid working directory: ' + cwd)
     }
 
     const { shell, args: shellArgs } = resolveShell(command)
