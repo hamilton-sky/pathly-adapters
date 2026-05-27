@@ -34,13 +34,6 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
   }
 
   return (
-    <>
-    <style>{`
-      @keyframes stop-pulse {
-        0%, 100% { box-shadow: 0 0 0 0px rgba(234, 179, 8, 0.4); }
-        50%       { box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.0); }
-      }
-    `}</style>
     <div
       className={styles.container}
       style={{ borderTop: t.border, background: t.bgSurface0 }}
@@ -101,46 +94,30 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
             ? '◈ MiniLM'
             : '◈ Loading…'}
         </span>
-        <button
-          className={styles.sendButton}
-          onClick={() => {
-            if (isLoading) {
-              onStop?.()
-            } else if (!disabled && value.trim()) {
-              onSend()
-            }
-          }}
-          disabled={isLoading ? false : (disabled || !value.trim() || isDownloading)}
-          title={isLoading ? 'Stop generating' : 'Send (Enter)'}
-          style={isLoading ? {
-            background: 'rgba(234, 179, 8, 0.15)',
-            color: '#EAB308',
-            border: '1px solid rgba(234, 179, 8, 0.3)',
-            animation: 'stop-pulse 1.8s ease-in-out infinite',
-          } : {
-            background: value.trim() && !disabled && !isDownloading ? t.accent : t.bgSurface1,
-            color: value.trim() && !disabled && !isDownloading ? '#000' : t.textMuted,
-          }}
-        >
-          <span style={{ position: 'relative', width: 13, height: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: isLoading ? 0 : 1, transform: isLoading ? 'scale(0.7)' : 'scale(1)',
-              transition: 'opacity 150ms ease, transform 150ms ease',
-            }}>
-              <Send size={13} />
-            </span>
-            <span style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: isLoading ? 1 : 0, transform: isLoading ? 'scale(1)' : 'scale(0.7)',
-              transition: 'opacity 150ms ease, transform 150ms ease',
-            }}>
-              <Square size={13} />
-            </span>
-          </span>
-        </button>
+        {isLoading ? (
+          <button
+            className={styles.sendButton}
+            onClick={() => onStop?.()}
+            title="Stop"
+            style={{ background: '#EAB308', color: '#000' }}
+          >
+            <Square size={13} />
+          </button>
+        ) : (
+          <button
+            className={styles.sendButton}
+            onClick={() => { if (!disabled && value.trim()) onSend() }}
+            disabled={disabled || !value.trim() || isDownloading}
+            title="Send (Enter)"
+            style={{
+              background: value.trim() && !disabled && !isDownloading ? t.accent : t.bgSurface1,
+              color: value.trim() && !disabled && !isDownloading ? '#000' : t.textMuted,
+            }}
+          >
+            <Send size={13} />
+          </button>
+        )}
       </div>
     </div>
-    </>
   )
 }

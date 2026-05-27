@@ -13,7 +13,8 @@ contextBridge.exposeInMainWorld('pathly', {
     listDirs: (dir: string): Promise<string[]> => ipcRenderer.invoke('fs:listDirs', dir),
     delete: (path: string): Promise<void> => ipcRenderer.invoke('fs:delete', path),
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('fs:pickFolder'),
-    userHome: (): Promise<string> => ipcRenderer.invoke('fs:userHome')
+    userHome: (): Promise<string> => ipcRenderer.invoke('fs:userHome'),
+    appRoot: (): Promise<string> => ipcRenderer.invoke('fs:appRoot')
   },
   shell: {
     openWindow: (path: string): Promise<void> => ipcRenderer.invoke('shell:openWindow', path),
@@ -148,6 +149,7 @@ declare global {
         delete: (path: string) => Promise<void>
         pickFolder: () => Promise<string | null>
         userHome: () => Promise<string>
+        appRoot: () => Promise<string>
       }
       shell: {
         openWindow: (path: string) => Promise<void>

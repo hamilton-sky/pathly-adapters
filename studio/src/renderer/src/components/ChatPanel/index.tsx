@@ -223,6 +223,12 @@ export function ChatPanel(): JSX.Element {
       .catch(() => { setEmbedProgress(0); setEmbedReady(false) })
   }, [setEmbedReady, setEmbedProgress])
 
+  function handleStop(): void {
+    abortLlm()
+    updateLastMessage({ status: 'done' })
+    setLoading(false)
+  }
+
   async function handleSend(): Promise<void> {
     const text = inputValue.trim()
     if (!text) return
@@ -403,12 +409,6 @@ export function ChatPanel(): JSX.Element {
     }
   }
 
-  function handleStop(): void {
-    abortLlm()
-    updateLastMessage({ status: 'done' })
-    setLoading(false)
-  }
-
   async function handleRunAll(steps: import('../../types/automation').AutomationStep[]): Promise<void> {
     const { setStatus, advanceToNext, setMode } = useAutomationStore.getState()
     setMode('auto')
@@ -544,9 +544,9 @@ export function ChatPanel(): JSX.Element {
         value={inputValue}
         onChange={setInputValue}
         onSend={handleSend}
-        disabled={isLoading}
-        isLoading={isLoading}
         onStop={handleStop}
+        isLoading={isLoading}
+        disabled={isLoading}
       />
     </div>
   )

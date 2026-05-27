@@ -7,7 +7,7 @@ _Last updated: 2026-05-27_
 | Conv | Scope | Status |
 |---|---|---|
 | 0 | Pre-flight | DONE |
-| 1 | Stop button | PENDING |
+| 1 | Stop button | DONE |
 | 2 | Claude Code proxy | PENDING |
 
 ## Conv 0 — Pre-flight
@@ -20,10 +20,10 @@ _Last updated: 2026-05-27_
 > Pre-existing TS: index.tsx:540 passes async handleSend where () => void expected — pre-existing, not introduced by this feature.
 
 ## Conv 1 — Stop Button
-- [ ] Phase 1.1: UI/UX design pass approved
-- [ ] Phase 1.2: ChatInput `isLoading` + `onStop` props added
-- [ ] Phase 1.3: ChatPanel wired — `handleStop` implemented
-- [ ] Phase 1.4: VERIFY.md written with RESULT: PASS
+- [x] Phase 1.1: UI/UX design pass approved
+- [x] Phase 1.2: ChatInput `isLoading` + `onStop` props added
+- [x] Phase 1.3: ChatPanel wired — `handleStop` implemented
+- [x] Phase 1.4: VERIFY.md written with RESULT: PASS
 
 ## Conv 2 — Claude Code Proxy
 - [ ] Phase 2.1: UI/UX design pass approved

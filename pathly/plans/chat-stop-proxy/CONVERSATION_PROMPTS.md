@@ -232,7 +232,7 @@ surfaces a recoverable message; LLM mode unaffected.
 
 ### Phase 2.5 — CC badge
 
-**File:** `studio/src/renderer/src/components/ChatPanel/index.tsx` (or message bubble component)
+**File:** `studio/src/renderer/src/components/ChatPanel/index.tsx` or `studio/src/renderer/src/components/ChatPanel/MessageList.tsx` (message bubble component)
 
 When rendering an assistant message where `source === 'claude-code'`, render a `CC` badge
 in the bubble header per Phase 2.1 design spec.

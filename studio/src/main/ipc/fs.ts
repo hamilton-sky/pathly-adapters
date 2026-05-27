@@ -96,4 +96,9 @@ export function registerFsHandlers(): void {
   ipcMain.handle('fs:userHome', async (): Promise<string> => {
     return path.join(app.getPath('home'), '.pathly')
   })
+
+  ipcMain.handle('fs:appRoot', async (): Promise<string> => {
+    // app.getAppPath() returns the studio/ directory; parent is the repo root
+    return path.resolve(app.getAppPath(), '..')
+  })
 }
