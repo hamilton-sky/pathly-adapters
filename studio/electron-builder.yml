@@ -10,6 +10,9 @@ files:
   - out/**/*
   - package.json
 
+asarUnpack:
+  - "node_modules/node-llama-cpp/**/*"
+
 extraResources:
   - from: resources/python
     to: python

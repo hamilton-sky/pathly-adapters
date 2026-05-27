@@ -146,9 +146,22 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 
 ## Phase 1: GET /status endpoint   ← Conversation 1
 
-> **WebGPU validated** (navigator.gpu confirmed available). Explanation layer moves to WebLLM in
-> the renderer (Conv 2). The Python server is now only needed for FSM state. No Ollama, no
-> chat_agent.py, no chat_tools.py.
+> **ARCHITECTURE CORRECTION (post Conv 9):** The earlier claim that "WebGPU was validated" was
+> incorrect. WebLLM (which relies on WebGPU) does not work in Electron's renderer process —
+> Chromium inside Electron has WebGPU disabled by default, and the flags added (--enable-unsafe-webgpu
+> etc.) are insufficient for the WebGPU compute shaders WebLLM needs. `webLLMEngine.ts` was
+> removed in Conv 9. The replacement (`node-llama-cpp`) requires Electron 33+ / Node 22 for its
+> native module loading to work; the current project targets Electron 28.
+>
+> **Correct LLM architecture (as of Conv 10 hotfix):**
+> - **Primary backend: Ollama** (auto-detected at localhost:11434). Works on any Electron version.
+>   Install via https://ollama.ai, then `ollama pull phi4-mini`. All 4 models supported.
+> - **Secondary backend: node-llama-cpp** (GGUF local files). Requires upgrading to Electron 33+
+>   in `devDependencies`. The IPC handlers already exist; the v3 API is already wired.
+> - **Fallback: skill-only mode** (always works). MiniLM embedding routes intents to skills.
+>   Chat responds with match information even with no LLM. Never blank.
+>
+> The Python server is only needed for FSM state (`/status`). No `chat_agent.py` needed.
 
 **File:** `src/pathly_orchestrator/http_server.py` — MODIFY
 **Done when:** `curl http://127.0.0.1:8765/status` returns current FSM stage without mutating state
@@ -159,16 +172,14 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
   - Returns `{ "current_state": str, "feature": str, "project_root": str }`
   - Returns `{ "current_state": "unknown" }` if no project loaded
   - **DO NOT call `/next_action` for context** — it writes `conv_start_sha` to disk on every call
-- Do NOT add a `/chat` route — explanation is handled entirely in the renderer via WebLLM
-- Do NOT add `ollama` to `pyproject.toml` — Ollama is not used
 
 ---
 
 ## ~~Phase 2: phi4-mini explainer agent~~   ← REMOVED
 
 > **Dead code — do not implement.**
-> WebGPU is confirmed available. The explanation layer runs entirely in the Electron renderer
-> via WebLLM (`@mlc-ai/web-llm`). `chat_agent.py`, `chat_tools.py`, and Ollama are not needed.
+> Explanation layer is handled by Ollama (or node-llama-cpp on Electron 33+) directly from the
+> Electron main process via IPC. `chat_agent.py`, `chat_tools.py` are not needed.
 > The Python server's only job is the read-only `/status` endpoint.
 
 ---
@@ -259,14 +270,16 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 - `ChatInput`: textarea 1–3 rows, Enter = send, Shift+Enter = newline; `◈ MiniLM` pill (purple), model name pill (green, reads `modelStore.selectedModelId` short name); Send/Stop toggle
 - `ChatPanel/index.tsx`: collapse animation `width 200ms ease-out`, 300px ↔ 36px
 - `App.tsx`: add `<ChatPanel />` after `<MainPanel />` in body flex row
-- **`data/models.ts`**: 4 model definitions — `Phi-4-mini-instruct-q4f16_1-MLC` (recommended, default), `Qwen3-4B-q4f16_1-MLC`, `Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC`, `Llama-3.2-3B-Instruct-q4f16_1-MLC`
-  - Each: `{ id, name, description, useCase, storage, speed, recommended? }`
-- **`lib/webLLMEngine.ts`**: `getEngine(modelId, onProgress)` singleton, `askWebLLM(prompt, system, onChunk)` streaming
-  - Add `@mlc-ai/web-llm` to `studio/package.json`
-  - Pre-warm engine at ChatPanel mount (background, no blocking)
-  - On message send: call `askWebLLM(input, systemPrompt, onChunk)` → stream into chatStore explanation field
-  - If engine not ready: show `◈ Loading model…` in explanation area
-- **No POST /chat call** — explanation is 100% local via WebLLM
+- **`data/models.ts`**: 4 model definitions — `qwen3-4b` (recommended, default), `qwen2.5-coder-7b`, `phi-4-mini`, `deepseek-r1-1.5b`
+  - Each: `{ id, name, description, useCase, storage, speed, recommended?, thinking?, ollamaId }`
+  - `thinking: true` on models that emit `<think>...</think>` blocks (qwen3-4b, deepseek-r1-1.5b)
+  - GGUF URIs in `main/ipc/llm.ts` MODEL_REGISTRY; Ollama IDs in `ollamaId` field
+- **`lib/llmBridge.ts`**: `askOllama(prompt, system, ollamaModelId, onChunk)` streaming via Ollama IPC,
+  `askLlm(prompt, system, onChunk)` for node-llama-cpp (Electron 33+)
+  - On message send: check Ollama availability → stream response via `llm:ollamaChat` IPC
+  - On message send (no Ollama): check node-llama-cpp availability → stream via `llm:chat` IPC
+  - On message send (neither): show skill-match fallback immediately — never blank
+- **`lib/webLLMEngine.ts` is DELETED** — WebLLM does not work in Electron renderer
 - Design: see DESIGN_SPEC.md → Full UI Layout (ASCII)
 
 ---
@@ -715,15 +728,46 @@ Note: the singleton is created here (not in `playwrightExecutor.ts`) so callback
 ---
 
 ## Prerequisites
-- MiniLM will auto-download via transformers.js (~22MB, first launch only)
-- WebLLM models download on first cache (Phi-4 Mini ~2GB, Qwen3 4B ~3GB, Qwen2.5 Coder ~5GB)
+- MiniLM auto-downloads via transformers.js (~22MB, first launch only) — always works
+- **Ollama (recommended):** Install from https://ollama.ai, then `ollama pull qwen3:4b`.
+  Ollama is auto-detected at localhost:11434. No env-var needed.
+  Available models:
+  - `qwen3:4b` (~2.6GB) — **recommended** — reasoning + automation planning, thinking mode
+  - `qwen2.5-coder:7b` (~4.7GB) — best for code-heavy tasks
+  - `phi4-mini:latest` (~2.5GB) — fast, light, no reasoning
+  - `deepseek-r1:1.5b` (~1.1GB) — tiny reasoning model for low-RAM machines, thinking mode
+- **node-llama-cpp (future):** Requires upgrading `electron` to `^33.0.0` in devDependencies.
+  Run `npm install` after upgrade. All IPC handlers already exist in `studio/src/main/ipc/llm.ts`.
+- **WebGPU / WebLLM: NOT usable.** WebLLM was removed — WebGPU is disabled inside Electron's
+  renderer process and cannot run the compute shaders required by WebLLM. Do not re-add WebLLM.
 - Pathly FSM server running on port 8765 before testing Conv 1
-- **Ollama: not required.** Explanation runs via WebLLM in the renderer. No `chat_agent.py`, no Ollama install needed.
-- **WebGPU: already enabled** in `studio/src/main/index.ts` (validated before Conv 1 — `navigator.gpu` confirmed non-null). `--enable-unsafe-webgpu`, `enable-features=Vulkan`, and `experimentalFeatures: true` are already in place.
+
+---
+
+## Phase 30: ThinkingBlock — inline reasoning display   ← Post-pipeline (DONE)
+
+**Files:** `lib/thinkingParser.ts` — CREATE, `ChatPanel/ThinkingBlock.tsx` — CREATE,
+`ChatPanel/ThinkingBlock.module.css` — CREATE, `store/chatStore.ts` — MODIFY,
+`ChatPanel/index.tsx` — MODIFY, `ChatPanel/MessageList.tsx` — MODIFY
+**Done when:** Models that emit `<think>...</think>` show a collapsible reasoning block above the message
+**Delivers:** S10.1 (reasoning transparency)
+
+**Details:**
+- `thinkingParser.ts`: `splitThinkingContent(text)` — splits accumulated stream into `{ thinking, content }`. Handles mid-tag streaming by tracking the last unclosed `<think>` block.
+- `Message.thinking?: string` — added to Message interface in chatStore
+- Both Ollama and node-llama-cpp streaming paths call `splitThinkingContent` on every chunk
+- `ThinkingBlock` component: minimal dark style, purple left-border `rgba(139,92,246,0.35)`, monospace 11px muted text, chevron toggle
+- Animation: CSS grid `grid-template-rows: 1fr → 0fr` for smooth height collapse without JS measuring
+- Auto-collapses 800ms after stream ends (`status === 'done'`)
+- `MessageList` renders `<ThinkingBlock>` above message content when `msg.thinking` exists
+- Only triggered by models with `thinking: true` in `data/models.ts` (qwen3-4b, deepseek-r1-1.5b)
+
+---
 
 ## Key Decisions
 - **Embedding over LLM for routing:** Zero hallucination, 22ms, deterministic. See ARCHITECTURE_PROPOSAL.md Decision 1.
-- **phi4-mini as explainer only:** Routing and explaining are separate concerns with different latency needs.
+- **qwen3-4b as default explainer:** Best for Pathly automation use-case — reasoning mode + strong structured JSON output for action plan generation. Replaces phi4-mini as default.
 - **Skills are the command vocabulary:** All commands are Pathly skills. Claude Code and Codex are terminal surfaces, not routing targets.
 - **Pre-embed at startup:** Ensures first-message latency is instant. 14 skills × ~384 dimensions = negligible memory.
 - **Confidence threshold UI:** Users need to see and understand match quality to trust the system.
+- **ThinkingBlock for transparency:** Reasoning models emit `<think>` tokens before the answer. Showing this (collapsed by default) builds user trust in automation decisions.

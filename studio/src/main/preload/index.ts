@@ -80,7 +80,61 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on('setup:progress', listener)
       return () => ipcRenderer.removeListener('setup:progress', listener)
     }
-  }
+  },
+  automation: {
+    executeStep: (step: { type: string; label: string; value?: string }): Promise<unknown> =>
+      ipcRenderer.invoke('automation:executeStep', step),
+  },
+  llm: {
+    isAvailable: (): Promise<boolean> =>
+      ipcRenderer.invoke('llm:isAvailable'),
+    listCached: (): Promise<string[]> =>
+      ipcRenderer.invoke('llm:listCached'),
+    download: (modelId: string): Promise<void> =>
+      ipcRenderer.invoke('llm:download', modelId),
+    delete: (modelId: string): Promise<void> =>
+      ipcRenderer.invoke('llm:delete', modelId),
+    load: (modelId: string): Promise<void> =>
+      ipcRenderer.invoke('llm:load', modelId),
+    chat: (prompt: string, systemPrompt: string, modelId: string): Promise<void> =>
+      ipcRenderer.invoke('llm:chat', { prompt, systemPrompt, modelId }),
+    abort: (): Promise<void> =>
+      ipcRenderer.invoke('llm:abort'),
+    onToken: (cb: (token: string) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, token: string): void => cb(token)
+      ipcRenderer.on('llm:token', listener)
+      return () => ipcRenderer.removeListener('llm:token', listener)
+    },
+    onDone: (cb: (fullText: string) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, text: string): void => cb(text)
+      ipcRenderer.on('llm:done', listener)
+      return () => ipcRenderer.removeListener('llm:done', listener)
+    },
+    onError: (cb: (message: string) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, msg: string): void => cb(msg)
+      ipcRenderer.on('llm:error', listener)
+      return () => ipcRenderer.removeListener('llm:error', listener)
+    },
+    onLoadProgress: (cb: (data: { pct: number; text: string }) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, data: { pct: number; text: string }): void => cb(data)
+      ipcRenderer.on('llm:load-progress', listener)
+      return () => ipcRenderer.removeListener('llm:load-progress', listener)
+    },
+    onDownloadProgress: (cb: (data: { modelId: string; pct: number; downloaded: number; total: number }) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, data: { modelId: string; pct: number; downloaded: number; total: number }): void => cb(data)
+      ipcRenderer.on('llm:dl-progress', listener)
+      return () => ipcRenderer.removeListener('llm:dl-progress', listener)
+    },
+    // Ollama backend — works on any Electron version
+    ollamaAvailable: (): Promise<{ available: boolean; models: string[] }> =>
+      ipcRenderer.invoke('llm:ollamaAvailable'),
+    ollamaPull: (ollamaId: string): Promise<void> =>
+      ipcRenderer.invoke('llm:ollamaPull', ollamaId),
+    ollamaDelete: (ollamaId: string): Promise<void> =>
+      ipcRenderer.invoke('llm:ollamaDelete', ollamaId),
+    ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean): Promise<void> =>
+      ipcRenderer.invoke('llm:ollamaChat', { prompt, systemPrompt, modelId, think }),
+  },
 })
 
 declare global {
@@ -128,6 +182,26 @@ declare global {
         isNeeded: () => Promise<boolean>
         run: () => Promise<{ ok: boolean; error?: string }>
         onProgress: (cb: (msg: string) => void) => () => void
+      }
+      automation: {
+        executeStep: (step: { type: string; label: string; value?: string }) => Promise<unknown>
+      }
+      llm: {
+        listCached: () => Promise<string[]>
+        download: (modelId: string) => Promise<void>
+        delete: (modelId: string) => Promise<void>
+        load: (modelId: string) => Promise<void>
+        chat: (prompt: string, systemPrompt: string, modelId: string) => Promise<void>
+        abort: () => Promise<void>
+        onToken: (cb: (token: string) => void) => () => void
+        onDone: (cb: (fullText: string) => void) => () => void
+        onError: (cb: (message: string) => void) => () => void
+        onLoadProgress: (cb: (data: { pct: number; text: string }) => void) => () => void
+        onDownloadProgress: (cb: (data: { modelId: string; pct: number; downloaded: number; total: number }) => void) => () => void
+        ollamaAvailable: () => Promise<{ available: boolean; models: string[] }>
+        ollamaPull: (ollamaId: string) => Promise<void>
+        ollamaDelete: (ollamaId: string) => Promise<void>
+        ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean) => Promise<void>
       }
     }
   }

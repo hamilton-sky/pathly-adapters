@@ -9,12 +9,10 @@ import { spawn, ChildProcess } from 'child_process'
 import net from 'net'
 import { getPythonPath } from './python'
 import { registerSetupHandlers } from './setup'
+import { registerAutomationHandlers } from './ipc/automation'
+import { registerLlmHandlers } from './ipc/llm'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
-
-// WebGPU validation — temporary, remove after testing navigator.gpu in DevTools
-app.commandLine.appendSwitch('enable-unsafe-webgpu')
-app.commandLine.appendSwitch('enable-features', 'Vulkan')
 
 let fsmServer: ChildProcess | null = null
 
@@ -151,4 +149,6 @@ function registerIpcHandlers(win: BrowserWindow): void {
   registerShellHandlers(win)
   registerTerminalHandlers(win)
   registerSetupHandlers()
+  registerAutomationHandlers(win)
+  registerLlmHandlers()
 }

@@ -1,6 +1,6 @@
 # Studio AI Chat — Progress
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Story Status
 
@@ -24,17 +24,17 @@
 | S5.3 | Low-confidence state guides user to correct skill | Conv 5 | DONE |
 | S6.1 | AI receives static schema of Studio UI elements | Conv 6 | DONE |
 | S6.2 | AI system prompt includes Studio UI context | Conv 6 | DONE |
-| S7.1 | Playwright executor connects to Electron window | Conv 7 | TODO |
-| S7.2 | AI can click, fill, or select any Studio element by label | Conv 7 | TODO |
-| S7.3 | Step execution is reliable across UI changes | Conv 7 | TODO |
-| S8.1 | Staged mode with per-step approval | Conv 8 | TODO |
-| S8.2 | Auto mode executes full plan | Conv 8 | TODO |
-| S8.3 | Auto mode blocked on low confidence | Conv 8 | TODO |
-| S8.4 | Full flow creation from plain-English description | Conv 8 | TODO |
-| S9.1 | Model selector shows all models with specs | Conv 9 | TODO |
-| S9.2 | Model download and cache via toggle | Conv 9 | TODO |
-| S9.3 | Selected model used for all AI responses | Conv 9 | TODO |
-| S9.4 | Model selection persists across restarts | Conv 9 | TODO |
+| S7.1 | Playwright executor connects to Electron window | Conv 7 | DONE |
+| S7.2 | AI can click, fill, or select any Studio element by label | Conv 7 | DONE |
+| S7.3 | Step execution is reliable across UI changes | Conv 7 | DONE |
+| S8.1 | Staged mode with per-step approval | Conv 8 | DONE |
+| S8.2 | Auto mode executes full plan | Conv 8 | DONE |
+| S8.3 | Auto mode blocked on low confidence | Conv 8 | DONE |
+| S8.4 | Full flow creation from plain-English description | Conv 8 | DONE |
+| S9.1 | Model selector shows all models with specs | Conv 9 | DONE |
+| S9.2 | Model download and cache via toggle | Conv 9 | DONE |
+| S9.3 | Selected model used for all AI responses | Conv 9 | DONE |
+| S9.4 | Model selection persists across restarts | Conv 9 | DONE |
 
 ## Conversation Breakdown
 
@@ -47,9 +47,9 @@
 | 4 | 12–14 | Core | S4.1, S4.2 | DONE | `cd studio && npm run typecheck` |
 | 5 | 15–18 | Core | S5.1, S5.2, S5.3 | DONE | `cd studio && npm run typecheck` |
 | 6 | 19–20 | Track A | S6.1, S6.2 | DONE | `cd studio && npm run typecheck` + inspect POST /chat body includes studioSchema |
-| 7 | 21–22 | Track A | S7.1, S7.2, S7.3 | TODO | `cd studio && npm run typecheck` + devtools: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` |
-| 8 | 24–26 | Track A | S8.1, S8.2, S8.3, S8.4 | TODO | E2E: type "create a test flow" → approve steps → flow appears in Studio |
-| 9 | 27–29 | Track B | S9.1, S9.2, S9.3, S9.4 | TODO | Select Phi-4 Mini → download → send message → response streams from WebLLM |
+| 7 | 21–22 | Track A | S7.1, S7.2, S7.3 | DONE | `cd studio && npm run typecheck` + devtools: `window.electronAPI.executeAutomationStep({ type: 'click', label: 'New Flow' })` |
+| 8 | 24–26 | Track A | S8.1, S8.2, S8.3, S8.4 | DONE | E2E: type "create a test flow" → approve steps → flow appears in Studio |
+| 9 | 27–29 | Track B | S9.1, S9.2, S9.3, S9.4 | DONE | Select Phi-4 Mini → download → send message → response streams from WebLLM |
 
 ## Phase Detail
 
@@ -79,15 +79,25 @@
 | 5 | 18 | `ChatPanel/index.tsx` + `chatStore.ts` | Wire embedding into send flow; /pathly commands route silently | MatchCard renders < 50ms; no YOU message for /pathly | DONE |
 | 6 | 19 | `lib/studioSchema.ts` + `types/studio.ts` | Static Studio UI schema (lib canonical; data/ is re-export shim) | No TS errors, schema covers all key elements | DONE |
 | 6 | 20 | `lib/pathlyContext.ts` | Inject schema into AI context | POST /chat body includes studioSchema | DONE |
-| 7 | 21 | `main/automation/playwrightExecutor.ts` | Playwright executor — 3-tier cascade + self-healing | executeStep click/fill/select works | TODO |
-| 7 | 21.5 | `lib/elementResolver.ts` | Renderer-side semantic+LLM resolution (uses embed+cosineSim from embedRouter) | IPC listeners registered at startup | TODO |
-| 7 | 22 | `main/ipc/automation.ts` | IPC handler + round-trip for Tier 2/3 | ipcRenderer.invoke executes step via Playwright | TODO |
-| 8 | 24 | `store/automationStore.ts` | Step queue state | No TS errors | TODO |
-| 8 | 25 | `ChatPanel/StepQueue.tsx` + `AutomationCard.tsx` | Staged/auto UI components | Staged approve/skip works visually | TODO |
-| 8 | 26 | `ChatPanel/index.tsx` + `chat_agent.py` | Wire AI → action plan → execution | Full flow creation E2E works | TODO |
-| 9 | 27 | `data/models.ts` + `lib/webLLMEngine.ts` | WebLLM models data + engine | Phi-4 Mini loads and streams response | TODO |
-| 9 | 28 | `store/modelStore.ts` + `ChatPanel/ModelSelector.tsx` | Model selector UI | Download, cache, selection all work | TODO |
-| 9 | 29 | `ChatPanel/index.tsx` | Wire WebLLM into chat flow | Responses stream from local model | TODO |
+| 7 | 21 | `main/automation/playwrightExecutor.ts` | Playwright executor — 3-tier cascade + self-healing | executeStep click/fill/select works | DONE |
+| 7 | 21.5 | `lib/elementResolver.ts` | Renderer-side semantic+LLM resolution (uses embed+cosineSim from embedRouter) | IPC listeners registered at startup | DONE |
+| 7 | 22 | `main/ipc/automation.ts` | IPC handler + round-trip for Tier 2/3 | ipcRenderer.invoke executes step via Playwright | DONE |
+| 8 | 24 | `store/automationStore.ts` | Step queue state | No TS errors | DONE |
+| 8 | 25 | `ChatPanel/StepQueue.tsx` + `AutomationCard.tsx` | Staged/auto UI components | Staged approve/skip works visually | DONE |
+| 8 | 26 | `ChatPanel/index.tsx` + `chat_agent.py` | Wire AI → action plan → execution | Full flow creation E2E works | DONE |
+| 9 | 27 | `data/models.ts` | Model definitions (Ollama + node-llama-cpp GGUF) | Models list correct, recommended set | DONE |
+| 9 | 28 | `store/modelStore.ts` + `ChatPanel/ModelSelector.tsx` | Model selector UI | Download, cache, selection all work | DONE |
+| 9 | 29 | `ChatPanel/index.tsx` | Wire Ollama/node-llama-cpp into chat flow | Responses stream from local model | DONE |
+
+## Post-Pipeline Additions
+
+| Addition | Files | Description | Status |
+|----------|-------|-------------|--------|
+| Reasoning/ThinkingBlock | `lib/thinkingParser.ts`, `ChatPanel/ThinkingBlock.tsx`, `ChatPanel/ThinkingBlock.module.css` | Inline collapsible `<think>` block; parses DeepSeek-R1 / Qwen3 reasoning tokens from stream | DONE |
+| `thinking` field on Message | `store/chatStore.ts` | `thinking?: string` added to Message type | DONE |
+| Stream parser wired to both LLM paths | `ChatPanel/index.tsx` | `splitThinkingContent()` called on every chunk for Ollama + node-llama-cpp | DONE |
+| Model lineup updated | `data/models.ts`, `main/ipc/llm.ts` | llama-3.2-3b replaced with deepseek-r1-1.5b; qwen3-4b is now recommended; `thinking` field added to Model interface | DONE |
+| phi-4-mini GGUF URI corrected | `main/ipc/llm.ts` | Removed erroneous `microsoft_` prefix from bartowski repo path | DONE |
 
 ## Hotfixes Applied (post-pipeline)
 
@@ -97,9 +107,10 @@
 | Windows PTY not executing commands | `lib/launchTerminal.ts` | `\n` → `\r` for Windows PTY Enter | FIXED |
 | ChatInput hidden by SkillsPanel | `ChatPanel/SkillsPanel.module.css` | Added `max-height: 100px; overflow-y: auto` to `.chips` | FIXED |
 | Doubled /pathly prefix in terminal | `lib/launchTerminal.ts` | Removed prepend — skills.json commands already include it | FIXED |
+| ModelSelector moved inline to footer | `ChatPanel/index.tsx` | Placed beside MiniLM status pill in input footer row | FIXED |
 
 ## Prerequisites
 - [x] FSM server running (port 8765) — Conv 1 done
 - [x] MiniLM auto-downloads on first launch (~22MB, transformers.js) — Conv 5 done
-- [ ] @playwright/test — add to studio/package.json in Conv 7
+- [x] @playwright/test — added to studio/package.json in Conv 7
 - [ ] WebLLM models download on first cache (Phi-4 Mini ~2GB) — Conv 9

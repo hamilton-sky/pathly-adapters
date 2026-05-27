@@ -248,7 +248,9 @@ export function HomeScreen(): JSX.Element {
     loadAllPlans()
   }, [projects.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sorted = [...projects].sort((a, b) => b.lastOpened - a.lastOpened)
+  const sorted = [...projects]
+    .filter((p, i, arr) => arr.findIndex((q) => q.path === p.path) === i)
+    .sort((a, b) => b.lastOpened - a.lastOpened)
   const pinnedProjects = sorted.filter((p) => p.pinned)
   const unpinnedProjects = sorted.filter((p) => !p.pinned)
 

@@ -5,9 +5,14 @@ pathly-status — cross-feature dashboard for active Pathly flows.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import sys
 from pathlib import Path
+
+# Ensure stdout can handle Unicode on Windows (cp1252 terminals)
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-16"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 _FEEDBACK_PRIORITY = [
     "HUMAN_QUESTIONS",

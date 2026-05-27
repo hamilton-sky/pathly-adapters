@@ -50,6 +50,27 @@ declare global {
       window?: {
         setTitleBarOverlay: (bgColor: string, symbolColor: string) => void
       }
+      automation: {
+        executeStep: (step: { type: 'click' | 'fill' | 'select' | 'navigate'; label: string; value?: string }) => Promise<{ success: boolean; tier: 1 | 2 | 3; error?: string; resolvedSelector?: string }>
+      }
+      llm: {
+        isAvailable: () => Promise<boolean>
+        listCached: () => Promise<string[]>
+        download: (modelId: string) => Promise<void>
+        delete: (modelId: string) => Promise<void>
+        load: (modelId: string) => Promise<void>
+        chat: (prompt: string, systemPrompt: string, modelId: string) => Promise<void>
+        abort: () => Promise<void>
+        onToken: (cb: (token: string) => void) => () => void
+        onDone: (cb: (fullText: string) => void) => () => void
+        onError: (cb: (message: string) => void) => () => void
+        onLoadProgress: (cb: (data: { pct: number; text: string }) => void) => () => void
+        onDownloadProgress: (cb: (data: { modelId: string; pct: number; downloaded: number; total: number }) => void) => () => void
+        ollamaAvailable: () => Promise<{ available: boolean; models: string[] }>
+        ollamaPull: (ollamaId: string) => Promise<void>
+        ollamaDelete: (ollamaId: string) => Promise<void>
+        ollamaChat: (prompt: string, systemPrompt: string, modelId: string) => Promise<void>
+      }
     }
   }
 }

@@ -34,7 +34,7 @@ class Settings:
         return cls(
             host=os.environ.get("PATHLY_FSM_HTTP_HOST", "127.0.0.1"),
             port=port,
-            cors_origin=os.environ.get("PATHLY_CORS_ORIGIN", "null"),
+            cors_origin=os.environ.get("PATHLY_CORS_ORIGIN", "*"),
             project_root=os.environ.get("PATHLY_PROJECT_ROOT", ""),
             rate_limit_max=int(os.environ.get("PATHLY_RATE_LIMIT_MAX", "120")),
             rate_limit_window=int(os.environ.get("PATHLY_RATE_LIMIT_WINDOW", "60")),

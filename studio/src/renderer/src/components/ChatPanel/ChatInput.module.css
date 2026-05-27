@@ -7,6 +7,35 @@
   position: relative;
 }
 
+.downloadBar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.downloadLabel {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.progressTrack {
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 300ms ease-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.2; }
+  50%       { opacity: 0.5; }
+}
+
 .textarea {
   width: 100%;
   resize: none;

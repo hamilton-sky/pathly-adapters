@@ -48,3 +48,41 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Elapsed time during streaming */
+.timer {
+  font-size: 11px;
+  color: #6b7280;
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
+/* Thinking indicator — three bouncing dots */
+.thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 2px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  opacity: 0.7;
+  animation: dotBounce 1.2s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40%            { transform: translateY(-6px); opacity: 1; }
+}

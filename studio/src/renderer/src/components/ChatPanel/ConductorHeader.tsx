@@ -1,14 +1,17 @@
 import { X, Zap, Trash2 } from 'lucide-react'
+import type { TerminalKind } from '../../store/chatStore'
 import styles from './ConductorHeader.module.css'
 
 interface ConductorHeaderProps {
   hasClaudeTab: boolean
   hasCodexTab: boolean
+  targetKind: TerminalKind
+  onSetTarget: (kind: TerminalKind) => void
   onToggleChat: () => void
   onClearChat: () => void
 }
 
-export function ConductorHeader({ hasClaudeTab, hasCodexTab, onToggleChat, onClearChat }: ConductorHeaderProps): JSX.Element {
+export function ConductorHeader({ hasClaudeTab, hasCodexTab, targetKind, onSetTarget, onToggleChat, onClearChat }: ConductorHeaderProps): JSX.Element {
 
   return (
     <div className={styles.header}>
@@ -19,14 +22,27 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, onToggleChat, onCle
       </div>
 
       <div className={styles.pills}>
-        <span className={styles.pill}>
+        <button
+          className={`${styles.pill} ${targetKind === 'claude' ? styles.pillSelected : ''}`}
+          onClick={() => onSetTarget('claude')}
+        >
           <span className={`${styles.dot} ${hasClaudeTab ? styles.dotActive : ''}`} />
           claude
-        </span>
-        <span className={styles.pill}>
+        </button>
+        <button
+          className={`${styles.pill} ${targetKind === 'codex' ? styles.pillSelected : ''}`}
+          onClick={() => onSetTarget('codex')}
+        >
           <span className={`${styles.dot} ${hasCodexTab ? styles.dotActive : ''}`} />
           codex
-        </span>
+        </button>
+        <button
+          className={`${styles.pill} ${targetKind === 'shell' ? styles.pillSelected : ''}`}
+          onClick={() => onSetTarget('shell')}
+        >
+          <span className={styles.dot} />
+          shell
+        </button>
       </div>
 
       <button

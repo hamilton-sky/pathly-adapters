@@ -37,6 +37,7 @@ from pathly_orchestrator.config import Settings
 from pathly_orchestrator.eventlog import read_state
 from pathly_orchestrator.feature_flags import flags
 from pathly_orchestrator.fsm_ops import next_action, complete_stage
+from pathly_orchestrator.chat_agent import handle_chat
 from pathly_telemetry.storage import append_activity
 
 
@@ -110,6 +111,16 @@ app = Flask(__name__)
 
 @app.before_request
 def _log_request():
+    # Handle CORS preflight (OPTIONS) before any routing or rate limiting.
+    # The browser sends this before every cross-origin POST with Content-Type: application/json.
+    if request.method == "OPTIONS":
+        from flask import Response as _Resp
+        resp = _Resp()
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        return resp
+
     if flags.rate_limiting and not _check_rate_limit(request.remote_addr or "unknown"):
         _inc("pathly_requests_rate_limited_total")
         return jsonify({"error": "Rate limit exceeded"}), 429
@@ -135,6 +146,10 @@ def _log_response(response):
     )
     if response.status_code >= 500:
         _inc("pathly_request_errors_total")
+    # Allow renderer (Vite dev server at localhost:5173 or Electron) to call the API
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
 
@@ -569,6 +584,18 @@ def record_activity_endpoint():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+@app.route("/chat", methods=["POST", "OPTIONS"])
+def chat():
+    if request.method == "OPTIONS":
+        from flask import Response as _Resp
+        resp = _Resp()
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        return resp
+    return handle_chat(request)
+
+
 @app.route("/events/stream", methods=["GET"])
 def events_stream():
     """SSE endpoint: streams new EVENTS.jsonl lines to the Studio UI."""
@@ -629,7 +656,7 @@ def events_stream():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": os.environ.get("PATHLY_CORS_ORIGIN", "null"),
+            "Access-Control-Allow-Origin": os.environ.get("PATHLY_CORS_ORIGIN", "*"),
         },
     )
 

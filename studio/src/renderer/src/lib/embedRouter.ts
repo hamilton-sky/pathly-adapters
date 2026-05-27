@@ -1,13 +1,32 @@
-import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers'
+import { pipeline, FeatureExtractionPipeline, env } from '@xenova/transformers'
 import type { Skill } from './skillsManifest'
 import type { MatchResult } from '../types/chat'
+
+// Explicit CDN — never resolve relative to localhost (Vite dev server returns HTML for unknown paths)
+env.allowLocalModels = false
+env.useBrowserCache = false   // disable cache entirely to avoid stale/corrupt entries in dev
+
+export type EmbedProgressCallback = (progress: number) => void
 
 let embedder: FeatureExtractionPipeline | null = null
 let embeddedSkills: Skill[] = []
 
-async function getEmbedder(): Promise<FeatureExtractionPipeline> {
+async function getEmbedder(onProgress?: EmbedProgressCallback): Promise<FeatureExtractionPipeline> {
   if (!embedder) {
-    embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2') as FeatureExtractionPipeline
+    embedder = await pipeline(
+      'feature-extraction',
+      'Xenova/all-MiniLM-L6-v2',
+      {
+        progress_callback: (p: Record<string, unknown>) => {
+          const progress = typeof p.progress === 'number' ? p.progress : null
+          if (progress !== null) {
+            onProgress?.(Math.round(progress))
+          } else if (p.status === 'ready') {
+            onProgress?.(100)
+          }
+        },
+      }
+    ) as FeatureExtractionPipeline
   }
   return embedder
 }
@@ -31,8 +50,8 @@ export function cosineSim(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom
 }
 
-export async function preEmbedSkills(skills: Skill[]): Promise<void> {
-  const ext = await getEmbedder()
+export async function preEmbedSkills(skills: Skill[], onProgress?: EmbedProgressCallback): Promise<void> {
+  const ext = await getEmbedder(onProgress)
   for (const skill of skills) {
     const output = await ext(skill.description, { pooling: 'mean', normalize: true })
     skill.vector = Array.from(output.data as Float32Array)
@@ -42,14 +61,20 @@ export async function preEmbedSkills(skills: Skill[]): Promise<void> {
 
 export async function matchIntent(input: string): Promise<MatchResult[]> {
   const inputVec = await embed(input)
+  const inputLower = input.toLowerCase().trim()
   const scored = embeddedSkills
     .filter((s) => s.vector !== undefined)
-    .map((s) => ({
-      skill: s.name,
-      confidence: cosineSim(inputVec, s.vector!),
-      command: s.command,
-      description: s.description,
-    }))
+    .map((s) => {
+      const embedSim = cosineSim(inputVec, s.vector!)
+      // Exact name/command match → always confident
+      const nameMatch =
+        inputLower === s.name.toLowerCase() ||
+        inputLower === s.command.toLowerCase() ||
+        inputLower === `/pathly ${s.name}`.toLowerCase() ||
+        inputLower.startsWith(s.name.toLowerCase() + ' ')
+      const confidence = nameMatch ? Math.max(0.92, embedSim) : embedSim
+      return { skill: s.name, confidence, command: s.command, description: s.description }
+    })
     .sort((a, b) => b.confidence - a.confidence)
   return scored.slice(0, 3)
 }

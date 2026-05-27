@@ -58,7 +58,11 @@ export const useProjectStore = create<ProjectState>()(
       setPathlyUserHome: (p) => set({ pathlyUserHome: p }),
       setActiveTopic: (t) => set({ activeTopic: t }),
       setSelectedItem: (item) => set({ selectedItem: item }),
-      addProject: (p) => set((s) => ({ projects: [...s.projects, p] })),
+      addProject: (p) => set((s) => ({
+        projects: s.projects.some((x) => x.path === p.path)
+          ? s.projects.map((x) => (x.path === p.path ? { ...x, ...p } : x))
+          : [...s.projects, p],
+      })),
       removeProject: (path) => set((s) => ({ projects: s.projects.filter((p) => p.path !== path) })),
       updateProject: (path, patch) =>
         set((s) => ({

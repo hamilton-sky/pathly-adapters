@@ -22,7 +22,7 @@ export async function launchTerminal(params: LaunchTerminalParams): Promise<void
 }
 
 export async function writeToTerminal(
-  kind: 'claude' | 'codex',
+  kind: 'claude' | 'codex' | 'shell',
   command: string,
   projectPath: string,
   tabs: TerminalTab[],
@@ -39,8 +39,13 @@ export async function writeToTerminal(
     tabId = existingTab.id
   } else {
     tabId = crypto.randomUUID()
-    addTab(tabId, kind === 'claude' ? 'claude' : 'codex', 'left', kind)
-    await window.pathly?.terminal?.spawn(tabId, projectPath, kind)
+    if (kind === 'shell') {
+      addTab(tabId, 'Shell', 'left', 'shell')
+      await window.pathly?.terminal?.spawn(tabId, projectPath, undefined)
+    } else {
+      addTab(tabId, kind === 'claude' ? 'claude' : 'codex', 'left', kind)
+      await window.pathly?.terminal?.spawn(tabId, projectPath, kind)
+    }
   }
 
   if (!open) toggle()
@@ -54,9 +59,14 @@ export async function writeToTerminal(
   // Build the command text and the Enter sequence separately.
   // Two-write pattern: text first, then Enter — this matches how xterm.js sends
   // keystrokes one-at-a-time and avoids readline swallowing the newline on Windows ConPTY.
-  const cmdText = kind === 'claude'
-    ? sanitized
-    : 'Use Pathly ' + sanitized.replace(/^\/pathly\s*/, '')
+  let cmdText: string
+  if (kind === 'claude') {
+    cmdText = sanitized
+  } else if (kind === 'shell') {
+    cmdText = sanitized
+  } else {
+    cmdText = 'Use Pathly ' + sanitized.replace(/^\/pathly\s*/, '')
+  }
 
   window.pathly?.terminal?.write(tabId, cmdText)
 
