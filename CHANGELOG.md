@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.11.7 - 2026-05-27
+
+### Studio library packaging
+
+- Bundle the canonical Pathly `agents`, `skills`, `templates`, and `flows`
+  content with Pathly Studio so the Library sidebar works in installed builds.
+- Load the bundled library through a read-only IPC path while keeping writes
+  restricted to user-owned workspace content.
+
+---
+
 ## 2.4.1 — 2026-05-13
 
 ### Schema fixes
