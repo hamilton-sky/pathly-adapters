@@ -50,17 +50,23 @@ export async function writeToTerminal(
 
   if (!open) toggle()
 
-  // If we just spawned a new tab, wait for the first PTY output before writing.
-  // Data-based wait is more reliable than a fixed sleep on slow machines.
-  // Falls back to 4s so we never hang forever.
+  // If we just spawned a new tab, wait for the CLI prompt before writing.
+  // We scan accumulated PTY output for the ready prompt ('> ' for claude/codex,
+  // '$ ' or '# ' for shell) so we write only when readline is actually listening.
+  // Falls back to 5s so we never hang forever.
   if (!existingTab) {
     await new Promise<void>((resolve) => {
-      const fallback = setTimeout(resolve, 4000)
-      const unsub = window.pathly?.terminal?.onData(tabId, () => {
-        clearTimeout(fallback)
-        unsub?.()
-        // Small pause after first output so readline is fully ready
-        setTimeout(resolve, 300)
+      const fallback = setTimeout(resolve, 5000)
+      let buf = ''
+      const promptPatterns = kind === 'shell' ? ['$ ', '# ', '> '] : ['> ']
+      const unsub = window.pathly?.terminal?.onData(tabId, (data: string) => {
+        // Strip ANSI escape codes before scanning for the prompt
+        buf += data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+        if (promptPatterns.some((p) => buf.includes(p))) {
+          clearTimeout(fallback)
+          unsub?.()
+          resolve()
+        }
       })
       if (!unsub) {
         clearTimeout(fallback)
@@ -69,9 +75,6 @@ export async function writeToTerminal(
     })
   }
 
-  // Build the command text and the Enter sequence separately.
-  // Two-write pattern: text first, then Enter — this matches how xterm.js sends
-  // keystrokes one-at-a-time and avoids readline swallowing the newline on Windows ConPTY.
   let cmdText: string
   if (kind === 'claude') {
     cmdText = sanitized
@@ -81,14 +84,10 @@ export async function writeToTerminal(
     cmdText = 'Use Pathly ' + sanitized.replace(/^\/pathly\s*/, '')
   }
 
-  window.pathly?.terminal?.write(tabId, cmdText)
-
-  // Small pause so readline buffers the text before seeing Enter
-  await new Promise<void>((r) => setTimeout(r, 80))
-
-  // '\r\n' covers Windows ConPTY (needs CR+LF), and '\r' alone is sufficient for
-  // Unix PTY — sending both is safe and universally triggers readline execution.
-  window.pathly?.terminal?.write(tabId, '\r\n')
+  // Send command + Enter as one atomic PTY write so readline processes them together.
+  // Splitting into two writes with a delay was racy — the Enter sometimes arrived
+  // while Claude Code was still flushing startup output, confusing readline.
+  window.pathly?.terminal?.write(tabId, cmdText + '\r')
 
   return tabId
 }
