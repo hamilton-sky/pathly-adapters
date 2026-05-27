@@ -529,15 +529,15 @@ export function ChatPanel(): JSX.Element {
           lines={shellOutput.lines}
         />
       )}
-      <div style={{ padding: '0 12px 4px', display: 'flex', alignItems: 'center' }}>
-        <ModelSelector />
-      </div>
       <ChatInput
         value={inputValue}
         onChange={setInputValue}
         onSend={handleSend}
         disabled={isLoading}
       />
+      <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center' }}>
+        <ModelSelector />
+      </div>
     </div>
   )
 }
