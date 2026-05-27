@@ -9,6 +9,7 @@ import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
 import { askLlm, getEngine, askOllama } from '../../lib/llmBridge'
+import { splitThinkingContent } from '../../lib/thinkingParser'
 import { useModelStore } from '../../store/modelStore'
 import { WEB_LLM_MODELS } from '../../data/models'
 import { loadSkills } from '../../lib/skillsManifest'
@@ -87,23 +88,7 @@ function buildSystemPrompt(
     : 'No active pipeline stage.'
 
   if (topMatch && topMatch.confidence >= 0.4) {
-    const pct = Math.round(topMatch.confidence * 100)
-    return `You are the Conductor — a helpful AI assistant built into Pathly Studio.
-
-## MATCHED SKILL (${pct}% confidence): ${topMatch.command}
-
-IMPORTANT: The user's message matched the Pathly skill below. Base your entire response ONLY on this description — do NOT add, invent, or guess any details not stated here.
-
-Skill command: ${topMatch.command}
-What it does: ${topMatch.description}
-
-Instructions:
-- In 1-2 sentences, explain what this skill does using ONLY the description above.
-- Confirm it was matched and invite the user to click Run, or ask a follow-up question.
-- Do NOT mention Java, Maven, CI systems, or any technology not named in the description above.
-
-${stageInfo}
-Available skills: ${skillList}`
+    return `You are Conductor in Pathly Studio. Answer questions about Pathly skills using only the information given to you. Do not invent details.`
   }
 
   const schemaInfo = context.studioSchema && context.studioSchema.length > 0
@@ -342,16 +327,25 @@ export function ChatPanel(): JSX.Element {
       const localModelCached = useModelStore.getState().cachedModelIds.includes(selectedModelId)
       const localAvailable = llmAvailable === true && localModelCached
 
+      // When a skill is matched, inject description into the user message so
+      // small models (phi4-mini) can't override it with their own priors
+      const llmPrompt = topMatch && topMatch.confidence >= 0.4
+        ? `Skill: ${topMatch.command}\nDescription: ${topMatch.description}\n\nBased only on the description above, explain this skill in one sentence, then say "Click **Run** to execute."`
+        : text
+
       if (ollamaHasModel) {
         // ── Ollama path — stream from local Ollama server ─────────────────
         try {
           let fullText = ''
-          await askOllama(text, systemPrompt, ollamaTag, (chunk) => {
+          await askOllama(llmPrompt, systemPrompt, ollamaTag, (chunk) => {
             fullText += chunk
-            updateLastMessage({ content: fullText, status: 'streaming' })
+            const { thinking, content } = splitThinkingContent(fullText)
+            updateLastMessage({ content, thinking, status: 'streaming' })
           })
+          const { thinking: doneThinking, content: doneContent } = splitThinkingContent(fullText)
           updateLastMessage({
-            content: fullText.trim() || '_(empty response — try a different model)_',
+            content: doneContent || '_(empty response — try a different model)_',
+            thinking: doneThinking,
             status: 'done',
           })
         } catch (err) {
@@ -365,12 +359,15 @@ export function ChatPanel(): JSX.Element {
         try {
           await getEngine(selectedModelId)
           let fullText = ''
-          await askLlm(text, systemPrompt, (chunk) => {
+          await askLlm(llmPrompt, systemPrompt, (chunk) => {
             fullText += chunk
-            updateLastMessage({ content: fullText, status: 'streaming' })
+            const { thinking, content } = splitThinkingContent(fullText)
+            updateLastMessage({ content, thinking, status: 'streaming' })
           })
+          const { thinking: doneThinking, content: doneContent } = splitThinkingContent(fullText)
           updateLastMessage({
-            content: fullText.trim() || '⚠ The model returned an empty response. Try re-downloading or switching to Phi-4 Mini.',
+            content: doneContent || '⚠ The model returned an empty response. Try re-downloading or switching to Phi-4 Mini.',
+            thinking: doneThinking,
             status: 'done',
           })
         } catch (err) {

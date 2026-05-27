@@ -61,14 +61,20 @@ export async function preEmbedSkills(skills: Skill[], onProgress?: EmbedProgress
 
 export async function matchIntent(input: string): Promise<MatchResult[]> {
   const inputVec = await embed(input)
+  const inputLower = input.toLowerCase().trim()
   const scored = embeddedSkills
     .filter((s) => s.vector !== undefined)
-    .map((s) => ({
-      skill: s.name,
-      confidence: cosineSim(inputVec, s.vector!),
-      command: s.command,
-      description: s.description,
-    }))
+    .map((s) => {
+      const embedSim = cosineSim(inputVec, s.vector!)
+      // Exact name/command match → always confident
+      const nameMatch =
+        inputLower === s.name.toLowerCase() ||
+        inputLower === s.command.toLowerCase() ||
+        inputLower === `/pathly ${s.name}`.toLowerCase() ||
+        inputLower.startsWith(s.name.toLowerCase() + ' ')
+      const confidence = nameMatch ? Math.max(0.92, embedSim) : embedSim
+      return { skill: s.name, confidence, command: s.command, description: s.description }
+    })
     .sort((a, b) => b.confidence - a.confidence)
   return scored.slice(0, 3)
 }
