@@ -275,6 +275,27 @@ export function ChatPanel(): JSX.Element {
       setAltMatches([])
     }
 
+    // ── Strong skill match: respond instantly from skill data, no LLM needed ──
+    // Phi-4-mini (and small local models) have no knowledge of Pathly skills
+    // and will hallucinate descriptions. When confidence ≥ 0.45 we already
+    // know exactly what the skill does — just show it.
+    if (topMatch && topMatch.confidence >= 0.45) {
+      const pct = Math.round(topMatch.confidence * 100)
+      const stage = context.fsmStage !== 'unknown' && context.fsmStage
+        ? `\n\nCurrent pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.`
+        : ''
+      addMessage({
+        id: crypto.randomUUID(),
+        role: 'assistant' as const,
+        content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to execute, or ask me anything.`,
+        status: 'done' as const,
+      })
+      if (autoApprove && topMatch.confidence >= 0.65) {
+        await handleRun()
+      }
+      return
+    }
+
     const isAutomationIntent = /\b(create|make|build|add|new)\b.*\b(flow|step|state|transition)\b/i.test(text)
 
     const assistantMsg = {
