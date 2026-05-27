@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { WEB_LLM_MODELS } from '../../data/models'
 import { useModelStore } from '../../store/modelStore'
-import { cacheWebLLMModel, cancelEngineLoad, deleteCachedWebLLMModel, getCachedWebLLMModelIds } from '../../lib/webLLMEngine'
+import { abortLlm, getCachedModelIds, pullOllamaModel, deleteOllamaModel, downloadModel, deleteModel } from '../../lib/llmBridge'
 import styles from './ModelSelector.module.css'
 
 function formatElapsed(secs: number): string {
@@ -10,42 +10,19 @@ function formatElapsed(secs: number): string {
   return `${Math.floor(secs / 60)}m ${secs % 60}s`
 }
 
-/** Translate raw WebLLM status text into a short human-readable phase label. */
+/** Translate node-llama-cpp progress text into a short human-readable phase label. */
 function describePhase(text: string | undefined): { label: string; hint?: string } {
-  if (!text) return { label: 'connecting…' }
+  if (!text) return { label: 'preparing…' }
   const t = text.toLowerCase()
-
-  // GPU shader / WASM compilation — the slow one-time step
-  if (t.includes('shader') || (t.includes('gpu') && t.includes('module')) || t.includes('compil')) {
-    const m = text.match(/\[(\d+)\/(\d+)\]/)
-    const pct = text.match(/:\s*(\d+)%/)
-    const pos = m ? ` ${m[1]}/${m[2]}` : ''
-    const pctLabel = pct ? ` (${pct[1]}%)` : ''
-    return {
-      label: `compiling GPU shaders${pos}${pctLabel}`,
-      hint: 'One-time compilation — next launch will be instant',
-    }
-  }
-
-  // Fetching / downloading model weight shards
-  if (t.includes('fetch') || t.includes('param cache') || t.includes('downloading')) {
-    const m = text.match(/\[(\d+)\/(\d+)\]/)
-    return { label: m ? `downloading weights ${m[1]}/${m[2]}` : 'downloading weights…' }
-  }
-
-  // Loading already-cached files
-  if (t.includes('loading') || t.includes('from cache')) {
-    const m = text.match(/\[(\d+)\/(\d+)\]/)
-    return { label: m ? `loading ${m[1]}/${m[2]}` : 'loading from cache…' }
-  }
-
-  // Fallback: try to extract [X/Y]
-  const m = text.match(/\[(\d+)\/(\d+)\]/)
-  return { label: m ? `step ${m[1]}/${m[2]}` : 'preparing…' }
+  if (t.includes('downloading')) return { label: text }
+  if (t.includes('loading model')) return { label: text, hint: 'Loaded once — stays in memory until you switch models' }
+  if (t.includes('ready')) return { label: 'ready' }
+  return { label: text }
 }
 
 export function ModelSelector(): JSX.Element {
   const [open, setOpen] = useState(false)
+  const [llmAvailable, setLlmAvailable] = useState<boolean | null>(null)
   const [progressText, setProgressText] = useState<Record<string, string>>({})
   const [downloadStart, setDownloadStart] = useState<Record<string, number>>({})
   const [elapsed, setElapsed] = useState<Record<string, number>>({})
@@ -60,13 +37,38 @@ export function ModelSelector(): JSX.Element {
   const setCached = useModelStore((s) => s.setCached)
   const setProgress = useModelStore((s) => s.setProgress)
 
+  const ollamaAvailable = useModelStore((s) => s.ollamaAvailable)
+  const ollamaModelIds = useModelStore((s) => s.ollamaModelIds)
+  const setOllama = useModelStore((s) => s.setOllama)
+
   const selectedModel = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)
   const shortName = selectedModel?.name ?? selectedModelId
-  const isSelectedCached = cachedModelIds.includes(selectedModelId)
+  const ollamaTag = selectedModel?.ollamaId ?? ''
+  const ollamaBase = ollamaTag.split(':')[0]
+  const isOllamaCached = ollamaModelIds.some(
+    (m) => m === ollamaTag || m.startsWith(ollamaBase + ':') || m.startsWith(ollamaBase + '-')
+  )
+  const isSelectedCached = cachedModelIds.includes(selectedModelId) || isOllamaCached
 
-  // Sync cached model list on mount
+  // Check LLM backend availability once on mount (with timeout to avoid hanging on Electron <33)
   useEffect(() => {
-    getCachedWebLLMModelIds().then(setCached).catch(() => {})
+    const timeout = setTimeout(() => setLlmAvailable(false), 4000)
+    window.pathly.llm.isAvailable()
+      .then((ok) => { clearTimeout(timeout); setLlmAvailable(ok) })
+      .catch(() => { clearTimeout(timeout); setLlmAvailable(false) })
+    return () => clearTimeout(timeout)
+  }, [])
+
+  // Sync Ollama state
+  useEffect(() => {
+    window.pathly.llm.ollamaAvailable()
+      .then(({ available, models }) => setOllama(available, models))
+      .catch(() => setOllama(false, []))
+  }, [setOllama])
+
+  // Sync GGUF cached model list on mount
+  useEffect(() => {
+    getCachedModelIds().then(setCached).catch(() => {})
   }, [setCached])
 
   // Close on outside click
@@ -102,7 +104,7 @@ export function ModelSelector(): JSX.Element {
   }, [downloadProgress, downloadStart])
 
   function handleCancelDownload(modelId: string): void {
-    cancelEngineLoad()
+    abortLlm()
     setProgress(modelId, 0)
     setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
     setDownloadStart((prev) => { const n = { ...prev }; delete n[modelId]; return n })
@@ -112,32 +114,74 @@ export function ModelSelector(): JSX.Element {
   }
 
   async function handleCacheToggle(modelId: string): Promise<void> {
-    const isCached = cachedModelIds.includes(modelId)
-    if (isCached) {
-      await deleteCachedWebLLMModel(modelId)
+    const model = WEB_LLM_MODELS.find((m) => m.id === modelId)
+    const tag = model?.ollamaId ?? ''
+    const tagBase = tag.split(':')[0]
+    const isGgufCached = cachedModelIds.includes(modelId)
+    const isOllamaInstalled = ollamaModelIds.some(
+      (m) => m === tag || m.startsWith(tagBase + ':') || m.startsWith(tagBase + '-')
+    )
+
+    // ── Remove ────────────────────────────────────────────────────────────
+    if (isOllamaInstalled) {
+      await deleteOllamaModel(tag)
+      setOllama(ollamaAvailable ?? false, ollamaModelIds.filter((m) => m !== tag && !m.startsWith(tagBase + ':')))
+      setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
+      return
+    }
+    if (isGgufCached) {
+      await deleteModel(modelId)
       setCached(cachedModelIds.filter((id) => id !== modelId))
       setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
-    } else {
-      const startMs = Date.now()
-      setDownloadStart(prev => ({ ...prev, [modelId]: startMs }))
-      setDownloadPhase(prev => ({ ...prev, [modelId]: 1 }))
-      setLastProgress(prev => ({ ...prev, [modelId]: 0 }))
-      setProgress(modelId, 0)
-      await cacheWebLLMModel(modelId, (pct, text) => {
-        setProgress(modelId, pct)
-        if (text) setProgressText((prev) => ({ ...prev, [modelId]: text }))
-        // Detect phase reset: if progress drops from a high value back to low,
-        // WebLLM moved from setup phase → weights phase
-        setLastProgress(prev => {
-          const prev_ = prev[modelId] ?? 0
-          if (prev_ > 60 && pct < 20) {
-            setDownloadPhase(p => ({ ...p, [modelId]: 2 }))
-          }
-          return { ...prev, [modelId]: pct }
+      return
+    }
+
+    // ── Download ──────────────────────────────────────────────────────────
+    const startMs = Date.now()
+    setDownloadStart(prev => ({ ...prev, [modelId]: startMs }))
+    setDownloadPhase(prev => ({ ...prev, [modelId]: 1 }))
+    setLastProgress(prev => ({ ...prev, [modelId]: 0 }))
+    setProgress(modelId, 1)
+
+    const removeDl = window.pathly.llm.onDownloadProgress(({ modelId: id, pct }) => {
+      if (id !== modelId && id !== tag) return
+      setProgress(modelId, Math.max(1, pct))
+      setProgressText(prev => ({ ...prev, [modelId]: `downloading… ${pct}%` }))
+    })
+
+    try {
+      if (ollamaAvailable) {
+        // Pull via Ollama
+        await pullOllamaModel(tag, (pct, text) => {
+          setProgress(modelId, pct)
+          if (text) setProgressText(prev => ({ ...prev, [modelId]: text }))
         })
-      })
-      const updated = await getCachedWebLLMModelIds()
-      setCached(updated)
+        // Refresh Ollama model list
+        const { models } = await window.pathly.llm.ollamaAvailable()
+        setOllama(true, models)
+      } else {
+        // GGUF download (requires Electron 33+ / node-llama-cpp v3)
+        const removeLoad = window.pathly.llm.onLoadProgress(({ pct, text }) => {
+          setProgress(modelId, pct)
+          if (text) setProgressText(prev => ({ ...prev, [modelId]: text }))
+        })
+        try {
+          await downloadModel(modelId, (pct, text) => {
+            setProgress(modelId, pct)
+            if (text) setProgressText(prev => ({ ...prev, [modelId]: text }))
+          })
+          const updated = await getCachedModelIds()
+          setCached(updated)
+        } finally {
+          removeLoad()
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setProgressText(prev => ({ ...prev, [modelId]: `Failed: ${msg}` }))
+      setProgress(modelId, 0)
+    } finally {
+      removeDl()
       setProgress(modelId, 100)
       setProgressText((prev) => { const n = { ...prev }; delete n[modelId]; return n })
       setDownloadPhase((prev) => { const n = { ...prev }; delete n[modelId]; return n })
@@ -161,13 +205,28 @@ export function ModelSelector(): JSX.Element {
 
       {open && (
         <div className={styles.panel}>
+          {!ollamaAvailable && llmAvailable !== true && (
+            <div className={styles.noBackendNote}>
+              <strong>No AI backend detected.</strong>
+              <br />
+              Install <a href="https://ollama.ai" target="_blank" rel="noreferrer">Ollama</a> for local AI,
+              then run <code>ollama pull phi4-mini</code>.
+              <br />
+              <span style={{ opacity: 0.6 }}>Or upgrade to Electron 33+ for built-in inference.</span>
+            </div>
+          )}
           {WEB_LLM_MODELS.map((model) => {
-            const isCached = cachedModelIds.includes(model.id)
+            const tag = model.ollamaId
+            const tagBase = tag.split(':')[0]
+            const isGgufCached = cachedModelIds.includes(model.id)
+            const isOllamaInstalled = ollamaModelIds.some(
+              (m) => m === tag || m.startsWith(tagBase + ':') || m.startsWith(tagBase + '-')
+            )
+            const isCached = isGgufCached || isOllamaInstalled
             const isSelected = model.id === selectedModelId
             const progress = downloadProgress[model.id] ?? 0
-            // Show downloading state from the moment the download starts (downloadStart set),
-            // not only after the first shard callback fires (progress > 0).
             const isDownloading = (downloadStart[model.id] !== undefined && !isCached) && progress < 100
+            const canDownload = ollamaAvailable === true || llmAvailable === true
 
             return (
               <div
@@ -181,7 +240,10 @@ export function ModelSelector(): JSX.Element {
                     {model.recommended && (
                       <span className={styles.badgeRecommended}>Recommended</span>
                     )}
-                    {isCached && (
+                    {isOllamaInstalled && (
+                      <span className={styles.badgeCached}>Ollama</span>
+                    )}
+                    {isGgufCached && !isOllamaInstalled && (
                       <span className={styles.badgeCached}>Cached</span>
                     )}
                     {isSelected && (
@@ -211,20 +273,15 @@ export function ModelSelector(): JSX.Element {
                   const phase = describePhase(progressText[model.id])
                   return (
                   <div className={styles.downloadBlock}>
-                    {/* meta row: percent + phase label + elapsed */}
                     <div className={styles.downloadMeta}>
                       <span className={styles.downloadPct}>{progress > 0 ? `${progress}%` : '…'}</span>
                       <span className={styles.downloadPhase}>{phase.label}</span>
                       <span className={styles.downloadElapsed}>{formatElapsed(elapsed[model.id] ?? 0)}</span>
                     </div>
-
-                    {/* two-layer progress bar: stripes behind, solid fill on top */}
                     <div className={styles.progressTrack}>
                       <div className={styles.progressStripes} />
                       <div className={styles.progressFill} style={{ width: `${progress}%` }} />
                     </div>
-
-                    {/* one-time hint (e.g. shader compilation) */}
                     {phase.hint && (
                       <span className={styles.downloadHint}>{phase.hint}</span>
                     )}
@@ -241,13 +298,21 @@ export function ModelSelector(): JSX.Element {
                   </button>
                 ) : (
                   <button
-                    className={`${styles.cacheBtn} ${isCached ? styles.cacheBtnOn : ''}`}
+                    className={`${styles.cacheBtn} ${isCached ? styles.cacheBtnOn : canDownload && isSelected ? styles.cacheBtnPrimary : ''}`}
+                    disabled={!isCached && !canDownload}
+                    title={!isCached && !canDownload ? 'Install Ollama or upgrade to Electron 33+' : undefined}
                     onClick={(e) => {
                       e.stopPropagation()
                       void handleCacheToggle(model.id)
                     }}
                   >
-                    {isCached ? '✓ Downloaded & ready  —  click to remove' : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}
+                    {isCached
+                      ? `✓ ${isOllamaInstalled ? 'Installed via Ollama' : 'Downloaded'}  —  click to remove`
+                      : !canDownload
+                        ? '⚠ Install Ollama to download models'
+                        : ollamaAvailable
+                          ? isSelected ? '↓ Pull via Ollama' : '↓ Pull & cache via Ollama'
+                          : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}
                   </button>
                 )}
               </div>

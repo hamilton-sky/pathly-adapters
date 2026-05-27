@@ -4,6 +4,16 @@ import { useChatStore } from '../../store/chatStore'
 import { useTheme } from '../../useTheme'
 import styles from './MessageList.module.css'
 
+function ThinkingDots({ color }: { color: string }): JSX.Element {
+  return (
+    <span className={styles.thinking} aria-label="Thinking…">
+      <span className={styles.dot} style={{ background: color }} />
+      <span className={styles.dot} style={{ background: color }} />
+      <span className={styles.dot} style={{ background: color }} />
+    </span>
+  )
+}
+
 export function MessageList(): JSX.Element {
   const messages = useChatStore((s) => s.messages)
   const t = useTheme()
@@ -39,12 +49,16 @@ export function MessageList(): JSX.Element {
           >
             {msg.role === 'user' ? 'You' : 'Conductor'}
           </span>
-          <span
-            className={styles.content}
-            style={{ color: t.textPrimary, fontFamily: t.fontFamilyBase }}
-          >
-            {msg.content}
-          </span>
+          {msg.role === 'assistant' && msg.status === 'streaming' && msg.content === '' ? (
+            <ThinkingDots color={t.accent} />
+          ) : (
+            <span
+              className={styles.content}
+              style={{ color: t.textPrimary, fontFamily: t.fontFamilyBase }}
+            >
+              {msg.content}
+            </span>
+          )}
         </div>
       ))}
       <div ref={bottomRef} />

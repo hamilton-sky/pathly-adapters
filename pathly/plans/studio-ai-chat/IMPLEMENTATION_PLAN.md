@@ -146,9 +146,22 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 
 ## Phase 1: GET /status endpoint   ← Conversation 1
 
-> **WebGPU validated** (navigator.gpu confirmed available). Explanation layer moves to WebLLM in
-> the renderer (Conv 2). The Python server is now only needed for FSM state. No Ollama, no
-> chat_agent.py, no chat_tools.py.
+> **ARCHITECTURE CORRECTION (post Conv 9):** The earlier claim that "WebGPU was validated" was
+> incorrect. WebLLM (which relies on WebGPU) does not work in Electron's renderer process —
+> Chromium inside Electron has WebGPU disabled by default, and the flags added (--enable-unsafe-webgpu
+> etc.) are insufficient for the WebGPU compute shaders WebLLM needs. `webLLMEngine.ts` was
+> removed in Conv 9. The replacement (`node-llama-cpp`) requires Electron 33+ / Node 22 for its
+> native module loading to work; the current project targets Electron 28.
+>
+> **Correct LLM architecture (as of Conv 10 hotfix):**
+> - **Primary backend: Ollama** (auto-detected at localhost:11434). Works on any Electron version.
+>   Install via https://ollama.ai, then `ollama pull phi4-mini`. All 4 models supported.
+> - **Secondary backend: node-llama-cpp** (GGUF local files). Requires upgrading to Electron 33+
+>   in `devDependencies`. The IPC handlers already exist; the v3 API is already wired.
+> - **Fallback: skill-only mode** (always works). MiniLM embedding routes intents to skills.
+>   Chat responds with match information even with no LLM. Never blank.
+>
+> The Python server is only needed for FSM state (`/status`). No `chat_agent.py` needed.
 
 **File:** `src/pathly_orchestrator/http_server.py` — MODIFY
 **Done when:** `curl http://127.0.0.1:8765/status` returns current FSM stage without mutating state
@@ -159,16 +172,14 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
   - Returns `{ "current_state": str, "feature": str, "project_root": str }`
   - Returns `{ "current_state": "unknown" }` if no project loaded
   - **DO NOT call `/next_action` for context** — it writes `conv_start_sha` to disk on every call
-- Do NOT add a `/chat` route — explanation is handled entirely in the renderer via WebLLM
-- Do NOT add `ollama` to `pyproject.toml` — Ollama is not used
 
 ---
 
 ## ~~Phase 2: phi4-mini explainer agent~~   ← REMOVED
 
 > **Dead code — do not implement.**
-> WebGPU is confirmed available. The explanation layer runs entirely in the Electron renderer
-> via WebLLM (`@mlc-ai/web-llm`). `chat_agent.py`, `chat_tools.py`, and Ollama are not needed.
+> Explanation layer is handled by Ollama (or node-llama-cpp on Electron 33+) directly from the
+> Electron main process via IPC. `chat_agent.py`, `chat_tools.py` are not needed.
 > The Python server's only job is the read-only `/status` endpoint.
 
 ---
@@ -261,12 +272,12 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 - `App.tsx`: add `<ChatPanel />` after `<MainPanel />` in body flex row
 - **`data/models.ts`**: 4 model definitions — `Phi-4-mini-instruct-q4f16_1-MLC` (recommended, default), `Qwen3-4B-q4f16_1-MLC`, `Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC`, `Llama-3.2-3B-Instruct-q4f16_1-MLC`
   - Each: `{ id, name, description, useCase, storage, speed, recommended? }`
-- **`lib/webLLMEngine.ts`**: `getEngine(modelId, onProgress)` singleton, `askWebLLM(prompt, system, onChunk)` streaming
-  - Add `@mlc-ai/web-llm` to `studio/package.json`
-  - Pre-warm engine at ChatPanel mount (background, no blocking)
-  - On message send: call `askWebLLM(input, systemPrompt, onChunk)` → stream into chatStore explanation field
-  - If engine not ready: show `◈ Loading model…` in explanation area
-- **No POST /chat call** — explanation is 100% local via WebLLM
+- **`lib/llmBridge.ts`**: `askOllama(prompt, system, ollamaModelId, onChunk)` streaming via Ollama IPC,
+  `askLlm(prompt, system, onChunk)` for node-llama-cpp (Electron 33+)
+  - On message send: check Ollama availability → stream response via `llm:ollamaChat` IPC
+  - On message send (no Ollama): check node-llama-cpp availability → stream via `llm:chat` IPC
+  - On message send (neither): show skill-match fallback immediately — never blank
+- **`lib/webLLMEngine.ts` is DELETED** — WebLLM does not work in Electron renderer
 - Design: see DESIGN_SPEC.md → Full UI Layout (ASCII)
 
 ---
@@ -715,11 +726,15 @@ Note: the singleton is created here (not in `playwrightExecutor.ts`) so callback
 ---
 
 ## Prerequisites
-- MiniLM will auto-download via transformers.js (~22MB, first launch only)
-- WebLLM models download on first cache (Phi-4 Mini ~2GB, Qwen3 4B ~3GB, Qwen2.5 Coder ~5GB)
+- MiniLM auto-downloads via transformers.js (~22MB, first launch only) — always works
+- **Ollama (recommended):** Install from https://ollama.ai, then `ollama pull phi4-mini`.
+  Ollama is auto-detected at localhost:11434. No env-var needed.
+  Available models: `phi4-mini:latest` (~2.5GB), `qwen3:4b` (~2.6GB), `qwen2.5-coder:7b` (~4.7GB), `llama3.2:3b` (~2GB)
+- **node-llama-cpp (future):** Requires upgrading `electron` to `^33.0.0` in devDependencies.
+  Run `npm install` after upgrade. All IPC handlers already exist in `studio/src/main/ipc/llm.ts`.
+- **WebGPU / WebLLM: NOT usable.** WebLLM was removed — WebGPU is disabled inside Electron's
+  renderer process and cannot run the compute shaders required by WebLLM. Do not re-add WebLLM.
 - Pathly FSM server running on port 8765 before testing Conv 1
-- **Ollama: not required.** Explanation runs via WebLLM in the renderer. No `chat_agent.py`, no Ollama install needed.
-- **WebGPU: already enabled** in `studio/src/main/index.ts` (validated before Conv 1 — `navigator.gpu` confirmed non-null). `--enable-unsafe-webgpu`, `enable-features=Vulkan`, and `experimentalFeatures: true` are already in place.
 
 ## Key Decisions
 - **Embedding over LLM for routing:** Zero hallucination, 22ms, deterministic. See ARCHITECTURE_PROPOSAL.md Decision 1.

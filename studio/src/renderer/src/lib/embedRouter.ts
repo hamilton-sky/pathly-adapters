@@ -18,8 +18,6 @@ async function getEmbedder(onProgress?: EmbedProgressCallback): Promise<FeatureE
       'Xenova/all-MiniLM-L6-v2',
       {
         progress_callback: (p: Record<string, unknown>) => {
-          // Log every callback in dev so we can see the real status values
-          console.debug('[MiniLM]', p.status, p.progress ?? '')
           const progress = typeof p.progress === 'number' ? p.progress : null
           if (progress !== null) {
             onProgress?.(Math.round(progress))

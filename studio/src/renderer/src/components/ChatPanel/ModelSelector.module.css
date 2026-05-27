@@ -340,6 +340,20 @@
   opacity: 0.5;
 }
 
+.cacheBtnPrimary {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(56, 189, 248, 0.08) 100%);
+  border-color: #38BDF8;
+  color: #38BDF8;
+  font-weight: 600;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+  transition: box-shadow 150ms ease-out, opacity 150ms ease-out;
+}
+
+.cacheBtnPrimary:hover:not(:disabled) {
+  opacity: 1;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
+}
+
 .cacheBtnOn {
   border-color: #22C55E;
   color: #22C55E;
@@ -348,4 +362,29 @@
 .cacheBtnCancel {
   border-color: rgba(239, 68, 68, 0.5);
   color: #f87171;
+}
+
+.noBackendNote {
+  font-size: 10px;
+  font-family: var(--font-family-base);
+  color: var(--text-muted);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 6px;
+  padding: 8px 10px;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.noBackendNote a {
+  color: #38BDF8;
+  text-decoration: none;
+}
+
+.noBackendNote code {
+  font-family: var(--font-family-mono);
+  background: rgba(255, 255, 255, 0.07);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
 }

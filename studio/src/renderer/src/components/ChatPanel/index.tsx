@@ -7,9 +7,8 @@ import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
-import { PATHLY_API_BASE } from '../../lib/config'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
-import { askWebLLM, getEngine } from '../../lib/webLLMEngine'
+import { askLlm, getEngine, askOllama } from '../../lib/llmBridge'
 import { useModelStore } from '../../store/modelStore'
 import { WEB_LLM_MODELS } from '../../data/models'
 import { loadSkills } from '../../lib/skillsManifest'
@@ -70,6 +69,11 @@ Be concise (2-3 sentences). Do not invent skills that are not in the available l
 
 export function ChatPanel(): JSX.Element {
   const [inputValue, setInputValue] = useState('')
+  const [llmAvailable, setLlmAvailable] = useState<boolean | null>(null)
+
+  const ollamaAvailable = useModelStore((s) => s.ollamaAvailable)
+  const ollamaModelIds = useModelStore((s) => s.ollamaModelIds)
+  const setOllama = useModelStore((s) => s.setOllama)
   const { chatRef, onDragStart, width } = useChatResize()
 
   const messages = useChatStore((s) => s.messages)
@@ -155,6 +159,23 @@ export function ChatPanel(): JSX.Element {
     }
   }, [tabs, appendOutputLine])
 
+  // Check LLM backend availability once on mount.
+  // node-llama-cpp may hang on Electron <33 — treat any non-resolution as false after 4s.
+  useEffect(() => {
+    const timeout = setTimeout(() => setLlmAvailable(false), 4000)
+    window.pathly.llm.isAvailable()
+      .then((ok) => { clearTimeout(timeout); setLlmAvailable(ok) })
+      .catch(() => { clearTimeout(timeout); setLlmAvailable(false) })
+    return () => clearTimeout(timeout)
+  }, [])
+
+  // Check if Ollama is running and which models are installed
+  useEffect(() => {
+    window.pathly.llm.ollamaAvailable()
+      .then(({ available, models }) => setOllama(available, models))
+      .catch(() => setOllama(false, []))
+  }, [setOllama])
+
   // Pre-embed all skill descriptions once on first mount.
   // Progress callback updates embedProgress (0–100) so the UI can show download state.
   useEffect(() => {
@@ -229,128 +250,102 @@ export function ChatPanel(): JSX.Element {
     addMessage(assistantMsg)
     setLoading(true)
 
-    if (process.env.PATHLY_CHAT_BACKEND !== 'ollama') {
-      // Local WebLLM path
+    {
+      // ── Determine which LLM backend to use ───────────────────────────────
+      const skillList = context.skills.filter(Boolean).join(', ') || 'plan, po, build, review, test, retro'
       const systemPrompt = buildSystemPrompt(context, topMatch)
-      try {
-        const selectedModelId = useModelStore.getState().selectedModelId
-        const selectedModelName = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)?.name ?? selectedModelId
-        const isCached = useModelStore.getState().cachedModelIds.includes(selectedModelId)
-        if (!isCached) {
-          // Model not downloaded — give an immediate response instead of blocking the chat
-          updateLastMessage({
-            content: `📥 **${selectedModelName}** isn't downloaded yet.\n\nOpen the model selector (top right) and click **↓ Download & use this model** to get it. Download takes a few minutes depending on your connection.\n\nOnce the green dot appears next to the model name, you're ready to chat.`,
-            status: 'done',
-          })
-          setLoading(false)
-          return
-        }
-        await getEngine(selectedModelId)
-        let fullText = ''
-        try {
-          await askWebLLM(text, systemPrompt, (chunk) => {
-            fullText += chunk
-            updateLastMessage({ content: fullText, status: 'streaming' })
-          })
-        } catch (llmErr) {
-          console.error('[WebLLM] askWebLLM error:', llmErr)
-          throw llmErr // re-throw so outer catch handles it
-        }
-        if (fullText.trim()) {
-          updateLastMessage({ content: fullText, status: 'done' })
-        } else {
-          // Model loaded but returned empty — surface a clear message
-          console.warn('[WebLLM] empty response from model')
-          updateLastMessage({
-            content: '⚠️ The model returned an empty response. This usually means WebGPU is not fully available in this window, or the model needs to be re-downloaded.\n\nTry: open DevTools → Console for details, or switch to Phi-4 Mini.',
-            status: 'done',
-          })
-        }
-      } catch (err) {
-        console.error('[WebLLM] chat error:', err)
-        const msg = err instanceof Error ? err.message : String(err)
-        if (msg === 'WebGPU not supported') {
-          updateLastMessage({
-            content: '⚠️ WebGPU is required for local AI. Enable it in Electron or set PATHLY_CHAT_BACKEND=ollama.',
-            status: 'done',
-          })
-        } else {
-          // WebLLM failed — fall back to local match response
-          if (topMatch && topMatch.confidence >= 0.4) {
-            const pct = Math.round(topMatch.confidence * 100)
-            const stage = context.fsmStage !== 'unknown' && context.fsmStage
-              ? `\n\nCurrent pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.`
-              : ''
-            updateLastMessage({
-              content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.`,
-              status: 'done',
-            })
-          } else {
-            updateLastMessage({
-              content: `No skill matched your message (best score < 40%).\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable: ${context.skills.join(', ')}.`,
-              status: 'done',
-            })
-          }
-        }
-      }
-    } else {
-      // Ollama/Python backend path (PATHLY_CHAT_BACKEND=ollama)
-      let usedServer = false
-      try {
-        const res = await fetch(`${PATHLY_API_BASE}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text,
-            message: text,
-            context,
-            mode: isAutomationIntent ? 'automation' : 'chat',
-            studioSchema: context.studioSchema,
-            history: messages.map((m) => ({ role: m.role, content: m.content })),
-            ...(topMatch && topMatch.confidence >= 0.4
-              ? { matchedSkill: topMatch.skill, skillDescription: topMatch.description }
-              : {}),
-          }),
-        })
 
-        if (res.ok) {
-          usedServer = true
-          const json = await res.json() as { type: string; text?: string; intent?: string; steps?: import('../../types/automation').AutomationStep[] }
-
-          if (json.type === 'automation' && json.steps) {
-            useAutomationStore.getState().setSteps(json.steps)
-            updateLastMessage({
-              content: '',
-              status: 'done',
-              mode: 'automation',
-              automationPlan: { intent: json.intent ?? text, steps: json.steps },
-            })
-          } else {
-            updateLastMessage({ content: json.text ?? '', status: 'done' })
-          }
-        }
-      } catch { /* server unreachable — fall through to local response */ }
-
-      if (!usedServer) {
+      const showSkillFallback = (note?: string): void => {
         if (topMatch && topMatch.confidence >= 0.4) {
           const pct = Math.round(topMatch.confidence * 100)
           const stage = context.fsmStage !== 'unknown' && context.fsmStage
             ? `\n\nCurrent pipeline stage: **${context.fsmStage}**${context.featureName ? ` (${context.featureName})` : ''}.`
             : ''
           updateLastMessage({
-            content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.`,
+            content: `Matched **${topMatch.command}** (${pct}% confidence)\n\n${topMatch.description}${stage}\n\nClick **Run** to send it to the terminal.${note ?? ''}`,
             status: 'done',
           })
         } else {
           updateLastMessage({
-            content: `No skill matched your message (best score < 40%).\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable: ${context.skills.join(', ')}.`,
+            content: `No skill matched your message.\n\nTry rephrasing, or pick a skill from the panel above.\n\nAvailable: ${skillList}.${note ?? ''}`,
             status: 'done',
           })
         }
       }
-    }
 
-    setLoading(false)
+      const selectedModelId = useModelStore.getState().selectedModelId
+      const selectedModel = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)
+      const selectedModelName = selectedModel?.name ?? selectedModelId
+
+      // Check if Ollama has this model installed (match by exact tag or base name)
+      const ollamaTag = selectedModel?.ollamaId ?? ''
+      const ollamaBase = ollamaTag.split(':')[0]
+      const currentOllamaModels = useModelStore.getState().ollamaModelIds
+      const ollamaHasModel = currentOllamaModels.some(
+        (m) => m === ollamaTag || m.startsWith(ollamaBase + ':') || m.startsWith(ollamaBase + '-')
+      )
+
+      const localModelCached = useModelStore.getState().cachedModelIds.includes(selectedModelId)
+      const localAvailable = llmAvailable === true && localModelCached
+
+      if (ollamaHasModel) {
+        // ── Ollama path — stream from local Ollama server ─────────────────
+        try {
+          let fullText = ''
+          await askOllama(text, systemPrompt, ollamaTag, (chunk) => {
+            fullText += chunk
+            updateLastMessage({ content: fullText, status: 'streaming' })
+          })
+          updateLastMessage({
+            content: fullText.trim() || '_(empty response — try a different model)_',
+            status: 'done',
+          })
+        } catch (err) {
+          console.error('[Ollama] chat error:', err)
+          showSkillFallback('\n\n_(Ollama error — is Ollama still running?)_')
+        } finally {
+          setLoading(false)
+        }
+      } else if (localAvailable) {
+        // ── node-llama-cpp path — Electron 33+ only ───────────────────────
+        try {
+          await getEngine(selectedModelId)
+          let fullText = ''
+          await askLlm(text, systemPrompt, (chunk) => {
+            fullText += chunk
+            updateLastMessage({ content: fullText, status: 'streaming' })
+          })
+          updateLastMessage({
+            content: fullText.trim() || '⚠ The model returned an empty response. Try re-downloading or switching to Phi-4 Mini.',
+            status: 'done',
+          })
+        } catch (err) {
+          console.error('[LLM] chat error:', err)
+          showSkillFallback('\n\n_(Local AI unavailable — upgrade Electron to 33+ for local inference.)_')
+        } finally {
+          setLoading(false)
+        }
+      } else {
+        // ── No LLM available — always respond immediately ─────────────────
+        const isOllamaRunning = useModelStore.getState().ollamaAvailable
+        if (!isOllamaRunning) {
+          // Ollama not running: explain how to get LLM responses
+          const hint = '\n\n---\n_No AI backend available. To enable responses:_\n' +
+            '_1. Install [Ollama](https://ollama.ai) and run `ollama pull ' + (ollamaTag || 'phi4-mini') + '`_\n' +
+            '_2. Start Ollama, then reload the app._'
+          showSkillFallback(hint)
+        } else if (!ollamaHasModel && ollamaTag) {
+          // Ollama is running but model not pulled yet
+          updateLastMessage({
+            content: `📥 **${selectedModelName}** isn't installed in Ollama yet.\n\nOpen the model selector (top-right) and click **↓ Pull via Ollama** to install it.\n\nOr run: \`ollama pull ${ollamaTag}\``,
+            status: 'done',
+          })
+        } else {
+          showSkillFallback()
+        }
+        setLoading(false)
+      }
+    }
 
     if (autoApprove && topMatch && topMatch.confidence >= 0.65) {
       await handleRun()

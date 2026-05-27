@@ -16,3 +16,4 @@ __pycache__/
 build/lib/
 build/bdist*/
 build/temp*/
+studio/tsconfig.web.tsbuildinfo
