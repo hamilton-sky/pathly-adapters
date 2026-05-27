@@ -167,6 +167,14 @@ function buildWheel() {
       { stdio: 'inherit', cwd: repoRoot }
     )
     console.log('Wheel built successfully.')
+
+    // Download all dependency wheels so the offline --no-index install works
+    console.log('Downloading dependency wheels...')
+    execSync(
+      `${systemPython} -m pip download --dest "${wheelsDir}" pyyaml flask --only-binary=:all:`,
+      { stdio: 'inherit' }
+    )
+    console.log('Dependency wheels downloaded.')
   } catch (err) {
     console.error('ERROR: Failed to build wheel:', err.message)
     process.exit(1)
