@@ -12,6 +12,8 @@
 | S2.2 | JSON response parsed into AutomationCard | Conv 2 | TODO |
 | S2.3 | Parsed steps wired to automationStore | Conv 2 | TODO |
 | S2.4 | Chat mode unaffected (no regression) | Conv 2 | TODO |
+| S3.1 | Named action registry | Conv 3 | TODO |
+| S3.2 | LLM prompt uses registry vocabulary; steps expand before execution | Conv 3 | TODO |
 
 ## Conversation Breakdown
 
@@ -19,6 +21,7 @@
 |------|--------|---------|--------|--------|
 | 1 | Pre-flight, 1, 2 | S1.1, S1.2 | TODO | `cd studio && npx tsc --noEmit` |
 | 2 | 3, 4 | S2.1, S2.2, S2.3, S2.4 | TODO | `cd studio && npx tsc --noEmit` |
+| 3 | 5, 6 | S3.1, S3.2 | TODO | `cd studio && npx tsc --noEmit` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 
@@ -31,6 +34,8 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 1 | 2 | `ChatInput.tsx` + `ChatInput.module.css` | Mode toggle pill in footer | Pill renders, clicking updates store, active styling works | TODO |
 | 2 | 3 | `ChatPanel/index.tsx` | Automation system prompt branch | Automate mode sends different prompt; chat mode unchanged | TODO |
 | 2 | 4 | `ChatPanel/index.tsx` | Parse JSON response + wire stores | AutomationCard appears; automationStore.steps populated | TODO |
+| 3 | 5 | `automation/pathlyActionRegistry.ts` | Named action registry | PATHLY_ACTIONS, expandAction, REGISTRY_PROMPT_BLOCK all compile | TODO |
+| 3 | 6 | `ChatPanel/index.tsx` | Update prompt + expand registry steps | LLM uses registry vocab; expandAction resolves steps before setSteps | TODO |
 
 ## Prerequisites
 - [x] `automationStore.ts` exists with `setSteps` and `reset`

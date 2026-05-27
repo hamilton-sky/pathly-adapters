@@ -120,3 +120,42 @@ as before, **so that** this feature adds capability without breaking anything.
 - [ ] TypeScript: no new errors
 
 **Delivered by:** Phase 3–4 → Conversation 2
+
+---
+
+### Story S3.1: Named action registry
+
+**As a** Pathly developer, **I want** a `pathlyActionRegistry.ts` that maps stable action names to
+concrete Playwright steps, **so that** the LLM prompt vocabulary stays consistent even when Studio
+UI labels change.
+
+**Acceptance Criteria:**
+- [ ] `pathlyActionRegistry.ts` exports `PATHLY_ACTIONS: PathlyActionDef[]` with at least 5 named actions: `pathly_plan_feature`, `pathly_run_storm`, `pathly_run_build`, `pathly_run_review`, `pathly_run_test`
+- [ ] `expandAction(name, params)` returns the concrete step array for a known name; returns `null` for unknown names
+- [ ] `{{paramName}}` placeholders in step `value` fields are replaced by `expandAction` using the provided params object
+- [ ] `REGISTRY_PROMPT_BLOCK` is a formatted string listing all action names, param signatures, and descriptions
+- [ ] TypeScript: no new errors
+
+**Delivered by:** Phase 5 → Conversation 3
+
+---
+
+### Story S3.2: LLM prompt uses registry vocabulary; steps expand before execution
+
+**As a** Pathly Studio user in Automate mode, **I want** the AI to generate steps using named
+Pathly actions (not raw click/fill labels), **so that** my workflows keep working even if Studio
+UI labels are renamed.
+
+**Acceptance Criteria:**
+- [ ] `buildAutomationPrompt()` takes no arguments and injects `REGISTRY_PROMPT_BLOCK` into the system prompt
+- [ ] The LLM JSON schema uses `{ "action": "<registry name>", "params": { ... } }` per step (not `{ "type": "click", "label": "..." }`)
+- [ ] `parseAutomationResponse` calls `expandAction` per raw step; unknown actions are silently skipped
+- [ ] If all steps expand to an empty array, `parseAutomationResponse` returns `null` (falls back to chat display)
+- [ ] Conv 2 behavior (raw label steps) is replaced — `studioSchema` is no longer injected into the automation prompt
+- [ ] TypeScript: no new errors
+
+**Edge Cases:**
+- LLM invents an action name not in the registry: `expandAction` returns null, step is skipped; if no steps expand, chat fallback fires
+- LLM omits `params` for a parameterized action: `expandAction` substitutes empty string for missing params (no crash)
+
+**Delivered by:** Phase 6 → Conversation 3

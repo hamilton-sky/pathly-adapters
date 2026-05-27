@@ -43,3 +43,38 @@ they wanted, reviewed the plan, and approved execution — all from the chat pan
 - [ ] Switching to Automate and sending a message shows AutomationCard (not a chat bubble)
 - [ ] Switching back to Chat and sending a message shows normal skill match + explanation
 - [ ] `automationStore.steps` is populated after an automation message
+
+---
+
+## Extended Happy Flow (Conv 3 — named action registry)
+
+The user asks for a multi-phase Pathly workflow by name. The AI maps it to registered actions.
+
+### Step 1: User switches to Automate mode
+- Same as above — clicks `[Automate]`, pill turns green
+
+### Step 2: User describes a multi-step Pathly workflow
+- **User does**: Types "plan a feature called auth-v2, then run storm and build" and presses Enter
+- **System does**: `buildAutomationPrompt()` injects `REGISTRY_PROMPT_BLOCK` into the system prompt, sends to LLM
+
+### Step 3: LLM streams named-action JSON
+- **System does**: LLM streams:
+  ```json
+  { "type": "automation", "intent": "Plan auth-v2 then storm and build",
+    "steps": [
+      { "description": "Create feature plan", "action": "pathly_plan_feature", "params": { "featureName": "auth-v2" } },
+      { "description": "Run storm phase",     "action": "pathly_run_storm",    "params": {} },
+      { "description": "Run build phase",     "action": "pathly_run_build",    "params": {} }
+    ] }
+  ```
+
+### Step 4: expandAction resolves each step
+- **System does**: `expandAction("pathly_plan_feature", { featureName: "auth-v2" })` returns 3 concrete Playwright steps. `expandAction("pathly_run_storm")` and `expandAction("pathly_run_build")` return 1 step each. Total: 5 concrete `AutomationStep[]` passed to `automationStore.setSteps()`.
+
+### Step 5: AutomationCard appears, user approves
+- Same as base flow — card shows intent + step count, user clicks Run All
+
+## Extended End State
+
+The Studio executes: New Feature → fill "auth-v2" → Create Plan → click Storm → click Build.
+The user described a workflow in natural language; the registry translated it to stable, resilient steps.

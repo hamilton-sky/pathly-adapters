@@ -53,7 +53,35 @@
 
 ---
 
+---
+
+## Category 4: Registry Resolution Failures (Conv 3+)
+
+### EC-4.1: LLM invents an action name not in the registry
+- **Trigger**: LLM outputs `{ "action": "pathly_deploy_to_prod" }` — not in `PATHLY_ACTIONS`
+- **Expected behavior**: `expandAction` returns `null`; step is silently skipped
+- **If all steps are unknown**: `concreteSteps.length === 0` → `parseAutomationResponse` returns `null` → chat fallback fires
+- **Handled in**: Phase 6 — `expandAction` returns null for unknown names; length-zero guard returns null
+
+### EC-4.2: LLM omits params for a parameterized action
+- **Trigger**: `{ "action": "pathly_plan_feature" }` with no `params` key
+- **Expected behavior**: `expandAction` receives `{}` as params; `{{featureName}}` resolves to empty string; step still runs (fills empty string into the input)
+- **Handled in**: Phase 6 — `expandAction` defaults `params` to `{}` when undefined; `replace` returns empty string for missing keys
+
+### EC-4.3: Registry has no entry for a requested workflow
+- **Trigger**: User asks "deploy this to production" — no `pathly_deploy` action exists
+- **Expected behavior**: All steps unknown → chat fallback shows LLM response text; user sees what the LLM said and can follow up
+- **Mitigation path**: Add `pathly_deploy` to `PATHLY_ACTIONS` (one entry, no other changes needed)
+
+### EC-4.4: Studio label referenced in registry doesn't exist in the live UI
+- **Trigger**: Registry step has `{ label: "Run Storm" }` but the button was renamed
+- **Expected behavior**: Playwright executor returns `{ ok: false, error: 'element not found: Run Storm' }` — existing executor error handling
+- **Mitigation**: Registry is the single source of truth for labels. Fixing a broken label = update registry once (not every past conversation).
+
+---
+
 ## Known Limitations
 
 - Streaming JSON is not parsed incrementally — the user sees raw JSON streaming in the message bubble during Automate mode until the response completes and the card appears. This is acceptable for v1; a future improvement could hide the raw JSON stream and show a spinner instead.
 - Mode is session-only and not labeled in the message history — if a user scrolls back, they cannot tell which messages were sent in Automate vs Chat mode. Out of scope for this plan.
+- Registry coverage is manual — new Pathly workflows require a developer to add an entry to `pathlyActionRegistry.ts`. This is intentional (developer controls the vocabulary) but means new flows aren't available until the registry is updated.

@@ -39,7 +39,8 @@ Files in the live repo that this feature reads or modifies.
 | `studio/src/renderer/src/store/chatStore.ts` | Conv 1 | Add `chatMode: 'chat' \| 'automate'` field and `setChatMode` action to `ChatState` |
 | `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx` | Conv 1 | Add mode toggle pill `[Chat \| Automate]` to footer row; reads `chatStore.chatMode` |
 | `studio/src/renderer/src/components/ChatPanel/ChatInput.module.css` | Conv 1 | Add `.modeToggle`, `.modeBtn`, `.modeBtnActive` styles |
-| `studio/src/renderer/src/components/ChatPanel/index.tsx` | Conv 2 | Replace unused `isAutomationIntent` regex with `chatMode` check; add automation system prompt branch; parse JSON response; call `updateLastMessage({ automationPlan })` and `automationStore.setSteps()` |
+| `studio/src/renderer/src/components/ChatPanel/index.tsx` | Conv 2 + Conv 3 | Conv 2: automation system prompt branch + JSON parse + store wiring. Conv 3: update to registry vocab + expandAction |
+| `studio/src/renderer/src/automation/pathlyActionRegistry.ts` | Conv 3 | CREATE — named action defs, expandAction, REGISTRY_PROMPT_BLOCK |
 
 > **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
 
@@ -51,6 +52,7 @@ Files in the live repo that this feature reads or modifies.
 |---|---|---|---|---|
 | 1 | Store field + toggle pill UI | S1.1, S1.2 | TODO | `chatStore.ts`, `ChatInput.tsx`, `ChatInput.module.css` |
 | 2 | Automation prompt + response wiring | S2.1, S2.2, S2.3, S2.4 | TODO | `ChatPanel/index.tsx` |
+| 3 | Named action registry | S3.1, S3.2 | TODO | `automation/pathlyActionRegistry.ts` (new), `ChatPanel/index.tsx` |
 
 ---
 

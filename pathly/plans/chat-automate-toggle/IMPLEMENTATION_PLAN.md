@@ -239,10 +239,147 @@ Read `automationStore` via `useAutomationStore.getState()` inside `handleSend` (
 
 ---
 
+## Phase 5: Pathly action registry   ← Conversation: 3
+
+**File:** `studio/src/renderer/src/automation/pathlyActionRegistry.ts` — CREATE
+**Done when:** `PATHLY_ACTIONS` exports a typed array of named actions; `expandAction(name, params)` resolves template params and returns concrete step objects; `REGISTRY_PROMPT_BLOCK` exports a formatted string listing all action names and descriptions for the LLM prompt
+**Delivers:** S3.1
+**Depends on:** Phase 4 (AutomationStep type from automationStore)
+**Enables:** Phase 6
+
+```ts
+export interface PathlyActionDef {
+  name: string
+  description: string
+  params?: string[]
+  steps: Array<{
+    type: 'click' | 'fill' | 'select'
+    label: string
+    value?: string  // may contain {{paramName}} template
+  }>
+}
+
+export const PATHLY_ACTIONS: PathlyActionDef[] = [
+  {
+    name: 'pathly_plan_feature',
+    description: 'Create a new feature plan with a given name',
+    params: ['featureName'],
+    steps: [
+      { type: 'click', label: 'New Feature' },
+      { type: 'fill', label: 'Feature Name Input', value: '{{featureName}}' },
+      { type: 'click', label: 'Create Plan' },
+    ],
+  },
+  {
+    name: 'pathly_run_storm',
+    description: 'Run the storm (brainstorm) phase on the active feature',
+    steps: [{ type: 'click', label: 'Storm' }],
+  },
+  {
+    name: 'pathly_run_build',
+    description: 'Run the build phase on the active feature',
+    steps: [{ type: 'click', label: 'Build' }],
+  },
+  {
+    name: 'pathly_run_review',
+    description: 'Run the review phase on the active feature',
+    steps: [{ type: 'click', label: 'Review' }],
+  },
+  {
+    name: 'pathly_run_test',
+    description: 'Run the test phase on the active feature',
+    steps: [{ type: 'click', label: 'Test' }],
+  },
+]
+
+export const REGISTRY_PROMPT_BLOCK = PATHLY_ACTIONS
+  .map((a) => `- ${a.name}${a.params ? `(${a.params.join(', ')})` : ''}: ${a.description}`)
+  .join('\n')
+
+export function expandAction(
+  name: string,
+  params: Record<string, string> = {},
+): Array<{ type: 'click' | 'fill' | 'select'; label: string; value?: string }> | null {
+  const def = PATHLY_ACTIONS.find((a) => a.name === name)
+  if (!def) return null
+  return def.steps.map((s) => ({
+    ...s,
+    value: s.value
+      ? s.value.replace(/\{\{(\w+)\}\}/g, (_, k) => params[k] ?? '')
+      : s.value,
+  }))
+}
+```
+
+**Verify:** `cd studio && npx tsc --noEmit`
+
+---
+
+## Phase 6: Update prompt + expand registry steps   ← Conversation: 3
+
+**File:** `studio/src/renderer/src/components/ChatPanel/index.tsx` — MODIFY
+**Done when:** `buildAutomationPrompt` uses `REGISTRY_PROMPT_BLOCK` and no longer takes `studioSchema`; the LLM JSON schema uses `{ "action": "<registry name>", "params": {...} }`; after parsing, `expandAction` is called per raw step to produce concrete `AutomationStep[]` before `automationStore.setSteps()`
+**Delivers:** S3.2
+**Depends on:** Phase 5
+**Details:**
+
+1. Import `REGISTRY_PROMPT_BLOCK` and `expandAction` from `'../automation/pathlyActionRegistry'`
+
+2. Replace `buildAutomationPrompt(schema)` with a zero-arg version:
+```ts
+function buildAutomationPrompt(): string {
+  return `You are a UI automation assistant for Pathly Studio.
+The user will describe a workflow. Return ONLY valid JSON (no markdown, no explanation):
+{
+  "type": "automation",
+  "intent": "<one-line description of what you will do>",
+  "steps": [
+    { "description": "<human-readable label>", "action": "<registry action name>", "params": { "<param>": "<value>" } }
+  ]
+}
+Use ONLY the following action names. Do not invent names.
+
+## Available actions
+${REGISTRY_PROMPT_BLOCK}`
+}
+```
+
+3. Update the `handleSend` automation branch call: `buildAutomationPrompt()` (no argument).
+
+4. Update `parseAutomationResponse` — expand named actions into concrete steps:
+```ts
+type RawStep = { description?: string; action?: string; params?: Record<string, string> }
+
+// after obj.steps validated as array:
+const concreteSteps: AutomationStep[] = []
+for (const raw of obj.steps as RawStep[]) {
+  const expanded = expandAction(raw.action ?? '', raw.params ?? {})
+  if (expanded) {
+    expanded.forEach((s) =>
+      concreteSteps.push({
+        id: crypto.randomUUID(),
+        description: raw.description ?? raw.action ?? '',
+        action: s,
+        status: 'pending' as const,
+      })
+    )
+  }
+  // unknown action names are silently skipped
+}
+if (concreteSteps.length === 0) return null
+return { intent: obj.intent, steps: concreteSteps }
+```
+
+5. Remove `studioSchema` from the automation prompt path — `buildAutomationPrompt` no longer uses it.
+
+**Verify:** `cd studio && npx tsc --noEmit`
+
+---
+
 ## Prerequisites
 - `studio/src/renderer/src/store/automationStore.ts` exists with `setSteps`, `reset` actions (confirmed)
 - `AutomationCard` already renders when `msg.automationPlan` is set (confirmed)
-- `buildPathlyContext()` already returns `studioSchema` (confirmed)
+- `buildPathlyContext()` already returns `studioSchema` (no longer used by automation prompt after Conv 3)
 - Baseline TypeScript: 0 errors (`cd studio && npx tsc --noEmit`)
 
 ## Key Decisions
@@ -250,3 +387,5 @@ Read `automationStore` via `useAutomationStore.getState()` inside `handleSend` (
 - **No mode persistence:** Mode resets to `'chat'` on reload. Automation is a deliberate act — defaulting to it on restart could surprise users.
 - **JSON fallback to chat:** If the LLM returns plain text in Automate mode, we show it as a chat message. This is safer than crashing or showing a broken AutomationCard.
 - **Automation prompt streams but only parses on done:** We don't try to parse partial JSON during streaming. The `content` field streams for user feedback; `parseAutomationResponse` runs only on the final `fullText`.
+- **Named action registry over raw click/fill/select (Conv 3):** Raw label steps are brittle — a label rename breaks every past automation. The registry decouples the LLM vocabulary (stable action names) from the Playwright implementation (editable step arrays). The LLM picks from a constrained, documented list; the registry maintains the mapping. Inspired by the stepper framework's pattern of named compound actions backed by POM methods.
+- **Template params in registry steps:** `{{featureName}}` in step `value` fields allows parameterized actions without duplicating step definitions. The `expandAction` function resolves them at parse time before steps reach the executor.

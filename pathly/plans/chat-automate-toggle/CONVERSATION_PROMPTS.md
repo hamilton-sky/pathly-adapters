@@ -106,3 +106,55 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 
 **Expected output:** Switching to Automate and sending "create a checkout flow" triggers LLM with the automation prompt. Response JSON is parsed and `AutomationCard` appears in the message list. `automationStore.steps` is populated. Chat mode still works exactly as before.
 **Files touched:** `ChatPanel/index.tsx`
+
+---
+
+## Conversation 3: Named action registry (Phases 5–6)
+
+**Stories delivered:** S3.1, S3.2
+
+**Prompt to paste:**
+```
+Read pathly/plans/chat-automate-toggle/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+
+Implement Chat/Automate Mode Toggle — Conversation 3 (Phases 5–6) from
+pathly/plans/chat-automate-toggle/IMPLEMENTATION_PLAN.md.
+
+Conversations 1 and 2 are complete: the toggle works, LLM generates JSON steps using raw click/fill labels.
+Conversation 3 replaces raw labels with a named action registry.
+
+**Before editing anything:** glob/read the live repo to confirm every file path below exists.
+Correct any discrepancy before proceeding.
+
+**Codebase files this conversation touches:**
+- `studio/src/renderer/src/automation/pathlyActionRegistry.ts` — CREATE
+- `studio/src/renderer/src/components/ChatPanel/index.tsx` — update buildAutomationPrompt + parseAutomationResponse
+
+**Phase 5 — pathlyActionRegistry.ts (CREATE):**
+Create `studio/src/renderer/src/automation/pathlyActionRegistry.ts` (create the `automation/` directory if it does not exist).
+Define `PathlyActionDef` interface, `PATHLY_ACTIONS` array, `REGISTRY_PROMPT_BLOCK` string, and `expandAction(name, params)` function.
+See IMPLEMENTATION_PLAN.md Phase 5 for the exact TypeScript — copy it verbatim, then confirm it compiles.
+Initial registry must include these 5 actions: `pathly_plan_feature`, `pathly_run_storm`, `pathly_run_build`, `pathly_run_review`, `pathly_run_test`.
+Do NOT invent Studio labels — use the labels exactly as they appear in `studioSchema.ts` (grep for it to confirm).
+
+**Phase 6 — Update buildAutomationPrompt + parseAutomationResponse:**
+1. Import `REGISTRY_PROMPT_BLOCK` and `expandAction` from `'../automation/pathlyActionRegistry'` (adjust relative path if needed).
+2. Replace `buildAutomationPrompt(schema: StudioElement[])` with the zero-arg version from IMPLEMENTATION_PLAN.md Phase 6 — it injects REGISTRY_PROMPT_BLOCK and uses the new step JSON shape `{ "action": "<name>", "params": {...} }`.
+3. Update the handleSend automation branch call: `buildAutomationPrompt()` (no argument).
+4. Update `parseAutomationResponse` to parse the new RawStep shape and call `expandAction` per step. See IMPLEMENTATION_PLAN.md Phase 6 for exact implementation.
+5. If all steps produce empty expansion (concreteSteps.length === 0), return null to trigger the chat fallback.
+6. Remove the `studioSchema` parameter from the automation prompt path. The `studioSchema` variable may still exist in the file for the chat path — do not remove it from there.
+
+Do NOT change MessageList, AutomationCard, StepQueue, automationStore, or the chat path.
+Do NOT touch any other file outside the two listed above.
+
+Verify: `cd studio && npx tsc --noEmit` — must be 0 errors.
+After done, update pathly/plans/chat-automate-toggle/PROGRESS.md Phases 5–6 to DONE.
+Write pathly/plans/chat-automate-toggle/VERIFY.md with first line `RESULT: PASS` and one-line summary.
+
+If verification fails and the fix requires out-of-scope changes, stop and report.
+If fundamentally broken, rollback with git checkout on affected files and retry.
+```
+
+**Expected output:** Switching to Automate and sending "run storm then build" produces an AutomationCard whose steps expand from named registry actions (`pathly_run_storm`, `pathly_run_build`). Unknown action names are silently skipped. Chat mode is unchanged. TypeScript: 0 errors.
+**Files touched:** `automation/pathlyActionRegistry.ts` (new), `ChatPanel/index.tsx`
