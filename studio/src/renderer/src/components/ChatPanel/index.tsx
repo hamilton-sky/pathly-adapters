@@ -8,7 +8,7 @@ import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
 import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
-import { askLlm, getEngine, askOllama } from '../../lib/llmBridge'
+import { askLlm, getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
 import { splitThinkingContent } from '../../lib/thinkingParser'
 import { useModelStore } from '../../store/modelStore'
 import { WEB_LLM_MODELS } from '../../data/models'
@@ -403,6 +403,12 @@ export function ChatPanel(): JSX.Element {
     }
   }
 
+  function handleStop(): void {
+    abortLlm()
+    updateLastMessage({ status: 'done' })
+    setLoading(false)
+  }
+
   async function handleRunAll(steps: import('../../types/automation').AutomationStep[]): Promise<void> {
     const { setStatus, advanceToNext, setMode } = useAutomationStore.getState()
     setMode('auto')
@@ -539,6 +545,8 @@ export function ChatPanel(): JSX.Element {
         onChange={setInputValue}
         onSend={handleSend}
         disabled={isLoading}
+        isLoading={isLoading}
+        onStop={handleStop}
       />
     </div>
   )
