@@ -39,10 +39,9 @@ mac:
       arch: [x64, arm64]
   category: public.app-category.developer-tools
   icon: resources/icon.icns
-  # CSC_LINK / CSC_KEY_PASSWORD read from env (MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD)
+  # Signing: set MAC_CSC_LINK + MAC_CSC_KEY_PASSWORD as GitHub secrets
   # Notarization: set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID as GitHub secrets
-  notarize:
-    teamId: ${APPLE_TEAM_ID}
+  # electron-builder v24+ auto-notarizes when all three Apple env vars are present
 
 linux:
   target: AppImage
