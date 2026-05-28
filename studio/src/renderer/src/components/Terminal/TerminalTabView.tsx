@@ -1,190 +1,78 @@
 import { useEffect, useRef } from 'react'
-import { Terminal as XTerm } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
-import type { TabInstance } from './types'
-import { darkTheme } from '../../theme'
+import * as xtermRegistry from './xtermRegistry'
 import styles from './Terminal.module.css'
-
-// Terminal is always dark regardless of app theme (industry standard: VS Code, etc.)
-function xtermThemeFor(): Record<string, string> {
-  const t = darkTheme
-  return {
-    background:            t.bgMantle,
-    foreground:            t.textPrimary,
-    cursor:                t.accent,
-    cursorAccent:          t.bgMantle,
-    selectionBackground:   t.bgSurface1,
-    selectionForeground:   t.textPrimary,
-    black:                 t.bgSurface0,
-    red:                   t.red,
-    green:                 t.green,
-    yellow:                t.yellow,
-    blue:                  t.blue,
-    magenta:               t.accent,
-    cyan:                  '#67e8f9',
-    white:                 '#cdd6f4',
-    brightBlack:           t.textMuted,
-    brightRed:             '#fca5a5',
-    brightGreen:           '#86efac',
-    brightYellow:          '#fde68a',
-    brightBlue:            '#93c5fd',
-    brightMagenta:         '#c4b5fd',
-    brightCyan:            '#a5f3fc',
-    brightWhite:           '#f5f5ff',
-  }
-}
 
 interface TerminalTabViewProps {
   tabId: string
   active: boolean
-  tabInstancesRef: React.MutableRefObject<Map<string, TabInstance>>
+  open: boolean
 }
 
-export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabViewProps): JSX.Element {
+/**
+ * Hosts the shared xterm instance for `tabId` whenever this tab is the active
+ * one in its pane AND the full terminal panel is open. Non-active or non-open
+ * states release ownership so the chat-panel MiniTerminalCard can host instead.
+ */
+export function TerminalTabView({ tabId, active, open }: TerminalTabViewProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
+  const isHost = active && open
 
-  // Force dark theme on any existing instance (e.g. created before dark-only change)
+  // Attach / detach the shared xterm based on host state.
   useEffect(() => {
-    const instance = tabInstancesRef.current.get(tabId)
-    if (instance) {
-      instance.xterm.options.theme = xtermThemeFor() as any
+    if (!isHost || !containerRef.current) {
+      xtermRegistry.detachFrom(tabId, 'full')
+      return
     }
-  }, [tabId, tabInstancesRef])
-
-  useEffect(() => {
-    if (!tabInstancesRef.current.has(tabId)) {
-      const xterm = new XTerm({
-        theme: xtermThemeFor() as any,
-        fontSize: 14,
-        fontFamily: "'Cascadia Code', 'Fira Mono', 'JetBrains Mono', monospace",
-        cursorBlink: true,
-        cursorStyle: 'bar',
-        lineHeight: 1.2,
-        scrollback: 5000,
-      })
-      const fitAddon = new FitAddon()
-      xterm.loadAddon(fitAddon)
-      tabInstancesRef.current.set(tabId, { xterm, fitAddon, container: null })
-    }
-
-    const instance = tabInstancesRef.current.get(tabId)!
-
-    if (containerRef.current && instance.container !== containerRef.current) {
-      if (instance.xterm.element) {
-        containerRef.current.appendChild(instance.xterm.element)
-      } else {
-        instance.xterm.open(containerRef.current)
-      }
-      instance.container = containerRef.current
-
-      setTimeout(() => {
-        const inst = tabInstancesRef.current.get(tabId)
-        if (inst) {
-          try {
-            inst.fitAddon.fit()
-            const { cols, rows } = inst.xterm
-            void window.pathly?.terminal?.resize(tabId, cols, rows)
-          } catch { /* ignore */ }
-        }
-      }, 150)
-    }
-  }, [tabId, tabInstancesRef])
-
-
-  useEffect(() => {
-    const instance = tabInstancesRef.current.get(tabId)
-    if (instance && active) {
-      setTimeout(() => {
-        try {
-          instance.fitAddon.fit()
-          const { cols, rows } = instance.xterm
-          void window.pathly?.terminal?.resize(tabId, cols, rows)
-        } catch { /* ignore */ }
-      }, 100)
-    }
-  }, [tabId, active, tabInstancesRef])
-
-  useEffect(() => {
-    const instance = tabInstancesRef.current.get(tabId)
-    if (!instance) return
-    const pathlyApi = window.pathly?.terminal
-    if (!pathlyApi) return
-    const removeListener = pathlyApi.onData(tabId, (data) => {
-      instance.xterm.write(data)
-    })
-    const disposeOnData = instance.xterm.onData((data: string) => {
-      pathlyApi.write(tabId, data)
-    })
+    xtermRegistry.getOrCreate(tabId, { fontSize: 14 })
+    xtermRegistry.attachTo(tabId, 'full', containerRef.current, { fontSize: 14 })
+    // Two-pass fit: immediate pass catches initial layout; the 150 ms pass
+    // accounts for monospace webfont loading delay.
+    const t0 = setTimeout(() => xtermRegistry.fit(tabId), 0)
+    const t1 = setTimeout(() => {
+      xtermRegistry.fit(tabId)
+      xtermRegistry.focus(tabId)
+    }, 150)
     return () => {
-      removeListener()
-      disposeOnData.dispose()
+      clearTimeout(t0)
+      clearTimeout(t1)
+      xtermRegistry.detachFrom(tabId, 'full')
     }
-  }, [tabId, tabInstancesRef])
+  }, [tabId, isHost])
 
+  // ResizeObserver: only the active host refits.
   useEffect(() => {
-    const instance = tabInstancesRef.current.get(tabId)
-    if (!instance) return
+    if (!isHost || !containerRef.current) return
+    const el = containerRef.current
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => xtermRegistry.fit(tabId))
+      : null
+    ro?.observe(el)
+    return () => ro?.disconnect()
+  }, [tabId, isHost])
 
-    const clipWrite = (text: string): void => {
-      void window.pathly?.clipboard?.write(text)
-    }
-    const clipRead = (cb: (text: string) => void): void => {
+  // Right-click paste and drag-drop — full panel only.
+  useEffect(() => {
+    if (!isHost || !containerRef.current) return
+    const container = containerRef.current
+
+    const writeClip = (text: string): void => { void window.pathly?.clipboard?.write(text) }
+    const readClip = (cb: (text: string) => void): void => {
       void window.pathly?.clipboard?.read().then(cb)
     }
 
-    instance.xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
-      if (event.type !== 'keydown') return true
-      if (event.ctrlKey && !event.shiftKey && event.key === 'c') {
-        const sel = instance.xterm.getSelection()
-        if (sel) { clipWrite(sel); return false }
-        return true
-      }
-      if (event.ctrlKey && !event.shiftKey && event.key === 'v') {
-        void (async () => {
-          const imgPath = await window.pathly?.clipboard?.readImagePath()
-          if (imgPath) {
-            void window.pathly?.terminal?.write(tabId, imgPath)
-          } else {
-            clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
-          }
-        })()
-        return false
-      }
-      if (event.ctrlKey && event.shiftKey && event.key === 'C') {
-        const sel = instance.xterm.getSelection()
-        if (sel) clipWrite(sel)
-        return false
-      }
-      if (event.ctrlKey && event.shiftKey && event.key === 'V') {
-        void (async () => {
-          const imgPath = await window.pathly?.clipboard?.readImagePath()
-          if (imgPath) {
-            void window.pathly?.terminal?.write(tabId, imgPath)
-          } else {
-            clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
-          }
-        })()
-        return false
-      }
-      return true
-    })
-
-    const container = instance.container
-    if (!container) return
-
     let savedSel = ''
     const handleMouseDown = (e: MouseEvent): void => {
-      if (e.button === 2) savedSel = instance.xterm.getSelection()
+      if (e.button === 2) savedSel = xtermRegistry.getSelection(tabId)
     }
 
     const handleContextMenu = (e: MouseEvent): void => {
       e.preventDefault()
-      const sel = savedSel || instance.xterm.getSelection()
+      const sel = savedSel || xtermRegistry.getSelection(tabId)
       savedSel = ''
       if (sel) {
-        clipWrite(sel)
+        writeClip(sel)
       } else {
-        clipRead((text) => void window.pathly?.terminal?.write(tabId, text))
+        readClip((text) => void window.pathly?.terminal?.write(tabId, text))
       }
     }
 
@@ -218,7 +106,7 @@ export function TerminalTabView({ tabId, active, tabInstancesRef }: TerminalTabV
       container.removeEventListener('dragover', handleDragOver, true)
       container.removeEventListener('drop', handleDrop, true)
     }
-  }, [tabId, tabInstancesRef])
+  }, [tabId, isHost])
 
   return (
     <div

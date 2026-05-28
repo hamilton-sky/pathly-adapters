@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink, X as XIcon } from 'lucide-react'
+import { ExternalLink, Trash2 } from 'lucide-react'
 import type { TerminalTab } from './types'
 import { Tooltip } from '../ui'
 import { ClaudeIcon, CodexIcon } from './BrandIcons'
@@ -94,11 +94,11 @@ export function PaneTabBar({
             <ExternalLink size={10} />
           </button>
           <button
-            title="Close tab"
-            aria-label="Close tab"
+            title="Kill terminal and close tab"
+            aria-label="Kill terminal and close tab"
             onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
             className={styles.closeTabBtn}
-          ><XIcon size={10} /></button>
+          ><Trash2 size={11} /></button>
         </div>
       ))}
       <div className={styles.actionGroup}>

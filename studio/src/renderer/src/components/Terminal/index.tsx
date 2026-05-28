@@ -3,10 +3,10 @@ import { Columns2, X as XIcon } from 'lucide-react'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
-import type { TabInstance } from './types'
 import { TerminalTabView } from './TerminalTabView'
 import { PaneTabBar } from './PaneTabBar'
 import { launchTerminal } from '../../lib/launchTerminal'
+import * as xtermRegistry from './xtermRegistry'
 import styles from './Terminal.module.css'
 
 export function Terminal(): JSX.Element {
@@ -21,7 +21,6 @@ export function Terminal(): JSX.Element {
   const panelRef = useRef<HTMLDivElement>(null)
   const vDragRef = useRef<{ x: number; ratio: number } | null>(null)
   const dragStartRef = useRef<{ y: number; h: number } | null>(null)
-  const tabInstancesRef = useRef(new Map<string, TabInstance>())
 
   const themeVars = {
     '--t-bg': theme.bgBase,
@@ -49,40 +48,22 @@ export function Terminal(): JSX.Element {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // Refit all terminals when panel opens or resizes
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => {
-        tabInstancesRef.current.forEach((inst, tid) => {
-          try {
-            inst.fitAddon.fit()
-            const { cols, rows } = inst.xterm
-            void window.pathly?.terminal?.resize(tid, cols, rows)
-          } catch { /* ignore */ }
-        })
-      }, 50)
-    }
-  }, [open, panelHeight, splitEnabled, splitRatio])
-
   // Focus the correct xterm when the mini-terminal "full terminal" button is clicked
   useEffect(() => {
     const handler = (e: Event): void => {
       const { tabId } = (e as CustomEvent<{ tabId: string }>).detail
-      setTimeout(() => {
-        tabInstancesRef.current.get(tabId)?.xterm.focus()
-      }, 60)
+      setTimeout(() => xtermRegistry.focus(tabId), 60)
     }
     document.addEventListener('pathly:focus-terminal-tab', handler)
     return () => document.removeEventListener('pathly:focus-terminal-tab', handler)
   }, [])
 
-  // Listen for PTY exit
+  // Listen for PTY exit — write an exit marker into the shared xterm
   useEffect(() => {
     const api = window.pathly?.terminal
     if (!api) return
     return api.onExit((tabId) => {
-      const instance = tabInstancesRef.current.get(tabId)
-      if (instance) instance.xterm.write('\r\n[process exited]\r\n')
+      xtermRegistry.write(tabId, '\r\n[process exited]\r\n')
     })
   }, [])
 
@@ -95,8 +76,7 @@ export function Terminal(): JSX.Element {
   const handleCloseTab = async (id: string, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation()
     try { await window.pathly?.terminal?.kill(id) } catch { /* PTY may already be dead */ }
-    const instance = tabInstancesRef.current.get(id)
-    if (instance) { instance.xterm.dispose(); tabInstancesRef.current.delete(id) }
+    xtermRegistry.dispose(id)
     closeTab(id)
   }
 
@@ -106,8 +86,10 @@ export function Terminal(): JSX.Element {
     try {
       await window.pathly?.terminal?.popout(id, tab.label)
     } catch { return }
-    const instance = tabInstancesRef.current.get(id)
-    if (instance) { instance.xterm.dispose(); tabInstancesRef.current.delete(id) }
+    // Popout transferred PTY ownership to the new BrowserWindow. The local
+    // xterm instance is no longer wired to the PTY; dispose it cleanly so any
+    // remaining card mounts don't show a stale buffer.
+    xtermRegistry.dispose(id)
     closeTab(id)
   }
 
@@ -154,7 +136,7 @@ export function Terminal(): JSX.Element {
       <div className={styles.contentArea}>
         {paneTabs.length === 0 && <div className={styles.emptyHint}>Press + to open a terminal</div>}
         {paneTabs.map((tab) => (
-          <TerminalTabView key={tab.id} tabId={tab.id} active={tab.id === activeId} tabInstancesRef={tabInstancesRef} />
+          <TerminalTabView key={tab.id} tabId={tab.id} active={tab.id === activeId} open={open} />
         ))}
       </div>
     </div>
@@ -224,7 +206,7 @@ export function Terminal(): JSX.Element {
             <div className={styles.emptyHint}>No terminal open.</div>
           )}
           {leftTabs.map((tab) => (
-            <TerminalTabView key={tab.id} tabId={tab.id} active={tab.id === activeTabIdLeft} tabInstancesRef={tabInstancesRef} />
+            <TerminalTabView key={tab.id} tabId={tab.id} active={tab.id === activeTabIdLeft} open={open} />
           ))}
         </div>
       )}
