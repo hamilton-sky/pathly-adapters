@@ -20,7 +20,7 @@ Internal review of pathly-adapters' current shape and release posture.
 
 ## Current Risks
 
-- pathly-adapters is at 2.3.0 for the core install path, but Copilot
+- pathly-adapters is at 2.11.9 for the core install path, but Copilot
   destination paths may require `--repair` after a VS Code update.
 - Hook path validation is string-based. A hardening pass is needed to resolve
   paths and confirm writes stay inside `plans/`.
@@ -53,9 +53,10 @@ src/install_cli/stitch.py        core/ + _meta/*.yaml → deployable agent/skill
 src/install_cli/materialize.py   atomic write to host config + manifest tracking
 src/install_cli/setup_command.py pathly-setup CLI (dry-run, apply, repair, force,
                                uninstall, per-host subcommands)
-src/pathly_data/core/agents/                 12 host-neutral agent behavior contracts
-src/pathly_data/core/skills/                 24 skill files (22 user-facing + 2 transition-action)
-src/pathly_data/core/flows/                  3 FSM flow definitions (team, debug, explore)
+src/pathly_data/core/agents/                 14 host-neutral agent behavior contracts
+src/pathly_data/core/skills/                 39 skill files (29 user-facing + 2 transition-action
+                                             + 7 team sub-skills + 1 internal utility)
+src/pathly_data/core/flows/                  4 FSM flow definitions (team, debug, explore, test)
 src/pathly_data/core/templates/plan/         plan file templates
 src/pathly_data/adapters/claude/_meta/       per-agent/skill YAML for Claude Code
 src/pathly_data/adapters/codex/_meta/        per-agent/skill YAML for Codex

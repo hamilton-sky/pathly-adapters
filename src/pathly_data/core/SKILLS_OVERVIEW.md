@@ -1013,6 +1013,42 @@ design [feature]
 
 ---
 
+## 29. log-agent-done — Agent Telemetry Recorder
+
+Writes an `AGENT_DONE` event to `EVENTS.jsonl` and POSTs telemetry to the FSM
+HTTP backend. Called automatically by agents at the end of each completed stage.
+Can be invoked directly for manual telemetry reporting.
+
+```
+log-agent-done $ARGUMENTS   (JSON object)
+      │
+      ▼
+  Parse required: agent, feature, conversation, result
+      │
+      ▼
+  Compute cost_usd:
+  ┌───────────────────────────────────────┐
+  │ Priority 1: caller-provided cost_usd  │
+  │ Priority 2: Claude pricing table      │
+  │   (input+output tokens × rate/MTok)   │
+  │ Priority 3: non-Claude → cost_usd=0   │
+  │   (print advisory, continue)          │
+  └───────────────────────────────────────┘
+      │
+      ▼
+  Append AGENT_DONE to EVENTS.jsonl:
+  pathly/plans/<feature>/EVENTS.jsonl
+      │
+      ▼
+  POST to http://127.0.0.1:8765/record_activity
+  (server unavailable → skip telemetry, do not fail)
+```
+
+Supported models: Claude (cost computed), OpenAI, Gemini, and others (pass
+`cost_usd` directly; cost computation skipped for non-Claude models).
+
+---
+
 ## Transition-Action Skills (internal, orchestrator-only)
 
 These two skills are not user-facing. The orchestrator spawns them automatically
@@ -1128,4 +1164,4 @@ Priority order (highest to lowest):
 
 ---
 
-_Generated 2026-05-19 — update this file after any core/skills/ change._
+_Generated 2026-05-28 — update this file after any core/skills/ change._

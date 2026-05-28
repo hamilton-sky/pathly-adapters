@@ -206,7 +206,7 @@ See [FLOW_DIAGRAM.md](FLOW_DIAGRAM.md) for the full command reference and deploy
 
 ## Flow YAMLs
 
-`src/pathly_data/core/flows/` contains three FSM definition files consumed by the orchestrator:
+`src/pathly_data/core/flows/` contains four FSM definition files consumed by the orchestrator:
 
 | Flow | File | States | Used for |
 |---|---|---|---|

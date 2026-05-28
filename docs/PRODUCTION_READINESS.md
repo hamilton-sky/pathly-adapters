@@ -7,7 +7,7 @@ pathly-adapters publicly as a public beta / technical preview.
 
 pathly-adapters is currently:
 
-- Stable (2.3.0) for the core install path (`--dry-run`, `--apply`, `--uninstall`).
+- Stable (2.11.9) for the core install path (`--dry-run`, `--apply`, `--uninstall`).
 - Verified with full rollback on failure.
 - Supported for Claude Code through the existing install scripts.
 - Ready for Codex plugin testing through `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`.
