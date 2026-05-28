@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Sun, Moon, LayoutGrid, List, Star, FolderOpen } from 'lucide-react'
 import { useStore } from '../store'
-import { listDirs, listDir, readFile, pickFolder, openWindow } from '../services/pathlyApi'
+import { listDirs, readFile, pickFolder, openWindow } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
 import { Settings } from './Settings'
 import type { Theme } from '../theme'
@@ -165,7 +165,7 @@ function getCardAccent(plans: PlanRow[], t: Theme): string {
 }
 
 export function HomeScreen(): JSX.Element {
-  const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic, setPathlyRoot, theme, setTheme, preferredDark, preferredLight } = useStore()
+  const { projects, setProjectPath, updateProject, removeProject, addProject, setActiveTopic, theme, setTheme, preferredDark, preferredLight } = useStore()
   const t = useTheme()
   const [projectPlans, setProjectPlans] = useState<ProjectPlans>({})
   const [hideDone, setHideDone] = useState(true)
@@ -224,12 +224,6 @@ export function HomeScreen(): JSX.Element {
       const result: ProjectPlans = {}
       for (const project of projects) {
         try {
-          listDir(`${project.path}/src/pathly_data/core/flows`)
-            .then((files) => {
-              if (files.length > 0) setPathlyRoot(project.path)
-            })
-            .catch(() => { /* not a pathly installation */ })
-
           const allRows: PlanRow[] = []
           for (const root of ROOTS) {
             const rows = await scanRoot(project.path, root.subdir, root.flowType)

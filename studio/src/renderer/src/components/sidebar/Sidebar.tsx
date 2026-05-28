@@ -2,7 +2,7 @@ import { useEffect, useDeferredValue, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import type { PathlyItem, PathlyCanvasDragItem, PathlyReorgDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
-import { listDir } from '../../services/pathlyApi'
+import { listDir, listDirs } from '../../services/pathlyApi'
 import { useProjectFiles } from '../../hooks/useProjectFiles'
 import { usePlanFiles } from '../../hooks/usePlanFiles'
 import { LibraryPanel } from './panels/LibraryPanel'
@@ -14,6 +14,28 @@ import { BottomNav } from './shell/BottomNav'
 import { SidebarDialogs } from './shell/SidebarDialogs'
 import type { Section } from './types'
 import styles from './Sidebar.module.css'
+
+const CORE_RESOURCE_DIRS = [
+  'src/pathly_data/core/flows',
+  'src/pathly_data/core/skills',
+  'src/pathly_data/core/agents',
+  'src/pathly_data/core/templates',
+]
+
+async function hasCoreEntries(root: string, relDir: string): Promise<boolean> {
+  const dir = `${root}/${relDir}`
+  const [files, dirs] = await Promise.all([
+    listDir(dir).catch(() => [] as string[]),
+    listDirs(dir).catch(() => [] as string[]),
+  ])
+  return files.length > 0 || dirs.length > 0
+}
+
+async function isPathlyCoreRoot(root: string): Promise<boolean> {
+  if (!root) return false
+  const checks = await Promise.all(CORE_RESOURCE_DIRS.map((dir) => hasCoreEntries(root, dir)))
+  return checks.every(Boolean)
+}
 
 export function Sidebar(): JSX.Element | null {
   const {
@@ -44,9 +66,8 @@ export function Sidebar(): JSX.Element | null {
     fn().then(setPathlyUserHome).catch(() => {})
   }, [pathlyUserHome, setPathlyUserHome])
 
-  // Find the Pathly source installation (src/pathly_data/core) across all known paths.
-  // Include the application checkout so Library works before a Pathly project has
-  // been opened or saved in Studio.
+  // The Library tab is Pathly's bundled/core library, not whichever saved project
+  // happens to expose a partial src/pathly_data/core folder.
   useEffect(() => {
     let cancelled = false
     const probe = async (): Promise<void> => {
@@ -54,9 +75,9 @@ export function Sidebar(): JSX.Element | null {
         ? await window.pathly.fs.appRoot().catch(() => '')
         : ''
       const candidates = [
-        ...(pathlyRoot ? [pathlyRoot] : []),
         ...(appRoot ? [appRoot] : []),
         ...(projectPath ? [projectPath] : []),
+        ...(pathlyRoot ? [pathlyRoot] : []),
         ...projects.map((p) => p.path),
       ]
       const seen = new Set<string>()
@@ -66,14 +87,10 @@ export function Sidebar(): JSX.Element | null {
         return true
       })
       for (const p of unique) {
-        try {
-          const files = await listDir(`${p}/src/pathly_data/core/flows`)
-          // listDir returns [] for missing dirs, so require at least one flow file
-          if (!cancelled && files.length > 0) {
-            if (p !== pathlyRoot) setPathlyRoot(p)
-            return
-          }
-        } catch { /* not a pathly installation */ }
+        if (!cancelled && await isPathlyCoreRoot(p)) {
+          if (p !== pathlyRoot) setPathlyRoot(p)
+          return
+        }
       }
     }
     void probe()

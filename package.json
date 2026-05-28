@@ -1,6 +1,6 @@
 {
   "name": "pathly-adapters",
-  "version": "2.10.0",
+  "version": "2.11.8",
   "private": true,
   "scripts": {
     "lint:core": "python tools/check_core.py"
