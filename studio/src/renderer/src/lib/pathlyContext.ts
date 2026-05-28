@@ -76,3 +76,33 @@ export async function buildPathlyContext(projectPath?: string): Promise<PathlyCo
 export function invalidatePathlyContext(projectPath?: string): void {
   contextCache.delete(projectPath ?? '')
 }
+
+/**
+ * Subscribe to real-time menu updates pushed by the FSM server via SSE.
+ * Called whenever /next_action or /complete_stage produces a new menu.
+ * Returns a cleanup function — call it on component unmount.
+ */
+export function subscribeToMenuUpdates(
+  projectPath: string,
+  onUpdate: (menu: PathlyMenu) => void
+): () => void {
+  let es: EventSource | null = null
+  try {
+    es = new EventSource(`${PATHLY_API_BASE}/events/menu`)
+    es.onmessage = (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data as string) as { type: string; menu?: PathlyMenu }
+        if (data.type === 'MENU_UPDATE' && data.menu) {
+          invalidatePathlyContext(projectPath)
+          onUpdate(data.menu)
+        }
+      } catch { /* ignore parse errors */ }
+    }
+    es.onerror = () => {
+      // EventSource auto-reconnects — nothing to do
+    }
+  } catch {
+    // EventSource not available (e.g. unit test env) — silently skip
+  }
+  return () => { es?.close() }
+}

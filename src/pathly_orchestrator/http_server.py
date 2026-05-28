@@ -173,6 +173,24 @@ _clients: dict[tuple[str, str], list[queue.Queue]] = {}
 _lock = threading.Lock()
 _tailers: dict[tuple[str, str], threading.Event] = {}
 
+# Global menu-push channel — broadcasts menu payloads to all Studio subscribers
+_menu_clients: list[queue.Queue] = []
+_menu_lock = threading.Lock()
+
+
+def _push_menu_to_sse(menu: dict) -> None:
+    """Broadcast a menu payload to all connected /events/menu SSE clients."""
+    payload = json.dumps({"type": "MENU_UPDATE", "menu": menu})
+    with _menu_lock:
+        dead = [q for q in _menu_clients if q.full()]
+        for q in dead:
+            _menu_clients.remove(q)
+        for q in _menu_clients:
+            try:
+                q.put_nowait(payload)
+            except queue.Full:
+                pass
+
 
 def _broadcast(key: tuple[str, str], line: str) -> None:
     with _lock:
@@ -429,6 +447,8 @@ def next_action_endpoint():
                 )
 
         result = next_action(data)
+        if isinstance(result.get("menu"), dict):
+            _push_menu_to_sse(result["menu"])
         return jsonify(result), 200
     except Exception as e:
         logging.exception("next_action error")
@@ -468,6 +488,8 @@ def complete_stage_endpoint():
                 )
 
         result = complete_stage(data)
+        if isinstance(result.get("menu"), dict):
+            _push_menu_to_sse(result["menu"])
         return jsonify(result), 200
     except Exception as e:
         logging.exception("complete_stage error")
@@ -628,6 +650,41 @@ def chat():
         resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
         return resp
     return handle_chat(request)
+
+
+@app.route("/events/menu", methods=["GET"])
+def menu_events_endpoint():
+    """SSE endpoint: pushes MENU_UPDATE events whenever FSM state changes.
+
+    The Studio renderer subscribes here with EventSource so the PathlyMenuCard
+    updates the instant Claude calls /next_action or /complete_stage —
+    no polling delay.
+    """
+    from flask import Response, stream_with_context
+
+    q: queue.Queue = queue.Queue(maxsize=50)
+    with _menu_lock:
+        _menu_clients.append(q)
+
+    def generate():
+        try:
+            yield 'data: {"type":"connected"}\n\n'
+            while True:
+                try:
+                    data = q.get(timeout=25)
+                    yield f"data: {data}\n\n"
+                except queue.Empty:
+                    yield ": keepalive\n\n"
+        finally:
+            with _menu_lock:
+                if q in _menu_clients:
+                    _menu_clients.remove(q)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.route("/events/stream", methods=["GET"])

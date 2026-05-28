@@ -69,8 +69,19 @@ export default function App(): JSX.Element | null {
 
 function MainApp(): JSX.Element | null {
   const projectPath = useStore((s) => s.projectPath)
+  const setProjectPath = useStore((s) => s.setProjectPath)
   const theme = useStore((s) => s.theme)
   const fsmState = useStore((s) => s.fsmState)
+
+  // Seed projectPath from the Electron-injected PROJECT_PATH query param on
+  // first mount. Electron passes it via loadFile({ query: { PROJECT_PATH } })
+  // but the renderer never reads it — without this the FSM /status call has
+  // no project_root and always returns "unknown" (no menu card).
+  useEffect(() => {
+    if (projectPath) return  // already set (user navigated to a project)
+    const qp = new URLSearchParams(window.location.search).get('PROJECT_PATH')
+    if (qp) setProjectPath(decodeURIComponent(qp))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const setActivePanel = useStore((s) => s.setActivePanel)
   const lastUsedFlowPath = useStore((s) => s.lastUsedFlowPath)
   const setLastUsedFlowPath = useStore((s) => s.setLastUsedFlowPath)

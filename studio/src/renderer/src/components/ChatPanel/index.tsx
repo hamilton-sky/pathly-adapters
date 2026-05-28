@@ -6,7 +6,7 @@ import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
-import { buildPathlyContext, invalidatePathlyContext } from '../../lib/pathlyContext'
+import { buildPathlyContext, invalidatePathlyContext, subscribeToMenuUpdates } from '../../lib/pathlyContext'
 import { hasEmbeddedSkills, matchIntent, matchIntentByName, preEmbedSkills } from '../../lib/embedRouter'
 import { askLlm, getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
 import { splitThinkingContent } from '../../lib/thinkingParser'
@@ -291,13 +291,23 @@ export function ChatPanel(): JSX.Element {
     invalidatePathlyContext(projectPath ?? undefined)
     fetchContext()
 
-    // Poll every 5 s so the card stays in sync with FSM state changes.
+    // Poll every 5 s as a fallback in case SSE is disconnected.
     const interval = window.setInterval(fetchContext, 5000)
 
     return () => {
       cancelled = true
       window.clearInterval(interval)
     }
+  }, [projectPath])
+
+  // SSE subscription — card updates instantly when Claude calls the FSM,
+  // without waiting for the next poll cycle.
+  useEffect(() => {
+    const unsubscribe = subscribeToMenuUpdates(
+      projectPath ?? '',
+      (menu) => setPathlyContext((prev) => prev ? { ...prev, menu } : null)
+    )
+    return unsubscribe
   }, [projectPath])
 
   // Pre-embed all skill descriptions once on first mount.
