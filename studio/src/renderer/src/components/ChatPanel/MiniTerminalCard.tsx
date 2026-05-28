@@ -108,9 +108,14 @@ export function MiniTerminalCard({
     const fit = (): void => {
       try {
         fitAddon.fit()
+        // Enforce a minimum of 40 cols so text doesn't wrap after every word
+        // in narrow chat panels (font-loading timing can undercount columns).
+        const cols = Math.max(40, xterm.cols)
+        const rows = xterm.rows
+        if (cols !== xterm.cols) xterm.resize(cols, rows)
         // Sync PTY dimensions so TUI apps (Claude Code, Codex) render within
-        // the mini card's actual row count instead of the default 80×24.
-        void window.pathly?.terminal?.resize(tabId, xterm.cols, xterm.rows)
+        // the mini card's actual viewport instead of the default 80×24.
+        void window.pathly?.terminal?.resize(tabId, cols, rows)
       } catch { /* ignore transient layout failures */ }
     }
 
@@ -122,7 +127,10 @@ export function MiniTerminalCard({
     const resizeObserver =
       typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => fit()) : null
     resizeObserver?.observe(containerRef.current)
+    // Two-pass fit: immediate pass catches the initial layout, the 150 ms pass
+    // runs after webfonts have loaded and gives a more accurate column count.
     setTimeout(fit, 0)
+    setTimeout(fit, 150)
 
     return () => {
       resizeObserver?.disconnect()
