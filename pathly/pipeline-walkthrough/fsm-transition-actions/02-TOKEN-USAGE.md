@@ -1,3 +1,6 @@
+---
+
+---
 # 02 — Token Usage: fsm-transition-actions
 
 _Date: 2026-05-14 | Sourced from: plans/fsm-transition-actions/EVENTS.jsonl_

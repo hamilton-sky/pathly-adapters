@@ -1,3 +1,6 @@
+---
+
+---
 # 02 — Token Usage: studio-ai-chat
 
 _Date: 2026-05-27 | Sourced from: pathly/plans/studio-ai-chat/EVENTS.jsonl_
