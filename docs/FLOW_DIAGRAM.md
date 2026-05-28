@@ -5,10 +5,12 @@ where files land.
 
 ## Host Entry Points
 
-Pathly has two runtime entry points:
+Pathly has three runtime entry points:
 
 - Claude Code: via the `/pathly` dispatcher (`/pathly go`, `/pathly build`, etc.) or direct skill invocations (`/go`, `/build`, `/start`, etc.)
 - Codex: `Use Pathly ...` (natural language)
+- Pathly Studio: `pathly-studio`, then use Canvas, Plan, Monitor, Conductor,
+  and Terminal inside the local desktop UI.
 
 `pathly-setup` is the install-time CLI only — it deploys agents and skills; it is not a runtime workflow command.
 
@@ -18,10 +20,12 @@ flowchart TD
     B --> CC["Claude Code\n/pathly <subcommand>\nor /skill-name directly"]
     B --> CX["Codex\nUse Pathly <request>"]
     B --> CP["Copilot\nCopilot-native skill invocation"]
+    B --> ST["Pathly Studio\nConductor + Canvas + Monitor"]
 
     CC --> CA[claude adapter\n~/.claude/agents/ + ~/.claude/skills/]
     CX --> XA[codex adapter\n~/.codex/agents/ + ~/.agents/skills/]
     CP --> PA[copilot adapter\n~/.vscode/extensions/pathly/agents/ + skills/]
+    ST --> FS[pathly-fsm-http\nproject pathly/plans/**\nwindow.pathly.terminal]
 ```
 
 ## Install Flow
@@ -171,6 +175,26 @@ agent, and generic delegation is used only when requested and permitted.
 Invocation syntax varies by VS Code / Copilot version. If `@pathly` is not available in your
 Copilot chat, try referencing the agent by name (e.g. `#pathly`) or check Copilot chat settings
 after install.
+
+### Pathly Studio
+
+```text
+pathly-studio
+```
+
+Studio is a local UI over the same files and HTTP runtime:
+
+- Canvas reads bundled and user flow YAMLs.
+- Plan reads and writes project-local `pathly/plans/**` artifacts.
+- Monitor tails `EVENTS.jsonl` through `GET /events/stream`.
+- Conductor routes chat work to Claude, Codex, or shell targets.
+- Terminal uses Electron PTY IPC through `window.pathly.terminal`.
+
+The full bottom terminal and Conductor mini terminal share one xterm instance per
+terminal `tabId` through `xtermRegistry`. Hiding a card or tab view preserves the
+process; the bin action kills the process and removes the instance. A hamburger
+button opens the right-side terminal instance rail for focus, hide, and kill
+controls.
 
 ## pathly-setup Commands
 

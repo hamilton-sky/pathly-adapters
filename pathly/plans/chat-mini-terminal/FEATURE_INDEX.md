@@ -14,4 +14,7 @@ Add an interactive mini terminal to Conductor chat so users can respond to Claud
 
 ## Current Status
 
-Planning complete. Ready for implementation.
+Implemented and verified. The feature now includes an interactive Conductor
+mini terminal, shared xterm ownership with the full terminal, hide-vs-kill
+terminal semantics, a hamburger-controlled full-terminal instance rail, and
+consistent Shell/Claude/Codex runtime icons.

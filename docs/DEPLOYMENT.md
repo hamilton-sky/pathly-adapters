@@ -115,6 +115,20 @@ curl http://localhost:8765/health
 
 Expected response: `{"status": "ok", "server": "pathly-fsm-http"}`
 
+## Running Pathly Studio
+
+Studio is the local Electron UI for Canvas, Plan, Monitor, Conductor, and
+Terminal. It uses the same local FSM server and project files as the host skills.
+
+```bash
+pathly-studio
+```
+
+Terminal sessions inside Studio use local Electron PTY IPC. The Conductor mini
+terminal and the full bottom terminal share one xterm instance per terminal tab
+id, so hiding a view keeps the process alive while bin actions kill and remove
+the instance.
+
 ## Troubleshooting
 
 ### Server won't start
@@ -131,8 +145,9 @@ Expected response: `{"status": "ok", "server": "pathly-fsm-http"}`
 
 ## Releasing a New Version
 
-1. Update version in `pyproject.toml`
-2. Update version references in `docs/SECURITY.md`
-3. Commit and tag: `git tag v<version>`
-4. Push tag: `git push origin v<version>`
-5. GitHub Actions will run tests and publish to PyPI automatically
+1. Update adapter package version in `pyproject.toml`
+2. Update Studio app version in `studio/package.json` and `studio/package-lock.json` when the release includes Studio changes
+3. Update version references in `README.md`, `docs/SECURITY.md`, and `docs/PRODUCTION_READINESS.md`
+4. Commit and tag: `git tag v<version>`
+5. Push tag: `git push origin v<version>`
+6. GitHub Actions will run tests and publish to PyPI automatically

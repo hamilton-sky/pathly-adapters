@@ -3,6 +3,8 @@
 Pathly is no longer a Claude-only file layout. The current repository already
 uses a core-plus-adapters structure so the same workflow contracts can be
 packaged for Claude Code, Codex, the Python CLI, and future hosts.
+Pathly Studio is the local desktop surface over the same project files and FSM
+HTTP runtime; it is not a separate workflow source of truth.
 
 ## Current Structure
 
@@ -43,6 +45,20 @@ metadata, and expose the host-native invocation style.
 | Claude Code | `/pathly <request>` or `/path <request>` (slash commands) | `src/pathly_data/adapters/claude/` |
 | Codex | `Use Pathly <request>` or `Pathly <request>` (natural language) | `src/pathly_data/adapters/codex/` |
 | Copilot | Version-dependent; agent files as custom instructions | `src/pathly_data/adapters/copilot/` |
+
+## Studio Surface
+
+Studio uses the same core runtime rather than defining another adapter:
+
+- Canvas reads bundled `src/pathly_data/core/flows/*.flow.yaml`.
+- Plan reads and writes project-local `pathly/plans/**` files.
+- Monitor consumes `pathly-fsm-http` events.
+- Conductor routes chat work to Claude, Codex, or shell targets.
+- Terminal uses `window.pathly.terminal` and a shared `xtermRegistry` so the
+  chat mini terminal and full terminal reparent one xterm instance per `tabId`.
+
+The terminal control contract is consistent across surfaces: X hides a view and
+keeps the PTY alive; the bin icon kills/disposes/removes the terminal instance.
 
 ## Installed Manifests
 

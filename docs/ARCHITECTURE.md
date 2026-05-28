@@ -2,7 +2,7 @@
 
 pathly-adapters installs Pathly agent and skill files into AI host tools (Claude
 Code, Codex, Copilot). It owns the stitch pipeline, host detection, resource
-loading, and the `pathly-setup` CLI.
+loading, the `pathly-setup` CLI, and the local Pathly Studio desktop UI.
 
 ## Package Layout
 
@@ -114,6 +114,7 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 | `src/install_cli/materialize.py` | Writes stitched output to `~/.claude/`, `~/.codex/`, etc. A manifest tracks Pathly-owned files; `--repair` overwrites owned files, `--force` overwrites everything. Install is atomic — if anything fails, already-written files are rolled back. |
 | `src/install_cli/setup_command.py` | CLI entry point registered as `pathly-setup` |
 | `src/install_cli/codex_plugin_config.py` | Codex local marketplace registration and plugin config |
+| `src/pathly_studio_cli/` | `pathly-studio` launcher and local Studio install helpers |
 | `src/pathly_data/core/` | Source-of-truth agent contracts, skill logic, plan templates — never edited by install |
 | `src/pathly_data/adapters/` | Per-tool YAML metadata (`_meta/`) and plugin manifests |
 | `src/pathly_orchestrator/` | FSM engine package. `http_server.py` exposes `/next_action`, `/complete_stage`, `/record_activity`, `/events/stream` over HTTP (port 8765). Also implements `pathly-events`, `pathly-state`, and `pathly-validate-flow` CLI entry points. |
@@ -195,6 +196,29 @@ For Claude Code:
 ```
 
 See [FLOW_DIAGRAM.md](FLOW_DIAGRAM.md) for the full command reference and deployed file details.
+
+## Pathly Studio Runtime Surface
+
+`studio/` is the local desktop UI for the same project-local Pathly artifacts
+that the host skills use. It does not replace the adapters; it reads and writes
+the same plan files, flow YAMLs, and FSM event streams.
+
+Current major panes:
+
+| Pane | Runtime source |
+|---|---|
+| Canvas | bundled `src/pathly_data/core/flows/*.flow.yaml` plus editable user flow files |
+| Plan | project-local `pathly/plans/**` artifacts |
+| Monitor | `pathly-fsm-http` SSE stream from `/events/stream` |
+| Conductor | chat target routing for Claude, Codex, and shell terminals |
+| Terminal | Electron PTY IPC exposed through `window.pathly.terminal` |
+
+Terminal ownership is shared by `studio/src/renderer/src/components/Terminal/xtermRegistry.ts`.
+The full bottom terminal and Conductor mini terminal card reparent one xterm
+instance per `tabId`; they do not spawn duplicate PTYs. Hiding a card or tab view
+keeps the process alive. Bin actions kill the PTY, dispose the shared xterm, and
+remove the terminal tab. The full terminal exposes a hamburger-controlled
+instance rail for focusing, hiding, and killing terminal instances.
 
 ## User-Level Data Locations
 

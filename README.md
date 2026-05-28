@@ -57,6 +57,7 @@ pathly-events summary <feature>     # print token/cost table for a pipeline run
 pathly-state <feature>              # print current FSM state for a feature
 pathly-tokens                       # print token/cost summary across all pipeline runs
 pathly-validate-flow <flow.yaml>    # validate a flow YAML against the FSM schema
+pathly-studio                       # launch the local Pathly Studio desktop UI
 ```
 
 `--dry-run` never writes. `--apply` is required for any writes.
@@ -95,6 +96,30 @@ pathly-fsm-http
 ```
 
 The `fsm-call` skill (shared by all FSM-using skills) handles health-check, auto-start, and the HTTP POST — skills never call the server directly.
+
+## Pathly Studio
+
+This repository also ships Pathly Studio, a local Electron UI for inspecting and
+driving Pathly workflows:
+
+- Canvas: visual flow editing and validation for shipped flow YAMLs.
+- Plan: project-local plan files and workflow artifacts.
+- Monitor: live FSM events from `GET /events/stream`.
+- Conductor: chat-driven workflow control with Claude, Codex, and shell targets.
+- Terminal: full bottom terminal plus chat mini-terminal cards that share the
+  same xterm/PTY tab through `xtermRegistry`.
+
+Studio terminal behavior is intentionally shared, not duplicated: the mini card
+and full terminal reparent one xterm instance per `tabId`. The chat card can be
+hidden without killing the process; the bin action kills/disposes/removes the
+terminal instance. The full terminal also has a hamburger-controlled instance
+rail for focusing, hiding, and killing open terminal sessions.
+
+Launch it from an installed package with:
+
+```bash
+pathly-studio
+```
 
 ## Development setup
 
@@ -139,7 +164,11 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Stable (2.11.9). Core install path (`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on failure. Copilot destination paths follow the VS Code Copilot agent spec and may require `--repair` after a VS Code update.
+Core adapter package metadata is at 2.11.10. The Studio app package is at
+2.11.11 and the latest repository tag is `v2.11.11`. Core install path
+(`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on
+failure. Copilot destination paths follow the VS Code Copilot agent spec and may
+require `--repair` after a VS Code update.
 
 ## Known Limitations
 

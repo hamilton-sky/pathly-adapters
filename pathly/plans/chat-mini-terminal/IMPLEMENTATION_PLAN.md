@@ -10,9 +10,9 @@ Tasks:
 2. Update `writeToTerminal(...)` integration so `ChatPanel` keeps the active tab id for each target.
 3. Create `MiniTerminalCard.tsx` in `components/ChatPanel`.
 4. Reuse the xterm setup pattern from `TerminalTabView.tsx`:
-   - create a local xterm instance,
-   - replay buffered output,
-   - subscribe to `window.pathly.terminal.onData(tabId, ...)`,
+   - create one shared xterm instance per `tabId` through `xtermRegistry`,
+   - attach/detach the shared xterm between full terminal and chat card hosts,
+   - subscribe to `window.pathly.terminal.onData(tabId, ...)` from the registry,
    - write xterm input through `window.pathly.terminal.write(tabId, data)`,
    - fit on mount and resize.
 5. Replace expanded `OutputSnippet` usage with `MiniTerminalCard` for the active target.
@@ -51,6 +51,28 @@ Verification:
 - `npm.cmd run typecheck`
 - `npm.cmd test`
 - Manual Studio smoke test with a prompt requiring input.
+
+## Conversation 3 - Full Terminal Controls And Runtime Icons
+
+Goal: Make terminal instances manageable from both the full terminal and
+Conductor chat.
+
+Tasks:
+
+1. Add always-visible full terminal tab actions: pop out, hide, and kill.
+2. Add `hiddenTabIds` to `terminalStore` so X hides a view without killing the
+   process.
+3. Add a hamburger-controlled right-side terminal instance rail.
+4. Let the rail focus/show, hide, and kill terminal instances.
+5. Replace dot-only runtime indicators with shared Shell, Claude, and Codex
+   icons across tabs, rail, mini cards, launcher dropdown, and Conductor header.
+6. Keep the header dot as the "instance exists" signal for Claude, Codex, and
+   shell.
+
+Verification:
+
+- `npm.cmd run typecheck`
+- `npm.cmd test`
 
 ## Non-Goals
 

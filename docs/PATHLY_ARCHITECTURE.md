@@ -20,6 +20,9 @@ provides:
 - **`src/pathly_data/`** — package resource layout for installed data files
 - **`src/pathly_telemetry/`** — cross-host activity telemetry (`pathly-tokens` command), inside `src/`
 
+- **`src/pathly_studio_cli/`** - `pathly-studio` launcher and Studio install helpers
+- **`studio/`** - Electron UI for Canvas, Plan, Monitor, Conductor, and Terminal
+
 The user installs Pathly once. After that, they interact with their AI coding
 tool normally — the tool reads Pathly's agents and skills transparently.
 
@@ -138,6 +141,7 @@ CLI implementation modules (`detect.py`, `stitch.py`, `materialize.py`, `orchest
 | `src/install_cli/codex_plugin_config.py` | Registers the Codex local marketplace and plugin configuration. |
 | `src/install_cli/resources.py` | Package resource loading helpers |
 | `src/install_cli/__main__.py` | Entry point registered as `pathly-setup` |
+| `src/pathly_studio_cli/` | `pathly-studio` launcher and local Studio install helpers |
 
 ---
 
@@ -281,7 +285,15 @@ pathly-setup = "install_cli.__main__:main"
 pathly-tokens = "pathly_telemetry.report:main"
 pathly-events = "pathly_orchestrator.eventlog:_cli"
 pathly-state = "pathly_orchestrator.eventlog:_state_cli"
+pathly-fsm-http = "pathly_orchestrator.http_server:main"
 pathly-validate-flow = "pathly_orchestrator.state:validate_flow_cli"
+pathly-run = "pathly_orchestrator.runner:main"
+pathly-status = "pathly_orchestrator.status_cli:main"
+pathly-log = "pathly_orchestrator.log_cli:main"
+pathly-back = "pathly_orchestrator.back_cli:main"
+pathly-ff = "pathly_orchestrator.ff_cli:main"
+pathly-studio = "pathly_studio_cli.install:main"
+pathly-design = "pathly_data.core.design.cli:main"
 ```
 
 ---

@@ -7,7 +7,11 @@ pathly-adapters publicly as a public beta / technical preview.
 
 pathly-adapters is currently:
 
-- Stable (2.11.9) for the core install path (`--dry-run`, `--apply`, `--uninstall`).
+- Stable at adapter package metadata version 2.11.10 for the core install path
+  (`--dry-run`, `--apply`, `--uninstall`).
+- Studio app package version 2.11.11 includes the Conductor mini-terminal,
+  shared xterm registry, runtime icons, and hamburger-controlled terminal
+  instance rail.
 - Verified with full rollback on failure.
 - Supported for Claude Code through the existing install scripts.
 - Ready for Codex plugin testing through `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`.

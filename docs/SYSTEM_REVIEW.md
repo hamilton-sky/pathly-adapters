@@ -20,7 +20,8 @@ Internal review of pathly-adapters' current shape and release posture.
 
 ## Current Risks
 
-- pathly-adapters is at 2.11.9 for the core install path, but Copilot
+- pathly-adapters package metadata is at 2.11.10 for the core install path;
+  Studio app package metadata is at 2.11.11. Copilot
   destination paths may require `--repair` after a VS Code update.
 - Hook path validation is string-based. A hardening pass is needed to resolve
   paths and confirm writes stay inside `plans/`.
