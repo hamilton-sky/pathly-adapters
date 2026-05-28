@@ -300,8 +300,8 @@ export function TopBar(): JSX.Element {
           {badge}
           <IconButton
             onClick={toggleChat}
-            title="Fleet"
-            description="Manage CLI instances of AI model orchestrators"
+            title="HQ"
+            description="Command center above your AI model orchestrators"
             placement="bottom"
           >
             <Brain size={14} style={{ color: chatOpen ? 'var(--theme-accent)' : undefined }} />
