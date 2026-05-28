@@ -36,6 +36,17 @@ _AGENT_GROUPS = {
 
 _CODEX_EXPLORER_AGENTS = {"explorer", "quick", "scout", "web-researcher"}
 
+_MENU_LABELS = {
+    "STORMING": "Refine the idea and choose the first planning step.",
+    "PLANNING": "Draft or revise the implementation plan.",
+    "DESIGNING": "Shape the UI or flow design before building.",
+    "BUILDING": "Implement the current plan.",
+    "REVIEWING": "Review the build and decide whether to loop back.",
+    "TESTING": "Verify the feature and capture failures if any.",
+    "RETRO": "Close out the feature and capture lessons.",
+    "DONE": "Feature complete.",
+}
+
 # ── Private helpers ───────────────────────────────────────────────────────────
 
 
@@ -134,6 +145,50 @@ def _blocked_response(feedback: dict, state_info: dict) -> dict:
     }
 
 
+def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -> dict:
+    transitions = flow_config.get("transitions") or {}
+    transition_rules = flow_config.get("transition_rules") or {}
+    targets = list(transitions.get(state_name, []))
+    agent = flow_config.get("agent_map", {}).get(state_name, "")
+    items: list[dict] = []
+
+    rule = transition_rules.get(state_name)
+    if isinstance(rule, dict):
+        decide = rule.get("decide")
+        if isinstance(decide, dict):
+            options = decide.get("options", {}) or {}
+            for label, target in options.items():
+                items.append(
+                    {
+                        "label": str(label),
+                        "description": f"Route to {target}",
+                        "command": str(label),
+                        "target_state": str(target),
+                    }
+                )
+
+    if not items:
+        for target in targets:
+            items.append(
+                {
+                    "label": target,
+                    "description": _MENU_LABELS.get(target, f"Advance to {target}."),
+                    "command": target,
+                    "target_state": target,
+                }
+            )
+
+    return {
+        "state": state_name,
+        "feature": storage_path.name,
+        "agent": agent,
+        "title": f"Pathly · {storage_path.name} · {state_name}",
+        "subtitle": _MENU_LABELS.get(state_name, ""),
+        "items": items,
+        "empty_message": "No menu items available for this state.",
+    }
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
@@ -198,6 +253,7 @@ def next_action(args: dict) -> dict:
 
     instructions = build_prompt(flow_config, state_info["current_state"], storage_path)
     agent = flow_config["agent_map"][state_info["current_state"]]
+    menu = build_menu_payload(flow_config, state_info["current_state"], storage_path)
     return {
         "current_state": state_info["current_state"],
         "conv": state_info["conv"],
@@ -206,6 +262,7 @@ def next_action(args: dict) -> dict:
         "codex_subagent": _codex_subagent_hint(agent, instructions),
         "storage_path": str(storage_path),
         "limits": state_info["limits"],
+        "menu": menu,
     }
 
 
@@ -363,10 +420,12 @@ def complete_stage(args: dict) -> dict:
 
     instructions = build_prompt(flow_config, next_state, storage_path)
     agent = flow_config["agent_map"][next_state]
+    menu = build_menu_payload(flow_config, next_state, storage_path)
     return {
         "next_state": next_state,
         "agent": agent,
         "instructions": instructions,
         "codex_subagent": _codex_subagent_hint(agent, instructions),
         "limits": state_info["limits"],
+        "menu": menu,
     }

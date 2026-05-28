@@ -36,7 +36,7 @@ except ImportError:
 from pathly_orchestrator.config import Settings
 from pathly_orchestrator.eventlog import read_state
 from pathly_orchestrator.feature_flags import flags
-from pathly_orchestrator.fsm_ops import next_action, complete_stage
+from pathly_orchestrator.fsm_ops import build_menu_payload, next_action, complete_stage
 from pathly_orchestrator.chat_agent import handle_chat
 from pathly_telemetry.storage import append_activity
 
@@ -254,11 +254,29 @@ def status_endpoint():
     if best_state is None:
         return jsonify({"current_state": "unknown"}), 200
 
+    menu = None
+    try:
+        flow_file = resolved_root / "src" / "pathly_data" / "core" / "flows" / "team.flow.yaml"
+        if flow_file.exists():
+            import yaml
+
+            flow_config = yaml.safe_load(flow_file.read_text(encoding="utf-8"))
+            feature = best_state.get("feature", "")
+            storage_path = resolved_root / "pathly" / "plans" / feature
+            menu = build_menu_payload(
+                flow_config,
+                best_state.get("current", "unknown"),
+                storage_path,
+            )
+    except Exception:
+        logger.debug("status: error building menu payload", exc_info=True)
+
     return jsonify(
         {
             "current_state": best_state.get("current", "unknown"),
             "feature": best_state.get("feature", ""),
             "project_root": project_root,
+            "menu": menu,
         }
     ), 200
 

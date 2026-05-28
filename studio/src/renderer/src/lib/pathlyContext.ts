@@ -7,6 +7,24 @@ export interface PathlyContext {
   featureName: string
   skills: string[]
   studioSchema: StudioElement[]
+  menu: PathlyMenu | null
+}
+
+export interface PathlyMenuItem {
+  label: string
+  description: string
+  command: string
+  target_state?: string
+}
+
+export interface PathlyMenu {
+  state: string
+  feature: string
+  agent: string
+  title: string
+  subtitle: string
+  items: PathlyMenuItem[]
+  empty_message: string
 }
 
 const KNOWN_SKILLS = [
@@ -17,7 +35,7 @@ const KNOWN_SKILLS = [
 let cachedContext: { value: PathlyContext; expiresAt: number } | null = null
 
 function fallbackContext(): PathlyContext {
-  return { fsmStage: 'unknown', featureName: '', skills: KNOWN_SKILLS, studioSchema: getStudioSchema() }
+  return { fsmStage: 'unknown', featureName: '', skills: KNOWN_SKILLS, studioSchema: getStudioSchema(), menu: null }
 }
 
 export async function buildPathlyContext(): Promise<PathlyContext> {
@@ -30,12 +48,13 @@ export async function buildPathlyContext(): Promise<PathlyContext> {
     const timeout = window.setTimeout(() => controller.abort(), 750)
     const res = await fetch(`${PATHLY_API_BASE}/status`, { signal: controller.signal })
     window.clearTimeout(timeout)
-    const data = await res.json() as { current_state?: string; feature?: string }
+    const data = await res.json() as { current_state?: string; feature?: string; menu?: PathlyMenu | null }
     const value = {
       fsmStage: data.current_state ?? 'unknown',
       featureName: data.feature ?? '',
       skills: KNOWN_SKILLS,
       studioSchema,
+      menu: data.menu ?? null,
     }
     cachedContext = { value, expiresAt: now + 3000 }
     return value

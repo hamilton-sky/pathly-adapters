@@ -159,13 +159,15 @@ Invoke the `fsm-call` skill with:
 ```
 
 Receives one of:
-- `{current_state, agent, instructions, codex_subagent, storage_path, limits}` — normal routing
+- `{current_state, agent, instructions, codex_subagent, storage_path, limits, menu}` — normal routing
 - `{blocked: true, target_agent: "human", file, instructions, limits}` — human must decide
 - `{blocked: true, target_agent: <agent>, file, instructions, codex_subagent, limits}` — feedback to resolve
 
 ### Step 2 — Display contextual menu
 
-After every `fsm-call` result, display the contextual menu before running any agent:
+After every `fsm-call` result, display the contextual menu from the returned
+`menu` payload before running any agent. Do not reconstruct it from hardcoded
+skill prose.
 
 ```
 ─────────────────────────────────────────────────────────

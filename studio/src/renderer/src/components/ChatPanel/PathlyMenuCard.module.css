@@ -1,0 +1,75 @@
+.card {
+  border-radius: 12px;
+  padding: 12px;
+  margin: 0 12px 8px;
+}
+
+.header {
+  margin-bottom: 10px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid;
+  border-radius: 999px;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.itemTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.itemLabel {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.itemCommand {
+  font-size: 11px;
+}
+
+.itemDescription {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.empty {
+  font-size: 12px;
+  padding: 8px 2px;
+}

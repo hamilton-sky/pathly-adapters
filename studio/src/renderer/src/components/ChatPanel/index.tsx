@@ -19,6 +19,7 @@ import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { MatchCard } from './MatchCard'
 import { MiniTerminalCard } from './MiniTerminalCard'
+import { PathlyMenuCard } from './PathlyMenuCard'
 import { OutputSnippet } from './OutputSnippet'
 import { AutomationCard } from './AutomationCard'
 import { StepQueue } from './StepQueue'
@@ -106,13 +107,16 @@ function buildSystemPrompt(
   const schemaInfo = context.studioSchema && context.studioSchema.length > 0
     ? `\n\n## Studio UI Elements\n${context.studioSchema.slice(0, 20).map((el) => `- ${el.screen}: ${el.label} (${el.type})`).join('\n')}`
     : ''
+  const menuInfo = context.menu
+    ? `\n\n## Current Menu\nState: ${context.menu.state}\nTitle: ${context.menu.title}\n${context.menu.items.map((item) => `- ${item.label}: ${item.command} (${item.description})`).join('\n')}`
+    : ''
 
   return `You are the Conductor — a helpful AI assistant built into Pathly Studio.
 Your job is to help users run Pathly pipeline skills and navigate the Studio UI.
 
 ${stageInfo}
 Available skills: ${skillList}
-No strong skill match found.${schemaInfo}
+No strong skill match found.${schemaInfo}${menuInfo}
 
 When a user asks about running a skill, explain what it does and confirm the match.
 Be concise (2-3 sentences). Do not invent skills that are not in the available list.`
@@ -121,6 +125,7 @@ Be concise (2-3 sentences). Do not invent skills that are not in the available l
 export function ChatPanel(): JSX.Element {
   const [inputValue, setInputValue] = useState('')
   const [llmAvailable, setLlmAvailable] = useState<boolean | null>(null)
+  const [pathlyContext, setPathlyContext] = useState<Awaited<ReturnType<typeof buildPathlyContext>> | null>(null)
   const [hiddenMiniCards, setHiddenMiniCards] = useState<Record<'claude' | 'codex' | 'shell', boolean>>({
     claude: false,
     codex: false,
@@ -188,6 +193,7 @@ export function ChatPanel(): JSX.Element {
   const hasClaudeTab = tabs.some((tab) => tab.kind === 'claude')
   const hasCodexTab = tabs.some((tab) => tab.kind === 'codex')
   const hasShellTab = tabs.some((tab) => tab.kind === 'shell')
+  const activeMenu = pathlyContext?.menu ?? null
 
   const t = useTheme()
   // Accumulates partial terminal data until a newline arrives
@@ -272,6 +278,20 @@ export function ChatPanel(): JSX.Element {
       .catch(() => setOllama(false, []))
   }, [setOllama])
 
+  useEffect(() => {
+    let cancelled = false
+    buildPathlyContext()
+      .then((ctx) => {
+        if (!cancelled) setPathlyContext(ctx)
+      })
+      .catch(() => {
+        if (!cancelled) setPathlyContext(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectPath])
+
   // Pre-embed all skill descriptions once on first mount.
   // Progress callback updates embedProgress (0–100) so the UI can show download state.
   useEffect(() => {
@@ -331,7 +351,7 @@ export function ChatPanel(): JSX.Element {
     } catch {
       // Embedding failed (e.g. model download error) — continue with no match.
       // Always include the known skills list so the fallback response is useful.
-      context = { fsmStage: 'unknown', featureName: '', skills: ['plan','po','storm','build','review','test','retro','explore','debug','design','fix','status','log','end'], studioSchema: [] }
+      context = { fsmStage: 'unknown', featureName: '', skills: ['plan','po','storm','build','review','test','retro','explore','debug','design','fix','status','log','end'], studioSchema: [], menu: null }
     } finally {
       setIsEmbedding(false)
     }
@@ -618,6 +638,7 @@ export function ChatPanel(): JSX.Element {
       <div className={styles.resizeHandle} onMouseDown={onDragStart} />
       <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} hasShellTab={hasShellTab} targetKind={targetKind} onSetTarget={setTargetKind} onToggleChat={toggleChat} onClearChat={handleClearAll} />
       <SkillsPanel onSkillClick={handleSkillClick} />
+      {activeMenu ? <PathlyMenuCard menu={activeMenu} /> : null}
       <MessageList />
       {automationMessages.length > 0 && automationMessages[automationMessages.length - 1].automationPlan && (
         <>
