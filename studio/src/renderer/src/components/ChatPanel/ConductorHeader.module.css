@@ -36,10 +36,10 @@
 .pill {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 10px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 12px;
   background: var(--bg-surface1);
   color: var(--text-muted);
   border: 1px solid transparent;
@@ -53,9 +53,18 @@
   color: var(--accent);
 }
 
+.pillIcon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   flex-shrink: 0;
   background: var(--text-muted);

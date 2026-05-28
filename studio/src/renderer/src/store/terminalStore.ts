@@ -10,12 +10,14 @@ export interface TerminalState {
   activeTabIdLeft: string | null
   activeTabIdRight: string | null
   splitEnabled: boolean
+  hiddenTabIds: Record<string, boolean>
   tabIdByKind: Partial<Record<TerminalKind, string>>
   scrollbackByTabId: Record<string, string[]>
   toggle(): void
   addTab(id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind']): void
   addTabSilent(id: string, label: string, kind?: TerminalTab['kind']): void
   closeTab(id: string): void
+  hideTab(id: string): void
   setActiveTab(id: string): void
   openTab(id: string): void
   renameTab(id: string, label: string): void
@@ -31,6 +33,7 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
   activeTabIdLeft: null,
   activeTabIdRight: null,
   splitEnabled: false,
+  hiddenTabIds: {},
   tabIdByKind: {},
   scrollbackByTabId: {},
 
@@ -59,29 +62,51 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
       }
       const scrollbackByTabId = { ...s.scrollbackByTabId }
       delete scrollbackByTabId[id]
-      const paneTabs = tabs.filter((t) => t.pane === pane)
+      const hiddenTabIds = { ...s.hiddenTabIds }
+      delete hiddenTabIds[id]
+      const paneTabs = tabs.filter((t) => t.pane === pane && !hiddenTabIds[t.id])
       const prevActive = pane === 'left' ? s.activeTabIdLeft : s.activeTabIdRight
       const newActive = prevActive === id
         ? (paneTabs[paneTabs.length - 1]?.id ?? null)
         : prevActive
-      if (pane === 'left') return { tabs, activeTabIdLeft: newActive, tabIdByKind, scrollbackByTabId }
-      return { tabs, activeTabIdRight: newActive, tabIdByKind, scrollbackByTabId }
+      if (pane === 'left') return { tabs, activeTabIdLeft: newActive, tabIdByKind, scrollbackByTabId, hiddenTabIds }
+      return { tabs, activeTabIdRight: newActive, tabIdByKind, scrollbackByTabId, hiddenTabIds }
+    }),
+
+  hideTab: (id) =>
+    set((s) => {
+      const tab = s.tabs.find((t) => t.id === id)
+      if (!tab) return {}
+      const hiddenTabIds = { ...s.hiddenTabIds, [id]: true }
+      const visiblePaneTabs = s.tabs.filter((t) => t.pane === tab.pane && t.id !== id && !hiddenTabIds[t.id])
+      const nextActive = visiblePaneTabs[visiblePaneTabs.length - 1]?.id ?? null
+      if (tab.pane === 'left' && s.activeTabIdLeft === id) {
+        return { hiddenTabIds, activeTabIdLeft: nextActive }
+      }
+      if (tab.pane === 'right' && s.activeTabIdRight === id) {
+        return { hiddenTabIds, activeTabIdRight: nextActive }
+      }
+      return { hiddenTabIds }
     }),
 
   setActiveTab: (id) =>
     set((s) => {
       const tab = s.tabs.find((t) => t.id === id)
       if (!tab) return {}
-      if (tab.pane === 'left') return { activeTabIdLeft: id }
-      return { activeTabIdRight: id }
+      const hiddenTabIds = { ...s.hiddenTabIds }
+      delete hiddenTabIds[id]
+      if (tab.pane === 'left') return { activeTabIdLeft: id, hiddenTabIds }
+      return { activeTabIdRight: id, hiddenTabIds }
     }),
 
   openTab: (id) =>
     set((s) => {
       const tab = s.tabs.find((t) => t.id === id)
       if (!tab) return {}
-      if (tab.pane === 'left') return { open: true, activeTabIdLeft: id }
-      return { open: true, activeTabIdRight: id }
+      const hiddenTabIds = { ...s.hiddenTabIds }
+      delete hiddenTabIds[id]
+      if (tab.pane === 'left') return { open: true, activeTabIdLeft: id, hiddenTabIds }
+      return { open: true, activeTabIdRight: id, hiddenTabIds }
     }),
 
   renameTab: (id, label) =>

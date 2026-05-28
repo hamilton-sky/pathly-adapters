@@ -23,6 +23,7 @@ import { OutputSnippet } from './OutputSnippet'
 import { AutomationCard } from './AutomationCard'
 import { StepQueue } from './StepQueue'
 import { useChatResize } from './useChatResize'
+import * as xtermRegistry from '../Terminal/xtermRegistry'
 import styles from './index.module.css'
 
 function stripAnsi(raw: string): string {
@@ -186,6 +187,7 @@ export function ChatPanel(): JSX.Element {
 
   const hasClaudeTab = tabs.some((tab) => tab.kind === 'claude')
   const hasCodexTab = tabs.some((tab) => tab.kind === 'codex')
+  const hasShellTab = tabs.some((tab) => tab.kind === 'shell')
 
   const t = useTheme()
   // Accumulates partial terminal data until a newline arrives
@@ -506,7 +508,22 @@ export function ChatPanel(): JSX.Element {
     setCommandRunning(targetKind, true)
     setHiddenMiniCards((state) => ({ ...state, [targetKind]: false }))
     try {
-      await writeToTerminal(targetKind, cmd, projectPath, tabs, addTab, open, toggle, rememberTabForKind, openTab)
+      const addBackgroundTab = (id: string, label: string, _pane?: 'left' | 'right', kind?: 'shell' | 'claude' | 'codex'): void => {
+        addTabSilent(id, label, kind)
+        xtermRegistry.getOrCreate(id, { fontSize: 12 })
+      }
+      await writeToTerminal(
+        targetKind,
+        cmd,
+        projectPath,
+        tabs,
+        addBackgroundTab,
+        open,
+        toggle,
+        rememberTabForKind,
+        openTab,
+        { revealFullTerminal: false }
+      )
     } catch (err) {
       console.error('[handleRun] terminal write failed:', err)
       setCommandRunning(targetKind, false)
@@ -537,6 +554,7 @@ export function ChatPanel(): JSX.Element {
     // addTabSilent registers the tab without changing activeTabIdLeft,
     // so the full terminal panel doesn't switch focus to the new tab.
     addTabSilent(id, label, kind)
+    xtermRegistry.getOrCreate(id, { fontSize: 12 })
     await window.pathly?.terminal?.spawn(id, projectPath, kind === 'shell' ? undefined : kind)
     setHiddenMiniCards((s) => ({ ...s, [kind]: false }))
   }
@@ -573,6 +591,16 @@ export function ChatPanel(): JSX.Element {
             document.dispatchEvent(new CustomEvent('pathly:focus-terminal-tab', { detail: { tabId } }))
           }}
           onClose={() => setHiddenMiniCards((state) => ({ ...state, [kind]: true }))}
+          onKill={() => {
+            void (async () => {
+              try { await window.pathly?.terminal?.kill(tabId) } catch { /* PTY may already be gone */ }
+              xtermRegistry.dispose(tabId)
+              useTerminalStore.getState().closeTab(tabId)
+              setCommandRunning(kind, false)
+              clearOutputLines(kind)
+              setHiddenMiniCards((state) => ({ ...state, [kind]: true }))
+            })()
+          }}
         />
       )
     }
@@ -588,7 +616,7 @@ export function ChatPanel(): JSX.Element {
     >
       {/* Left-edge drag handle — drag to resize */}
       <div className={styles.resizeHandle} onMouseDown={onDragStart} />
-      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} targetKind={targetKind} onSetTarget={setTargetKind} onToggleChat={toggleChat} onClearChat={handleClearAll} />
+      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} hasShellTab={hasShellTab} targetKind={targetKind} onSetTarget={setTargetKind} onToggleChat={toggleChat} onClearChat={handleClearAll} />
       <SkillsPanel onSkillClick={handleSkillClick} />
       <MessageList />
       {automationMessages.length > 0 && automationMessages[automationMessages.length - 1].automationPlan && (

@@ -30,8 +30,10 @@ export async function writeToTerminal(
   open: boolean,
   toggle: () => void,
   rememberTabForKind: (kind: TerminalKind, id: string) => void,
-  openTab: (id: string) => void
+  openTab: (id: string) => void,
+  options: { revealFullTerminal?: boolean } = {}
 ): Promise<string> {
+  const revealFullTerminal = options.revealFullTerminal ?? true
   const sanitized = command.replace(/[;&|><]/g, '')
 
   const existingTab = tabs.find((tab) => tab.kind === kind)
@@ -51,8 +53,10 @@ export async function writeToTerminal(
   }
 
   rememberTabForKind(kind, tabId)
-  if (!open) toggle()
-  openTab(tabId)
+  if (revealFullTerminal) {
+    if (!open) toggle()
+    openTab(tabId)
+  }
 
   // If we just spawned a new tab, wait for the CLI prompt before writing.
   // We scan accumulated PTY output for the ready prompt ('> ' for claude/codex,

@@ -3,6 +3,7 @@ import { Send, Square, TerminalSquare, ChevronUp } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import { useChatStore } from '../../store/chatStore'
 import { ModelSelector } from './ModelSelector'
+import { ClaudeIcon, CodexIcon, ShellIcon } from '../Terminal/BrandIcons'
 import styles from './ChatInput.module.css'
 
 
@@ -99,8 +100,12 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
               style={{ background: t.bgSurface0, border: `1px solid ${t.bgSurface1}` }}
             >
               {(['shell', 'claude', 'codex'] as const).map((kind) => {
-                const colors = { shell: '#86EFAC', claude: '#38BDF8', codex: '#F59E0B' }
                 const labels = { shell: '+ Shell', claude: 'Claude Code', codex: 'Codex' }
+                const icons = {
+                  shell: <ShellIcon size={14} />,
+                  claude: <ClaudeIcon size={14} />,
+                  codex: <CodexIcon size={14} />,
+                }
                 return (
                   <button
                     key={kind}
@@ -111,7 +116,7 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
                       onLaunchMiniTerminal?.(kind)
                     }}
                   >
-                    <span style={{ color: colors[kind], fontSize: 10 }}>●</span>
+                    {icons[kind]}
                     {labels[kind]}
                   </button>
                 )

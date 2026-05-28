@@ -7,8 +7,16 @@ Implement the interactive mini terminal card for Conductor chat.
 Start from these files:
 
 - `studio/src/renderer/src/components/ChatPanel/index.tsx`
+- `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx`
+- `studio/src/renderer/src/components/ChatPanel/ChatInput.module.css`
+- `studio/src/renderer/src/components/ChatPanel/MiniTerminalCard.tsx`
+- `studio/src/renderer/src/components/ChatPanel/MiniTerminalCard.module.css`
 - `studio/src/renderer/src/components/ChatPanel/OutputSnippet.tsx`
+- `studio/src/renderer/src/components/Terminal/index.tsx`
+- `studio/src/renderer/src/components/Terminal/PaneTabBar.tsx`
 - `studio/src/renderer/src/components/Terminal/TerminalTabView.tsx`
+- `studio/src/renderer/src/components/Terminal/types.ts`
+- `studio/src/renderer/src/components/Terminal/xtermRegistry.ts`
 - `studio/src/renderer/src/store/terminalStore.ts`
 - `studio/src/renderer/src/lib/launchTerminal.ts`
 

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Maximize2, Minimize2, ExternalLink, X } from 'lucide-react'
+import { Maximize2, Minimize2, ExternalLink, Trash2, X } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import { useTerminalStore } from '../../store/terminalStore'
+import { ClaudeIcon, CodexIcon, ShellIcon } from '../Terminal/BrandIcons'
 import * as xtermRegistry from '../Terminal/xtermRegistry'
 import styles from './MiniTerminalCard.module.css'
 
@@ -14,12 +15,19 @@ interface MiniTerminalCardProps {
   previewLines: string[]
   onOpenFullTerminal: () => void
   onClose: () => void
+  onKill: () => void
 }
 
 const TARGET_COLORS: Record<MiniTerminalCardProps['target'], string> = {
   claude: '#38BDF8',
   codex: '#F59E0B',
   shell: '#86EFAC',
+}
+
+function TargetIcon({ target }: { target: MiniTerminalCardProps['target'] }): JSX.Element {
+  if (target === 'claude') return <ClaudeIcon size={14} />
+  if (target === 'codex') return <CodexIcon size={14} />
+  return <ShellIcon size={14} />
 }
 
 /**
@@ -37,6 +45,7 @@ export function MiniTerminalCard({
   previewLines,
   onOpenFullTerminal,
   onClose,
+  onKill,
 }: MiniTerminalCardProps): JSX.Element {
   const t = useTheme()
   const [userViewState, setUserViewState] = useState<ViewState>('peek')
@@ -115,6 +124,7 @@ export function MiniTerminalCard({
       {/* Header row — two-zone layout */}
       <div className={styles.header}>
         <div className={styles.meta}>
+          <TargetIcon target={target} />
           <span className={styles.targetLabel} style={{ color: targetColor }}>
             {target}
           </span>
@@ -149,6 +159,14 @@ export function MiniTerminalCard({
             title="Hide"
           >
             <X size={13} />
+          </button>
+          <button
+            className={`${styles.iconBtn} ${styles.dangerBtn}`}
+            onClick={onKill}
+            type="button"
+            title="Kill terminal and close instance"
+          >
+            <Trash2 size={13} />
           </button>
         </div>
       </div>

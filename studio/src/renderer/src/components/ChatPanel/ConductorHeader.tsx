@@ -1,17 +1,29 @@
 import { X, Zap, Trash2 } from 'lucide-react'
 import type { TerminalKind } from '../../store/chatStore'
+import { ClaudeIcon, CodexIcon, ShellIcon } from '../Terminal/BrandIcons'
 import styles from './ConductorHeader.module.css'
 
 interface ConductorHeaderProps {
   hasClaudeTab: boolean
   hasCodexTab: boolean
+  hasShellTab: boolean
   targetKind: TerminalKind
   onSetTarget: (kind: TerminalKind) => void
   onToggleChat: () => void
   onClearChat: () => void
 }
 
-export function ConductorHeader({ hasClaudeTab, hasCodexTab, targetKind, onSetTarget, onToggleChat, onClearChat }: ConductorHeaderProps): JSX.Element {
+export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, targetKind, onSetTarget, onToggleChat, onClearChat }: ConductorHeaderProps): JSX.Element {
+  const targetPills: Array<{
+    kind: TerminalKind
+    label: string
+    icon: JSX.Element
+    active: boolean
+  }> = [
+    { kind: 'claude', label: 'claude', icon: <ClaudeIcon size={14} />, active: hasClaudeTab },
+    { kind: 'codex', label: 'codex', icon: <CodexIcon size={14} />, active: hasCodexTab },
+    { kind: 'shell', label: 'shell', icon: <ShellIcon size={14} />, active: hasShellTab },
+  ]
 
   return (
     <div className={styles.header}>
@@ -22,27 +34,17 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, targetKind, onSetTa
       </div>
 
       <div className={styles.pills}>
-        <button
-          className={`${styles.pill} ${targetKind === 'claude' ? styles.pillSelected : ''}`}
-          onClick={() => onSetTarget('claude')}
-        >
-          <span className={`${styles.dot} ${hasClaudeTab ? styles.dotActive : ''}`} />
-          claude
-        </button>
-        <button
-          className={`${styles.pill} ${targetKind === 'codex' ? styles.pillSelected : ''}`}
-          onClick={() => onSetTarget('codex')}
-        >
-          <span className={`${styles.dot} ${hasCodexTab ? styles.dotActive : ''}`} />
-          codex
-        </button>
-        <button
-          className={`${styles.pill} ${targetKind === 'shell' ? styles.pillSelected : ''}`}
-          onClick={() => onSetTarget('shell')}
-        >
-          <span className={styles.dot} />
-          shell
-        </button>
+        {targetPills.map((pill) => (
+          <button
+            key={pill.kind}
+            className={`${styles.pill} ${targetKind === pill.kind ? styles.pillSelected : ''}`}
+            onClick={() => onSetTarget(pill.kind)}
+          >
+            <span className={styles.pillIcon}>{pill.icon}</span>
+            <span className={`${styles.dot} ${pill.active ? styles.dotActive : ''}`} />
+            {pill.label}
+          </button>
+        ))}
       </div>
 
       <button

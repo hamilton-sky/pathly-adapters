@@ -1,23 +1,25 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Columns2, X as XIcon } from 'lucide-react'
+import { Columns2, Menu, X as XIcon } from 'lucide-react'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import { TerminalTabView } from './TerminalTabView'
 import { PaneTabBar } from './PaneTabBar'
+import { TerminalInstancesRail } from './TerminalInstancesRail'
 import { launchTerminal } from '../../lib/launchTerminal'
 import * as xtermRegistry from './xtermRegistry'
 import styles from './Terminal.module.css'
 
 export function Terminal(): JSX.Element {
   const {
-    open, tabs, activeTabIdLeft, activeTabIdRight, splitEnabled,
-    toggle, addTab, closeTab, setActiveTab, renameTab, toggleSplit,
+    open, tabs, activeTabIdLeft, activeTabIdRight, splitEnabled, hiddenTabIds,
+    toggle, addTab, closeTab, hideTab, setActiveTab, openTab, renameTab, toggleSplit,
   } = useTerminalStore()
   const projectPath = useStore((s) => s.projectPath)
   const theme = useTheme()
   const [panelHeight, setPanelHeight] = useState(180)
   const [splitRatio, setSplitRatio] = useState(0.5)
+  const [instancesRailOpen, setInstancesRailOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const vDragRef = useRef<{ x: number; ratio: number } | null>(null)
   const dragStartRef = useRef<{ y: number; h: number } | null>(null)
@@ -35,8 +37,8 @@ export function Terminal(): JSX.Element {
     '--t-blue': theme.blue,
   } as React.CSSProperties
 
-  const leftTabs = tabs.filter((t) => t.pane === 'left')
-  const rightTabs = tabs.filter((t) => t.pane === 'right')
+  const leftTabs = tabs.filter((t) => t.pane === 'left' && !hiddenTabIds[t.id])
+  const rightTabs = tabs.filter((t) => t.pane === 'right' && !hiddenTabIds[t.id])
 
   // Ctrl+` global toggle
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -73,11 +75,20 @@ export function Terminal(): JSX.Element {
     } catch { /* PTY errors surface in terminal */ }
   }
 
-  const handleCloseTab = async (id: string, e: React.MouseEvent): Promise<void> => {
-    e.stopPropagation()
+  const killTab = async (id: string): Promise<void> => {
     try { await window.pathly?.terminal?.kill(id) } catch { /* PTY may already be dead */ }
     xtermRegistry.dispose(id)
     closeTab(id)
+  }
+
+  const handleCloseTab = async (id: string, e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation()
+    await killTab(id)
+  }
+
+  const handleHideTab = (id: string, e?: React.MouseEvent): void => {
+    e?.stopPropagation()
+    hideTab(id)
   }
 
   const handlePopout = async (id: string): Promise<void> => {
@@ -128,6 +139,7 @@ export function Terminal(): JSX.Element {
         activeTabId={activeId}
         onSelectTab={setActiveTab}
         onCloseTab={(id, e) => void handleCloseTab(id, e)}
+        onHideTab={handleHideTab}
         onAddTab={(p) => void handleLaunch(undefined, `Shell ${tabs.length + 1}`, p)}
         onLaunch={(cmd, label, p) => void handleLaunch(cmd, label, p)}
         onPopout={(id) => void handlePopout(id)}
@@ -142,7 +154,7 @@ export function Terminal(): JSX.Element {
     </div>
   )
 
-  const isEmpty = !splitEnabled && leftTabs.length === 0
+  const isEmpty = !splitEnabled && tabs.length === 0
   const effectiveHeight = isEmpty ? 72 : panelHeight
 
   return (
@@ -162,6 +174,7 @@ export function Terminal(): JSX.Element {
             inline
             onSelectTab={setActiveTab}
             onCloseTab={(id, e) => void handleCloseTab(id, e)}
+            onHideTab={handleHideTab}
             onAddTab={() => void handleLaunch(undefined, `Shell ${tabs.length + 1}`, 'left')}
             onLaunch={(cmd, label) => void handleLaunch(cmd, label, 'left')}
             onPopout={(id) => void handlePopout(id)}
@@ -171,6 +184,15 @@ export function Terminal(): JSX.Element {
             {tabs.length >= 2 && (
               <button className={styles.splitIconBtn} onClick={toggleSplit} title="Split pane side-by-side">
                 <Columns2 size={13} />
+              </button>
+            )}
+            {tabs.length > 0 && (
+              <button
+                className={`${styles.splitIconBtn} ${instancesRailOpen ? styles.splitIconBtnActive : ''}`}
+                onClick={() => setInstancesRailOpen((v) => !v)}
+                title={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'}
+              >
+                <Menu size={13} />
               </button>
             )}
             <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={13} /></button>
@@ -183,33 +205,68 @@ export function Terminal(): JSX.Element {
           <button className={`${styles.splitIconBtn} ${styles.splitIconBtnActive}`} onClick={toggleSplit} title="Close split">
             <Columns2 size={13} />
           </button>
+          {tabs.length > 0 && (
+            <button
+              className={`${styles.splitIconBtn} ${instancesRailOpen ? styles.splitIconBtnActive : ''}`}
+              onClick={() => setInstancesRailOpen((v) => !v)}
+              title={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'}
+            >
+              <Menu size={13} />
+            </button>
+          )}
           <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={13} /></button>
         </div>
       )}
 
-      {splitEnabled ? (
-        <div className={styles.splitArea}>
-          <div className={styles.pane} style={{ flex: splitRatio }}>
-            {renderPane('left', leftTabs, activeTabIdLeft)}
-          </div>
-          <div
-            className={styles.splitDivider}
-            onMouseDown={(e) => { vDragRef.current = { x: e.clientX, ratio: splitRatio }; e.preventDefault() }}
-          />
-          <div className={styles.pane} style={{ flex: 1 - splitRatio }}>
-            {renderPane('right', rightTabs, activeTabIdRight)}
-          </div>
-        </div>
-      ) : (
-        <div className={styles.contentArea}>
-          {leftTabs.length === 0 && (
-            <div className={styles.emptyHint}>No terminal open.</div>
+      <div className={styles.terminalBody}>
+        <div className={styles.terminalWorkspace}>
+          {splitEnabled ? (
+            <div className={styles.splitArea}>
+              <div className={styles.pane} style={{ flex: splitRatio }}>
+                {renderPane('left', leftTabs, activeTabIdLeft)}
+              </div>
+              <div
+                className={styles.splitDivider}
+                onMouseDown={(e) => { vDragRef.current = { x: e.clientX, ratio: splitRatio }; e.preventDefault() }}
+              />
+              <div className={styles.pane} style={{ flex: 1 - splitRatio }}>
+                {renderPane('right', rightTabs, activeTabIdRight)}
+              </div>
+            </div>
+          ) : (
+            <div className={styles.contentArea}>
+              {leftTabs.length === 0 && (
+                <div className={styles.emptyHint}>No terminal open.</div>
+              )}
+              {leftTabs.map((tab) => (
+                <TerminalTabView key={tab.id} tabId={tab.id} active={tab.id === activeTabIdLeft} open={open} />
+              ))}
+            </div>
           )}
-          {leftTabs.map((tab) => (
-            <TerminalTabView key={tab.id} tabId={tab.id} active={tab.id === activeTabIdLeft} open={open} />
-          ))}
         </div>
-      )}
+        {tabs.length > 0 && !instancesRailOpen && (
+          <button
+            type="button"
+            className={styles.instancesRailToggle}
+            onClick={() => setInstancesRailOpen(true)}
+            title="Open instances panel"
+            aria-label="Open instances panel"
+          >
+            <Menu size={14} />
+          </button>
+        )}
+        {tabs.length > 0 && instancesRailOpen && (
+          <TerminalInstancesRail
+            tabs={tabs}
+            activeTabIds={[activeTabIdLeft, activeTabIdRight]}
+            hiddenTabIds={hiddenTabIds}
+            onClosePanel={() => setInstancesRailOpen(false)}
+            onOpenTab={openTab}
+            onHideTab={handleHideTab}
+            onKillTab={(id) => void killTab(id)}
+          />
+        )}
+      </div>
     </div>
   )
 }
