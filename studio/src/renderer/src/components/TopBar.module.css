@@ -295,6 +295,132 @@
   margin: 4px 0;
 }
 
+/* ── VS Code split-button ── */
+.vsCodeSplit {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 5px;
+  transition: border-color 0.12s, background 0.12s;
+  -webkit-app-region: no-drag;
+}
+
+.vsCodeSplit:hover {
+  border-color: var(--accent);
+  background: var(--bg-surface0);
+}
+
+.vsCodeSplitMain {
+  width: 26px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px 0 0 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s;
+  -webkit-app-region: no-drag;
+}
+
+.vsCodeSplitMain:hover {
+  background: var(--bg-surface0);
+}
+
+.vsCodeSplitMain:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.vsCodeSplitDivider {
+  width: 1px;
+  height: 14px;
+  background: var(--bg-surface1);
+  flex-shrink: 0;
+}
+
+.vsCodeSplitChevron {
+  width: 16px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+  -webkit-app-region: no-drag;
+}
+
+.vsCodeSplitChevron:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.vsCodeSplitChevron:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* ── VS Code launcher dropdown (portal — position:fixed set inline) ── */
+.vsCodeDropdown {
+  min-width: 180px;
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 8px;
+  z-index: 9999;
+  overflow: hidden;
+  padding: 4px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.vsCodeDropdownLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 6px 12px 4px;
+}
+
+.vsCodeDropdownDivider {
+  height: 1px;
+  background: var(--bg-surface1);
+  margin: 2px 0 4px;
+}
+
+.vsCodeDropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12.5px;
+  padding: 7px 14px;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s;
+}
+
+.vsCodeDropdownItem:hover {
+  background: var(--bg-surface1);
+  color: var(--accent);
+}
+
+.vsCodeDropdownItem:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
 .navBtn {
   background: transparent;
   border: none;

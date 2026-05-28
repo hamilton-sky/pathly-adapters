@@ -4,6 +4,7 @@ import { useTheme } from '../../useTheme'
 
 interface TooltipProps {
   label: string
+  description?: string
   shortcut?: string
   children: ReactNode
   placement?: 'top' | 'bottom' | 'left' | 'right'
@@ -12,6 +13,7 @@ interface TooltipProps {
 
 export function Tooltip({
   label,
+  description,
   shortcut,
   children,
   placement = 'top',
@@ -26,10 +28,21 @@ export function Tooltip({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const t = useTheme()
 
+  function getAnchorEl(root: HTMLElement): HTMLElement {
+    // display:contents spans have zero-size BCR; walk down until we find a real box
+    let el: HTMLElement = root
+    while (el.getBoundingClientRect().width === 0 && el.getBoundingClientRect().height === 0) {
+      const child = el.firstElementChild as HTMLElement | null
+      if (!child) break
+      el = child
+    }
+    return el
+  }
+
   function show(): void {
     timerRef.current = setTimeout(() => {
-      const el = (wrapRef.current?.firstElementChild as HTMLElement | null) ?? wrapRef.current
-      if (!el) return
+      if (!wrapRef.current) return
+      const el = getAnchorEl(wrapRef.current)
       const r = el.getBoundingClientRect()
       const GAP = 7
       let top: number, left: number, rp = placement
@@ -104,21 +117,24 @@ export function Tooltip({
             zIndex: 99999,
             pointerEvents: 'none',
             display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
+            flexDirection: description ? 'column' : 'row',
+            alignItems: description ? 'flex-start' : 'center',
+            gap: description ? 3 : 7,
             backgroundColor: t.bgSurface1,
             color: t.textPrimary,
-            padding: '5px 10px',
+            padding: '6px 10px',
             borderRadius: 6,
             fontSize: 12,
             fontFamily: t.fontFamilyBase,
-            whiteSpace: 'nowrap',
+            whiteSpace: description ? 'normal' : 'nowrap',
+            maxWidth: description ? 220 : undefined,
             boxShadow: '0 4px 18px rgba(0,0,0,0.5)',
             border: `1px solid rgba(255,255,255,0.07)`,
             lineHeight: 1.4,
           }}
         >
-          {label}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
+            {label}
           {shortcut && (
             <kbd
               style={{
@@ -137,6 +153,12 @@ export function Tooltip({
             >
               {shortcut}
             </kbd>
+          )}
+          </span>
+          {description && (
+            <span style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.4 }}>
+              {description}
+            </span>
           )}
         </div>,
         document.body,

@@ -1,56 +1,118 @@
-.card {
-  border-radius: 12px;
-  padding: 12px;
-  margin: 0 12px 8px;
+.panel {
+  flex-shrink: 0;
 }
 
-.header {
-  margin-bottom: 10px;
+.headerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  gap: 6px;
+  font-family: inherit;
 }
 
 .titleRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
 }
 
 .title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .badge {
   font-size: 10px;
-  padding: 2px 6px;
+  padding: 1px 6px;
   border: 1px solid;
   border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Pushed-menu controls (dismiss × + collapse chevron) ── */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dismissBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  color: inherit;
+  opacity: 0.5;
+  transition: opacity 100ms ease, background 100ms ease;
+  padding: 0;
+  font-family: inherit;
+}
+
+.dismissBtn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Progress bar (pushed menus only) ── */
+@keyframes depleteTimer {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+.timerBar {
+  height: 2px;
+  background: var(--accent, #6366f1);
+  transform-origin: left center;
+  animation: depleteTimer linear forwards;
+  opacity: 0.7;
+}
+
+/* ── Content ── */
+.body {
+  padding-bottom: 8px;
 }
 
 .subtitle {
-  margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.4;
+  padding: 2px 12px 6px;
+  opacity: 0.6;
+  margin: 0;
 }
 
 .items {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .item {
   width: 100%;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid transparent;
+  padding: 5px 12px;
+  background: none;
+  border: none;
   text-align: left;
   cursor: default;
   font-family: inherit;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background 100ms ease;
 }
 
 .itemClickable {
@@ -58,12 +120,11 @@
 }
 
 .itemClickable:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .itemClickable:active {
-  background: rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .itemTop {
@@ -74,21 +135,24 @@
 }
 
 .itemLabel {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
 
 .itemCommand {
-  font-size: 11px;
+  font-size: 10px;
+  opacity: 0.6;
 }
 
 .itemDescription {
-  margin-top: 4px;
-  font-size: 11px;
+  margin-top: 2px;
+  font-size: 10px;
   line-height: 1.35;
+  opacity: 0.55;
 }
 
 .empty {
-  font-size: 12px;
-  padding: 8px 2px;
+  font-size: 11px;
+  padding: 4px 12px;
+  opacity: 0.45;
 }

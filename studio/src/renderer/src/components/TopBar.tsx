@@ -1,15 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Terminal, ChevronDown, X, Moon, Sun, Menu, LayoutGrid, List, Activity, Brain } from 'lucide-react'
+import { Terminal, ChevronDown, X, Moon, Sun, Menu, LayoutGrid, List, Activity, Brain, Copy } from 'lucide-react'
 import { useStore } from '../store'
 import { useUiStore } from '../store/uiStore'
 import { isLightPalette } from '../theme'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
 import { IconButton, Tooltip } from './ui'
-import { ClaudeIcon, CodexIcon } from './Terminal/BrandIcons'
+import { ClaudeIcon, CodexIcon, FileExplorerIcon, WindowsTerminalIcon, GitBashIcon, WslIcon, PyCharmIcon } from './Terminal/BrandIcons'
 import { launchTerminal } from '../lib/launchTerminal'
 import styles from './TopBar.module.css'
+
+
+function VsCodeIcon({ size = 14, style }: { size?: number; style?: React.CSSProperties }): JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={style}>
+      <path d="M23.15 2.587L18.21.21a1.494 1.494 0 00-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 00-1.276.057L.327 7.261A1 1 0 00.326 8.74L3.9 12 .326 15.26a1 1 0 00.001 1.479L1.65 17.94a.999.999 0 001.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 001.704.29l4.942-2.377A1.5 1.5 0 0024 20.06V3.939a1.5 1.5 0 00-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/>
+    </svg>
+  )
+}
 
 export function TopBar(): JSX.Element {
   const {
@@ -88,6 +97,11 @@ export function TopBar(): JSX.Element {
   const terminalChevronRef = useRef<HTMLButtonElement>(null)
   const terminalDropdownRef = useRef<HTMLDivElement>(null)
 
+  const [vsCodeDropdownOpen, setVsCodeDropdownOpen] = useState(false)
+  const [vsCodeDropdownPos, setVsCodeDropdownPos] = useState<{ top: number; left: number } | null>(null)
+  const vsCodeChevronRef = useRef<HTMLButtonElement>(null)
+  const vsCodeDropdownRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (!terminalDropdownOpen) return
     function handleMouseDown(e: MouseEvent): void {
@@ -101,6 +115,35 @@ export function TopBar(): JSX.Element {
     document.addEventListener('mousedown', handleMouseDown)
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [terminalDropdownOpen])
+
+  useEffect(() => {
+    if (!vsCodeDropdownOpen) return
+    function handleMouseDown(e: MouseEvent): void {
+      if (
+        vsCodeDropdownRef.current && !vsCodeDropdownRef.current.contains(e.target as Node) &&
+        vsCodeChevronRef.current && !vsCodeChevronRef.current.contains(e.target as Node)
+      ) {
+        setVsCodeDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [vsCodeDropdownOpen])
+
+  function openVsCodeDropdown(): void {
+    if (vsCodeChevronRef.current) {
+      const rect = vsCodeChevronRef.current.getBoundingClientRect()
+      setVsCodeDropdownPos({ top: rect.bottom + 4, left: rect.left })
+    }
+    setVsCodeDropdownOpen((v) => !v)
+  }
+
+  async function launchInApp(appType: string): Promise<void> {
+    setVsCodeDropdownOpen(false)
+    try {
+      await window.pathly.shell.openInApp(projectPath, appType)
+    } catch { /* surface errors silently */ }
+  }
 
   async function launchTerminalWithKind(cmd: string | undefined, label: string): Promise<void> {
     setTerminalDropdownOpen(false)
@@ -155,6 +198,73 @@ export function TopBar(): JSX.Element {
               {activeTopics.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
+          {projectPath && (
+            <div className={styles.vsCodeSplit}>
+              <Tooltip label="Open in VS Code" placement="bottom">
+                <button
+                  className={styles.vsCodeSplitMain}
+                  onClick={() => void window.pathly.shell.openVsCode(projectPath)}
+                  aria-label="Open in VS Code"
+                >
+                  <VsCodeIcon size={14} style={{ color: '#007ACC' }} />
+                </button>
+              </Tooltip>
+              <div className={styles.vsCodeSplitDivider} />
+              <button
+                ref={vsCodeChevronRef}
+                className={styles.vsCodeSplitChevron}
+                onClick={openVsCodeDropdown}
+                aria-label="Open project in…"
+              >
+                <ChevronDown size={10} />
+              </button>
+            </div>
+          )}
+          {vsCodeDropdownOpen && vsCodeDropdownPos && createPortal(
+            <div
+              ref={vsCodeDropdownRef}
+              className={styles.vsCodeDropdown}
+              style={{ position: 'fixed', top: vsCodeDropdownPos.top, left: vsCodeDropdownPos.left }}
+            >
+              <div className={styles.vsCodeDropdownLabel}>Open project in…</div>
+              <div className={styles.vsCodeDropdownDivider} />
+              <button className={styles.vsCodeDropdownItem} onClick={() => void launchInApp('vscode')}>
+                <VsCodeIcon size={15} style={{ color: '#007ACC' }} />
+                VS Code
+              </button>
+              <button className={styles.vsCodeDropdownItem} onClick={() => void launchInApp('explorer')}>
+                <FileExplorerIcon size={15} />
+                File Explorer
+              </button>
+              <button className={styles.vsCodeDropdownItem} onClick={() => void launchInApp('terminal')}>
+                <WindowsTerminalIcon size={15} />
+                Terminal
+              </button>
+              <button className={styles.vsCodeDropdownItem} onClick={() => void launchInApp('gitbash')}>
+                <GitBashIcon size={15} />
+                Git Bash
+              </button>
+              <button className={styles.vsCodeDropdownItem} onClick={() => void launchInApp('wsl')}>
+                <WslIcon size={15} />
+                WSL
+              </button>
+              <button className={styles.vsCodeDropdownItem} onClick={() => void launchInApp('pycharm')}>
+                <PyCharmIcon size={15} />
+                PyCharm
+              </button>
+            </div>,
+            document.body
+          )}
+          {projectPath && (
+            <IconButton
+              onClick={() => void window.pathly.shell.openWindow(projectPath)}
+              title="New Pathly window"
+              description="Open multiple projects simultaneously in separate windows"
+              placement="bottom"
+            >
+              <Copy size={14} />
+            </IconButton>
+          )}
           <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexShrink: 0 }}>
             <Tooltip label="Flow canvas" shortcut="Ctrl+1" placement="bottom">
               <button
@@ -188,11 +298,14 @@ export function TopBar(): JSX.Element {
 
         <div className={styles.right}>
           {badge}
-          <Tooltip label="Toggle Conductor" placement="bottom">
-            <IconButton onClick={toggleChat} title="Toggle Conductor">
-              <Brain size={14} style={{ color: chatOpen ? 'var(--theme-accent)' : undefined }} />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            onClick={toggleChat}
+            title="Fleet"
+            description="Manage CLI instances of AI model orchestrators"
+            placement="bottom"
+          >
+            <Brain size={14} style={{ color: chatOpen ? 'var(--theme-accent)' : undefined }} />
+          </IconButton>
           <IconButton
             onClick={() => setTheme(isLightPalette(theme) ? preferredDark : preferredLight)}
             title={isLightPalette(theme) ? `Switch to dark (${preferredDark})` : `Switch to light (${preferredLight})`}

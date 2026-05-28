@@ -16,6 +16,8 @@ declare global {
       }
       shell: {
         openWindow: (path: string) => Promise<void>
+        openVsCode: (path: string) => Promise<void>
+        openInApp: (path: string, appType: string) => Promise<void>
         publish: (cwd: string) => Promise<number | null>
         onOutput: (cb: (line: string) => void) => () => void
       }

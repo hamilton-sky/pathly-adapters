@@ -50,7 +50,7 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, target
     <div ref={headerRef} className={styles.header}>
       <div className={styles.titleRow}>
         <span className={styles.title}>
-          <Zap size={13} /> Conductor
+          <Zap size={13} /> Fleet
         </span>
       </div>
 

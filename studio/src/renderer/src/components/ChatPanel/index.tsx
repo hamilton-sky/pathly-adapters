@@ -6,7 +6,7 @@ import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
-import { buildPathlyContext, invalidatePathlyContext, subscribeToMenuUpdates } from '../../lib/pathlyContext'
+import { buildPathlyContext, invalidatePathlyContext, subscribeToMenuUpdates, type PushedMenu } from '../../lib/pathlyContext'
 import { hasEmbeddedSkills, matchIntent, matchIntentByName, preEmbedSkills } from '../../lib/embedRouter'
 import { askLlm, getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
 import { splitThinkingContent } from '../../lib/thinkingParser'
@@ -131,6 +131,9 @@ export function ChatPanel(): JSX.Element {
     codex: false,
     shell: false,
   })
+  const [menuCardOpen, setMenuCardOpen] = useState(true)
+  const [pushedMenu, setPushedMenu] = useState<PushedMenu | null>(null)
+  const [pushedMenuOpen, setPushedMenuOpen] = useState(true)
 
   const ollamaAvailable = useModelStore((s) => s.ollamaAvailable)
   const ollamaModelIds = useModelStore((s) => s.ollamaModelIds)
@@ -189,11 +192,16 @@ export function ChatPanel(): JSX.Element {
   const toggleChat = useUiStore((s) => s.toggleChat)
 
   const projectPath = useStore((s) => s.projectPath)
+  const activeTopic = useStore((s) => s.activeTopic)
 
   const hasClaudeTab = tabs.some((tab) => tab.kind === 'claude')
   const hasCodexTab = tabs.some((tab) => tab.kind === 'codex')
   const hasShellTab = tabs.some((tab) => tab.kind === 'shell')
   const activeMenu = pathlyContext?.menu ?? null
+  // Key identifying the current menu — used to auto-restore after a topic transition
+  const menuKey = activeMenu ? `${activeMenu.state}:${activeMenu.feature}` : null
+  const [menuDismissedKey, setMenuDismissedKey] = useState<string | null>(null)
+  const menuVisible = activeMenu !== null && menuKey !== menuDismissedKey
 
   const t = useTheme()
   // Accumulates partial terminal data until a newline arrives
@@ -282,12 +290,12 @@ export function ChatPanel(): JSX.Element {
     let cancelled = false
 
     const fetchContext = (): void => {
-      buildPathlyContext(projectPath ?? undefined)
+      buildPathlyContext(projectPath ?? undefined, activeTopic ?? undefined)
         .then((ctx) => { if (!cancelled) setPathlyContext(ctx) })
         .catch(() => { if (!cancelled) setPathlyContext(null) })
     }
 
-    // Invalidate stale cache when project changes, then fetch immediately.
+    // Invalidate stale cache when project or topic changes, then fetch immediately.
     invalidatePathlyContext(projectPath ?? undefined)
     fetchContext()
 
@@ -298,14 +306,18 @@ export function ChatPanel(): JSX.Element {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [projectPath])
+  }, [projectPath, activeTopic])
 
-  // SSE subscription — card updates instantly when Claude calls the FSM,
-  // without waiting for the next poll cycle.
+  // SSE subscription — handles three event types from /events/menu:
+  //   MENU_UPDATE  → pipeline menu changed (FSM state transition)
+  //   MENU_PUSH    → skill triggered a named menu via GET /menu/{name}
+  //   MENU_CLEAR   → pushed menu TTL expired
   useEffect(() => {
     const unsubscribe = subscribeToMenuUpdates(
       projectPath ?? '',
-      (menu) => setPathlyContext((prev) => prev ? { ...prev, menu } : null)
+      (menu) => setPathlyContext((prev) => prev ? { ...prev, menu } : null),
+      (pushed) => { setPushedMenu(pushed); setPushedMenuOpen(true) },
+      () => setPushedMenu(null),
     )
     return unsubscribe
   }, [projectPath])
@@ -369,7 +381,7 @@ export function ChatPanel(): JSX.Element {
     } catch {
       // Embedding failed (e.g. model download error) — continue with no match.
       // Always include the known skills list so the fallback response is useful.
-      context = { fsmStage: 'unknown', featureName: '', skills: ['plan','po','storm','build','review','test','retro','explore','debug','design','fix','status','log','end'], studioSchema: [], menu: null }
+      context = { fsmStage: 'unknown', featureName: '', skills: ['plan','po','storm','build','review','test','retro','explore','debug','design','fix','status','log','end'], studioSchema: [], menu: null, pushedMenu: null }
     } finally {
       setIsEmbedding(false)
     }
@@ -647,10 +659,32 @@ export function ChatPanel(): JSX.Element {
   }
 
   function handleMenuSelect(item: import('../../lib/pathlyContext').PathlyMenuItem): void {
+    if (!projectPath) return
+    // Dismiss the current menu immediately — it restores automatically when the FSM
+    // transitions to a new state (menuKey changes via SSE or the next poll).
+    setMenuDismissedKey(menuKey)
     const kind = item.terminal_kind ?? 'claude'
-    const tabId = kind === 'claude' ? claudeTabId : kind === 'codex' ? codexTabId : shellTabId
-    if (!tabId) return
-    void window.pathly?.terminal?.write(tabId, item.command + '\r')
+    setCommandRunning(kind, true)
+    setHiddenMiniCards((s) => ({ ...s, [kind]: false }))
+    const addBackgroundTab = (id: string, label: string, _pane?: 'left' | 'right', tabKind?: 'shell' | 'claude' | 'codex'): void => {
+      addTabSilent(id, label, tabKind)
+      xtermRegistry.getOrCreate(id, { fontSize: 12 })
+    }
+    void writeToTerminal(
+      kind,
+      item.command,
+      projectPath,
+      tabs,
+      addBackgroundTab,
+      open,
+      toggle,
+      rememberTabForKind,
+      openTab,
+      { revealFullTerminal: false }
+    ).catch((err) => {
+      console.error('[handleMenuSelect] terminal write failed:', err)
+      setCommandRunning(kind, false)
+    })
   }
 
   return (
@@ -663,7 +697,19 @@ export function ChatPanel(): JSX.Element {
       <div className={styles.resizeHandle} onMouseDown={onDragStart} />
       <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} hasShellTab={hasShellTab} targetKind={targetKind} onSetTarget={setTargetKind} onToggleChat={toggleChat} onClearChat={handleClearAll} />
       <SkillsPanel onSkillClick={handleSkillClick} />
-      {activeMenu ? <PathlyMenuCard menu={activeMenu} onSelect={handleMenuSelect} /> : null}
+      {/* Pipeline menu — permanent, FSM-state-driven */}
+      {menuVisible ? <PathlyMenuCard menu={activeMenu!} onSelect={handleMenuSelect} isOpen={menuCardOpen} onToggle={() => setMenuCardOpen((v) => !v)} /> : null}
+      {/* Pushed menu — transient, skill-triggered with TTL progress bar */}
+      {pushedMenu ? (
+        <PathlyMenuCard
+          menu={pushedMenu}
+          onSelect={(item) => { handleMenuSelect(item); setPushedMenu(null) }}
+          onDismiss={() => setPushedMenu(null)}
+          onExpire={() => setPushedMenu(null)}
+          isOpen={pushedMenuOpen}
+          onToggle={() => setPushedMenuOpen((v) => !v)}
+        />
+      ) : null}
       <MessageList />
       {automationMessages.length > 0 && automationMessages[automationMessages.length - 1].automationPlan && (
         <>

@@ -7,7 +7,13 @@ export interface PathlyContext {
   featureName: string
   skills: string[]
   studioSchema: StudioElement[]
-  menu: PathlyMenu | null
+  menu: PathlyMenu | null       // pipeline menu — FSM-state-driven, from /status
+  pushedMenu: PushedMenu | null // transient menu — skill-triggered, from /menu/{name}
+}
+
+export interface PushedMenu extends PathlyMenu {
+  ttl: number      // total TTL in seconds
+  pushedAt: number // ms timestamp when the server pushed this menu
 }
 
 export interface PathlyMenuItem {
@@ -37,11 +43,11 @@ const KNOWN_SKILLS = [
 const contextCache = new Map<string, { value: PathlyContext; expiresAt: number }>()
 
 function fallbackContext(): PathlyContext {
-  return { fsmStage: 'unknown', featureName: '', skills: KNOWN_SKILLS, studioSchema: getStudioSchema(), menu: null }
+  return { fsmStage: 'unknown', featureName: '', skills: KNOWN_SKILLS, studioSchema: getStudioSchema(), menu: null, pushedMenu: null }
 }
 
-export async function buildPathlyContext(projectPath?: string): Promise<PathlyContext> {
-  const cacheKey = projectPath ?? ''
+export async function buildPathlyContext(projectPath?: string, topic?: string): Promise<PathlyContext> {
+  const cacheKey = `${projectPath ?? ''}:${topic ?? ''}`
   const now = Date.now()
   const cached = contextCache.get(cacheKey)
   if (cached && cached.expiresAt > now) return cached.value
@@ -50,9 +56,10 @@ export async function buildPathlyContext(projectPath?: string): Promise<PathlyCo
   try {
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 750)
-    const url = projectPath
+    let url = projectPath
       ? `${PATHLY_API_BASE}/status?project_root=${encodeURIComponent(projectPath)}`
       : `${PATHLY_API_BASE}/status`
+    if (topic) url += `&topic=${encodeURIComponent(topic)}`
     const res = await fetch(url, { signal: controller.signal })
     window.clearTimeout(timeout)
     const data = await res.json() as { current_state?: string; feature?: string; menu?: PathlyMenu | null }
@@ -62,6 +69,7 @@ export async function buildPathlyContext(projectPath?: string): Promise<PathlyCo
       skills: KNOWN_SKILLS,
       studioSchema,
       menu: data.menu ?? null,
+      pushedMenu: null, // pushed menus arrive via SSE only, not polling
     }
     contextCache.set(cacheKey, { value, expiresAt: now + 3000 })
     return value
@@ -72,35 +80,55 @@ export async function buildPathlyContext(projectPath?: string): Promise<PathlyCo
   }
 }
 
-/** Force-expire the cache for a project so the next call re-fetches. */
+/** Force-expire all cached entries for a project (all topics) so the next call re-fetches. */
 export function invalidatePathlyContext(projectPath?: string): void {
-  contextCache.delete(projectPath ?? '')
+  const prefix = projectPath ?? ''
+  for (const key of Array.from(contextCache.keys())) {
+    if (key === prefix || key === `${prefix}:` || key.startsWith(`${prefix}:`)) {
+      contextCache.delete(key)
+    }
+  }
 }
 
 /**
- * Subscribe to real-time menu updates pushed by the FSM server via SSE.
- * Called whenever /next_action or /complete_stage produces a new menu.
+ * Subscribe to real-time menu events from the FSM server via SSE.
+ *
+ * MENU_UPDATE  — pipeline menu changed (FSM state transition)
+ * MENU_PUSH    — transient menu pushed by a skill via GET /menu/{name}
+ * MENU_CLEAR   — pushed menu TTL expired (server-side timer fired)
+ *
  * Returns a cleanup function — call it on component unmount.
  */
 export function subscribeToMenuUpdates(
   projectPath: string,
-  onUpdate: (menu: PathlyMenu) => void
+  onPipelineUpdate: (menu: PathlyMenu) => void,
+  onPushedUpdate: (menu: PushedMenu) => void,
+  onPushedClear: () => void,
 ): () => void {
   let es: EventSource | null = null
   try {
     es = new EventSource(`${PATHLY_API_BASE}/events/menu`)
     es.onmessage = (e: MessageEvent) => {
       try {
-        const data = JSON.parse(e.data as string) as { type: string; menu?: PathlyMenu }
+        const data = JSON.parse(e.data as string) as {
+          type: string
+          menu?: PathlyMenu & { ttl?: number; pushed_at?: number }
+        }
         if (data.type === 'MENU_UPDATE' && data.menu) {
           invalidatePathlyContext(projectPath)
-          onUpdate(data.menu)
+          onPipelineUpdate(data.menu)
+        } else if (data.type === 'MENU_PUSH' && data.menu) {
+          onPushedUpdate({
+            ...data.menu,
+            ttl: data.menu.ttl ?? 60,
+            pushedAt: data.menu.pushed_at ?? Date.now(),
+          })
+        } else if (data.type === 'MENU_CLEAR') {
+          onPushedClear()
         }
       } catch { /* ignore parse errors */ }
     }
-    es.onerror = () => {
-      // EventSource auto-reconnects — nothing to do
-    }
+    es.onerror = () => { /* EventSource auto-reconnects */ }
   } catch {
     // EventSource not available (e.g. unit test env) — silently skip
   }

@@ -6,6 +6,7 @@ import styles from './ui.module.css'
 interface IconButtonProps {
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
   title: string
+  description?: string
   shortcut?: string
   placement?: 'top' | 'bottom' | 'left' | 'right'
   children: React.ReactNode
@@ -16,6 +17,7 @@ interface IconButtonProps {
 export function IconButton({
   onClick,
   title,
+  description,
   shortcut,
   placement = 'bottom',
   children,
@@ -44,7 +46,7 @@ export function IconButton({
   }
 
   return (
-    <Tooltip label={title} shortcut={shortcut} placement={placement}>
+    <Tooltip label={title} description={description} shortcut={shortcut} placement={placement}>
       <button
         className={`pathly-btn ${styles.focusVisible}`}
         style={baseStyle}

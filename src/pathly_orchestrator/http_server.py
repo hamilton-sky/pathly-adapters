@@ -178,18 +178,46 @@ _menu_clients: list[queue.Queue] = []
 _menu_lock = threading.Lock()
 
 
-def _push_menu_to_sse(menu: dict) -> None:
-    """Broadcast a menu payload to all connected /events/menu SSE clients."""
-    payload = json.dumps({"type": "MENU_UPDATE", "menu": menu})
+def _broadcast_sse(payload: dict) -> None:
+    """Generic SSE broadcast to all connected /events/menu clients."""
+    raw = json.dumps(payload)
     with _menu_lock:
         dead = [q for q in _menu_clients if q.full()]
         for q in dead:
             _menu_clients.remove(q)
         for q in _menu_clients:
             try:
-                q.put_nowait(payload)
+                q.put_nowait(raw)
             except queue.Full:
                 pass
+
+
+def _push_menu_to_sse(menu: dict) -> None:
+    """Broadcast a pipeline MENU_UPDATE to all connected /events/menu SSE clients."""
+    _broadcast_sse({"type": "MENU_UPDATE", "menu": menu})
+
+
+# ── Pushed-menu TTL timer ────────────────────────────────────────────────────
+_push_timer: threading.Timer | None = None
+_push_timer_lock = threading.Lock()
+
+
+def _fire_push_clear() -> None:
+    global _push_timer
+    with _push_timer_lock:
+        _push_timer = None
+    _broadcast_sse({"type": "MENU_CLEAR"})
+
+
+def _schedule_push_clear(ttl: float) -> None:
+    global _push_timer
+    with _push_timer_lock:
+        if _push_timer is not None:
+            _push_timer.cancel()
+        t = threading.Timer(ttl, _fire_push_clear)
+        t.daemon = True
+        t.start()
+        _push_timer = t
 
 
 def _broadcast(key: tuple[str, str], line: str) -> None:
@@ -264,25 +292,38 @@ def status_endpoint():
     if not plans_dir.exists():
         return jsonify({"current_state": "no-feature", "feature": "", "project_root": project_root, "menu": _NO_FEATURE_MENU}), 200
 
-    # Find the most recently updated STATE.json across all features.
+    topic = request.args.get("topic", "").strip()
     best_state: dict | None = None
-    best_mtime: float = -1.0
-    try:
-        for state_file in plans_dir.glob("*/STATE.json"):
-            if not state_file.resolve().is_relative_to(resolved_root):
-                continue
-            try:
-                mtime = state_file.stat().st_mtime
-                if mtime > best_mtime:
-                    candidate = read_state(str(state_file.parent))
-                    if candidate is not None:
-                        best_mtime = mtime
-                        best_state = candidate
-            except Exception:
-                logger.debug("status: error reading %s", state_file, exc_info=True)
-    except Exception:
-        logger.debug("status: error scanning plans dir", exc_info=True)
-        return jsonify({"current_state": "unknown"}), 200
+
+    if topic:
+        # Specific topic requested — read directly, skip the glob.
+        topic_dir = plans_dir / topic
+        try:
+            if not topic_dir.resolve().is_relative_to(resolved_root):
+                return jsonify({"error": "Invalid topic"}), 400
+        except Exception:
+            return jsonify({"error": "Invalid topic"}), 400
+        if topic_dir.is_dir():
+            best_state = read_state(str(topic_dir))
+    else:
+        # Find the most recently updated STATE.json across all features.
+        best_mtime: float = -1.0
+        try:
+            for state_file in plans_dir.glob("*/STATE.json"):
+                if not state_file.resolve().is_relative_to(resolved_root):
+                    continue
+                try:
+                    mtime = state_file.stat().st_mtime
+                    if mtime > best_mtime:
+                        candidate = read_state(str(state_file.parent))
+                        if candidate is not None:
+                            best_mtime = mtime
+                            best_state = candidate
+                except Exception:
+                    logger.debug("status: error reading %s", state_file, exc_info=True)
+        except Exception:
+            logger.debug("status: error scanning plans dir", exc_info=True)
+            return jsonify({"current_state": "unknown"}), 200
 
     if best_state is None:
         return jsonify({"current_state": "no-feature", "feature": "", "project_root": project_root, "menu": _NO_FEATURE_MENU}), 200
@@ -313,6 +354,70 @@ def status_endpoint():
             "menu": menu,
         }
     ), 200
+
+
+@app.route("/menu/<name>", methods=["GET"])
+def get_named_menu(name: str):
+    """Return a pre-defined named menu, broadcast it as MENU_PUSH via SSE, start TTL.
+
+    Query params:
+      feature (optional): substituted into {feature} placeholders in title/descriptions.
+      state   (optional): FSM state name (e.g. BUILDING); items whose `states:` list
+                          does not include this state are filtered out.  Items with no
+                          `states:` field are always included.
+
+    The Studio Conductor shows the menu until TTL expires (MENU_CLEAR SSE event)
+    or the user dismisses it.  Skills call this endpoint instead of rendering
+    ASCII menus in the terminal.
+    """
+    feature = request.args.get("feature", "").strip()
+    state = request.args.get("state", "").strip().upper()
+
+    try:
+        from importlib.resources import files as _res_files
+        import yaml as _yaml
+        all_menus = _yaml.safe_load(
+            _res_files("pathly_data").joinpath("core/menus.yaml").read_text(encoding="utf-8")
+        ) or {}
+    except Exception:
+        logger.debug("get_named_menu: failed to load menus.yaml", exc_info=True)
+        return jsonify({"error": "Menu registry unavailable"}), 503
+
+    if name not in all_menus:
+        return jsonify({"error": f"Unknown menu: '{name}'"}), 404
+
+    raw = all_menus[name]
+    ttl = float(raw.get("ttl", 60))
+    pushed_at_ms = int(time.time() * 1000)
+
+    def sub(text: str) -> str:
+        return text.replace("{feature}", feature) if feature and isinstance(text, str) else (text or "")
+
+    menu = {
+        "state": name,
+        "feature": feature,
+        "agent": "director",
+        "title": sub(raw.get("title", name)),
+        "subtitle": sub(raw.get("subtitle", "")),
+        "items": [
+            {
+                "label": item.get("label", ""),
+                "description": sub(item.get("description", "")),
+                "command": item.get("command", ""),
+                "terminal_kind": item.get("terminal_kind", "claude"),
+            }
+            for item in raw.get("items", [])
+            if not item.get("states") or not state or state in [s.upper() for s in item["states"]]
+        ],
+        "empty_message": raw.get("empty_message", "No options available."),
+        "ttl": ttl,
+        "pushed_at": pushed_at_ms,
+    }
+
+    _broadcast_sse({"type": "MENU_PUSH", "menu": menu})
+    _schedule_push_clear(ttl)
+
+    return jsonify({"status": "pushed", "menu": menu}), 200
 
 
 @app.route("/metrics", methods=["GET"])
