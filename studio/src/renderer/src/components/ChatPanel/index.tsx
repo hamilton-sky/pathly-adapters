@@ -6,7 +6,7 @@ import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
-import { buildPathlyContext } from '../../lib/pathlyContext'
+import { buildPathlyContext, invalidatePathlyContext } from '../../lib/pathlyContext'
 import { hasEmbeddedSkills, matchIntent, matchIntentByName, preEmbedSkills } from '../../lib/embedRouter'
 import { askLlm, getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
 import { splitThinkingContent } from '../../lib/thinkingParser'
@@ -280,15 +280,23 @@ export function ChatPanel(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false
-    buildPathlyContext(projectPath ?? undefined)
-      .then((ctx) => {
-        if (!cancelled) setPathlyContext(ctx)
-      })
-      .catch(() => {
-        if (!cancelled) setPathlyContext(null)
-      })
+
+    const fetchContext = (): void => {
+      buildPathlyContext(projectPath ?? undefined)
+        .then((ctx) => { if (!cancelled) setPathlyContext(ctx) })
+        .catch(() => { if (!cancelled) setPathlyContext(null) })
+    }
+
+    // Invalidate stale cache when project changes, then fetch immediately.
+    invalidatePathlyContext(projectPath ?? undefined)
+    fetchContext()
+
+    // Poll every 5 s so the card stays in sync with FSM state changes.
+    const interval = window.setInterval(fetchContext, 5000)
+
     return () => {
       cancelled = true
+      window.clearInterval(interval)
     }
   }, [projectPath])
 
@@ -346,7 +354,7 @@ export function ChatPanel(): JSX.Element {
     try {
       ;[matches, context] = await Promise.all([
         canUseEmbedding ? matchIntent(text) : Promise.resolve(matchIntentByName(text, loadSkills())),
-        buildPathlyContext(),
+        buildPathlyContext(projectPath ?? undefined),
       ])
     } catch {
       // Embedding failed (e.g. model download error) — continue with no match.

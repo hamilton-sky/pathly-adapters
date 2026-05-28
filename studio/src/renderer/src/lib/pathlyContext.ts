@@ -33,15 +33,18 @@ const KNOWN_SKILLS = [
   'explore', 'debug', 'design', 'fix', 'status', 'log', 'end',
 ]
 
-let cachedContext: { value: PathlyContext; expiresAt: number } | null = null
+// Per-project cache — keyed by projectPath (or '' for unknown).
+const contextCache = new Map<string, { value: PathlyContext; expiresAt: number }>()
 
 function fallbackContext(): PathlyContext {
   return { fsmStage: 'unknown', featureName: '', skills: KNOWN_SKILLS, studioSchema: getStudioSchema(), menu: null }
 }
 
 export async function buildPathlyContext(projectPath?: string): Promise<PathlyContext> {
+  const cacheKey = projectPath ?? ''
   const now = Date.now()
-  if (cachedContext && cachedContext.expiresAt > now) return cachedContext.value
+  const cached = contextCache.get(cacheKey)
+  if (cached && cached.expiresAt > now) return cached.value
 
   const studioSchema = getStudioSchema()
   try {
@@ -60,11 +63,16 @@ export async function buildPathlyContext(projectPath?: string): Promise<PathlyCo
       studioSchema,
       menu: data.menu ?? null,
     }
-    cachedContext = { value, expiresAt: now + 3000 }
+    contextCache.set(cacheKey, { value, expiresAt: now + 3000 })
     return value
   } catch {
     const value = fallbackContext()
-    cachedContext = { value, expiresAt: now + 1000 }
+    contextCache.set(cacheKey, { value, expiresAt: now + 1000 })
     return value
   }
+}
+
+/** Force-expire the cache for a project so the next call re-fetches. */
+export function invalidatePathlyContext(projectPath?: string): void {
+  contextCache.delete(projectPath ?? '')
 }
