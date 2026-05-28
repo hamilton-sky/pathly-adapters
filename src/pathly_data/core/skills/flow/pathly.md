@@ -180,9 +180,30 @@ write a read-only consult note to `pathly/plans/<feature>/feedback/CONSULT_<role
    - **build-done** — all conversations DONE, no RETRO.md yet
    - **retro-done** — RETRO.md exists
 
-**Step 2 — Print state-aware menu**
+**Step 2 — Fetch menu from FSM and render**
 
-### no-feature
+Invoke `Skill("pathly-fsm-call")` to call the `/status` endpoint.
+
+If the response contains a `menu` object with one or more items, render it as:
+
+```
+═══════════════════════════════════════════
+  {menu.title}
+  {menu.subtitle}
+═══════════════════════════════════════════
+
+  [1] {items[0].label:<32} {items[0].command}
+  [2] {items[1].label:<32} {items[1].command}
+  ...
+
+Reply with 1–{N}, or type a command directly:
+```
+
+Wait for user input. Route:
+- **Number N**: execute `items[N-1].command`
+- **Free text**: treat as intent → route via **go** behavior
+
+If the FSM is unreachable or returns no menu items, use this fallback:
 
 ```
 ═══════════════════════════════════════════
@@ -190,79 +211,11 @@ write a read-only consult note to `pathly/plans/<feature>/feedback/CONSULT_<role
 ═══════════════════════════════════════════
 
   [1] Start a new feature          /pathly go <what you want>
-  [2] Brainstorm an unclear idea   /pathly go storm
+  [2] Brainstorm an idea           /pathly storm
   [3] Import a PRD/BMAD file       /pathly prd-import
-  [4] See all commands
+  [4] Explore the codebase         /pathly explore
 
-Reply with 1–4:
-```
-
-### plan-done
-
-```
-═══════════════════════════════════════════
-  <feature>  |  Plan ready
-  Conv: <X> done · <Y> remaining
-  Rigor: <lite|standard|strict>
-═══════════════════════════════════════════
-
-  [1] Continue building            /pathly go continue
-  [2] Run full pipeline            /pathly team build
-  [3] Review current code          /pathly review
-  [4] See all commands
-
-Reply with 1–4:
-```
-
-### feedback-open
-
-```
-═══════════════════════════════════════════
-  <feature>  |  Open feedback requires action
-  Rigor: <lite|standard|strict>
-═══════════════════════════════════════════
-
-  Open files:
-    <list each file → who must act>
-
-  [1] Resume pipeline              /pathly go continue
-  [2] Show feedback file content
-  [3] See all commands
-
-Reply with 1–3:
-```
-
-### build-done
-
-```
-═══════════════════════════════════════════
-  <feature>  |  All conversations complete
-  Rigor: <lite|standard|strict>
-═══════════════════════════════════════════
-
-  [1] Close feature (tests + retro)  /pathly end
-  [2] Run tests only                  /pathly team test
-  [3] Write retro only                /pathly retro
-  [4] See all commands
-
-Reply with 1–4:
-```
-
-### retro-done
-
-```
-═══════════════════════════════════════════
-  <feature>  |  DONE ✓
-  RETRO.md written
-  Rigor: <lite|standard|strict>
-═══════════════════════════════════════════
-
-  [1] Archive this feature         /pathly archive
-  [2] Promote lessons              /pathly lessons
-  [3] Start next feature           /pathly go <what you want>
-  [4] Read the retro
-
-Reply with 1–4:
+Reply with 1–4, or describe what you want:
 ```
 
 **Step 3 — Full command reference (shown on "See all commands")**

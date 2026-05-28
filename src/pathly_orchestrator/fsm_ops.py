@@ -47,6 +47,17 @@ _MENU_LABELS = {
     "DONE": "Feature complete.",
 }
 
+_STATE_TO_COMMAND = {
+    "STORMING": "/pathly storm",
+    "PLANNING": "/pathly plan",
+    "DESIGNING": "/pathly design",
+    "BUILDING": "/pathly build",
+    "REVIEWING": "/pathly review",
+    "TESTING": "/pathly test",
+    "RETRO": "/pathly retro",
+    "DONE": "/pathly end",
+}
+
 # ── Private helpers ───────────────────────────────────────────────────────────
 
 
@@ -164,6 +175,7 @@ def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -
                         "description": f"Route to {target}",
                         "command": str(label),
                         "target_state": str(target),
+                        "terminal_kind": "claude",
                     }
                 )
 
@@ -173,8 +185,9 @@ def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -
                 {
                     "label": target,
                     "description": _MENU_LABELS.get(target, f"Advance to {target}."),
-                    "command": target,
+                    "command": _STATE_TO_COMMAND.get(target, f"/pathly {target.lower()}"),
                     "target_state": target,
+                    "terminal_kind": "claude",
                 }
             )
 

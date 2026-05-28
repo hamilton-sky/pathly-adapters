@@ -1,12 +1,13 @@
-import type { PathlyMenu } from '../../lib/pathlyContext'
+import type { PathlyMenu, PathlyMenuItem } from '../../lib/pathlyContext'
 import { useTheme } from '../../useTheme'
 import styles from './PathlyMenuCard.module.css'
 
 interface PathlyMenuCardProps {
   menu: PathlyMenu
+  onSelect?: (item: PathlyMenuItem) => void
 }
 
-export function PathlyMenuCard({ menu }: PathlyMenuCardProps): JSX.Element {
+export function PathlyMenuCard({ menu, onSelect }: PathlyMenuCardProps): JSX.Element {
   const t = useTheme()
 
   return (
@@ -25,7 +26,12 @@ export function PathlyMenuCard({ menu }: PathlyMenuCardProps): JSX.Element {
 
       <div className={styles.items}>
         {menu.items.length > 0 ? menu.items.map((item) => (
-          <div key={`${item.label}-${item.command}`} className={styles.item}>
+          <button
+            key={`${item.label}-${item.command}`}
+            className={`${styles.item} ${onSelect ? styles.itemClickable : ''}`}
+            onClick={onSelect ? () => onSelect(item) : undefined}
+            aria-label={`Select: ${item.label}`}
+          >
             <div className={styles.itemTop}>
               <span className={styles.itemLabel} style={{ color: t.textPrimary }}>{item.label}</span>
               <code className={styles.itemCommand} style={{ color: t.textMuted }}>{item.command}</code>
@@ -33,7 +39,7 @@ export function PathlyMenuCard({ menu }: PathlyMenuCardProps): JSX.Element {
             <div className={styles.itemDescription} style={{ color: t.textSecondary }}>
               {item.description}
             </div>
-          </div>
+          </button>
         )) : (
           <div className={styles.empty} style={{ color: t.textMuted }}>
             {menu.empty_message}

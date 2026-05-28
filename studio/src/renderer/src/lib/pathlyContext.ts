@@ -15,6 +15,7 @@ export interface PathlyMenuItem {
   description: string
   command: string
   target_state?: string
+  terminal_kind?: 'claude' | 'codex' | 'shell'
 }
 
 export interface PathlyMenu {
@@ -38,7 +39,7 @@ function fallbackContext(): PathlyContext {
   return { fsmStage: 'unknown', featureName: '', skills: KNOWN_SKILLS, studioSchema: getStudioSchema(), menu: null }
 }
 
-export async function buildPathlyContext(): Promise<PathlyContext> {
+export async function buildPathlyContext(projectPath?: string): Promise<PathlyContext> {
   const now = Date.now()
   if (cachedContext && cachedContext.expiresAt > now) return cachedContext.value
 
@@ -46,7 +47,10 @@ export async function buildPathlyContext(): Promise<PathlyContext> {
   try {
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 750)
-    const res = await fetch(`${PATHLY_API_BASE}/status`, { signal: controller.signal })
+    const url = projectPath
+      ? `${PATHLY_API_BASE}/status?project_root=${encodeURIComponent(projectPath)}`
+      : `${PATHLY_API_BASE}/status`
+    const res = await fetch(url, { signal: controller.signal })
     window.clearTimeout(timeout)
     const data = await res.json() as { current_state?: string; feature?: string; menu?: PathlyMenu | null }
     const value = {

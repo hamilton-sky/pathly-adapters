@@ -280,7 +280,7 @@ export function ChatPanel(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false
-    buildPathlyContext()
+    buildPathlyContext(projectPath ?? undefined)
       .then((ctx) => {
         if (!cancelled) setPathlyContext(ctx)
       })
@@ -628,6 +628,13 @@ export function ChatPanel(): JSX.Element {
     return null
   }
 
+  function handleMenuSelect(item: import('../../lib/pathlyContext').PathlyMenuItem): void {
+    const kind = item.terminal_kind ?? 'claude'
+    const tabId = kind === 'claude' ? claudeTabId : kind === 'codex' ? codexTabId : shellTabId
+    if (!tabId) return
+    void window.pathly?.terminal?.write(tabId, item.command + '\r')
+  }
+
   return (
     <div
       ref={chatRef}
@@ -638,7 +645,7 @@ export function ChatPanel(): JSX.Element {
       <div className={styles.resizeHandle} onMouseDown={onDragStart} />
       <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} hasShellTab={hasShellTab} targetKind={targetKind} onSetTarget={setTargetKind} onToggleChat={toggleChat} onClearChat={handleClearAll} />
       <SkillsPanel onSkillClick={handleSkillClick} />
-      {activeMenu ? <PathlyMenuCard menu={activeMenu} /> : null}
+      {activeMenu ? <PathlyMenuCard menu={activeMenu} onSelect={handleMenuSelect} /> : null}
       <MessageList />
       {automationMessages.length > 0 && automationMessages[automationMessages.length - 1].automationPlan && (
         <>

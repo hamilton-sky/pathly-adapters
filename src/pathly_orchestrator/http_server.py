@@ -40,6 +40,21 @@ from pathly_orchestrator.fsm_ops import build_menu_payload, next_action, complet
 from pathly_orchestrator.chat_agent import handle_chat
 from pathly_telemetry.storage import append_activity
 
+_NO_FEATURE_MENU = {
+    "state": "no-feature",
+    "feature": "",
+    "agent": "director",
+    "title": "Pathly · No active feature",
+    "subtitle": "Start a new feature or explore the codebase.",
+    "items": [
+        {"label": "Start a new feature", "description": "Describe it and let the director route.", "command": "/pathly go", "terminal_kind": "claude"},
+        {"label": "Brainstorm an idea", "description": "Open an architect storm session.", "command": "/pathly storm", "terminal_kind": "claude"},
+        {"label": "Import a PRD file", "description": "Import requirements from a PRD or BMAD file.", "command": "/pathly prd-import", "terminal_kind": "claude"},
+        {"label": "Explore the codebase", "description": "Read-only Q&A about the project.", "command": "/pathly explore", "terminal_kind": "claude"},
+    ],
+    "empty_message": "No menu items available.",
+}
+
 
 class _JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -229,7 +244,7 @@ def status_endpoint():
     if not plans_dir.resolve().is_relative_to(resolved_root):
         return jsonify({"error": "Invalid project_root"}), 400
     if not plans_dir.exists():
-        return jsonify({"current_state": "unknown"}), 200
+        return jsonify({"current_state": "no-feature", "feature": "", "project_root": project_root, "menu": _NO_FEATURE_MENU}), 200
 
     # Find the most recently updated STATE.json across all features.
     best_state: dict | None = None
@@ -252,22 +267,23 @@ def status_endpoint():
         return jsonify({"current_state": "unknown"}), 200
 
     if best_state is None:
-        return jsonify({"current_state": "unknown"}), 200
+        return jsonify({"current_state": "no-feature", "feature": "", "project_root": project_root, "menu": _NO_FEATURE_MENU}), 200
 
     menu = None
     try:
-        flow_file = resolved_root / "src" / "pathly_data" / "core" / "flows" / "team.flow.yaml"
-        if flow_file.exists():
-            import yaml
+        from importlib.resources import files
+        import yaml
 
-            flow_config = yaml.safe_load(flow_file.read_text(encoding="utf-8"))
-            feature = best_state.get("feature", "")
-            storage_path = resolved_root / "pathly" / "plans" / feature
-            menu = build_menu_payload(
-                flow_config,
-                best_state.get("current", "unknown"),
-                storage_path,
-            )
+        flow_config = yaml.safe_load(
+            files("pathly_data").joinpath("core/flows/team.flow.yaml").read_text(encoding="utf-8")
+        )
+        feature = best_state.get("feature", "")
+        storage_path = resolved_root / "pathly" / "plans" / feature
+        menu = build_menu_payload(
+            flow_config,
+            best_state.get("current", "unknown"),
+            storage_path,
+        )
     except Exception:
         logger.debug("status: error building menu payload", exc_info=True)
 
