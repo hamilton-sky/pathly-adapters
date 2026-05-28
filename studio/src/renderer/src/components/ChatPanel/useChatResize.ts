@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 
 const CHAT_WIDTH_KEY = 'chat-panel-width'
-const MIN_WIDTH = 260
+// Keep enough room for the Conductor header controls in compact mode.
+const MIN_WIDTH = 320
 const MAX_WIDTH = 720
 
 export function useChatResize(): {

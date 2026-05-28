@@ -47,6 +47,10 @@
   transition: border-color 150ms ease-out, background 150ms ease-out;
 }
 
+.pillCompact {
+  padding-right: 4px;
+}
+
 .pillSelected {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 15%, var(--bg-surface1));
