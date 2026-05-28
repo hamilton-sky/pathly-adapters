@@ -534,7 +534,7 @@ export function Sidebar(): JSX.Element | null {
         onFlowWizardClose={() => setShowFlowWizard(false)}
         onFlowWizardCreated={(filePath) => {
           setShowFlowWizard(false)
-          setSections((prev) => ({ ...prev, Flows: { ...prev.Flows, open: true } }))
+          setSections((prev) => ({ ...prev, UserFlows: { ...prev.UserFlows, open: true } }))
           loadItems().then(() => {
             if (filePath) {
               const item: PathlyItem = {

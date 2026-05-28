@@ -19,7 +19,7 @@ import { validateStep } from './FlowWizard.validation'
 import { FieldError } from '../ui'
 
 export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
-  const { projectPath } = useStore()
+  const { pathlyUserHome } = useStore()
   const t = useTheme()
   const styles = makeStyles(t)
 
@@ -127,10 +127,13 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   }
 
   async function handleSave(): Promise<void> {
-    if (!projectPath) return
+    if (!pathlyUserHome) {
+      setSaveError('User library path is not available')
+      return
+    }
     const trimmedName = flowName.trim()
     const yaml = generateYaml(trimmedName, storagePath, states.filter((s) => s.trim()), agentMap, transitions, gates, feedbackRoutes, transitionRules)
-    const filePath = `${projectPath}/src/pathly_data/core/flows/${trimmedName}.flow.yaml`
+    const filePath = `${pathlyUserHome}/flows/${trimmedName}.flow.yaml`
     setSaving(true)
     try {
       await writeFile(filePath, yaml)
