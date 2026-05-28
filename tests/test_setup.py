@@ -202,6 +202,9 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
 
     build_skill = captured_plugin_files["skills/pathly-build/SKILL.md"]
     assert "## Codex Execution Contract" in build_skill
+    assert "codex_subagent" in build_skill
+    assert "`worker`" in build_skill
+    assert "`explorer`" in build_skill
     assert "Never block or claim failure solely because a named Pathly role" in build_skill
     assert build_skill.index("## Codex Execution Contract") < build_skill.index("# build")
 

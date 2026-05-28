@@ -39,6 +39,18 @@ DECIDE_FLOW = {
     "transition_actions": {},
 }
 
+ROUTING_FLOW = {
+    "version": 1,
+    "flow": "test",
+    "storage_path": "pathly/plans/{topic}/",
+    "states": ["BUILDING"],
+    "transitions": {"BUILDING": []},
+    "agent_map": {"BUILDING": "builder"},
+    "feedback_routing": {},
+    "transition_rules": {},
+    "transition_actions": {},
+}
+
 
 def _storage_path(tmp_path: Path, topic: str = "test-topic") -> Path:
     p = tmp_path / "pathly" / "plans" / topic
@@ -56,6 +68,32 @@ def test_next_action_initial_state(tmp_path):
     })
     assert result["current_state"] == "STORMING"
     assert result["agent"] == "team/discover"
+
+
+def test_next_action_includes_codex_worker_hint(tmp_path, monkeypatch):
+    _patch_load_flow(monkeypatch, ROUTING_FLOW)
+    _patch_build_prompt(monkeypatch)
+
+    result = next_action({
+        "flow": "test",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+
+    assert result["agent"] == "builder"
+    hint = result["codex_subagent"]
+    assert hint["pathly_agent"] == "builder"
+    assert hint["codex_role"] == "worker"
+    assert "PATHLY AGENT: builder" in hint["instructions"]
+    assert "instructions for BUILDING" in hint["instructions"]
+
+
+def test_codex_hint_maps_research_agents_to_explorer():
+    hint = fsm_ops._codex_subagent_hint("scout", "find the relevant files")
+
+    assert hint["pathly_agent"] == "scout"
+    assert hint["codex_role"] == "explorer"
+    assert "find the relevant files" in hint["instructions"]
 
 
 def test_complete_stage_after_planning(tmp_path):
@@ -88,6 +126,8 @@ def test_complete_stage_blocked_by_review_failures(tmp_path):
     assert result.get("blocked") is True
     assert result.get("target_agent") == "builder"
     assert "# builder" in result["instructions"]
+    assert result["codex_subagent"]["pathly_agent"] == "builder"
+    assert result["codex_subagent"]["codex_role"] == "worker"
 
 
 # ── Two-call decide protocol ──────────────────────────────────────────────────

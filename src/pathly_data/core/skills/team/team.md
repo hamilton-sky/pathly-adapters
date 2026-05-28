@@ -159,9 +159,9 @@ Invoke the `fsm-call` skill with:
 ```
 
 Receives one of:
-- `{current_state, agent, instructions, storage_path, limits}` — normal routing
+- `{current_state, agent, instructions, codex_subagent, storage_path, limits}` — normal routing
 - `{blocked: true, target_agent: "human", file, instructions, limits}` — human must decide
-- `{blocked: true, target_agent: <agent>, file, instructions, limits}` — feedback to resolve
+- `{blocked: true, target_agent: <agent>, file, instructions, codex_subagent, limits}` — feedback to resolve
 
 ### Step 2 — Display contextual menu
 
@@ -222,6 +222,15 @@ In auto-flow mode, default to [1] without asking. Note "auto-flow: proceeding".
 
 Execute the instructions returned by the `next_action` result for the returned agent.
 
+In Codex, if the named Pathly agent is not callable and the response includes
+`codex_subagent`, use that payload as the fallback routing contract:
+- If `codex_subagent.codex_role` is `worker`, spawn a Codex worker with
+  `codex_subagent.instructions`.
+- If `codex_subagent.codex_role` is `explorer`, spawn a Codex explorer with
+  `codex_subagent.instructions`.
+- If the active Codex session cannot delegate, execute `codex_subagent.instructions`
+  in the current agent and state that Codex subagent delegation was unavailable.
+
 Track per stage (reset each stage):
 - `needs_context_count = 0`
 - `feedback_round_count = 0`
@@ -267,10 +276,10 @@ Invoke the `fsm-call` skill with:
 Add `decision` or `resolved_files` fields when applicable.
 
 Receives one of:
-- `{next_state, agent, instructions, limits}` — advance
+- `{next_state, agent, instructions, codex_subagent, limits}` — advance
 - `{done: true}` — pipeline complete
 - `{blocked: true, target_agent: "human", file, instructions}` — human must decide
-- `{blocked: true, target_agent: <agent>, file, instructions}` — feedback to resolve
+- `{blocked: true, target_agent: <agent>, file, instructions, codex_subagent}` — feedback to resolve
 - `{decide: true, question, context, options, default}` — Level 3 routing
 
 **Feedback resolution loop:**

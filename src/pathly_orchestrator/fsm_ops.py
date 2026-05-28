@@ -34,6 +34,8 @@ _AGENT_GROUPS = {
     "web-researcher": "research",
 }
 
+_CODEX_EXPLORER_AGENTS = {"explorer", "quick", "scout", "web-researcher"}
+
 # ── Private helpers ───────────────────────────────────────────────────────────
 
 
@@ -92,6 +94,27 @@ def build_prompt_for_agent(
         f"Storage path: {storage_path}\n"
     )
     return agent_text + context
+
+
+def _codex_subagent_hint(agent: str, instructions: str | None) -> dict:
+    codex_role = "explorer" if agent in _CODEX_EXPLORER_AGENTS else "worker"
+    prompt = (
+        f"PATHLY AGENT: {agent}\n"
+        f"CODEX FALLBACK ROLE: {codex_role}\n\n"
+        "Use the Pathly role instructions below as the source of truth. "
+        "Preserve the requested artifacts, limits, and completion signal. "
+        "Do not revert unrelated user changes.\n\n"
+    )
+    if instructions:
+        prompt += instructions
+    else:
+        prompt += "No role instructions were available. Report this as a Pathly routing issue."
+    return {
+        "pathly_agent": agent,
+        "codex_role": codex_role,
+        "mode": "native-pathly-agent-if-callable-else-codex-role",
+        "instructions": prompt,
+    }
 
 
 def _blocked_response(feedback: dict, state_info: dict) -> dict:
@@ -166,16 +189,21 @@ def next_action(args: dict) -> dict:
                     flow_config, feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
+                result["codex_subagent"] = _codex_subagent_hint(
+                    feedback["target_agent"], instructions
+                )
             except Exception:
                 result["instructions"] = None
         return result
 
     instructions = build_prompt(flow_config, state_info["current_state"], storage_path)
+    agent = flow_config["agent_map"][state_info["current_state"]]
     return {
         "current_state": state_info["current_state"],
         "conv": state_info["conv"],
-        "agent": flow_config["agent_map"][state_info["current_state"]],
+        "agent": agent,
         "instructions": instructions,
+        "codex_subagent": _codex_subagent_hint(agent, instructions),
         "storage_path": str(storage_path),
         "limits": state_info["limits"],
     }
@@ -220,6 +248,9 @@ def complete_stage(args: dict) -> dict:
                     flow_config, feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
+                result["codex_subagent"] = _codex_subagent_hint(
+                    feedback["target_agent"], instructions
+                )
             except Exception:
                 result["instructions"] = None
         return result
@@ -278,7 +309,19 @@ def complete_stage(args: dict) -> dict:
         feedback = route_feedback(flow_config, storage_path)
         if feedback is None:
             feedback = {"target_agent": "human", "file": gate_failure.get("feedback_file", "HUMAN_QUESTIONS.md")}
-        return _blocked_response(feedback, state_info)
+        result = _blocked_response(feedback, state_info)
+        if feedback["target_agent"] != "human":
+            try:
+                instructions = build_prompt_for_agent(
+                    flow_config, feedback["target_agent"], storage_path
+                )
+                result["instructions"] = instructions
+                result["codex_subagent"] = _codex_subagent_hint(
+                    feedback["target_agent"], instructions
+                )
+            except Exception:
+                result["instructions"] = None
+        return result
 
     if state_before is not None and state_file.exists():
         try:
@@ -314,9 +357,11 @@ def complete_stage(args: dict) -> dict:
         return {"done": True}
 
     instructions = build_prompt(flow_config, next_state, storage_path)
+    agent = flow_config["agent_map"][next_state]
     return {
         "next_state": next_state,
-        "agent": flow_config["agent_map"][next_state],
+        "agent": agent,
         "instructions": instructions,
+        "codex_subagent": _codex_subagent_hint(agent, instructions),
         "limits": state_info["limits"],
     }
