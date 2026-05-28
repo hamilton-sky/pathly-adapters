@@ -296,9 +296,11 @@ def complete_stage(args: dict) -> dict:
                 },
             )
     else:
-        assert isinstance(
-            eval_result, str
-        ), f"Unexpected result type: {type(eval_result)}"
+        if not isinstance(eval_result, str):
+            raise RuntimeError(
+                f"evaluate_transition_rules returned unexpected type {type(eval_result)!r}; "
+                f"expected str or decide-dict"
+            )
         next_state = eval_result
 
     gate_failure = run_gates(
@@ -340,7 +342,10 @@ def complete_stage(args: dict) -> dict:
         state_info["conv"],
     )
 
-    prior_state = state_before or {}
+    prior_state = dict(state_before or {})
+    # Clear the per-conversation git baseline so the *next* conversation
+    # gets a fresh SHA stamp from next_action — not the previous conv's baseline.
+    prior_state.pop("conv_start_sha", None)
     write_state(storage_path, next_state, prior_state)
 
     append_event(

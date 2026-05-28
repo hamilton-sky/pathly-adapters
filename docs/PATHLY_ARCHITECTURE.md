@@ -102,7 +102,10 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │           ├── codex/           ← .codex-plugin/ + _meta/*.yaml per agent/skill
 │           └── copilot/         ← _meta/*.yaml per agent/skill
 │
-└── pyproject.toml               ← entry_points: pathly-setup, pathly-tokens, pathly-events, pathly-state
+└── pyproject.toml               ← entry_points: pathly-setup, pathly-tokens, pathly-events, pathly-state,
+                                                  pathly-fsm-http, pathly-validate-flow, pathly-run,
+                                                  pathly-status, pathly-log, pathly-back, pathly-ff,
+                                                  pathly-studio, pathly-design
 ```
 
 ---

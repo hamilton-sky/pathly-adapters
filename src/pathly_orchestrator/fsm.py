@@ -348,9 +348,10 @@ def _verify_passed(path: Path, marker: str) -> bool:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return False
+    # Scan all non-empty lines — the marker may appear after front-matter or headers.
     for line in text.splitlines():
-        if line.strip():
-            return line.strip() == marker
+        if line.strip() == marker:
+            return True
     return False
 
 

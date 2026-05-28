@@ -127,16 +127,19 @@ twine upload dist/*
 | [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) | Adapter release criteria: install checks for each host, pathly-setup flags, package build/publish, marketplace manifests |
 | [docs/SECURITY.md](docs/SECURITY.md) | Hook injection risks, subprocess calls in installer, file write safety, trust boundaries, marketplace manifest integrity |
 | [docs/SYSTEM_REVIEW.md](docs/SYSTEM_REVIEW.md) | Adapter strengths, risks, design decisions, hardening recommendations |
-| [src/pathly_data/core/SKILLS_OVERVIEW.md](src/pathly_data/core/SKILLS_OVERVIEW.md) | Full reference for all 28 user-facing Pathly skills with ASCII flow diagrams |
+| [src/pathly_data/core/SKILLS_OVERVIEW.md](src/pathly_data/core/SKILLS_OVERVIEW.md) | Full reference for all 29 user-facing Pathly skills + 2 internal transition-action skills, with ASCII flow diagrams |
+| [docs/API.md](docs/API.md) | FSM HTTP server endpoint contracts (request/response shapes, error codes) |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Environment variables, persistent server setup (systemd/launchd), hook configuration |
+| [docs/PHONE_NOTIFICATIONS.md](docs/PHONE_NOTIFICATIONS.md) | Design notes for phone push notifications via the FSM event stream |
+| [docs/RISK_ASSESSMENT.md](docs/RISK_ASSESSMENT.md) | Architecture risk assessment — known issues and proposed solutions |
+| [docs/PATHLY_IMPROVEMENT_RECOMMENDATIONS.md](docs/PATHLY_IMPROVEMENT_RECOMMENDATIONS.md) | Improvement recommendations: agents, skills, flow design, and Python FSM engine |
 
 For engine-specific docs (FSM, orchestrator, state machine, team-flow driver):
 see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) — `pathly-engine/docs/` folder.
 
 ## Release Status
 
-Stable (2.9.0). Core install path (`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on failure. Copilot destination paths follow the VS Code Copilot agent spec and may require `--repair` after a VS Code update.
-
-**2.9.0 changes:** FSM and telemetry run over HTTP. All skills now use the shared `fsm-call` skill, which auto-starts the HTTP server. No local transport server is registered during install.
+Stable (2.11.9). Core install path (`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on failure. Copilot destination paths follow the VS Code Copilot agent spec and may require `--repair` after a VS Code update.
 
 ## Known Limitations
 
