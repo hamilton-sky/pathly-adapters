@@ -31,9 +31,11 @@ export function ModelSelector(): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
 
   const selectedModelId = useModelStore((s) => s.selectedModelId)
+  const responseMode = useModelStore((s) => s.responseMode)
   const cachedModelIds = useModelStore((s) => s.cachedModelIds)
   const downloadProgress = useModelStore((s) => s.downloadProgress)
   const setSelectedModel = useModelStore((s) => s.setSelectedModel)
+  const setResponseMode = useModelStore((s) => s.setResponseMode)
   const setCached = useModelStore((s) => s.setCached)
   const setProgress = useModelStore((s) => s.setProgress)
 
@@ -205,6 +207,22 @@ export function ModelSelector(): JSX.Element {
 
       {open && (
         <div className={styles.panel}>
+          <div className={styles.modeToggle} role="group" aria-label="Response mode">
+            <button
+              className={`${styles.modeBtn} ${responseMode === 'fast' ? styles.modeBtnActive : ''}`}
+              onClick={() => setResponseMode('fast')}
+              type="button"
+            >
+              Fast
+            </button>
+            <button
+              className={`${styles.modeBtn} ${responseMode === 'deep' ? styles.modeBtnActive : ''}`}
+              onClick={() => setResponseMode('deep')}
+              type="button"
+            >
+              Deep
+            </button>
+          </div>
           {!ollamaAvailable && llmAvailable !== true && (
             <div className={styles.noBackendNote}>
               <strong>No AI backend detected.</strong>

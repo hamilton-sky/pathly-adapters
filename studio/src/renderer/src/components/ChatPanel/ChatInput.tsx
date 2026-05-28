@@ -1,4 +1,5 @@
-import { Send, Square } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Send, Square, TerminalSquare, ChevronUp } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import { useChatStore } from '../../store/chatStore'
 import { ModelSelector } from './ModelSelector'
@@ -12,16 +13,30 @@ interface ChatInputProps {
   disabled?: boolean
   isLoading?: boolean
   onStop?: () => void
+  onToggleMiniTerminal?: () => void
+  onLaunchMiniTerminal?: (kind: 'shell' | 'claude' | 'codex') => void
+  miniTerminalActive?: boolean
+  miniTerminalColor?: string
 }
 
-export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop }: ChatInputProps): JSX.Element {
+export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop, onToggleMiniTerminal, onLaunchMiniTerminal, miniTerminalActive, miniTerminalColor }: ChatInputProps): JSX.Element {
   const t = useTheme()
   const isEmbedding = useChatStore((s) => s.isEmbedding)
   const embedReady = useChatStore((s) => s.embedReady)
   const embedProgress = useChatStore((s) => s.embedProgress)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const groupRef = useRef<HTMLDivElement>(null)
 
-  const isModelLoading = !embedReady
-  const isDownloading = isModelLoading
+  const isRouterLoading = !embedReady
+
+  useEffect(() => {
+    if (!dropdownOpen) return
+    const handler = (e: MouseEvent): void => {
+      if (!groupRef.current?.contains(e.target as Node)) setDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [dropdownOpen])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -39,7 +54,7 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
       style={{ borderTop: t.border, background: t.bgSurface0 }}
     >
       {/* Model loading bar — shown from first mount until model is ready */}
-      {isModelLoading && (
+      {isRouterLoading && (
         <div className={styles.downloadBar}>
           <div className={styles.downloadLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyMono }}>
             {embedProgress > 0
@@ -65,8 +80,8 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        disabled={disabled || isDownloading}
-        placeholder={isDownloading ? 'Waiting for MiniLM to download…' : 'Message Conductor…'}
+        disabled={disabled}
+        placeholder="Message Conductor..."
         rows={1}
         style={{
           color: t.textPrimary,
@@ -77,18 +92,68 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
         }}
       />
       <div className={styles.footer}>
+        <div ref={groupRef} className={styles.terminalGroup} style={{ border: `1px solid ${t.bgSurface1}` }}>
+          {dropdownOpen && (
+            <div
+              className={styles.terminalDropdown}
+              style={{ background: t.bgSurface0, border: `1px solid ${t.bgSurface1}` }}
+            >
+              {(['shell', 'claude', 'codex'] as const).map((kind) => {
+                const colors = { shell: '#86EFAC', claude: '#38BDF8', codex: '#F59E0B' }
+                const labels = { shell: '+ Shell', claude: 'Claude Code', codex: 'Codex' }
+                return (
+                  <button
+                    key={kind}
+                    className={styles.terminalDropdownItem}
+                    style={{ color: t.textSecondary, fontFamily: t.fontFamilyMono }}
+                    onClick={() => {
+                      setDropdownOpen(false)
+                      onLaunchMiniTerminal?.(kind)
+                    }}
+                  >
+                    <span style={{ color: colors[kind], fontSize: 10 }}>●</span>
+                    {labels[kind]}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          <button
+            className={styles.terminalBtn}
+            onClick={() => {
+              if (miniTerminalColor) {
+                onToggleMiniTerminal?.()
+              } else {
+                onLaunchMiniTerminal?.('shell')
+              }
+            }}
+            title={miniTerminalColor ? (miniTerminalActive ? 'Hide terminal' : 'Show terminal') : 'Open terminal'}
+            style={{ color: miniTerminalColor ?? undefined }}
+          >
+            <TerminalSquare size={14} />
+          </button>
+          <div style={{ width: 1, height: 16, background: t.bgSurface1, flexShrink: 0 }} />
+          <button
+            className={styles.terminalChevron}
+            onClick={() => setDropdownOpen((v) => !v)}
+            title="Choose terminal type"
+            style={{ color: t.textMuted }}
+          >
+            <ChevronUp size={10} />
+          </button>
+        </div>
         <ModelSelector />
         <span
           className={styles.modelPill}
           style={{
             background: t.bgSurface1,
-            color: isEmbedding ? t.accent : isDownloading ? t.accent : embedReady ? t.textMuted : t.textMuted,
+            color: isEmbedding ? t.accent : isRouterLoading ? t.accent : embedReady ? t.textMuted : t.textMuted,
             fontFamily: t.fontFamilyMono,
           }}
         >
           {isEmbedding
             ? '◈ Routing…'
-            : isDownloading
+            : isRouterLoading
             ? `◈ ${embedProgress}%`
             : embedReady
             ? '◈ MiniLM'
@@ -107,11 +172,11 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
           <button
             className={styles.sendButton}
             onClick={() => { if (!disabled && value.trim()) onSend() }}
-            disabled={disabled || !value.trim() || isDownloading}
+            disabled={disabled || !value.trim()}
             title="Send (Enter)"
             style={{
-              background: value.trim() && !disabled && !isDownloading ? t.accent : t.bgSurface1,
-              color: value.trim() && !disabled && !isDownloading ? '#000' : t.textMuted,
+              background: value.trim() && !disabled ? t.accent : t.bgSurface1,
+              color: value.trim() && !disabled ? '#000' : t.textMuted,
             }}
           >
             <Send size={13} />

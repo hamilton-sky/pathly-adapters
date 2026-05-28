@@ -28,7 +28,9 @@ export async function writeToTerminal(
   tabs: TerminalTab[],
   addTab: (id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind']) => void,
   open: boolean,
-  toggle: () => void
+  toggle: () => void,
+  rememberTabForKind: (kind: TerminalKind, id: string) => void,
+  openTab: (id: string) => void
 ): Promise<string> {
   const sanitized = command.replace(/[;&|><]/g, '')
 
@@ -48,7 +50,9 @@ export async function writeToTerminal(
     }
   }
 
+  rememberTabForKind(kind, tabId)
   if (!open) toggle()
+  openTab(tabId)
 
   // If we just spawned a new tab, wait for the CLI prompt before writing.
   // We scan accumulated PTY output for the ready prompt ('> ' for claude/codex,

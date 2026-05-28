@@ -210,13 +210,14 @@
 .terminalSplit {
   display: inline-flex;
   align-items: center;
-  border: 1px solid transparent;
+  border: 1px solid var(--bg-surface1);
   border-radius: 5px;
-  transition: border-color 0.12s;
+  transition: border-color 0.12s, background 0.12s;
 }
 
 .terminalSplit:hover {
-  border-color: var(--bg-surface1);
+  border-color: var(--accent);
+  background: var(--bg-surface0);
 }
 
 .terminalSplitDivider {

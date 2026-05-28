@@ -7,7 +7,7 @@ import { useUiStore } from '../../store/uiStore'
 import { useTheme } from '../../useTheme'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext } from '../../lib/pathlyContext'
-import { matchIntent, preEmbedSkills } from '../../lib/embedRouter'
+import { hasEmbeddedSkills, matchIntent, matchIntentByName, preEmbedSkills } from '../../lib/embedRouter'
 import { askLlm, getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
 import { splitThinkingContent } from '../../lib/thinkingParser'
 import { useModelStore } from '../../store/modelStore'
@@ -18,6 +18,7 @@ import { SkillsPanel } from './SkillsPanel'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { MatchCard } from './MatchCard'
+import { MiniTerminalCard } from './MiniTerminalCard'
 import { OutputSnippet } from './OutputSnippet'
 import { AutomationCard } from './AutomationCard'
 import { StepQueue } from './StepQueue'
@@ -34,8 +35,9 @@ function stripAnsi(raw: string): string {
     .replace(/\x1b\[[\x20-\x3f]*[\x40-\x7e]/g, '')
     // Any remaining ESC + one char
     .replace(/\x1b./g, '')
-    // C0 control chars except CR (\r), LF (\n), TAB (\t)
-    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
+    // C0 control chars except BS (\x08), CR (\r), LF (\n), TAB (\t)
+    // \x08 is intentionally kept — feedBuffer handles it as a backspace/erase
+    .replace(/[\x00-\x07\x0b\x0c\x0e-\x1f\x7f]/g, '')
     // NOTE: \r is intentionally NOT stripped here — handled in feedBuffer below
 }
 
@@ -65,7 +67,16 @@ function feedBuffer(buf: string, data: string): { buf: string; lines: string[] }
       const lastNl = current.lastIndexOf('\n')
       current = lastNl >= 0 ? current.slice(0, lastNl + 1) : ''
     }
-    current += segments[i]
+    // Apply segment char-by-char so \x08 (backspace) erases the previous character
+    for (const ch of segments[i]) {
+      if (ch === '\x08') {
+        // Erase last non-newline character in the current partial line
+        const lastNl = current.lastIndexOf('\n')
+        if (current.length > lastNl + 1) current = current.slice(0, -1)
+      } else {
+        current += ch
+      }
+    }
   }
 
   const parts = current.split('\n')
@@ -109,6 +120,11 @@ Be concise (2-3 sentences). Do not invent skills that are not in the available l
 export function ChatPanel(): JSX.Element {
   const [inputValue, setInputValue] = useState('')
   const [llmAvailable, setLlmAvailable] = useState<boolean | null>(null)
+  const [hiddenMiniCards, setHiddenMiniCards] = useState<Record<'claude' | 'codex' | 'shell', boolean>>({
+    claude: false,
+    codex: false,
+    shell: false,
+  })
 
   const ollamaAvailable = useModelStore((s) => s.ollamaAvailable)
   const ollamaModelIds = useModelStore((s) => s.ollamaModelIds)
@@ -145,8 +161,24 @@ export function ChatPanel(): JSX.Element {
 
   const tabs = useTerminalStore((s) => s.tabs)
   const addTab = useTerminalStore((s) => s.addTab)
+  const addTabSilent = useTerminalStore((s) => s.addTabSilent)
   const open = useTerminalStore((s) => s.open)
   const toggle = useTerminalStore((s) => s.toggle)
+  const openTab = useTerminalStore((s) => s.openTab)
+  const tabIdByKind = useTerminalStore((s) => s.tabIdByKind)
+  const rememberTabForKind = useTerminalStore((s) => s.rememberTabForKind)
+  const appendScrollback = useTerminalStore((s) => s.appendScrollback)
+  const claudeTabId = tabIdByKind.claude ?? tabs.find((tab) => tab.kind === 'claude')?.id ?? null
+  const codexTabId = tabIdByKind.codex ?? tabs.find((tab) => tab.kind === 'codex')?.id ?? null
+  const shellTabId = tabIdByKind.shell ?? tabs.find((tab) => tab.kind === 'shell')?.id ?? null
+
+  const TARGET_COLORS: Record<'claude' | 'codex' | 'shell', string> = {
+    claude: '#38BDF8', codex: '#F59E0B', shell: '#86EFAC',
+  }
+  const currentTabId = targetKind === 'claude' ? claudeTabId : targetKind === 'codex' ? codexTabId : shellTabId
+  const currentOutput = targetKind === 'claude' ? claudeOutput : targetKind === 'codex' ? codexOutput : shellOutput
+  const hasActiveTerminal = !!currentTabId
+  const miniTerminalVisible = hasActiveTerminal && !hiddenMiniCards[targetKind]
 
   const toggleChat = useUiStore((s) => s.toggleChat)
 
@@ -160,6 +192,29 @@ export function ChatPanel(): JSX.Element {
   // Per-target buffers and idle timers
   const terminalBuffers = useRef<Record<string, string>>({ claude: '', codex: '', shell: '' })
   const idleTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({ claude: null, codex: null, shell: null })
+  const streamTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const streamPending = useRef<ReturnType<typeof splitThinkingContent> | null>(null)
+
+  function queueAssistantStream(fullText: string): void {
+    streamPending.current = splitThinkingContent(fullText)
+    if (streamTimer.current) return
+    streamTimer.current = setTimeout(() => {
+      const pending = streamPending.current
+      streamTimer.current = null
+      streamPending.current = null
+      if (pending) updateLastMessage({ content: pending.content, thinking: pending.thinking, status: 'streaming' })
+    }, 60)
+  }
+
+  function finishAssistantStream(fullText: string, fallback: string): void {
+    if (streamTimer.current) {
+      clearTimeout(streamTimer.current)
+      streamTimer.current = null
+    }
+    streamPending.current = null
+    const { thinking, content } = splitThinkingContent(fullText)
+    updateLastMessage({ content: content || fallback, thinking, status: 'done' })
+  }
 
   // Subscribe to claude, codex AND shell tabs simultaneously
   useEffect(() => {
@@ -167,11 +222,11 @@ export function ChatPanel(): JSX.Element {
     const unsubs: Array<(() => void) | undefined> = []
 
     for (const kind of kinds) {
-      const matchingTab = tabs.find((tab) => tab.kind === kind)
-      if (!matchingTab) continue
+      const tabId = tabIdByKind[kind] ?? tabs.find((tab) => tab.kind === kind)?.id
+      if (!tabId) continue
 
-      const tabId = matchingTab.id
       const unsub = window.pathly?.terminal?.onData(tabId, (data) => {
+        appendScrollback(tabId, data)
         if (!useChatStore.getState().outputByTarget[kind].running) return
 
         // Reset this target's idle timer
@@ -196,7 +251,7 @@ export function ChatPanel(): JSX.Element {
       }
       unsubs.forEach((u) => u?.())
     }
-  }, [tabs, appendOutputLine])
+  }, [tabs, tabIdByKind, appendOutputLine, appendScrollback])
 
   // Check LLM backend availability once on mount.
   // node-llama-cpp may hang on Electron <33 — treat any non-resolution as false after 4s.
@@ -225,6 +280,11 @@ export function ChatPanel(): JSX.Element {
 
   function handleStop(): void {
     abortLlm()
+    if (streamTimer.current) {
+      clearTimeout(streamTimer.current)
+      streamTimer.current = null
+    }
+    streamPending.current = null
     updateLastMessage({ status: 'done' })
     setLoading(false)
   }
@@ -260,9 +320,10 @@ export function ChatPanel(): JSX.Element {
     setIsEmbedding(true)
     let matches: Awaited<ReturnType<typeof matchIntent>> = []
     let context: Awaited<ReturnType<typeof buildPathlyContext>>
+    const canUseEmbedding = useChatStore.getState().embedReady && hasEmbeddedSkills()
     try {
       ;[matches, context] = await Promise.all([
-        matchIntent(text),
+        canUseEmbedding ? matchIntent(text) : Promise.resolve(matchIntentByName(text, loadSkills())),
         buildPathlyContext(),
       ])
     } catch {
@@ -319,6 +380,7 @@ export function ChatPanel(): JSX.Element {
       }
 
       const selectedModelId = useModelStore.getState().selectedModelId
+      const responseMode = useModelStore.getState().responseMode
       const selectedModel = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)
       const selectedModelName = selectedModel?.name ?? selectedModelId
 
@@ -345,15 +407,9 @@ export function ChatPanel(): JSX.Element {
           let fullText = ''
           await askOllama(llmPrompt, systemPrompt, ollamaTag, (chunk) => {
             fullText += chunk
-            const { thinking, content } = splitThinkingContent(fullText)
-            updateLastMessage({ content, thinking, status: 'streaming' })
-          }, selectedModel?.thinking ?? false)
-          const { thinking: doneThinking, content: doneContent } = splitThinkingContent(fullText)
-          updateLastMessage({
-            content: doneContent || '_(empty response — try a different model)_',
-            thinking: doneThinking,
-            status: 'done',
-          })
+            queueAssistantStream(fullText)
+          }, responseMode === 'deep' && selectedModel?.thinking === true)
+          finishAssistantStream(fullText, '_(empty response - try a different model)_')
         } catch (err) {
           console.error('[Ollama] chat error:', err)
           showSkillFallback('\n\n_(Ollama error — is Ollama still running?)_')
@@ -367,15 +423,9 @@ export function ChatPanel(): JSX.Element {
           let fullText = ''
           await askLlm(llmPrompt, systemPrompt, (chunk) => {
             fullText += chunk
-            const { thinking, content } = splitThinkingContent(fullText)
-            updateLastMessage({ content, thinking, status: 'streaming' })
+            queueAssistantStream(fullText)
           })
-          const { thinking: doneThinking, content: doneContent } = splitThinkingContent(fullText)
-          updateLastMessage({
-            content: doneContent || '⚠ The model returned an empty response. Try re-downloading or switching to Phi-4 Mini.',
-            thinking: doneThinking,
-            status: 'done',
-          })
+          finishAssistantStream(fullText, 'The model returned an empty response. Try re-downloading or switching to Phi-4 Mini.')
         } catch (err) {
           console.error('[LLM] chat error:', err)
           showSkillFallback('\n\n_(Local AI unavailable — upgrade Electron to 33+ for local inference.)_')
@@ -454,8 +504,9 @@ export function ChatPanel(): JSX.Element {
     setAltMatches([])
     clearOutputLines(targetKind)
     setCommandRunning(targetKind, true)
+    setHiddenMiniCards((state) => ({ ...state, [targetKind]: false }))
     try {
-      await writeToTerminal(targetKind, cmd, projectPath, tabs, addTab, open, toggle)
+      await writeToTerminal(targetKind, cmd, projectPath, tabs, addTab, open, toggle, rememberTabForKind, openTab)
     } catch (err) {
       console.error('[handleRun] terminal write failed:', err)
       setCommandRunning(targetKind, false)
@@ -474,6 +525,22 @@ export function ChatPanel(): JSX.Element {
     clearOutputLines(targetKind)
   }
 
+  async function launchMiniTerminal(kind: 'shell' | 'claude' | 'codex'): Promise<void> {
+    if (!projectPath) return
+    const existing = tabs.find((tab) => tab.kind === kind)
+    if (existing) {
+      setHiddenMiniCards((s) => ({ ...s, [kind]: false }))
+      return
+    }
+    const id = crypto.randomUUID()
+    const label = kind === 'claude' ? 'Claude Code' : kind === 'codex' ? 'Codex' : 'Shell'
+    // addTabSilent registers the tab without changing activeTabIdLeft,
+    // so the full terminal panel doesn't switch focus to the new tab.
+    addTabSilent(id, label, kind)
+    await window.pathly?.terminal?.spawn(id, projectPath, kind === 'shell' ? undefined : kind)
+    setHiddenMiniCards((s) => ({ ...s, [kind]: false }))
+  }
+
   /** Trash button — wipes everything visible in the panel */
   function handleClearAll(): void {
     clearMessages()
@@ -484,6 +551,33 @@ export function ChatPanel(): JSX.Element {
     setCommandRunning('codex', false)
     setCommandRunning('shell', false)
     setLoading(false)
+  }
+
+  function renderTerminalCard(
+    kind: 'claude' | 'codex' | 'shell',
+    tabId: string | null,
+    output: typeof claudeOutput
+  ): JSX.Element | null {
+    // PTY tab exists → always show MiniTerminalCard (unless manually hidden)
+    if (tabId) {
+      if (hiddenMiniCards[kind]) return null
+      return (
+        <MiniTerminalCard
+          key={`${kind}-${tabId}`}
+          tabId={tabId}
+          target={kind}
+          status={output.running ? 'running' : 'done'}
+          previewLines={output.lines}
+          onOpenFullTerminal={() => {
+            openTab(tabId)
+            document.dispatchEvent(new CustomEvent('pathly:focus-terminal-tab', { detail: { tabId } }))
+          }}
+          onClose={() => setHiddenMiniCards((state) => ({ ...state, [kind]: true }))}
+        />
+      )
+    }
+
+    return null
   }
 
   return (
@@ -519,27 +613,9 @@ export function ChatPanel(): JSX.Element {
         />
       )}
       {/* Show a snippet per target — both can be visible simultaneously */}
-      {claudeOutput.lines.length > 0 && (
-        <OutputSnippet
-          target="claude-code"
-          status={claudeOutput.running ? 'running' : 'done'}
-          lines={claudeOutput.lines}
-        />
-      )}
-      {codexOutput.lines.length > 0 && (
-        <OutputSnippet
-          target="codex"
-          status={codexOutput.running ? 'running' : 'done'}
-          lines={codexOutput.lines}
-        />
-      )}
-      {shellOutput.lines.length > 0 && (
-        <OutputSnippet
-          target="shell"
-          status={shellOutput.running ? 'running' : 'done'}
-          lines={shellOutput.lines}
-        />
-      )}
+      {renderTerminalCard('claude', claudeTabId, claudeOutput)}
+      {renderTerminalCard('codex', codexTabId, codexOutput)}
+      {renderTerminalCard('shell', shellTabId, shellOutput)}
       <ChatInput
         value={inputValue}
         onChange={setInputValue}
@@ -547,6 +623,12 @@ export function ChatPanel(): JSX.Element {
         onStop={handleStop}
         isLoading={isLoading}
         disabled={isLoading}
+        onToggleMiniTerminal={() => {
+          if (hasActiveTerminal) setHiddenMiniCards((s) => ({ ...s, [targetKind]: !s[targetKind] }))
+        }}
+        onLaunchMiniTerminal={(kind) => { void launchMiniTerminal(kind) }}
+        miniTerminalActive={miniTerminalVisible}
+        miniTerminalColor={hasActiveTerminal ? TARGET_COLORS[targetKind] : undefined}
       />
     </div>
   )

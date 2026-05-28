@@ -14,18 +14,34 @@ const KNOWN_SKILLS = [
   'explore', 'debug', 'design', 'fix', 'status', 'log', 'end',
 ]
 
+let cachedContext: { value: PathlyContext; expiresAt: number } | null = null
+
+function fallbackContext(): PathlyContext {
+  return { fsmStage: 'unknown', featureName: '', skills: KNOWN_SKILLS, studioSchema: getStudioSchema() }
+}
+
 export async function buildPathlyContext(): Promise<PathlyContext> {
+  const now = Date.now()
+  if (cachedContext && cachedContext.expiresAt > now) return cachedContext.value
+
   const studioSchema = getStudioSchema()
   try {
-    const res = await fetch(`${PATHLY_API_BASE}/status`)
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 750)
+    const res = await fetch(`${PATHLY_API_BASE}/status`, { signal: controller.signal })
+    window.clearTimeout(timeout)
     const data = await res.json() as { current_state?: string; feature?: string }
-    return {
+    const value = {
       fsmStage: data.current_state ?? 'unknown',
       featureName: data.feature ?? '',
       skills: KNOWN_SKILLS,
       studioSchema,
     }
+    cachedContext = { value, expiresAt: now + 3000 }
+    return value
   } catch {
-    return { fsmStage: 'unknown', featureName: '', skills: KNOWN_SKILLS, studioSchema }
+    const value = fallbackContext()
+    cachedContext = { value, expiresAt: now + 1000 }
+    return value
   }
 }

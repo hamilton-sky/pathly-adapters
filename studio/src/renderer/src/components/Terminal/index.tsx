@@ -64,6 +64,18 @@ export function Terminal(): JSX.Element {
     }
   }, [open, panelHeight, splitEnabled, splitRatio])
 
+  // Focus the correct xterm when the mini-terminal "full terminal" button is clicked
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const { tabId } = (e as CustomEvent<{ tabId: string }>).detail
+      setTimeout(() => {
+        tabInstancesRef.current.get(tabId)?.xterm.focus()
+      }, 60)
+    }
+    document.addEventListener('pathly:focus-terminal-tab', handler)
+    return () => document.removeEventListener('pathly:focus-terminal-tab', handler)
+  }, [])
+
   // Listen for PTY exit
   useEffect(() => {
     const api = window.pathly?.terminal

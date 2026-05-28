@@ -4,16 +4,17 @@ import type { MatchResult } from '../types/chat'
 
 // Explicit CDN — never resolve relative to localhost (Vite dev server returns HTML for unknown paths)
 env.allowLocalModels = false
-env.useBrowserCache = false   // disable cache entirely to avoid stale/corrupt entries in dev
+env.useBrowserCache = true
 
 export type EmbedProgressCallback = (progress: number) => void
 
 let embedder: FeatureExtractionPipeline | null = null
 let embeddedSkills: Skill[] = []
+let embedderPromise: Promise<FeatureExtractionPipeline> | null = null
 
 async function getEmbedder(onProgress?: EmbedProgressCallback): Promise<FeatureExtractionPipeline> {
   if (!embedder) {
-    embedder = await pipeline(
+    embedderPromise ??= pipeline(
       'feature-extraction',
       'Xenova/all-MiniLM-L6-v2',
       {
@@ -26,9 +27,27 @@ async function getEmbedder(onProgress?: EmbedProgressCallback): Promise<FeatureE
           }
         },
       }
-    ) as FeatureExtractionPipeline
+    ) as Promise<FeatureExtractionPipeline>
+    embedder = await embedderPromise
   }
-  return embedder
+  return embedder!
+}
+
+export function hasEmbeddedSkills(): boolean {
+  return embeddedSkills.some((skill) => skill.vector !== undefined)
+}
+
+export function matchIntentByName(input: string, skills: Skill[]): MatchResult[] {
+  const inputLower = input.toLowerCase().trim()
+  return skills
+    .filter((s) =>
+      inputLower === s.name.toLowerCase() ||
+      inputLower === s.command.toLowerCase() ||
+      inputLower === `/pathly ${s.name}`.toLowerCase() ||
+      inputLower.startsWith(s.name.toLowerCase() + ' ')
+    )
+    .map((s) => ({ skill: s.name, confidence: 0.92, command: s.command, description: s.description }))
+    .slice(0, 3)
 }
 
 export async function embed(text: string): Promise<number[]> {

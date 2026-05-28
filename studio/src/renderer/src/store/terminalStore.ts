@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { TerminalTab } from '../types/terminal'
 
 export type { TerminalTab }
+type TerminalKind = NonNullable<TerminalTab['kind']>
 
 export interface TerminalState {
   open: boolean
@@ -9,12 +10,19 @@ export interface TerminalState {
   activeTabIdLeft: string | null
   activeTabIdRight: string | null
   splitEnabled: boolean
+  tabIdByKind: Partial<Record<TerminalKind, string>>
+  scrollbackByTabId: Record<string, string[]>
   toggle(): void
   addTab(id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind']): void
+  addTabSilent(id: string, label: string, kind?: TerminalTab['kind']): void
   closeTab(id: string): void
   setActiveTab(id: string): void
+  openTab(id: string): void
   renameTab(id: string, label: string): void
   toggleSplit(): void
+  rememberTabForKind(kind: TerminalKind, id: string): void
+  appendScrollback(tabId: string, chunk: string): void
+  clearScrollback(tabId: string): void
 }
 
 export const useTerminalStore = create<TerminalState>()((set) => ({
@@ -23,6 +31,8 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
   activeTabIdLeft: null,
   activeTabIdRight: null,
   splitEnabled: false,
+  tabIdByKind: {},
+  scrollbackByTabId: {},
 
   toggle: () => set((s) => ({ open: !s.open })),
 
@@ -32,6 +42,9 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
       const update: Partial<TerminalState> = { tabs: [...s.tabs, tab] }
       if (pane === 'left') update.activeTabIdLeft = id
       else update.activeTabIdRight = id
+      if (kind) {
+        update.tabIdByKind = { ...s.tabIdByKind, [kind]: id }
+      }
       return update
     }),
 
@@ -40,13 +53,19 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
       const tab = s.tabs.find((t) => t.id === id)
       const pane = tab?.pane ?? 'left'
       const tabs = s.tabs.filter((t) => t.id !== id)
+      const tabIdByKind = { ...s.tabIdByKind }
+      if (tab?.kind && tabIdByKind[tab.kind] === id) {
+        delete tabIdByKind[tab.kind]
+      }
+      const scrollbackByTabId = { ...s.scrollbackByTabId }
+      delete scrollbackByTabId[id]
       const paneTabs = tabs.filter((t) => t.pane === pane)
       const prevActive = pane === 'left' ? s.activeTabIdLeft : s.activeTabIdRight
       const newActive = prevActive === id
         ? (paneTabs[paneTabs.length - 1]?.id ?? null)
         : prevActive
-      if (pane === 'left') return { tabs, activeTabIdLeft: newActive }
-      return { tabs, activeTabIdRight: newActive }
+      if (pane === 'left') return { tabs, activeTabIdLeft: newActive, tabIdByKind, scrollbackByTabId }
+      return { tabs, activeTabIdRight: newActive, tabIdByKind, scrollbackByTabId }
     }),
 
   setActiveTab: (id) =>
@@ -55,6 +74,14 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
       if (!tab) return {}
       if (tab.pane === 'left') return { activeTabIdLeft: id }
       return { activeTabIdRight: id }
+    }),
+
+  openTab: (id) =>
+    set((s) => {
+      const tab = s.tabs.find((t) => t.id === id)
+      if (!tab) return {}
+      if (tab.pane === 'left') return { open: true, activeTabIdLeft: id }
+      return { open: true, activeTabIdRight: id }
     }),
 
   renameTab: (id, label) =>
@@ -78,4 +105,32 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
         activeTabIdRight: tabs[1].id,
       }
     }),
+
+  addTabSilent: (id, label, kind) =>
+    set((s) => {
+      const tab: TerminalTab = { id, label, pane: 'left', kind }
+      const update: Partial<TerminalState> = { tabs: [...s.tabs, tab] }
+      if (kind) update.tabIdByKind = { ...s.tabIdByKind, [kind]: id }
+      // Does NOT change activeTabIdLeft — mini tabs don't steal focus from the full terminal
+      return update
+    }),
+
+  rememberTabForKind: (kind, id) =>
+    set((s) => ({ tabIdByKind: { ...s.tabIdByKind, [kind]: id } })),
+
+  appendScrollback: (tabId, chunk) =>
+    set((s) => ({
+      scrollbackByTabId: {
+        ...s.scrollbackByTabId,
+        [tabId]: [...(s.scrollbackByTabId[tabId] ?? []), chunk].slice(-400),
+      },
+    })),
+
+  clearScrollback: (tabId) =>
+    set((s) => ({
+      scrollbackByTabId: {
+        ...s.scrollbackByTabId,
+        [tabId]: [],
+      },
+    })),
 }))

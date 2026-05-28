@@ -13,7 +13,7 @@ export interface Model {
   ollamaId: string
 }
 
-export const RECOMMENDED_MODEL_ID = 'qwen3-4b'
+export const RECOMMENDED_MODEL_ID = 'phi-4-mini'
 
 // IDs must match the keys in MODEL_REGISTRY in studio/src/main/ipc/llm.ts
 export const WEB_LLM_MODELS: Model[] = [
@@ -25,7 +25,6 @@ export const WEB_LLM_MODELS: Model[] = [
     system: 'CPU / GPU',
     storage: '~2.6 GB',
     speed: 'Medium',
-    recommended: true,
     thinking: true,
     ollamaId: 'qwen3:4b',
   },
@@ -47,6 +46,7 @@ export const WEB_LLM_MODELS: Model[] = [
     system: 'CPU / GPU',
     storage: '~2.5 GB',
     speed: 'Fast',
+    recommended: true,
     ollamaId: 'phi4-mini:latest',
   },
   {
