@@ -88,6 +88,25 @@ def test_next_action_includes_codex_worker_hint(tmp_path, monkeypatch):
     assert "instructions for BUILDING" in hint["instructions"]
 
 
+def test_next_action_includes_menu_payload(tmp_path, monkeypatch):
+    _patch_load_flow(monkeypatch, ROUTING_FLOW)
+    _patch_build_prompt(monkeypatch)
+
+    result = next_action({
+        "flow": "test",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+
+    menu = result["menu"]
+    assert menu["state"] == "BUILDING"
+    assert menu["feature"] == "test-topic"
+    assert menu["agent"] == "builder"
+    assert isinstance(menu["items"], list)
+    assert menu["items"] == []
+    assert "empty_message" in menu
+
+
 def test_codex_hint_maps_research_agents_to_explorer():
     hint = fsm_ops._codex_subagent_hint("scout", "find the relevant files")
 
