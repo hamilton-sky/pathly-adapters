@@ -359,14 +359,15 @@ function PlanProgressSection(): JSX.Element | null {
         </span>
       </button>
 
-      {/* Thin progress bar — always visible */}
-      <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }}>
+      {/* Progress bar */}
+      <div style={{ height: '5px', background: 'rgba(255,255,255,0.12)', flexShrink: 0 }}>
         <div style={{
           height: '100%',
           width: `${pct}%`,
           background: GREEN,
           borderRadius: '0 2px 2px 0',
           transition: 'width 300ms ease-out',
+          boxShadow: pct > 0 ? `0 0 6px ${GREEN}66` : 'none',
         }} />
       </div>
 
