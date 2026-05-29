@@ -125,16 +125,8 @@ export function Sidebar(): JSX.Element | null {
   const deferredFilter = useDeferredValue(filter)
   const lowerFilter = deferredFilter.toLowerCase()
 
-  // Auto-switch sidebar tab to match the active main panel
-  useEffect(() => {
-    if (activePanel === 'flow') {
-      setLibraryOpen(true)
-      try { localStorage.setItem('pathly:sidebarTab', 'library') } catch {}
-    } else if (activePanel === 'monitor') {
-      setLibraryOpen(false)
-      try { localStorage.setItem('pathly:sidebarTab', 'workspace') } catch {}
-    }
-  }, [activePanel])
+  // Derive sidebar tab from active panel — synchronous, no post-render flash
+  const showLibrary = activePanel === 'flow' ? true : activePanel === 'monitor' ? false : libraryOpen
 
   if (sidebarCollapsed) return null
 
@@ -468,10 +460,10 @@ export function Sidebar(): JSX.Element | null {
 
   return (
     <div ref={sidebarRef} className={styles.sidebar}>
-      <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
+      <TabBar libraryOpen={showLibrary} onSwitch={switchTab} />
 
       <FilterRow
-        libraryOpen={libraryOpen}
+        libraryOpen={showLibrary}
         filter={filter}
         onChange={setFilter}
         onClear={() => setFilter('')}
@@ -479,7 +471,7 @@ export function Sidebar(): JSX.Element | null {
       />
 
       <div className={styles.treeContainer}>
-        {libraryOpen && (
+        {showLibrary && (
           <LibraryPanel
             sections={sections}
             selectedItem={selectedItem}
@@ -501,7 +493,7 @@ export function Sidebar(): JSX.Element | null {
           />
         )}
 
-        {!libraryOpen && projectPath && (
+        {!showLibrary && projectPath && (
           <WorkspacePanel
             sections={sections}
             projectPath={projectPath}
