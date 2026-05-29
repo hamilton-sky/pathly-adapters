@@ -5,7 +5,7 @@ import { useStore } from '../store'
 import { useUiStore } from '../store/uiStore'
 import { isLightPalette } from '../theme'
 import { useTerminalStore } from '../store/terminalStore'
-import { listDirs, publish, onPublishOutput } from '../services/pathlyApi'
+import { listDirs, publish, onPublishOutput, readFile } from '../services/pathlyApi'
 import { IconButton, Tooltip } from './ui'
 import { ClaudeIcon, CodexIcon, FileExplorerIcon, WindowsTerminalIcon, GitBashIcon, WslIcon, PyCharmIcon } from './Terminal/BrandIcons'
 import { launchTerminal } from '../lib/launchTerminal'
@@ -32,6 +32,8 @@ export function TopBar(): JSX.Element {
     preferredLight,
     activePanel,
     sidebarCollapsed,
+    selectedItem,
+    lastUsedFlowPath,
     setProjectPath,
     setActiveTopic,
     setPublishing,
@@ -40,6 +42,8 @@ export function TopBar(): JSX.Element {
     setTheme,
     setActivePanel,
     setSidebarCollapsed,
+    setSelectedItem,
+    setLastUsedFlowPath,
   } = useStore()
 
   const [activeTopics,   setActiveTopics]   = useState<string[]>([])
@@ -269,7 +273,14 @@ export function TopBar(): JSX.Element {
             <Tooltip label="Flow canvas" shortcut="Ctrl+1" placement="bottom">
               <button
                 className={`${styles.navBtn} ${activePanel === 'flow' ? styles.navBtnActive : ''}`}
-                onClick={() => setActivePanel('flow')}
+                onClick={() => {
+                  setActivePanel('flow')
+                  if ((!selectedItem || selectedItem.type !== 'flow') && lastUsedFlowPath) {
+                    readFile(lastUsedFlowPath)
+                      .then(() => setSelectedItem({ name: lastUsedFlowPath.split('/').pop() ?? lastUsedFlowPath, path: lastUsedFlowPath, type: 'flow' }))
+                      .catch(() => setLastUsedFlowPath(null))
+                  }
+                }}
               >
                 <LayoutGrid size={13} />
                 Canvas

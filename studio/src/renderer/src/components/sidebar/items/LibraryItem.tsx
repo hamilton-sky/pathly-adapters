@@ -32,6 +32,7 @@ export function LibraryItem({ item, isSelected, isCanvasDraggable, deep, onSelec
     <div
       className={cls}
       draggable={isCanvasDraggable && !isRenaming}
+      style={isCanvasDraggable && !isRenaming ? { cursor: 'grab' } : undefined}
       onClick={() => { if (!isRenaming) onSelect() }}
       onDragStart={onDragStart}
       title={item.path}

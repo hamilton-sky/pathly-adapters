@@ -372,10 +372,11 @@
   cursor: grab;
   flex-shrink: 0;
   margin-right: 4px;
-  opacity: 0;
+  opacity: 0.3;
   transition: opacity 0.12s;
 }
-.itemRow:hover .grip { opacity: 0.7; }
+.itemRow:hover .grip { opacity: 0.8; }
+.systemItemRow:hover .grip { opacity: 0.8; }
 .grip:active { cursor: grabbing; }
 
 /* ── Drop target highlight for folder rows ── */
