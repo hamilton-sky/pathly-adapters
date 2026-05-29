@@ -1,6 +1,16 @@
 export {}
 
 declare global {
+  interface BrightskyTokenPayload {
+    access_token: string
+    refresh_token: string
+    user: { id: string; email: string; displayName: string }
+  }
+
+  interface BrightskyAuthError {
+    error: string
+  }
+
   interface Window {
     pathly: {
       fs: {
@@ -73,6 +83,10 @@ declare global {
         ollamaPull: (ollamaId: string) => Promise<void>
         ollamaDelete: (ollamaId: string) => Promise<void>
         ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean) => Promise<void>
+      }
+      brightsky: {
+        login: () => Promise<void>
+        onToken: (cb: (payload: BrightskyTokenPayload | BrightskyAuthError) => void) => () => void
       }
     }
   }

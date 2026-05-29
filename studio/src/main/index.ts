@@ -11,6 +11,7 @@ import { getPythonPath } from './python'
 import { registerSetupHandlers } from './setup'
 import { registerAutomationHandlers } from './ipc/automation'
 import { registerLlmHandlers } from './ipc/llm'
+import { registerBrightskyHandlers } from './ipc/brightsky'
 import { autoUpdater } from 'electron-updater'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
@@ -157,4 +158,5 @@ function registerIpcHandlers(win: BrowserWindow): void {
   registerSetupHandlers()
   registerAutomationHandlers(win)
   registerLlmHandlers()
+  registerBrightskyHandlers(win)
 }

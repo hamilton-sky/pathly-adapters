@@ -94,3 +94,94 @@
 .closeBtn:hover {
   opacity: 0.7;
 }
+
+.closeBtnActive {
+  opacity: 0.7;
+  background: var(--bg-surface1);
+}
+
+/* Sessions badge */
+.sessionsBadge {
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 4px;
+  color: #000;
+  pointer-events: none;
+}
+
+/* Sessions dropdown wrapper */
+.sessionsWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sessionsWrapper .closeBtn {
+  position: relative;
+}
+
+/* Dropdown panel */
+.sessionsDropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 240px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.sessionsHeader {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sessionsEmpty {
+  padding: 16px 12px;
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.sessionsList {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.sessionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+
+.sessionItem:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.sessionTitle {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sessionMeta {
+  font-size: 10px;
+  opacity: 0.6;
+}

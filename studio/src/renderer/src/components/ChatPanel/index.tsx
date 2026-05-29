@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import { useBrightskyStore } from '../../store/brightskyStore'
+import { brightskyClient } from '../../lib/brightskyClient'
 import { useChatStore } from '../../store/chatStore'
 import { useAutomationStore } from '../../store/automationStore'
 import { useTerminalStore } from '../../store/terminalStore'
@@ -134,6 +136,8 @@ export function ChatPanel(): JSX.Element {
   const [menuCardOpen, setMenuCardOpen] = useState(true)
   const [pushedMenu, setPushedMenu] = useState<PushedMenu | null>(null)
   const [pushedMenuOpen, setPushedMenuOpen] = useState(true)
+
+  const brightskyAuthenticated = useBrightskyStore((s) => s.authenticated)
 
   const ollamaAvailable = useModelStore((s) => s.ollamaAvailable)
   const ollamaModelIds = useModelStore((s) => s.ollamaModelIds)
@@ -330,6 +334,18 @@ export function ChatPanel(): JSX.Element {
       .catch(() => { setEmbedProgress(0); setEmbedReady(false) })
   }, [setEmbedReady, setEmbedProgress])
 
+  async function handleBrightskySend(content: string): Promise<void> {
+    const { connected, wsUrl, accessToken, sessionId, authenticated } = useBrightskyStore.getState()
+    if (!authenticated || !accessToken) {
+      useBrightskyStore.getState().setAuthError('Please connect to Brightsky first.')
+      return
+    }
+    if (!connected) {
+      brightskyClient.connect(wsUrl, accessToken)
+    }
+    await brightskyClient.sendMessage(content, sessionId)
+  }
+
   function handleStop(): void {
     abortLlm()
     if (streamTimer.current) {
@@ -366,6 +382,12 @@ export function ChatPanel(): JSX.Element {
       status: 'done' as const,
     }
     addMessage(userMsg)
+
+    // Brightsky cloud path — bypass local LLM routing
+    if (useModelStore.getState().selectedModelId === 'brightsky') {
+      await handleBrightskySend(text)
+      return
+    }
 
     // Run embed routing and context fetch in parallel.
     // Always clear isEmbedding even if matchIntent throws (model download fail etc.)
@@ -695,7 +717,7 @@ export function ChatPanel(): JSX.Element {
     >
       {/* Left-edge drag handle — drag to resize */}
       <div className={styles.resizeHandle} onMouseDown={onDragStart} />
-      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} hasShellTab={hasShellTab} targetKind={targetKind} onSetTarget={setTargetKind} onToggleChat={toggleChat} onClearChat={handleClearAll} />
+      <ConductorHeader hasClaudeTab={hasClaudeTab} hasCodexTab={hasCodexTab} hasShellTab={hasShellTab} targetKind={targetKind} onSetTarget={setTargetKind} onToggleChat={toggleChat} onClearChat={handleClearAll} sessions={brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
       <SkillsPanel onSkillClick={handleSkillClick} />
       {/* Pipeline menu — permanent, FSM-state-driven */}
       {menuVisible ? <PathlyMenuCard menu={activeMenu!} onSelect={handleMenuSelect} isOpen={menuCardOpen} onToggle={() => setMenuCardOpen((v) => !v)} /> : null}

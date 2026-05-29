@@ -138,9 +138,26 @@ contextBridge.exposeInMainWorld('pathly', {
     ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean): Promise<void> =>
       ipcRenderer.invoke('llm:ollamaChat', { prompt, systemPrompt, modelId, think }),
   },
+  brightsky: {
+    login: (): Promise<void> => ipcRenderer.invoke('brightsky:login'),
+    onToken: (cb: (payload: BrightskyTokenPayload | BrightskyAuthError) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, payload: BrightskyTokenPayload | BrightskyAuthError): void => cb(payload)
+      ipcRenderer.on('brightsky:token', listener)
+      return () => ipcRenderer.removeListener('brightsky:token', listener)
+    },
+  },
 })
 
 declare global {
+  interface BrightskyTokenPayload {
+    access_token: string
+    refresh_token: string
+    user: { id: string; email: string; displayName: string }
+  }
+  interface BrightskyAuthError {
+    error: string
+  }
+
   interface Window {
     pathly: {
       fs: {
@@ -193,6 +210,7 @@ declare global {
         executeStep: (step: { type: string; label: string; value?: string }) => Promise<unknown>
       }
       llm: {
+        isAvailable: () => Promise<boolean>
         listCached: () => Promise<string[]>
         download: (modelId: string) => Promise<void>
         delete: (modelId: string) => Promise<void>
@@ -208,6 +226,10 @@ declare global {
         ollamaPull: (ollamaId: string) => Promise<void>
         ollamaDelete: (ollamaId: string) => Promise<void>
         ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean) => Promise<void>
+      }
+      brightsky: {
+        login: () => Promise<void>
+        onToken: (cb: (payload: BrightskyTokenPayload | BrightskyAuthError) => void) => () => void
       }
     }
   }

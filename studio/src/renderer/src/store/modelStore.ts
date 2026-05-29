@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { RECOMMENDED_MODEL_ID, WEB_LLM_MODELS } from '../data/models'
 
-const VALID_IDS = new Set(WEB_LLM_MODELS.map((m) => m.id))
+const VALID_IDS = new Set([...WEB_LLM_MODELS.map((m) => m.id), 'brightsky'])
 
 export interface ModelStore {
   selectedModelId: string

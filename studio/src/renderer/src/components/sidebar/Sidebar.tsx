@@ -4,11 +4,10 @@ import type { PathlyItem, PathlyCanvasDragItem, PathlyReorgDragItem } from '../.
 import { PATHLY_DRAG_MIME } from '../../types'
 import { listDir, listDirs } from '../../services/pathlyApi'
 import { useProjectFiles } from '../../hooks/useProjectFiles'
-import { usePlanFiles } from '../../hooks/usePlanFiles'
 import { LibraryPanel } from './panels/LibraryPanel'
 import { WorkspacePanel } from './panels/WorkspacePanel'
 import { useSidebarResize } from './shell/useSidebarResize'
-import { TabBar } from './shell/TabBar'
+import { SidebarHeader } from './shell/SidebarHeader'
 import { FilterRow } from './shell/FilterRow'
 import { BottomNav } from './shell/BottomNav'
 import { SidebarDialogs } from './shell/SidebarDialogs'
@@ -57,7 +56,6 @@ export function Sidebar(): JSX.Element | null {
   } = useStore()
 
   const { sections, setSections, loadItems, customWorkspaceSections } = useProjectFiles()
-  const { planFolders, setPlanFolders, loadPlanFiles } = usePlanFiles()
 
   useEffect(() => {
     if (pathlyUserHome) return
@@ -99,12 +97,7 @@ export function Sidebar(): JSX.Element | null {
 
   const { sidebarRef, onDragStart } = useSidebarResize()
 
-  const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
-  const [libraryOpen, setLibraryOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem('pathly:sidebarTab') !== 'workspace' }
-    catch { return true }
-  })
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
@@ -126,6 +119,19 @@ export function Sidebar(): JSX.Element | null {
   const lowerFilter = deferredFilter.toLowerCase()
 
   if (sidebarCollapsed) return null
+
+  // Derive sidebar context from activePanel — no tab bar needed
+  let sidebarContext: 'workspace' | 'library'
+  if (activePanel === 'flow') {
+    sidebarContext = 'library'
+  } else if (activePanel === 'monitor' || activePanel === 'editor' || activePanel === 'plan' || activePanel === 'settings') {
+    sidebarContext = 'workspace'
+  } else {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`[Sidebar] Unexpected activePanel value: "${activePanel as string}", falling back to workspace`)
+    }
+    sidebarContext = 'workspace'
+  }
 
   function toggleSection(label: string): void {
     setSections((prev) => ({ ...prev, [label]: { ...prev[label], open: !prev[label].open } }))
@@ -187,18 +193,6 @@ export function Sidebar(): JSX.Element | null {
     setInlineCreate({ target: 'workspace-root', parentDir: `${projectPath}/pathly`, type: 'folder' })
   }
 
-  function handleInlineCreatePlan(e: React.MouseEvent<HTMLButtonElement>): void {
-    e.stopPropagation()
-    if (!projectPath) return
-    setInlineCreate({ target: 'plan-folder', parentDir: `${projectPath}/pathly/plans`, type: 'folder' })
-  }
-
-  function handleCreatePlanFile(e: React.MouseEvent<HTMLButtonElement>): void {
-    e.stopPropagation()
-    if (!projectPath || !activeTopic) return
-    setInlineCreate({ target: 'plan-file', parentDir: `${projectPath}/pathly/plans/${activeTopic}`, type: 'file' })
-  }
-
   async function handleInlineCreateSubmit(name: string): Promise<void> {
     if (!inlineCreate) return
     const trimmed = name.trim()
@@ -209,10 +203,8 @@ export function Sidebar(): JSX.Element | null {
       if (target === 'plan-folder') {
         await window.pathly.fs.write(`${parentDir}/${trimmed}/STATE.json`, JSON.stringify({ current: 'INIT' }))
         await loadItems()
-        await loadPlanFiles()
       } else if (target === 'plan-file') {
         await window.pathly.fs.write(`${parentDir}/${trimmed}`, '')
-        await loadPlanFiles()
       } else if (type === 'folder') {
         await window.pathly.fs.write(`${parentDir}/${trimmed}/.gitkeep`, '')
         await loadItems()
@@ -227,23 +219,6 @@ export function Sidebar(): JSX.Element | null {
 
   function handleInlineCreateCancel(): void {
     setInlineCreate(null)
-  }
-
-  function handleToggleFolder(name: string): void {
-    setPlanFolders((prev) => prev.map((f) => f.name === name ? { ...f, open: !f.open } : f))
-  }
-
-  function handleTogglePlanSubdir(folderName: string, subdirName: string): void {
-    setPlanFolders((prev) => prev.map((f) =>
-      f.name === folderName
-        ? { ...f, subdirs: f.subdirs.map((sd) => sd.name === subdirName ? { ...sd, open: !sd.open } : sd) }
-        : f
-    ))
-  }
-
-  function handleFolderClick(name: string): void {
-    setActiveTopic(name)
-    setActivePanel('plan')
   }
 
   function startRename(item: PathlyItem, _itemDir: string): void {
@@ -322,22 +297,6 @@ export function Sidebar(): JSX.Element | null {
     }
     setConfirmDeleteSection(null)
     await loadItems()
-  }
-
-  async function handleDeletePlanFolder(folderPath: string): Promise<void> {
-    try {
-      const files = await window.pathly.fs.list(folderPath).catch(() => [] as string[])
-      for (const fname of files) {
-        await window.pathly.fs.delete(`${folderPath}/${fname}`).catch(() => {})
-      }
-      await window.pathly.fs.delete(folderPath).catch(() => {})
-      const folderName = folderPath.split('/').pop() ?? ''
-      if (activeTopic === folderName) setActiveTopic(null)
-    } catch (err) {
-      console.error('Delete plan folder failed:', err)
-    }
-    await loadItems()
-    await loadPlanFiles()
   }
 
   async function handleMoveFolder(sourcePath: string, targetSectionDir: string): Promise<void> {
@@ -429,25 +388,18 @@ export function Sidebar(): JSX.Element | null {
 
   void dragOverPath
 
-  function switchTab(tab: 'library' | 'workspace'): void {
-    setLibraryOpen(tab === 'library')
-    setFilter('')
-    try { localStorage.setItem('pathly:sidebarTab', tab) } catch {}
-  }
-
   return (
     <div ref={sidebarRef} className={styles.sidebar}>
-      <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
+      <SidebarHeader context={sidebarContext} />
 
       <FilterRow
-        libraryOpen={libraryOpen}
         filter={filter}
         onChange={setFilter}
         onClear={() => setFilter('')}
       />
 
-      <div className={styles.treeContainer}>
-        {libraryOpen && (
+      <div key={sidebarContext} className={`${styles.treeContainer} ${styles.panelTransition}`}>
+        {sidebarContext === 'library' && (
           <LibraryPanel
             sections={sections}
             selectedItem={selectedItem}
@@ -469,7 +421,7 @@ export function Sidebar(): JSX.Element | null {
           />
         )}
 
-        {!libraryOpen && projectPath && (
+        {sidebarContext === 'workspace' && projectPath && (
           <WorkspacePanel
             sections={sections}
             projectPath={projectPath}
@@ -477,8 +429,6 @@ export function Sidebar(): JSX.Element | null {
             dirtyItems={dirtyItems}
             filter={filter}
             lowerFilter={lowerFilter}
-            activeTopic={activeTopic}
-            planFolders={planFolders}
             renamingPath={renamingPath}
             renameValue={renameValue}
             inlineCreate={inlineCreate}
@@ -489,8 +439,6 @@ export function Sidebar(): JSX.Element | null {
             onCreateTopLevelFolder={handleCreateTopLevelFolder}
             onInlineCreateFile={handleInlineCreateFile}
             onInlineCreateFolder={handleInlineCreateFolder}
-            onNewPlan={handleInlineCreatePlan}
-            onCreatePlanFile={handleCreatePlanFile}
             onInlineCreateSubmit={(name) => { void handleInlineCreateSubmit(name) }}
             onInlineCreateCancel={handleInlineCreateCancel}
             onRenameChange={setRenameValue}
@@ -498,14 +446,8 @@ export function Sidebar(): JSX.Element | null {
             onRenameCancel={() => setRenamingPath(null)}
             onStartRename={startRename}
             onStartDelete={setConfirmDelete}
-            planOpen={planOpen}
-            onTogglePlan={() => setPlanOpen((v) => !v)}
-            onToggleFolder={handleToggleFolder}
-            onFolderClick={handleFolderClick}
             onRenameFolder={(oldPath, newName) => { void handleRenameFolder(oldPath, newName) }}
             onDeleteFolder={(folderPath) => setConfirmDeleteFolder(folderPath)}
-            onDeletePlanFolder={(folderPath) => { void handleDeletePlanFolder(folderPath) }}
-            onTogglePlanSubdir={handleTogglePlanSubdir}
             onDeleteCustomSection={(dir) => { void handleDeleteCustomSection(dir) }}
             onInlineCreateFileInFolder={handleInlineCreateFileInFolder}
             onInlineCreateFolderInFolder={handleInlineCreateFolderInFolder}

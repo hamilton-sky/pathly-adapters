@@ -3,6 +3,8 @@ import { ChevronDown } from 'lucide-react'
 import { WEB_LLM_MODELS } from '../../data/models'
 import { useModelStore } from '../../store/modelStore'
 import { abortLlm, getCachedModelIds, pullOllamaModel, deleteOllamaModel, downloadModel, deleteModel } from '../../lib/llmBridge'
+import { useBrightskyStore } from '../../store/brightskyStore'
+import { brightskyClient } from '../../lib/brightskyClient'
 import styles from './ModelSelector.module.css'
 
 function formatElapsed(secs: number): string {
@@ -43,8 +45,14 @@ export function ModelSelector(): JSX.Element {
   const ollamaModelIds = useModelStore((s) => s.ollamaModelIds)
   const setOllama = useModelStore((s) => s.setOllama)
 
+  const brightskyAuthenticated = useBrightskyStore((s) => s.authenticated)
+  const brightskyConnected = useBrightskyStore((s) => s.connected)
+  const brightskyAuthError = useBrightskyStore((s) => s.authError)
+  const clearBrightskyAuth = useBrightskyStore((s) => s.clearAuth)
+
   const selectedModel = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)
-  const shortName = selectedModel?.name ?? selectedModelId
+  const isBrightsky = selectedModelId === 'brightsky'
+  const shortName = isBrightsky ? 'Brightsky' : (selectedModel?.name ?? selectedModelId)
   const ollamaTag = selectedModel?.ollamaId ?? ''
   const ollamaBase = ollamaTag.split(':')[0]
   const isOllamaCached = ollamaModelIds.some(
@@ -199,7 +207,11 @@ export function ModelSelector(): JSX.Element {
           onClick={() => setOpen((v) => !v)}
           title="Select local AI model"
         >
-          <span className={isSelectedCached ? styles.readyDot : styles.notReadyDot} />
+          {isBrightsky ? (
+            <span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: brightskyAuthenticated ? '#22c55e' : '#6b7280', flexShrink: 0 }} />
+          ) : (
+            <span className={isSelectedCached ? styles.readyDot : styles.notReadyDot} />
+          )}
           <span className={styles.triggerName}>{shortName}</span>
           <ChevronDown size={11} className={open ? styles.chevronOpen : styles.chevron} />
         </button>
@@ -233,6 +245,55 @@ export function ModelSelector(): JSX.Element {
               <span style={{ opacity: 0.6 }}>Or upgrade to Electron 33+ for built-in inference.</span>
             </div>
           )}
+
+          {/* Brightsky cloud backend */}
+          <div
+            className={`${styles.card} ${selectedModelId === 'brightsky' ? styles.cardSelected : ''}`}
+            onClick={() => setSelectedModel('brightsky')}
+          >
+            <div className={styles.cardHeader}>
+              <span className={styles.cardName}>Brightsky</span>
+              <div className={styles.badges}>
+                {selectedModelId === 'brightsky' && (
+                  <span className={styles.badgeSelected}>Selected</span>
+                )}
+              </div>
+            </div>
+            <p className={styles.cardDesc}>Cloud AI backend — streams responses via WebSocket.</p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: brightskyAuthenticated ? '#22c55e' : '#6b7280', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, opacity: 0.7 }}>{brightskyConnected ? 'Connected' : 'Disconnected'}</span>
+            </div>
+
+            {!brightskyAuthenticated ? (
+              <button
+                className={styles.cacheBtn}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.pathly?.brightsky?.login()
+                }}
+              >
+                Connect with Google
+              </button>
+            ) : (
+              <button
+                className={`${styles.cacheBtn} ${styles.cacheBtnOn}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  clearBrightskyAuth()
+                  brightskyClient.disconnect()
+                }}
+              >
+                Disconnect
+              </button>
+            )}
+
+            {brightskyAuthError && (
+              <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>{brightskyAuthError}</div>
+            )}
+          </div>
+
           {WEB_LLM_MODELS.map((model) => {
             const tag = model.ollamaId
             const tagBase = tag.split(':')[0]

@@ -5,6 +5,7 @@ import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
 import { HealthCheck } from './HealthCheck'
+import { PlanProgress } from './PlanProgress'
 import { Tooltip } from '../ui/Tooltip'
 import type { FsmEvent } from '../../types/index'
 import { watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
@@ -584,6 +585,7 @@ export function Monitor(): JSX.Element {
   return (
     <div style={styles.panel}>
       <HeaderBar effectiveTopic={effectiveTopic} />
+      <PlanProgress />
       {showTabBar && (
         <TabBar
           sessions={activeFlowSessions}

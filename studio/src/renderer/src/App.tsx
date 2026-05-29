@@ -2,6 +2,7 @@ import { Component, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useStore } from './store'
 import { useUiStore } from './store/uiStore'
+import { useBrightskyStore } from './store/brightskyStore'
 import { readFile } from './services/pathlyApi'
 import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/sidebar'
@@ -65,6 +66,10 @@ export default function App(): JSX.Element | null {
   }
 
   return <MainApp />
+}
+
+function isBrightskyAuthError(p: unknown): p is BrightskyAuthError {
+  return typeof p === 'object' && p !== null && 'error' in p
 }
 
 function MainApp(): JSX.Element | null {
@@ -135,6 +140,30 @@ function MainApp(): JSX.Element | null {
         })
     }
   }, []) // run once on mount only
+
+  useEffect(() => {
+    if (!window.pathly?.brightsky) return
+    const cleanup = window.pathly.brightsky.onToken((payload) => {
+      if (isBrightskyAuthError(payload)) {
+        useBrightskyStore.getState().setAuthError(payload.error)
+      } else {
+        useBrightskyStore.getState().setTokens(payload.access_token, payload.refresh_token, payload.user)
+      }
+    })
+    return cleanup
+  }, [])
+
+  useEffect(() => {
+    let prevUserId = useBrightskyStore.getState().userId
+    const unsub = useBrightskyStore.subscribe((state) => {
+      const newId = state.userId
+      if (prevUserId !== null && newId !== null && newId !== prevUserId) {
+        useBrightskyStore.getState().setSessionId(null)
+      }
+      prevUserId = newId
+    })
+    return unsub
+  }, [])
 
   if (setupDone === null) return null
 

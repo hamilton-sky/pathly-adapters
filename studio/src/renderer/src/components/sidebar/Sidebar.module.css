@@ -678,3 +678,27 @@
   outline: 1px dashed var(--accent, #7ec8e3);
   outline-offset: -1px;
 }
+
+/* ── Sidebar context header (replaces TabBar) ── */
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  font: 600 10px var(--font-family-base);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--bg-surface1);
+  flex-shrink: 0;
+}
+
+/* ── Context transition (150ms fade + y-translate) ── */
+.panelTransition {
+  animation: panelFadeIn 150ms ease-out;
+}
+
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

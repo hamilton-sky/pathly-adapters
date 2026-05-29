@@ -1,13 +1,11 @@
 import { useState } from 'react'
-import { FolderPlus, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
+import { FolderPlus, Plus, Trash2 } from 'lucide-react'
 import type { PathlyItem, SectionState, PathlyReorgDragItem, PathlyFolderDragItem } from '../../../types'
 import { PATHLY_DRAG_MIME } from '../../../types'
-import type { PlanFolder } from '../../../hooks/usePlanFiles'
 import { IconButton } from '../../ui'
 import { SectionHeader } from '../shared/SectionHeader'
 import { SubdirRow } from '../items/SubdirRow'
 import { WorkspaceItem } from '../items/WorkspaceItem'
-import { PlanSection } from '../items/PlanSection'
 import { InlineCreateInput } from '../shared/InlineCreateInput'
 import { WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from '../constants'
 import type { Section } from '../types'
@@ -21,8 +19,6 @@ interface Props {
   dirtyItems: Set<string>
   filter: string
   lowerFilter: string
-  activeTopic: string | null
-  planFolders: PlanFolder[]
   renamingPath: string | null
   renameValue: string
   inlineCreate: { target: string; parentDir: string; type: 'file' | 'folder' } | null
@@ -31,10 +27,8 @@ interface Props {
   onToggleSubdir: (label: string, idx: number) => void
   onActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
   onCreateTopLevelFolder: (e: React.MouseEvent<HTMLButtonElement>) => void
-  onCreatePlanFile: (e: React.MouseEvent<HTMLButtonElement>) => void
   onInlineCreateFile: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
   onInlineCreateFolder: (section: { label: string; type: string; dir: string }, e: React.MouseEvent<HTMLButtonElement>) => void
-  onNewPlan: (e: React.MouseEvent<HTMLButtonElement>) => void
   onInlineCreateSubmit: (name: string) => void
   onInlineCreateCancel: () => void
   onRenameChange: (v: string) => void
@@ -42,14 +36,8 @@ interface Props {
   onRenameCancel: () => void
   onStartRename: (item: PathlyItem, itemDir: string) => void
   onStartDelete: (item: PathlyItem) => void
-  planOpen: boolean
-  onTogglePlan: () => void
-  onToggleFolder: (name: string) => void
-  onFolderClick: (name: string) => void
   onRenameFolder?: (oldPath: string, newName: string) => void
   onDeleteFolder?: (folderPath: string) => void
-  onDeletePlanFolder?: (folderPath: string) => void
-  onTogglePlanSubdir?: (folderName: string, subdirName: string) => void
   onDeleteCustomSection?: (sectionDir: string) => void
   onInlineCreateFileInFolder?: (folderPath: string) => void
   onInlineCreateFolderInFolder?: (folderPath: string) => void
@@ -61,16 +49,15 @@ interface Props {
 export function WorkspacePanel(props: Props): JSX.Element {
   const {
     sections, projectPath, selectedItem, dirtyItems,
-    filter, lowerFilter, activeTopic, planFolders,
+    filter, lowerFilter,
     renamingPath, renameValue, inlineCreate,
     onSelect, onToggleSection, onToggleSubdir,
-    onCreateTopLevelFolder, onCreatePlanFile,
-    onInlineCreateFile, onInlineCreateFolder, onNewPlan,
+    onCreateTopLevelFolder,
+    onInlineCreateFile, onInlineCreateFolder,
     onInlineCreateSubmit, onInlineCreateCancel,
     onRenameChange, onRenameCommit, onRenameCancel,
     onStartRename, onStartDelete,
-    planOpen, onTogglePlan, onToggleFolder, onFolderClick,
-    onRenameFolder, onDeleteFolder, onDeletePlanFolder, onTogglePlanSubdir,
+    onRenameFolder, onDeleteFolder,
     onDeleteCustomSection, onInlineCreateFileInFolder, onInlineCreateFolderInFolder,
     onReorgDrop, onMoveFolder, customWorkspaceSections = [],
   } = props
@@ -98,33 +85,6 @@ export function WorkspacePanel(props: Props): JSX.Element {
           onCancel={onInlineCreateCancel}
         />
       )}
-
-      <PlanSection
-        planFolders={planFolders}
-        selectedItem={selectedItem}
-        dirtyItems={dirtyItems}
-        lowerFilter={lowerFilter}
-        activeTopic={activeTopic}
-        renamingPath={renamingPath}
-        renameValue={renameValue}
-        planOpen={planOpen}
-        inlineCreate={inlineCreate}
-        onTogglePlan={onTogglePlan}
-        onToggleFolder={onToggleFolder}
-        onFolderClick={onFolderClick}
-        onNewPlan={onNewPlan}
-        onCreatePlanFile={onCreatePlanFile}
-        onInlineCreateSubmit={onInlineCreateSubmit}
-        onInlineCreateCancel={onInlineCreateCancel}
-        onDeletePlanFolder={onDeletePlanFolder}
-        onTogglePlanSubdir={onTogglePlanSubdir}
-        onSelect={onSelect}
-        onRenameChange={onRenameChange}
-        onRenameCommit={onRenameCommit}
-        onRenameCancel={onRenameCancel}
-        onStartRename={onStartRename}
-        onStartDelete={onStartDelete}
-      />
 
       {WORKSPACE_FILE_SECTIONS.map((section) => {
         const state = sections[section.label]
