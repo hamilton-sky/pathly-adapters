@@ -7,6 +7,7 @@ import { isLightPalette } from '../theme'
 import { useTerminalStore } from '../store/terminalStore'
 import { listDirs, publish, onPublishOutput, readFile } from '../services/pathlyApi'
 import { IconButton, Tooltip } from './ui'
+import { useToastStore } from '../store/toastStore'
 import { ClaudeIcon, CodexIcon, FileExplorerIcon, WindowsTerminalIcon, GitBashIcon, WslIcon, PyCharmIcon } from './Terminal/BrandIcons'
 import { launchTerminal } from '../lib/launchTerminal'
 import styles from './TopBar.module.css'
@@ -94,6 +95,7 @@ export function TopBar(): JSX.Element {
   }
 
   const { toggle: toggleTerminal, open: terminalOpen, addTab, tabs } = useTerminalStore()
+  const pushToast = useToastStore((s) => s.push)
   const { chatOpen, toggleChat } = useUiStore()
 
   const [terminalDropdownOpen, setTerminalDropdownOpen] = useState(false)
@@ -142,11 +144,27 @@ export function TopBar(): JSX.Element {
     setVsCodeDropdownOpen((v) => !v)
   }
 
+  function ipcErrMsg(err: unknown): string {
+    const raw = err instanceof Error ? err.message : String(err)
+    // Strip Electron's "Error invoking remote method '…': " prefix
+    return raw.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+  }
+
   async function launchInApp(appType: string): Promise<void> {
     setVsCodeDropdownOpen(false)
     try {
       await window.pathly.shell.openInApp(projectPath, appType)
-    } catch { /* surface errors silently */ }
+    } catch (err) {
+      pushToast(ipcErrMsg(err), 'error')
+    }
+  }
+
+  async function openVsCode(): Promise<void> {
+    try {
+      await window.pathly.shell.openVsCode(projectPath)
+    } catch (err) {
+      pushToast(ipcErrMsg(err), 'error')
+    }
   }
 
   async function launchTerminalWithKind(cmd: string | undefined, label: string): Promise<void> {
@@ -207,7 +225,7 @@ export function TopBar(): JSX.Element {
               <Tooltip label="Open in VS Code" placement="bottom">
                 <button
                   className={styles.vsCodeSplitMain}
-                  onClick={() => void window.pathly.shell.openVsCode(projectPath)}
+                  onClick={() => void openVsCode()}
                   aria-label="Open in VS Code"
                 >
                   <VsCodeIcon size={14} style={{ color: '#007ACC' }} />

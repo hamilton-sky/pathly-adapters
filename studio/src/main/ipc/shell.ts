@@ -28,40 +28,74 @@ function findGitBash(): string | null {
   return null
 }
 
-const LAUNCHERS: Record<string, (dir: string) => void> = {
-  vscode: (dir) => spawn('code', [dir], { detached: true, stdio: 'ignore', shell: true }).unref(),
-  explorer: (dir) => spawn('explorer', [dir], { detached: true, stdio: 'ignore', shell: true }).unref(),
+// Check if a command is resolvable via Windows `where.exe` (handles .cmd, .exe, etc.)
+function inPath(cmd: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn('where', [cmd], { stdio: 'ignore' })
+    child.once('close', (code) => resolve(code === 0))
+    child.once('error', () => resolve(false))
+  })
+}
+
+const LAUNCHERS: Record<string, (dir: string) => Promise<void>> = {
+  vscode: async (dir) => {
+    if (!await inPath('code')) throw new Error('VS Code not found — install it and ensure the `code` command is in your PATH')
+    spawn('code', [dir], { detached: true, stdio: 'ignore', shell: true }).unref()
+  },
+
+  // explorer.exe is always present on Windows — fire and forget
+  explorer: (dir) => {
+    spawn('explorer', [dir], { detached: true, stdio: 'ignore', shell: true }).unref()
+    return Promise.resolve()
+  },
+
+  // Windows Terminal with PowerShell fallback; both are always available
   terminal: (dir) => {
-    // Windows Terminal; fall back to PowerShell if not installed
+    const escaped = dir.replace(/'/g, "''")
     const child = spawn('wt', ['-d', dir], { detached: true, stdio: 'ignore', shell: true })
     child.on('error', () =>
-      spawn('powershell', ['-NoExit', '-Command', `Set-Location '${dir}'`], { detached: true, stdio: 'ignore' }).unref()
+      spawn(
+        'powershell',
+        ['-NoExit', '-Command', `Set-Location '${escaped}'`],
+        { detached: true, stdio: 'ignore' }
+      ).unref()
     )
     child.unref()
+    return Promise.resolve()
   },
-  gitbash: (dir) => {
+
+  gitbash: async (dir) => {
     const exe = findGitBash()
     if (exe) {
       spawn(exe, [`--cd=${dir}`], { detached: true, stdio: 'ignore' }).unref()
-    } else {
-      // Fallback: open bash via Git's sh.exe if on PATH
-      spawn('sh', ['--login'], { cwd: dir, detached: true, stdio: 'ignore', shell: true }).unref()
+      return
     }
+    if (!await inPath('sh')) throw new Error('Git Bash not found — install Git for Windows')
+    spawn('sh', ['--login'], { cwd: dir, detached: true, stdio: 'ignore', shell: true }).unref()
   },
-  wsl: (dir) => spawn('wsl', ['--cd', dir], { detached: true, stdio: 'ignore', shell: true }).unref(),
-  pycharm: (dir) => {
-    // JetBrains Toolbox puts 'pycharm' in PATH; older installs use 'charm'
-    const child = spawn('pycharm', [dir], { detached: true, stdio: 'ignore', shell: true })
-    child.on('error', () =>
+
+  wsl: async (dir) => {
+    if (!await inPath('wsl')) throw new Error('WSL not found — enable Windows Subsystem for Linux in Windows Features')
+    spawn('wsl', ['--cd', dir], { detached: true, stdio: 'ignore', shell: true }).unref()
+  },
+
+  pycharm: async (dir) => {
+    if (await inPath('pycharm')) {
+      spawn('pycharm', [dir], { detached: true, stdio: 'ignore', shell: true }).unref()
+      return
+    }
+    if (await inPath('charm')) {
       spawn('charm', [dir], { detached: true, stdio: 'ignore', shell: true }).unref()
-    )
-    child.unref()
+      return
+    }
+    throw new Error('PyCharm not found — install it via JetBrains Toolbox and enable the `pycharm` shell script')
   },
 }
 
 export function registerShellHandlers(win: BrowserWindow): void {
   ipcMain.handle('shell:openVsCode', async (_event, dir: string) => {
     if (!isValidProjectPath(dir)) throw new Error('Invalid project path')
+    if (!await inPath('code')) throw new Error('VS Code not found — install it and ensure the `code` command is in your PATH')
     spawn('code', [dir], { detached: true, stdio: 'ignore', shell: true }).unref()
   })
 
@@ -69,13 +103,11 @@ export function registerShellHandlers(win: BrowserWindow): void {
     if (!isValidProjectPath(dir)) throw new Error('Invalid project path')
     const launcher = LAUNCHERS[appType]
     if (!launcher) throw new Error(`Unknown app type: ${appType}`)
-    launcher(dir)
+    await launcher(dir)
   })
 
   ipcMain.handle('shell:publish', (_event, cwd: string) => {
-    if (!isValidProjectPath(cwd)) {
-      throw new Error('Invalid project path')
-    }
+    if (!isValidProjectPath(cwd)) throw new Error('Invalid project path')
     const proc = spawn('pip', ['install', '-e', '.'], { cwd, stdio: 'pipe' })
     proc.stdout?.on('data', (d: Buffer) => win.webContents.send('shell:output', d.toString()))
     proc.stderr?.on('data', (d: Buffer) => win.webContents.send('shell:output', d.toString()))

@@ -16,6 +16,7 @@ import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
 import { ChatPanel } from './components/ChatPanel'
+import { Toaster } from './components/Toaster'
 import { themes } from './theme'
 import appStyles from './App.module.css'
 
@@ -65,7 +66,12 @@ export default function App(): JSX.Element | null {
     return <PopoutTerminal tabId={popoutTabId} label={popoutLabel} />
   }
 
-  return <MainApp />
+  return (
+    <>
+      <MainApp />
+      <Toaster />
+    </>
+  )
 }
 
 function isBrightskyAuthError(p: unknown): p is BrightskyAuthError {
