@@ -1,11 +1,11 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
+import { usePlanConversations } from '../../hooks/usePlanConversations'
 import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
 import { HealthCheck } from './HealthCheck'
-import { PlanProgress } from './PlanProgress'
 import { Tooltip } from '../ui/Tooltip'
 import type { FsmEvent } from '../../types/index'
 import { watchStart, readFile, onWatchEvent } from '../../services/pathlyApi'
@@ -302,6 +302,144 @@ function TabBar({ sessions, activeTab, onTabSelect }: TabBarProps): JSX.Element 
   )
 }
 
+function PlanProgressSection(): JSX.Element | null {
+  const [open, setOpen] = useState(true)
+  const { planConvs } = usePlanConversations()
+
+  if (planConvs.length === 0) return null
+
+  const total = planConvs.length
+  const doneCount = planConvs.filter((c) => c.status === 'DONE').length
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0
+  const FONT = 'system-ui, -apple-system, sans-serif'
+  const GREEN = '#00ff87'
+  const MUTED = '#64748b'
+  const SURFACE = 'rgba(255,255,255,0.04)'
+
+  return (
+    <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* Header row */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 12px',
+          height: '32px',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{
+          fontSize: '10px',
+          fontFamily: FONT,
+          fontWeight: 600,
+          color: MUTED,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase' as const,
+        }}>
+          Conversations
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '10px', fontFamily: FONT, color: doneCount === total ? GREEN : MUTED }}>
+            {doneCount}/{total}
+          </span>
+          <span style={{
+            display: 'inline-block',
+            transform: open ? 'rotate(180deg)' : 'none',
+            transition: 'transform 150ms ease',
+            fontSize: '10px',
+            color: MUTED,
+            lineHeight: 1,
+          }}>▾</span>
+        </span>
+      </button>
+
+      {/* Thin progress bar — always visible */}
+      <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div style={{
+          height: '100%',
+          width: `${pct}%`,
+          background: GREEN,
+          borderRadius: '0 2px 2px 0',
+          transition: 'width 300ms ease-out',
+        }} />
+      </div>
+
+      {/* Conv rows */}
+      {open && (
+        <div style={{ maxHeight: '192px', overflowY: 'auto', padding: '4px 0 6px' }}>
+          {planConvs.map((conv) => {
+            const done = conv.status === 'DONE'
+            return (
+              <div
+                key={conv.num}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  height: '28px',
+                  padding: '0 12px',
+                }}
+              >
+                {/* Status circle */}
+                <span style={{
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  flexShrink: 0,
+                  background: done ? GREEN : 'transparent',
+                  border: done ? `1.5px solid ${GREEN}` : '1.5px solid rgba(100,116,139,0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '8px',
+                  fontWeight: 700,
+                  color: done ? '#000' : MUTED,
+                  lineHeight: 1,
+                }}>
+                  {done ? '✓' : String(conv.num)}
+                </span>
+                {/* Title */}
+                <span style={{
+                  flex: 1,
+                  fontSize: '12px',
+                  fontFamily: FONT,
+                  color: done ? '#e2e8f0' : MUTED,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {conv.title || `Conv ${conv.num}`}
+                </span>
+                {/* Badge */}
+                <span style={{
+                  flexShrink: 0,
+                  fontSize: '9px',
+                  fontFamily: FONT,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  color: done ? GREEN : MUTED,
+                  background: done ? 'rgba(0,255,135,0.08)' : SURFACE,
+                  border: `1px solid ${done ? 'rgba(0,255,135,0.2)' : 'rgba(100,116,139,0.2)'}`,
+                }}>
+                  {done ? 'done' : 'todo'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MetricsStrip(): JSX.Element {
   const t = useTheme()
   const { totalTokens, lastWall, totalCost, noTelemetry, eventsCount } = useAgentTelemetry()
@@ -585,7 +723,6 @@ export function Monitor(): JSX.Element {
   return (
     <div style={styles.panel}>
       <HeaderBar effectiveTopic={effectiveTopic} />
-      <PlanProgress />
       {showTabBar && (
         <TabBar
           sessions={activeFlowSessions}
@@ -593,6 +730,7 @@ export function Monitor(): JSX.Element {
           onTabSelect={setActiveMonitorTab}
         />
       )}
+      <PlanProgressSection />
       <HealthCheck />
       <FsmView />
       <MetricsStrip />

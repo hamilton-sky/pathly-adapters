@@ -2,7 +2,7 @@
 
 | Conv | Title | Stories | Status |
 |------|-------|---------|--------|
-| 1 | Context-aware sidebar switch | S1, S2 | TODO |
+| 1 | Context-aware sidebar switch | S1, S2 | DONE |
 | 2 | Library card grid + pill filters + My Library chips | S3, S4, S6 | TODO |
 | 3 | Drag-to-canvas for all library item types | S5 | TODO |
 

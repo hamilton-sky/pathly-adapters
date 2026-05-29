@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Terminal, ChevronDown, X, Moon, Sun, Menu, LayoutGrid, List, Activity, Brain, Copy } from 'lucide-react'
+import { Terminal, ChevronDown, X, Moon, Sun, Menu, LayoutGrid, Activity, Brain, Copy } from 'lucide-react'
 import { useStore } from '../store'
 import { useUiStore } from '../store/uiStore'
 import { isLightPalette } from '../theme'
@@ -273,15 +273,6 @@ export function TopBar(): JSX.Element {
               >
                 <LayoutGrid size={13} />
                 Canvas
-              </button>
-            </Tooltip>
-            <Tooltip label="Plan board" shortcut="Ctrl+2" placement="bottom">
-              <button
-                className={`${styles.navBtn} ${activePanel === 'plan' ? styles.navBtnActive : ''}`}
-                onClick={() => setActivePanel('plan')}
-              >
-                <List size={13} />
-                Plan
               </button>
             </Tooltip>
             <Tooltip label="Live monitor" shortcut="Ctrl+3" placement="bottom">
