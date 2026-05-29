@@ -446,6 +446,26 @@ export function Sidebar(): JSX.Element | null {
     try { localStorage.setItem('pathly:sidebarTab', tab) } catch {}
   }
 
+  function handleCollapseAll(): void {
+    setPlanOpen(false)
+    setPlanFolders((prev) => prev.map((f) => ({
+      ...f,
+      open: false,
+      subdirs: f.subdirs.map((sd) => ({ ...sd, open: false })),
+    })))
+    setSections((prev) => {
+      const next: typeof prev = {}
+      for (const key in prev) {
+        next[key] = {
+          ...prev[key],
+          open: false,
+          subdirs: prev[key].subdirs?.map((sd) => ({ ...sd, open: false })) ?? prev[key].subdirs,
+        }
+      }
+      return next
+    })
+  }
+
   return (
     <div ref={sidebarRef} className={styles.sidebar}>
       <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
@@ -455,6 +475,7 @@ export function Sidebar(): JSX.Element | null {
         filter={filter}
         onChange={setFilter}
         onClear={() => setFilter('')}
+        onCollapseAll={handleCollapseAll}
       />
 
       <div className={styles.treeContainer}>

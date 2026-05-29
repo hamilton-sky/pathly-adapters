@@ -645,6 +645,22 @@
 }
 .filterClear:hover { color: var(--text-primary); }
 
+.collapseAll {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px 4px;
+  line-height: 1;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  transition: color 0.1s;
+}
+.collapseAll:hover { color: var(--text-primary); }
+.collapseAll:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
 /* ── Context menu portal (draggable, fixed-position) ── */
 .contextMenuPortal {
   position: fixed;
