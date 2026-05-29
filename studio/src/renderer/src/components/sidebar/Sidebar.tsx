@@ -125,8 +125,6 @@ export function Sidebar(): JSX.Element | null {
   const deferredFilter = useDeferredValue(filter)
   const lowerFilter = deferredFilter.toLowerCase()
 
-  // Derive sidebar tab from active panel — synchronous, no post-render flash
-  const showLibrary = activePanel === 'flow' ? true : activePanel === 'monitor' ? false : libraryOpen
 
   if (sidebarCollapsed) return null
 
@@ -460,10 +458,10 @@ export function Sidebar(): JSX.Element | null {
 
   return (
     <div ref={sidebarRef} className={styles.sidebar}>
-      <TabBar libraryOpen={showLibrary} onSwitch={switchTab} />
+      <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
 
       <FilterRow
-        libraryOpen={showLibrary}
+        libraryOpen={libraryOpen}
         filter={filter}
         onChange={setFilter}
         onClear={() => setFilter('')}
@@ -471,7 +469,7 @@ export function Sidebar(): JSX.Element | null {
       />
 
       <div className={styles.treeContainer}>
-        {showLibrary && (
+        {libraryOpen && (
           <LibraryPanel
             sections={sections}
             selectedItem={selectedItem}
@@ -493,7 +491,7 @@ export function Sidebar(): JSX.Element | null {
           />
         )}
 
-        {!showLibrary && projectPath && (
+        {!libraryOpen && projectPath && (
           <WorkspacePanel
             sections={sections}
             projectPath={projectPath}
