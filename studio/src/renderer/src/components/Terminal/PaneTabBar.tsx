@@ -66,6 +66,7 @@ export function PaneTabBar({
             aria-label={`Status: ${tab.status ?? 'idle'}`}
           />
           <TabBrandIcon kind={tab.kind} />
+          <span className={styles.instanceNumericId}>#{tab.numericId}</span>
           {editingId === tab.id ? (
             <input
               autoFocus

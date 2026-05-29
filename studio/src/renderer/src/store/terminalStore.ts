@@ -13,9 +13,10 @@ export interface TerminalState {
   hiddenTabIds: Record<string, boolean>
   tabIdByKind: Partial<Record<TerminalKind, string>>
   scrollbackByTabId: Record<string, string[]>
+  tabCounter: number
   toggle(): void
-  addTab(id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind']): void
-  addTabSilent(id: string, label: string, kind?: TerminalTab['kind']): void
+  addTab(id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind'], plan?: string, stage?: string): void
+  addTabSilent(id: string, label: string, kind?: TerminalTab['kind'], plan?: string, stage?: string): void
   closeTab(id: string): void
   hideTab(id: string): void
   setActiveTab(id: string): void
@@ -36,13 +37,15 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
   hiddenTabIds: {},
   tabIdByKind: {},
   scrollbackByTabId: {},
+  tabCounter: 0,
 
   toggle: () => set((s) => ({ open: !s.open })),
 
-  addTab: (id, label, pane = 'left', kind) =>
+  addTab: (id, label, pane = 'left', kind, plan, stage) =>
     set((s) => {
-      const tab: TerminalTab = { id, label, pane, kind }
-      const update: Partial<TerminalState> = { tabs: [...s.tabs, tab] }
+      const numericId = s.tabCounter + 1
+      const tab: TerminalTab = { id, numericId, label, pane, kind, plan, stage }
+      const update: Partial<TerminalState> = { tabs: [...s.tabs, tab], tabCounter: numericId }
       if (pane === 'left') update.activeTabIdLeft = id
       else update.activeTabIdRight = id
       if (kind) {
@@ -131,10 +134,11 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
       }
     }),
 
-  addTabSilent: (id, label, kind) =>
+  addTabSilent: (id, label, kind, plan, stage) =>
     set((s) => {
-      const tab: TerminalTab = { id, label, pane: 'left', kind }
-      const update: Partial<TerminalState> = { tabs: [...s.tabs, tab] }
+      const numericId = s.tabCounter + 1
+      const tab: TerminalTab = { id, numericId, label, pane: 'left', kind, plan, stage }
+      const update: Partial<TerminalState> = { tabs: [...s.tabs, tab], tabCounter: numericId }
       if (kind) update.tabIdByKind = { ...s.tabIdByKind, [kind]: id }
       // Does NOT change activeTabIdLeft — mini tabs don't steal focus from the full terminal
       return update

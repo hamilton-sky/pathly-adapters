@@ -9,15 +9,17 @@ export interface LaunchTerminalParams {
   projectPath: string
   open: boolean
   toggle: () => void
-  addTab: (id: string, label: string, pane: 'left' | 'right', kind: TerminalKind) => void
+  addTab: (id: string, label: string, pane: 'left' | 'right', kind: TerminalKind, plan?: string, stage?: string) => void
+  plan?: string
+  stage?: string
 }
 
 export async function launchTerminal(params: LaunchTerminalParams): Promise<void> {
-  const { command, label, pane, projectPath, open, toggle, addTab } = params
+  const { command, label, pane, projectPath, open, toggle, addTab, plan, stage } = params
   if (!open) toggle()
   const id = crypto.randomUUID()
   const kind: TerminalKind = command === 'claude' ? 'claude' : command === 'codex' ? 'codex' : 'shell'
-  addTab(id, label, pane, kind)
+  addTab(id, label, pane, kind, plan, stage)
   await window.pathly?.terminal?.spawn(id, projectPath, command)
 }
 
@@ -26,14 +28,15 @@ export async function writeToTerminal(
   command: string,
   projectPath: string,
   tabs: TerminalTab[],
-  addTab: (id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind']) => void,
+  addTab: (id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind'], plan?: string, stage?: string) => void,
   open: boolean,
   toggle: () => void,
   rememberTabForKind: (kind: TerminalKind, id: string) => void,
   openTab: (id: string) => void,
-  options: { revealFullTerminal?: boolean } = {}
+  options: { revealFullTerminal?: boolean; plan?: string; stage?: string } = {}
 ): Promise<string> {
   const revealFullTerminal = options.revealFullTerminal ?? true
+  const { plan, stage } = options
   const sanitized = command.replace(/[;&|><]/g, '')
 
   const existingTab = tabs.find((tab) => tab.kind === kind)
@@ -44,10 +47,10 @@ export async function writeToTerminal(
   } else {
     tabId = crypto.randomUUID()
     if (kind === 'shell') {
-      addTab(tabId, 'Shell', 'left', 'shell')
+      addTab(tabId, 'Shell', 'left', 'shell', plan, stage)
       await window.pathly?.terminal?.spawn(tabId, projectPath, undefined)
     } else {
-      addTab(tabId, kind === 'claude' ? 'claude' : 'codex', 'left', kind)
+      addTab(tabId, kind === 'claude' ? 'claude' : 'codex', 'left', kind, plan, stage)
       await window.pathly?.terminal?.spawn(tabId, projectPath, kind)
     }
   }
