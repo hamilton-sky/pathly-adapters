@@ -85,7 +85,7 @@
 .panel {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 0;
+  left: -40px;
   width: 280px;
   background: var(--bg-base);
   border: var(--border);

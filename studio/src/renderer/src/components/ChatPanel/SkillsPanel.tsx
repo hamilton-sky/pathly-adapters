@@ -34,8 +34,7 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
       </button>
 
       {skillsPanelOpen && (
-        <div className={styles.sections}>
-          {/* Pipeline skills */}
+        <>
           <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
             Pipeline
           </div>
@@ -56,30 +55,30 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
               </button>
             ))}
           </div>
-
-          {/* Control commands */}
           <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
             Control
           </div>
-          <div className={styles.chips}>
-            {CONTROL_SKILLS.map((skill) => (
-              <button
-                key={skill}
-                className={styles.chip}
-                onClick={() => onSkillClick(`/pathly ${skill}`)}
-                style={{
-                  background: t.bgSurface1,
-                  color: t.textPrimary,
-                  fontFamily: t.fontFamilyMono,
-                  border: `1px solid ${t.bgSurface1}`,
-                }}
-              >
-                {skill}
-              </button>
-            ))}
-          </div>
-        </div>
+        </>
       )}
+
+      {/* Control commands — always visible */}
+      <div className={skillsPanelOpen ? styles.chips : styles.chipsCompact}>
+        {CONTROL_SKILLS.map((skill) => (
+          <button
+            key={skill}
+            className={styles.chip}
+            onClick={() => onSkillClick(`/pathly ${skill}`)}
+            style={{
+              background: t.bgSurface1,
+              color: t.textPrimary,
+              fontFamily: t.fontFamilyMono,
+              border: `1px solid ${t.bgSurface1}`,
+            }}
+          >
+            {skill}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

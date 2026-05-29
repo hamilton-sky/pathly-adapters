@@ -1,10 +1,14 @@
-import { ipcMain, shell, BrowserWindow } from 'electron'
-import http from 'http'
-import { AddressInfo } from 'net'
+import { ipcMain, BrowserWindow } from 'electron'
 
 const BRIGHTSKY_BASE_URL = 'https://brightsky-ai.onrender.com'
 
-// Tracks whether an OAuth flow is already in progress so we never open two browser tabs.
+// The Brightsky backend always redirects to http://localhost:3000/auth/success?code=xxx
+// after a successful Google OAuth flow (hardcoded in auth.controller.ts).
+// We intercept this via a BrowserWindow's will-navigate event — no local HTTP server needed.
+const OAUTH_SUCCESS_PREFIX_1 = 'http://localhost:3000/auth/success'
+const OAUTH_SUCCESS_PREFIX_2 = 'http://127.0.0.1:3000/auth/success'
+
+// Tracks whether an OAuth flow is already in progress so we never open two auth windows.
 let loginInProgress = false
 
 export function registerBrightskyHandlers(win: BrowserWindow): void {
@@ -14,10 +18,6 @@ export function registerBrightskyHandlers(win: BrowserWindow): void {
     loginInProgress = true
 
     try {
-      // Use a local HTTP server to capture the OAuth callback code.
-      // This approach works in both dev and packaged builds without
-      // registering a custom protocol client, and avoids platform
-      // differences between macOS (open-url) and Windows (second-instance).
       const code = await captureOAuthCode()
       await exchangeCode(code, win)
     } catch (err) {
@@ -31,40 +31,64 @@ export function registerBrightskyHandlers(win: BrowserWindow): void {
 
 function captureOAuthCode(): Promise<string> {
   return new Promise((resolve, reject) => {
-    const server = http.createServer((req, res) => {
-      const url = new URL(req.url ?? '/', `http://localhost`)
-      const code = url.searchParams.get('code')
-
-      if (!code) {
-        res.writeHead(400, { 'Content-Type': 'text/html' })
-        res.end('<html><body><p>Authentication cancelled.</p></body></html>')
-        server.close()
-        clearTimeout(timeout)
-        reject(new Error('Auth cancelled'))
-        return
-      }
-
-      res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.end(
-        '<html><body><p>Authentication complete. You may close this tab.</p></body></html>'
-      )
-
-      server.close()
-      clearTimeout(timeout)
-      resolve(code)
+    const authWin = new BrowserWindow({
+      width: 500,
+      height: 650,
+      title: 'Sign in with Google',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
     })
 
-    server.listen(0, '127.0.0.1', () => {
-      const port = (server.address() as AddressInfo).port
-      const redirectUri = `http://127.0.0.1:${port}/callback`
-      const authUrl = `${BRIGHTSKY_BASE_URL}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`
-      shell.openExternal(authUrl)
+    let settled = false
+
+    function settle(fn: () => void): void {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      // Destroy after microtask so the will-navigate handler can return first
+      setImmediate(() => {
+        if (!authWin.isDestroyed()) authWin.destroy()
+      })
+      fn()
+    }
+
+    // Intercept the redirect before it loads — extract the code without hitting localhost:3000
+    authWin.webContents.on('will-navigate', (_event, url) => {
+      if (url.startsWith(OAUTH_SUCCESS_PREFIX_1) || url.startsWith(OAUTH_SUCCESS_PREFIX_2)) {
+        _event.preventDefault()
+        const code = new URL(url).searchParams.get('code')
+        if (code) {
+          settle(() => resolve(code))
+        } else {
+          settle(() => reject(new Error('Auth cancelled — no code in callback URL')))
+        }
+      }
+    })
+
+    // Same intercept for did-navigate (fires if will-navigate was not prevented in time)
+    authWin.webContents.on('did-navigate', (_event, url) => {
+      if (url.startsWith(OAUTH_SUCCESS_PREFIX_1) || url.startsWith(OAUTH_SUCCESS_PREFIX_2)) {
+        const code = new URL(url).searchParams.get('code')
+        if (code) {
+          settle(() => resolve(code))
+        } else {
+          settle(() => reject(new Error('Auth cancelled — no code in callback URL')))
+        }
+      }
+    })
+
+    // User closed the window without completing auth
+    authWin.on('closed', () => {
+      settle(() => reject(new Error('Auth window closed')))
     })
 
     const timeout = setTimeout(() => {
-      server.close()
-      reject(new Error('Auth timed out'))
+      settle(() => reject(new Error('Auth timed out')))
     }, 60_000)
+
+    authWin.loadURL(`${BRIGHTSKY_BASE_URL}/auth/google`)
   })
 }
 

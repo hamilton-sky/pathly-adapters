@@ -52,3 +52,10 @@
 .chip:hover {
   opacity: 0.75;
 }
+
+.chipsCompact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 4px 12px 8px;
+}
