@@ -1,7 +1,16 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export const BRIGHTSKY_BASE_URL = 'https://brightsky-ai.onrender.com'
+// Read from Vite env if present (set VITE_BRIGHTSKY_URL in studio/.env.local for local dev)
+// Default: Render production backend
+export const BRIGHTSKY_BASE_URL: string =
+  (import.meta.env.VITE_BRIGHTSKY_URL as string | undefined) || 'https://bright-sky-ai.onrender.com'
+
+// WS URL: explicit override first, otherwise derived from base (https→wss, http→ws).
+// Local dev needs an explicit override because the WS port (3002) differs from HTTP (3001).
+export const BRIGHTSKY_WS_URL: string =
+  (import.meta.env.VITE_BRIGHTSKY_WS_URL as string | undefined) ||
+  BRIGHTSKY_BASE_URL.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + '/ws'
 
 interface BrightskyState {
   connected: boolean
@@ -9,6 +18,8 @@ interface BrightskyState {
   accessToken: string | null
   refreshToken: string | null
   userId: string | null
+  userEmail: string | null
+  userDisplayName: string | null
   sessionId: string | null
   wsUrl: string
   authUrl: string
@@ -28,8 +39,10 @@ export const useBrightskyStore = create<BrightskyState>()(
       accessToken: null,
       refreshToken: null,
       userId: null,
+      userEmail: null,
+      userDisplayName: null,
       sessionId: null,
-      wsUrl: `${BRIGHTSKY_BASE_URL}/ws`,
+      wsUrl: BRIGHTSKY_WS_URL,
       authUrl: `${BRIGHTSKY_BASE_URL}/auth/google`,
       authError: null,
 
@@ -38,8 +51,10 @@ export const useBrightskyStore = create<BrightskyState>()(
           accessToken: access,
           refreshToken: refresh,
           userId: user.id,
+          userEmail: user.email,
+          userDisplayName: user.displayName,
           authenticated: true,
-          connected: true,
+          // NOTE: do NOT set connected:true here — that is set only by ws.onopen
           authError: null,
         }),
 
@@ -48,6 +63,8 @@ export const useBrightskyStore = create<BrightskyState>()(
           accessToken: null,
           refreshToken: null,
           userId: null,
+          userEmail: null,
+          userDisplayName: null,
           sessionId: null,
           authenticated: false,
           connected: false,
@@ -66,6 +83,8 @@ export const useBrightskyStore = create<BrightskyState>()(
         accessToken: s.accessToken,
         refreshToken: s.refreshToken,
         userId: s.userId,
+        userEmail: s.userEmail,
+        userDisplayName: s.userDisplayName,
         authenticated: s.authenticated,
       }),
     }

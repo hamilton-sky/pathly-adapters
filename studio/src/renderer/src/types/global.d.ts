@@ -85,7 +85,7 @@ declare global {
         ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean) => Promise<void>
       }
       brightsky: {
-        login: () => Promise<void>
+        login: (baseUrl: string) => Promise<void>
         onToken: (cb: (payload: BrightskyTokenPayload | BrightskyAuthError) => void) => () => void
       }
     }

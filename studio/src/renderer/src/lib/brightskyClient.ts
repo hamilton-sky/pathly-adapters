@@ -24,7 +24,9 @@ export class BrightskyClient {
       )
     }, 90000)
 
-    const ws = new WebSocket(wsUrl)
+    const url = new URL(wsUrl)
+    url.searchParams.set('token', accessToken)
+    const ws = new WebSocket(url.toString())
     this.ws = ws
 
     ws.onopen = () => {

@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "target": "ES2021",
     "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
     "jsx": "react-jsx",
     "strict": true,
     "skipLibCheck": true,

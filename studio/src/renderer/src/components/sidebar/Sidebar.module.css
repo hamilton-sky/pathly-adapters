@@ -685,6 +685,105 @@
   text-align: right;
 }
 
+/* ── Brightsky profile strip (bottom of sidebar) ── */
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--bg-surface0);
+  flex-shrink: 0;
+}
+
+.profileAvatar {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.03em;
+}
+
+.profileInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.profileName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profileEmail {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profileLogout {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 3px 8px;
+  transition: color 0.12s, border-color 0.12s;
+  font-family: var(--font-family-base);
+}
+.profileLogout:hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.profileSignIn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--bg-surface0);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 10px 12px;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+  font-family: var(--font-family-base);
+  flex-shrink: 0;
+}
+.profileSignIn:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.profileSignInDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bg-surface1);
+  border: 1px solid var(--text-muted);
+  flex-shrink: 0;
+}
+
 /* ── Drag-and-drop reorg ── */
 .draggableItem {
   cursor: grab;

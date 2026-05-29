@@ -1,7 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
 
-const BRIGHTSKY_BASE_URL = 'https://brightsky-ai.onrender.com'
-
 // The Brightsky backend always redirects to http://localhost:3000/auth/success?code=xxx
 // after a successful Google OAuth flow (hardcoded in auth.controller.ts).
 // We intercept this via a BrowserWindow's will-navigate event — no local HTTP server needed.
@@ -12,14 +10,16 @@ const OAUTH_SUCCESS_PREFIX_2 = 'http://127.0.0.1:3000/auth/success'
 let loginInProgress = false
 
 export function registerBrightskyHandlers(win: BrowserWindow): void {
-  ipcMain.handle('brightsky:login', async () => {
+  // baseUrl is passed from the renderer so it picks up VITE_BRIGHTSKY_URL from the store.
+  // e.g. 'https://brightsky-ai.onrender.com' (prod) or 'http://localhost:3001' (local dev)
+  ipcMain.handle('brightsky:login', async (_event, baseUrl: string) => {
     if (loginInProgress) return
 
     loginInProgress = true
 
     try {
-      const code = await captureOAuthCode()
-      await exchangeCode(code, win)
+      const code = await captureOAuthCode(baseUrl)
+      await exchangeCode(code, win, baseUrl)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Auth failed'
       win.webContents.send('brightsky:token', { error: message })
@@ -29,7 +29,7 @@ export function registerBrightskyHandlers(win: BrowserWindow): void {
   })
 }
 
-function captureOAuthCode(): Promise<string> {
+function captureOAuthCode(baseUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const authWin = new BrowserWindow({
       width: 500,
@@ -54,7 +54,21 @@ function captureOAuthCode(): Promise<string> {
       fn()
     }
 
-    // Intercept the redirect before it loads — extract the code without hitting localhost:3000
+    // PRIMARY: intercept the server-side 302 redirect (Render → localhost:3000/auth/success).
+    // The backend sends an HTTP 302, so Electron fires 'will-redirect', NOT 'will-navigate'.
+    authWin.webContents.on('will-redirect', (_event, url) => {
+      if (url.startsWith(OAUTH_SUCCESS_PREFIX_1) || url.startsWith(OAUTH_SUCCESS_PREFIX_2)) {
+        _event.preventDefault()
+        const code = new URL(url).searchParams.get('code')
+        if (code) {
+          settle(() => resolve(code))
+        } else {
+          settle(() => reject(new Error('Auth cancelled — no code in callback URL')))
+        }
+      }
+    })
+
+    // FALLBACK: catch client-side navigations to the success URL (should rarely fire)
     authWin.webContents.on('will-navigate', (_event, url) => {
       if (url.startsWith(OAUTH_SUCCESS_PREFIX_1) || url.startsWith(OAUTH_SUCCESS_PREFIX_2)) {
         _event.preventDefault()
@@ -67,7 +81,7 @@ function captureOAuthCode(): Promise<string> {
       }
     })
 
-    // Same intercept for did-navigate (fires if will-navigate was not prevented in time)
+    // LAST RESORT: if the page somehow loaded anyway, grab the code from the URL
     authWin.webContents.on('did-navigate', (_event, url) => {
       if (url.startsWith(OAUTH_SUCCESS_PREFIX_1) || url.startsWith(OAUTH_SUCCESS_PREFIX_2)) {
         const code = new URL(url).searchParams.get('code')
@@ -88,12 +102,12 @@ function captureOAuthCode(): Promise<string> {
       settle(() => reject(new Error('Auth timed out')))
     }, 60_000)
 
-    authWin.loadURL(`${BRIGHTSKY_BASE_URL}/auth/google`)
+    authWin.loadURL(`${baseUrl}/auth/google`)
   })
 }
 
-async function exchangeCode(code: string, win: BrowserWindow): Promise<void> {
-  const response = await fetch(`${BRIGHTSKY_BASE_URL}/auth/exchange-code`, {
+async function exchangeCode(code: string, win: BrowserWindow, baseUrl: string): Promise<void> {
+  const response = await fetch(`${baseUrl}/auth/exchange-code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code }),

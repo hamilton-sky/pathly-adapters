@@ -11,6 +11,7 @@ import { useSidebarResize } from './shell/useSidebarResize'
 import { TabBar } from './shell/TabBar'
 import { FilterRow } from './shell/FilterRow'
 import { BottomNav } from './shell/BottomNav'
+import { BrightskyProfile } from './shell/BrightskyProfile'
 import { SidebarDialogs } from './shell/SidebarDialogs'
 import type { Section } from './types'
 import styles from './Sidebar.module.css'
@@ -543,6 +544,8 @@ export function Sidebar(): JSX.Element | null {
           onSettings={() => setActivePanel('settings')}
         />
       </div>
+
+      <BrightskyProfile />
 
       <div className={styles.resizeHandle} onMouseDown={onDragStart} role="separator" aria-orientation="vertical" aria-label="Resize sidebar" />
 

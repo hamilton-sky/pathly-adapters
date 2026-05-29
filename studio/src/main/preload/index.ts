@@ -139,7 +139,7 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('llm:ollamaChat', { prompt, systemPrompt, modelId, think }),
   },
   brightsky: {
-    login: (): Promise<void> => ipcRenderer.invoke('brightsky:login'),
+    login: (baseUrl: string): Promise<void> => ipcRenderer.invoke('brightsky:login', baseUrl),
     onToken: (cb: (payload: BrightskyTokenPayload | BrightskyAuthError) => void): (() => void) => {
       const listener = (_e: Electron.IpcRendererEvent, payload: BrightskyTokenPayload | BrightskyAuthError): void => cb(payload)
       ipcRenderer.on('brightsky:token', listener)
@@ -228,7 +228,7 @@ declare global {
         ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean) => Promise<void>
       }
       brightsky: {
-        login: () => Promise<void>
+        login: (baseUrl: string) => Promise<void>
         onToken: (cb: (payload: BrightskyTokenPayload | BrightskyAuthError) => void) => () => void
       }
     }

@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { WEB_LLM_MODELS } from '../../data/models'
 import { useModelStore } from '../../store/modelStore'
 import { abortLlm, getCachedModelIds, pullOllamaModel, deleteOllamaModel, downloadModel, deleteModel } from '../../lib/llmBridge'
-import { useBrightskyStore } from '../../store/brightskyStore'
+import { useBrightskyStore, BRIGHTSKY_BASE_URL } from '../../store/brightskyStore'
 import { brightskyClient } from '../../lib/brightskyClient'
 import styles from './ModelSelector.module.css'
 
@@ -271,7 +271,7 @@ export function ModelSelector(): JSX.Element {
                 className={styles.cacheBtn}
                 onClick={(e) => {
                   e.stopPropagation()
-                  window.pathly?.brightsky?.login()
+                  window.pathly?.brightsky?.login(BRIGHTSKY_BASE_URL)
                 }}
               >
                 Connect with Google

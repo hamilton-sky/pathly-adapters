@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useStore } from './store'
 import { useUiStore } from './store/uiStore'
 import { useBrightskyStore } from './store/brightskyStore'
+import { brightskyClient } from './lib/brightskyClient'
 import { readFile } from './services/pathlyApi'
 import { HomeScreen } from './components/HomeScreen'
 import { Sidebar } from './components/sidebar'
@@ -147,6 +148,14 @@ function MainApp(): JSX.Element | null {
     }
   }, []) // run once on mount only
 
+  // Auto-connect WebSocket on mount if a token is already persisted (returning user)
+  useEffect(() => {
+    const { authenticated, accessToken, wsUrl } = useBrightskyStore.getState()
+    if (authenticated && accessToken) {
+      brightskyClient.connect(wsUrl, accessToken)
+    }
+  }, [])
+
   useEffect(() => {
     if (!window.pathly?.brightsky) return
     const cleanup = window.pathly.brightsky.onToken((payload) => {
@@ -154,6 +163,9 @@ function MainApp(): JSX.Element | null {
         useBrightskyStore.getState().setAuthError(payload.error)
       } else {
         useBrightskyStore.getState().setTokens(payload.access_token, payload.refresh_token, payload.user)
+        // Auto-connect WebSocket immediately after fresh auth
+        const { wsUrl } = useBrightskyStore.getState()
+        brightskyClient.connect(wsUrl, payload.access_token)
       }
     })
     return cleanup
