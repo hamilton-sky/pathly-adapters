@@ -1,0 +1,174 @@
+# Pathly Studio — named menu registry
+#
+# Skills call:  GET /menu/{name}?feature=my-feature&state=BUILDING
+#
+# {feature}  is substituted into title/description strings at request time.
+# states:    optional list of FSM states where this item is shown.
+#            If omitted the item is always shown regardless of state.
+# ttl:       seconds before the pushed banner auto-clears.
+
+# ── Post-pipeline menus ──────────────────────────────────────────────────────
+
+done_options:
+  title: "Feature Complete · {feature}"
+  subtitle: "What would you like to do next?"
+  ttl: 120
+  items:
+    - label: Archive this feature
+      description: "Archive {feature} and close it out"
+      command: /pathly archive
+      terminal_kind: claude
+
+    - label: Promote lessons
+      description: "Extract and promote lessons learned from {feature}"
+      command: /pathly lessons
+      terminal_kind: claude
+
+    - label: Start next feature
+      description: Begin planning a new feature
+      command: /pathly go
+      terminal_kind: claude
+
+    - label: Read the retro
+      description: "Review the retrospective for {feature}"
+      command: /pathly retro
+      terminal_kind: claude
+
+retro_done:
+  title: "Retro Written · {feature}"
+  subtitle: "The retrospective has been saved."
+  ttl: 90
+  items:
+    - label: Archive this feature
+      description: "Archive {feature} and close it out"
+      command: /pathly archive
+      terminal_kind: claude
+
+    - label: Promote lessons
+      description: Extract and promote lessons learned
+      command: /pathly lessons
+      terminal_kind: claude
+
+    - label: Start next feature
+      description: Begin planning the next feature
+      command: /pathly go
+      terminal_kind: claude
+
+# ── Blocked / feedback menus ─────────────────────────────────────────────────
+
+blocked:
+  title: "Action Required · {feature}"
+  subtitle: "Open feedback must be addressed before continuing."
+  ttl: 300
+  items:
+    - label: Resume pipeline
+      description: Continue — address open feedback and advance
+      command: /pathly go continue
+      terminal_kind: claude
+
+    - label: Fix issues
+      description: Directly fix the reported issues
+      command: /pathly fix
+      terminal_kind: claude
+
+    - label: Show status
+      description: Display the current pipeline status
+      command: /pathly status
+      terminal_kind: claude
+
+# ── Help menu (state-aware) ───────────────────────────────────────────────────
+#
+# Items tagged with `states:` only appear when ?state= matches.
+# Items with no `states:` are always shown.
+
+help:
+  title: "Pathly Help · {feature}"
+  subtitle: "Commands relevant to your current stage"
+  ttl: 60
+  items:
+
+    # Always visible
+    - label: Status
+      description: Show current pipeline status and open files
+      command: /pathly status
+      terminal_kind: claude
+
+    # Ideation / early stages
+    - label: Storm
+      description: Brainstorm and shape the idea
+      command: /pathly storm
+      terminal_kind: claude
+      states: [STORMING, PLANNING]
+
+    - label: PO
+      description: Clarify requirements with the product owner
+      command: /pathly po
+      terminal_kind: claude
+      states: [STORMING, PLANNING]
+
+    - label: Plan
+      description: Create user stories and implementation plan
+      command: /pathly plan
+      terminal_kind: claude
+      states: [STORMING, PLANNING, BUILDING]
+
+    # Design
+    - label: Design
+      description: Generate UI/UX design system
+      command: /pathly design
+      terminal_kind: claude
+      states: [PLANNING, DESIGNING, BUILDING]
+
+    # Build cycle
+    - label: Build
+      description: Implement the current plan
+      command: /pathly build
+      terminal_kind: claude
+      states: [PLANNING, BUILDING, REVIEWING]
+
+    - label: Review
+      description: Adversarial review of the build
+      command: /pathly review
+      terminal_kind: claude
+      states: [BUILDING, REVIEWING, TESTING]
+
+    - label: Fix
+      description: Resolve open review or test feedback
+      command: /pathly fix
+      terminal_kind: claude
+      states: [REVIEWING, TESTING, BUILDING]
+
+    - label: Test
+      description: Run tests and verify acceptance criteria
+      command: /pathly test
+      terminal_kind: claude
+      states: [REVIEWING, TESTING]
+
+    # Wrap-up
+    - label: Retro
+      description: Write retrospective and capture lessons
+      command: /pathly retro
+      terminal_kind: claude
+      states: [TESTING, RETRO, DONE]
+
+    - label: End
+      description: Complete and close the current feature
+      command: /pathly end
+      terminal_kind: claude
+      states: [RETRO, DONE]
+
+    # Always visible — exploration / debug
+    - label: Explore
+      description: Read-only codebase Q&A
+      command: /pathly explore
+      terminal_kind: claude
+
+    - label: Debug
+      description: Investigate a bug or unexpected behaviour
+      command: /pathly debug
+      terminal_kind: claude
+
+    - label: Log
+      description: View the feature event log
+      command: /pathly log
+      terminal_kind: claude
