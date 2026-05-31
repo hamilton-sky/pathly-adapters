@@ -2,7 +2,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './SkillsPanel.module.css'
 
-const PIPELINE_SKILLS = ['plan', 'po', 'storm', 'build', 'review', 'test', 'retro', 'explore', 'debug', 'design', 'fix', 'status', 'log', 'end'] as const
+const PIPELINE_SKILLS = ['plan', 'po', 'storm', 'build', 'review', 'test', 'retro', 'explore', 'debug', 'design', 'fix', 'quick-fix', 'status', 'log', 'end'] as const
 const CONTROL_SKILLS  = ['start', 'go', 'pause', 'ff', 'help', 'team', 'end'] as const
 
 interface SkillsPanelProps {
