@@ -40,6 +40,14 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
   const activeFlowSessionsRef = useRef(activeFlowSessions)
   activeFlowSessionsRef.current = activeFlowSessions
 
+  // Clear stale session state whenever the active project changes.
+  useEffect(() => {
+    setActiveFlowSessions(() => ({}))
+    setActiveMonitorTab(null)
+    setFsmState(null)
+    setEvents([])
+  }, [projectPath, setActiveFlowSessions, setActiveMonitorTab, setFsmState, setEvents])
+
   // Proactive scan: read STATE.json for every plan folder and register any non-terminal flow as a session.
   useEffect(() => {
     if (!projectPath || planFolders.length === 0) return
