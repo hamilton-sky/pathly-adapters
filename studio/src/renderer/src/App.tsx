@@ -2,6 +2,7 @@ import { Component, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useStore } from './store'
 import { useUiStore } from './store/uiStore'
+import { useTerminalStore } from './store/terminalStore'
 import { useBrightskyStore } from './store/brightskyStore'
 import { brightskyClient } from './lib/brightskyClient'
 import { readFile } from './services/pathlyApi'
@@ -179,6 +180,14 @@ function MainApp(): JSX.Element | null {
   useEffect(() => {
     const bridge = window as Window & { __pathlyNavigate?: (panelName: string) => void }
     bridge.__pathlyNavigate = (panelName: string) => {
+      if (panelName === 'chat') {
+        if (!useUiStore.getState().chatOpen) useUiStore.getState().toggleChat()
+        return
+      }
+      if (panelName === 'terminal') {
+        if (!useTerminalStore.getState().open) useTerminalStore.getState().toggle()
+        return
+      }
       const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings'])
       if (!allowed.has(panelName)) {
         throw new Error(`Unknown panel: ${panelName}`)

@@ -76,7 +76,7 @@ export function getOrCreate(tabId: string, opts: { fontSize?: number } = {}): Xt
       void (async () => {
         const imgPath = await window.pathly?.clipboard?.readImagePath()
         if (imgPath) void window.pathly?.terminal?.write(tabId, imgPath)
-        else readClip((text) => void window.pathly?.terminal?.write(tabId, text))
+        // For plain text, let xterm's native paste event handle it via onData
       })()
       return false
     }
@@ -89,7 +89,7 @@ export function getOrCreate(tabId: string, opts: { fontSize?: number } = {}): Xt
       void (async () => {
         const imgPath = await window.pathly?.clipboard?.readImagePath()
         if (imgPath) void window.pathly?.terminal?.write(tabId, imgPath)
-        else readClip((text) => void window.pathly?.terminal?.write(tabId, text))
+        // For plain text, let xterm's native paste event handle it via onData
       })()
       return false
     }

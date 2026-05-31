@@ -5,11 +5,12 @@ import styles from '../Sidebar.module.css'
 interface Props {
   type: 'file' | 'folder'
   deep?: boolean
+  dataLabel?: string
   onCommit: (name: string) => void
   onCancel: () => void
 }
 
-export function InlineCreateInput({ type, deep, onCommit, onCancel }: Props): JSX.Element {
+export function InlineCreateInput({ type, deep, dataLabel, onCommit, onCancel }: Props): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
@@ -29,7 +30,7 @@ export function InlineCreateInput({ type, deep, onCommit, onCancel }: Props): JS
         ref={inputRef}
         className={styles.inlineCreateInput}
         placeholder={type === 'folder' ? 'folder name…' : 'file name…'}
-        data-label={type === 'folder' ? 'New Folder Name' : 'New Plan Name'}
+        data-label={dataLabel ?? (type === 'folder' ? 'New Folder Name' : 'New Plan Name')}
         defaultValue=""
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); submit() }

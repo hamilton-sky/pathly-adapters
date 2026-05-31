@@ -97,6 +97,7 @@ export function PlanSection({
           {inlineCreate?.target === 'plan-folder' && (
             <InlineCreateInput
               type="folder"
+              dataLabel="New Plan Name"
               onCommit={onInlineCreateSubmit}
               onCancel={onInlineCreateCancel}
             />

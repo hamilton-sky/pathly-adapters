@@ -51,7 +51,7 @@
 **Acceptance criteria:**
 - [ ] After `session_created` is received, the client sends a `client_capabilities` message over WebSocket
 - [ ] The `client_capabilities` message includes `type: 'client_capabilities'`, `source: 'pathly-studio'`, `version: '1.0'`
-- [ ] In Conv 1 the handshake declares `canExecuteToolCalls: false` and `canStreamThinking: true`
+- [ ] After Conv 3 the handshake declares `canExecuteToolCalls: true`, `canStreamThinking: true`, and `supportedToolTypes: ['studio_analyzer', 'automation']`
 - [ ] The handshake is sent exactly once per session (not repeated on subsequent messages)
 - [ ] The handshake does not block or delay the session creation confirmation in the UI
 
@@ -152,7 +152,7 @@
 - [ ] `NewItemDialog.tsx` — name, description, subdirectory inputs and confirm button have `data-label` (for library item creation)
 - [ ] `ChatPanel/ChatInput.tsx` — message textarea has `data-label="Chat Input"`
 - [ ] `ChatPanel` — send button has `data-label="Send Message"`
-- [ ] `Editor/ConfigForm.tsx` — name, description, adapter toggles, model/category selects have `data-label`
+- [ ] `Editor/ConfigForm.tsx` — name input, description input, and adapter toggle chips have `data-label`
 - [ ] Sidebar inline inputs (InlineFolderInput, RenameInput) have `data-label`
 - [ ] App-level navigation panels (Monitor, Chat, Files, Terminal) have `data-label` matching panel name
 - [ ] No `data-label` value is duplicated on the same page — each label is unique

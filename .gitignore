@@ -17,3 +17,4 @@ build/lib/
 build/bdist*/
 build/temp*/
 studio/tsconfig.web.tsbuildinfo
+studio/tsconfig.node.tsbuildinfo
