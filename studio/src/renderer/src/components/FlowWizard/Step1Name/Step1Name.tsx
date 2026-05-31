@@ -25,6 +25,7 @@ export function Step1Name({
         placeholder="my-flow"
         value={flowName}
         onChange={(e) => onFlowNameChange(e.target.value)}
+        data-testid="wizard-input-name"
       />
       <label htmlFor="flow-description" className={styles.label}>Description (optional)</label>
       <textarea
@@ -33,6 +34,7 @@ export function Step1Name({
         placeholder="Describe this flow…"
         value={description}
         onChange={(e) => onDescriptionChange(e.target.value)}
+        data-testid="wizard-input-description"
       />
     </div>
   )

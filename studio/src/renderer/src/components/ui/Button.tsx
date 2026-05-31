@@ -13,6 +13,7 @@ interface ButtonProps {
   onClick?: () => void
   children: React.ReactNode
   style?: React.CSSProperties
+  'data-testid'?: string
 }
 
 export function Button({
@@ -23,6 +24,7 @@ export function Button({
   onClick,
   children,
   style,
+  'data-testid': dataTestId,
 }: ButtonProps): JSX.Element {
   return (
     <button
@@ -30,6 +32,7 @@ export function Button({
       style={style}
       disabled={disabled || loading}
       onClick={onClick}
+      data-testid={dataTestId}
     >
       {children}
     </button>

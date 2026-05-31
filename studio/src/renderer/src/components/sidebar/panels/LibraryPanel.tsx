@@ -111,7 +111,11 @@ function renderSection(
         open={state.open}
         onToggle={() => onToggleSection(stateKey)}
         actions={showAddButton ? (
-          <IconButton onClick={(e) => onNewUserLibraryItem(section, e)} title={`New ${displayLabel.slice(0, -1).toLowerCase()}`}>
+          <IconButton
+            onClick={(e) => onNewUserLibraryItem(section, e)}
+            title={`New ${displayLabel.slice(0, -1).toLowerCase()}`}
+            data-testid={section.type === 'flow' ? 'sidebar-flows-add-btn' : undefined}
+          >
             <Plus size={12} />
           </IconButton>
         ) : undefined}

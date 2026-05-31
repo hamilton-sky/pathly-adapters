@@ -29,6 +29,7 @@ export function Step0Entry({
           type="button"
           className={`${styles.choiceCard} ${selectedTemplateId === (templates[0]?.id ?? null) ? styles.choiceCardActive : ''}`}
           onClick={() => onSelectTemplate(templates[0] ?? null)}
+          data-testid="wizard-start-template"
         >
           <div className={styles.choiceTitle}>From template</div>
           <div className={styles.choiceCopy}>Pre-filled stages for common workflows</div>
@@ -37,6 +38,7 @@ export function Step0Entry({
           type="button"
           className={styles.choiceCard}
           onClick={onStartBlank}
+          data-testid="wizard-start-blank"
         >
           <div className={styles.choiceTitle}>Start blank</div>
           <div className={styles.choiceCopy}>Define every stage yourself</div>
@@ -53,6 +55,7 @@ export function Step0Entry({
               type="button"
               className={`${styles.templateCard} ${active ? styles.templateCardActive : ''}`}
               onClick={() => onSelectTemplate(template)}
+              data-testid={`wizard-template-${template.id}`}
             >
               <div className={styles.templateRow}>
                 <strong>{template.name}</strong>
@@ -67,7 +70,7 @@ export function Step0Entry({
       {hasDraft && onResume && (
         <div className={styles.resumeCard}>
           <div className={styles.resumeLabel}>Resume draft</div>
-          <button type="button" className={styles.addBtn} onClick={onResume}>Resume saved draft</button>
+          <button type="button" className={styles.addBtn} onClick={onResume} data-testid="wizard-resume-draft">Resume saved draft</button>
         </div>
       )}
     </div>
