@@ -27,11 +27,11 @@ export function WizardFooter({
 
   return (
     <div className={styles.row}>
-      <button className={`${styles.btn} ${styles.cancel}`} onClick={onCancel} data-testid="wizard-btn-cancel">Cancel</button>
+      <button type="button" className={`${styles.btn} ${styles.cancel}`} onClick={onCancel} data-testid="wizard-btn-cancel">Cancel</button>
       <div className={styles.group}>
-        {step > 0 && <button className={`${styles.btn} ${styles.back}`} onClick={onBack} data-testid="wizard-btn-back">← Back</button>}
+        {step > 0 && <button type="button" className={`${styles.btn} ${styles.back}`} onClick={onBack} data-testid="wizard-btn-back">← Back</button>}
         {step < totalSteps ? (
-          <button className={`${styles.btn} ${styles.next}`} onClick={onNext} disabled={isNextDisabled} data-testid="wizard-btn-next">
+          <button type="button" className={`${styles.btn} ${styles.next}`} onClick={onNext} disabled={isNextDisabled} data-testid="wizard-btn-next">
             Next →
           </button>
         ) : (
