@@ -54,27 +54,39 @@
   opacity: 0.75;
 }
 
-.barTrack {
+.confBar,
+.confBarUnsure {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
   height: 4px;
+  border: none;
   border-radius: 2px;
-  background: rgba(128, 128, 128, 0.2);
   margin-bottom: 10px;
-  overflow: hidden;
+  background: rgba(128, 128, 128, 0.2);
 }
 
-.barFill {
-  height: 100%;
+.confBar::-webkit-progress-bar,
+.confBarUnsure::-webkit-progress-bar {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 2px;
+}
+
+.confBar::-webkit-progress-value {
+  background: var(--accent);
   border-radius: 2px;
   transition: width var(--t-bar) var(--ease-out-expo);
 }
 
-.barFillMatched {
-  background: var(--accent);
+.confBarUnsure::-webkit-progress-value {
+  background: var(--codex-amber);
+  border-radius: 2px;
+  transition: width var(--t-bar) var(--ease-out-expo);
 }
 
-.barFillUnsure {
-  background: var(--codex-amber);
-}
+.confBar::-moz-progress-bar { background: var(--accent); border-radius: 2px; }
+.confBarUnsure::-moz-progress-bar { background: var(--codex-amber); border-radius: 2px; }
 
 .actions {
   display: flex;

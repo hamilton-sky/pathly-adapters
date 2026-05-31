@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useRef } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import type { PathlyMenu, PathlyMenuItem, PushedMenu } from '../../../lib/pathlyContext'
 import styles from './PathlyMenuCard.module.css'
@@ -25,16 +25,20 @@ export function PathlyMenuCard({
   onExpire,
 }: PathlyMenuCardProps): JSX.Element {
   const pushed = isPushedMenu(menu)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   const remainingMs = pushed
     ? Math.max(0, menu.ttl * 1000 - (Date.now() - menu.pushedAt))
     : 0
 
+  useEffect(() => {
+    if (panelRef.current && pushed && remainingMs > 0) {
+      panelRef.current.style.setProperty('--timer-ms', `${remainingMs}ms`)
+    }
+  }, [pushed, remainingMs])
+
   return (
-    <div
-      className={styles.panel}
-      style={pushed && remainingMs > 0 ? { '--timer-ms': `${remainingMs}ms` } as CSSProperties : undefined}
-    >
+    <div ref={panelRef} className={styles.panel}>
       {/* Header row */}
       <button
         type="button"

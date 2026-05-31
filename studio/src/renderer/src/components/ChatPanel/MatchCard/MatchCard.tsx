@@ -26,12 +26,11 @@ export function MatchCard({ match, alts, onRun, onReject, onSelectAlt }: MatchCa
 
       <div className={styles.confidence}>{pct}% confidence</div>
 
-      <div className={styles.barTrack}>
-        <div
-          className={`${styles.barFill} ${matched ? styles.barFillMatched : styles.barFillUnsure}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <progress
+        className={matched ? styles.confBar : styles.confBarUnsure}
+        value={pct}
+        max={100}
+      />
 
       <div className={styles.actions}>
         <button type="button" className={styles.btnRun} onClick={onRun} aria-label={`Run ${match.skill}`}>

@@ -101,10 +101,7 @@ export function ModelCard({
               <span className={styles.downloadPhase}>{phase.label}</span>
               <span className={styles.downloadElapsed}>{formatElapsed(elapsed)}</span>
             </div>
-            <div className={styles.progressTrack}>
-              <div className={styles.progressStripes} />
-              <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-            </div>
+            <progress className={styles.downloadProgress} value={progress} max={100} />
             {phase.hint && (
               <span className={styles.downloadHint}>{phase.hint}</span>
             )}
