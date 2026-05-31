@@ -1,0 +1,12 @@
+{"type": "STATE_TRANSITION", "to": "PLANNING", "ts": "2026-05-31T11:01:28Z"}
+{"type": "HUMAN_RESPONSE", "value": "2", "ts": "2026-05-31T11:01:28Z"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "PLANNING", "schema_version": 1, "ts": "2026-05-31T11:01:38Z"}
+{"type":"AGENT_DONE","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":22442,"tokens_out":5611,"total_tokens":28053,"cost_usd":0.151491,"tool_uses":11,"wall_seconds":283,"ts":"2026-05-31T11:13:49Z","schema_version":1}
+{"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-05-31T11:14:15Z"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-31T11:14:15Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T11:14:21Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-05-31T11:24:50Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T11:24:50Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-05-31T11:25:51Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T11:25:51Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-31T11:27:57Z"}

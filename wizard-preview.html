@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FlowWizard Redesign Preview</title>
+<style>
+:root {
+  --bg-base: #1e1e2e;
+  --bg-mantle: #181825;
+  --bg-surface0: #313244;
+  --bg-surface1: #45475a;
+  --text-primary: #cdd6f4;
+  --text-secondary: #bac2de;
+  --text-muted: #585b70;
+  --accent: #cba6f7;
+  --green: #a6e3a1;
+  --red: #f38ba8;
+  --blue: #89b4fa;
+  --yellow: #f9e2af;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #0d0d1a; color: var(--text-primary); min-height: 100vh; display: flex; flex-direction: column; }
+
+/* Tabs */
+.tab-bar { display: flex; gap: 4px; padding: 14px 24px 0; background: var(--bg-mantle); border-bottom: 1px solid var(--bg-surface0); }
+.tab { padding: 7px 18px; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-muted); border: 1px solid transparent; border-bottom: none; position: relative; bottom: -1px; }
+.tab.active { background: #0d0d1a; color: var(--text-primary); border-color: var(--bg-surface0); }
+
+/* App area */
+.app { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 32px 24px; }
+.panel { display: none; width: 100%; max-width: 920px; flex-direction: column; align-items: center; gap: 16px; }
+.panel.active { display: flex; }
+
+/* Nav row */
+.nav-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+.step-btns { display: flex; gap: 4px; }
+.snav { padding: 4px 10px; font-size: 11px; border: 1px solid var(--bg-surface0); border-radius: 4px; cursor: pointer; color: var(--text-muted); background: none; font-family: inherit; }
+.snav:hover { border-color: var(--accent); color: var(--accent); }
+.snav.active { border-color: var(--accent); color: var(--accent); background: rgba(203,166,247,0.1); }
+
+/* Modal */
+.modal { width: 100%; background: var(--bg-mantle); border: 1px solid var(--bg-surface0); border-radius: 10px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; }
+.modal-narrow { max-width: 600px; }
+.modal-wide { max-width: 880px; }
+
+/* Progress bar */
+.pbar { height: 2px; background: var(--bg-surface0); }
+.pfill { height: 100%; background: var(--accent); transition: width 0.3s; }
+.pfill-done { background: var(--green); }
+
+/* Step indicator */
+.step-ind { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border-bottom: 1px solid var(--bg-surface0); }
+.dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.dot-done { background: var(--green); color: var(--bg-base); }
+.dot-active { background: var(--accent); color: var(--bg-base); }
+.dot-future { background: var(--bg-surface0); color: var(--text-muted); }
+.dot-click { cursor: pointer; transition: transform 0.15s; }
+.dot-click:hover { transform: scale(1.1); opacity: 0.85; }
+.conn { flex: 1; height: 1px; background: var(--bg-surface0); max-width: 40px; }
+.conn-done { background: rgba(166,227,161,0.4); }
+.step-label { text-align: center; padding: 6px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--bg-surface0); }
+
+/* Content */
+.mcontent { padding: 22px; overflow-y: auto; max-height: 420px; }
+.mtitle { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.msub { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
+label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
+input[type=text], textarea, select { width: 100%; background: var(--bg-base); border: 1px solid var(--bg-surface0); border-radius: 4px; color: var(--text-primary); font-size: 13px; padding: 6px 10px; outline: none; font-family: inherit; margin-bottom: 12px; }
+textarea { resize: vertical; min-height: 65px; }
+
+/* Entry cards */
+.ecards { display: grid; gap: 10px; margin-bottom: 10px; }
+.e3 { grid-template-columns: repeat(3, 1fr); }
+.e2 { grid-template-columns: repeat(2, 1fr); }
+.ecard { background: var(--bg-surface0); border: 1px solid var(--bg-surface1); border-radius: 8px; padding: 18px 14px; cursor: pointer; text-align: center; transition: all 0.15s; }
+.ecard:hover { border-color: var(--accent); background: rgba(203,166,247,0.06); }
+.ecard.resume { border-color: rgba(166,227,161,0.3); background: rgba(166,227,161,0.05); }
+.ecard.resume:hover { border-color: var(--green); background: rgba(166,227,161,0.1); }
+.ecard.selected { border-color: var(--accent); background: rgba(203,166,247,0.06); }
+.ci { font-size: 22px; margin-bottom: 7px; display: block; }
+.ct { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+.cd { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+/* Template cards */
+.tgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
+.tcard { background: var(--bg-surface0); border: 1px solid var(--bg-surface1); border-radius: 6px; padding: 10px 12px; cursor: pointer; transition: all 0.15s; }
+.tcard:hover, .tcard.sel { border-color: var(--accent); background: rgba(203,166,247,0.06); }
+.tn { font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+.tpills { display: flex; flex-wrap: wrap; gap: 3px; }
+.tpill { font-size: 10px; font-family: monospace; background: var(--bg-base); border: 1px solid var(--bg-surface0); border-radius: 3px; padding: 1px 5px; color: var(--text-muted); }
+
+/* State rows */
+.srow { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+.srow input { flex: 1; font-family: monospace; font-size: 12px; margin-bottom: 0; }
+.dh { color: var(--text-muted); cursor: grab; padding: 0 3px; font-size: 13px; flex-shrink: 0; }
+.stag { font-size: 10px; color: var(--text-muted); flex-shrink: 0; min-width: 48px; }
+.rbtn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0 3px; flex-shrink: 0; }
+.abtn { background: none; border: 1px dashed var(--bg-surface1); border-radius: 4px; color: var(--blue); cursor: pointer; font-size: 11px; padding: 5px 12px; margin-top: 3px; width: 100%; }
+
+/* Pipeline chain */
+.pchain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 9px 11px; background: var(--bg-base); border: 1px solid var(--bg-surface0); border-radius: 6px; margin-top: 10px; }
+.ppill { background: rgba(137,180,250,0.12); border: 1px solid rgba(137,180,250,0.25); border-radius: 20px; padding: 3px 9px; font-size: 11px; font-family: monospace; color: var(--blue); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ppill.term { background: rgba(166,227,161,0.12); border-color: rgba(166,227,161,0.25); color: var(--green); }
+.parr { color: var(--text-muted); font-size: 12px; }
+
+/* YAML */
+.yaml { background: var(--bg-base); border: 1px solid var(--bg-surface0); border-radius: 4px; padding: 12px; font-size: 12px; font-family: 'Cascadia Code', 'Fira Code', monospace; color: var(--text-secondary); overflow: auto; max-height: 300px; white-space: pre; line-height: 1.55; }
+.yk { color: #89b4fa; } .yv { color: #a6e3a1; } .ys { color: #f9e2af; } .yc { color: var(--text-muted); font-style: italic; }
+
+/* Accordion */
+.acc { border: 1px solid var(--bg-surface0); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+.acc:last-child { margin-bottom: 0; }
+.acch { display: flex; justify-content: space-between; align-items: center; padding: 9px 13px; cursor: pointer; background: var(--bg-surface0); user-select: none; }
+.acch:hover { background: var(--bg-surface1); }
+.acct { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.accm { display: flex; align-items: center; gap: 7px; }
+.accb { font-size: 10px; color: var(--text-muted); background: var(--bg-base); border-radius: 20px; padding: 2px 7px; }
+.acccv { color: var(--text-muted); font-size: 13px; transition: transform 0.2s; }
+.accbody { padding: 13px; background: var(--bg-mantle); font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--bg-surface0); }
+
+/* Agent rows */
+.arow { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.aname { width: 110px; font-size: 11px; font-family: monospace; color: var(--text-secondary); flex-shrink: 0; }
+.ainput { flex: 1; background: var(--bg-base); border: 1px solid var(--bg-surface0); border-radius: 4px; color: var(--text-primary); font-size: 11px; padding: 4px 8px; font-family: monospace; outline: none; }
+
+/* Transitions */
+.trow { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+.tsel { background: var(--bg-base); border: 1px solid var(--bg-surface0); border-radius: 4px; color: var(--text-primary); font-size: 11px; padding: 4px 7px; font-family: monospace; outline: none; }
+.tarr { color: var(--text-muted); font-size: 14px; }
+.tlbl { width: 75px; background: var(--bg-base); border: 1px solid var(--bg-surface0); border-radius: 4px; color: var(--text-secondary); font-size: 11px; padding: 4px 7px; font-family: monospace; outline: none; }
+
+/* Warning */
+.warn { display: flex; align-items: flex-start; gap: 7px; background: rgba(249,226,175,0.08); border: 1px solid rgba(249,226,175,0.2); border-radius: 4px; padding: 7px 11px; margin-bottom: 11px; font-size: 12px; color: var(--yellow); line-height: 1.4; }
+
+/* Summary checklist */
+.sum-row { display: flex; gap: 7px; align-items: flex-start; font-size: 12px; margin-bottom: 8px; }
+.sum-icon { flex-shrink: 0; margin-top: 1px; }
+
+/* Footer */
+.mfooter { display: flex; justify-content: space-between; align-items: center; padding: 13px 22px; border-top: 1px solid var(--bg-surface0); flex-shrink: 0; }
+.fl { display: flex; align-items: center; gap: 7px; }
+.fr { display: flex; align-items: center; gap: 7px; }
+.btn { border-radius: 4px; font-size: 13px; cursor: pointer; padding: 6px 14px; font-family: inherit; transition: opacity 0.15s; }
+.btn:hover { opacity: 0.85; }
+.bp { background: var(--accent); border: none; color: var(--bg-base); font-weight: 600; }
+.bs { background: none; border: 1px solid var(--bg-surface1); color: var(--text-secondary); }
+.bg { background: none; border: none; color: var(--text-muted); }
+.bw { background: none; border: none; color: var(--yellow); font-size: 12px; }
+.bsu { background: var(--green); border: none; color: var(--bg-base); font-weight: 600; }
+
+/* Split layout */
+.split { display: grid; grid-template-columns: 1fr 280px; }
+.smain { padding: 22px; overflow-y: auto; max-height: 420px; }
+.sside { border-left: 1px solid var(--bg-surface0); display: flex; flex-direction: column; }
+.sideh { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--bg-surface0); background: var(--bg-surface0); }
+.sidet { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.sideb { flex: 1; padding: 10px; overflow-y: auto; }
+.yamlsm { font-size: 11px; font-family: 'Cascadia Code', 'Fira Code', monospace; color: var(--text-secondary); white-space: pre; line-height: 1.55; }
+
+/* Callout */
+.callout { font-size: 11px; padding: 7px 11px; border-radius: 4px; margin-bottom: 12px; line-height: 1.4; }
+.ci-info { background: rgba(137,180,250,0.07); border: 1px solid rgba(137,180,250,0.2); color: var(--blue); }
+.ci-sug { background: rgba(203,166,247,0.07); border: 1px solid rgba(203,166,247,0.2); color: var(--accent); }
+
+/* Section label */
+.slabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 7px; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('plan',this)">Plan — As Designed</div>
+  <div class="tab" onclick="switchTab('alt',this)">My Take — Alternative</div>
+</div>
+
+<div class="app">
+
+<!-- ============ PLAN PANEL ============ -->
+<div class="panel active" id="panel-plan">
+  <div class="nav-row" style="max-width:600px">
+    <span style="font-size:11px; color:var(--text-muted)">Click steps to preview each screen:</span>
+    <div class="step-btns" id="pnav">
+      <button class="snav active" onclick="showStep('plan',0,this)">Step 0</button>
+      <button class="snav" onclick="showStep('plan',1,this)">1</button>
+      <button class="snav" onclick="showStep('plan',2,this)">2</button>
+      <button class="snav" onclick="showStep('plan',3,this)">3</button>
+      <button class="snav" onclick="showStep('plan',4,this)">4</button>
+      <button class="snav" onclick="showStep('plan',5,this)">5 ✓</button>
+    </div>
+  </div>
+
+  <!-- P0 -->
+  <div class="modal modal-narrow" id="plan-0">
+    <div style="padding:22px 22px 6px; border-bottom:1px solid var(--bg-surface0); text-align:center">
+      <div class="mtitle" style="font-size:18px">Create a new flow</div>
+      <div class="msub" style="margin-bottom:14px">How would you like to start?</div>
+    </div>
+    <div class="mcontent">
+      <div class="ecards e3">
+        <div class="ecard"><span class="ci">📋</span><div class="ct">From template</div><div class="cd">Start with a predefined structure</div></div>
+        <div class="ecard"><span class="ci">✏️</span><div class="ct">From name</div><div class="cd">Enter a name, build from scratch</div></div>
+        <div class="ecard"><span class="ci">⬜</span><div class="ct">Start blank</div><div class="cd">Empty wizard, no pre-fills</div></div>
+      </div>
+      <div class="ecards" style="grid-template-columns:1fr">
+        <div class="ecard resume" style="text-align:left; display:flex; align-items:center; gap:12px; padding:14px 16px">
+          <span style="font-size:20px; flex-shrink:0">↩</span>
+          <div><div class="ct" style="color:var(--green)">Resume draft</div><div class="cd">feature-pipeline — saved 2 min ago · Step 2</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mfooter"><button class="btn bg">Cancel</button><div></div></div>
+  </div>
+
+  <!-- P1 -->
+  <div class="modal modal-narrow" id="plan-1" style="display:none">
+    <div class="step-ind">
+      <div class="dot dot-done">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">1</div><div class="conn"></div>
+      <div class="dot dot-future">2</div><div class="conn"></div>
+      <div class="dot dot-future">3</div><div class="conn"></div>
+      <div class="dot dot-future">4</div><div class="conn"></div>
+      <div class="dot dot-future">5</div>
+    </div>
+    <div class="step-label">Step 1 of 5 — Name your flow</div>
+    <div class="mcontent">
+      <div class="mtitle">Name your flow</div>
+      <div class="msub">Give your AI agent workflow a unique name.</div>
+      <label>Flow name <span style="color:var(--red)">*</span></label>
+      <input type="text" value="feature-pipeline">
+      <label>Description</label>
+      <textarea placeholder="Optional description..."></textarea>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr"><button class="btn bg">Cancel</button><button class="btn bp">Next</button></div>
+    </div>
+  </div>
+
+  <!-- P2 -->
+  <div class="modal modal-narrow" id="plan-2" style="display:none">
+    <div class="step-ind">
+      <div class="dot dot-done">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">2</div><div class="conn"></div>
+      <div class="dot dot-future">3</div><div class="conn"></div>
+      <div class="dot dot-future">4</div><div class="conn"></div>
+      <div class="dot dot-future">5</div>
+    </div>
+    <div class="step-label">Step 2 of 5 — Define stages</div>
+    <div class="mcontent">
+      <div class="mtitle">Define stages</div>
+      <div class="msub">Add the states your flow passes through. Drag to reorder.</div>
+      <div class="srow"><span class="dh">⠿</span><input type="text" value="STORMING"><span class="stag">initial</span><button class="rbtn">×</button></div>
+      <div class="srow"><span class="dh">⠿</span><input type="text" value="PLANNING"><span class="stag"></span><button class="rbtn">×</button></div>
+      <div class="srow"><span class="dh">⠿</span><input type="text" value="BUILDING"><span class="stag"></span><button class="rbtn">×</button></div>
+      <div class="srow"><span class="dh">⠿</span><input type="text" value="REVIEWING"><span class="stag"></span><button class="rbtn">×</button></div>
+      <div class="srow"><span class="dh">⠿</span><input type="text" value="DONE"><span class="stag">terminal</span><button class="rbtn">×</button></div>
+      <button class="abtn">+ Add state</button>
+      <div class="pchain">
+        <span class="ppill">STORMING</span><span class="parr">→</span>
+        <span class="ppill">PLANNING</span><span class="parr">→</span>
+        <span class="ppill">BUILDING</span><span class="parr">→</span>
+        <span class="ppill">REVIEWING</span><span class="parr">→</span>
+        <span class="ppill term">DONE</span>
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr">
+        <button class="btn bw">Start over</button>
+        <button class="btn bg" style="font-size:12px">Save draft</button>
+        <button class="btn bg">Cancel</button>
+        <button class="btn bp">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- P3 -->
+  <div class="modal modal-narrow" id="plan-3" style="display:none">
+    <div class="step-ind">
+      <div class="dot dot-done">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">3</div><div class="conn"></div>
+      <div class="dot dot-future">4</div><div class="conn"></div>
+      <div class="dot dot-future">5</div>
+    </div>
+    <div class="step-label">Step 3 of 5 — Assign agents</div>
+    <div class="mcontent">
+      <div class="mtitle">Assign agents</div>
+      <div class="msub">Map an agent role to each non-terminal state.</div>
+      <div class="warn">⚠ REVIEWING has no agent assigned — the flow may stall at this stage.</div>
+      <div class="arow"><span class="aname">STORMING</span><input class="ainput" type="text" value="architect"></div>
+      <div class="arow"><span class="aname">PLANNING</span><input class="ainput" type="text" value="planner"></div>
+      <div class="arow"><span class="aname">BUILDING</span><input class="ainput" type="text" value="builder"></div>
+      <div class="arow"><span class="aname">REVIEWING</span><input class="ainput" type="text" placeholder="unassigned…" style="border-color:rgba(249,226,175,0.4)"></div>
+      <div class="arow"><span class="aname" style="color:var(--text-muted);font-style:italic">DONE</span><span style="font-size:11px;color:var(--text-muted);font-style:italic">terminal — no agent needed</span></div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr">
+        <button class="btn bw">Start over</button>
+        <button class="btn bg" style="font-size:12px">Save draft</button>
+        <button class="btn bg">Cancel</button>
+        <button class="btn bp">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- P4 -->
+  <div class="modal modal-narrow" id="plan-4" style="display:none">
+    <div class="step-ind">
+      <div class="dot dot-done">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">4</div><div class="conn"></div>
+      <div class="dot dot-future">5</div>
+    </div>
+    <div class="step-label">Step 4 of 5 — Quality &amp; routing</div>
+    <div class="mcontent">
+      <div class="mtitle">Quality &amp; routing</div>
+      <div class="msub">Configure gates, routing rules, and transitions. All optional.</div>
+      <div class="acc"><div class="acch"><span class="acct">Quality Gates</span><div class="accm"><span class="accb">0 configured</span><span class="acccv">›</span></div></div></div>
+      <div class="acc"><div class="acch"><span class="acct">Feedback Routing</span><div class="accm"><span class="accb">0 configured</span><span class="acccv">›</span></div></div></div>
+      <div class="acc">
+        <div class="acch" style="background:rgba(203,166,247,0.08); border-bottom:1px solid var(--bg-surface0)">
+          <span class="acct" style="color:var(--text-primary)">Transition Rules</span>
+          <div class="accm"><span class="accb" style="background:rgba(166,227,161,0.15);color:var(--green)">1 rule</span><span class="acccv" style="transform:rotate(90deg)">›</span></div>
+        </div>
+        <div class="accbody">
+          <div class="trow">
+            <select class="tsel"><option>BUILDING</option></select>
+            <span class="tarr">→</span>
+            <select class="tsel"><option>REVIEWING</option></select>
+            <input class="tlbl" type="text" value="submit">
+            <button class="rbtn">×</button>
+          </div>
+          <button class="abtn" style="font-size:11px">+ Add rule</button>
+        </div>
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr">
+        <button class="btn bw">Start over</button>
+        <button class="btn bg" style="font-size:12px">Save draft</button>
+        <button class="btn bg">Cancel</button>
+        <button class="btn bp">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- P5 -->
+  <div class="modal modal-narrow" id="plan-5" style="display:none; max-width:680px">
+    <div class="step-ind">
+      <div class="dot dot-done">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-done">✓</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">5</div>
+    </div>
+    <div class="step-label">Step 5 of 5 — Review &amp; save</div>
+    <div class="mcontent">
+      <div class="mtitle">Review &amp; save</div>
+      <div class="msub">Your flow YAML — updates live as you edit previous steps.</div>
+      <div class="yaml"><span class="yk">name</span>: <span class="ys">feature-pipeline</span>
+<span class="yk">version</span>: <span class="yv">1</span>
+<span class="yk">states</span>:
+  - <span class="yk">id</span>: <span class="ys">STORMING</span>
+    <span class="yk">agent</span>: <span class="ys">architect</span>
+    <span class="yk">initial</span>: <span class="yv">true</span>
+  - <span class="yk">id</span>: <span class="ys">PLANNING</span>
+    <span class="yk">agent</span>: <span class="ys">planner</span>
+  - <span class="yk">id</span>: <span class="ys">BUILDING</span>
+    <span class="yk">agent</span>: <span class="ys">builder</span>
+  - <span class="yk">id</span>: <span class="ys">REVIEWING</span>
+  - <span class="yk">id</span>: <span class="ys">DONE</span>
+    <span class="yk">terminal</span>: <span class="yv">true</span>
+<span class="yk">transitions</span>:
+  - <span class="yk">from</span>: <span class="ys">BUILDING</span>
+    <span class="yk">to</span>: <span class="ys">REVIEWING</span>
+    <span class="yk">on</span>: <span class="ys">submit</span>
+<span class="yk">storage_path</span>: <span class="ys">~/.pathly</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+        <span style="font-size:12px;color:var(--text-secondary);flex-shrink:0">Save to:</span>
+        <input type="text" value="~/.pathly/flows/feature-pipeline.yaml" style="font-family:monospace;font-size:11px;margin-bottom:0;flex:1">
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr"><button class="btn bg">Cancel</button><button class="btn bsu">Save Flow</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ALT PANEL ============ -->
+<div class="panel" id="panel-alt">
+  <div class="nav-row" style="max-width:880px">
+    <span style="font-size:11px; color:var(--text-muted)">3 key differences: persistent YAML sidebar · template gallery on step 0 · clickable completed dots</span>
+    <div class="step-btns" id="anav">
+      <button class="snav active" onclick="showStep('alt',0,this)">Step 0</button>
+      <button class="snav" onclick="showStep('alt',1,this)">1</button>
+      <button class="snav" onclick="showStep('alt',2,this)">2</button>
+      <button class="snav" onclick="showStep('alt',3,this)">3</button>
+      <button class="snav" onclick="showStep('alt',4,this)">4</button>
+      <button class="snav" onclick="showStep('alt',5,this)">5 ✓</button>
+    </div>
+  </div>
+
+  <!-- A0 -->
+  <div class="modal modal-wide" id="alt-0">
+    <div style="padding:22px 22px 0; border-bottom:1px solid var(--bg-surface0)">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px">New flow</div>
+      <div class="ecards e2" style="margin-bottom:14px">
+        <div class="ecard selected" style="text-align:left;display:flex;align-items:center;gap:14px;padding:14px 16px">
+          <span style="font-size:26px;flex-shrink:0">📋</span>
+          <div><div class="ct" style="font-size:14px;margin-bottom:3px">Start from a template</div><div class="cd">Pre-filled stages for common workflows</div></div>
+        </div>
+        <div class="ecard" style="text-align:left;display:flex;align-items:center;gap:14px;padding:14px 16px">
+          <span style="font-size:26px;flex-shrink:0">⬜</span>
+          <div><div class="ct" style="font-size:14px;margin-bottom:3px">Start blank</div><div class="cd">Define every stage yourself</div></div>
+        </div>
+      </div>
+      <div class="slabel">Choose a template</div>
+      <div class="tgrid">
+        <div class="tcard sel"><div class="tn">Standard pipeline <span style="color:var(--accent);font-size:10px;font-weight:400">selected</span></div><div class="tpills"><span class="tpill">STORMING</span><span class="tpill">PLANNING</span><span class="tpill">BUILDING</span><span class="tpill">REVIEWING</span><span class="tpill">TESTING</span><span class="tpill">DONE</span></div></div>
+        <div class="tcard"><div class="tn">Review loop</div><div class="tpills"><span class="tpill">DRAFTING</span><span class="tpill">REVIEW</span><span class="tpill">DONE</span></div></div>
+        <div class="tcard"><div class="tn">Debug cycle</div><div class="tpills"><span class="tpill">REPRODUCING</span><span class="tpill">DIAGNOSING</span><span class="tpill">FIXING</span><span class="tpill">DONE</span></div></div>
+        <div class="tcard"><div class="tn">Blank</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px">No pre-fills</div></div>
+      </div>
+      <div class="ecard resume" style="text-align:left;display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:14px">
+        <span style="font-size:18px;flex-shrink:0">↩</span>
+        <div style="flex:1"><div class="ct" style="color:var(--green)">Resume draft — feature-pipeline</div><div class="cd">Saved 2 min ago · Step 2 · 5 states configured</div></div>
+        <button class="btn bs" style="font-size:11px;padding:4px 10px;flex-shrink:0">Resume</button>
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bg">Cancel</button></div>
+      <div class="fr"><button class="btn bp">Use Standard pipeline →</button></div>
+    </div>
+  </div>
+
+  <!-- A1 -->
+  <div class="modal modal-wide" id="alt-1" style="display:none">
+    <div class="pbar"><div class="pfill" style="width:20%"></div></div>
+    <div class="step-ind">
+      <div class="dot dot-done dot-click" title="Back to Step 0">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">1</div><div class="conn"></div>
+      <div class="dot dot-future">2</div><div class="conn"></div>
+      <div class="dot dot-future">3</div><div class="conn"></div>
+      <div class="dot dot-future">4</div><div class="conn"></div>
+      <div class="dot dot-future">5</div>
+    </div>
+    <div class="step-label" style="color:var(--accent)">Step 1 of 5 — Name your flow</div>
+    <div class="split">
+      <div class="smain">
+        <div class="mtitle">Name your flow</div>
+        <div class="msub">Give your AI agent workflow a name.</div>
+        <div class="callout ci-sug" style="margin-bottom:14px">Template: <strong>Standard pipeline</strong> — 6 states pre-filled on next step.</div>
+        <label>Flow name</label>
+        <input type="text" value="feature-pipeline">
+        <label>Description</label>
+        <textarea placeholder="Optional..."></textarea>
+      </div>
+      <div class="sside">
+        <div class="sideh"><span class="sidet">Live YAML</span><span style="font-size:10px;color:var(--text-muted)">updates as you type</span></div>
+        <div class="sideb">
+          <pre class="yamlsm"><span class="yk">name</span>: <span class="ys">feature-pipeline</span>
+<span class="yk">version</span>: <span class="yv">1</span>
+<span class="yk">states</span>: <span class="yc"># fill in step 2</span>
+<span class="yk">transitions</span>: <span class="yc"># fill in step 4</span>
+<span class="yk">storage_path</span>: <span class="ys">~/.pathly</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr"><button class="btn bw" style="font-size:11px">Start over</button><button class="btn bg" style="font-size:12px">Save draft</button><button class="btn bg">Cancel</button><button class="btn bp">Next →</button></div>
+    </div>
+  </div>
+
+  <!-- A2 -->
+  <div class="modal modal-wide" id="alt-2" style="display:none">
+    <div class="pbar"><div class="pfill" style="width:40%"></div></div>
+    <div class="step-ind">
+      <div class="dot dot-done dot-click">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click" title="Go back to Step 1">1</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">2</div><div class="conn"></div>
+      <div class="dot dot-future">3</div><div class="conn"></div>
+      <div class="dot dot-future">4</div><div class="conn"></div>
+      <div class="dot dot-future">5</div>
+    </div>
+    <div class="step-label" style="color:var(--accent)">Step 2 of 5 — Define stages</div>
+    <div class="split">
+      <div class="smain">
+        <div class="mtitle">Define stages</div>
+        <div class="msub">Drag to reorder. Initial = first, Terminal = last.</div>
+        <div class="srow"><span class="dh">⠿</span><input type="text" value="STORMING" style="margin-bottom:0"><span class="stag">initial</span><button class="rbtn">×</button></div>
+        <div class="srow"><span class="dh">⠿</span><input type="text" value="PLANNING" style="margin-bottom:0"><span class="stag"></span><button class="rbtn">×</button></div>
+        <div class="srow"><span class="dh">⠿</span><input type="text" value="BUILDING" style="margin-bottom:0"><span class="stag"></span><button class="rbtn">×</button></div>
+        <div class="srow"><span class="dh">⠿</span><input type="text" value="REVIEWING" style="margin-bottom:0"><span class="stag"></span><button class="rbtn">×</button></div>
+        <div class="srow"><span class="dh">⠿</span><input type="text" value="TESTING" style="margin-bottom:0"><span class="stag"></span><button class="rbtn">×</button></div>
+        <div class="srow"><span class="dh">⠿</span><input type="text" value="DONE" style="margin-bottom:0"><span class="stag">terminal</span><button class="rbtn">×</button></div>
+        <button class="abtn">+ Add state</button>
+        <div class="slabel" style="margin-top:12px">Pipeline preview</div>
+        <div class="pchain">
+          <span class="ppill">STORMING</span><span class="parr">→</span>
+          <span class="ppill">PLANNING</span><span class="parr">→</span>
+          <span class="ppill">BUILDING</span><span class="parr">→</span>
+          <span class="ppill">REVIEWING</span><span class="parr">→</span>
+          <span class="ppill">TESTING</span><span class="parr">→</span>
+          <span class="ppill term">DONE</span>
+        </div>
+      </div>
+      <div class="sside">
+        <div class="sideh"><span class="sidet">Live YAML</span><span style="font-size:10px;color:var(--green)">● live</span></div>
+        <div class="sideb">
+          <pre class="yamlsm"><span class="yk">name</span>: <span class="ys">feature-pipeline</span>
+<span class="yk">states</span>:
+  - <span class="yk">id</span>: <span class="ys">STORMING</span>
+    <span class="yk">initial</span>: <span class="yv">true</span>
+  - <span class="yk">id</span>: <span class="ys">PLANNING</span>
+  - <span class="yk">id</span>: <span class="ys">BUILDING</span>
+  - <span class="yk">id</span>: <span class="ys">REVIEWING</span>
+  - <span class="yk">id</span>: <span class="ys">TESTING</span>
+  - <span class="yk">id</span>: <span class="ys">DONE</span>
+    <span class="yk">terminal</span>: <span class="yv">true</span>
+<span class="yk">transitions</span>: <span class="yc"># step 4</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr"><button class="btn bw" style="font-size:11px">Start over</button><button class="btn bg" style="font-size:12px">Save draft</button><button class="btn bg">Cancel</button><button class="btn bp">Next →</button></div>
+    </div>
+  </div>
+
+  <!-- A3 -->
+  <div class="modal modal-wide" id="alt-3" style="display:none">
+    <div class="pbar"><div class="pfill" style="width:60%"></div></div>
+    <div class="step-ind">
+      <div class="dot dot-done dot-click">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">1</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">2</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">3</div><div class="conn"></div>
+      <div class="dot dot-future">4</div><div class="conn"></div>
+      <div class="dot dot-future">5</div>
+    </div>
+    <div class="step-label" style="color:var(--accent)">Step 3 of 5 — Assign agents</div>
+    <div class="split">
+      <div class="smain">
+        <div class="mtitle">Assign agents</div>
+        <div class="msub">Map a role to each non-terminal state.</div>
+        <div class="warn">⚠ REVIEWING has no agent — flow may stall.</div>
+        <div class="arow"><span class="aname">STORMING</span><input class="ainput" type="text" value="architect"></div>
+        <div class="arow"><span class="aname">PLANNING</span><input class="ainput" type="text" value="planner"></div>
+        <div class="arow"><span class="aname">BUILDING</span><input class="ainput" type="text" value="builder"></div>
+        <div class="arow"><span class="aname">REVIEWING</span><input class="ainput" type="text" placeholder="unassigned…" style="border-color:rgba(249,226,175,0.4)"></div>
+        <div class="arow"><span class="aname">TESTING</span><input class="ainput" type="text" value="tester"></div>
+        <div class="arow"><span class="aname" style="color:var(--text-muted);font-style:italic">DONE</span><span style="font-size:11px;color:var(--text-muted);font-style:italic">terminal</span></div>
+      </div>
+      <div class="sside">
+        <div class="sideh"><span class="sidet">Live YAML</span><span style="font-size:10px;color:var(--green)">● live</span></div>
+        <div class="sideb">
+          <pre class="yamlsm"><span class="yk">name</span>: <span class="ys">feature-pipeline</span>
+<span class="yk">states</span>:
+  - <span class="yk">id</span>: <span class="ys">STORMING</span>
+    <span class="yk">agent</span>: <span class="ys">architect</span>
+  - <span class="yk">id</span>: <span class="ys">PLANNING</span>
+    <span class="yk">agent</span>: <span class="ys">planner</span>
+  - <span class="yk">id</span>: <span class="ys">BUILDING</span>
+    <span class="yk">agent</span>: <span class="ys">builder</span>
+  - <span class="yk">id</span>: <span class="ys">REVIEWING</span>
+    <span style="color:#f38ba8"># ⚠ no agent</span>
+  - <span class="yk">id</span>: <span class="ys">TESTING</span>
+    <span class="yk">agent</span>: <span class="ys">tester</span>
+  - <span class="yk">id</span>: <span class="ys">DONE</span>
+    <span class="yk">terminal</span>: <span class="yv">true</span>
+<span class="yk">transitions</span>: <span class="yc"># step 4</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr"><button class="btn bw" style="font-size:11px">Start over</button><button class="btn bg" style="font-size:12px">Save draft</button><button class="btn bg">Cancel</button><button class="btn bp">Next →</button></div>
+    </div>
+  </div>
+
+  <!-- A4 -->
+  <div class="modal modal-wide" id="alt-4" style="display:none">
+    <div class="pbar"><div class="pfill" style="width:80%"></div></div>
+    <div class="step-ind">
+      <div class="dot dot-done dot-click">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">1</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">2</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">3</div><div class="conn conn-done"></div>
+      <div class="dot dot-active">4</div><div class="conn"></div>
+      <div class="dot dot-future">5</div>
+    </div>
+    <div class="step-label" style="color:var(--accent)">Step 4 of 5 — Quality &amp; routing</div>
+    <div class="split">
+      <div class="smain">
+        <div class="mtitle">Quality &amp; routing <span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:5px">optional</span></div>
+        <div class="msub">Gates, routing, and transition rules. Skip if not needed.</div>
+        <div class="acc"><div class="acch"><span class="acct">Quality Gates</span><div class="accm"><span class="accb">0 · skip ok</span><span class="acccv">›</span></div></div></div>
+        <div class="acc"><div class="acch"><span class="acct">Feedback Routing</span><div class="accm"><span class="accb">0 · skip ok</span><span class="acccv">›</span></div></div></div>
+        <div class="acc">
+          <div class="acch" style="background:rgba(203,166,247,0.08);border-bottom:1px solid var(--bg-surface0)">
+            <span class="acct" style="color:var(--text-primary)">Transition Rules</span>
+            <div class="accm"><span class="accb" style="background:rgba(166,227,161,0.15);color:var(--green)">1 rule</span><span class="acccv" style="transform:rotate(90deg)">›</span></div>
+          </div>
+          <div class="accbody">
+            <div class="trow">
+              <select class="tsel"><option>BUILDING</option></select>
+              <span class="tarr">→</span>
+              <select class="tsel"><option>REVIEWING</option></select>
+              <input class="tlbl" type="text" value="submit">
+              <button class="rbtn">×</button>
+            </div>
+            <button class="abtn" style="font-size:11px">+ Add rule</button>
+          </div>
+        </div>
+      </div>
+      <div class="sside">
+        <div class="sideh"><span class="sidet">Live YAML</span><span style="font-size:10px;color:var(--green)">● live</span></div>
+        <div class="sideb">
+          <pre class="yamlsm"><span class="yk">name</span>: <span class="ys">feature-pipeline</span>
+<span class="yk">states</span>:
+  - <span class="yk">id</span>: <span class="ys">STORMING</span>
+    <span class="yk">agent</span>: <span class="ys">architect</span>
+  - <span class="yk">id</span>: <span class="ys">BUILDING</span>
+    <span class="yk">agent</span>: <span class="ys">builder</span>
+  - <span class="yk">id</span>: <span class="ys">REVIEWING</span>
+  - <span class="yk">id</span>: <span class="ys">TESTING</span>
+    <span class="yk">agent</span>: <span class="ys">tester</span>
+  - <span class="yk">id</span>: <span class="ys">DONE</span>
+    <span class="yk">terminal</span>: <span class="yv">true</span>
+<span class="yk">transitions</span>:
+  - <span class="yk">from</span>: <span class="ys">BUILDING</span>
+    <span class="yk">to</span>: <span class="ys">REVIEWING</span>
+    <span class="yk">on</span>: <span class="ys">submit</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr"><button class="btn bw" style="font-size:11px">Start over</button><button class="btn bg" style="font-size:12px">Save draft</button><button class="btn bg">Cancel</button><button class="btn bp">Review &amp; Save →</button></div>
+    </div>
+  </div>
+
+  <!-- A5 -->
+  <div class="modal modal-wide" id="alt-5" style="display:none">
+    <div class="pbar"><div class="pfill pfill-done" style="width:100%"></div></div>
+    <div class="step-ind">
+      <div class="dot dot-done dot-click">↩</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">1</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">2</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">3</div><div class="conn conn-done"></div>
+      <div class="dot dot-done dot-click">4</div><div class="conn conn-done"></div>
+      <div class="dot dot-active" style="background:var(--green)">✓</div>
+    </div>
+    <div class="step-label" style="color:var(--green);font-weight:600">Ready to save — feature-pipeline</div>
+    <div class="split">
+      <div class="smain">
+        <div class="mtitle">Review &amp; save</div>
+        <div class="msub">Everything looks good. Click completed steps above to make edits.</div>
+        <div class="sum-row"><span class="sum-icon" style="color:var(--green)">✓</span><span style="color:var(--text-secondary)">Name:</span><span style="font-family:monospace;color:var(--text-primary);margin-left:6px">feature-pipeline</span></div>
+        <div class="sum-row"><span class="sum-icon" style="color:var(--green)">✓</span><span style="color:var(--text-secondary)">Stages:</span><span style="font-family:monospace;color:var(--text-primary);margin-left:6px;font-size:11px">STORMING → PLANNING → BUILDING → REVIEWING → TESTING → DONE</span></div>
+        <div class="sum-row"><span class="sum-icon" style="color:var(--yellow)">⚠</span><span style="color:var(--text-secondary)">Agents:</span><span style="color:var(--yellow);margin-left:6px;font-size:12px">REVIEWING has no agent — flow may stall</span></div>
+        <div class="sum-row"><span class="sum-icon" style="color:var(--green)">✓</span><span style="color:var(--text-secondary)">Transitions:</span><span style="color:var(--text-primary);margin-left:6px">1 rule</span></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:14px">
+          <span style="font-size:12px;color:var(--text-secondary);flex-shrink:0">Save to:</span>
+          <input type="text" value="~/.pathly/flows/feature-pipeline.yaml" style="font-family:monospace;font-size:11px;margin-bottom:0;flex:1">
+        </div>
+      </div>
+      <div class="sside">
+        <div class="sideh"><span class="sidet">Final YAML</span><span style="font-size:10px;color:var(--green)">● complete</span></div>
+        <div class="sideb">
+          <pre class="yamlsm"><span class="yk">name</span>: <span class="ys">feature-pipeline</span>
+<span class="yk">version</span>: <span class="yv">1</span>
+<span class="yk">states</span>:
+  - <span class="yk">id</span>: <span class="ys">STORMING</span>
+    <span class="yk">agent</span>: <span class="ys">architect</span>
+    <span class="yk">initial</span>: <span class="yv">true</span>
+  - <span class="yk">id</span>: <span class="ys">PLANNING</span>
+    <span class="yk">agent</span>: <span class="ys">planner</span>
+  - <span class="yk">id</span>: <span class="ys">BUILDING</span>
+    <span class="yk">agent</span>: <span class="ys">builder</span>
+  - <span class="yk">id</span>: <span class="ys">REVIEWING</span>
+  - <span class="yk">id</span>: <span class="ys">TESTING</span>
+    <span class="yk">agent</span>: <span class="ys">tester</span>
+  - <span class="yk">id</span>: <span class="ys">DONE</span>
+    <span class="yk">terminal</span>: <span class="yv">true</span>
+<span class="yk">transitions</span>:
+  - <span class="yk">from</span>: <span class="ys">BUILDING</span>
+    <span class="yk">to</span>: <span class="ys">REVIEWING</span>
+    <span class="yk">on</span>: <span class="ys">submit</span>
+<span class="yk">storage_path</span>: <span class="ys">~/.pathly</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="mfooter">
+      <div class="fl"><button class="btn bs">Back</button></div>
+      <div class="fr"><button class="btn bg">Cancel</button><button class="btn bsu">Save Flow</button></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+function switchTab(id, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + id).classList.add('active');
+}
+function showStep(prefix, n, el) {
+  for (let i = 0; i <= 5; i++) {
+    const el2 = document.getElementById(prefix + '-' + i);
+    if (el2) el2.style.display = i === n ? '' : 'none';
+  }
+  el.closest('.step-btns').querySelectorAll('.snav').forEach((b, i) => b.classList.toggle('active', i === n));
+}
+</script>
+</body>
+</html>

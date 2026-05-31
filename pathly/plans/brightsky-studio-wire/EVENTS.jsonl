@@ -1,0 +1,5 @@
+{"type": "STATE_TRANSITION", "to": "STORMING", "ts": "2026-05-31T00:00:00Z"}
+{"type": "HUMAN_RESPONSE", "value": "skip-discovery", "ts": "2026-05-31T00:00:01Z"}
+{"type": "STATE_TRANSITION", "to": "PLANNING", "ts": "2026-05-31T00:00:02Z"}
+{"type": "STATE_TRANSITION", "to": "DESIGNING", "ts": "2026-05-31T00:10:00Z"}
+{"type": "STATE_TRANSITION", "to": "PLANNING", "ts": "2026-05-31T00:20:00Z"}
