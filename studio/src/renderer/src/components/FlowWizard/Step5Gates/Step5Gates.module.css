@@ -1,0 +1,33 @@
+.root { display: block; }
+.empty { color: var(--theme-text-muted); font-size: var(--font-size-sm); }
+.card { margin-bottom: 20px; padding: 12px; border: 1px solid var(--theme-bg-surface1); border-radius: 6px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.state { font-family: monospace; font-size: var(--font-size-sm); color: var(--theme-text-primary); }
+.gateCard { margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 4px; }
+.gateHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.label { font-size: 11px; color: var(--theme-text-muted); }
+.stack { display: flex; flex-direction: column; gap: 6px; }
+.input {
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-bg-surface0);
+  border-radius: 4px;
+  color: var(--theme-text-primary);
+  font-size: var(--font-size-sm);
+  padding: 4px 8px;
+  outline: none;
+  font-family: monospace;
+  width: 100%;
+  box-sizing: border-box;
+}
+.select {
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-bg-surface0);
+  border-radius: 4px;
+  color: var(--theme-text-primary);
+  font-size: var(--font-size-sm);
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+}
+.optional { color: var(--theme-text-muted); font-size: var(--font-size-sm); font-style: italic; }

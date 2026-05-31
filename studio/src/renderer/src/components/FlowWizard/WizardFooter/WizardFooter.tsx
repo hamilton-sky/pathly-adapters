@@ -1,5 +1,6 @@
 import React from 'react'
-import { Button } from '../ui'
+import { Button } from '../../ui'
+import styles from './WizardFooter.module.css'
 
 interface WizardFooterProps {
   step: number
@@ -10,7 +11,6 @@ interface WizardFooterProps {
   onSave: () => void
   saving: boolean
   nextDisabled?: boolean
-  styles: Record<string, React.CSSProperties>
 }
 
 export function WizardFooter({
@@ -22,22 +22,16 @@ export function WizardFooter({
   onSave,
   saving,
   nextDisabled,
-  styles
 }: WizardFooterProps): JSX.Element {
   const isNextDisabled = saving || !!nextDisabled
-  const saveNextStyle: React.CSSProperties = isNextDisabled
-    ? { ...styles.nextBtn, opacity: 0.6, cursor: 'not-allowed' }
-    : styles.nextBtn
 
   return (
-    <div style={styles.btnRow}>
-      <button style={styles.cancelBtn} onClick={onCancel}>Cancel</button>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        {step > 0 && (
-          <button style={styles.backBtn} onClick={onBack}>← Back</button>
-        )}
+    <div className={styles.row}>
+      <button className={`${styles.btn} ${styles.cancel}`} onClick={onCancel}>Cancel</button>
+      <div className={styles.group}>
+        {step > 0 && <button className={`${styles.btn} ${styles.back}`} onClick={onBack}>← Back</button>}
         {step < totalSteps ? (
-          <button style={saveNextStyle} onClick={onNext} disabled={isNextDisabled}>
+          <button className={`${styles.btn} ${styles.next}`} onClick={onNext} disabled={isNextDisabled}>
             Next →
           </button>
         ) : (

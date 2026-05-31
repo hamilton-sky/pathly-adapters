@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import type { Gate, Transition, TransitionRule, FeedbackRoute } from './types'
-import { Step5Gates } from './Step5Gates'
-import { Step6FeedbackRouting } from './Step6FeedbackRouting'
-import { Step7TransitionRules } from './Step7TransitionRules'
+import type { Gate, Transition, TransitionRule, FeedbackRoute } from '../types'
+import { Step5Gates } from '../Step5Gates/Step5Gates'
+import { Step6FeedbackRouting } from '../Step6FeedbackRouting/Step6FeedbackRouting'
+import { Step7TransitionRules } from '../Step7TransitionRules/Step7TransitionRules'
 
 interface Step4QualityProps {
   transitions: Transition[]
@@ -59,7 +59,6 @@ export function Step4Quality(props: Step4QualityProps): JSX.Element {
                   transitions={props.transitions}
                   gates={props.gates}
                   onSetGates={props.onSetGates}
-                  styles={props.styles}
                 />
               )}
               {key === 'routing' && (

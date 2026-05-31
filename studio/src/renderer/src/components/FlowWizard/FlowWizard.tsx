@@ -5,16 +5,16 @@ import { useTheme } from '../../useTheme'
 import type { Props, Transition, Gate, TransitionRule, FeedbackRoute } from './types'
 import { makeStyles } from './FlowWizard.styles'
 import { generateYaml } from './utils'
-import { StepIndicator } from './StepIndicator'
-import { WizardFooter } from './WizardFooter'
-import { Step1Name } from './Step1Name'
-import { Step2States } from './Step2States'
-import { Step3Transitions } from './Step3Transitions'
-import { Step4Agents } from './Step4Agents'
-import { Step4Quality } from './Step4Quality'
-import { Step5Review } from './Step5Review'
-import { Step0Entry } from './Step0Entry'
-import { YamlPreview } from './YamlPreview'
+import { StepIndicator } from './StepIndicator/StepIndicator'
+import { WizardFooter } from './WizardFooter/WizardFooter'
+import { Step1Name } from './Step1Name/Step1Name'
+import { Step2States } from './Step2States/Step2States'
+import { Step3Transitions } from './Step3Transitions/Step3Transitions'
+import { Step4Agents } from './Step4Agents/Step4Agents'
+import { Step4Quality } from './Step4Quality/Step4Quality'
+import { Step5Review } from './Step5Review/Step5Review'
+import { Step0Entry } from './Step0Entry/Step0Entry'
+import { YamlPreview } from './YamlPreview/YamlPreview'
 import { WIZARD_TEMPLATES, type WizardTemplate } from './wizardTemplates'
 import { DRAFT_FILE_NAME, parseDraft, serializeDraft, type WizardDraft } from './draftUtils'
 import { validateStep } from './FlowWizard.validation'
@@ -261,16 +261,15 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
         <div style={step === 0 ? styles.contentFull : styles.content}>
           <div>
             {step === 0 && (
-              <Step0Entry
-                selectedTemplateId={selectedTemplateId}
-                templates={WIZARD_TEMPLATES}
-                onSelectTemplate={applyTemplate}
-                onStartBlank={startBlank}
-                onResume={resumeDraft}
-                hasDraft={hasDraft}
-                styles={styles}
-              />
-            )}
+                <Step0Entry
+                  selectedTemplateId={selectedTemplateId}
+                  templates={WIZARD_TEMPLATES}
+                  onSelectTemplate={applyTemplate}
+                  onStartBlank={startBlank}
+                  onResume={resumeDraft}
+                  hasDraft={hasDraft}
+                />
+              )}
             {step === 1 && (
               <>
                 <Step1Name
@@ -291,7 +290,6 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
                   onRemoveState={removeState}
                   onAddState={addState}
                   onReorderState={reorderState}
-                  styles={styles}
                 />
                 <FieldError message={stepErrors[2]?.states} />
               </>
@@ -312,7 +310,6 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
                 terminalState={terminalState}
                 agentMap={agentMap}
                 onUpdateAgent={updateAgent}
-                styles={styles}
               />
             )}
             {step === 5 && (
@@ -356,7 +353,6 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
           onSave={handleSave}
           saving={saving}
           nextDisabled={nextDisabled}
-          styles={styles}
         />
       </div>
     </div>

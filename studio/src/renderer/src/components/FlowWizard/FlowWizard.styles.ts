@@ -384,3 +384,13 @@ export function stepDotStyle(t: Theme, active: boolean, done: boolean): CSSPrope
     transition: 'transform 120ms ease'
   }
 }
+
+export function hoverButtonStyle(base: CSSProperties, hovered: boolean, accentColor?: string): CSSProperties {
+  return {
+    ...base,
+    transition: 'transform 120ms ease, border-color 120ms ease, background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
+    transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
+    boxShadow: hovered ? '0 6px 18px rgba(0,0,0,0.18)' : (base.boxShadow as string | undefined),
+    borderColor: hovered && accentColor ? accentColor : base.borderColor
+  }
+}

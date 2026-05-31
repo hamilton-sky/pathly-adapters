@@ -1,6 +1,6 @@
 import React from 'react'
-import type { Theme } from '../../theme'
-import { stepDotStyle } from './FlowWizard.styles'
+import type { Theme } from '../../../theme'
+import { stepDotStyle } from '../FlowWizard.styles'
 
 interface StepIndicatorProps {
   step: number

@@ -1,5 +1,5 @@
 import React from 'react'
-import type { TransitionRule, ArtifactCondition } from './types'
+import type { TransitionRule, ArtifactCondition } from '../types'
 
 interface Step7TransitionRulesProps {
   nonTerminalStates: string[]
@@ -38,14 +38,14 @@ export function Step7TransitionRules({
 
   function removeCondition(state: string, idx: number): void {
     const rule = getRule(state)
-    setRule(state, { ...rule, conditions: rule.conditions.filter((_, i) => i !== idx) })
+    setRule(state, { ...rule, conditions: rule.conditions.filter((_, i: number) => i !== idx) })
   }
 
   function updateCondition(state: string, idx: number, patch: Partial<ArtifactCondition>): void {
     const rule = getRule(state)
     setRule(state, {
       ...rule,
-      conditions: rule.conditions.map((c, i) => i === idx ? { ...c, ...patch } : c),
+      conditions: rule.conditions.map((c: ArtifactCondition, i: number) => i === idx ? { ...c, ...patch } : c),
     })
   }
 
@@ -87,7 +87,7 @@ export function Step7TransitionRules({
               <button style={styles.addBtn} onClick={() => addCondition(state)}>+ If artifact exists…</button>
             </div>
 
-            {rule.conditions.map((cond, idx) => (
+            {rule.conditions.map((cond: ArtifactCondition, idx: number) => (
               <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ fontSize: '11px', color: styles.stepSub?.color, flexShrink: 0 }}>if</span>
                 <input

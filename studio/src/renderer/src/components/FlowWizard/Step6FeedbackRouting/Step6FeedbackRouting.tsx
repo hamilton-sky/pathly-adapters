@@ -1,5 +1,5 @@
 import React from 'react'
-import type { FeedbackRoute } from './types'
+import type { FeedbackRoute } from '../types'
 
 interface Step6FeedbackRoutingProps {
   feedbackRoutes: FeedbackRoute[]

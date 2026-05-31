@@ -1,5 +1,5 @@
 import React from 'react'
-import type { Transition } from './types'
+import type { Transition } from '../types'
 
 interface Step3TransitionsProps {
   transitions: Transition[]

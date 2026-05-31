@@ -1,0 +1,7 @@
+.root { display: block; }
+.title { font-size: var(--font-size-lg); font-weight: 600; color: var(--theme-text-primary); margin-bottom: 4px; }
+.sub { font-size: var(--font-size-sm); color: var(--theme-text-muted); margin-bottom: 20px; }
+.row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.name { width: 120px; font-size: var(--font-size-sm); color: var(--theme-text-secondary); font-family: monospace; flex-shrink: 0; }
+.input { flex: 1; background: var(--theme-bg-base); border: 1px solid var(--theme-bg-surface0); border-radius: 4px; color: var(--theme-text-primary); font-size: var(--font-size-sm); padding: 5px 8px; outline: none; font-family: monospace; }
+.terminal { font-size: var(--font-size-sm); color: var(--theme-text-muted); font-style: italic; }
