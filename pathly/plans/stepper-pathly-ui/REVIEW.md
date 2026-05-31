@@ -1,30 +1,22 @@
-# Review — stepper-pathly-ui · Conv 0 (Plan gate)
+# Review — stepper-pathly-ui
 
-**Result: PASS**
-**Reviewer: adversarial reviewer (plan files)**
+**Reviewer:** claude-sonnet-4-6
 **Date:** 2026-05-31
+**Rigor:** lite
+**Scope:** Conv 1–5 cross-repo (playwright-stepper-framework + pathly-adapters/studio)
 
-## What was reviewed
+## Result: PASS
 
-Plan files for feature `stepper-pathly-ui` prior to starting implementation:
-- FEATURE_INDEX.md, USER_STORIES.md, IMPLEMENTATION_PLAN.md, PROGRESS.md, CONVERSATION_PROMPTS.md
-- ARCHITECTURE_PROPOSAL.md, HAPPY_FLOW.md
-- VERIFY.md (gate artifact)
+All 9 violations from the initial review resolved:
+- V1–V4, V7: Added type="button" to all buttons missing the attribute across topbar, HomeScreen, IconButton
+- V8: settings_page.py now accepts "python-fsm" in addition to "llm" and "python"
+- V9: StepperSession.__aenter__ now registers PathlyHomeScreen, PathlySettings, PathlyTopBar
 
-## Violations found and fixed
+## Stories delivered
 
-| # | Violation | Fix applied |
-|---|---|---|
-| 1 | Conv 2 done criteria said "17 testids" — actual count is 20 | Changed to "20" in CONVERSATION_PROMPTS.md and HAPPY_FLOW.md |
-| 2 | Conv 3, 4, 5 referenced USER_STORIES.md with relative path | Changed to absolute path in all three |
-| 3 | Conv 4 done criteria ambiguous on optional action count | Clarified as "7 required" + optional note |
-
-## Scope gate
-
-`studio/CLAUDE.md` was extended with UI coding rules by a scout agent during context-gathering.
-Declared in Conv 2 scope (studio work). Gate cleared.
-
-## Summary
-
-All plan files are structurally complete. All cross-references are consistent. All done criteria are verifiable.
-No violations remain. Plan is ready for implementation starting with Conv 1 and Conv 2 (parallel).
+- S1 (Electron CDP launcher): PASS
+- S2 (data-testid attributes): PASS
+- S3 (Pathly POMs): PASS
+- S4 (Pathly glue actions + register): PASS
+- S5 (Pathly workflows): PASS
+- S6 (Extension README): PASS
