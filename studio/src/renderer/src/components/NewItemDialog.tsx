@@ -117,6 +117,7 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
               type="text"
               placeholder={namePH[type]}
               value={name}
+              data-label="Item Name"
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate() }}
             />
@@ -130,6 +131,7 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
                 type="text"
                 placeholder={type === 'skill' ? 'Continue active pipeline feature' : 'Agent role description'}
                 value={description}
+                data-label="Item Description"
                 onChange={(e) => setDesc(e.target.value)}
               />
             </div>
@@ -179,6 +181,7 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
                 type="text"
                 placeholder="general"
                 value={subdirName}
+                data-label="Subdirectory"
                 onChange={(e) => setSubdir(e.target.value)}
               />
             </div>
@@ -188,8 +191,8 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
         </div>
 
         <div className={styles.footer}>
-          <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-          <button className={styles.createBtn} onClick={() => void handleCreate()}>Create</button>
+          <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancel</button>
+          <button type="button" className={styles.createBtn} data-label="Confirm" onClick={() => void handleCreate()}>Create</button>
         </div>
       </div>
     </div>

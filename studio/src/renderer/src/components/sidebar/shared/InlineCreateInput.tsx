@@ -29,6 +29,7 @@ export function InlineCreateInput({ type, deep, onCommit, onCancel }: Props): JS
         ref={inputRef}
         className={styles.inlineCreateInput}
         placeholder={type === 'folder' ? 'folder name…' : 'file name…'}
+        data-label={type === 'folder' ? 'New Folder Name' : 'New Plan Name'}
         defaultValue=""
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); submit() }

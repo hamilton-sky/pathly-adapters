@@ -57,7 +57,7 @@ export function TerminalLauncher(): JSX.Element {
   return (
     <>
       <div className={styles.terminalSplit}>
-        <IconButton onClick={() => toggleTerminal()} title="Toggle terminal" shortcut="Ctrl+`">
+        <IconButton onClick={() => toggleTerminal()} title="Toggle terminal" shortcut="Ctrl+`" data-label="Terminal">
           <Terminal size={14} />
         </IconButton>
         <div className={styles.terminalSplitDivider} />

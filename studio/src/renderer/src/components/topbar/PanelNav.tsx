@@ -32,6 +32,7 @@ export function PanelNav(): JSX.Element {
         <button
           type="button"
           data-testid="topbar-panel-monitor"
+          data-label="Monitor"
           className={`${styles.navBtn} ${activePanel === 'monitor' ? styles.navBtnActive : ''}`}
           onClick={() => setActivePanel('monitor')}
         >

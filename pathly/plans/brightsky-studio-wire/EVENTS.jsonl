@@ -25,3 +25,9 @@
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": 0, "ts": "2026-05-31T19:30:00Z"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 50644, "tokens_out": 12661, "total_tokens": 63305, "cost_usd": 0.341847, "tool_uses": 56, "wall_seconds": 514, "ts": "2026-05-31T19:31:04Z", "schema_version": 1}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_baseline_sha", "schema_version": 1, "ts": "2026-05-31T19:31:04Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-31T19:31:05Z"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-31T19:32:29Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": 0, "ts": "2026-05-31T19:40:00Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "tokens_in": 106382, "tokens_out": 26596, "total_tokens": 132978, "cost_usd": 0.718086, "tool_uses": 122, "wall_seconds": 864, "ts": "2026-05-31T19:47:33Z", "schema_version": 1}
+{"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_baseline_sha", "schema_version": 1, "ts": "2026-05-31T19:47:34Z"}

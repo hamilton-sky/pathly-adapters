@@ -75,6 +75,7 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
         disabled={disabled}
         placeholder="Message..."
         rows={1}
+        data-label="Chat Input"
       />
       <div className={styles.footer}>
         <div ref={groupRef} className={styles.terminalGroup}>
@@ -157,6 +158,7 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
             onClick={() => { if (!disabled && value.trim()) onSend() }}
             disabled={disabled || !value.trim()}
             title="Send (Enter)"
+            data-label="Send Message"
           >
             <Send size={13} />
           </button>

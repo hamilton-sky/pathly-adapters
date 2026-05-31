@@ -19,6 +19,7 @@ export function InlineFolderInput({ onConfirm, onCancel }: Props): JSX.Element {
         className={styles.inlineCreateInput}
         value={value}
         aria-label="Folder name"
+        data-label="New Folder Name"
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); onConfirm(value) }

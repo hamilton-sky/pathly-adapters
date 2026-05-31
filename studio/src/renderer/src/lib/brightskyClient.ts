@@ -71,9 +71,9 @@ export class BrightskyClient {
             source: 'pathly-studio',
             capabilities: {
               canAnalyzeDom: false,
-              canExecuteToolCalls: false,
+              canExecuteToolCalls: true,
               canStreamThinking: true,
-              supportedToolTypes: [] as string[],
+              supportedToolTypes: ['studio_analyzer', 'automation'] as string[],
             },
             version: '1.0',
           }))
@@ -201,9 +201,9 @@ export class BrightskyClient {
       context: { source: 'pathly-studio', appContext: pathlyCtx.appContext },
       capabilities: {
         canAnalyzeDom: false,
-        canExecuteToolCalls: false,
+        canExecuteToolCalls: true,
         canStreamThinking: true,
-        supportedToolTypes: [] as string[],
+        supportedToolTypes: ['studio_analyzer', 'automation'] as string[],
       },
     }
 

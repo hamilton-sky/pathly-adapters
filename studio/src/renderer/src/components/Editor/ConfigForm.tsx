@@ -60,6 +60,7 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
               style={chipVars(active, meta)}
               onClick={readOnly ? undefined : () => toggleAdapter(adapter, !active)}
               title={readOnly ? adapter : (active ? `Remove ${adapter}` : `Add ${adapter}`)}
+              data-label={`${adapter} Toggle`}
             >
               <span className={styles.chipDot} />
               {adapter}
@@ -93,6 +94,7 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
             value={values.name ?? ''}
             onChange={(e) => set({ name: e.target.value })}
             placeholder="skill-name"
+            data-label="Config Name"
           />
         </div>
 
@@ -105,6 +107,7 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
               value={values.description ?? ''}
               onChange={(e) => set({ description: e.target.value })}
               placeholder="What does this skill do?"
+              data-label="Config Description"
             />
           </div>
         )}

@@ -22,6 +22,7 @@ export function RenameInput({ value, onChange, onCommit, onCancel }: Props): JSX
       className={styles.renameInput}
       value={value}
       aria-label="Rename file"
+      data-label="Rename Input"
       placeholder="new name"
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {

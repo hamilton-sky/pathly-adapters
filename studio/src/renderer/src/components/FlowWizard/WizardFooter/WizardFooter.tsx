@@ -35,7 +35,7 @@ export function WizardFooter({
             Next →
           </button>
         ) : (
-          <Button onClick={onSave} loading={saving} disabled={saving} data-testid="wizard-btn-save">
+          <Button onClick={onSave} loading={saving} disabled={saving} data-testid="wizard-btn-save" data-label="Create Flow">
             Save Flow
           </Button>
         )}

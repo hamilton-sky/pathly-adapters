@@ -82,7 +82,7 @@ export function PlanSection({
         onToggle={onTogglePlan}
         sub={activeTopic ? `[${activeTopic}]` : undefined}
         actionsLeft={
-          <IconButton onClick={onNewPlan} title="New plan folder">
+          <IconButton onClick={onNewPlan} title="New plan folder" data-label="New Plan Folder">
             <FolderPlus size={12} />
           </IconButton>
         }

@@ -68,6 +68,7 @@ export function TopBar(): JSX.Element {
           </Tooltip>
           <IconButton
             data-testid="topbar-chat-toggle"
+            data-label="Chat"
             onClick={toggleChat}
             title="HQ"
             description="Command center above your AI model orchestrators"

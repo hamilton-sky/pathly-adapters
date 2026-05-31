@@ -26,6 +26,7 @@ export function Step1Name({
         value={flowName}
         onChange={(e) => onFlowNameChange(e.target.value)}
         data-testid="wizard-input-name"
+        data-label="Flow Name"
       />
       <label htmlFor="flow-description" className={styles.label}>Description (optional)</label>
       <textarea
@@ -35,6 +36,7 @@ export function Step1Name({
         value={description}
         onChange={(e) => onDescriptionChange(e.target.value)}
         data-testid="wizard-input-description"
+        data-label="Flow Description"
       />
     </div>
   )

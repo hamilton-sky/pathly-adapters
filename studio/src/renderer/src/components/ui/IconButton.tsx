@@ -13,6 +13,7 @@ interface IconButtonProps {
   disabled?: boolean
   style?: React.CSSProperties
   'data-testid'?: string
+  'data-label'?: string
 }
 
 export function IconButton({
@@ -25,6 +26,7 @@ export function IconButton({
   disabled = false,
   style,
   'data-testid': dataTestId,
+  'data-label': dataLabel,
 }: IconButtonProps): JSX.Element {
   const t = useTheme()
   const [hovered, setHovered] = useState(false)
@@ -59,6 +61,7 @@ export function IconButton({
         onMouseLeave={() => setHovered(false)}
         aria-label={title}
         data-testid={dataTestId}
+        data-label={dataLabel}
       >
         {children}
       </button>

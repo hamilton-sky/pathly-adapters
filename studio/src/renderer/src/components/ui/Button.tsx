@@ -14,6 +14,7 @@ interface ButtonProps {
   children: React.ReactNode
   style?: React.CSSProperties
   'data-testid'?: string
+  'data-label'?: string
 }
 
 export function Button({
@@ -25,14 +26,17 @@ export function Button({
   children,
   style,
   'data-testid': dataTestId,
+  'data-label': dataLabel,
 }: ButtonProps): JSX.Element {
   return (
     <button
+      type="button"
       className={clsx('pathly-btn', styles.btn, styles[variant], styles[size], uiStyles.focusVisible, loading && styles.loading)}
       style={style}
       disabled={disabled || loading}
       onClick={onClick}
       data-testid={dataTestId}
+      data-label={dataLabel}
     >
       {children}
     </button>
