@@ -43,7 +43,7 @@ export function TopBar(): JSX.Element {
         </IconButton>
 
         <Tooltip label="Back to projects" placement="bottom">
-          <button data-testid="topbar-back-btn" className={styles.backBtn} onClick={() => setProjectPath('')}>Projects</button>
+          <button type="button" data-testid="topbar-back-btn" className={styles.backBtn} onClick={() => setProjectPath('')}>Projects</button>
         </Tooltip>
 
         <div className={styles.center}>

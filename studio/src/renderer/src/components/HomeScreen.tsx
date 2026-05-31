@@ -342,6 +342,7 @@ export function HomeScreen(): JSX.Element {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             {/* Pin/star button */}
             <button
+              type="button"
               aria-label={project.pinned ? 'Unpin project' : 'Pin project'}
               style={{
                 display: 'flex',
@@ -367,6 +368,7 @@ export function HomeScreen(): JSX.Element {
 
             {/* Remove button */}
             <button
+              type="button"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -465,6 +467,7 @@ export function HomeScreen(): JSX.Element {
           </span>
 
           <button
+            type="button"
             data-testid="homescreen-open-btn"
             style={{
               display: 'flex',
@@ -536,6 +539,7 @@ export function HomeScreen(): JSX.Element {
             const isActive = activeTab === tab
             return (
               <button
+                type="button"
                 key={tab}
                 data-testid={`homescreen-tab-${tab}`}
                 onClick={() => handleTab(tab)}
@@ -671,6 +675,7 @@ export function HomeScreen(): JSX.Element {
             </div>
           ))}
           <button
+            type="button"
             onClick={() => handleTab('projects')}
             style={{
               marginTop: '8px',
@@ -731,6 +736,7 @@ export function HomeScreen(): JSX.Element {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {/* + New project CTA */}
             <button
+              type="button"
               data-testid="homescreen-new-project-btn"
               onClick={handleOpenFolder}
               title="Open project folder"
@@ -755,6 +761,7 @@ export function HomeScreen(): JSX.Element {
             {/* View toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               <button
+                type="button"
                 data-testid="homescreen-view-grid-btn"
                 onClick={() => handleViewMode('grid')}
                 title="Grid view"
@@ -771,6 +778,7 @@ export function HomeScreen(): JSX.Element {
                 <LayoutGrid size={13} />
               </button>
               <button
+                type="button"
                 data-testid="homescreen-view-list-btn"
                 onClick={() => handleViewMode('list')}
                 title="List view"
@@ -788,6 +796,7 @@ export function HomeScreen(): JSX.Element {
               </button>
             </div>
             <button
+              type="button"
               data-testid="home-toggle-done-btn"
               onClick={() => setHideDone((v) => !v)}
               style={{
@@ -875,6 +884,7 @@ export function HomeScreen(): JSX.Element {
 
               {hiddenCount > 0 && (
                 <button
+                  type="button"
                   data-testid="home-show-more-btn"
                   onClick={() => setVisibleCount((n) => n + 6)}
                   style={{

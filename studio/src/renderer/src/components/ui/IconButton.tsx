@@ -50,6 +50,7 @@ export function IconButton({
   return (
     <Tooltip label={title} description={description} shortcut={shortcut} placement={placement}>
       <button
+        type="button"
         className={`pathly-btn ${styles.focusVisible}`}
         style={baseStyle}
         disabled={disabled}
