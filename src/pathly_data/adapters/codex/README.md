@@ -118,3 +118,68 @@ and a plugin bundle to `~/.codex/plugins/pathly/` by
 
 Claude Code keeps its own model-specific wrappers under
 `adapters/claude/` for the Claude plugin package.
+
+## Multi-agent setup
+
+Pathly can delegate pipeline stages to native Codex sub-agents using the
+`spawn_agent` / `wait_agent` / `close_agent` tool set introduced in
+Codex CLI v0.131.0.
+
+**Requirements:** Codex CLI v0.131.0 or later.
+
+### Enable multi-agent mode
+
+Copy the Pathly config template to your project root or your global Codex config:
+
+```powershell
+# Project-local (applies to one project)
+Copy-Item ~/.codex/pathly-marketplace/plugins/pathly/.codex/config.toml .codex/config.toml
+
+# Global (applies to all Codex sessions on this machine)
+Copy-Item ~/.codex/pathly-marketplace/plugins/pathly/.codex/config.toml ~/.codex/config.toml
+```
+
+The template enables two settings:
+
+```toml
+[features]
+multi_agent = true       # enables spawn_agent / wait_agent / close_agent tools
+
+[agents]
+max_depth   = 1          # Pathly sub-agents must not spawn further sub-agents
+max_threads = 6          # max concurrent workers
+```
+
+### Agent TOML files
+
+`pathly-setup codex --apply` installs a TOML file for each Pathly role to
+`~/.codex/agents/`. These files define the role contract, model, and sandbox
+mode that Codex uses when an orchestrator calls `spawn_agent(agent_type=<name>)`.
+
+Roles installed:
+
+| Role | Model | Sandbox |
+|---|---|---|
+| director, architect, orchestrator | o3 | full / restricted |
+| builder, reviewer, tester, designer, planner, po | codex-1 | full |
+| explorer | codex-1 | restricted |
+| scout, quick | codex-1-mini | restricted |
+
+### Verify installation
+
+After running `pathly-setup codex --apply`, check that agent files are present:
+
+```powershell
+ls ~/.codex/agents/
+# Expected: builder.toml, reviewer.toml, tester.toml, architect.toml, ...
+```
+
+If your Codex CLI version supports it, `codex --list-agents` will show registered agents.
+
+### Known limitation
+
+Project-local `.codex/agents/` directories may not be visible inside
+MCP-backed Codex sessions. For this reason, `pathly-setup` installs all
+agent TOML files to the global `~/.codex/agents/` location rather than
+the project-local `.codex/agents/`. The project-local `.codex/config.toml`
+(with `multi_agent = true`) is still used for feature flags.

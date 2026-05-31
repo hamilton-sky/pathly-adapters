@@ -1,0 +1,10 @@
+# Pathly multi-agent configuration for Codex
+# Copy to .codex/config.toml in your project root, or ~/.codex/config.toml for global use.
+# Requires Codex CLI v0.131.0+
+
+[features]
+multi_agent = true       # enables spawn_agent / wait_agent / close_agent tools
+
+[agents]
+max_depth   = 1          # Pathly sub-agents must not spawn further sub-agents
+max_threads = 6          # max concurrent workers (one per pipeline stage is enough)

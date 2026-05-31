@@ -13,3 +13,13 @@ plugin:
   source: .codex-plugin
   include_stitched: true
 telemetry: true
+
+codex_agents:
+  destination: ~/.codex/agents/
+  source: .codex/agents/
+  format: toml
+
+codex_config_template:
+  destination: ~/.codex/
+  source: .codex/config.toml
+  note: "Copy to project root .codex/config.toml or global ~/.codex/config.toml"
