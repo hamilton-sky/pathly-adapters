@@ -1,5 +1,5 @@
 import { useChatPanel } from './useChatPanel'
-import { ConductorHeader } from './ConductorHeader/ConductorHeader'
+import { ChatHeader } from './ChatHeader/ChatHeader'
 import { SkillsPanel } from './SkillsPanel/SkillsPanel'
 import { MessageList } from './MessageList/MessageList'
 import { ChatInput } from './ChatInput/ChatInput'
@@ -20,7 +20,7 @@ export function ChatPanel(): JSX.Element {
     >
       {/* Left-edge drag handle — drag to resize */}
       <div className={styles.resizeHandle} onMouseDown={chat.onDragStart} />
-      <ConductorHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={chat.handleClearAll} sessions={chat.brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
+      <ChatHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={chat.handleClearAll} sessions={chat.brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
       <SkillsPanel onSkillClick={chat.handleSkillClick} />
       {/* Pipeline menu — permanent, FSM-state-driven */}
       {chat.menuVisible ? <PathlyMenuCard menu={chat.activeMenu!} onSelect={chat.handleMenuSelect} isOpen={chat.menuCardOpen} onToggle={() => chat.setMenuCardOpen((v) => !v)} /> : null}

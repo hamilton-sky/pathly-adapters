@@ -3,7 +3,7 @@ import { X, Zap, SquarePen, History } from 'lucide-react'
 import type { TerminalKind } from '../../../store/chatStore'
 import { Tooltip } from '../../ui'
 import { ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
-import styles from './ConductorHeader.module.css'
+import styles from './ChatHeader.module.css'
 
 export interface SessionSummary {
   id: string
@@ -12,7 +12,7 @@ export interface SessionSummary {
   lastActivity: string
 }
 
-interface ConductorHeaderProps {
+interface ChatHeaderProps {
   hasClaudeTab: boolean
   hasCodexTab: boolean
   hasShellTab: boolean
@@ -24,7 +24,7 @@ interface ConductorHeaderProps {
   onSelectSession?: (id: string) => void
 }
 
-export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, targetKind, onSetTarget, onToggleChat, onClearChat, sessions = [], onSelectSession }: ConductorHeaderProps): JSX.Element {
+export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, targetKind, onSetTarget, onToggleChat, onClearChat, sessions = [], onSelectSession }: ChatHeaderProps): JSX.Element {
   const headerRef = useRef<HTMLDivElement>(null)
   const [compact, setCompact] = useState(false)
   const [sessionsOpen, setSessionsOpen] = useState(false)
