@@ -294,6 +294,7 @@ def status_endpoint():
 
     topic = request.args.get("topic", "").strip()
     best_state: dict | None = None
+    best_state_dir: Path | None = None
 
     if topic:
         # Specific topic requested — read directly, skip the glob.
@@ -305,6 +306,8 @@ def status_endpoint():
             return jsonify({"error": "Invalid topic"}), 400
         if topic_dir.is_dir():
             best_state = read_state(str(topic_dir))
+            if best_state is not None:
+                best_state_dir = topic_dir
     else:
         # Find the most recently updated STATE.json across all features.
         best_mtime: float = -1.0
@@ -319,6 +322,7 @@ def status_endpoint():
                         if candidate is not None:
                             best_mtime = mtime
                             best_state = candidate
+                            best_state_dir = state_file.parent
                 except Exception:
                     logger.debug("status: error reading %s", state_file, exc_info=True)
         except Exception:
@@ -328,6 +332,9 @@ def status_endpoint():
     if best_state is None:
         return jsonify({"current_state": "no-feature", "feature": "", "project_root": project_root, "menu": _NO_FEATURE_MENU}), 200
 
+    # Infer feature from directory name when STATE.json lacks the field.
+    feature = best_state.get("feature", "") or (best_state_dir.name if best_state_dir else "")
+
     menu = None
     try:
         from importlib.resources import files
@@ -336,7 +343,6 @@ def status_endpoint():
         flow_config = yaml.safe_load(
             files("pathly_data").joinpath("core/flows/team.flow.yaml").read_text(encoding="utf-8")
         )
-        feature = best_state.get("feature", "")
         storage_path = resolved_root / "pathly" / "plans" / feature
         menu = build_menu_payload(
             flow_config,
@@ -349,7 +355,7 @@ def status_endpoint():
     return jsonify(
         {
             "current_state": best_state.get("current", "unknown"),
-            "feature": best_state.get("feature", ""),
+            "feature": feature,
             "project_root": project_root,
             "menu": menu,
         }
