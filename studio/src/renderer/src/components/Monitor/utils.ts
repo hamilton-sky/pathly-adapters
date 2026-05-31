@@ -62,3 +62,46 @@ export function useAgentTelemetry(): AgentTelemetry {
     eventsCount: events.length,
   }
 }
+
+export function getFlowYamlName(flow: string | undefined): string {
+  switch (flow) {
+    case 'team': return 'team.flow.yaml'
+    case 'debug': return 'debug.flow.yaml'
+    case 'explore': return 'explore.flow.yaml'
+    default:
+      if (flow !== undefined) {
+        console.warn(`[Monitor] Unknown flow type "${flow}", falling back to team.flow.yaml`)
+      }
+      return 'team.flow.yaml'
+  }
+}
+
+export function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + '…' : s
+}
+
+export function extractTopic(sessionKey: string): string {
+  const slash = sessionKey.indexOf('/')
+  return slash === -1 ? sessionKey : sessionKey.slice(slash + 1)
+}
+
+export function flowTypeLabel(flowKey: string): string {
+  const t = flowKey.replace('.flow.yaml', '')
+  return t === 'team' ? 'plan' : t
+}
+
+export function fmtTokens(n: number): string {
+  if (n === 0) return '—'
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
+
+export function fmtWall(n: number | undefined): string {
+  return n == null ? '—' : `${n}s`
+}
+
+export function fmtCost(n: number): string {
+  return n === 0 ? '—' : `$${n.toFixed(2)}`
+}
+
+export const EMPTY_TOOLTIP = 'Waiting for AGENT_DONE events with telemetry'
