@@ -208,6 +208,9 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
     assert "Never block or claim failure solely because a named Pathly role" in build_skill
     assert build_skill.index("## Codex Execution Contract") < build_skill.index("# build")
 
+    builder_agent = captured_plugin_files["agents/builder.toml"]
+    assert "pathly-fsm-call record-activity" in builder_agent
+
 
 # ---------------------------------------------------------------------------
 # uninstall — manifest traversal guard

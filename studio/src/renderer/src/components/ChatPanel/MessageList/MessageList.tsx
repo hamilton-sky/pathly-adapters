@@ -41,7 +41,7 @@ export function MessageList(): JSX.Element {
     return (
       <div className={styles.empty}>
         <MessageSquare size={22} className={styles.emptyIcon} />
-        <span className={styles.emptyText}>Ask Conductor anything about your Pathly workflow.</span>
+        <span className={styles.emptyText}>Ask anything about your Pathly workflow.</span>
       </div>
     )
   }

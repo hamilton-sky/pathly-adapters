@@ -81,9 +81,12 @@ _TELEMETRY_FOOTER = """
 
 *Telemetry: when your task is complete, run:*
 ```bash
-curl -s -X POST http://127.0.0.1:8765/record_activity \
-  -H "Content-Type: application/json" \
-  -d '{"agent":"<your-agent-name>","feature":"<feature>","summary":"<one-line summary>","input_tokens":0,"output_tokens":0}'
+pathly-fsm-call record-activity \
+  --agent "<your-agent-name>" \
+  --feature "<feature>" \
+  --summary "<one-line summary>" \
+  --input-tokens 0 \
+  --output-tokens 0
 ```
 """.strip()
 

@@ -22,7 +22,7 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
         {...(skillsPanelOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
         <span className={styles.title}>
-          {skillsPanelOpen ? 'Skills' : 'Controls'}
+          {'Controls'}
         </span>
         {skillsPanelOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
       </button>

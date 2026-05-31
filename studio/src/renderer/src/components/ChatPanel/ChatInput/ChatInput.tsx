@@ -73,7 +73,7 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        placeholder="Message Conductor..."
+        placeholder="Message..."
         rows={1}
       />
       <div className={styles.footer}>

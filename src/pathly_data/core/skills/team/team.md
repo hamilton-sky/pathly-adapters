@@ -19,8 +19,9 @@ by the FSM-backed Python surface.
 # team
 
 Unified entry point for the Pathly team pipeline.
-HTTP/FSM engine first (auto-starts the Python server via `fsm-call`); falls back to
-the LLM orchestrator if the server cannot start.
+HTTP/FSM engine first (auto-starts the Python server via `fsm-call` or the
+packaged `pathly-fsm-call` helper); falls back to the LLM orchestrator if the
+server cannot start.
 
 Run for `$ARGUMENTS`.
 

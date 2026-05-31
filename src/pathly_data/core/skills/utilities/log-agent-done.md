@@ -101,7 +101,23 @@ If unavailable:
 2. Wait 2 seconds, retry once.
 3. If still unavailable: print `log-agent-done: HTTP backend unavailable, skipping telemetry` and stop (do not fail).
 
-POST telemetry:
+POST telemetry with the packaged helper first:
+```bash
+pathly-fsm-call record-activity \
+  --agent "<agent>" \
+  --feature "<feature>" \
+  --summary "<summary>" \
+  --conversation <conversation> \
+  --total-tokens <total_tokens> \
+  --tool-uses <tool_uses> \
+  --wall-seconds <wall_seconds> \
+  --duration-ms <duration_ms> \
+  --input-tokens <tokens_in> \
+  --output-tokens <tokens_out> \
+  --cost-usd <cost_usd>
+```
+
+If the helper is unavailable, POST telemetry directly:
 ```bash
 curl -s -X POST http://127.0.0.1:8765/record_activity \
   -H "Content-Type: application/json" \

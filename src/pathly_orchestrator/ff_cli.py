@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from pathly_orchestrator.fsm_ops import complete_stage, next_action
+from pathly_orchestrator.fsm_http_client import complete_stage, next_action
 
 _SCAN_ROOTS = [
     ("pathly/plans", "team"),

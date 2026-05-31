@@ -16,6 +16,16 @@ Use Pathly to explore how auth state flows
 Use Pathly flow for checkout-flow
 ```
 
+Once the plugin is selected, use the packaged `pathly-fsm-call` helper for the
+HTTP lifecycle steps instead of hand-writing raw `curl` calls. That bridge is
+the Codex-side equivalent of the fully wired host integration:
+
+```text
+pathly-fsm-call next-action ...
+pathly-fsm-call complete-stage ...
+pathly-fsm-call record-activity ...
+```
+
 Short forms may work when Codex confidently selects the plugin:
 
 ```text

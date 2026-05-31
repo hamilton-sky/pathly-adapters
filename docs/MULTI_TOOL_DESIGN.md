@@ -43,7 +43,7 @@ metadata, and expose the host-native invocation style.
 | Adapter | User invocation | Files |
 |---|---|---|
 | Claude Code | `/pathly <request>` or `/path <request>` (slash commands) | `src/pathly_data/adapters/claude/` |
-| Codex | `Use Pathly <request>` or `Pathly <request>` (natural language) | `src/pathly_data/adapters/codex/` |
+| Codex | `Use Pathly <request>` or `Pathly <request>` (natural language) plus `pathly-fsm-call` for HTTP lifecycle steps | `src/pathly_data/adapters/codex/` |
 | Copilot | Version-dependent; agent files as custom instructions | `src/pathly_data/adapters/copilot/` |
 
 ## Studio Surface

@@ -192,7 +192,7 @@ Hook failures must be visible and recoverable. They must not corrupt workflow st
 |---|---|
 | CLI | `pathly-setup --apply` installs to all detected hosts without error |
 | Claude Code | `/pathly help` and `/pathly add password reset` reach the adapter |
-| Codex | `Use Pathly help` and `Use Pathly to add password reset` select the plugin skill |
+| Codex | `Use Pathly help`, `Use Pathly to add password reset`, and `pathly-fsm-call next-action ...` reach the adapter + HTTP bridge |
 | Hooks | Optional hook install reports exact registered commands and diagnostics |
 
 Docs should only claim behavior that this matrix verifies.

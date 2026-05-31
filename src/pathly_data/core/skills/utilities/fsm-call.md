@@ -1,8 +1,9 @@
 # fsm-call
 
-Internal utility — makes a single HTTP call to the Pathly FSM server.
-Ensures the server is running first, auto-starting it if needed.
-All other skills delegate FSM calls here instead of duplicating transport logic.
+Internal utility - makes a single HTTP call to the Pathly FSM server.
+The packaged `pathly-fsm-call` helper is the canonical Codex-friendly bridge;
+all other skills delegate FSM calls here instead of duplicating transport logic.
+It ensures the server is running first, auto-starting it if needed.
 
 ## Arguments
 
@@ -14,7 +15,7 @@ All other skills delegate FSM calls here instead of duplicating transport logic.
 - `decision` (optional): decision key for `complete_stage` routing decisions
 - `resolved_files` (optional): array of feedback filenames to mark resolved
 
-## Step 1 — Parse arguments
+## Step 1 - Parse arguments
 
 Parse `$ARGUMENTS` as JSON. If any required field is missing, print:
 ```
@@ -22,7 +23,7 @@ fsm-call: missing required field(s): <list>. Pass a JSON object with action, flo
 ```
 and stop.
 
-## Step 2 — Ensure server is running
+## Step 2 - Ensure server is running
 
 ```bash
 curl -s --max-time 1 http://127.0.0.1:8765/health
@@ -44,7 +45,22 @@ If it fails or times out:
    ```
    Stop.
 
-## Step 3 — POST to endpoint
+## Step 3 - POST to endpoint
+
+Prefer the helper CLI:
+
+```bash
+pathly-fsm-call next-action \
+  --flow "<flow>" \
+  --topic "<topic>" \
+  --project-root "<project_root>"
+```
+
+Use `pathly-fsm-call complete-stage` for stage advancement and
+`pathly-fsm-call record-activity` for telemetry. Omit `--decision` and
+`--resolved-file` unless needed.
+
+If the helper is unavailable, fall back to direct HTTP.
 
 Build the JSON body from the parsed fields (omit `decision` and `resolved_files` if not provided):
 
@@ -54,7 +70,7 @@ curl -s -X POST http://127.0.0.1:8765/<action> \
   -d '<body>'
 ```
 
-## Step 4 — Return response
+## Step 4 - Return response
 
 Print the raw JSON response exactly as received. The calling skill parses and acts on it.
 

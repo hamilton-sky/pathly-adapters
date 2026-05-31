@@ -14,7 +14,7 @@ logger = logging.getLogger("pathly.runner")
 import yaml
 from importlib.resources import files
 
-from pathly_orchestrator.fsm_ops import next_action, complete_stage
+from pathly_orchestrator.fsm_http_client import next_action, complete_stage
 
 
 def _storage_path(flow: str, project_root: str, topic: str) -> Path:

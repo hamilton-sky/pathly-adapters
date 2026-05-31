@@ -23,7 +23,8 @@ starts.
 - Classify the user intent into `tiny_change`, `new_feature`, `brainstorm`,
   `resume`, `test`, `fix_or_review`, `retro`, or `unclear`.
 - Choose the lightest safe workflow.
-- If an active feature exists, call `fsm-call` and render the returned menu
-  payload instead of printing a static menu block.
+- If an active feature exists, call `fsm-call` or the packaged
+  `pathly-fsm-call` helper and render the returned menu payload instead of
+  printing a static menu block.
 - If the user asks for a direct command surface, route to the appropriate
   workflow skill without inventing a separate menu.
