@@ -25,3 +25,5 @@
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-31T12:27:35Z"}
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":5,"result":"DONE","tokens_in":12590,"tokens_out":3148,"total_tokens":15738,"cost_usd":0.084984,"tool_uses":14,"wall_seconds":68,"ts":"2026-05-31T19:56:00Z","schema_version":1}
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-31T12:33:47Z"}
+{"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":5,"result":"PASS","tokens_in":68814,"tokens_out":17204,"total_tokens":86018,"cost_usd":0.464487,"tool_uses":38,"wall_seconds":239,"ts":"2026-05-31T20:05:00Z","schema_version":1}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-31T20:05:10Z", "schema_version": 1}
