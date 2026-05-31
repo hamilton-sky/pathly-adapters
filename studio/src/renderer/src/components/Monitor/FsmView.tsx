@@ -1,12 +1,8 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { useStore } from '../../store'
-import { useTheme } from '../../useTheme'
 import { Tooltip } from '../ui/Tooltip'
 import { useInjectCSS } from './utils'
-
-const COMPLETED_GREEN = '#16A34A'
-const ACTIVE_CYAN = '#06B6D4'
-const RETRY_AMBER = '#F59E0B'
+import styles from './Monitor.module.css'
 
 const PULSE_CSS = `
 @keyframes pathly-pulse {
@@ -45,8 +41,25 @@ const PULSE_CSS = `
 
 type StepStatus = 'completed' | 'active' | 'active-retry' | 'pending'
 
+function dotClass(status: StepStatus): string {
+  const map: Record<StepStatus, string> = {
+    completed:    styles.fsmDotCompleted,
+    active:       styles.fsmDotActive,
+    'active-retry': styles.fsmDotRetry,
+    pending:      styles.fsmDotPending,
+  }
+  return map[status]
+}
+
+function labelClass(status: StepStatus): string {
+  if (status === 'active')       return styles.fsmStepLabelActive
+  if (status === 'active-retry') return styles.fsmStepLabelRetry
+  return styles.fsmStepLabelMuted
+}
+
 function TimelineDot({ status, currentState }: { status: StepStatus; currentState: string }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -64,23 +77,21 @@ function TimelineDot({ status, currentState }: { status: StepStatus; currentStat
     }
   }, [currentState, status])
 
-  const base: React.CSSProperties = { width: 12, height: 12, borderRadius: '50%', flexShrink: 0 }
-  const style: React.CSSProperties =
-    status === 'completed'    ? { ...base, backgroundColor: COMPLETED_GREEN }
-    : status === 'active'     ? { ...base, backgroundColor: 'transparent', border: `2px solid ${ACTIVE_CYAN}`, boxShadow: `inset 0 0 0 3px ${ACTIVE_CYAN}` }
-    : status === 'active-retry' ? { ...base, backgroundColor: 'transparent', border: `2px dashed ${RETRY_AMBER}`, boxShadow: `inset 0 0 0 3px ${RETRY_AMBER}` }
-    : { ...base, backgroundColor: 'transparent', border: '1px solid #374151' }
-
-  return <div ref={ref} style={style} />
+  return <div ref={ref} className={`${styles.fsmDot} ${dotClass(status)}`} />
 }
 
 export function FsmView(): JSX.Element {
   const fsmState = useStore((s) => s.fsmState)
   const pipelineStates = useStore((s) => s.pipelineStates)
   const events = useStore((s) => s.events)
-  const t = useTheme()
+  const convLabelRef = useRef<HTMLDivElement>(null)
 
   useInjectCSS(PULSE_CSS)
+
+  // Set aria-atomic imperatively to avoid JSX expression lint false-positive
+  useEffect(() => {
+    convLabelRef.current?.setAttribute('aria-atomic', 'true')
+  }, [])
 
   const PIPELINE = useMemo(
     () => (pipelineStates.length > 0 ? pipelineStates : ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'DONE'])
@@ -88,7 +99,6 @@ export function FsmView(): JSX.Element {
     [pipelineStates]
   )
 
-  // Count how many times each stage was re-entered via a backward transition
   const retryMap = useMemo(() => {
     const map: Record<string, number> = {}
     for (const ev of events) {
@@ -117,23 +127,17 @@ export function FsmView(): JSX.Element {
   const remainingCount = activeIdx >= 0 ? PIPELINE.length - activeIdx - 1 : PIPELINE.length
 
   return (
-    <div style={{ padding: '10px 12px 8px', flexShrink: 0, backgroundColor: t.bgMantle, borderBottom: `1px solid ${t.bgSurface1}` }}>
-      {/* Conv label */}
-      <div
-        aria-live="polite"
-        aria-atomic={true}
-        style={{ fontSize: '11px', fontFamily: t.fontFamilyMono, color: t.textMuted, marginBottom: '8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-      >
+    <div className={styles.fsmRoot}>
+      <div ref={convLabelRef} aria-live="polite" className={styles.fsmConvLabel}>
         {convNum != null
           ? `${convLabel} ${convNum} · ${doneCount} done · ${remainingCount} remaining`
           : `${doneCount} done · ${remainingCount} remaining`}
       </div>
 
-      {/* Horizontal timeline */}
       <div
         role="group"
         aria-label={`Pipeline: ${activeState ?? 'idle'}, step ${activeIdx + 1} of ${PIPELINE.length}`}
-        style={{ display: 'flex', alignItems: 'flex-start', width: '100%', overflow: 'hidden' }}
+        className={styles.fsmTimeline}
       >
         {PIPELINE.map((state, idx) => {
           const isRetried = (retryMap[state] ?? 0) > 0
@@ -142,62 +146,27 @@ export function FsmView(): JSX.Element {
             : idx === activeIdx ? (isRetried ? 'active-retry' : 'active')
             : 'pending'
           const isLast = idx === PIPELINE.length - 1
-          const labelColor = status === 'active' ? t.textPrimary
-            : status === 'active-retry' ? RETRY_AMBER
-            : t.textMuted
           const retryCount = retryMap[state] ?? 0
           const tooltipLabel = status === 'active-retry'
             ? `${state} — retried ${retryCount}×`
             : `${state} — ${status}`
 
           return (
-            <div key={state} style={{ display: 'flex', alignItems: 'flex-start', flex: isLast ? '0 0 auto' : 1, minWidth: 0 }}>
-              {/* Dot + label column */}
+            <div key={state} className={isLast ? styles.fsmStepLast : styles.fsmStep}>
               <Tooltip label={tooltipLabel} placement="bottom" delay={200}>
-                <div
-                  aria-label={tooltipLabel}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, cursor: 'default' }}
-                >
+                <div aria-label={tooltipLabel} className={styles.fsmDotCol}>
                   <TimelineDot status={status} currentState={activeState ?? ''} />
-                  <span style={{
-                    fontSize: '9px',
-                    color: labelColor,
-                    marginTop: '3px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.03em',
-                    maxWidth: '34px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    textAlign: 'center',
-                    fontFamily: t.fontFamilyMono,
-                    fontWeight: (status === 'active' || status === 'active-retry') ? 600 : 400,
-                  }}>
+                  <span className={`${styles.fsmStepLabel} ${labelClass(status)}`}>
                     {state.slice(0, 8)}
                   </span>
                   {status === 'active-retry' && retryCount > 0 && (
-                    <span style={{
-                      fontSize: '8px',
-                      color: RETRY_AMBER,
-                      fontFamily: t.fontFamilyMono,
-                      marginTop: '1px',
-                      lineHeight: 1,
-                    }}>
-                      ↩{retryCount}
-                    </span>
+                    <span className={styles.fsmRetryBadge}>↩{retryCount}</span>
                   )}
                 </div>
               </Tooltip>
 
-              {/* Connector line (not after last dot) */}
               {!isLast && (
-                <div style={{
-                  flex: 1,
-                  height: '1px',
-                  marginTop: '5px',
-                  backgroundColor: idx < activeIdx ? COMPLETED_GREEN : t.bgSurface1,
-                  minWidth: '4px',
-                }} />
+                <div className={`${styles.fsmConnector} ${idx < activeIdx ? styles.fsmConnectorDone : ''}`} />
               )}
             </div>
           )
