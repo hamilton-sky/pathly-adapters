@@ -15,6 +15,13 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
   const toggleSkillsPanel = useUiStore((s) => s.toggleSkillsPanel)
   const t = useTheme()
 
+  const chipStyle = {
+    background: t.bgSurface1,
+    color: t.textPrimary,
+    fontFamily: t.fontFamilyMono,
+    border: `1px solid ${t.bgSurface1}`,
+  }
+
   return (
     <div
       className={styles.panel}
@@ -26,13 +33,27 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
         aria-expanded={skillsPanelOpen}
         style={{ color: t.textSecondary, fontFamily: t.fontFamilyBase }}
       >
-        <span className={styles.title} style={{ color: t.textPrimary }}>Skills</span>
-        {skillsPanelOpen
-          ? <ChevronUp size={13} />
-          : <ChevronDown size={13} />
-        }
+        <span className={styles.title} style={{ color: t.textPrimary }}>
+          {skillsPanelOpen ? 'Skills' : 'Controls'}
+        </span>
+        {skillsPanelOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
       </button>
 
+      {/* Control section — label only when expanded, chips always visible */}
+      {skillsPanelOpen && (
+        <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
+          Control
+        </div>
+      )}
+      <div className={skillsPanelOpen ? styles.chips : styles.chipsCompact}>
+        {CONTROL_SKILLS.map((skill) => (
+          <button key={skill} className={styles.chip} onClick={() => onSkillClick(`/pathly ${skill}`)} style={chipStyle}>
+            {skill}
+          </button>
+        ))}
+      </div>
+
+      {/* Pipeline section — only when expanded, below controls */}
       {skillsPanelOpen && (
         <>
           <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
@@ -40,45 +61,13 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
           </div>
           <div className={styles.chips}>
             {PIPELINE_SKILLS.map((skill) => (
-              <button
-                key={skill}
-                className={styles.chip}
-                onClick={() => onSkillClick(`/pathly ${skill}`)}
-                style={{
-                  background: t.bgSurface1,
-                  color: t.textPrimary,
-                  fontFamily: t.fontFamilyMono,
-                  border: `1px solid ${t.bgSurface1}`,
-                }}
-              >
+              <button key={skill} className={styles.chip} onClick={() => onSkillClick(`/pathly ${skill}`)} style={chipStyle}>
                 {skill}
               </button>
             ))}
           </div>
-          <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
-            Control
-          </div>
         </>
       )}
-
-      {/* Control commands — always visible */}
-      <div className={skillsPanelOpen ? styles.chips : styles.chipsCompact}>
-        {CONTROL_SKILLS.map((skill) => (
-          <button
-            key={skill}
-            className={styles.chip}
-            onClick={() => onSkillClick(`/pathly ${skill}`)}
-            style={{
-              background: t.bgSurface1,
-              color: t.textPrimary,
-              fontFamily: t.fontFamilyMono,
-              border: `1px solid ${t.bgSurface1}`,
-            }}
-          >
-            {skill}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }
