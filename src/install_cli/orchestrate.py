@@ -52,6 +52,7 @@ _SKILL_GROUPS = {
     "explore": "development",
     "ff": "flow",
     "fix": "development",
+    "quick-fix": "development",
     "fsm-call": "utilities",
     "go": "flow",
     "help": "utilities",

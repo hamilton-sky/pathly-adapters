@@ -1,0 +1,40 @@
+version: 1
+flow: quick-fix
+storage_path: pathly/fixes/{topic}/
+states:
+  - SCOPING
+  - FIXING
+  - VERIFYING
+  - DONE
+
+transitions:
+  SCOPING:
+    - FIXING
+  FIXING:
+    - VERIFYING
+    - SCOPING
+  VERIFYING:
+    - DONE
+    - FIXING
+  DONE: []
+
+agent_map:
+  SCOPING: scout
+  FIXING: builder
+  VERIFYING: tester
+
+role_map:
+  SCOPING: scout
+  FIXING: builder
+  VERIFYING: tester
+
+feedback_routing:
+  TEST_FAILURES: builder
+  HUMAN_QUESTIONS: human
+
+transition_actions:
+  FIXING->VERIFYING:
+    - skill: commit
+      message: "fix: {topic}"
+  VERIFYING->DONE:
+    - skill: archive-artifacts
