@@ -203,7 +203,7 @@ def test_complete_stage_gate_then_advance(tmp_path, monkeypatch):
         "project_root": str(tmp_path),
     })
 
-    assert result.get("next_state") == "REVIEWING"
+    assert result.get("current_state") == "REVIEWING"
     state_after = json.loads(state_file.read_text(encoding="utf-8"))
     assert state_after["current"] == "REVIEWING"
 

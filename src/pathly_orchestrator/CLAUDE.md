@@ -27,6 +27,24 @@ curl -s -X POST http://127.0.0.1:8765/complete_stage \
 
 Always verify the FSM is running before starting a pipeline — use `Skill(pathly-fsm-call)` → health, or the curl above.
 
+## `/next_action` response contract
+
+Every `/next_action` response includes the following top-level fields:
+
+| Field | Values | Notes |
+|---|---|---|
+| `current_state` | FSM stage string | e.g. `"BUILDING"` |
+| `agent` | role name string | e.g. `"builder"` |
+| `decision` | `"continue"` / `"block"` / `"escalate"` | automation gate — see below |
+| `agent_hint.role` | `"worker"` or `"explorer"` | host-neutral delegation signal |
+| `agent_hint.instructions` | string | full prompt for the next agent |
+| `codex_subagent` | legacy object | **frozen** — present for backward compat only; new adapters must read `agent_hint` |
+
+**`decision` field:**
+- `continue` — adapter may automate the next step without human involvement
+- `block` — an agent-resolvable feedback file is open; surface to the next Pathly agent via the standard feedback resolution flow
+- `escalate` — human input is required (corrupt state, unknown feedback, or retry limit exceeded); do not automate
+
 ## FSM recovery
 
 The `orchestrator` agent (haiku) can reconstruct state from `EVENTS.jsonl` if `STATE.json` is lost or corrupt. It is deterministic — same event log always produces the same state.

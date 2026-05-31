@@ -30,6 +30,14 @@ User → /pathly <cmd>           skills (installed at ~/.claude/skills/pathly-*)
      → pathly/plans/<feature>/ filesystem state
 ```
 
+**Adapter install step:** `pathly-setup <host> --apply` stitches `core/agents/` and `core/skills/` with adapter-specific `_meta/*.yaml` files and writes deployable files to the host's install directory. Three adapters: `claude` → `~/.claude/`, `codex` → `~/.codex/` + `~/.agents/`, `copilot` → `~/.vscode/extensions/pathly/`.
+
+**FSM response contract (`agent_hint`):** Every `/next_action` response includes:
+- `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)
+- `agent_hint.instructions` — full prompt for the next agent (Pathly role, phase, artifacts, limits)
+- `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
+- `codex_subagent` — legacy compat field with frozen keys; new adapters should read `agent_hint`
+
 **Agent roles** (full definitions in `src/pathly_data/core/agents/`):
 
 | Role | Model | Job |

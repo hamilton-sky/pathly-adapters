@@ -28,6 +28,13 @@ core/
                           HAPPY_FLOW, ARCHITECTURE_PROPOSAL, MERMAID_DIAGRAM
                   pipeline-walkthrough/   01-PIPELINE-FLOW, 02-TOKEN-USAGE, 03-ARTIFACT-MAP
 
+  flows/        flow YAML files read by the FSM:
+                  team.flow.yaml      full pipeline (STORM→PLAN→DESIGN→BUILD→REVIEW→TEST→RETRO→DONE)
+                  debug.flow.yaml     debug flow
+                  explore.flow.yaml   exploration flow
+                  test.flow.yaml      test-only flow
+                  quick-fix.flow.yaml nano/lite fast path
+
   design/       UI/UX design subsystem — powers `pathly-design` command:
                   data/   colors.csv, fonts.csv, styles.csv, typography.csv,
                           ux-guidelines.csv, charts.csv, products.csv,
@@ -42,6 +49,26 @@ adapters/
   codex/        Codex adapter (_meta/ agent + skill YAMLs)
   copilot/      Copilot adapter (_meta/ agent + skill YAMLs)
 ```
+
+## Adapters
+
+Three adapters derive from `core/`:
+
+| Adapter | Install destination |
+|---|---|
+| `claude/` | `~/.claude/agents/` and `~/.claude/skills/pathly-*/` |
+| `codex/` | `~/.codex/agents/`, `~/.agents/skills/`, and `~/.codex/plugins/pathly/` |
+| `copilot/` | `~/.vscode/extensions/pathly/agents/` and `~/.vscode/extensions/pathly/skills/` |
+
+Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that supply host-specific metadata (model name, tool list, `can_spawn` flag, install destination). `pathly-setup <host> --apply` stitches `core/` content with `_meta/` and writes deployable files.
+
+## FSM response contract
+
+`/next_action` returns `agent_hint` as the primary routing contract for all adapters:
+- `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)
+- `agent_hint.instructions` — full prompt for the next agent
+- `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
+- `codex_subagent` — **frozen legacy field**; present for backward compat only — new adapters must read `agent_hint`, not `codex_subagent`
 
 ## Adapter sync rule — CRITICAL
 

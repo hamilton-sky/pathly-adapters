@@ -348,11 +348,9 @@ def _verify_passed(path: Path, marker: str) -> bool:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return False
-    # Scan all non-empty lines — the marker may appear after front-matter or headers.
-    for line in text.splitlines():
-        if line.strip() == marker:
-            return True
-    return False
+    # Marker must be on line 1 (strict sentinel — body content does not count).
+    lines = text.splitlines()
+    return bool(lines) and lines[0].strip() == marker
 
 
 def _write_gate_feedback(storage_path: Path, on_fail: str, reason: str) -> None:
