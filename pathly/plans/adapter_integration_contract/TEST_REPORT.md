@@ -1,86 +1,55 @@
-# TEST REPORT — adapter_integration_contract Conv 1
+# TEST REPORT — adapter_integration_contract Conv 2
 
 **Date:** 2026-06-01
-**Test run:** `pytest -q tests/test_fsm_ops.py -v`
-**Result:** 18 passed, 0 failed
+**Test run:** `pytest -q tests/test_setup.py -v`
+**Result:** 26 passed, 0 failed (3.08s)
 
 ---
 
-## Story 1.1: Normalize FSM response shape
+## Story S2.1 — Expose adapter-agnostic hints
 
 ```
-Story 1.1: Normalize FSM response shape
+Story S2.1: Expose adapter-agnostic hints
 
-  Criterion: Both next_action and complete_stage return current_state at the top level (never next_state)
-  Test: test_current_state_key_on_next_action, test_current_state_key_on_complete_stage
-        (also asserted in test_next_action_initial_state, test_complete_stage_after_planning,
-        test_complete_stage_with_valid_decision, test_complete_stage_blocked_by_review_failures)
+  Criterion: SKILL_EXECUTION.md references agent_hint.role and agent_hint.instructions
+             as primary dispatch contract
+  Test: Read src/pathly_data/adapters/codex/SKILL_EXECUTION.md; confirm both
+        agent_hint.role and agent_hint.instructions are present and described
+        as the routing contract. Also: test_skill_execution_md_agent_hint_is_primary PASS.
   Status: PASS
 
-  Criterion: agent_hint has adapter-neutral keys: agent, role, mode, instructions
-  Test: test_agent_hint_uses_neutral_keys (verifies agent, role, absence of codex_role/pathly_agent);
-        test_next_action_includes_codex_worker_hint (verifies agent + role values);
-        test_next_action_initial_state (verifies agent and role keys present)
+  Criterion: SKILL_EXECUTION.md does NOT teach codex_subagent as primary path
+  Test: Confirm string "codex_subagent" is absent from the file.
+        test_skill_execution_md_no_codex_subagent_primary_dispatch PASS.
   Status: PASS
-  Notes: mode key is present in implementation (fsm_ops.py:139,160,329) but no test asserts its
-         presence in agent_hint. The criterion is satisfied at the implementation level; test
-         coverage for the mode key specifically is a minor gap but does not cause a failure.
 
-  Criterion: codex_subagent retains legacy keys: codex_role, pathly_agent, mode, instructions
-  Test: test_codex_subagent_retains_legacy_keys, test_next_action_includes_codex_worker_hint,
-        test_complete_stage_blocked_by_review_failures
+  Criterion: SKILL_EXECUTION.md has a ## Decisions block with continue, block, escalate
+  Test: Confirm "## Decisions" heading present; confirm all three values documented.
+        test_skill_execution_md_decision_values PASS.
   Status: PASS
-  Notes: Tests verify codex_role and pathly_agent. mode is not separately asserted in tests
-         but is present in implementation.
-
-  Criterion: Blocked/escalated responses include agent_hint, storage_path, and stage_brief
-  Test: test_blocked_response_has_agent_hint_and_storage_path (agent_hint + storage_path on block),
-        test_complete_stage_blocked_by_review_failures (agent_hint + storage_path + stage_brief on block),
-        test_next_action_corrupt_state_escalate_has_storage_path (storage_path on escalate)
-  Status: PASS
-  Notes: stage_brief on escalated (corrupt state) response is not explicitly asserted in the
-         escalate test, but the implementation sets it (fsm_ops.py:330,424). The blocked path is
-         fully covered. The escalate path is partially covered (storage_path asserted, stage_brief
-         not asserted).
 ```
 
 ---
 
-## Story 1.2: Separate block from escalate
+## Story S2.2 — Keep the contract bounded
 
 ```
-Story 1.2: Separate block from escalate
+Story S2.2: Keep the contract bounded
 
-  Criterion: Agent-target feedback -> decision = "block"
-  Test: test_block_decision_when_target_is_non_human_agent,
-        test_complete_stage_blocked_by_review_failures,
-        test_blocked_response_has_agent_hint_and_storage_path,
-        test_blocked_response_warnings_contain_open_feedback
+  Criterion: stage_brief guidance has not grown into an unstructured blob
+  Test: Read SKILL_EXECUTION.md (45 lines total). String "stage_brief" does not
+        appear anywhere in the file. Contract is tightly scoped to decision
+        routing and agent_hint delegation — no unstructured blob present.
   Status: PASS
 
-  Criterion: Human-target feedback -> decision = "escalate"
-  Test: test_escalate_decision_when_target_is_human
+  Criterion: block vs escalate distinction is explicit in the docs
+  Test: Read ## Decisions section.
+        - block: "an agent-resolvable feedback file is open. Surface to the next
+          Pathly agent via the standard feedback resolution flow."
+        - escalate: "human input is required (corrupt state, unknown feedback,
+          or retry limit exceeded). Do not automate; surface to the user."
+        Distinction is explicit: block = agent-resolvable, escalate = human-required.
   Status: PASS
-
-  Criterion: Corrupt state (recover_state failure) -> decision = "escalate" AND response includes storage_path
-  Test: test_next_action_corrupt_state_escalate_has_storage_path
-  Status: PASS
-
-  Criterion: Gate failure with no routable feedback -> decision = "escalate"
-  Test: (none found)
-  Status: NOT COVERED
-  Notes: No test exercises the path where complete_stage encounters a gate failure with no
-         feedback file present. This criterion is from S1.2 in USER_STORIES.md. Implementation
-         behavior for this path is unverified by tests.
-
-  Criterion: The adapter can safely automate continue and block, but must surface escalate to the user
-  Test: (none found — this is a documentation/contract criterion, not directly testable at the
-        unit level, but no integration test or contract test covers it either)
-  Status: NOT COVERED
-  Notes: This is a behavioral contract statement. No test verifies that escalate responses are
-         structured in a way that forces surfacing (e.g., assert no auto-retry field, or that
-         escalate does not carry the same continue-able shape). Low risk given the decision
-         enum is already verified, but the specific adapter safeguard is untested.
 ```
 
 ---
@@ -89,16 +58,12 @@ Story 1.2: Separate block from escalate
 
 | Criterion | Status |
 |---|---|
-| S1.1 — current_state key on both endpoints | PASS |
-| S1.1 — agent_hint neutral keys | PASS |
-| S1.1 — codex_subagent legacy keys | PASS |
-| S1.1 — blocked/escalated have agent_hint + storage_path + stage_brief | PASS |
-| S1.2 — agent-target feedback -> block | PASS |
-| S1.2 — human-target feedback -> escalate | PASS |
-| S1.2 — corrupt state -> escalate + storage_path | PASS |
-| S1.2 — gate failure no feedback -> escalate | NOT COVERED |
-| S1.2 — adapter must surface escalate (contract safeguard) | NOT COVERED |
+| S2.1 — agent_hint.role and agent_hint.instructions as primary contract | PASS |
+| S2.1 — codex_subagent not primary dispatch path | PASS |
+| S2.1 — ## Decisions block with continue / block / escalate | PASS |
+| S2.2 — stage_brief not an unstructured blob | PASS |
+| S2.2 — block vs escalate distinction explicit | PASS |
 
-**Overall: 7 PASS / 2 NOT COVERED / 0 FAIL**
+**Overall: 5 PASS / 0 NOT COVERED / 0 FAIL**
 
-The two NOT COVERED items are coverage gaps, not failures. No test failures were found.
+TEST RESULT: PASS

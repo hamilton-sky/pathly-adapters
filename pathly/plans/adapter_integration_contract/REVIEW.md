@@ -1,38 +1,43 @@
-# REVIEW — adapter_integration_contract Conv 1
+# Review — adapter_integration_contract Conv 2
+
+**Result: PASS**
 
 Date: 2026-06-01
 Reviewer: reviewer agent
-Files reviewed: `src/pathly_orchestrator/fsm_ops.py`, `tests/test_fsm_ops.py`
-Stories in scope: S1.1, S1.2
+Files reviewed: `src/pathly_data/adapters/codex/SKILL_EXECUTION.md`, `tests/test_setup.py`
+Stories in scope: S2.1, S2.2
 
-## Outcome: FAIL (1 violation)
+---
 
-One acceptance criterion is not fully satisfied. See `feedback/REVIEW_FAILURES.md`.
+## Review Report
 
-## Summary
+### Violations
 
-| Criterion | Result |
-|---|---|
-| S1.1 — `current_state` key on both endpoints | PASS |
-| S1.1 — `agent_hint` neutral keys only | PASS |
-| S1.1 — `codex_subagent` retains legacy keys | PASS |
-| S1.1 — blocked/escalated shape includes `agent_hint`, `storage_path`, `stage_brief` | FAIL — corrupt-state path omits `storage_path` |
-| S1.2 — agent-target feedback → `decision = "block"` | PASS |
-| S1.2 — human-target feedback → `decision = "escalate"` | PASS |
-| S1.2 — corrupt state → `decision = "escalate"` | PASS (value correct; shape incomplete) |
-| S1.2 — gate failure + no routable feedback → `decision = "escalate"` | PASS |
-| S1.2 — `recover_state` wrapped in try/except | PASS |
+None.
 
-## Violation detail
+### Warnings (non-blocking)
 
-`fsm_ops.py` lines 322–336 (`next_action`) and lines 415–429 (`complete_stage`) return inline
-dicts for the corrupt-state escalate path. Both dicts include `agent_hint` and `stage_brief`
-but omit `storage_path`. Every other blocked/escalated code path (via `_blocked_response`)
-correctly includes `storage_path`.
+None.
 
-Fix: add `"storage_path": str(storage_path)` to both inline escalate dicts.
+### Pass
 
-## Test coverage note
+**S2.1 — SKILL_EXECUTION.md dispatch contract**
 
-No test exercises the `recover_state` exception branch. Adding a test that patches
-`recover_state` to raise would catch the shape violation and prevent regression.
+- `agent_hint.role` is referenced as the primary Codex routing value (line 10).
+- `agent_hint.instructions` is referenced as the complete delegated prompt (line 11).
+- `codex_subagent` does not appear anywhere in the file — it is not taught as a primary dispatch path.
+- `## Decisions` block is present (line 24) and defines all three values: `continue`, `block`, `escalate`.
+
+**S2.2 — Bounded guidance and block/escalate distinction**
+
+- `stage_brief` does not appear in SKILL_EXECUTION.md — guidance has not grown into the file.
+- `warnings` does not appear in SKILL_EXECUTION.md — no adapter-specific parsing requirement introduced.
+- `block` and `escalate` are explicitly distinguished: `block` routes to the next Pathly agent via the feedback resolution flow; `escalate` surfaces to the human and must not be automated.
+
+**Tests**
+
+- `test_skill_execution_md_decision_values` (line 219): correctly asserts `continue`, `block`, `escalate` presence.
+- `test_skill_execution_md_agent_hint_is_primary` (line 231): correctly asserts `agent_hint` presence.
+- `test_skill_execution_md_no_codex_subagent_primary_dispatch` (line 241): correctly asserts `codex_subagent` absence.
+- All three tests resolve the file via `Path(__file__).parent.parent / "src/pathly_data/adapters/codex/SKILL_EXECUTION.md"` — path is correct relative to the repo root.
+- No hardcoded credentials, injection risks, or dependency direction violations found in the test file.

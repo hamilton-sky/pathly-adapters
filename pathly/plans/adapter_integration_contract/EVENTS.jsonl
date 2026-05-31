@@ -22,3 +22,9 @@
 {"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "schema_version": 1, "ts": "2026-05-31T22:57:43Z"}
 {"type": "STATE_TRANSITION", "from": "RETRO", "to": "BUILDING", "reason": "conv2-not-done", "ts": "2026-05-31T22:58:16.716955Z"}
 {"type": "AGENT_DONE", "agent": "team/build", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 15993, "tokens_out": 3998, "total_tokens": 19991, "cost_usd": 0.107951, "tool_uses": 11, "wall_seconds": 59, "ts": "2026-05-31T23:01:00.491056Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-31T23:10:15Z"}
+{"type": "AGENT_DONE", "agent": "team/review", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "tokens_in": 13218, "tokens_out": 3304, "total_tokens": 16522, "cost_usd": 0.089219, "tool_uses": 6, "wall_seconds": 52, "ts": "2026-05-31T23:11:37.512320Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "schema_version": 1, "ts": "2026-05-31T23:11:37Z"}
+{"type": "AGENT_DONE", "agent": "team/test", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "tokens_in": 16899, "tokens_out": 4225, "total_tokens": 21124, "cost_usd": 0.11407, "tool_uses": 9, "wall_seconds": 65, "ts": "2026-05-31T23:13:02.504895Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "schema_version": 1, "ts": "2026-05-31T23:13:02Z"}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "schema_version": 1, "ts": "2026-05-31T23:17:51Z"}

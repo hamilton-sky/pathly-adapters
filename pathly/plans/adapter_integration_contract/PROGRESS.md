@@ -3,10 +3,9 @@ name: Progress
 ---
 # Adapter Integration Contract — Progress
 
-## Status: PLAN READY
+## Status: COMPLETE
 
-Plan reviewed and updated by architect + web research on 2026-06-01.
-Ready to build. Start with Conversation 1 prompt from CONVERSATION_PROMPTS.md.
+All conversations delivered. Retro written 2026-06-01. FSM: DONE.
 
 ## Story Status
 
