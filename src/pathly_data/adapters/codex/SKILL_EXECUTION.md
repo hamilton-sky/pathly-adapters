@@ -6,9 +6,9 @@ the active Codex session:
 
 - If Codex exposes the named Pathly role as callable, invoke it with the
   requested phase and prompt.
-- If an FSM response includes `codex_subagent`, use it as the Codex fallback
-  routing contract. `codex_subagent.codex_role` is the callable Codex role
-  (`worker` or `explorer`), and `codex_subagent.instructions` is the complete
+- If an FSM response includes `agent_hint`, use it as the Codex fallback
+  routing contract. `agent_hint.role` is the callable Codex role
+  (`worker` or `explorer`), and `agent_hint.instructions` is the complete
   delegated prompt containing the Pathly role, phase, artifacts, and limits.
 - Use Codex sub-agent delegation when the user has requested or approved Pathly
   subagents and the active Codex tool policy permits it. Route read-only
@@ -20,6 +20,17 @@ the active Codex session:
   in the current Codex agent while following the returned instructions exactly.
 - Never block or claim failure solely because a named Pathly role is not
   exposed as a callable Codex sub-agent.
+
+## Decisions
+
+Every FSM response includes a `decision` field:
+
+- `continue` — adapter may automate the next step without human involvement.
+- `block` — an agent-resolvable feedback file is open. Surface to the next
+  Pathly agent via the standard feedback resolution flow.
+- `escalate` — human input is required (corrupt state, unknown feedback, or
+  retry limit exceeded). Do not automate; surface to the user.
+
 - Use the packaged `pathly-fsm-call` HTTP bridge after each phase to talk to
   the live Pathly FSM server:
   - `pathly-fsm-call next-action --flow <flow> --topic <feature> --project-root <abs path>`

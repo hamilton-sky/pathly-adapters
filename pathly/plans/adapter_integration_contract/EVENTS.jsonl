@@ -13,3 +13,12 @@
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T22:44:41Z"}
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T22:45:43Z"}
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T22:48:03Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-31T22:49:08Z"}
+{"type": "AGENT_DONE", "agent": "team/review", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "tokens_in": 20747, "tokens_out": 5187, "total_tokens": 25934, "cost_usd": 0.140044, "tool_uses": 9, "wall_seconds": 68, "ts": "2026-05-31T22:51:12.894203Z", "schema_version": 1}
+{"type": "AGENT_DONE", "agent": "team/build", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "tokens_in": 16869, "tokens_out": 4217, "total_tokens": 21086, "cost_usd": 0.113864, "tool_uses": 9, "wall_seconds": 52, "ts": "2026-05-31T22:53:02.243377Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "schema_version": 1, "ts": "2026-05-31T22:53:14Z"}
+{"type": "AGENT_DONE", "agent": "team/test", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "tokens_in": 20035, "tokens_out": 5009, "total_tokens": 25044, "cost_usd": 0.135238, "tool_uses": 20, "wall_seconds": 104, "ts": "2026-05-31T22:55:54.839744Z", "schema_version": 1}
+{"type": "AGENT_DONE", "agent": "team/build", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "tokens_in": 20748, "tokens_out": 5187, "total_tokens": 25935, "cost_usd": 0.140049, "tool_uses": 8, "wall_seconds": 61, "ts": "2026-05-31T22:57:36.315934Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "schema_version": 1, "ts": "2026-05-31T22:57:43Z"}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "BUILDING", "reason": "conv2-not-done", "ts": "2026-05-31T22:58:16.716955Z"}
+{"type": "AGENT_DONE", "agent": "team/build", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 15993, "tokens_out": 3998, "total_tokens": 19991, "cost_usd": 0.107951, "tool_uses": 11, "wall_seconds": 59, "ts": "2026-05-31T23:01:00.491056Z", "schema_version": 1}

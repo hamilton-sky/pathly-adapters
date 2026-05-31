@@ -202,7 +202,7 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
 
     build_skill = captured_plugin_files["skills/pathly-build/SKILL.md"]
     assert "## Codex Execution Contract" in build_skill
-    assert "codex_subagent" in build_skill
+    assert "agent_hint" in build_skill
     assert "`worker`" in build_skill
     assert "`explorer`" in build_skill
     assert "Never block or claim failure solely because a named Pathly role" in build_skill
@@ -210,6 +210,42 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
 
     builder_agent = captured_plugin_files["agents/builder.toml"]
     assert "pathly-fsm-call record-activity" in builder_agent
+
+
+# ---------------------------------------------------------------------------
+# SKILL_EXECUTION.md — adapter integration contract assertions
+# ---------------------------------------------------------------------------
+
+def test_skill_execution_md_decision_values():
+    """SKILL_EXECUTION.md must document all three FSM decision values."""
+    skill_exec = (
+        Path(__file__).parent.parent
+        / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
+    )
+    content = skill_exec.read_text(encoding="utf-8")
+    assert "continue" in content
+    assert "block" in content
+    assert "escalate" in content
+
+
+def test_skill_execution_md_agent_hint_is_primary():
+    """SKILL_EXECUTION.md must reference agent_hint as primary contract."""
+    skill_exec = (
+        Path(__file__).parent.parent
+        / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
+    )
+    content = skill_exec.read_text(encoding="utf-8")
+    assert "agent_hint" in content
+
+
+def test_skill_execution_md_no_codex_subagent_primary_dispatch():
+    """codex_subagent must not appear as a primary dispatch reference."""
+    skill_exec = (
+        Path(__file__).parent.parent
+        / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
+    )
+    content = skill_exec.read_text(encoding="utf-8")
+    assert "codex_subagent" not in content
 
 
 # ---------------------------------------------------------------------------
