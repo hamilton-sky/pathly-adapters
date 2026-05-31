@@ -575,6 +575,7 @@ export function HomeScreen(): JSX.Element {
           WebkitAppRegion: 'no-drag',
         } as React.CSSProperties}>
           <button
+            type="button"
             data-testid="home-theme-toggle"
             onClick={() => setTheme(isLightPalette(theme) ? preferredDark : preferredLight)}
             title={isLightPalette(theme) ? 'Switch to dark mode' : 'Switch to light mode'}
