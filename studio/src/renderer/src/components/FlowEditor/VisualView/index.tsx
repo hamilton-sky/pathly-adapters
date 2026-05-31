@@ -110,26 +110,19 @@ function VisualViewWithBanner(props: VisualViewProps): JSX.Element {
   )
   const isMultiFlow = Object.keys(activeFlowSessions).length >= 2
 
-  // Track isRunning transitions false → true (EC-3.2) to reset dismissed state
+  // Track isRunning false→true transitions (EC-3.2)
   const prevRunningRef = useRef(isRunning)
   const [dismissedKey, setDismissedKey] = useState(0)
 
   useEffect(() => {
-    if (!prevRunningRef.current && isRunning) {
-      // Transition from not-running to running — reset banner
-      setDismissedKey((k) => k + 1)
-    }
+    const wasRunning = prevRunningRef.current
     prevRunningRef.current = isRunning
-  }, [isRunning])
-
-  // When multi-flow + running: auto-switch to monitor once on mount
-  const autoSwitchedRef = useRef(false)
-  useEffect(() => {
-    if (isMultiFlow && isRunning && !autoSwitchedRef.current) {
-      autoSwitchedRef.current = true
-      setActivePanel('monitor')
+    if (!wasRunning && isRunning) {
+      // Reset banner and auto-switch to monitor only when running starts
+      setDismissedKey((k) => k + 1)
+      if (isMultiFlow) setActivePanel('monitor')
     }
-  }, [isMultiFlow, isRunning, setActivePanel])
+  }, [isRunning, isMultiFlow, setActivePanel])
 
   const flowName = (fsmState?.flow as string | undefined) ?? 'flow'
   const stateName = (fsmState?.current as string | undefined) ?? ''

@@ -304,7 +304,7 @@ function TabBar({ sessions, activeTab, onTabSelect }: TabBarProps): JSX.Element 
 }
 
 function PlanProgressSection({ topic }: { topic: string | null }): JSX.Element | null {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const { planConvs } = usePlanConversations(topic)
   const t = useTheme()
 
@@ -581,11 +581,14 @@ export function Monitor(): JSX.Element {
   const activeFlowSessionsRef = useRef(activeFlowSessions)
   activeFlowSessionsRef.current = activeFlowSessions
 
-  // When sidebar selection changes, auto-select the matching tab.
-  // Depends only on activeTopic — NOT on activeFlowSessions — so a tab click never triggers this.
+  // When sidebar selection changes, auto-select the matching tab — but never override a tab the
+  // user has already chosen. This prevents the tab from resetting when switching Canvas↔Monitor.
   useEffect(() => {
     if (!activeTopic) return
-    const matchingKey = Object.keys(activeFlowSessionsRef.current).find((k) => extractTopic(k) === activeTopic)
+    const sessions = activeFlowSessionsRef.current
+    // Skip if the current tab already points to a valid session (user's explicit choice)
+    if (activeMonitorTabRef.current != null && !!sessions[activeMonitorTabRef.current]) return
+    const matchingKey = Object.keys(sessions).find((k) => extractTopic(k) === activeTopic)
     if (matchingKey) setActiveMonitorTab(matchingKey)
   }, [activeTopic, setActiveMonitorTab])
 
