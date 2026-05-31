@@ -5,11 +5,12 @@ interface Props {
   label: string
   description: string
   onClick: () => void
+  'data-testid'?: string
 }
 
-export function RadioCard({ active, label, description, onClick }: Props): JSX.Element {
+export function RadioCard({ active, label, description, onClick, 'data-testid': dataTestId }: Props): JSX.Element {
   return (
-    <div className={`${s.radioCard}${active ? ` ${s.active}` : ''}`} onClick={onClick}>
+    <div data-testid={dataTestId} className={`${s.radioCard}${active ? ` ${s.active}` : ''}`} onClick={onClick}>
       <span className={`${s.radioLabel}${active ? ` ${s.active}` : ''}`}>
         <span>{active ? '●' : '○'}</span> {label}
       </span>

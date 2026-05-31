@@ -45,7 +45,7 @@ Examples: `homescreen-tab-projects`, `topbar-panel-flow`, `settings-routing-llm`
 
 - AC2.1: HomeScreen has testids: `homescreen-tab-projects`, `homescreen-tab-getting-started`, `homescreen-tab-settings`, `homescreen-new-project-btn`, `homescreen-project-card` (on each card), `homescreen-open-btn` (on each card's Open button), `homescreen-view-grid-btn`, `homescreen-view-list-btn`.
 - AC2.2: Settings has testids: `settings-save-btn`, `settings-fsm-command-input`, `settings-routing-llm`, `settings-routing-python`, `settings-palette-{name}` (one per palette swatch, where `{name}` is the palette identifier).
-- AC2.3: TopBar has testids: `topbar-sidebar-toggle`, `topbar-panel-plan`, `topbar-panel-editor`, `topbar-panel-flow`, `topbar-panel-monitor`, `topbar-panel-settings`, `topbar-chat-toggle`, `topbar-theme-toggle`.
+- AC2.3: TopBar has testids: `topbar-sidebar-toggle`, `topbar-panel-flow`, `topbar-panel-monitor`, `topbar-chat-toggle`, `topbar-theme-toggle` (all in `topbar/index.tsx` or its sub-components). The plan, editor, and settings panels are NOT accessible via topbar buttons — they are activated through Sidebar elements. Accordingly: `data-testid="sidebar-nav-settings"` is added to the Settings button in `sidebar/shell/BottomNav.tsx`; `data-testid="sidebar-nav-monitor"` is added to the Monitor button in `BottomNav.tsx`. No discrete nav buttons exist for plan or editor — those panels activate when the user clicks a plan folder or file in the Sidebar tree; testids for those tree items are out of scope for S2.
 - AC2.4: Running `npx tsc --noEmit` in `studio/` passes with no new errors after all additions.
 - AC2.5: The Studio application renders identically in dev mode before and after the additions — `data-testid` attributes are inert and add no logic.
 - AC2.6: No existing class names, inline styles, or event handlers are removed or modified; only `data-testid` props are added.
@@ -69,7 +69,7 @@ Examples: `homescreen-tab-projects`, `topbar-panel-flow`, `settings-routing-llm`
 
 - AC3.1: `poms/pathly/pages/home_screen_page.py` defines `HomeScreenPage(BasePage)` with locators bound to all AC2.1 testids and methods: `open_project(name: str)`, `click_new_project()`, `get_project_names() -> list[str]`.
 - AC3.2: `poms/pathly/pages/settings_page.py` defines `SettingsPage(BasePage)` with locators bound to all AC2.2 testids and methods: `set_routing_engine(engine: str)`, `set_fsm_command(cmd: str)`, `save_settings()`.
-- AC3.3: `poms/pathly/pages/top_bar_page.py` defines `TopBarPage(BasePage)` with locators bound to all AC2.3 testids and methods: `navigate_to_panel(panel: str)`, `toggle_chat()`, `toggle_theme()`.
+- AC3.3: `poms/pathly/pages/top_bar_page.py` defines `TopBarPage(BasePage)` with locators bound to the topbar testids (`topbar-sidebar-toggle`, `topbar-panel-flow`, `topbar-panel-monitor`, `topbar-chat-toggle`, `topbar-theme-toggle`) plus sidebar nav testids (`sidebar-nav-settings`, `sidebar-nav-monitor`) from `BottomNav`. Methods: `navigate_to_panel(panel: str)` (valid values: `"flow"`, `"monitor"`, `"settings"`; flow/monitor click topbar buttons, settings clicks `sidebar-nav-settings`), `toggle_chat()`, `toggle_theme()`. The `"plan"` and `"editor"` panel values are not supported by `navigate_to_panel` — those panels require a sidebar tree item click which is outside this POM's scope.
 - AC3.4: All three classes override the `url` property; the property returns the CDP target URL string (not an HTTP address). The `open()` method is a no-op with a docstring noting that navigation in Electron is handled by the CDP launcher, not URL loading.
 - AC3.5: `poms/pathly/__init__.py` exists and exports all three page classes.
 - AC3.6: All locator definitions use `data-testid` selectors exclusively (e.g., `page.locator('[data-testid="homescreen-new-project-btn"]')`).
@@ -103,7 +103,7 @@ Examples: `homescreen-tab-projects`, `topbar-panel-flow`, `settings-routing-llm`
 ### Edge cases
 
 - `pathly_assert_projects` receives `extra.expected_names` as a list; it must fail the step (not silently pass) if any expected name is absent from the DOM.
-- `pathly_navigate_panel` must validate that `extra.panel` is one of `["plan", "editor", "flow", "monitor", "settings"]` before clicking, and fail the step with a clear message if not.
+- `pathly_navigate_panel` must validate that `extra.panel` is one of `["flow", "monitor", "settings"]` before clicking, and fail the step with a clear message if not. The values `"plan"` and `"editor"` are not supported — those panels are activated by sidebar tree item clicks, not by a dedicated nav button.
 
 ---
 
@@ -118,7 +118,7 @@ Examples: `homescreen-tab-projects`, `topbar-panel-flow`, `settings-routing-llm`
 ### Acceptance criteria
 
 - AC5.1: `stepper/sites/pathly/workflows/pathly_smoke.json` is valid workflow JSON (schema: `{name, description, variables, steps}`).
-- AC5.2: The smoke workflow steps in order: wait for HomeScreen to be ready → open a named project (using `{{project_name}}` variable) → navigate to each of plan, editor, flow, monitor panels via TopBar → assert each panel rendered → exit cleanly.
+- AC5.2: The smoke workflow steps in order: wait for HomeScreen to be ready → open a named project (using `{{project_name}}` variable) → navigate to flow panel (via topbar) → screenshot → navigate to monitor panel (via topbar) → screenshot → navigate to settings panel (via sidebar BottomNav) → screenshot → exit cleanly. Note: plan and editor panels are activated by sidebar tree item clicks and are not navigable via `pathly_navigate_panel`; they are out of scope for the smoke workflow.
 - AC5.3: Running the smoke workflow against a live `npm run dev` session (Electron with `--remote-debugging-port=9222`) completes in under 60 seconds.
 - AC5.4: `stepper/sites/pathly/workflows/pathly_settings.json` is valid workflow JSON that: navigates to settings → reads the current routing engine value → does NOT mutate the developer's settings (read-only assertions only).
 - AC5.5: The smoke workflow exits with code 0 on success and non-zero on any step failure.

@@ -12,6 +12,7 @@ export function PanelNav(): JSX.Element {
     <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexShrink: 0 }}>
       <Tooltip label="Flow canvas" shortcut="Ctrl+1" placement="bottom">
         <button
+          data-testid="topbar-panel-flow"
           className={`${styles.navBtn} ${activePanel === 'flow' ? styles.navBtnActive : ''}`}
           onClick={() => {
             setActivePanel('flow')
@@ -28,6 +29,7 @@ export function PanelNav(): JSX.Element {
       </Tooltip>
       <Tooltip label="Live monitor" shortcut="Ctrl+3" placement="bottom">
         <button
+          data-testid="topbar-panel-monitor"
           className={`${styles.navBtn} ${activePanel === 'monitor' ? styles.navBtnActive : ''}`}
           onClick={() => setActivePanel('monitor')}
         >

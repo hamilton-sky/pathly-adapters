@@ -294,6 +294,7 @@ export function HomeScreen(): JSX.Element {
     return (
       <div
         key={project.path}
+        data-testid="homescreen-project-card"
         style={{
           border: isCardHovered ? `1px solid ${t.accent}50` : `1px solid ${t.bgSurface0}`,
           borderTop: isCardHovered ? `1px solid ${t.accent}50` : `3px solid ${accentColor}`,
@@ -464,6 +465,7 @@ export function HomeScreen(): JSX.Element {
           </span>
 
           <button
+            data-testid="homescreen-open-btn"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -493,7 +495,9 @@ export function HomeScreen(): JSX.Element {
   }
 
   return (
-    <div style={{
+    <div
+      data-testid="home-screen"
+      style={{
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -533,6 +537,7 @@ export function HomeScreen(): JSX.Element {
             return (
               <button
                 key={tab}
+                data-testid={`homescreen-tab-${tab}`}
                 onClick={() => handleTab(tab)}
                 style={{
                   display: 'flex',
@@ -566,6 +571,7 @@ export function HomeScreen(): JSX.Element {
           WebkitAppRegion: 'no-drag',
         } as React.CSSProperties}>
           <button
+            data-testid="home-theme-toggle"
             onClick={() => setTheme(isLightPalette(theme) ? preferredDark : preferredLight)}
             title={isLightPalette(theme) ? 'Switch to dark mode' : 'Switch to light mode'}
             aria-label={isLightPalette(theme) ? 'Switch to dark mode' : 'Switch to light mode'}
@@ -725,6 +731,7 @@ export function HomeScreen(): JSX.Element {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {/* + New project CTA */}
             <button
+              data-testid="homescreen-new-project-btn"
               onClick={handleOpenFolder}
               title="Open project folder"
               style={{
@@ -748,6 +755,7 @@ export function HomeScreen(): JSX.Element {
             {/* View toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               <button
+                data-testid="homescreen-view-grid-btn"
                 onClick={() => handleViewMode('grid')}
                 title="Grid view"
                 aria-label="Grid view"
@@ -763,6 +771,7 @@ export function HomeScreen(): JSX.Element {
                 <LayoutGrid size={13} />
               </button>
               <button
+                data-testid="homescreen-view-list-btn"
                 onClick={() => handleViewMode('list')}
                 title="List view"
                 aria-label="List view"
@@ -779,6 +788,7 @@ export function HomeScreen(): JSX.Element {
               </button>
             </div>
             <button
+              data-testid="home-toggle-done-btn"
               onClick={() => setHideDone((v) => !v)}
               style={{
                 background: 'none',
@@ -865,6 +875,7 @@ export function HomeScreen(): JSX.Element {
 
               {hiddenCount > 0 && (
                 <button
+                  data-testid="home-show-more-btn"
                   onClick={() => setVisibleCount((n) => n + 6)}
                   style={{
                     marginTop: '8px',

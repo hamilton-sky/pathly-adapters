@@ -13,6 +13,7 @@ export function BottomNav({ activePanel, onMonitor, onSettings }: BottomNavProps
 
       <button
         type="button"
+        data-testid="sidebar-nav-monitor"
         className={`${styles.bottomRow} ${activePanel === 'monitor' ? styles.bottomRowActive : ''}`}
         onClick={onMonitor}
       >
@@ -21,6 +22,7 @@ export function BottomNav({ activePanel, onMonitor, onSettings }: BottomNavProps
 
       <button
         type="button"
+        data-testid="sidebar-nav-settings"
         className={`${styles.bottomRow} ${activePanel === 'settings' ? styles.bottomRowActive : ''}`}
         onClick={onSettings}
       >

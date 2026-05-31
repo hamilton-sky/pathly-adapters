@@ -103,13 +103,18 @@ Work to do:
 
 **topbar/index.tsx** — add these testids:
 - Sidebar toggle button: `data-testid="topbar-sidebar-toggle"`
-- Plan panel button: `data-testid="topbar-panel-plan"`
-- Editor panel button: `data-testid="topbar-panel-editor"`
-- Flow panel button: `data-testid="topbar-panel-flow"`
-- Monitor panel button: `data-testid="topbar-panel-monitor"`
-- Settings panel button: `data-testid="topbar-panel-settings"`
+- Flow panel button: `data-testid="topbar-panel-flow"` (in `PanelNav.tsx` — already done by builder)
+- Monitor panel button: `data-testid="topbar-panel-monitor"` (in `PanelNav.tsx` — already done by builder)
 - Chat toggle button: `data-testid="topbar-chat-toggle"`
 - Theme toggle button: `data-testid="topbar-theme-toggle"`
+
+Note: There are no topbar buttons for plan, editor, or settings panels. Those panels are activated via Sidebar elements.
+
+**sidebar/shell/BottomNav.tsx** — add these testids:
+- Monitor button: `data-testid="sidebar-nav-monitor"`
+- Settings button: `data-testid="sidebar-nav-settings"`
+
+Note: Plan and editor panels activate when the user clicks a plan folder or file in the Sidebar tree (WorkspacePanel). There are no single dedicated nav buttons for those panels, so no testids are needed for them in this story.
 
 Constraints:
 - Add only `data-testid` props. Do not modify any existing prop, class name, style, event handler, or logic.
@@ -169,8 +174,14 @@ Work to do:
 
 5. Create `poms/pathly/pages/top_bar_page.py` — `TopBarPage(BasePage)`:
    - `url` property: returns `"electron://pathly-topbar"`. `open()`: no-op with same docstring.
-   - Locators: `_sidebar_toggle`, `_panel_btns` (dict or individual properties for each panel), `_chat_toggle`, `_theme_toggle`.
-   - `navigate_to_panel(panel: str)`: validates panel is in `["plan", "editor", "flow", "monitor", "settings"]`; raises `ValueError` if not; clicks `self.page.locator(f'[data-testid="topbar-panel-{panel}"]')`.
+   - Locators (all using `[data-testid="..."]`):
+     - `_sidebar_toggle` → `topbar-sidebar-toggle`
+     - `_panel_flow` → `topbar-panel-flow`
+     - `_panel_monitor` → `topbar-panel-monitor`
+     - `_chat_toggle` → `topbar-chat-toggle`
+     - `_theme_toggle` → `topbar-theme-toggle`
+     - `_sidebar_nav_settings` → `sidebar-nav-settings` (BottomNav inside Sidebar)
+   - `navigate_to_panel(panel: str)`: validates panel is in `["flow", "monitor", "settings"]`; raises `ValueError` if not. For `"flow"` clicks `_panel_flow`; for `"monitor"` clicks `_panel_monitor`; for `"settings"` clicks `_sidebar_nav_settings`. Note: `"plan"` and `"editor"` are not supported — those panels are activated by clicking Sidebar tree items, which is outside this POM's responsibility.
    - `toggle_chat()`: clicks `_chat_toggle`.
    - `toggle_theme()`: clicks `_theme_toggle`.
 
@@ -215,9 +226,9 @@ Work to do:
    - `@classmethod register(cls, registry)`: registers both.
 
 5. Create `stepper/sites/pathly/pages/top_bar_action.py` — `PathlyTopBar`:
-   - Action `pathly_navigate_panel`: reads `step.extra["panel"]`; calls `TopBarPage.navigate_to_panel(panel)` (validation done inside POM).
+   - Action `pathly_navigate_panel`: reads `step.extra["panel"]`; calls `TopBarPage.navigate_to_panel(panel)` (validation done inside POM — valid values: `"flow"`, `"monitor"`, `"settings"`; `"plan"` and `"editor"` are not supported and will raise `ValueError`).
    - Action `pathly_toggle_chat`: calls `TopBarPage.toggle_chat()`.
-   - Action `pathly_assert_panel_visible` (bonus, optional): reads `step.extra["panel"]`; asserts `[data-testid="topbar-panel-{panel}"]` is visible.
+   - Action `pathly_assert_panel_visible` (bonus, optional): reads `step.extra["panel"]`; for flow/monitor asserts `[data-testid="topbar-panel-{panel}"]` is visible; for settings asserts `[data-testid="sidebar-nav-settings"]` is visible.
    - `@classmethod register(cls, registry)`: registers all registered actions.
 
 6. Create `stepper/sites/pathly/register.py`:
@@ -274,14 +285,12 @@ Work to do:
      "steps": [
        { "action": "wait", "description": "Wait for HomeScreen to be ready", "extra": { "timeout": 5000 } },
        { "action": "pathly_open_project", "description": "Open project {{project_name}}", "extra": { "project_name": "{{project_name}}" } },
-       { "action": "pathly_navigate_panel", "description": "Navigate to plan panel",    "extra": { "panel": "plan" } },
-       { "action": "screenshot",           "description": "Screenshot plan panel" },
-       { "action": "pathly_navigate_panel", "description": "Navigate to editor panel",  "extra": { "panel": "editor" } },
-       { "action": "screenshot",           "description": "Screenshot editor panel" },
        { "action": "pathly_navigate_panel", "description": "Navigate to flow panel",    "extra": { "panel": "flow" } },
        { "action": "screenshot",           "description": "Screenshot flow panel" },
        { "action": "pathly_navigate_panel", "description": "Navigate to monitor panel", "extra": { "panel": "monitor" } },
-       { "action": "screenshot",           "description": "Screenshot monitor panel" }
+       { "action": "screenshot",           "description": "Screenshot monitor panel" },
+       { "action": "pathly_navigate_panel", "description": "Navigate to settings panel", "extra": { "panel": "settings" } },
+       { "action": "screenshot",           "description": "Screenshot settings panel" }
      ]
    }
    ```

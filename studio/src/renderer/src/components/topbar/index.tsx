@@ -32,8 +32,9 @@ export function TopBar(): JSX.Element {
 
   return (
     <>
-      <div className={styles.bar}>
+      <div data-testid="topbar" className={styles.bar}>
         <IconButton
+          data-testid="topbar-sidebar-toggle"
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           title={sidebarCollapsed ? 'Open sidebar' : 'Close sidebar'}
           placement="bottom"
@@ -42,7 +43,7 @@ export function TopBar(): JSX.Element {
         </IconButton>
 
         <Tooltip label="Back to projects" placement="bottom">
-          <button className={styles.backBtn} onClick={() => setProjectPath('')}>Projects</button>
+          <button data-testid="topbar-back-btn" className={styles.backBtn} onClick={() => setProjectPath('')}>Projects</button>
         </Tooltip>
 
         <div className={styles.center}>
@@ -66,6 +67,7 @@ export function TopBar(): JSX.Element {
             <span className={monitorSource === 'sse' ? styles.badgeLive : styles.badgeWatch}>●</span>
           </Tooltip>
           <IconButton
+            data-testid="topbar-chat-toggle"
             onClick={toggleChat}
             title="HQ"
             description="Command center above your AI model orchestrators"
@@ -74,6 +76,7 @@ export function TopBar(): JSX.Element {
             <Brain size={14} style={{ color: chatOpen ? 'var(--theme-accent)' : undefined }} />
           </IconButton>
           <IconButton
+            data-testid="topbar-theme-toggle"
             onClick={() => setTheme(isLightPalette(theme) ? preferredDark : preferredLight)}
             title={isLightPalette(theme) ? `Switch to dark (${preferredDark})` : `Switch to light (${preferredLight})`}
           >

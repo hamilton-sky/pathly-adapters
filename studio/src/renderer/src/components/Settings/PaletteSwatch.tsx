@@ -6,12 +6,14 @@ interface Props {
   name: ThemeName
   active: boolean
   onClick: () => void
+  'data-testid'?: string
 }
 
-export function PaletteSwatch({ name, active, onClick }: Props): JSX.Element {
+export function PaletteSwatch({ name, active, onClick, 'data-testid': dataTestId }: Props): JSX.Element {
   const p = themes[name]
   return (
     <div
+      data-testid={dataTestId}
       onClick={onClick}
       className={`${s.wrapper}${active ? ` ${s.active}` : ''}`}
       style={{

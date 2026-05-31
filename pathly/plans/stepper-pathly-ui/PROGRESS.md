@@ -2,7 +2,7 @@
 
 | Conv | Title | Repo | Status | Stories |
 |---|---|---|---|---|
-| 1 | Electron CDP launcher | playwright-stepper-framework | TODO | S1 |
+| 1 | Electron CDP launcher | playwright-stepper-framework | DONE | S1 |
 | 2 | data-testid attributes in Studio | pathly-adapters/studio | TODO | S2 |
 | 3 | Pathly POMs | playwright-stepper-framework | TODO | S3 |
 | 4 | Pathly glue actions + site register | playwright-stepper-framework | TODO | S4 |

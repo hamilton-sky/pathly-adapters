@@ -11,3 +11,6 @@
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T11:25:51Z"}
 {"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-05-31T11:27:57Z"}
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-31T11:51:18Z"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-31T11:55:08.322385+00:00", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-31T11:55:23Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 67057, "tokens_out": 16764, "total_tokens": 83821, "cost_usd": 0.452631, "tool_uses": 65, "wall_seconds": 1770, "ts": "2026-05-31T12:10:53.391216+00:00", "schema_version": 1}
