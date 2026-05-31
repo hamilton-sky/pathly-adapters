@@ -322,3 +322,69 @@ MUST include a grep-based done-condition for POM locator completeness when a sto
 
 ### Source
 Feature: stepper-pathly-ui | Stage: test | Date: 2026-05-31
+
+---
+
+## [wizard-e2e-flow] Name the feature class explicitly in the planner prompt
+
+### Pattern
+The planner agent received a feature description without an explicit class label ("Stepper
+automation"). It defaulted to the most common pattern it had seen (Vitest unit-test plan),
+requiring manual correction of the plan files before building could start.
+
+### Rule
+MUST include one sentence in the planner prompt naming the feature class when it diverges from
+the default: "This is a Stepper automation feature, same pattern as stepper-pathly-ui."
+One sentence prevents a planning redo.
+
+### Injection
+- Add to the planner invocation prompt for Stepper automation features: "Feature class: Stepper
+  automation (CDP-driven Playwright over Electron). Pattern: testids first in Studio, then POM
+  + glue + workflow in playwright-stepper-framework. Do not generate a Vitest or unit-test plan."
+
+### Source
+Feature: wizard-e2e-flow | Stage: planning | Date: 2026-05-31
+
+---
+
+## [wizard-e2e-flow] New features need VERIFY.md pre-created — FSM verify_gate has no "never built" exemption
+
+### Pattern
+The FSM verify_gate requires a VERIFY.md with "RESULT: PASS" before transitioning
+BUILDING → REVIEWING. For brand-new features with no prior build history, no VERIFY.md
+exists. The gate fired twice before a manually pre-created VERIFY.md unblocked the pipeline.
+
+### Rule
+MUST add a step to CONVERSATION_PROMPTS.md Conv 1 for any new feature: "After the verify
+command passes, write `RESULT: PASS` to `pathly/plans/<feature>/VERIFY.md`." Document this
+as a required manual step until the pipeline auto-creates it via a transition_action.
+
+### Injection
+- Add to CONVERSATION_PROMPTS.md Conv 1 preamble (all new features): "When the verify
+  command passes, write exactly `RESULT: PASS` to `pathly/plans/<feature>/VERIFY.md`.
+  This is required to pass the FSM gate into REVIEWING."
+
+### Source
+Feature: wizard-e2e-flow | Stage: building | Date: 2026-05-31
+
+---
+
+## [wizard-e2e-flow] Step-count acceptance criteria must be verified against the live component
+
+### Pattern
+AC4.2 specified "3 clicks" to advance through the wizard. The builder correctly implemented
+4 clicks (matching the actual 5-step wizard at runtime). The acceptance criterion was stale —
+written before the wizard step count was finalised, without reading the live component.
+
+### Rule
+MUST read the live component source and count interactive steps before writing any acceptance
+criterion that contains a step count (wizard steps, nav clicks, form fields, iterations).
+
+### Injection
+- Add to USER_STORIES.md planner checklist: "For any criterion that references a step count
+  or iteration count, read the live component source and confirm the count before writing it."
+- Add to CONVERSATION_PROMPTS.md: "Before accepting the USER_STORIES.md spec, verify any
+  step-count criteria against the live component — grep for the step array or render condition."
+
+### Source
+Feature: wizard-e2e-flow | Stage: test | Date: 2026-05-31
