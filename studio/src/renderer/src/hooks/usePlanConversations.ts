@@ -65,21 +65,22 @@ export function parseProgressMd(md: string): ConvRow[] {
   return rows
 }
 
-export function usePlanConversations(): { planConvs: ConvRow[] } {
+export function usePlanConversations(topicOverride?: string | null): { planConvs: ConvRow[] } {
   const { projectPath, activeTopic } = useStore()
+  const topic = topicOverride ?? activeTopic
   const [planConvs, setPlanConvs] = useState<ConvRow[]>([])
 
   useEffect(() => {
-    if (!projectPath || !activeTopic) { setPlanConvs([]); return }
+    if (!projectPath || !topic) { setPlanConvs([]); return }
     async function loadPlan(): Promise<void> {
       try {
-        const md = await readFile(`${projectPath}/pathly/plans/${activeTopic}/PROGRESS.md`)
+        const md = await readFile(`${projectPath}/pathly/plans/${topic}/PROGRESS.md`)
         if (!md) { setPlanConvs([]); return }
         setPlanConvs(parseProgressMd(md))
       } catch { setPlanConvs([]) }
     }
     void loadPlan()
-  }, [projectPath, activeTopic])
+  }, [projectPath, topic])
 
   return { planConvs }
 }

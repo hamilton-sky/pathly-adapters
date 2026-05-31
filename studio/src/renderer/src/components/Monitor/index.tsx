@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
 import { usePlanConversations } from '../../hooks/usePlanConversations'
+import { usePlanFiles } from '../../hooks/usePlanFiles'
 import type { Theme } from '../../theme'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
@@ -302,9 +303,10 @@ function TabBar({ sessions, activeTab, onTabSelect }: TabBarProps): JSX.Element 
   )
 }
 
-function PlanProgressSection(): JSX.Element | null {
+function PlanProgressSection({ topic }: { topic: string | null }): JSX.Element | null {
   const [open, setOpen] = useState(true)
-  const { planConvs } = usePlanConversations()
+  const { planConvs } = usePlanConversations(topic)
+  const t = useTheme()
 
   if (planConvs.length === 0) return null
 
@@ -312,12 +314,10 @@ function PlanProgressSection(): JSX.Element | null {
   const doneCount = planConvs.filter((c) => c.status === 'DONE').length
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0
   const FONT = 'system-ui, -apple-system, sans-serif'
-  const GREEN = '#00ff87'
-  const MUTED = '#64748b'
-  const SURFACE = 'rgba(255,255,255,0.04)'
+  const GREEN = '#15803d'
 
   return (
-    <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ flexShrink: 0, borderBottom: `1px solid ${t.bgSurface1}` }}>
       {/* Header row */}
       <button
         onClick={() => setOpen((o) => !o)}
@@ -338,14 +338,14 @@ function PlanProgressSection(): JSX.Element | null {
           fontSize: '10px',
           fontFamily: FONT,
           fontWeight: 600,
-          color: MUTED,
+          color: t.textSecondary,
           letterSpacing: '0.08em',
           textTransform: 'uppercase' as const,
         }}>
           Conversations
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '10px', fontFamily: FONT, color: doneCount === total ? GREEN : MUTED }}>
+          <span style={{ fontSize: '10px', fontFamily: FONT, color: doneCount === total ? GREEN : t.textSecondary }}>
             {doneCount}/{total}
           </span>
           <span style={{
@@ -353,7 +353,7 @@ function PlanProgressSection(): JSX.Element | null {
             transform: open ? 'rotate(180deg)' : 'none',
             transition: 'transform 150ms ease',
             fontSize: '10px',
-            color: MUTED,
+            color: t.textMuted,
             lineHeight: 1,
           }}>▾</span>
         </span>
@@ -367,7 +367,7 @@ function PlanProgressSection(): JSX.Element | null {
           background: GREEN,
           borderRadius: '0 2px 2px 0',
           transition: 'width 300ms ease-out',
-          boxShadow: pct > 0 ? `0 0 6px ${GREEN}66` : 'none',
+          boxShadow: 'none',
         }} />
       </div>
 
@@ -394,13 +394,13 @@ function PlanProgressSection(): JSX.Element | null {
                   borderRadius: '50%',
                   flexShrink: 0,
                   background: done ? GREEN : 'transparent',
-                  border: done ? `1.5px solid ${GREEN}` : '1.5px solid rgba(100,116,139,0.4)',
+                  border: done ? `1.5px solid ${GREEN}` : `1.5px solid ${t.textMuted}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '8px',
                   fontWeight: 700,
-                  color: done ? '#000' : MUTED,
+                  color: done ? '#fff' : t.textMuted,
                   lineHeight: 1,
                 }}>
                   {done ? '✓' : String(conv.num)}
@@ -410,7 +410,7 @@ function PlanProgressSection(): JSX.Element | null {
                   flex: 1,
                   fontSize: '12px',
                   fontFamily: FONT,
-                  color: done ? '#e2e8f0' : MUTED,
+                  color: t.textPrimary,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -426,9 +426,9 @@ function PlanProgressSection(): JSX.Element | null {
                   letterSpacing: '0.04em',
                   padding: '1px 5px',
                   borderRadius: '3px',
-                  color: done ? GREEN : MUTED,
-                  background: done ? 'rgba(0,255,135,0.08)' : SURFACE,
-                  border: `1px solid ${done ? 'rgba(0,255,135,0.2)' : 'rgba(100,116,139,0.2)'}`,
+                  color: done ? GREEN : t.textMuted,
+                  background: done ? 'rgba(21,128,61,0.12)' : t.bgSurface1,
+                  border: `1px solid ${done ? 'rgba(21,128,61,0.3)' : t.bgSurface1}`,
                 }}>
                   {done ? 'done' : 'todo'}
                 </span>
@@ -529,6 +529,8 @@ export function Monitor(): JSX.Element {
     setActiveMonitorTab
   } = useStore()
 
+  const { planFolders } = usePlanFiles()
+
   const eventsRef = useRef(events)
   eventsRef.current = events
 
@@ -545,14 +547,47 @@ export function Monitor(): JSX.Element {
   const activeTabValid = activeMonitorTab != null && !!activeFlowSessions[activeMonitorTab]
   const effectiveTopic = activeTabValid ? extractTopic(activeMonitorTab!) : activeTopic
 
-  // When the sidebar topic changes, clear all sessions and reset the active tab.
-  const prevTopicRef = useRef(activeTopic)
+  // Proactive scan: read STATE.json for every plan folder and register any non-terminal flow as a session.
   useEffect(() => {
-    if (prevTopicRef.current === activeTopic) return
-    prevTopicRef.current = activeTopic
-    setActiveFlowSessions(() => ({}))
-    setActiveMonitorTab(null)
-  }, [activeTopic, setActiveFlowSessions, setActiveMonitorTab])
+    if (!projectPath || planFolders.length === 0) return
+    void Promise.all(
+      planFolders.map(async (folder) => {
+        try {
+          const content = await readFile(`${folder.path}/STATE.json`)
+          if (!content) return null
+          const state = JSON.parse(content) as Record<string, unknown>
+          const current = state.current as string | undefined
+          if (current === 'DONE' || current === 'IDLE' || !current) return null
+          const flowType = (state.flow as string | undefined) ?? 'team'
+          return { key: `${flowType}/${folder.name}`, flowType, topic: folder.name }
+        } catch { return null }
+      })
+    ).then((results) => {
+      const active = results.filter((r): r is NonNullable<typeof r> => r !== null)
+      if (active.length === 0) return
+      setActiveFlowSessions((prev) => {
+        const next = { ...prev }
+        for (const item of active) {
+          if (!(item.key in next)) {
+            next[item.key] = { flowKey: `${item.flowType}.flow.yaml`, topic: item.topic, isRunning: true, isPaused: false, isCli: false }
+          }
+        }
+        return next
+      })
+    })
+  }, [projectPath, planFolders, setActiveFlowSessions])
+
+  // Keep a ref so the auto-select effect can read current sessions without depending on them.
+  const activeFlowSessionsRef = useRef(activeFlowSessions)
+  activeFlowSessionsRef.current = activeFlowSessions
+
+  // When sidebar selection changes, auto-select the matching tab.
+  // Depends only on activeTopic — NOT on activeFlowSessions — so a tab click never triggers this.
+  useEffect(() => {
+    if (!activeTopic) return
+    const matchingKey = Object.keys(activeFlowSessionsRef.current).find((k) => extractTopic(k) === activeTopic)
+    if (matchingKey) setActiveMonitorTab(matchingKey)
+  }, [activeTopic, setActiveMonitorTab])
 
   useEffect(() => {
     if (!effectiveTopic) {
@@ -589,9 +624,11 @@ export function Monitor(): JSX.Element {
         setFsmState(parsedState)
 
         // Compound session key "flowType/topic". Remove when done; add/update when running.
-        if (activeTopic) {
+        // Use effectiveTopic (the active tab's topic) not activeTopic (the sidebar selection),
+        // so switching tabs doesn't corrupt the wrong session.
+        if (effectiveTopic) {
           const flowType = (parsedState.flow as string | undefined) ?? 'team'
-          const sessionKey = `${flowType}/${activeTopic}`
+          const sessionKey = `${flowType}/${effectiveTopic}`
           const isDone = parsedState.current === 'DONE' || parsedState.current === 'IDLE'
           if (isDone) {
             setActiveFlowSessions((prev) => {
@@ -606,7 +643,7 @@ export function Monitor(): JSX.Element {
               ...prev,
               [sessionKey]: {
                 flowKey: `${flowType}.flow.yaml`,
-                topic: activeTopic,
+                topic: effectiveTopic,
                 isRunning: true,
                 isPaused: false,
                 isCli: false as const
@@ -711,7 +748,7 @@ export function Monitor(): JSX.Element {
     }
   }, [effectiveTopic, projectPath, setMonitorSource, setFsmState, setEvents, setPipelineStates, setActiveFlowSessions, activeTopic])
 
-  const showTabBar = Object.keys(activeFlowSessions).length >= 2
+  const showTabBar = Object.keys(activeFlowSessions).length >= 1
 
   if (!activeTopic) {
     return (
@@ -731,7 +768,7 @@ export function Monitor(): JSX.Element {
           onTabSelect={setActiveMonitorTab}
         />
       )}
-      <PlanProgressSection />
+      <PlanProgressSection topic={effectiveTopic} />
       <HealthCheck />
       <FsmView />
       <MetricsStrip />
