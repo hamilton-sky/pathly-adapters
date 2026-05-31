@@ -1,0 +1,9 @@
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "schema_version": 1, "ts": "2026-05-31T13:34:07Z"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance"}
+{"type": "STATE_TRANSITION", "to": "BUILDING"}
+{"type":"AGENT_DONE","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":40482,"tokens_out":10120,"total_tokens":50602,"cost_usd":0.273251,"tool_uses":57,"wall_seconds":380,"ts":"2026-05-31T21:10:00Z","schema_version":1}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T13:44:48Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-05-31T13:45:23Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T13:45:23Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-05-31T13:48:24Z"}
+{"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_declared_scope", "schema_version": 1, "ts": "2026-05-31T13:48:24Z"}
