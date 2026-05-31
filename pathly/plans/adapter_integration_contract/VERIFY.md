@@ -8,7 +8,7 @@ pytest -q tests/test_fsm_ops.py
 ```
 
 ## Output
-17 passed in 0.82s
+18 passed in 0.86s (includes corrupt-state escalate coverage added after review)
 
 ## Tests covering new contract
 - test_agent_hint_uses_neutral_keys — agent_hint has `role` and `agent` (not `codex_role`/`pathly_agent`)

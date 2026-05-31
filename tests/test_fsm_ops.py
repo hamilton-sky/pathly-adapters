@@ -400,6 +400,19 @@ def test_blocked_response_has_agent_hint_and_storage_path(tmp_path):
     assert "storage_path" in result
 
 
+def test_next_action_corrupt_state_escalate_has_storage_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(fsm_ops, "recover_state", lambda *_: (_ for _ in ()).throw(RuntimeError("corrupt")))
+
+    result = next_action({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+
+    assert result["decision"] == "escalate"
+    assert "storage_path" in result
+
+
 def test_blocked_response_warnings_contain_open_feedback(tmp_path):
     storage = _storage_path(tmp_path)
     state_file = storage / "STATE.json"
@@ -414,3 +427,42 @@ def test_blocked_response_warnings_contain_open_feedback(tmp_path):
         "project_root": str(tmp_path),
     })
     assert any(w.get("code") == "open_feedback" for w in result["warnings"])
+
+
+def test_escalate_when_no_routable_feedback(tmp_path, monkeypatch):
+    storage = _storage_path(tmp_path)
+    state_file = storage / "STATE.json"
+    state_file.write_text(json.dumps({"current": "BUILDING"}), encoding="utf-8")
+    # No feedback/ directory — route_feedback will return None
+
+    monkeypatch.setattr(
+        fsm_ops,
+        "run_gates",
+        lambda *_args, **_kwargs: {"gate_failed": "verify_gate", "feedback_file": "REVIEW_FAILURES.md"},
+    )
+
+    result = complete_stage({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+    assert result["decision"] == "escalate"
+    assert result.get("blocked") is True
+
+
+def test_escalate_response_not_continuable(tmp_path):
+    storage = _storage_path(tmp_path)
+    state_file = storage / "STATE.json"
+    state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
+    feedback_dir = storage / "feedback"
+    feedback_dir.mkdir()
+    (feedback_dir / "HUMAN_QUESTIONS.md").write_text("needs human input", encoding="utf-8")
+
+    result = next_action({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+    assert result["decision"] == "escalate"
+    assert result.get("blocked") is True
+    assert "next_state" not in result

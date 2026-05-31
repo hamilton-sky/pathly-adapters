@@ -333,6 +333,7 @@ def next_action(args: dict) -> dict:
             "target_agent": "human",
             "file": "HUMAN_QUESTIONS.md",
             "instructions": f"FSM state recovery failed: {e}",
+            "storage_path": str(storage_path),
         }
 
     # Stamp conv_start_sha once per conversation start so scope_gate can baseline the diff.
@@ -426,6 +427,7 @@ def complete_stage(args: dict) -> dict:
             "target_agent": "human",
             "file": "HUMAN_QUESTIONS.md",
             "instructions": f"FSM state recovery failed: {e}",
+            "storage_path": str(storage_path),
         }
 
     feedback = route_feedback(flow_config, storage_path)
