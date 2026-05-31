@@ -19,3 +19,4 @@
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-31T12:12:37Z"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "tokens_in": 22802, "tokens_out": 5701, "total_tokens": 28503, "cost_usd": 0.153921, "tool_uses": 29, "wall_seconds": 125, "ts": "2026-05-31T12:16:32.717734+00:00", "schema_version": 1}
 {"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-05-31T12:16:32.726921+00:00", "schema_version": 1}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":4,"result":"DONE","tokens_in":29246,"tokens_out":7312,"total_tokens":36558,"cost_usd":0.197413,"tool_uses":30,"wall_seconds":188,"ts":"2026-05-31T19:52:00Z","schema_version":1}
