@@ -35,3 +35,10 @@
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-31T12:56:29Z"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-05-31T12:56:40Z"}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_baseline_sha", "schema_version": 1, "ts": "2026-05-31T12:57:09Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-31T12:57:10Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "schema_version": 1, "ts": "2026-05-31T12:57:18Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "TEST_FAILURES.md", "schema_version": 1, "ts": "2026-05-31T13:20:04Z"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "schema_version": 1, "ts": "2026-05-31T13:20:04Z"}
+{"type": "AGENT_DONE", "agent": "quick", "model": "claude-sonnet-4-6", "conversation": 0, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "tool_uses": 0, "wall_seconds": 0, "ts": "2026-05-31T13:25:00Z"}
+{"type": "STATE_TRANSITION", "to": "DONE", "ts": "2026-05-31T13:25:10Z"}
+{"type":"AGENT_DONE","agent":"quick","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":45346,"tokens_out":11337,"total_tokens":56683,"cost_usd":0.306093,"tool_uses":41,"wall_seconds":338,"ts":"2026-05-31T20:35:00Z","schema_version":1}

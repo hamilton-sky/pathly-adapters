@@ -256,3 +256,69 @@ MUST glob the target directory and confirm the exact intended path before writin
 
 ### Source
 Feature: adapter-parity | Stage: test | Date: 2026-05-25
+
+---
+
+## [stepper-pathly-ui] CLI arg-forwarding must include an execution verify step, not just a --help check
+
+### Pattern
+Conv 1 added `--browser` and `--cdp-port` argparse arguments and verified they appeared in `--help` output. The arguments were parsed correctly but never forwarded to the `run()` function or `launch_browser()`. The CLI silently ignored `--browser electron` at runtime. The tester caught this as AC1.4 failure.
+
+### Rule
+MUST include a done-condition that actually exercises the new CLI argument end-to-end — not just confirms `--help` displays it. For any conversation that adds a CLI argument, verify: run the CLI with the argument and confirm it reaches the intended code path (e.g., a log line, a raised error, or a traceable execution branch).
+
+### Injection
+- Add to `CONVERSATION_PROMPTS.md` template for CLI-touching conversations: "Done-condition must include a runtime invocation test, not only `--help`. Example: `python stepper/main.py --browser electron --cdp-port 9222 --workflow <file>` — confirm the CDP path is entered."
+- Add to `IMPLEMENTATION_PLAN.md` phase for CLI changes: "Verify: run the new flag end-to-end and confirm it reaches the intended dispatch branch — check with a traceable side effect (error message, log line, or unit test mock)."
+
+### Source
+Feature: stepper-pathly-ui | Stage: test | Date: 2026-05-31
+
+---
+
+## [stepper-pathly-ui] Studio file touches must include a studio/CLAUDE.md rules audit
+
+### Pattern
+Conv 2 added `data-testid` attributes to `HomeScreen.tsx`, `topbar/index.tsx`, and `PanelNav.tsx` correctly, but did not audit the touched files for pre-existing `studio/CLAUDE.md` violations (every `<button>` must have `type=`, no inline styles). The reviewer found 7 violations across those files in the first review cycle, requiring a fix conversation.
+
+### Rule
+MUST end every conversation that touches a Studio component file with: "Read studio/CLAUDE.md and confirm all `<button>` elements in touched files have an explicit `type=` attribute, and no new inline styles were introduced."
+
+### Injection
+- Add to `CONVERSATION_PROMPTS.md` preamble for Studio-touching conversations: "After making changes, audit all touched files against studio/CLAUDE.md rules: (1) every `<button>` has `type='button'`, (2) no `style={{ }}` props outside the accepted exceptions."
+- Add as a standard checklist item in the studio builder conversation template.
+
+### Source
+Feature: stepper-pathly-ui | Stage: review | Date: 2026-05-31
+
+---
+
+## [stepper-pathly-ui] Scope adjustments from IMPL_QUESTIONS must propagate to downstream conversation prompts
+
+### Pattern
+Conv 2 filed IMPL_QUESTIONS when it discovered that `topbar-panel-plan`, `topbar-panel-editor`, `topbar-panel-settings` had no corresponding DOM buttons. The orchestrator resolved the question and adjusted the spec. However, Conv 5's prompt still referenced `"plan"` and `"editor"` panel navigation in the smoke workflow. The builder produced a workflow with contradictory steps that had to be reverted in review.
+
+### Rule
+MUST update all downstream conversation prompts in `CONVERSATION_PROMPTS.md` immediately when a scope adjustment resolves an IMPL_QUESTIONS file. Any prompt that references the now-out-of-scope items must be patched before the next conversation begins.
+
+### Injection
+- Add to orchestrator IMPL_QUESTIONS resolution step: "After resolving, grep CONVERSATION_PROMPTS.md for any reference to the out-of-scope item and update the affected conversation prompts before unblocking the next build conversation."
+
+### Source
+Feature: stepper-pathly-ui | Stage: building | Date: 2026-05-31
+
+---
+
+## [stepper-pathly-ui] POM locator completeness needs a grep-based done-condition
+
+### Pattern
+Conv 3 implemented `TopBarPage` with a `sidebar-nav-settings` locator but omitted `sidebar-nav-monitor`, even though both testids were in `BottomNav.tsx` and both were specified in AC3.3. The tester caught this as FAIL 2. A single grep in the done-condition would have caught it immediately.
+
+### Rule
+MUST include a grep-based done-condition for POM locator completeness when a story specifies multiple testids from the same source component. The grep confirms every required testid has a corresponding locator definition in the POM file.
+
+### Injection
+- Add to Conv 3 (and any POM-writing conversation) done-condition: "grep -n 'data-testid' poms/pathly/pages/<file>.py — confirm every testid specified in USER_STORIES.md AC has a matching locator definition. List any missing ones before marking done."
+
+### Source
+Feature: stepper-pathly-ui | Stage: test | Date: 2026-05-31
