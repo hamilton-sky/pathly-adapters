@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { Gate, Transition, TransitionRule, FeedbackRoute } from '../types'
 import { Step5Gates } from '../Step5Gates/Step5Gates'
 import { Step6FeedbackRouting } from '../Step6FeedbackRouting/Step6FeedbackRouting'
 import { Step7TransitionRules } from '../Step7TransitionRules/Step7TransitionRules'
+import styles from './Step4Quality.module.css'
 
 interface Step4QualityProps {
   transitions: Transition[]
@@ -14,7 +15,6 @@ interface Step4QualityProps {
   onSetGates: (gates: Record<string, Gate[]>) => void
   onSetRoutes: (routes: FeedbackRoute[]) => void
   onSetRules: (rules: Record<string, TransitionRule>) => void
-  styles: Record<string, React.CSSProperties>
 }
 
 export function Step4Quality(props: Step4QualityProps): JSX.Element {
@@ -27,33 +27,33 @@ export function Step4Quality(props: Step4QualityProps): JSX.Element {
   const gateCount = Object.values(props.gates).reduce((sum, items) => sum + items.length, 0)
   const routeCount = props.feedbackRoutes.filter((route) => route.tag.trim() && route.agent.trim()).length
   const ruleCount = Object.values(props.transitionRules).filter((rule) => rule.conditions.length > 0 || rule.default.trim()).length
-  const panels: Array<[PanelKey, string]> = [
-    ['gates', 'Gates'],
-    ['routing', 'Feedback routing'],
-    ['rules', 'Transition rules']
+  const panels: Array<[PanelKey, string, number, string]> = [
+    ['gates', 'Gates', gateCount, `${gateCount} configured`],
+    ['routing', 'Feedback routing', routeCount, `${routeCount} configured`],
+    ['rules', 'Transition rules', ruleCount, `${ruleCount} rule${ruleCount === 1 ? '' : 's'}`],
   ]
 
   return (
-    <div>
-      <div style={props.styles.stepHeader}>Quality &amp; routing</div>
-      <div style={props.styles.stepSub}>Step 4 / 5 - Optional checks and routing rules.</div>
+    <div className={styles.root}>
+      <div className={styles.title}>Quality &amp; routing</div>
+      <div className={styles.sub}>Step 4 / 5 - Optional checks and routing rules.</div>
 
-      {panels.map(([key, label]) => (
-        <div key={key} style={props.styles.accordion}>
+      {panels.map(([key, label, , countLabel]) => (
+        <div key={key} className={styles.accordion}>
           <button
-            style={props.styles.accordionButton}
+            type="button"
+            className={styles.accordionBtn}
             onClick={() => setOpen((prev) => ({ ...prev, [key]: !prev[key] }))}
+            {...(open[key] ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
           >
             <span>{label}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '11px', color: props.styles.stepSub.color }}>
-                {key === 'gates' ? `${gateCount} configured` : key === 'routing' ? `${routeCount} configured` : `${ruleCount} rule${ruleCount === 1 ? '' : 's'}`}
-              </span>
-              <span style={{ color: props.styles.stepSub.color }}>{open[key] ? '›' : '›'}</span>
+            <span className={styles.accordionMeta}>
+              <span className={styles.accordionCount}>{countLabel}</span>
+              <span className={styles.accordionChevron}>{open[key] ? '›' : '›'}</span>
             </span>
           </button>
           {open[key] && (
-            <div style={props.styles.accordionPanel}>
+            <div className={styles.accordionPanel}>
               {key === 'gates' && (
                 <Step5Gates
                   transitions={props.transitions}
@@ -65,7 +65,6 @@ export function Step4Quality(props: Step4QualityProps): JSX.Element {
                 <Step6FeedbackRouting
                   feedbackRoutes={props.feedbackRoutes}
                   onSetRoutes={props.onSetRoutes}
-                  styles={props.styles}
                 />
               )}
               {key === 'rules' && (
@@ -74,7 +73,6 @@ export function Step4Quality(props: Step4QualityProps): JSX.Element {
                   validStates={props.validStates}
                   transitionRules={props.transitionRules}
                   onSetRules={props.onSetRules}
-                  styles={props.styles}
                 />
               )}
             </div>

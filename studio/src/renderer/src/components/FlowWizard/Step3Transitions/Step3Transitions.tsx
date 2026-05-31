@@ -1,4 +1,4 @@
-import React from 'react'
+import styles from './Step3Transitions.module.css'
 import type { Transition } from '../types'
 
 interface Step3TransitionsProps {
@@ -7,7 +7,6 @@ interface Step3TransitionsProps {
   onUpdateTransition: (idx: number, patch: Partial<Transition>) => void
   onRemoveTransition: (idx: number) => void
   onAddTransition: () => void
-  styles: Record<string, React.CSSProperties>
 }
 
 export function Step3Transitions({
@@ -16,25 +15,24 @@ export function Step3Transitions({
   onUpdateTransition,
   onRemoveTransition,
   onAddTransition,
-  styles
 }: Step3TransitionsProps): JSX.Element {
   return (
-    <div>
-      <div style={styles.stepHeader}>Define transitions</div>
-      <div style={styles.stepSub}>Step 3 / 8</div>
+    <div className={styles.root}>
+      <div className={styles.title}>Define transitions</div>
+      <div className={styles.sub}>Step 3 / 8</div>
       {transitions.map((tr, idx) => (
-        <div key={idx} style={styles.transitionRow}>
+        <div key={idx} className={styles.row}>
           <select
-            style={styles.select}
+            className={styles.select}
             value={tr.from}
             aria-label="From state"
             onChange={(e) => onUpdateTransition(idx, { from: e.target.value })}
           >
             {validStates.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <span style={styles.transitionArrow}>→</span>
+          <span className={styles.arrow}>→</span>
           <select
-            style={styles.select}
+            className={styles.select}
             value={tr.to}
             aria-label="To state"
             onChange={(e) => onUpdateTransition(idx, { to: e.target.value })}
@@ -42,14 +40,15 @@ export function Step3Transitions({
             {validStates.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <input
-            style={styles.transitionLabelInput}
+            className={styles.labelInput}
             type="text"
             value={tr.label}
             onChange={(e) => onUpdateTransition(idx, { label: e.target.value })}
             placeholder="label"
           />
           <button
-            style={styles.removeBtn}
+            type="button"
+            className={styles.removeBtn}
             onClick={() => onRemoveTransition(idx)}
             aria-label="Remove transition"
           >
@@ -57,7 +56,7 @@ export function Step3Transitions({
           </button>
         </div>
       ))}
-      <button style={styles.addBtn} onClick={onAddTransition}>+ Add transition</button>
+      <button type="button" className={styles.addBtn} onClick={onAddTransition}>+ Add transition</button>
     </div>
   )
 }

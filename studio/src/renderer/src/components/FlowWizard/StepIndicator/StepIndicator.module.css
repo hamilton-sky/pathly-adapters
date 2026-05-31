@@ -1,0 +1,27 @@
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px 10px;
+  border-bottom: 1px solid var(--theme-bg-surface0);
+  flex-shrink: 0;
+}
+.dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  background: var(--theme-bg-surface0);
+  color: var(--theme-text-muted);
+  flex-shrink: 0;
+  cursor: default;
+  transition: transform 120ms ease;
+}
+.dotActive { background: var(--theme-accent); color: var(--theme-bg-base); }
+.dotDone { background: var(--theme-green); color: var(--theme-bg-base); cursor: pointer; }
+.connector { flex: 1; height: 1px; background: var(--theme-bg-surface0); max-width: 40px; }

@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store'
 import { readFile, writeFile } from '../../services/pathlyApi'
-import { useTheme } from '../../useTheme'
 import type { Props, Transition, Gate, TransitionRule, FeedbackRoute } from './types'
-import { makeStyles } from './FlowWizard.styles'
 import { generateYaml } from './utils'
 import { StepIndicator } from './StepIndicator/StepIndicator'
 import { WizardFooter } from './WizardFooter/WizardFooter'
@@ -19,13 +17,12 @@ import { WIZARD_TEMPLATES, type WizardTemplate } from './wizardTemplates'
 import { DRAFT_FILE_NAME, parseDraft, serializeDraft, type WizardDraft } from './draftUtils'
 import { validateStep } from './FlowWizard.validation'
 import { FieldError } from '../ui'
+import styles from './FlowWizard.module.css'
 
 const TOTAL_STEPS = 5
 
 export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const { pathlyUserHome } = useStore()
-  const t = useTheme()
-  const styles = makeStyles(t)
 
   const [step, setStep] = useState(0)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
@@ -246,30 +243,30 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const nextDisabled = touched[step] && Object.keys(stepErrors[step] ?? {}).length > 0
 
   return (
-    <div style={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={styles.card}>
+    <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className={styles.card}>
         {step > 0 && (
           <>
-            <span style={styles.stepCounter}>Step {step} of {TOTAL_STEPS}</span>
-            <div style={styles.progressBarWrap}>
-              <div style={{ ...styles.progressBar, width: `${(step / TOTAL_STEPS) * 100}%` }} />
+            <span className={styles.stepCounter}>Step {step} of {TOTAL_STEPS}</span>
+            <div className={styles.progressWrap}>
+              <progress value={step} max={TOTAL_STEPS} />
             </div>
-            <StepIndicator step={step} totalSteps={TOTAL_STEPS} onJumpToStep={jumpToStep} t={t} styles={styles} />
+            <StepIndicator step={step} totalSteps={TOTAL_STEPS} onJumpToStep={jumpToStep} />
           </>
         )}
 
-        <div style={step === 0 ? styles.contentFull : styles.content}>
+        <div className={step === 0 ? styles.contentFull : styles.content}>
           <div>
             {step === 0 && (
-                <Step0Entry
-                  selectedTemplateId={selectedTemplateId}
-                  templates={WIZARD_TEMPLATES}
-                  onSelectTemplate={applyTemplate}
-                  onStartBlank={startBlank}
-                  onResume={resumeDraft}
-                  hasDraft={hasDraft}
-                />
-              )}
+              <Step0Entry
+                selectedTemplateId={selectedTemplateId}
+                templates={WIZARD_TEMPLATES}
+                onSelectTemplate={applyTemplate}
+                onStartBlank={startBlank}
+                onResume={resumeDraft}
+                hasDraft={hasDraft}
+              />
+            )}
             {step === 1 && (
               <>
                 <Step1Name
@@ -277,7 +274,6 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
                   description={description}
                   onFlowNameChange={setFlowName}
                   onDescriptionChange={setDescription}
-                  styles={styles}
                 />
                 <FieldError message={stepErrors[1]?.name} />
               </>
@@ -301,7 +297,6 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
                 onUpdateTransition={updateTransition}
                 onRemoveTransition={removeTransition}
                 onAddTransition={addTransition}
-                styles={styles}
               />
             )}
             {step === 4 && (
@@ -324,22 +319,20 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
                   onSetGates={setGates}
                   onSetRoutes={setFeedbackRoutes}
                   onSetRules={setTransitionRules}
-                  styles={styles}
                 />
                 <Step5Review
                   yamlPreview={yamlPreview}
                   storagePath={storagePath}
                   onStoragePathChange={setStoragePath}
                   error={saveError}
-                  styles={styles}
                 />
               </>
             )}
           </div>
 
           {step > 0 && (
-            <aside style={styles.sidebar}>
-              <YamlPreview yaml={yamlPreview} styles={styles} />
+            <aside className={styles.sidebar}>
+              <YamlPreview yaml={yamlPreview} />
             </aside>
           )}
         </div>

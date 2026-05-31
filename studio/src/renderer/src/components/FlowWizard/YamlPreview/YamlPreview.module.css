@@ -1,0 +1,21 @@
+.card {
+  border: 1px solid var(--theme-bg-surface0);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--theme-bg-base);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+}
+.title { font-size: var(--font-size-lg); font-weight: 600; color: var(--theme-text-primary); margin-bottom: 4px; }
+.sub { font-size: var(--font-size-sm); color: var(--theme-text-muted); margin-bottom: 8px; }
+.pre {
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-bg-surface0);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: var(--font-size-sm);
+  font-family: monospace;
+  color: var(--theme-text-primary);
+  overflow-x: auto;
+  white-space: pre;
+  overflow-y: auto;
+}

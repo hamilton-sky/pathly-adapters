@@ -1,18 +1,16 @@
-import React from 'react'
+import styles from './Step5Review.module.css'
 
 interface Step5ReviewProps {
   yamlPreview: string
   storagePath: string
   onStoragePathChange: (value: string) => void
   error: string | null
-  styles: Record<string, React.CSSProperties>
 }
 
 export function Step5Review({
   storagePath,
   onStoragePathChange,
   error,
-  styles
 }: Step5ReviewProps): JSX.Element {
   const checklist = [
     { icon: '✓', text: 'Name: the YAML updates live as you move through the wizard.' },
@@ -23,38 +21,32 @@ export function Step5Review({
   ]
 
   return (
-    <div>
-      <div style={styles.stepHeader}>Review &amp; save</div>
-      <div style={styles.stepSub}>Step 5 / 5 - Review the generated YAML</div>
+    <div className={styles.root}>
+      <div className={styles.title}>Review &amp; save</div>
+      <div className={styles.sub}>Step 5 / 5 - Review the generated YAML</div>
 
-      <div style={styles.summaryCard}>
+      <div className={styles.summaryCard}>
         {checklist.map((row) => (
-          <div key={row.text} style={styles.checklistRow}>
-            <span style={styles.checklistIcon}>{row.icon}</span>
+          <div key={row.text} className={styles.checklistRow}>
+            <span className={styles.checklistIcon}>{row.icon}</span>
             <span>{row.text}</span>
           </div>
         ))}
       </div>
 
-      <div style={styles.reviewPathBox}>
-        <div style={{ color: styles.stepSub.color, fontSize: '11px', marginBottom: '6px' }}>Save to</div>
+      <div className={styles.reviewPathBox}>
+        <div className={styles.reviewPathLabel}>Save to</div>
         <input
           id="storage-path"
-          style={{
-            ...styles.storageInput,
-            marginBottom: 0,
-            backgroundColor: 'transparent',
-            border: 'none',
-            padding: 0,
-            fontSize: '12px'
-          }}
+          className={styles.reviewPathInput}
           type="text"
+          aria-label="Storage path"
           value={storagePath}
           onChange={(e) => onStoragePathChange(e.target.value)}
         />
       </div>
 
-      {error && <div style={styles.error}>{error}</div>}
+      {error && <div className={styles.error}>{error}</div>}
     </div>
   )
 }

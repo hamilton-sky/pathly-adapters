@@ -1,31 +1,29 @@
 import React from 'react'
-import type { Theme } from '../../../theme'
-import { stepDotStyle } from '../FlowWizard.styles'
+import styles from './StepIndicator.module.css'
 
 interface StepIndicatorProps {
   step: number
   totalSteps: number
   onJumpToStep?: (step: number) => void
-  t: Theme
-  styles: Record<string, React.CSSProperties>
 }
 
-export function StepIndicator({ step, totalSteps, onJumpToStep, t, styles }: StepIndicatorProps): JSX.Element {
+export function StepIndicator({ step, totalSteps, onJumpToStep }: StepIndicatorProps): JSX.Element {
   return (
-    <div style={styles.stepIndicator}>
+    <div className={styles.root}>
       {Array.from({ length: totalSteps }, (_, idx) => {
         const n = idx + 1
         const active = step === n
         const done = step > n
+        const dotClass = [styles.dot, active ? styles.dotActive : '', done ? styles.dotDone : ''].filter(Boolean).join(' ')
         return (
           <React.Fragment key={n}>
             <div
-              style={stepDotStyle(t, active, done)}
+              className={dotClass}
               onClick={done && onJumpToStep ? () => onJumpToStep(n) : undefined}
             >
               {done ? '✓' : n}
             </div>
-            {idx < totalSteps - 1 && <div style={styles.stepConnector} />}
+            {idx < totalSteps - 1 && <div className={styles.connector} />}
           </React.Fragment>
         )
       })}

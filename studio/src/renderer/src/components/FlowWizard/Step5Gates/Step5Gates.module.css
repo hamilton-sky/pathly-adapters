@@ -5,6 +5,7 @@
 .state { font-family: monospace; font-size: var(--font-size-sm); color: var(--theme-text-primary); }
 .gateCard { margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 4px; }
 .gateHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.gateHead .select { width: auto; flex: 1; margin-right: 8px; }
 .label { font-size: 11px; color: var(--theme-text-muted); }
 .stack { display: flex; flex-direction: column; gap: 6px; }
 .input {

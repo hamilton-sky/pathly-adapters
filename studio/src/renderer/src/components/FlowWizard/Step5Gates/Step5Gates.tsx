@@ -1,4 +1,3 @@
-import React from 'react'
 import type { Transition, Gate } from '../types'
 import styles from './Step5Gates.module.css'
 
@@ -55,16 +54,16 @@ export function Step5Gates({ transitions, gates, onSetGates }: Step5GatesProps):
           <div key={key} className={styles.card}>
             <div className={styles.header}>
               <span className={styles.state}>{tr.from} → {tr.to}</span>
-              <button className="wizard-add-btn" onClick={() => addGate(tr)}>+ Add gate</button>
+              <button type="button" className="wizard-add-btn" onClick={() => addGate(tr)}>+ Add gate</button>
             </div>
             {trGates.length === 0 && <div className={styles.optional}>No gates — transition is always allowed</div>}
             {trGates.map((gate, idx) => (
               <div key={idx} className={styles.gateCard}>
                 <div className={styles.gateHead}>
-                  <select className={styles.select} style={{ width: 'auto', flex: 1, marginRight: '8px' }} value={gate.type} onChange={(e) => changeType(tr, idx, e.target.value as Gate['type'])}>
+                  <select className={styles.select} aria-label="Gate type" value={gate.type} onChange={(e) => changeType(tr, idx, e.target.value as Gate['type'])}>
                     {GATE_TYPES.map((t) => <option key={t} value={t}>{GATE_LABELS[t]}</option>)}
                   </select>
-                  <button className="wizard-remove-btn" onClick={() => removeGate(tr, idx)} aria-label="Remove gate">×</button>
+                  <button type="button" className="wizard-remove-btn" onClick={() => removeGate(tr, idx)} aria-label="Remove gate">×</button>
                 </div>
                 {gate.type === 'verify_gate' && (
                   <div className={styles.stack}>

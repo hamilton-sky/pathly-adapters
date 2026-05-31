@@ -49,6 +49,7 @@ export function Step2States({
           {idx === 0 && <span className={styles.tag}>initial</span>}
           {idx === states.length - 1 && <span className={styles.tag}>terminal</span>}
           <button
+            type="button"
             className={styles.remove}
             onClick={() => onRemoveState(idx)}
             disabled={states.length <= 2}
@@ -59,7 +60,7 @@ export function Step2States({
         </div>
       ))}
 
-      <button className={styles.add} onClick={onAddState}>+ Add state</button>
+      <button type="button" className={styles.add} onClick={onAddState}>+ Add state</button>
 
       <div className={styles.previewLabel}>Pipeline preview</div>
       <div className={styles.previewBox}>

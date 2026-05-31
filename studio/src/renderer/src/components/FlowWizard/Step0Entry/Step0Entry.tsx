@@ -26,6 +26,7 @@ export function Step0Entry({
 
       <div className={styles.choiceGrid}>
         <button
+          type="button"
           className={`${styles.choiceCard} ${selectedTemplateId === (templates[0]?.id ?? null) ? styles.choiceCardActive : ''}`}
           onClick={() => onSelectTemplate(templates[0] ?? null)}
         >
@@ -33,6 +34,7 @@ export function Step0Entry({
           <div className={styles.choiceCopy}>Pre-filled stages for common workflows</div>
         </button>
         <button
+          type="button"
           className={styles.choiceCard}
           onClick={onStartBlank}
         >
@@ -48,6 +50,7 @@ export function Step0Entry({
           return (
             <button
               key={template.id}
+              type="button"
               className={`${styles.templateCard} ${active ? styles.templateCardActive : ''}`}
               onClick={() => onSelectTemplate(template)}
             >
@@ -64,7 +67,7 @@ export function Step0Entry({
       {hasDraft && onResume && (
         <div className={styles.resumeCard}>
           <div className={styles.resumeLabel}>Resume draft</div>
-          <button className={styles.addBtn} onClick={onResume}>Resume saved draft</button>
+          <button type="button" className={styles.addBtn} onClick={onResume}>Resume saved draft</button>
         </div>
       )}
     </div>

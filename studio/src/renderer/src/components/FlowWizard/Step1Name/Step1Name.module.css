@@ -1,0 +1,32 @@
+.root { display: block; }
+.title { font-size: var(--font-size-lg); font-weight: 600; color: var(--theme-text-primary); margin-bottom: 4px; }
+.sub { font-size: var(--font-size-sm); color: var(--theme-text-muted); margin-bottom: 20px; }
+.label { display: block; font-size: var(--font-size-sm); color: var(--theme-text-secondary); margin-bottom: 6px; font-weight: 600; }
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-bg-surface0);
+  border-radius: 4px;
+  color: var(--theme-text-primary);
+  font-size: var(--font-size-base);
+  padding: 8px 10px;
+  outline: none;
+  margin-bottom: 16px;
+  font-family: inherit;
+}
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-bg-surface0);
+  border-radius: 4px;
+  color: var(--theme-text-primary);
+  font-size: var(--font-size-base);
+  padding: 8px 10px;
+  outline: none;
+  margin-bottom: 16px;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
