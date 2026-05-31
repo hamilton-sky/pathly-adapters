@@ -245,7 +245,9 @@ export function useProjectFiles(): {
   useEffect(() => {
     void loadItems()
     if (!projectPath) return
-    const { watchWorkspace, onWorkspaceChanged } = window.pathly.watch
+    const watchApi = window.pathly?.watch
+    if (!watchApi) return
+    const { watchWorkspace, onWorkspaceChanged } = watchApi
     if (!watchWorkspace || !onWorkspaceChanged) return
     void watchWorkspace(projectPath)
     return onWorkspaceChanged(() => { void loadItems() })

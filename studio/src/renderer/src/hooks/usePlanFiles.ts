@@ -83,7 +83,7 @@ export function usePlanFiles(): {
   useEffect(() => {
     void loadPlanFiles()
     if (!projectPath) return
-    const { onWorkspaceChanged } = window.pathly.watch
+    const onWorkspaceChanged = window.pathly?.watch?.onWorkspaceChanged
     if (!onWorkspaceChanged) return
     return onWorkspaceChanged(() => { void loadPlanFiles() })
   }, [loadPlanFiles, projectPath])

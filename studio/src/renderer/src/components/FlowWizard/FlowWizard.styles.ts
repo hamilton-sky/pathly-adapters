@@ -13,11 +13,12 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       zIndex: 1000
     },
     card: {
-      width: '600px',
+      width: '980px',
       maxHeight: '88vh',
-      backgroundColor: t.bgMantle,
+      background: `linear-gradient(180deg, ${t.bgMantle} 0%, ${t.bgBase} 100%)`,
       border: `1px solid ${t.bgSurface0}`,
-      borderRadius: '8px',
+      borderRadius: '14px',
+      boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
       display: 'flex',
       flexDirection: 'column'
     },
@@ -26,9 +27,22 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       alignItems: 'center',
       justifyContent: 'center',
       gap: '8px',
-      padding: '16px 24px',
+      padding: '14px 24px 10px',
       borderBottom: `1px solid ${t.bgSurface0}`,
       flexShrink: 0
+    },
+    progressBarWrap: {
+      height: '3px',
+      backgroundColor: t.bgSurface0,
+      margin: '0 24px',
+      borderRadius: '999px',
+      overflow: 'hidden',
+      flexShrink: 0
+    },
+    progressBar: {
+      height: '100%',
+      backgroundColor: t.accent,
+      borderRadius: '999px'
     },
     stepConnector: {
       flex: 1,
@@ -39,7 +53,20 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
     content: {
       flex: 1,
       overflowY: 'auto',
+      padding: '24px',
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0, 1fr) 300px',
+      gap: '22px'
+    },
+    contentFull: {
+      flex: 1,
+      overflowY: 'auto',
       padding: '24px'
+    },
+    sidebar: {
+      borderLeft: `1px solid ${t.bgSurface0}`,
+      paddingLeft: '20px',
+      background: `linear-gradient(180deg, ${t.bgBase} 0%, ${t.bgMantle} 100%)`
     },
     stepHeader: {
       fontSize: 'var(--font-size-lg)',
@@ -268,7 +295,74 @@ export function makeStyles(t: Theme): Record<string, CSSProperties> {
       color: t.textMuted,
       display: 'block',
       textAlign: 'center' as const,
-      paddingTop: '16px'
+      paddingTop: '14px'
+    },
+    accordion: {
+      border: `1px solid ${t.bgSurface0}`,
+      borderRadius: '6px',
+      marginBottom: '12px',
+      overflow: 'hidden'
+    },
+    accordionButton: {
+      width: '100%',
+      background: 'none',
+      border: 'none',
+      color: t.textPrimary,
+      cursor: 'pointer',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '12px 14px',
+      fontSize: 'var(--font-size-sm)',
+      fontWeight: 600,
+      textAlign: 'left'
+    },
+    accordionPanel: {
+      padding: '0 14px 14px'
+    },
+    templateCard: {
+      border: `1px solid ${t.bgSurface0}`,
+      borderRadius: '8px',
+      padding: '14px',
+      cursor: 'pointer',
+      backgroundColor: t.bgBase,
+      textAlign: 'left'
+    },
+    templateCardActive: {
+      border: `1px solid ${t.accent}`,
+      boxShadow: `0 0 0 1px ${t.accent} inset`
+    },
+    summaryCard: {
+      border: `1px solid ${t.bgSurface0}`,
+      borderRadius: '8px',
+      padding: '14px',
+      marginBottom: '16px',
+      backgroundColor: t.bgBase,
+      boxShadow: '0 8px 24px rgba(0,0,0,0.18)'
+    },
+    checklistRow: {
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'flex-start',
+      fontSize: 'var(--font-size-sm)',
+      marginBottom: '10px',
+      lineHeight: 1.4
+    },
+    checklistIcon: {
+      flexShrink: 0,
+      marginTop: '1px',
+      width: '16px',
+      textAlign: 'center'
+    },
+    reviewPathBox: {
+      marginTop: '12px',
+      border: `1px solid ${t.bgSurface0}`,
+      borderRadius: '6px',
+      backgroundColor: t.bgBase,
+      padding: '10px 12px',
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      color: t.textSecondary
     }
   }
 }
@@ -285,6 +379,8 @@ export function stepDotStyle(t: Theme, active: boolean, done: boolean): CSSPrope
     fontWeight: 600,
     backgroundColor: done ? t.green : active ? t.accent : t.bgSurface0,
     color: done || active ? t.bgBase : t.textMuted,
-    flexShrink: 0
+    flexShrink: 0,
+    cursor: done ? 'pointer' : 'default',
+    transition: 'transform 120ms ease'
   }
 }

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store'
-import { writeFile } from '../../services/pathlyApi'
+import { readFile, writeFile } from '../../services/pathlyApi'
 import { useTheme } from '../../useTheme'
 import type { Props, Transition, Gate, TransitionRule, FeedbackRoute } from './types'
 import { makeStyles } from './FlowWizard.styles'
@@ -11,19 +11,24 @@ import { Step1Name } from './Step1Name'
 import { Step2States } from './Step2States'
 import { Step3Transitions } from './Step3Transitions'
 import { Step4Agents } from './Step4Agents'
-import { Step5Gates } from './Step5Gates'
-import { Step6FeedbackRouting } from './Step6FeedbackRouting'
-import { Step7TransitionRules } from './Step7TransitionRules'
+import { Step4Quality } from './Step4Quality'
 import { Step5Review } from './Step5Review'
+import { Step0Entry } from './Step0Entry'
+import { YamlPreview } from './YamlPreview'
+import { WIZARD_TEMPLATES, type WizardTemplate } from './wizardTemplates'
+import { DRAFT_FILE_NAME, parseDraft, serializeDraft, type WizardDraft } from './draftUtils'
 import { validateStep } from './FlowWizard.validation'
 import { FieldError } from '../ui'
+
+const TOTAL_STEPS = 5
 
 export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const { pathlyUserHome } = useStore()
   const t = useTheme()
   const styles = makeStyles(t)
 
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [flowName, setFlowName] = useState('')
   const [description, setDescription] = useState('')
   const [states, setStates] = useState(['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'TESTING', 'DONE'])
@@ -43,43 +48,119 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const [saving, setSaving] = useState(false)
   const [stepErrors, setStepErrors] = useState<Record<number, Record<string, string>>>({})
   const [touched, setTouched] = useState<Record<number, boolean>>({})
+  const [draftLoaded, setDraftLoaded] = useState(false)
+  const [hasDraft, setHasDraft] = useState(false)
+  const [savedDraft, setSavedDraft] = useState<WizardDraft | null>(null)
+
+  const validStates = states.filter((s) => s.trim())
+  const nonTerminalStates = validStates.slice(0, -1)
+  const terminalState = validStates[validStates.length - 1] ?? ''
+
+  const yamlPreview = useMemo(
+    () => generateYaml(flowName || 'my-flow', storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules),
+    [flowName, storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules]
+  )
+
+  const draftPath = pathlyUserHome ? `${pathlyUserHome}/flows/${DRAFT_FILE_NAME}` : ''
 
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
+    let cancelled = false
+    async function loadDraft(): Promise<void> {
+      if (!draftPath) return
+      try {
+        const content = await readFile(draftPath)
+        const draft = parseDraft(content)
+        if (!draft || cancelled) {
+          setHasDraft(false)
+          setSavedDraft(null)
+          setDraftLoaded(true)
+          return
+        }
+        setSavedDraft(draft)
+        setHasDraft(true)
+      } catch {
+        setHasDraft(false)
+      } finally {
+        if (!cancelled) setDraftLoaded(true)
+      }
     }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+    void loadDraft()
+    return () => { cancelled = true }
+  }, [draftPath])
 
   useEffect(() => {
-    if (touched[1]) {
-      const errors = validateStep(1, { flowName, states, transitions, agentMap })
-      setStepErrors((prev) => ({ ...prev, 1: errors }))
+    if (!draftLoaded || !draftPath || step === 0) return
+    const draft: WizardDraft = {
+      version: 1,
+      flowName,
+      description,
+      step,
+      selectedTemplateId,
+      states,
+      transitions,
+      agentMap,
+      gates,
+      feedbackRoutes,
+      transitionRules,
+      storagePath
     }
-  }, [flowName])
+    void writeFile(draftPath, serializeDraft(draft)).then(() => setHasDraft(true)).catch(() => {})
+  }, [draftLoaded, draftPath, flowName, description, step, selectedTemplateId, states, transitions, agentMap, gates, feedbackRoutes, transitionRules, storagePath])
 
-  useEffect(() => {
-    if (touched[2]) {
-      const errors = validateStep(2, { flowName, states, transitions, agentMap })
-      setStepErrors((prev) => ({ ...prev, 2: errors }))
-    }
-  }, [states])
+  function applyTemplate(template: WizardTemplate | null): void {
+    if (!template) return
+    setSelectedTemplateId(template.id)
+    setStates(template.states)
+    setTransitions([])
+    setStep(1)
+  }
+
+  function applyDraft(draft: WizardDraft): void {
+    setFlowName(draft.flowName)
+    setDescription(draft.description)
+    setStep(draft.step)
+    setSelectedTemplateId(draft.selectedTemplateId)
+    setStates(draft.states)
+    setTransitions(draft.transitions)
+    setAgentMap(draft.agentMap)
+    setGates(draft.gates)
+    setFeedbackRoutes(draft.feedbackRoutes)
+    setTransitionRules(draft.transitionRules)
+    setStoragePath(draft.storagePath)
+  }
+
+  function resumeDraft(): void {
+    if (!savedDraft) return
+    applyDraft(savedDraft)
+    setStep(savedDraft.step)
+  }
+
+  function startBlank(): void {
+    setSelectedTemplateId('blank')
+    setStates(['DONE'])
+    setTransitions([])
+    setAgentMap({})
+    setGates({})
+    setFeedbackRoutes([])
+    setTransitionRules({})
+    setStep(1)
+  }
 
   function goToStep(next: number): void {
-    if (next === 3 && step === 2) {
+    if (next < 0) return
+    if (next > TOTAL_STEPS) return
+    if (next === 2 && step === 1 && transitions.length === 0 && validStates.length > 1) {
       const autoTransitions: Transition[] = []
-      for (let i = 0; i < states.length - 1; i++) {
-        autoTransitions.push({ from: states[i], to: states[i + 1], label: 'default' })
+      for (let i = 0; i < validStates.length - 1; i++) {
+        autoTransitions.push({ from: validStates[i], to: validStates[i + 1], label: 'default' })
       }
-      if (transitions.length === 0) {
-        setTransitions(autoTransitions)
-      }
+      setTransitions(autoTransitions)
     }
     setStep(next)
   }
 
   function handleNext(): void {
+    if (step === 0) return
     const values = { flowName, states, transitions, agentMap }
     const errors = validateStep(step, values)
     if (Object.keys(errors).length > 0) {
@@ -92,7 +173,11 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   }
 
   function handleBack(): void {
-    setStep((s) => s - 1)
+    setStep((s) => Math.max(0, s - 1))
+  }
+
+  function jumpToStep(next: number): void {
+    if (next >= 1 && next <= step) setStep(next)
   }
 
   function updateState(idx: number, value: string): void {
@@ -108,6 +193,17 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
 
   function addState(): void {
     setStates((s) => [...s, ''])
+  }
+
+  function reorderState(from: number, to: number): void {
+    setStates((prev) => {
+      if (from === to) return prev
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+    setTransitions([])
   }
 
   function updateTransition(idx: number, patch: Partial<Transition>): void {
@@ -132,11 +228,13 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
       return
     }
     const trimmedName = flowName.trim()
-    const yaml = generateYaml(trimmedName, storagePath, states.filter((s) => s.trim()), agentMap, transitions, gates, feedbackRoutes, transitionRules)
     const filePath = `${pathlyUserHome}/flows/${trimmedName}.flow.yaml`
     setSaving(true)
     try {
-      await writeFile(filePath, yaml)
+      await writeFile(filePath, yamlPreview)
+      if (draftPath) {
+        await writeFile(draftPath, '')
+      }
       onCreated(filePath)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))
@@ -145,112 +243,113 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     }
   }
 
-  const nonTerminalStates = states.slice(0, -1)
-  const terminalState = states[states.length - 1]
-  const validStates = states.filter((s) => s.trim())
-
-  const yamlPreview = generateYaml(
-    flowName || 'my-flow',
-    storagePath,
-    validStates,
-    agentMap,
-    transitions,
-    gates,
-    feedbackRoutes,
-    transitionRules
-  )
-
   const nextDisabled = touched[step] && Object.keys(stepErrors[step] ?? {}).length > 0
 
   return (
     <div style={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div style={styles.card}>
-        <span style={styles.stepCounter}>
-          Step {step} of 8
-        </span>
-        <StepIndicator step={step} t={t} styles={styles} />
+        {step > 0 && (
+          <>
+            <span style={styles.stepCounter}>Step {step} of {TOTAL_STEPS}</span>
+            <div style={styles.progressBarWrap}>
+              <div style={{ ...styles.progressBar, width: `${(step / TOTAL_STEPS) * 100}%` }} />
+            </div>
+            <StepIndicator step={step} totalSteps={TOTAL_STEPS} onJumpToStep={jumpToStep} t={t} styles={styles} />
+          </>
+        )}
 
-        <div style={styles.content}>
-          {step === 1 && (
-            <>
-              <Step1Name
-                flowName={flowName}
-                description={description}
-                onFlowNameChange={setFlowName}
-                onDescriptionChange={setDescription}
+        <div style={step === 0 ? styles.contentFull : styles.content}>
+          <div>
+            {step === 0 && (
+              <Step0Entry
+                selectedTemplateId={selectedTemplateId}
+                templates={WIZARD_TEMPLATES}
+                onSelectTemplate={applyTemplate}
+                onStartBlank={startBlank}
+                onResume={resumeDraft}
+                hasDraft={hasDraft}
                 styles={styles}
               />
-              <FieldError message={stepErrors[1]?.name} />
-            </>
-          )}
-          {step === 2 && (
-            <>
-              <Step2States
-                states={states}
-                onUpdateState={updateState}
-                onRemoveState={removeState}
-                onAddState={addState}
+            )}
+            {step === 1 && (
+              <>
+                <Step1Name
+                  flowName={flowName}
+                  description={description}
+                  onFlowNameChange={setFlowName}
+                  onDescriptionChange={setDescription}
+                  styles={styles}
+                />
+                <FieldError message={stepErrors[1]?.name} />
+              </>
+            )}
+            {step === 2 && (
+              <>
+                <Step2States
+                  states={states}
+                  onUpdateState={updateState}
+                  onRemoveState={removeState}
+                  onAddState={addState}
+                  onReorderState={reorderState}
+                  styles={styles}
+                />
+                <FieldError message={stepErrors[2]?.states} />
+              </>
+            )}
+            {step === 3 && (
+              <Step3Transitions
+                transitions={transitions}
+                validStates={validStates}
+                onUpdateTransition={updateTransition}
+                onRemoveTransition={removeTransition}
+                onAddTransition={addTransition}
                 styles={styles}
               />
-              <FieldError message={stepErrors[2]?.states} />
-            </>
-          )}
-          {step === 3 && (
-            <Step3Transitions
-              transitions={transitions}
-              validStates={validStates}
-              onUpdateTransition={updateTransition}
-              onRemoveTransition={removeTransition}
-              onAddTransition={addTransition}
-              styles={styles}
-            />
-          )}
-          {step === 4 && (
-            <Step4Agents
-              nonTerminalStates={nonTerminalStates}
-              terminalState={terminalState}
-              agentMap={agentMap}
-              onUpdateAgent={updateAgent}
-              styles={styles}
-            />
-          )}
-          {step === 5 && (
-            <Step5Gates
-              transitions={transitions.filter((tr) => tr.from.trim() && tr.to.trim())}
-              gates={gates}
-              onSetGates={setGates}
-              styles={styles}
-            />
-          )}
-          {step === 6 && (
-            <Step6FeedbackRouting
-              feedbackRoutes={feedbackRoutes}
-              onSetRoutes={setFeedbackRoutes}
-              styles={styles}
-            />
-          )}
-          {step === 7 && (
-            <Step7TransitionRules
-              nonTerminalStates={nonTerminalStates.filter((s) => s.trim())}
-              validStates={states.filter((s) => s.trim())}
-              transitionRules={transitionRules}
-              onSetRules={setTransitionRules}
-              styles={styles}
-            />
-          )}
-          {step === 8 && (
-            <Step5Review
-              yamlPreview={yamlPreview}
-              storagePath={storagePath}
-              onStoragePathChange={setStoragePath}
-              error={saveError}
-              styles={styles}
-            />
+            )}
+            {step === 4 && (
+              <Step4Agents
+                nonTerminalStates={nonTerminalStates}
+                terminalState={terminalState}
+                agentMap={agentMap}
+                onUpdateAgent={updateAgent}
+                styles={styles}
+              />
+            )}
+            {step === 5 && (
+              <>
+                <Step4Quality
+                  transitions={transitions.filter((tr) => tr.from.trim() && tr.to.trim())}
+                  gates={gates}
+                  feedbackRoutes={feedbackRoutes}
+                  transitionRules={transitionRules}
+                  nonTerminalStates={nonTerminalStates}
+                  validStates={validStates}
+                  onSetGates={setGates}
+                  onSetRoutes={setFeedbackRoutes}
+                  onSetRules={setTransitionRules}
+                  styles={styles}
+                />
+                <Step5Review
+                  yamlPreview={yamlPreview}
+                  storagePath={storagePath}
+                  onStoragePathChange={setStoragePath}
+                  error={saveError}
+                  styles={styles}
+                />
+              </>
+            )}
+          </div>
+
+          {step > 0 && (
+            <aside style={styles.sidebar}>
+              <YamlPreview yaml={yamlPreview} styles={styles} />
+            </aside>
           )}
         </div>
 
         <WizardFooter
           step={step}
+          totalSteps={TOTAL_STEPS}
           onCancel={onClose}
           onBack={handleBack}
           onNext={handleNext}

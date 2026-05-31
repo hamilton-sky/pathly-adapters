@@ -3,6 +3,7 @@ import { Button } from '../ui'
 
 interface WizardFooterProps {
   step: number
+  totalSteps: number
   onCancel: () => void
   onBack: () => void
   onNext: () => void
@@ -14,6 +15,7 @@ interface WizardFooterProps {
 
 export function WizardFooter({
   step,
+  totalSteps,
   onCancel,
   onBack,
   onNext,
@@ -31,10 +33,10 @@ export function WizardFooter({
     <div style={styles.btnRow}>
       <button style={styles.cancelBtn} onClick={onCancel}>Cancel</button>
       <div style={{ display: 'flex', gap: '8px' }}>
-        {step > 1 && (
+        {step > 0 && (
           <button style={styles.backBtn} onClick={onBack}>← Back</button>
         )}
-        {step < 8 ? (
+        {step < totalSteps ? (
           <button style={saveNextStyle} onClick={onNext} disabled={isNextDisabled}>
             Next →
           </button>

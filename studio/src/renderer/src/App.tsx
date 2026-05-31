@@ -103,9 +103,14 @@ function MainApp(): JSX.Element | null {
   const [setupDone, setSetupDone] = useState<boolean | null>(null)
 
   useEffect(() => {
-    window.pathly.setup.isNeeded().then((needed: boolean) => {
+    const setupApi = window.pathly?.setup
+    if (!setupApi?.isNeeded) {
+      setSetupDone(true)
+      return
+    }
+    setupApi.isNeeded().then((needed: boolean) => {
       setSetupDone(!needed)
-    })
+    }).catch(() => setSetupDone(true))
   }, [])
 
   useEffect(() => {
