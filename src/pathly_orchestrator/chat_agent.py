@@ -22,6 +22,11 @@ _FLOW_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+_NEXT_STEP_PATTERN = re.compile(
+    r"\b(what should i do next|what do i do next|next step|next steps|what's next)\b",
+    re.IGNORECASE,
+)
+
 
 def _is_automation_intent(text: str) -> bool:
     return bool(_AUTOMATION_PATTERN.search(text) and _FLOW_PATTERN.search(text))
@@ -149,6 +154,29 @@ def _extract_intent(text: str) -> str:
     return " ".join(words[:10]).capitalize() + "..."
 
 
+def _build_pathly_reply(text: str, context: dict) -> str:
+    app_context: dict = context.get("appContext") or {}
+    feature = app_context.get("activeFeature") or ""
+    stage = app_context.get("fsmStage") or "unknown"
+    conversation = app_context.get("activeConversation")
+    next_story = app_context.get("nextUncompletedStory") or ""
+    stories = app_context.get("userStoriesSummary") or ""
+
+    if feature:
+        intro = f"You are working on **{feature}** at stage **{stage}**."
+        if conversation is not None:
+            intro += f" Conversation {conversation}."
+        if _NEXT_STEP_PATTERN.search(text):
+            if next_story:
+                return f"{intro} Next: {next_story}"
+            return f"{intro} Continue with the current plan."
+        if stories:
+            return f"{intro} Plan context is available."
+        return f"{intro} Continue with the current plan."
+
+    return "I can help you with your Pathly workflow. Try asking me what should I do next."
+
+
 def handle_chat(request) -> Response:
     """Handle POST /chat.
 
@@ -172,6 +200,9 @@ def handle_chat(request) -> Response:
         steps = _generate_steps(text, labels)
         intent = _extract_intent(text)
         return jsonify({"type": "automation", "intent": intent, "steps": steps})
+
+    if context.get("source") == "pathly-studio" or data.get("messageType") == "pathly_chat":
+        return jsonify({"type": "chat", "text": _build_pathly_reply(text, context)})
 
     # Chat / skill routing response
     skills: list[str] = context.get("skills") or []

@@ -1,5 +1,6 @@
 import { useBrightskyStore, BRIGHTSKY_BASE_URL } from '../store/brightskyStore'
 import { useChatStore } from '../store/chatStore'
+import { collectPathlyContext } from './pathlyContextCollector'
 
 export class BrightskyClient {
   private ws: WebSocket | null = null
@@ -7,8 +8,17 @@ export class BrightskyClient {
   private connectTimeout: ReturnType<typeof setTimeout> | null = null
   private streamContent = ''
   private intentionalDisconnect = false
+  private wsUrl = ''
+  private accessToken = ''
+  private reconnectAttempts = 0
+  private clientCapabilitiesSent = false
 
-  connect(wsUrl: string, accessToken: string): void {
+  connect(wsUrl: string, accessToken: string, resetReconnect = true): void {
+    this.wsUrl = wsUrl
+    this.accessToken = accessToken
+    this.clientCapabilitiesSent = false
+    if (resetReconnect) this.reconnectAttempts = 0
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return
 
     if (this.connectTimeout) {
@@ -54,7 +64,25 @@ export class BrightskyClient {
           (data.sessionId as string | undefined) ??
           null
         if (sessionId) useBrightskyStore.getState().setSessionId(sessionId)
+        if (!this.clientCapabilitiesSent && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'client_capabilities',
+            source: 'pathly-studio',
+            capabilities: {
+              canAnalyzeDom: false,
+              canExecuteToolCalls: false,
+              canStreamThinking: true,
+              supportedToolTypes: [] as string[],
+            },
+            version: '1.0',
+          }))
+          this.clientCapabilitiesSent = true
+        }
+      } else if (type === 'typing_metadata') {
+        const label = (data.label as string | undefined) ?? null
+        useBrightskyStore.getState().setThinkingLabel(label)
       } else if (type === 'stream_chunk') {
+        useBrightskyStore.getState().setThinkingLabel(null)
         const payload = data.payload as Record<string, unknown> | undefined
         const chunk = (payload?.chunk as string | undefined) ?? ''
         this.streamContent += chunk
@@ -64,6 +92,7 @@ export class BrightskyClient {
           this.streamContent = ''
         }
       } else if (type === 'stream_end') {
+        useBrightskyStore.getState().setThinkingLabel(null)
         this.streamInProgress = false
         this.streamContent = ''
       } else if (type === 'processing_status') {
@@ -83,8 +112,17 @@ export class BrightskyClient {
       }
       this.streamInProgress = false
       this.streamContent = ''
+      useBrightskyStore.getState().setThinkingLabel(null)
       if (!this.intentionalDisconnect) {
-        useBrightskyStore.getState().setAuthError('Disconnected from Brightsky.')
+        const delays = [1000, 2000, 4000, 8000, 16000]
+        const attempt = this.reconnectAttempts++
+        if (attempt < delays.length) {
+          setTimeout(() => {
+            if (!this.intentionalDisconnect) this.connect(this.wsUrl, this.accessToken, false)
+          }, delays[attempt])
+        } else {
+          useBrightskyStore.getState().setAuthError('Connection lost after 5 attempts — please sign in again.')
+        }
       }
       this.intentionalDisconnect = false
       this.ws = null
@@ -102,6 +140,7 @@ export class BrightskyClient {
       }
       this.streamInProgress = false
       this.streamContent = ''
+      useBrightskyStore.getState().setThinkingLabel(null)
       useBrightskyStore.getState().setAuthError('Disconnected from Brightsky.')
     }
   }
@@ -122,16 +161,34 @@ export class BrightskyClient {
     })
     this.streamContent = ''
     this.streamInProgress = true
+    const pathlyCtx = await collectPathlyContext()
+    const sharedFields = {
+      requestId: crypto.randomUUID(),
+      messageType: 'pathly_chat',
+      context: { source: 'pathly-studio', appContext: pathlyCtx.appContext },
+      capabilities: {
+        canAnalyzeDom: false,
+        canExecuteToolCalls: false,
+        canStreamThinking: true,
+        supportedToolTypes: [] as string[],
+      },
+    }
 
     if (sessionId === null) {
       this.ws?.send(
         JSON.stringify({
           type: 'create_session_with_message',
           payload: { userMessage: { content, role: 'user' } },
+          ...sharedFields,
         })
       )
     } else {
-      this.ws?.send(JSON.stringify({ type: 'user_message', content, sessionId }))
+      this.ws?.send(JSON.stringify({
+        type: 'user_message',
+        content,
+        sessionId,
+        ...sharedFields,
+      }))
     }
   }
 

@@ -12,6 +12,7 @@ import styles from './index.module.css'
 
 export function ChatPanel(): JSX.Element {
   const chat = useChatPanel()
+  const thinkingLabel = useBrightskyStore((s) => s.thinkingLabel)
 
   return (
     <div
@@ -35,6 +36,12 @@ export function ChatPanel(): JSX.Element {
           onToggle={() => chat.setPushedMenuOpen((v) => !v)}
         />
       ) : null}
+      {thinkingLabel && (
+        <div className={styles.thinkingBar}>
+          <span className={styles.thinkingDot} />
+          {thinkingLabel}
+        </div>
+      )}
       <MessageList />
       {chat.automationMessages.length > 0 && chat.automationMessages[chat.automationMessages.length - 1].automationPlan && (
         <>

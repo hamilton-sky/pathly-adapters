@@ -7,3 +7,9 @@
 {"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-05-31T13:45:23Z"}
 {"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-05-31T13:48:24Z"}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_declared_scope", "schema_version": 1, "ts": "2026-05-31T13:48:24Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-05-31T13:48:27Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "tokens_in": 24603, "tokens_out": 6151, "total_tokens": 30754, "cost_usd": 0.166072, "tool_uses": 30, "wall_seconds": 261, "ts": "2026-05-31T13:54:25Z", "schema_version": 1}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "tokens_in": 16297, "tokens_out": 4074, "total_tokens": 20371, "cost_usd": 0.110007, "tool_uses": 19, "wall_seconds": 137, "ts": "2026-05-31T14:03:44Z", "schema_version": 1}
+{"type": "GATE_FAILED", "gate": "require_artifact", "transition": "REVIEWING->TESTING", "schema_version": 1, "ts": "2026-05-31T14:03:51Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "HUMAN_QUESTIONS.md", "schema_version": 1, "ts": "2026-05-31T14:04:08Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "schema_version": 1, "ts": "2026-05-31T14:04:08Z"}

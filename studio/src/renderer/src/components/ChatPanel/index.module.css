@@ -32,3 +32,26 @@
   background: var(--accent, #22C55E);
   opacity: 0.5;
 }
+
+.thinkingBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent, #22C55E) 24%, transparent);
+  background: color-mix(in srgb, var(--accent, #22C55E) 10%, transparent);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.thinkingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent, #22C55E);
+  flex-shrink: 0;
+}

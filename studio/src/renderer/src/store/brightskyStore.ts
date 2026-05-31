@@ -15,6 +15,7 @@ export const BRIGHTSKY_WS_URL: string =
 interface BrightskyState {
   connected: boolean
   authenticated: boolean
+  thinkingLabel: string | null
   accessToken: string | null
   refreshToken: string | null
   userId: string | null
@@ -29,6 +30,7 @@ interface BrightskyState {
   setSessionId: (id: string | null) => void
   setConnected: (val: boolean) => void
   setAuthError: (msg: string | null) => void
+  setThinkingLabel: (label: string | null) => void
 }
 
 export const useBrightskyStore = create<BrightskyState>()(
@@ -36,6 +38,7 @@ export const useBrightskyStore = create<BrightskyState>()(
     (set) => ({
       connected: false,
       authenticated: false,
+      thinkingLabel: null,
       accessToken: null,
       refreshToken: null,
       userId: null,
@@ -76,6 +79,7 @@ export const useBrightskyStore = create<BrightskyState>()(
       setConnected: (val) => set({ connected: val }),
 
       setAuthError: (msg) => set({ authError: msg }),
+      setThinkingLabel: (label) => set({ thinkingLabel: label }),
     }),
     {
       name: 'brightsky-store',

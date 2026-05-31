@@ -3,12 +3,13 @@
 .card {
   flex-shrink: 0;
   margin: 4px 8px 6px;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--bg-mantle);
   border: 1px solid var(--bg-surface0);
   color: var(--text-secondary);
   transition: box-shadow 150ms ease-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .cardFocused {
@@ -122,7 +123,7 @@
 
 /* ── Preview row (BANNER state) ─────────────────────────── */
 .preview {
-  padding: 6px 10px 8px;
+  padding: 6px 8px 8px;
   font-family: 'Geist Mono', 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 11px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -143,19 +144,22 @@
 
 /* ── xterm container ────────────────────────────────────── */
 .terminal {
-  height: 132px;
-  min-height: 132px;
-  max-height: 132px;
+  height: 120px;
+  min-height: 120px;
+  max-height: 120px;
+  width: 100%;
   overflow: hidden;
-  padding: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 6px 6px 4px;
+  border-top: none;
   background: #0d1117;
+  border-radius: 6px;
 }
 
 .peekWrapper {
   height: 120px;
   overflow: hidden;
-  padding-left: 4px;
+  padding: 0px 6px 6px 4px;
+  border-radius: 0 0 11px 11px;
 }
 
 .peekWrapperHidden {
