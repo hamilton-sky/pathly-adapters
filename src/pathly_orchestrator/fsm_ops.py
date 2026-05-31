@@ -58,6 +58,8 @@ _STATE_TO_COMMAND = {
     "DONE": "/pathly end",
 }
 
+_SCHEMA_VERSION = "1"
+
 # ── Private helpers ───────────────────────────────────────────────────────────
 
 
@@ -139,21 +141,95 @@ def _codex_subagent_hint(agent: str, instructions: str | None) -> dict:
     }
 
 
+def _agent_hint(agent: str, instructions: str | None) -> dict:
+    return _codex_subagent_hint(agent, instructions)
+
+
+def _stage_brief(state_info: dict, storage_path: Path) -> dict:
+    feedback_dir = storage_path / "feedback"
+    open_feedback = []
+    if feedback_dir.exists():
+        for item in sorted(feedback_dir.iterdir()):
+            if item.is_file():
+                open_feedback.append(item.name)
+    return {
+        "state": state_info["current_state"],
+        "conv": state_info["conv"],
+        "retry_count": state_info.get("retry_count", 0),
+        "open_feedback": open_feedback,
+        "feedback_age_hours": None,
+        "recent_events": [],
+        "recent_consult": None,
+        "plan_path": str(storage_path),
+    }
+
+
+def _response_envelope(
+    *,
+    state_info: dict,
+    storage_path: Path,
+    agent: str,
+    instructions: str | None,
+    menu: dict | None,
+    current_state_key: str = "current_state",
+    current_state_value: str | None = None,
+    include_storage_path: bool = True,
+) -> dict:
+    result = {
+        "schema_version": _SCHEMA_VERSION,
+        "decision": "continue",
+        current_state_key: current_state_value or state_info["current_state"],
+        "conv": state_info["conv"],
+        "role": agent,
+        "agent": agent,
+        "agent_hint": _agent_hint(agent, instructions),
+        "stage_brief": _stage_brief(state_info, storage_path),
+        "warnings": [],
+        "menu": menu,
+    }
+    if include_storage_path:
+        result["storage_path"] = str(storage_path)
+    result["codex_subagent"] = result["agent_hint"]
+    if instructions is not None:
+        result["instructions"] = instructions
+    return result
+
+
 def _blocked_response(feedback: dict, state_info: dict) -> dict:
+    result = {
+        "schema_version": _SCHEMA_VERSION,
+        "decision": "block",
+        "current_state": state_info["current_state"],
+        "conv": state_info["conv"],
+        "role": feedback["target_agent"],
+        "agent": feedback["target_agent"],
+        "stage_brief": {
+            "state": state_info["current_state"],
+            "conv": state_info["conv"],
+            "retry_count": state_info.get("retry_count", 0),
+            "open_feedback": [feedback["file"]],
+            "feedback_age_hours": None,
+            "recent_events": [],
+            "recent_consult": None,
+            "plan_path": "",
+        },
+        "warnings": [],
+        "limits": state_info["limits"],
+    }
     if feedback["target_agent"] == "human":
-        return {
+        result.update({
             "blocked": True,
             "target_agent": "human",
             "file": feedback["file"],
             "instructions": feedback.get("instructions", ""),
-            "limits": state_info["limits"],
-        }
-    return {
+        })
+        return result
+    result.update({
         "blocked": True,
         "target_agent": feedback["target_agent"],
         "file": feedback["file"],
-        "limits": state_info["limits"],
-    }
+    })
+    return result
 
 
 def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -> dict:
@@ -257,9 +333,8 @@ def next_action(args: dict) -> dict:
                     flow_config, feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
-                result["codex_subagent"] = _codex_subagent_hint(
-                    feedback["target_agent"], instructions
-                )
+                result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
+                result["codex_subagent"] = result["agent_hint"]
             except Exception:
                 result["instructions"] = None
         return result
@@ -267,16 +342,15 @@ def next_action(args: dict) -> dict:
     instructions = build_prompt(flow_config, state_info["current_state"], storage_path)
     agent = flow_config["agent_map"][state_info["current_state"]]
     menu = build_menu_payload(flow_config, state_info["current_state"], storage_path)
-    return {
-        "current_state": state_info["current_state"],
-        "conv": state_info["conv"],
-        "agent": agent,
-        "instructions": instructions,
-        "codex_subagent": _codex_subagent_hint(agent, instructions),
-        "storage_path": str(storage_path),
-        "limits": state_info["limits"],
-        "menu": menu,
-    }
+    result = _response_envelope(
+        state_info=state_info,
+        storage_path=storage_path,
+        agent=agent,
+        instructions=instructions,
+        menu=menu,
+    )
+    result["limits"] = state_info["limits"]
+    return result
 
 
 def complete_stage(args: dict) -> dict:
@@ -318,9 +392,8 @@ def complete_stage(args: dict) -> dict:
                     flow_config, feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
-                result["codex_subagent"] = _codex_subagent_hint(
-                    feedback["target_agent"], instructions
-                )
+                result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
+                result["codex_subagent"] = result["agent_hint"]
             except Exception:
                 result["instructions"] = None
         return result
@@ -434,11 +507,14 @@ def complete_stage(args: dict) -> dict:
     instructions = build_prompt(flow_config, next_state, storage_path)
     agent = flow_config["agent_map"][next_state]
     menu = build_menu_payload(flow_config, next_state, storage_path)
-    return {
-        "next_state": next_state,
-        "agent": agent,
-        "instructions": instructions,
-        "codex_subagent": _codex_subagent_hint(agent, instructions),
-        "limits": state_info["limits"],
-        "menu": menu,
-    }
+    result = _response_envelope(
+        state_info=state_info,
+        storage_path=storage_path,
+        agent=agent,
+        instructions=instructions,
+        menu=menu,
+        current_state_key="next_state",
+        current_state_value=next_state,
+    )
+    result["limits"] = state_info["limits"]
+    return result

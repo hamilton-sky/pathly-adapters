@@ -68,6 +68,14 @@ def test_next_action_initial_state(tmp_path):
     })
     assert result["current_state"] == "STORMING"
     assert result["agent"] == "team/discover"
+    assert result["schema_version"] == "1"
+    assert result["decision"] == "continue"
+    assert result["role"] == "team/discover"
+    assert result["agent_hint"] == result["codex_subagent"]
+    assert result["stage_brief"]["state"] == "STORMING"
+    assert "open_feedback" in result["stage_brief"]
+    assert "warnings" in result
+    assert "storage_path" in result
 
 
 def test_next_action_includes_codex_worker_hint(tmp_path, monkeypatch):
@@ -81,7 +89,7 @@ def test_next_action_includes_codex_worker_hint(tmp_path, monkeypatch):
     })
 
     assert result["agent"] == "builder"
-    hint = result["codex_subagent"]
+    hint = result["agent_hint"]
     assert hint["pathly_agent"] == "builder"
     assert hint["codex_role"] == "worker"
     assert "PATHLY AGENT: builder" in hint["instructions"]
@@ -108,7 +116,7 @@ def test_next_action_includes_menu_payload(tmp_path, monkeypatch):
 
 
 def test_codex_hint_maps_research_agents_to_explorer():
-    hint = fsm_ops._codex_subagent_hint("scout", "find the relevant files")
+    hint = fsm_ops._agent_hint("scout", "find the relevant files")
 
     assert hint["pathly_agent"] == "scout"
     assert hint["codex_role"] == "explorer"
@@ -127,6 +135,12 @@ def test_complete_stage_after_planning(tmp_path):
         "project_root": str(tmp_path),
     })
     assert result.get("next_state") in ("BUILDING", "DESIGNING")
+    assert result["schema_version"] == "1"
+    assert result["decision"] == "continue"
+    assert result["role"] == result["agent"]
+    assert result["agent_hint"] == result["codex_subagent"]
+    assert "stage_brief" in result
+    assert "storage_path" in result
 
 
 def test_complete_stage_blocked_by_review_failures(tmp_path):
@@ -145,8 +159,10 @@ def test_complete_stage_blocked_by_review_failures(tmp_path):
     assert result.get("blocked") is True
     assert result.get("target_agent") == "builder"
     assert "# builder" in result["instructions"]
-    assert result["codex_subagent"]["pathly_agent"] == "builder"
+    assert result["decision"] == "block"
+    assert result["agent_hint"]["pathly_agent"] == "builder"
     assert result["codex_subagent"]["codex_role"] == "worker"
+    assert "stage_brief" in result
 
 
 # ── Two-call decide protocol ──────────────────────────────────────────────────
@@ -217,6 +233,9 @@ def test_complete_stage_with_valid_decision(tmp_path, monkeypatch):
     assert result.get("next_state") == "PATH_A"
     assert "agent" in result
     assert "instructions" in result
+    assert result["schema_version"] == "1"
+    assert result["decision"] == "continue"
+    assert result["role"] == result["agent"]
 
     state_after = json.loads(state_file.read_text(encoding="utf-8"))
     assert state_after["current"] == "PATH_A"
@@ -245,6 +264,7 @@ def test_complete_stage_with_invalid_decision(tmp_path, monkeypatch):
     })
 
     assert result.get("next_state") == "PATH_A"
+    assert result["decision"] == "continue"
 
     events_file = storage / "EVENTS.jsonl"
     assert events_file.exists()
