@@ -142,7 +142,24 @@ def _codex_subagent_hint(agent: str, instructions: str | None) -> dict:
 
 
 def _agent_hint(agent: str, instructions: str | None) -> dict:
-    return _codex_subagent_hint(agent, instructions)
+    codex_role = "explorer" if agent in _CODEX_EXPLORER_AGENTS else "worker"
+    prompt = (
+        f"PATHLY AGENT: {agent}\n"
+        f"CODEX FALLBACK ROLE: {codex_role}\n\n"
+        "Use the Pathly role instructions below as the source of truth. "
+        "Preserve the requested artifacts, limits, and completion signal. "
+        "Do not revert unrelated user changes.\n\n"
+    )
+    if instructions:
+        prompt += instructions
+    else:
+        prompt += "No role instructions were available. Report this as a Pathly routing issue."
+    return {
+        "agent": agent,
+        "role": codex_role,
+        "mode": "native-pathly-agent-if-callable-else-codex-role",
+        "instructions": prompt,
+    }
 
 
 def _stage_brief(state_info: dict, storage_path: Path) -> dict:
@@ -171,14 +188,13 @@ def _response_envelope(
     agent: str,
     instructions: str | None,
     menu: dict | None,
-    current_state_key: str = "current_state",
     current_state_value: str | None = None,
     include_storage_path: bool = True,
 ) -> dict:
     result = {
         "schema_version": _SCHEMA_VERSION,
         "decision": "continue",
-        current_state_key: current_state_value or state_info["current_state"],
+        "current_state": current_state_value or state_info["current_state"],
         "conv": state_info["conv"],
         "role": agent,
         "agent": agent,
@@ -189,20 +205,22 @@ def _response_envelope(
     }
     if include_storage_path:
         result["storage_path"] = str(storage_path)
-    result["codex_subagent"] = result["agent_hint"]
+    result["codex_subagent"] = _codex_subagent_hint(agent, instructions)
     if instructions is not None:
         result["instructions"] = instructions
     return result
 
 
-def _blocked_response(feedback: dict, state_info: dict) -> dict:
+def _blocked_response(feedback: dict, state_info: dict, storage_path: Path | None = None) -> dict:
+    decision = "escalate" if feedback["target_agent"] == "human" else "block"
     result = {
         "schema_version": _SCHEMA_VERSION,
-        "decision": "block",
+        "decision": decision,
         "current_state": state_info["current_state"],
         "conv": state_info["conv"],
         "role": feedback["target_agent"],
         "agent": feedback["target_agent"],
+        "agent_hint": _agent_hint(feedback["target_agent"], feedback.get("instructions")),
         "stage_brief": {
             "state": state_info["current_state"],
             "conv": state_info["conv"],
@@ -213,22 +231,15 @@ def _blocked_response(feedback: dict, state_info: dict) -> dict:
             "recent_consult": None,
             "plan_path": "",
         },
-        "warnings": [],
+        "warnings": [{"code": "open_feedback", "file": feedback["file"]}],
         "limits": state_info["limits"],
-    }
-    if feedback["target_agent"] == "human":
-        result.update({
-            "blocked": True,
-            "target_agent": "human",
-            "file": feedback["file"],
-            "instructions": feedback.get("instructions", ""),
-        })
-        return result
-    result.update({
+        "storage_path": str(storage_path) if storage_path else "",
         "blocked": True,
         "target_agent": feedback["target_agent"],
         "file": feedback["file"],
-    })
+    }
+    if feedback["target_agent"] == "human":
+        result["instructions"] = feedback.get("instructions", "")
     return result
 
 
@@ -305,7 +316,24 @@ def next_action(args: dict) -> dict:
     flow_config = _load_flow(flow_name)
     storage_path = _resolve_storage_path(flow_config, project_root, topic)
 
-    state_info = recover_state(storage_path, flow_config)
+    try:
+        state_info = recover_state(storage_path, flow_config)
+    except Exception as e:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "decision": "escalate",
+            "current_state": "UNKNOWN",
+            "conv": 0,
+            "role": "human",
+            "agent": "human",
+            "agent_hint": {"agent": "human", "role": "human", "mode": "escalate", "instructions": "FSM state is corrupt or unreadable. Human intervention required."},
+            "stage_brief": {"state": "UNKNOWN", "conv": 0, "retry_count": 0, "open_feedback": [], "feedback_age_hours": None, "recent_events": [], "recent_consult": None, "plan_path": ""},
+            "warnings": [{"code": "corrupt_state", "message": str(e)}],
+            "blocked": True,
+            "target_agent": "human",
+            "file": "HUMAN_QUESTIONS.md",
+            "instructions": f"FSM state recovery failed: {e}",
+        }
 
     # Stamp conv_start_sha once per conversation start so scope_gate can baseline the diff.
     # Only write if not already present — re-calling next_action mid-conversation must not
@@ -326,7 +354,7 @@ def next_action(args: dict) -> dict:
     feedback = route_feedback(flow_config, storage_path)
 
     if feedback is not None:
-        result = _blocked_response(feedback, state_info)
+        result = _blocked_response(feedback, state_info, storage_path)
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
@@ -334,7 +362,7 @@ def next_action(args: dict) -> dict:
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
-                result["codex_subagent"] = result["agent_hint"]
+                result["codex_subagent"] = _codex_subagent_hint(feedback["target_agent"], instructions)
             except Exception:
                 result["instructions"] = None
         return result
@@ -381,11 +409,28 @@ def complete_stage(args: dict) -> dict:
         except (json.JSONDecodeError, OSError):
             state_before = None
 
-    state_info = recover_state(storage_path, flow_config)
+    try:
+        state_info = recover_state(storage_path, flow_config)
+    except Exception as e:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "decision": "escalate",
+            "current_state": "UNKNOWN",
+            "conv": 0,
+            "role": "human",
+            "agent": "human",
+            "agent_hint": {"agent": "human", "role": "human", "mode": "escalate", "instructions": "FSM state is corrupt or unreadable. Human intervention required."},
+            "stage_brief": {"state": "UNKNOWN", "conv": 0, "retry_count": 0, "open_feedback": [], "feedback_age_hours": None, "recent_events": [], "recent_consult": None, "plan_path": ""},
+            "warnings": [{"code": "corrupt_state", "message": str(e)}],
+            "blocked": True,
+            "target_agent": "human",
+            "file": "HUMAN_QUESTIONS.md",
+            "instructions": f"FSM state recovery failed: {e}",
+        }
 
     feedback = route_feedback(flow_config, storage_path)
     if feedback is not None:
-        result = _blocked_response(feedback, state_info)
+        result = _blocked_response(feedback, state_info, storage_path)
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
@@ -393,7 +438,7 @@ def complete_stage(args: dict) -> dict:
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
-                result["codex_subagent"] = result["agent_hint"]
+                result["codex_subagent"] = _codex_subagent_hint(feedback["target_agent"], instructions)
             except Exception:
                 result["instructions"] = None
         return result
@@ -454,13 +499,14 @@ def complete_stage(args: dict) -> dict:
         feedback = route_feedback(flow_config, storage_path)
         if feedback is None:
             feedback = {"target_agent": "human", "file": gate_failure.get("feedback_file", "HUMAN_QUESTIONS.md")}
-        result = _blocked_response(feedback, state_info)
+        result = _blocked_response(feedback, state_info, storage_path)
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
                     flow_config, feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
+                result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
                 result["codex_subagent"] = _codex_subagent_hint(
                     feedback["target_agent"], instructions
                 )
@@ -513,7 +559,6 @@ def complete_stage(args: dict) -> dict:
         agent=agent,
         instructions=instructions,
         menu=menu,
-        current_state_key="next_state",
         current_state_value=next_state,
     )
     result["limits"] = state_info["limits"]

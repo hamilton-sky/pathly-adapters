@@ -71,7 +71,10 @@ def test_next_action_initial_state(tmp_path):
     assert result["schema_version"] == "1"
     assert result["decision"] == "continue"
     assert result["role"] == "team/discover"
-    assert result["agent_hint"] == result["codex_subagent"]
+    assert "agent" in result["agent_hint"]
+    assert "role" in result["agent_hint"]
+    assert "codex_role" in result["codex_subagent"]
+    assert "pathly_agent" in result["codex_subagent"]
     assert result["stage_brief"]["state"] == "STORMING"
     assert "open_feedback" in result["stage_brief"]
     assert "warnings" in result
@@ -90,10 +93,14 @@ def test_next_action_includes_codex_worker_hint(tmp_path, monkeypatch):
 
     assert result["agent"] == "builder"
     hint = result["agent_hint"]
-    assert hint["pathly_agent"] == "builder"
-    assert hint["codex_role"] == "worker"
+    assert hint["agent"] == "builder"
+    assert hint["role"] == "worker"
     assert "PATHLY AGENT: builder" in hint["instructions"]
     assert "instructions for BUILDING" in hint["instructions"]
+    # codex_subagent still exposes the old Codex-specific keys for backward compat
+    codex = result["codex_subagent"]
+    assert codex["pathly_agent"] == "builder"
+    assert codex["codex_role"] == "worker"
 
 
 def test_next_action_includes_menu_payload(tmp_path, monkeypatch):
@@ -118,8 +125,8 @@ def test_next_action_includes_menu_payload(tmp_path, monkeypatch):
 def test_codex_hint_maps_research_agents_to_explorer():
     hint = fsm_ops._agent_hint("scout", "find the relevant files")
 
-    assert hint["pathly_agent"] == "scout"
-    assert hint["codex_role"] == "explorer"
+    assert hint["agent"] == "scout"
+    assert hint["role"] == "explorer"
     assert "find the relevant files" in hint["instructions"]
 
 
@@ -134,11 +141,14 @@ def test_complete_stage_after_planning(tmp_path):
         "topic": "test-topic",
         "project_root": str(tmp_path),
     })
-    assert result.get("next_state") in ("BUILDING", "DESIGNING")
+    assert result.get("current_state") in ("BUILDING", "DESIGNING")
     assert result["schema_version"] == "1"
     assert result["decision"] == "continue"
     assert result["role"] == result["agent"]
-    assert result["agent_hint"] == result["codex_subagent"]
+    assert "agent" in result["agent_hint"]
+    assert "role" in result["agent_hint"]
+    assert "codex_role" in result["codex_subagent"]
+    assert "pathly_agent" in result["codex_subagent"]
     assert "stage_brief" in result
     assert "storage_path" in result
 
@@ -160,9 +170,13 @@ def test_complete_stage_blocked_by_review_failures(tmp_path):
     assert result.get("target_agent") == "builder"
     assert "# builder" in result["instructions"]
     assert result["decision"] == "block"
-    assert result["agent_hint"]["pathly_agent"] == "builder"
+    assert result["agent_hint"]["agent"] == "builder"
+    assert result["agent_hint"]["role"] == "worker"
     assert result["codex_subagent"]["codex_role"] == "worker"
+    assert result["codex_subagent"]["pathly_agent"] == "builder"
     assert "stage_brief" in result
+    assert "storage_path" in result
+    assert result["warnings"] == [{"code": "open_feedback", "file": "REVIEW_FAILURES.md"}]
 
 
 # ── Two-call decide protocol ──────────────────────────────────────────────────
@@ -230,7 +244,7 @@ def test_complete_stage_with_valid_decision(tmp_path, monkeypatch):
         "decision": "a",
     })
 
-    assert result.get("next_state") == "PATH_A"
+    assert result.get("current_state") == "PATH_A"
     assert "agent" in result
     assert "instructions" in result
     assert result["schema_version"] == "1"
@@ -263,7 +277,7 @@ def test_complete_stage_with_invalid_decision(tmp_path, monkeypatch):
         "decision": "nonsense",
     })
 
-    assert result.get("next_state") == "PATH_A"
+    assert result.get("current_state") == "PATH_A"
     assert result["decision"] == "continue"
 
     events_file = storage / "EVENTS.jsonl"
@@ -273,3 +287,130 @@ def test_complete_stage_with_invalid_decision(tmp_path, monkeypatch):
     assert len(decide_events) == 1
     # The implementation mutates decision to the default before logging, so decision_input is "a"
     assert decide_events[0].get("decision_input") == "a"
+
+
+# ── Adapter-neutral envelope tests ───────────────────────────────────────────
+
+def test_agent_hint_uses_neutral_keys(tmp_path, monkeypatch):
+    _patch_load_flow(monkeypatch, ROUTING_FLOW)
+    _patch_build_prompt(monkeypatch)
+
+    result = next_action({
+        "flow": "test",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+
+    hint = result["agent_hint"]
+    assert "agent" in hint
+    assert "role" in hint
+    assert "codex_role" not in hint
+    assert "pathly_agent" not in hint
+
+
+def test_codex_subagent_retains_legacy_keys(tmp_path, monkeypatch):
+    _patch_load_flow(monkeypatch, ROUTING_FLOW)
+    _patch_build_prompt(monkeypatch)
+
+    result = next_action({
+        "flow": "test",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+
+    codex = result["codex_subagent"]
+    assert "codex_role" in codex
+    assert "pathly_agent" in codex
+
+
+def test_current_state_key_on_next_action(tmp_path):
+    result = next_action({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+    assert "current_state" in result
+    assert "next_state" not in result
+
+
+def test_current_state_key_on_complete_stage(tmp_path):
+    storage = _storage_path(tmp_path)
+    state_file = storage / "STATE.json"
+    state_file.write_text(json.dumps({"current": "PLANNING"}), encoding="utf-8")
+    (storage / "IMPLEMENTATION_PLAN.md").write_text("plan content", encoding="utf-8")
+
+    result = complete_stage({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+    assert "current_state" in result
+    assert "next_state" not in result
+
+
+def test_escalate_decision_when_target_is_human(tmp_path):
+    storage = _storage_path(tmp_path)
+    state_file = storage / "STATE.json"
+    state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
+    feedback_dir = storage / "feedback"
+    feedback_dir.mkdir()
+    (feedback_dir / "HUMAN_QUESTIONS.md").write_text("needs human input", encoding="utf-8")
+
+    result = next_action({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+    assert result["decision"] == "escalate"
+    assert result["target_agent"] == "human"
+
+
+def test_block_decision_when_target_is_non_human_agent(tmp_path):
+    storage = _storage_path(tmp_path)
+    state_file = storage / "STATE.json"
+    state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
+    feedback_dir = storage / "feedback"
+    feedback_dir.mkdir()
+    (feedback_dir / "REVIEW_FAILURES.md").write_text("these tests failed", encoding="utf-8")
+
+    result = next_action({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+    assert result["decision"] == "block"
+    assert result["target_agent"] != "human"
+
+
+def test_blocked_response_has_agent_hint_and_storage_path(tmp_path):
+    storage = _storage_path(tmp_path)
+    state_file = storage / "STATE.json"
+    state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
+    feedback_dir = storage / "feedback"
+    feedback_dir.mkdir()
+    (feedback_dir / "REVIEW_FAILURES.md").write_text("these tests failed", encoding="utf-8")
+
+    result = next_action({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+    assert result.get("blocked") is True
+    assert "agent_hint" in result
+    assert "storage_path" in result
+
+
+def test_blocked_response_warnings_contain_open_feedback(tmp_path):
+    storage = _storage_path(tmp_path)
+    state_file = storage / "STATE.json"
+    state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
+    feedback_dir = storage / "feedback"
+    feedback_dir.mkdir()
+    (feedback_dir / "REVIEW_FAILURES.md").write_text("these tests failed", encoding="utf-8")
+
+    result = next_action({
+        "flow": "team",
+        "topic": "test-topic",
+        "project_root": str(tmp_path),
+    })
+    assert any(w.get("code") == "open_feedback" for w in result["warnings"])

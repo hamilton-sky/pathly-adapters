@@ -28,19 +28,17 @@ name: Feature Index
 
 Files in the live repo that this feature reads or modifies.
 
+> **Note:** The response envelope fields (`schema_version`, `decision`, `agent_hint`, `stage_brief`, etc.) are **already present** in `fsm_ops.py`. The changes below are targeted corrections — not a rewrite.
+
 | Codebase file | Conversation | What changes |
 |---|---|---|
-| `src/pathly_orchestrator/fsm_ops.py` | Conv 1 | Add `schema_version`, `decision`, `role`, `agent_hint`, `stage_brief`, and `warnings`; align `next_action` and `complete_stage` payloads; deprecate `codex_subagent`. |
-| `tests/test_fsm_ops.py` | Conv 1 | Update response-shape assertions for the new contract fields and edge cases. |
-| `src/pathly_data/adapters/codex/SKILL_EXECUTION.md` | Conv 2 | Switch Codex fallback references from `codex_subagent` to `agent_hint`. |
-| `tests/test_setup.py` | Conv 2 | Update setup / packaging expectations that still assert the old `codex_subagent` surface. |
-| `src/pathly_data/core/flows/team.flow.yaml` | Conv 1 | Verify current flow metadata already carries `role_map`; only adjust if a contract mismatch is discovered. |
-| `src/pathly_data/core/flows/test.flow.yaml` | Conv 1 | Verify current flow metadata already carries `role_map`; only adjust if a contract mismatch is discovered. |
-| `src/pathly_data/core/flows/quick-fix.flow.yaml` | Conv 1 | Verify current flow metadata already carries `role_map`; only adjust if a contract mismatch is discovered. |
-| `src/pathly_data/core/flows/debug.flow.yaml` | Conv 1 | Verify current flow metadata already carries `role_map`; only adjust if a contract mismatch is discovered. |
-| `src/pathly_data/core/flows/explore.flow.yaml` | Conv 1 | Verify current flow metadata already carries `role_map`; only adjust if a contract mismatch is discovered. |
+| `src/pathly_orchestrator/fsm_ops.py` | Conv 1 | (1) Rename `agent_hint` inner keys to adapter-neutral (`agent`, `role` instead of `pathly_agent`, `codex_role`); (2) fix `complete_stage` to emit `current_state` instead of `next_state`; (3) add `escalate` decision for human-target and corrupt-state paths; (4) normalize `_blocked_response` shape to match the main envelope. |
+| `tests/test_fsm_ops.py` | Conv 1 | Add/update assertions for new `agent_hint` key names, `current_state` on both endpoints, `escalate` vs `block` distinction, and normalized blocked response shape. |
+| `src/pathly_data/adapters/codex/SKILL_EXECUTION.md` | Conv 2 | Add `## Decisions` block documenting `continue`, `block`, `escalate`; ensure `codex_subagent` is not taught as the primary dispatch path. |
+| `tests/test_setup.py` | Conv 2 | Assert SKILL_EXECUTION.md contains the three decision values and `agent_hint`, and does not reference `codex_subagent` as primary. |
 
 > **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
+> The flow YAML files (`team.flow.yaml`, etc.) are read-only reference for Conv 1 — verify `role_map` is already present but do NOT modify them unless a concrete contract mismatch is discovered.
 
 ---
 
@@ -48,7 +46,7 @@ Files in the live repo that this feature reads or modifies.
 
 | Conv | Title | Stories | Status | Key files touched |
 |---|---|---|---|---|
-| 1 | FSM contract normalization | S1.1, S1.2, S1.3 | TODO | `src/pathly_orchestrator/fsm_ops.py`, `tests/test_fsm_ops.py` |
+| 1 | FSM contract normalization | S1.1, S1.2 | TODO | `src/pathly_orchestrator/fsm_ops.py`, `tests/test_fsm_ops.py` |
 | 2 | Codex surface alignment | S2.1, S2.2 | TODO | `src/pathly_data/adapters/codex/SKILL_EXECUTION.md`, `tests/test_setup.py` |
 
 ---
