@@ -106,7 +106,19 @@ export class PlaywrightExecutor {
         await this.evalInPage(`
           (() => {
             const el = document.querySelector(${escaped});
-            if (el) { el.focus(); el.value = ${value}; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }
+            if (el) {
+              el.focus();
+              const desc = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')
+                || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+              const setter = desc?.set;
+              if (setter) {
+                setter.call(el, ${value});
+              } else {
+                el.value = ${value};
+              }
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
           })()
         `)
         break
@@ -119,7 +131,8 @@ export class PlaywrightExecutor {
         `)
         break
       case 'navigate':
-        throw new Error('navigate not yet implemented: use fill or click for navigation')
+        await this.evalInPage(`window.__pathlyNavigate(${JSON.stringify(step.label)})`)
+        break
     }
   }
 }

@@ -12,6 +12,7 @@ declare global {
   }
 
   interface Window {
+    __pathlyNavigate?: (panelName: string) => void
     pathly: {
       fs: {
         read: (path: string) => Promise<string>

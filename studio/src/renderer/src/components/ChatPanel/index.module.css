@@ -55,3 +55,25 @@
   background: var(--accent, #22C55E);
   flex-shrink: 0;
 }
+
+.toolBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--yellow, #fcd34d) 30%, transparent);
+  background: color-mix(in srgb, var(--yellow, #fcd34d) 8%, transparent);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.toolDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--yellow, #fcd34d);
+  flex-shrink: 0;
+}

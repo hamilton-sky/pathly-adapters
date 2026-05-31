@@ -223,6 +223,10 @@ Render a status bar above the message area (or above the input bar) when it is n
 ```
 Add minimal CSS for `.thinkingBar` — small italic text, muted color, visible but not intrusive.
 
+**5. Modify `studio/src/renderer/src/components/ChatPanel/index.module.css`**
+
+Add styles for `.thinkingBar`, `.thinkingDot`, and related status-row spacing.
+
 ### Acceptance test — verify before declaring done
 
 1. Open Studio. Activate a feature (set `activeTopic` to any existing plan).
@@ -572,7 +576,11 @@ declare global {
 }
 ```
 
-**6. Add data-label attributes — systematic audit**
+**6. Modify `studio/src/renderer/src/types/global.d.ts`**
+
+Add the `window.__pathlyNavigate` declaration to the renderer globals.
+
+**7. Add data-label attributes — systematic audit**
 
 > **Critical note on feature creation:** The wizard for creating a new Pathly feature/plan is NOT
 > `FlowWizard` (that is for flow.yaml definitions) and NOT `NewItemDialog` (that creates library

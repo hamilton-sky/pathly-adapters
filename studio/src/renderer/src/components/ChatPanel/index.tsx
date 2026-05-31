@@ -13,6 +13,7 @@ import styles from './index.module.css'
 export function ChatPanel(): JSX.Element {
   const chat = useChatPanel()
   const thinkingLabel = useBrightskyStore((s) => s.thinkingLabel)
+  const toolCallInProgress = useBrightskyStore((s) => s.toolCallInProgress)
 
   return (
     <div
@@ -40,6 +41,12 @@ export function ChatPanel(): JSX.Element {
         <div className={styles.thinkingBar}>
           <span className={styles.thinkingDot} />
           {thinkingLabel}
+        </div>
+      )}
+      {toolCallInProgress && (
+        <div className={styles.toolBar}>
+          <span className={styles.toolDot} />
+          Using tool: {toolCallInProgress}...
         </div>
       )}
       <MessageList />

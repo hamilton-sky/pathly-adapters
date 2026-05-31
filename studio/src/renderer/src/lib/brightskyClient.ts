@@ -1,6 +1,7 @@
 import { useBrightskyStore, BRIGHTSKY_BASE_URL } from '../store/brightskyStore'
 import { useChatStore } from '../store/chatStore'
 import { collectPathlyContext } from './pathlyContextCollector'
+import { executeStudioTool } from './studioAnalyzer'
 
 export class BrightskyClient {
   private ws: WebSocket | null = null
@@ -95,6 +96,35 @@ export class BrightskyClient {
         useBrightskyStore.getState().setThinkingLabel(null)
         this.streamInProgress = false
         this.streamContent = ''
+      } else if (type === 'tool_call') {
+        const callId = (data.callId as string | undefined) ?? ''
+        const toolName = (data.toolName as string | undefined) ?? ''
+        const parameters = data.parameters
+        if (!callId || !toolName) return
+        const socket = this.ws
+        useBrightskyStore.getState().setToolCallInProgress(toolName)
+        void (async () => {
+          try {
+            const result = await executeStudioTool(toolName, parameters)
+            if (socket === this.ws && socket?.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({
+                type: 'tool_response',
+                callId,
+                payload: { result, success: true },
+              }))
+            }
+          } catch (err) {
+            if (socket === this.ws && socket?.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({
+                type: 'tool_response',
+                callId,
+                payload: { success: false, error: String(err instanceof Error ? err.message : err) },
+              }))
+            }
+          } finally {
+            useBrightskyStore.getState().setToolCallInProgress(null)
+          }
+        })()
       } else if (type === 'processing_status') {
         // no dedicated status field in brightskyStore — intentionally ignored
       }
@@ -113,6 +143,7 @@ export class BrightskyClient {
       this.streamInProgress = false
       this.streamContent = ''
       useBrightskyStore.getState().setThinkingLabel(null)
+      useBrightskyStore.getState().setToolCallInProgress(null)
       if (!this.intentionalDisconnect) {
         const delays = [1000, 2000, 4000, 8000, 16000]
         const attempt = this.reconnectAttempts++
@@ -141,6 +172,7 @@ export class BrightskyClient {
       this.streamInProgress = false
       this.streamContent = ''
       useBrightskyStore.getState().setThinkingLabel(null)
+      useBrightskyStore.getState().setToolCallInProgress(null)
       useBrightskyStore.getState().setAuthError('Disconnected from Brightsky.')
     }
   }
@@ -161,6 +193,7 @@ export class BrightskyClient {
     })
     this.streamContent = ''
     this.streamInProgress = true
+    useBrightskyStore.getState().setToolCallInProgress(null)
     const pathlyCtx = await collectPathlyContext()
     const sharedFields = {
       requestId: crypto.randomUUID(),

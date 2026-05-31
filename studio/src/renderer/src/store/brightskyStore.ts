@@ -16,6 +16,7 @@ interface BrightskyState {
   connected: boolean
   authenticated: boolean
   thinkingLabel: string | null
+  toolCallInProgress: string | null
   accessToken: string | null
   refreshToken: string | null
   userId: string | null
@@ -31,6 +32,7 @@ interface BrightskyState {
   setConnected: (val: boolean) => void
   setAuthError: (msg: string | null) => void
   setThinkingLabel: (label: string | null) => void
+  setToolCallInProgress: (toolName: string | null) => void
 }
 
 export const useBrightskyStore = create<BrightskyState>()(
@@ -39,6 +41,7 @@ export const useBrightskyStore = create<BrightskyState>()(
       connected: false,
       authenticated: false,
       thinkingLabel: null,
+      toolCallInProgress: null,
       accessToken: null,
       refreshToken: null,
       userId: null,
@@ -80,6 +83,7 @@ export const useBrightskyStore = create<BrightskyState>()(
 
       setAuthError: (msg) => set({ authError: msg }),
       setThinkingLabel: (label) => set({ thinkingLabel: label }),
+      setToolCallInProgress: (toolName) => set({ toolCallInProgress: toolName }),
     }),
     {
       name: 'brightsky-store',

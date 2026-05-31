@@ -177,6 +177,20 @@ function MainApp(): JSX.Element | null {
   }, [])
 
   useEffect(() => {
+    const bridge = window as Window & { __pathlyNavigate?: (panelName: string) => void }
+    bridge.__pathlyNavigate = (panelName: string) => {
+      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings'])
+      if (!allowed.has(panelName)) {
+        throw new Error(`Unknown panel: ${panelName}`)
+      }
+      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings')
+    }
+    return () => {
+      delete bridge.__pathlyNavigate
+    }
+  }, [setActivePanel])
+
+  useEffect(() => {
     let prevUserId = useBrightskyStore.getState().userId
     const unsub = useBrightskyStore.subscribe((state) => {
       const newId = state.userId
