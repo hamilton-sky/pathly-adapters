@@ -99,7 +99,7 @@ and saves a flow, **so that** I can verify the wizard is not broken before commi
   2. `pathly_open_wizard` — click the "+" in the flows section
   3. `pathly_wizard_select_template` with `template_id: "standard-pipeline"` (first template)
   4. `pathly_wizard_set_name` with `name: "{{flow_name}}"` variable
-  5. `pathly_wizard_next` — advance through steps 2, 3, 4 (3 clicks)
+  5. `pathly_wizard_next` — advance through steps 2, 3, 4, 5 (4 clicks)
   6. `pathly_wizard_save` — click Save Flow
   7. `screenshot` — capture result
 - AC4.3: Default `variables.flow_name` is `"test-automation-flow"`.
