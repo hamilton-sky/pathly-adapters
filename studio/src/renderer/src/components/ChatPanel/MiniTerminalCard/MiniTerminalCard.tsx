@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Maximize2, Minimize2, ExternalLink, Trash2, X } from 'lucide-react'
-import { useTheme } from '../../useTheme'
-import { useTerminalStore } from '../../store/terminalStore'
-import { ClaudeIcon, CodexIcon, ShellIcon } from '../Terminal/BrandIcons'
-import * as xtermRegistry from '../Terminal/xtermRegistry'
+import { useTerminalStore } from '../../../store/terminalStore'
+import { ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
+import * as xtermRegistry from '../../Terminal/xtermRegistry'
 import styles from './MiniTerminalCard.module.css'
 
 type ViewState = 'banner' | 'peek'
@@ -16,12 +15,6 @@ interface MiniTerminalCardProps {
   onOpenFullTerminal: () => void
   onClose: () => void
   onKill: () => void
-}
-
-const TARGET_COLORS: Record<MiniTerminalCardProps['target'], string> = {
-  claude: '#38BDF8',
-  codex: '#F59E0B',
-  shell: '#86EFAC',
 }
 
 function TargetIcon({ target }: { target: MiniTerminalCardProps['target'] }): JSX.Element {
@@ -47,7 +40,6 @@ export function MiniTerminalCard({
   onClose,
   onKill,
 }: MiniTerminalCardProps): JSX.Element {
-  const t = useTheme()
   const [userViewState, setUserViewState] = useState<ViewState>('peek')
   const [focused, setFocused] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -58,7 +50,6 @@ export function MiniTerminalCard({
   const activeRight = useTerminalStore((s) => s.activeTabIdRight)
   const fullShowingThisTab = fullPanelOpen && (activeLeft === tabId || activeRight === tabId)
 
-  const targetColor = TARGET_COLORS[target]
   const previewLine = previewLines[previewLines.length - 1] ?? ''
 
   // Card hosts the live xterm iff the user wants peek AND the full panel
@@ -116,7 +107,6 @@ export function MiniTerminalCard({
   return (
     <div
       className={`${styles.card} ${focused ? styles.cardFocused : ''}`}
-      style={{ background: t.bgMantle, border: `1px solid ${t.bgSurface0}`, color: t.textSecondary }}
       tabIndex={0}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
@@ -125,7 +115,7 @@ export function MiniTerminalCard({
       <div className={styles.header}>
         <div className={styles.meta}>
           <TargetIcon target={target} />
-          <span className={styles.targetLabel} style={{ color: targetColor }}>
+          <span className={styles.targetLabel} data-target={target}>
             {target}
           </span>
           <div className={statusDotClass} />
@@ -170,35 +160,16 @@ export function MiniTerminalCard({
           </button>
         </div>
       </div>
-
       {/* Peek area — only renders height when card hosts the live xterm.
           The container div stays in the tree so the registry can reparent
           back into it cleanly when the card becomes host again. */}
-      <div style={{ height: cardHosts ? 132 : 0, overflow: 'hidden', paddingLeft: 4 }}>
+      <div className={cardHosts ? styles.peekWrapper : styles.peekWrapperHidden}>
         <div
           ref={containerRef}
           className={styles.terminal}
           onClick={() => xtermRegistry.focus(tabId)}
         />
       </div>
-
-      {/* Banner preview row — visible whenever the card is not hosting */}
-      {!cardHosts && (
-        <div className={styles.preview}>
-          {previewLine ? (
-            <span
-              className={styles.previewLine}
-              style={{ borderLeft: `3px solid ${targetColor}`, paddingLeft: 8 }}
-            >
-              {previewLine}
-            </span>
-          ) : (
-            <span className={`${styles.previewLine} ${styles.empty}`}>
-              {fullShowingThisTab ? 'live view in full terminal' : 'waiting...'}
-            </span>
-          )}
-        </div>
-      )}
     </div>
   )
 }

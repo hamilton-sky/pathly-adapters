@@ -25,9 +25,10 @@ export function ThinkingBlock({ thinking, status }: Props): JSX.Element | null {
   return (
     <div className={styles.container}>
       <button
+        type="button"
         className={styles.toggle}
         onClick={() => setExpanded((e) => !e)}
-        aria-expanded={expanded}
+        {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
         aria-label={expanded ? 'Collapse reasoning' : 'Expand reasoning'}
       >
         <span className={styles.label}>

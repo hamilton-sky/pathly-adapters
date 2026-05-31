@@ -3,6 +3,27 @@
   margin: 8px 12px;
   border-radius: 6px;
   padding: 10px 12px;
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+}
+
+.automationCardTitle {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.automationCardSteps {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.automationCardActions {
+  display: flex;
+  gap: 8px;
 }
 
 .automationBtnRun {
@@ -12,25 +33,39 @@
   border: none;
   font-size: 12px;
   font-weight: 600;
+  font-family: var(--font-family-base);
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.automationBtnRunEnabled {
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
 }
 
 .automationBtnStep {
   flex: 1;
   padding: 5px 12px;
   border-radius: 4px;
-  border: 1px solid;
+  border: 1px solid var(--border-subtle);
   font-size: 12px;
   background: transparent;
   cursor: pointer;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
 }
 
 .automationBtnStop {
   padding: 3px 10px;
   border-radius: 4px;
-  border: 1px solid;
+  border: 1px solid var(--red);
   font-size: 11px;
   background: transparent;
   cursor: pointer;
+  color: var(--red);
+  font-family: var(--font-family-base);
 }
 
 .automationBtnApprove {
@@ -40,16 +75,23 @@
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  background: var(--green);
+  color: #fff;
+  font-family: var(--font-family-base);
 }
 
 .automationBtnSkipStep {
   padding: 3px 10px;
   border-radius: 4px;
-  border: 1px solid;
+  border: 1px solid var(--border-subtle);
   font-size: 11px;
   background: transparent;
   cursor: pointer;
+  color: var(--text-secondary);
+  font-family: var(--font-family-base);
 }
+
+/* ── Step Queue ─────────────────────────────────────────── */
 
 .stepQueue {
   flex-shrink: 0;
@@ -61,30 +103,121 @@
   gap: 4px;
   max-height: 280px;
   overflow-y: auto;
+  background: var(--bg-surface0);
+  font-family: var(--font-family-base);
+}
+
+.autoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.autoCount {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.autoProgress {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: none;
+  border-radius: 3px;
+  background: var(--bg-surface1);
+}
+
+.autoProgress::-webkit-progress-bar {
+  background: var(--bg-surface1);
+  border-radius: 3px;
+}
+
+.autoProgress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 300ms ease-out;
+}
+
+.autoProgress::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: 3px;
 }
 
 .stepItem {
   border-radius: 4px;
   padding: 8px 10px;
   transition: background 150ms ease-out;
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
 }
 
 .stepItemCurrent {
-  /* highlighted state — color applied via inline style */
+  background: var(--bg-surface1);
+  border-color: var(--accent-border);
 }
 
-.stepItemDone {
-  /* done state — opacity applied via inline style */
+.stepItemDone,
+.stepItemSkipped {
+  opacity: 0.5;
 }
 
-.progressBar {
-  height: 6px;
-  border-radius: 3px;
-  overflow: hidden;
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.progressFill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 300ms ease-out;
+.stepRowSpaced {
+  margin-bottom: 8px;
+}
+
+.stepIndex {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  min-width: 20px;
+}
+
+.stepDesc {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.stepStatusDone {
+  color: var(--green);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.stepStatusSkipped {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.stepAction {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  margin-left: 28px;
+}
+
+.stepActionSpaced {
+  margin-bottom: 8px;
+}
+
+.stepError {
+  font-size: var(--font-size-sm);
+  color: var(--red);
+  margin-left: 28px;
+  margin-top: 4px;
+}
+
+.stepActionBtns {
+  display: flex;
+  gap: 6px;
+  margin-left: 28px;
 }

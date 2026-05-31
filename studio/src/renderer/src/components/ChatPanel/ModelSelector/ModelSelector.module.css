@@ -390,6 +390,44 @@
   color: #f87171;
 }
 
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.statusDotConnected {
+  background: #22c55e;
+}
+
+.statusDotDisconnected {
+  background: #6b7280;
+}
+
+.statusText {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.authError {
+  font-size: 11px;
+  color: var(--red);
+  margin-top: 4px;
+}
+
+.noBackendHint {
+  opacity: 0.6;
+}
+
 .noBackendNote {
   font-size: 10px;
   font-family: var(--font-family-base);

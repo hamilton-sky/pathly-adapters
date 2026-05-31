@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageSquare } from 'lucide-react'
-import { useChatStore } from '../../store/chatStore'
-import { useTheme } from '../../useTheme'
-import { ThinkingBlock } from './ThinkingBlock'
+import { useChatStore } from '../../../store/chatStore'
+import { ThinkingBlock } from '../ThinkingBlock/ThinkingBlock'
 import styles from './MessageList.module.css'
 
 function StreamingTimer({ status }: { status: string }): JSX.Element | null {
@@ -20,19 +19,18 @@ function StreamingTimer({ status }: { status: string }): JSX.Element | null {
   return <span className={styles.timer}>{label}</span>
 }
 
-function ThinkingDots({ color }: { color: string }): JSX.Element {
+function ThinkingDots(): JSX.Element {
   return (
     <span className={styles.thinking} aria-label="Thinking…">
-      <span className={styles.dot} style={{ background: color }} />
-      <span className={styles.dot} style={{ background: color }} />
-      <span className={styles.dot} style={{ background: color }} />
+      <span className={styles.dot} />
+      <span className={styles.dot} />
+      <span className={styles.dot} />
     </span>
   )
 }
 
 export function MessageList(): JSX.Element {
   const messages = useChatStore((s) => s.messages)
-  const t = useTheme()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -41,11 +39,8 @@ export function MessageList(): JSX.Element {
 
   if (messages.length === 0) {
     return (
-      <div
-        className={styles.empty}
-        style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}
-      >
-        <MessageSquare size={22} style={{ opacity: 0.4 }} />
+      <div className={styles.empty}>
+        <MessageSquare size={22} className={styles.emptyIcon} />
         <span className={styles.emptyText}>Ask Conductor anything about your Pathly workflow.</span>
       </div>
     )
@@ -55,30 +50,16 @@ export function MessageList(): JSX.Element {
     <div className={styles.list}>
       {messages.map((msg) => (
         <div key={msg.id} className={styles.message}>
-          <span
-            className={styles.badge}
-            style={{
-              background: msg.role === 'user' ? t.bgSurface1 : t.accent + '22',
-              color: msg.role === 'user' ? t.textSecondary : t.accent,
-              fontFamily: t.fontFamilyBase,
-            }}
-          >
+          <span className={`${styles.badge} ${msg.role === 'user' ? styles.badgeUser : styles.badgeAssistant}`}>
             {msg.role === 'user' ? 'You' : 'Conductor'}
           </span>
           {msg.role === 'assistant' && msg.thinking && (
             <ThinkingBlock thinking={msg.thinking} status={msg.status} />
           )}
           {msg.role === 'assistant' && msg.status === 'streaming' && !msg.content && !msg.thinking
-            ? <><ThinkingDots color={t.accent} /><StreamingTimer status={msg.status} /></>
+            ? <><ThinkingDots /><StreamingTimer status={msg.status} /></>
             : msg.content
-              ? (
-                <span
-                  className={styles.content}
-                  style={{ color: t.textPrimary, fontFamily: t.fontFamilyBase }}
-                >
-                  {msg.content}
-                </span>
-              )
+              ? <span className={styles.content}>{msg.content}</span>
               : null
           }
         </div>

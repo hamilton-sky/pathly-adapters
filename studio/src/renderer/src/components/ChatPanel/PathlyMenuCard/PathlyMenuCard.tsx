@@ -1,6 +1,6 @@
+import type { CSSProperties } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
-import type { PathlyMenu, PathlyMenuItem, PushedMenu } from '../../lib/pathlyContext'
-import { useTheme } from '../../useTheme'
+import type { PathlyMenu, PathlyMenuItem, PushedMenu } from '../../../lib/pathlyContext'
 import styles from './PathlyMenuCard.module.css'
 
 interface PathlyMenuCardProps {
@@ -24,7 +24,6 @@ export function PathlyMenuCard({
   onToggle,
   onExpire,
 }: PathlyMenuCardProps): JSX.Element {
-  const t = useTheme()
   const pushed = isPushedMenu(menu)
 
   const remainingMs = pushed
@@ -34,70 +33,67 @@ export function PathlyMenuCard({
   return (
     <div
       className={styles.panel}
-      style={{ borderBottom: t.border, background: t.bgSurface0 }}
+      style={pushed && remainingMs > 0 ? { '--timer-ms': `${remainingMs}ms` } as CSSProperties : undefined}
     >
       {/* Header row */}
       <button
+        type="button"
         className={styles.headerBtn}
         onClick={onToggle}
-        aria-expanded={isOpen}
-        style={{ color: t.textSecondary, fontFamily: t.fontFamilyBase }}
+        {...(isOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
         <div className={styles.titleRow}>
-          <span className={styles.title} style={{ color: t.textPrimary }}>{menu.title}</span>
-          <span className={styles.badge} style={{ color: t.textMuted, borderColor: t.bgSurface1 }}>
+          <span className={styles.title}>{menu.title}</span>
+          <span className={styles.badge}>
             {menu.state}
           </span>
         </div>
 
         <div className={styles.controls}>
           {onDismiss && (
-            <span
+            <button
+              type="button"
               className={styles.dismissBtn}
-              role="button"
               aria-label="Dismiss"
               onClick={(e) => { e.stopPropagation(); onDismiss() }}
             >
               <X size={11} />
-            </span>
+            </button>
           )}
-          {isOpen ? <ChevronUp size={13} style={{ flexShrink: 0 }} /> : <ChevronDown size={13} style={{ flexShrink: 0 }} />}
+          {isOpen ? <ChevronUp size={13} className={styles.flexShrinkZero} /> : <ChevronDown size={13} className={styles.flexShrinkZero} />}
         </div>
       </button>
 
       {/* Progress bar — pushed menus only */}
       {pushed && remainingMs > 0 && (
-        <div
-          className={styles.timerBar}
-          style={{ animationDuration: `${remainingMs}ms` }}
-          onAnimationEnd={onExpire}
-        />
+        <div className={styles.timerBar} onAnimationEnd={onExpire} />
       )}
 
       {/* Collapsible content */}
       {isOpen && (
         <div className={styles.body}>
           {menu.subtitle ? (
-            <p className={styles.subtitle} style={{ color: t.textSecondary }}>{menu.subtitle}</p>
+            <p className={styles.subtitle}>{menu.subtitle}</p>
           ) : null}
           <div className={styles.items}>
             {menu.items.length > 0 ? menu.items.map((item) => (
               <button
+                type="button"
                 key={`${item.label}-${item.command}`}
                 className={`${styles.item} ${onSelect ? styles.itemClickable : ''}`}
                 onClick={onSelect ? () => onSelect(item) : undefined}
                 aria-label={`Run: ${item.label}`}
               >
                 <div className={styles.itemTop}>
-                  <span className={styles.itemLabel} style={{ color: t.textPrimary }}>{item.label}</span>
-                  <code className={styles.itemCommand} style={{ color: t.textMuted }}>{item.command}</code>
+                  <span className={styles.itemLabel}>{item.label}</span>
+                  <code className={styles.itemCommand}>{item.command}</code>
                 </div>
-                <div className={styles.itemDescription} style={{ color: t.textSecondary }}>
+                <div className={styles.itemDescription}>
                   {item.description}
                 </div>
               </button>
             )) : (
-              <div className={styles.empty} style={{ color: t.textMuted }}>
+              <div className={styles.empty}>
                 {menu.empty_message}
               </div>
             )}

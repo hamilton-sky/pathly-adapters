@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Zap, SquarePen, History } from 'lucide-react'
-import type { TerminalKind } from '../../store/chatStore'
-import { Tooltip } from '../ui'
-import { ClaudeIcon, CodexIcon, ShellIcon } from '../Terminal/BrandIcons'
-import { useTheme } from '../../useTheme'
+import type { TerminalKind } from '../../../store/chatStore'
+import { Tooltip } from '../../ui'
+import { ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
 import styles from './ConductorHeader.module.css'
 
 export interface SessionSummary {
@@ -26,7 +25,6 @@ interface ConductorHeaderProps {
 }
 
 export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, targetKind, onSetTarget, onToggleChat, onClearChat, sessions = [], onSelectSession }: ConductorHeaderProps): JSX.Element {
-  const t = useTheme()
   const headerRef = useRef<HTMLDivElement>(null)
   const [compact, setCompact] = useState(false)
   const [sessionsOpen, setSessionsOpen] = useState(false)
@@ -68,6 +66,7 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, target
     return `${Math.floor(hrs / 24)}d ago`
   }
 
+
   return (
     <div ref={headerRef} className={styles.header}>
       <div className={styles.titleRow}>
@@ -80,6 +79,7 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, target
         {targetPills.map((pill) => (
           <Tooltip key={pill.kind} label={`Focus ${pill.label} terminal`} placement="bottom">
             <button
+              type="button"
               className={`${styles.pill} ${targetKind === pill.kind ? styles.pillSelected : ''} ${compact ? styles.pillCompact : ''}`}
               onClick={() => onSetTarget(pill.kind)}
               aria-label={`Focus ${pill.label} terminal`}
@@ -95,7 +95,7 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, target
 
       {/* New session */}
       <Tooltip label="New session" placement="bottom">
-        <button className={styles.closeBtn} onClick={onClearChat} aria-label="New session">
+        <button type="button" className={styles.closeBtn} onClick={onClearChat} aria-label="New session">
           <SquarePen size={13} />
         </button>
       </Tooltip>
@@ -104,13 +104,15 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, target
       <div ref={sessionsRef} className={styles.sessionsWrapper}>
         <Tooltip label="Session history" placement="bottom">
           <button
+            type="button"
             className={`${styles.closeBtn} ${sessionsOpen ? styles.closeBtnActive : ''}`}
             onClick={() => setSessionsOpen((v) => !v)}
             aria-label="Session history"
+            {...(sessionsOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
           >
             <History size={13} />
             {sessions.length > 0 && (
-              <span className={styles.sessionsBadge} style={{ background: t.accent }}>
+              <span className={`${styles.sessionsBadge} ${styles.sessionsBadgeAccent}`}>
                 {sessions.length > 9 ? '9+' : sessions.length}
               </span>
             )}
@@ -118,27 +120,27 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, target
         </Tooltip>
 
         {sessionsOpen && (
-          <div className={styles.sessionsDropdown} style={{ background: t.bgSurface0, border: `1px solid ${t.bgSurface1}` }}>
-            <div className={styles.sessionsHeader} style={{ borderBottom: `1px solid ${t.bgSurface1}`, color: t.textMuted }}>
+          <div className={styles.sessionsDropdown}>
+            <div className={styles.sessionsHeader}>
               Conversations
             </div>
             {sessions.length === 0 ? (
-              <div className={styles.sessionsEmpty} style={{ color: t.textMuted }}>
+              <div className={styles.sessionsEmpty}>
                 No sessions yet.
                 <br />
-                <span style={{ opacity: 0.6, fontSize: 11 }}>Connect Brightsky to see history.</span>
+                <span className={styles.sessionsEmptyHint}>Connect Brightsky to see history.</span>
               </div>
             ) : (
               <div className={styles.sessionsList}>
                 {sessions.map((s) => (
                   <button
                     key={s.id}
+                    type="button"
                     className={styles.sessionItem}
-                    style={{ color: t.textPrimary }}
                     onClick={() => { onSelectSession?.(s.id); setSessionsOpen(false) }}
                   >
                     <span className={styles.sessionTitle}>{s.title}</span>
-                    <span className={styles.sessionMeta} style={{ color: t.textMuted }}>
+                    <span className={styles.sessionMeta}>
                       {s.messageCount} msg · {formatActivity(s.lastActivity)}
                     </span>
                   </button>
@@ -150,7 +152,7 @@ export function ConductorHeader({ hasClaudeTab, hasCodexTab, hasShellTab, target
       </div>
 
       <Tooltip label="Close chat panel" placement="bottom">
-        <button className={styles.closeBtn} onClick={onToggleChat} aria-label="Close chat panel">
+        <button type="button" className={styles.closeBtn} onClick={onToggleChat} aria-label="Close chat panel">
           <X size={14} />
         </button>
       </Tooltip>

@@ -18,6 +18,12 @@
   gap: 10px;
   padding: 24px;
   text-align: center;
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+}
+
+.emptyIcon {
+  opacity: 0.4;
 }
 
 .emptyText {
@@ -40,6 +46,17 @@
   align-self: flex-start;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  font-family: var(--font-family-base);
+}
+
+.badgeUser {
+  background: var(--bg-surface1);
+  color: var(--text-secondary);
+}
+
+.badgeAssistant {
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
 .content {
@@ -47,6 +64,8 @@
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
 }
 
 /* Elapsed time during streaming */
@@ -70,6 +89,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
+  background: var(--accent);
   opacity: 0.7;
   animation: dotBounce 1.2s ease-in-out infinite;
 }

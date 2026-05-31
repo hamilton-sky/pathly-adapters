@@ -1,6 +1,5 @@
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { useUiStore } from '../../store/uiStore'
-import { useTheme } from '../../useTheme'
+import { useUiStore } from '../../../store/uiStore'
 import styles from './SkillsPanel.module.css'
 
 const PIPELINE_SKILLS = ['plan', 'po', 'storm', 'build', 'review', 'test', 'retro', 'explore', 'debug', 'design', 'fix', 'status', 'log', 'end'] as const
@@ -13,55 +12,35 @@ interface SkillsPanelProps {
 export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
   const skillsPanelOpen = useUiStore((s) => s.skillsPanelOpen)
   const toggleSkillsPanel = useUiStore((s) => s.toggleSkillsPanel)
-  const t = useTheme()
-
-  const chipStyle = {
-    background: t.bgSurface1,
-    color: t.textPrimary,
-    fontFamily: t.fontFamilyMono,
-    border: `1px solid ${t.bgSurface1}`,
-  }
 
   return (
-    <div
-      className={styles.panel}
-      style={{ borderBottom: t.border, background: t.bgSurface0 }}
-    >
+    <div className={styles.panel}>
       <button
+        type="button"
         className={styles.header}
         onClick={toggleSkillsPanel}
-        aria-expanded={skillsPanelOpen}
-        style={{ color: t.textSecondary, fontFamily: t.fontFamilyBase }}
+        {...(skillsPanelOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
-        <span className={styles.title} style={{ color: t.textPrimary }}>
+        <span className={styles.title}>
           {skillsPanelOpen ? 'Skills' : 'Controls'}
         </span>
         {skillsPanelOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
       </button>
 
-      {/* Control section — label only when expanded, chips always visible */}
-      {skillsPanelOpen && (
-        <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
-          Control
-        </div>
-      )}
       <div className={skillsPanelOpen ? styles.chips : styles.chipsCompact}>
         {CONTROL_SKILLS.map((skill) => (
-          <button key={skill} className={styles.chip} onClick={() => onSkillClick(`/pathly ${skill}`)} style={chipStyle}>
+          <button type="button" key={skill} className={styles.chip} onClick={() => onSkillClick(`/pathly ${skill}`)}>
             {skill}
           </button>
         ))}
       </div>
 
-      {/* Pipeline section — only when expanded, below controls */}
       {skillsPanelOpen && (
         <>
-          <div className={styles.sectionLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyBase }}>
-            Pipeline
-          </div>
+          <div className={styles.sectionLabel}>Pipeline</div>
           <div className={styles.chips}>
             {PIPELINE_SKILLS.map((skill) => (
-              <button key={skill} className={styles.chip} onClick={() => onSkillClick(`/pathly ${skill}`)} style={chipStyle}>
+              <button type="button" key={skill} className={styles.chip} onClick={() => onSkillClick(`/pathly ${skill}`)}>
                 {skill}
               </button>
             ))}

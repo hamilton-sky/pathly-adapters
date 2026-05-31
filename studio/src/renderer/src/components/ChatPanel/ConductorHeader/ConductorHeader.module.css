@@ -134,6 +134,8 @@
   box-shadow: 0 8px 24px rgba(0,0,0,0.35);
   z-index: 200;
   overflow: hidden;
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
 }
 
 .sessionsHeader {
@@ -142,6 +144,8 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  border-bottom: 1px solid var(--bg-surface1);
+  color: var(--text-muted);
 }
 
 .sessionsEmpty {
@@ -149,6 +153,12 @@
   font-size: 12px;
   text-align: center;
   line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.sessionsEmptyHint {
+  opacity: 0.6;
+  font-size: 11px;
 }
 
 .sessionsList {
@@ -167,6 +177,7 @@
   border: none;
   cursor: pointer;
   transition: background 120ms ease-out;
+  color: var(--text-primary);
 }
 
 .sessionItem:hover {
@@ -184,4 +195,9 @@
 .sessionMeta {
   font-size: 10px;
   opacity: 0.6;
+  color: var(--text-muted);
+}
+
+.sessionsBadgeAccent {
+  background: var(--accent);
 }

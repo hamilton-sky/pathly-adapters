@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Square, TerminalSquare, ChevronUp } from 'lucide-react'
-import { useTheme } from '../../useTheme'
-import { useChatStore } from '../../store/chatStore'
-import { ModelSelector } from './ModelSelector'
-import { ClaudeIcon, CodexIcon, ShellIcon } from '../Terminal/BrandIcons'
+import { useChatStore } from '../../../store/chatStore'
+import { ModelSelector } from '../ModelSelector/ModelSelector'
+import { ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
 import styles from './ChatInput.module.css'
 
 
@@ -17,11 +16,10 @@ interface ChatInputProps {
   onToggleMiniTerminal?: () => void
   onLaunchMiniTerminal?: (kind: 'shell' | 'claude' | 'codex') => void
   miniTerminalActive?: boolean
-  miniTerminalColor?: string
+  miniTerminalKind?: 'claude' | 'codex' | 'shell'
 }
 
-export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop, onToggleMiniTerminal, onLaunchMiniTerminal, miniTerminalActive, miniTerminalColor }: ChatInputProps): JSX.Element {
-  const t = useTheme()
+export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop, onToggleMiniTerminal, onLaunchMiniTerminal, miniTerminalActive, miniTerminalKind }: ChatInputProps): JSX.Element {
   const isEmbedding = useChatStore((s) => s.isEmbedding)
   const embedReady = useChatStore((s) => s.embedReady)
   const embedProgress = useChatStore((s) => s.embedProgress)
@@ -49,30 +47,23 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
     }
   }
 
+  const pillIsActive = isEmbedding || isRouterLoading
+
   return (
-    <div
-      className={styles.container}
-      style={{ borderTop: t.border, background: t.bgSurface0 }}
-    >
+    <div className={styles.container}>
       {/* Model loading bar — shown from first mount until model is ready */}
       {isRouterLoading && (
         <div className={styles.downloadBar}>
-          <div className={styles.downloadLabel} style={{ color: t.textMuted, fontFamily: t.fontFamilyMono }}>
+          <div className={styles.downloadLabel}>
             {embedProgress > 0
               ? `⬇ Downloading MiniLM… ${embedProgress}%`
               : '⬇ Loading MiniLM routing model…'}
           </div>
-          <div className={styles.progressTrack} style={{ background: t.bgSurface1 }}>
-            <div
-              className={styles.progressFill}
-              style={{
-                width: embedProgress > 0 ? `${embedProgress}%` : '100%',
-                background: t.accent,
-                opacity: embedProgress > 0 ? 1 : 0.35,
-                animation: embedProgress === 0 ? 'pulse 1.5s ease-in-out infinite' : 'none',
-              }}
-            />
-          </div>
+          <progress
+            className={`${styles.progressBar} ${embedProgress === 0 ? styles.progressBarPulsing : ''}`}
+            value={embedProgress > 0 ? embedProgress : undefined}
+            max={100}
+          />
         </div>
       )}
 
@@ -84,21 +75,11 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
         disabled={disabled}
         placeholder="Message Conductor..."
         rows={1}
-        style={{
-          color: t.textPrimary,
-          background: t.bgBase,
-          border: t.border,
-          fontFamily: t.fontFamilyBase,
-          caretColor: t.accent,
-        }}
       />
       <div className={styles.footer}>
-        <div ref={groupRef} className={styles.terminalGroup} style={{ border: `1px solid ${t.bgSurface1}` }}>
+        <div ref={groupRef} className={styles.terminalGroup}>
           {dropdownOpen && (
-            <div
-              className={styles.terminalDropdown}
-              style={{ background: t.bgSurface0, border: `1px solid ${t.bgSurface1}` }}
-            >
+            <div className={styles.terminalDropdown}>
               {(['shell', 'claude', 'codex'] as const).map((kind) => {
                 const labels = { shell: '+ Shell', claude: 'Claude Code', codex: 'Codex' }
                 const icons = {
@@ -109,8 +90,8 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
                 return (
                   <button
                     key={kind}
+                    type="button"
                     className={styles.terminalDropdownItem}
-                    style={{ color: t.textSecondary, fontFamily: t.fontFamilyMono }}
                     onClick={() => {
                       setDropdownOpen(false)
                       onLaunchMiniTerminal?.(kind)
@@ -124,37 +105,33 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
             </div>
           )}
           <button
+            type="button"
             className={styles.terminalBtn}
+            data-kind={miniTerminalKind}
             onClick={() => {
-              if (miniTerminalColor) {
+              if (miniTerminalKind) {
                 onToggleMiniTerminal?.()
               } else {
                 onLaunchMiniTerminal?.('shell')
               }
             }}
-            title={miniTerminalColor ? (miniTerminalActive ? 'Hide terminal' : 'Show terminal') : 'Open terminal'}
-            style={{ color: miniTerminalColor ?? undefined }}
+            title={miniTerminalKind ? (miniTerminalActive ? 'Hide terminal' : 'Show terminal') : 'Open terminal'}
           >
             <TerminalSquare size={14} />
           </button>
-          <div style={{ width: 1, height: 16, background: t.bgSurface1, flexShrink: 0 }} />
+          <div className={styles.terminalSep} />
           <button
+            type="button"
             className={styles.terminalChevron}
             onClick={() => setDropdownOpen((v) => !v)}
             title="Choose terminal type"
-            style={{ color: t.textMuted }}
           >
             <ChevronUp size={10} />
           </button>
         </div>
         <ModelSelector />
         <span
-          className={styles.modelPill}
-          style={{
-            background: t.bgSurface1,
-            color: isEmbedding ? t.accent : isRouterLoading ? t.accent : embedReady ? t.textMuted : t.textMuted,
-            fontFamily: t.fontFamilyMono,
-          }}
+          className={`${styles.modelPill} ${pillIsActive ? styles.modelPillActive : ''}`}
         >
           {isEmbedding
             ? '◈ Routing…'
@@ -166,23 +143,20 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
         </span>
         {isLoading ? (
           <button
-            className={styles.sendButton}
+            type="button"
+            className={`${styles.sendButton} ${styles.sendButtonStop}`}
             onClick={() => onStop?.()}
             title="Stop"
-            style={{ background: '#EAB308', color: '#000' }}
           >
             <Square size={13} />
           </button>
         ) : (
           <button
-            className={styles.sendButton}
+            type="button"
+            className={`${styles.sendButton} ${value.trim() && !disabled ? styles.sendButtonActive : styles.sendButtonIdle}`}
             onClick={() => { if (!disabled && value.trim()) onSend() }}
             disabled={disabled || !value.trim()}
             title="Send (Enter)"
-            style={{
-              background: value.trim() && !disabled ? t.accent : t.bgSurface1,
-              color: value.trim() && !disabled ? '#000' : t.textMuted,
-            }}
           >
             <Send size={13} />
           </button>

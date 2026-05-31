@@ -1,6 +1,6 @@
 .panel {
   --chat-width: 320px;
-  width: var(--chat-width);
+  width: var(--chat-width, 320px);
   min-width: 260px;
   max-width: 720px;
   flex-shrink: 0;
@@ -9,6 +9,9 @@
   height: 100%;
   overflow: hidden;
   position: relative;
+  background: var(--bg-base);
+  border-left: var(--border);
+  font-family: var(--font-family-base);
 }
 
 /* Drag handle — left edge of the panel */

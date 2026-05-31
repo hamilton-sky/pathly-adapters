@@ -1,26 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { WEB_LLM_MODELS } from '../../data/models'
-import { useModelStore } from '../../store/modelStore'
-import { abortLlm, getCachedModelIds, pullOllamaModel, deleteOllamaModel, downloadModel, deleteModel } from '../../lib/llmBridge'
-import { useBrightskyStore, BRIGHTSKY_BASE_URL } from '../../store/brightskyStore'
-import { brightskyClient } from '../../lib/brightskyClient'
+import { WEB_LLM_MODELS } from '../../../data/models'
+import { useModelStore } from '../../../store/modelStore'
+import { abortLlm, getCachedModelIds, pullOllamaModel, deleteOllamaModel, downloadModel, deleteModel } from '../../../lib/llmBridge'
+import { useBrightskyStore } from '../../../store/brightskyStore'
+import { brightskyClient } from '../../../lib/brightskyClient'
+import { BrightskyCard } from './BrightskyCard'
+import { ModelCard } from './ModelCard'
 import styles from './ModelSelector.module.css'
-
-function formatElapsed(secs: number): string {
-  if (secs < 60) return `${secs}s`
-  return `${Math.floor(secs / 60)}m ${secs % 60}s`
-}
-
-/** Translate node-llama-cpp progress text into a short human-readable phase label. */
-function describePhase(text: string | undefined): { label: string; hint?: string } {
-  if (!text) return { label: 'preparing…' }
-  const t = text.toLowerCase()
-  if (t.includes('downloading')) return { label: text }
-  if (t.includes('loading model')) return { label: text, hint: 'Loaded once — stays in memory until you switch models' }
-  if (t.includes('ready')) return { label: 'ready' }
-  return { label: text }
-}
 
 export function ModelSelector(): JSX.Element {
   const [open, setOpen] = useState(false)
@@ -203,12 +190,13 @@ export function ModelSelector(): JSX.Element {
     <div className={styles.wrapper} ref={ref}>
       <div className={styles.trigger}>
         <button
+          type="button"
           className={styles.triggerBtn}
           onClick={() => setOpen((v) => !v)}
           title="Select local AI model"
         >
           {isBrightsky ? (
-            <span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: brightskyAuthenticated ? '#22c55e' : '#6b7280', flexShrink: 0 }} />
+            <span className={`${styles.statusDot} ${brightskyAuthenticated ? styles.statusDotConnected : styles.statusDotDisconnected}`} />
           ) : (
             <span className={isSelectedCached ? styles.readyDot : styles.notReadyDot} />
           )}
@@ -239,60 +227,22 @@ export function ModelSelector(): JSX.Element {
             <div className={styles.noBackendNote}>
               <strong>No AI backend detected.</strong>
               <br />
-              Install <a href="https://ollama.ai" target="_blank" rel="noreferrer">Ollama</a> for local AI,
+              Install <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">Ollama</a> for local AI,
               then run <code>ollama pull phi4-mini</code>.
               <br />
-              <span style={{ opacity: 0.6 }}>Or upgrade to Electron 33+ for built-in inference.</span>
+              <span className={styles.noBackendHint}>Or upgrade to Electron 33+ for built-in inference.</span>
             </div>
           )}
 
-          {/* Brightsky cloud backend */}
-          <div
-            className={`${styles.card} ${selectedModelId === 'brightsky' ? styles.cardSelected : ''}`}
-            onClick={() => setSelectedModel('brightsky')}
-          >
-            <div className={styles.cardHeader}>
-              <span className={styles.cardName}>Brightsky</span>
-              <div className={styles.badges}>
-                {selectedModelId === 'brightsky' && (
-                  <span className={styles.badgeSelected}>Selected</span>
-                )}
-              </div>
-            </div>
-            <p className={styles.cardDesc}>Cloud AI backend — streams responses via WebSocket.</p>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: brightskyAuthenticated ? '#22c55e' : '#6b7280', flexShrink: 0 }} />
-              <span style={{ fontSize: 11, opacity: 0.7 }}>{brightskyConnected ? 'Connected' : 'Disconnected'}</span>
-            </div>
-
-            {!brightskyAuthenticated ? (
-              <button
-                className={styles.cacheBtn}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  window.pathly?.brightsky?.login(BRIGHTSKY_BASE_URL)
-                }}
-              >
-                Connect with Google
-              </button>
-            ) : (
-              <button
-                className={`${styles.cacheBtn} ${styles.cacheBtnOn}`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  clearBrightskyAuth()
-                  brightskyClient.disconnect()
-                }}
-              >
-                Disconnect
-              </button>
-            )}
-
-            {brightskyAuthError && (
-              <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>{brightskyAuthError}</div>
-            )}
-          </div>
+          <BrightskyCard
+            isSelected={selectedModelId === 'brightsky'}
+            authenticated={brightskyAuthenticated}
+            connected={brightskyConnected}
+            authError={brightskyAuthError}
+            onSelect={() => setSelectedModel('brightsky')}
+            onConnect={() => {}}
+            onDisconnect={() => { clearBrightskyAuth(); brightskyClient.disconnect() }}
+          />
 
           {WEB_LLM_MODELS.map((model) => {
             const tag = model.ollamaId
@@ -308,93 +258,24 @@ export function ModelSelector(): JSX.Element {
             const canDownload = ollamaAvailable === true || llmAvailable === true
 
             return (
-              <div
+              <ModelCard
                 key={model.id}
-                className={`${styles.card} ${isSelected ? styles.cardSelected : ''} ${isDownloading ? styles.cardDownloading : ''}`}
-                onClick={() => setSelectedModel(model.id)}
-              >
-                <div className={styles.cardHeader}>
-                  <span className={styles.cardName}>{model.name}</span>
-                  <div className={styles.badges}>
-                    {model.recommended && (
-                      <span className={styles.badgeRecommended}>Recommended</span>
-                    )}
-                    {isOllamaInstalled && (
-                      <span className={styles.badgeCached}>Ollama</span>
-                    )}
-                    {isGgufCached && !isOllamaInstalled && (
-                      <span className={styles.badgeCached}>Cached</span>
-                    )}
-                    {isSelected && (
-                      <span className={styles.badgeSelected}>Selected</span>
-                    )}
-                  </div>
-                </div>
-
-                <p className={styles.cardDesc}>{model.description}</p>
-
-                <div className={styles.infoRows}>
-                  <div className={styles.infoRow}>
-                    <span className={styles.infoKey}>SYSTEM</span>
-                    <span className={styles.infoVal}>{model.system}</span>
-                  </div>
-                  <div className={styles.infoRow}>
-                    <span className={styles.infoKey}>STORAGE</span>
-                    <span className={styles.infoVal}>{model.storage}</span>
-                  </div>
-                  <div className={styles.infoRow}>
-                    <span className={styles.infoKey}>SPEED</span>
-                    <span className={styles.infoVal}>{model.speed}</span>
-                  </div>
-                </div>
-
-                {isDownloading && (() => {
-                  const phase = describePhase(progressText[model.id])
-                  return (
-                  <div className={styles.downloadBlock}>
-                    <div className={styles.downloadMeta}>
-                      <span className={styles.downloadPct}>{progress > 0 ? `${progress}%` : '…'}</span>
-                      <span className={styles.downloadPhase}>{phase.label}</span>
-                      <span className={styles.downloadElapsed}>{formatElapsed(elapsed[model.id] ?? 0)}</span>
-                    </div>
-                    <div className={styles.progressTrack}>
-                      <div className={styles.progressStripes} />
-                      <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-                    </div>
-                    {phase.hint && (
-                      <span className={styles.downloadHint}>{phase.hint}</span>
-                    )}
-                  </div>
-                  )
-                })()}
-
-                {isDownloading ? (
-                  <button
-                    className={`${styles.cacheBtn} ${styles.cacheBtnCancel}`}
-                    onClick={(e) => { e.stopPropagation(); handleCancelDownload(model.id) }}
-                  >
-                    ✕ Cancel download
-                  </button>
-                ) : (
-                  <button
-                    className={`${styles.cacheBtn} ${isCached ? styles.cacheBtnOn : canDownload && isSelected ? styles.cacheBtnPrimary : ''}`}
-                    disabled={!isCached && !canDownload}
-                    title={!isCached && !canDownload ? 'Install Ollama or upgrade to Electron 33+' : undefined}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void handleCacheToggle(model.id)
-                    }}
-                  >
-                    {isCached
-                      ? `✓ ${isOllamaInstalled ? 'Installed via Ollama' : 'Downloaded'}  —  click to remove`
-                      : !canDownload
-                        ? '⚠ Install Ollama to download models'
-                        : ollamaAvailable
-                          ? isSelected ? '↓ Pull via Ollama' : '↓ Pull & cache via Ollama'
-                          : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}
-                  </button>
-                )}
-              </div>
+                model={model}
+                isSelected={isSelected}
+                isCached={isCached}
+                isGgufCached={isGgufCached}
+                isOllamaInstalled={isOllamaInstalled}
+                isOllamaAvailable={ollamaAvailable ?? false}
+                isDownloading={isDownloading}
+                canDownload={canDownload}
+                progress={progress}
+                progressText={progressText[model.id]}
+                elapsed={elapsed[model.id] ?? 0}
+                ollamaAvailable={ollamaAvailable}
+                onSelect={() => setSelectedModel(model.id)}
+                onCacheToggle={() => void handleCacheToggle(model.id)}
+                onCancelDownload={() => handleCancelDownload(model.id)}
+              />
             )
           })}
         </div>

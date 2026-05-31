@@ -1,5 +1,4 @@
-import type { MatchResult } from '../../types/chat'
-import { useTheme } from '../../useTheme'
+import type { MatchResult } from '../../../types/chat'
 import styles from './MatchCard.module.css'
 
 interface MatchCardProps {
@@ -11,17 +10,13 @@ interface MatchCardProps {
 }
 
 export function MatchCard({ match, alts, onRun, onReject, onSelectAlt }: MatchCardProps): JSX.Element {
-  const t = useTheme()
   const matched = match.confidence >= 0.65
   const pct = Math.round(match.confidence * 100)
 
   return (
-    <div
-      className={`${styles.card} ${matched ? styles.cardMatched : styles.cardUnsure}`}
-      style={{ background: t.bgSurface0, color: t.textPrimary }}
-    >
+    <div className={`${styles.card} ${matched ? styles.cardMatched : styles.cardUnsure}`}>
       <div className={styles.header}>
-        <span className={styles.skillName} style={{ color: t.textPrimary }}>
+        <span className={styles.skillName}>
           {match.skill}
         </span>
         <span className={`${styles.badge} ${matched ? styles.badgeMatched : styles.badgeUnsure}`}>
@@ -39,12 +34,12 @@ export function MatchCard({ match, alts, onRun, onReject, onSelectAlt }: MatchCa
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.btnRun} onClick={onRun} aria-label={`Run ${match.skill}`}>
+        <button type="button" className={styles.btnRun} onClick={onRun} aria-label={`Run ${match.skill}`}>
           Run
         </button>
         <button
+          type="button"
           className={styles.btnReject}
-          style={{ color: t.textPrimary, borderColor: t.borderSubtle }}
           onClick={onReject}
         >
           Not this
@@ -55,17 +50,15 @@ export function MatchCard({ match, alts, onRun, onReject, onSelectAlt }: MatchCa
         <div className={styles.alts}>
           <span className={styles.altLabel}>Try instead:</span>
           {alts.map((a) => (
-            <span
+            <button
               key={a.skill}
+              type="button"
               className={styles.altChip}
-              role="button"
               aria-label={`Select ${a.skill}`}
-              tabIndex={0}
               onClick={() => onSelectAlt(a.skill)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectAlt(a.skill) }}
             >
               {a.skill}
-            </span>
+            </button>
           ))}
         </div>
       )}

@@ -4,6 +4,8 @@
   border-radius: 6px;
   padding: 10px 12px;
   border: 1.5px solid;
+  background: var(--bg-surface0);
+  color: var(--text-primary);
 }
 
 .cardMatched {
@@ -25,6 +27,7 @@
   font-family: monospace;
   font-weight: bold;
   font-size: 13px;
+  color: var(--text-primary);
 }
 
 .badge {
@@ -99,10 +102,11 @@
   flex: 1;
   padding: 5px 0;
   border-radius: 4px;
-  border: 1px solid rgba(128, 128, 128, 0.4);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
   font-size: 12px;
   background: transparent;
+  color: var(--text-primary);
 }
 
 .btnReject:hover {
@@ -127,6 +131,8 @@
   background: rgba(128, 128, 128, 0.15);
   cursor: pointer;
   font-family: monospace;
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
 }
 
 .altChip:hover {
