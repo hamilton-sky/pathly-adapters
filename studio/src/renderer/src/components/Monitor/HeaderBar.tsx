@@ -61,9 +61,6 @@ export function HeaderBar({ effectiveTopic }: Props): JSX.Element {
           <span aria-hidden="true">{badgeLabel}</span>
         </span>
       </div>
-      {metaParts.length > 0 && (
-        <div className={styles.headerMeta}>{metaParts.join(' · ')}</div>
-      )}
     </div>
   )
 }
