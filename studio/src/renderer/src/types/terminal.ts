@@ -3,7 +3,7 @@ export interface TerminalTab {
   numericId: number
   label: string
   pane: 'left' | 'right'
-  kind?: 'shell' | 'claude' | 'codex'
+  kind?: 'shell' | 'claude' | 'codex' | 'antigravity'
   status?: 'idle' | 'running' | 'error' | 'done'
   plan?: string
   stage?: string

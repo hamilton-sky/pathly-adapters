@@ -17,7 +17,7 @@ export interface Message {
   }
 }
 
-export type TerminalKind = 'claude' | 'codex' | 'shell'
+export type TerminalKind = 'claude' | 'codex' | 'shell' | 'antigravity'
 
 export interface TargetOutput {
   lines: string[]
@@ -65,7 +65,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
   isLoading: false,
   targetKind: 'claude',
-  outputByTarget: { claude: emptyTarget(), codex: emptyTarget(), shell: emptyTarget() },
+  outputByTarget: { claude: emptyTarget(), codex: emptyTarget(), shell: emptyTarget(), antigravity: emptyTarget() },
   currentMatch: null,
   autoApprove: false,
   altMatches: [],
@@ -110,7 +110,7 @@ export const useChatStore = create<ChatState>()((set) => ({
           },
         }
       }
-      return { outputByTarget: { claude: emptyTarget(), codex: emptyTarget(), shell: emptyTarget() } }
+      return { outputByTarget: { claude: emptyTarget(), codex: emptyTarget(), shell: emptyTarget(), antigravity: emptyTarget() } }
     }),
 
   setCommandRunning: (kind, b) =>

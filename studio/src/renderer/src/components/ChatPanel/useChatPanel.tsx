@@ -24,10 +24,11 @@ export function useChatPanel() {
   const [inputValue, setInputValue] = useState('')
   const [llmAvailable, setLlmAvailable] = useState<boolean | null>(null)
   const [pathlyContext, setPathlyContext] = useState<Awaited<ReturnType<typeof buildPathlyContext>> | null>(null)
-  const [hiddenMiniCards, setHiddenMiniCards] = useState<Record<'claude' | 'codex' | 'shell', boolean>>({
+  const [hiddenMiniCards, setHiddenMiniCards] = useState<Record<'claude' | 'codex' | 'shell' | 'antigravity', boolean>>({
     claude: false,
     codex: false,
     shell: false,
+    antigravity: false,
   })
   const [menuCardOpen, setMenuCardOpen] = useState(true)
   const [pushedMenu, setPushedMenu] = useState<PushedMenu | null>(null)
@@ -80,8 +81,8 @@ export function useChatPanel() {
   const codexTabId = tabIdByKind.codex ?? tabs.find((tab) => tab.kind === 'codex')?.id ?? null
   const shellTabId = tabIdByKind.shell ?? tabs.find((tab) => tab.kind === 'shell')?.id ?? null
 
-  const TARGET_COLORS: Record<'claude' | 'codex' | 'shell', string> = {
-    claude: '#38BDF8', codex: '#F59E0B', shell: '#86EFAC',
+  const TARGET_COLORS: Record<'claude' | 'codex' | 'shell' | 'antigravity', string> = {
+    claude: '#38BDF8', codex: '#F59E0B', shell: '#86EFAC', antigravity: '#4285F4',
   }
   const currentTabId = targetKind === 'claude' ? claudeTabId : targetKind === 'codex' ? codexTabId : shellTabId
   const currentOutput = targetKind === 'claude' ? claudeOutput : targetKind === 'codex' ? codexOutput : shellOutput
@@ -440,7 +441,7 @@ export function useChatPanel() {
     setCommandRunning(targetKind, true)
     setHiddenMiniCards((state) => ({ ...state, [targetKind]: false }))
     try {
-      const addBackgroundTab = (id: string, label: string, _pane?: 'left' | 'right', kind?: 'shell' | 'claude' | 'codex'): void => {
+      const addBackgroundTab = (id: string, label: string, _pane?: 'left' | 'right', kind?: 'shell' | 'claude' | 'codex' | 'antigravity'): void => {
         addTabSilent(id, label, kind)
         xtermRegistry.getOrCreate(id, { fontSize: 12 })
       }
@@ -474,7 +475,7 @@ export function useChatPanel() {
     clearOutputLines(targetKind)
   }
 
-  async function launchMiniTerminal(kind: 'shell' | 'claude' | 'codex'): Promise<void> {
+  async function launchMiniTerminal(kind: 'shell' | 'claude' | 'codex' | 'antigravity'): Promise<void> {
     if (!projectPath) return
     const existing = tabs.find((tab) => tab.kind === kind)
     if (existing) {
@@ -482,10 +483,10 @@ export function useChatPanel() {
       return
     }
     const id = crypto.randomUUID()
-    const label = kind === 'claude' ? 'Claude Code' : kind === 'codex' ? 'Codex' : 'Shell'
+    const label = kind === 'claude' ? 'Claude Code' : kind === 'codex' ? 'Codex' : kind === 'antigravity' ? 'Antigravity' : 'Shell'
     addTabSilent(id, label, kind)
     xtermRegistry.getOrCreate(id, { fontSize: 12 })
-    await window.pathly?.terminal?.spawn(id, projectPath, kind === 'shell' ? undefined : kind)
+    await window.pathly?.terminal?.spawn(id, projectPath, kind === 'shell' ? undefined : kind === 'antigravity' ? 'agy' : kind)
     setHiddenMiniCards((s) => ({ ...s, [kind]: false }))
   }
 
@@ -542,7 +543,7 @@ export function useChatPanel() {
     const kind = item.terminal_kind ?? 'claude'
     setCommandRunning(kind, true)
     setHiddenMiniCards((s) => ({ ...s, [kind]: false }))
-    const addBackgroundTab = (id: string, label: string, _pane?: 'left' | 'right', tabKind?: 'shell' | 'claude' | 'codex'): void => {
+    const addBackgroundTab = (id: string, label: string, _pane?: 'left' | 'right', tabKind?: 'shell' | 'claude' | 'codex' | 'antigravity'): void => {
       addTabSilent(id, label, tabKind)
       xtermRegistry.getOrCreate(id, { fontSize: 12 })
     }

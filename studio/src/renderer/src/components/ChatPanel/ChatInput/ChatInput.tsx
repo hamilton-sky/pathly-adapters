@@ -14,9 +14,9 @@ interface ChatInputProps {
   isLoading?: boolean
   onStop?: () => void
   onToggleMiniTerminal?: () => void
-  onLaunchMiniTerminal?: (kind: 'shell' | 'claude' | 'codex') => void
+  onLaunchMiniTerminal?: (kind: 'shell' | 'claude' | 'codex' | 'antigravity') => void
   miniTerminalActive?: boolean
-  miniTerminalKind?: 'claude' | 'codex' | 'shell'
+  miniTerminalKind?: 'claude' | 'codex' | 'shell' | 'antigravity'
 }
 
 export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop, onToggleMiniTerminal, onLaunchMiniTerminal, miniTerminalActive, miniTerminalKind }: ChatInputProps): JSX.Element {

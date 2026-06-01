@@ -18,13 +18,13 @@ export async function launchTerminal(params: LaunchTerminalParams): Promise<void
   const { command, label, pane, projectPath, open, toggle, addTab, plan, stage } = params
   if (!open) toggle()
   const id = crypto.randomUUID()
-  const kind: TerminalKind = command === 'claude' ? 'claude' : command === 'codex' ? 'codex' : 'shell'
+  const kind: TerminalKind = command === 'claude' ? 'claude' : command === 'codex' ? 'codex' : command === 'agy' ? 'antigravity' : 'shell'
   addTab(id, label, pane, kind, plan, stage)
   await window.pathly?.terminal?.spawn(id, projectPath, command)
 }
 
 export async function writeToTerminal(
-  kind: 'claude' | 'codex' | 'shell',
+  kind: 'claude' | 'codex' | 'shell' | 'antigravity',
   command: string,
   projectPath: string,
   tabs: TerminalTab[],
@@ -49,6 +49,9 @@ export async function writeToTerminal(
     if (kind === 'shell') {
       addTab(tabId, 'Shell', 'left', 'shell', plan, stage)
       await window.pathly?.terminal?.spawn(tabId, projectPath, undefined)
+    } else if (kind === 'antigravity') {
+      addTab(tabId, 'antigravity', 'left', 'antigravity', plan, stage)
+      await window.pathly?.terminal?.spawn(tabId, projectPath, 'agy')
     } else {
       addTab(tabId, kind === 'claude' ? 'claude' : 'codex', 'left', kind, plan, stage)
       await window.pathly?.terminal?.spawn(tabId, projectPath, kind)
@@ -91,6 +94,8 @@ export async function writeToTerminal(
     cmdText = sanitized
   } else if (kind === 'shell') {
     cmdText = sanitized
+  } else if (kind === 'antigravity') {
+    cmdText = 'Use Pathly ' + sanitized.replace(/^\/pathly\s*/, '')
   } else {
     cmdText = 'Use Pathly ' + sanitized.replace(/^\/pathly\s*/, '')
   }
