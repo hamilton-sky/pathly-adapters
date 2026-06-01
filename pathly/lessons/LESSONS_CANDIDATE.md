@@ -369,6 +369,45 @@ Feature: wizard-e2e-flow | Stage: building | Date: 2026-05-31
 
 ---
 
+## [multi-adapter-routing] Fix builder token telemetry before it corrupts multiple features
+
+### Pattern
+Four consecutive builder conversations logged `tokens_in: 0, tokens_out: 0, cost_usd: 0.0`. The stop hook fires but builder token data is never captured, making the build stage — the most expensive stage — invisible in cost tracking.
+
+### Rule
+MUST verify `src/pathly_hooks/stop_telemetry.py` fires and writes real token counts for builder sessions. Run a single builder conversation and confirm EVENTS.jsonl contains non-zero token fields before starting a multi-conversation feature.
+
+### Source
+Feature: multi-adapter-routing | Stage: retro | Date: 2026-06-01
+
+---
+
+## [multi-adapter-routing] Gate feedback must include artifact path + format + example
+
+### Pattern
+A `require_artifact` gate fired because a required artifact was missing after the Conv 2 review. The gate feedback did not tell the builder where to write the file, what the first line should be, or what format was expected. A human had to manually unblock the pipeline.
+
+### Rule
+MUST include in any `require_artifact` gate `on_fail` feedback: (a) the exact expected path, (b) the required first line or schema shape, and (c) a minimal example content block. Without this, the gate always requires a human unblock.
+
+### Source
+Feature: multi-adapter-routing | Stage: building | Date: 2026-06-01
+
+---
+
+## [multi-adapter-routing] Split Studio wizard conversations by typecheck gate
+
+### Pattern
+Phases 7-9 touched `utils.ts`, a new component + CSS module, `FlowWizard.tsx`, `draftUtils.ts`, and `types.ts` in a single conversation. This is near the upper bound of reliable single-conversation scope for TypeScript. A TS error introduced in Phase 8 would have required re-running Phase 9 as well.
+
+### Rule
+MUST split Studio wizard feature conversations at typecheck boundaries: (a) utility/serializer functions + typecheck; (b) component + wiring + typecheck + visual confirm. Each conversation must end with a passing `tsc --noEmit` before the next begins.
+
+### Source
+Feature: multi-adapter-routing | Stage: planning/building | Date: 2026-06-01
+
+---
+
 ## [wizard-e2e-flow] Step-count acceptance criteria must be verified against the live component
 
 ### Pattern
