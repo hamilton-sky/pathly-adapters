@@ -4,33 +4,26 @@
   border-bottom: 1px solid var(--border);
 }
 
-.rows {
+.bar {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   padding: 5px 10px;
-}
-
-.row {
-  display: flex;
-  gap: 4px;
   align-items: center;
 }
 
-/* ── Base button ── */
+/* ── Base button — icon only ── */
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  font-size: 11px;
-  font-weight: 500;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--bg-mantle);
   color: var(--text-secondary);
   cursor: pointer;
-  white-space: nowrap;
+  flex-shrink: 0;
   transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out, opacity 120ms ease-out;
 }
 
@@ -82,11 +75,13 @@
   color: #fff;
 }
 
-/* ── Abort pushed to far right within its row ── */
-.rowDecision {
-  display: flex;
-  gap: 4px;
-  align-items: center;
+/* ── Group separator ── */
+.sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  flex-shrink: 0;
+  margin: 0 3px;
 }
 
 .rerouteWrapper {

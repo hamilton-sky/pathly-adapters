@@ -40,7 +40,6 @@ export function RunnerBtn({
         onClick={onClick}
       >
         {children}
-        {label}
       </button>
     </Tooltip>
   )

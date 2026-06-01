@@ -35,88 +35,42 @@ export function FlowControlBar(): JSX.Element {
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.rows}>
-        {/* Row 1 — lifecycle: control the run */}
-        <div className={styles.row}>
-          <RunnerBtn
-            label="Start"
-            tooltip="Start a new pipeline run"
-            enabled={startEnabled}
-            onClick={() => { void postAction('start') }}
-            extraClass={startEnabled ? styles.btnPrimary : ''}
-          >
-            <Play size={10} />
-          </RunnerBtn>
+      <div className={styles.bar}>
+        {/* Lifecycle group */}
+        <RunnerBtn label="Start" tooltip="Start a new pipeline run" enabled={startEnabled} onClick={() => { void postAction('start') }} extraClass={startEnabled ? styles.btnPrimary : ''}>
+          <Play size={12} />
+        </RunnerBtn>
+        <RunnerBtn label="Pause" tooltip="Pause the running pipeline" enabled={pauseEnabled} onClick={() => { void postAction('pause') }}>
+          <Pause size={12} />
+        </RunnerBtn>
+        <RunnerBtn label="Resume" tooltip="Continue from where it paused" enabled={resumeEnabled} onClick={() => { void postAction('resume') }}>
+          <SkipForward size={12} />
+        </RunnerBtn>
 
-          <RunnerBtn
-            label="Pause"
-            tooltip="Pause the running pipeline"
-            enabled={pauseEnabled}
-            onClick={() => { void postAction('pause') }}
-          >
-            <Pause size={10} />
-          </RunnerBtn>
+        <div className={styles.sep} />
 
-          <RunnerBtn
-            label="Resume"
-            tooltip="Continue from where it paused"
-            enabled={resumeEnabled}
-            onClick={() => { void postAction('resume') }}
-          >
-            <SkipForward size={10} />
+        {/* Decision group */}
+        <RunnerBtn label="Advance" tooltip="Skip past the current decision point" enabled={advanceEnabled} onClick={() => { void postAction('advance') }} extraClass={styles.btnDecision}>
+          <ChevronsRight size={12} />
+        </RunnerBtn>
+        <div className={styles.rerouteWrapper}>
+          <RunnerBtn label="Reroute" tooltip="Switch to a different AI adapter mid-run" enabled={rerouteEnabled} onClick={() => setShowReroute((v) => !v)} extraClass={styles.btnDecision}>
+            <Shuffle size={12} />
           </RunnerBtn>
+          {showReroute && rerouteEnabled && (
+            <ReroutePopover onClose={() => setShowReroute(false)} onError={(msg) => setRunnerState({ errorMessage: msg })} />
+          )}
         </div>
+        <RunnerBtn label="Retry" tooltip="Retry the current blocked stage" enabled={retryEnabled} onClick={() => { void postAction('retry') }} extraClass={styles.btnDecision}>
+          <RotateCcw size={12} />
+        </RunnerBtn>
 
-        {/* Row 2 — unblock: decision actions + abort */}
-        <div className={styles.row}>
-          <RunnerBtn
-            label="Advance"
-            tooltip="Skip past the current decision point"
-            enabled={advanceEnabled}
-            onClick={() => { void postAction('advance') }}
-            extraClass={styles.btnDecision}
-          >
-            <ChevronsRight size={10} />
-          </RunnerBtn>
+        <div className={styles.sep} />
 
-          <div className={styles.rerouteWrapper}>
-            <RunnerBtn
-              label="Reroute"
-              tooltip="Switch to a different AI adapter mid-run"
-              enabled={rerouteEnabled}
-              onClick={() => setShowReroute((v) => !v)}
-              extraClass={styles.btnDecision}
-            >
-              <Shuffle size={10} />
-            </RunnerBtn>
-            {showReroute && rerouteEnabled && (
-              <ReroutePopover
-                onClose={() => setShowReroute(false)}
-                onError={(msg) => setRunnerState({ errorMessage: msg })}
-              />
-            )}
-          </div>
-
-          <RunnerBtn
-            label="Retry"
-            tooltip="Retry the current blocked stage"
-            enabled={retryEnabled}
-            onClick={() => { void postAction('retry') }}
-            extraClass={styles.btnDecision}
-          >
-            <RotateCcw size={10} />
-          </RunnerBtn>
-
-          <RunnerBtn
-            label="Abort"
-            tooltip="Stop the run completely"
-            enabled={abortEnabled}
-            onClick={() => setShowAbort((v) => !v)}
-            abortStyle
-          >
-            <Square size={10} />
-          </RunnerBtn>
-        </div>
+        {/* Abort */}
+        <RunnerBtn label="Abort" tooltip="Stop the run completely" enabled={abortEnabled} onClick={() => setShowAbort((v) => !v)} abortStyle>
+          <Square size={12} />
+        </RunnerBtn>
       </div>
 
       {showAbort && (
