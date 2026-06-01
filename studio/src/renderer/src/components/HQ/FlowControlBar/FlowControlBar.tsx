@@ -87,7 +87,7 @@ export function FlowControlBar(): JSX.Element {
       </div>
 
       {topic === null && (
-        <div className={styles.noTopicWarning}>No active feature — server offline or no feature loaded</div>
+        <div className={styles.noTopicWarning}>No active feature — use /pathly go to start one</div>
       )}
 
       {showAbort && (

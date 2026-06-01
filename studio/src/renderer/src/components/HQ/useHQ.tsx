@@ -272,15 +272,19 @@ export function useHQ() {
   }, [activeTopic])
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8765/status')
+    if (!projectPath) return   // wait until the store has the project root
+    const url = `http://127.0.0.1:8765/status?project_root=${encodeURIComponent(projectPath)}`
+    fetch(url)
       .then((r) => r.json())
       .then((data: Record<string, unknown>) => {
-        if (data.feature && data.project_root) {
-          useRunnerStore.getState().setRunnerConfig(data.feature as string, data.project_root as string)
+        const feature = data.feature as string | undefined
+        const root = (data.project_root as string | undefined) ?? projectPath
+        if (feature) {
+          useRunnerStore.getState().setRunnerConfig(feature, root)
         }
       })
       .catch(() => { /* server may be offline */ })
-  }, [])
+  }, [projectPath])
 
   useEffect(() => {
     preEmbedSkills(loadSkills(), (pct) => setEmbedProgress(pct))
