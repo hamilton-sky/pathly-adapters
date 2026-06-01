@@ -10,7 +10,7 @@ try {
   console.warn('[terminal] node-pty not available')
 }
 
-const ALLOWED_SHELLS = new Set(['bash', 'zsh', 'sh', 'pwsh', 'powershell.exe', 'cmd.exe', 'claude', 'codex'])
+const ALLOWED_SHELLS = new Set(['bash', 'zsh', 'sh', 'pwsh', 'powershell.exe', 'cmd.exe', 'claude', 'codex', 'agy'])
 
 const activePtys = new Map<string, import('node-pty').IPty>()
 // Maps tabId → the BrowserWindow that should receive PTY data for that tab
@@ -37,13 +37,14 @@ function isValidCwd(dir: string): boolean {
 
 function resolveShell(command: string | undefined): { shell: string; args: string[] } {
   if (process.platform !== 'win32') {
-    if (command === 'claude' || command === 'codex') {
+    if (command === 'claude' || command === 'codex' || command === 'agy') {
       return { shell: 'bash', args: ['-c', `exec ${command}`] }
     }
     return { shell: command ?? 'bash', args: [] }
   }
   if (command === 'claude') return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'claude'] }
   if (command === 'codex')  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'codex'] }
+  if (command === 'agy')    return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'agy'] }
   return { shell: 'powershell.exe', args: [] }
 }
 
