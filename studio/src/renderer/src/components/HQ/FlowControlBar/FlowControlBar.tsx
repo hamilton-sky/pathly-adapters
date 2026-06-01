@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { Play, Pause, SkipForward, ChevronsRight, Shuffle, RotateCcw, Square } from 'lucide-react'
 import { useRunnerStore } from '../../../store/runnerStore'
 import { AbortConfirmStrip } from './AbortConfirmStrip'
 import { ReroutePopover } from './ReroutePopover'
+import { RunnerBtn } from './RunnerBtn'
 import styles from './FlowControlBar.module.css'
 
 const RUNNER_BASE = 'http://127.0.0.1:8765'
@@ -34,57 +36,56 @@ export function FlowControlBar(): JSX.Element {
   return (
     <div className={styles.wrapper}>
       <div className={styles.bar}>
-        <button
-          type="button"
-          className={`${styles.btn} ${!startEnabled ? styles.btnDisabled : ''}`}
-          disabled={!startEnabled}
-          aria-label="Start run"
-          {...(startEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
+        <RunnerBtn
+          label="Start"
+          tooltip="Start a new pipeline run"
+          enabled={startEnabled}
           onClick={() => { void postAction('start') }}
+          extraClass={startEnabled ? styles.btnPrimary : ''}
         >
-          Start
-        </button>
-        <button
-          type="button"
-          className={`${styles.btn} ${!pauseEnabled ? styles.btnDisabled : ''}`}
-          disabled={!pauseEnabled}
-          aria-label="Pause run"
-          {...(pauseEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
+          <Play size={10} />
+        </RunnerBtn>
+
+        <RunnerBtn
+          label="Pause"
+          tooltip="Pause the running pipeline"
+          enabled={pauseEnabled}
           onClick={() => { void postAction('pause') }}
         >
-          Pause
-        </button>
-        <button
-          type="button"
-          className={`${styles.btn} ${!resumeEnabled ? styles.btnDisabled : ''}`}
-          disabled={!resumeEnabled}
-          aria-label="Resume run"
-          {...(resumeEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
+          <Pause size={10} />
+        </RunnerBtn>
+
+        <RunnerBtn
+          label="Resume"
+          tooltip="Continue from where it paused"
+          enabled={resumeEnabled}
           onClick={() => { void postAction('resume') }}
         >
-          Resume
-        </button>
-        <button
-          type="button"
-          className={`${styles.btn} ${!advanceEnabled ? styles.btnDisabled : ''}`}
-          disabled={!advanceEnabled}
-          aria-label="Advance past decision"
-          {...(advanceEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
+          <SkipForward size={10} />
+        </RunnerBtn>
+
+        <div className={styles.sep} />
+
+        <RunnerBtn
+          label="Advance"
+          tooltip="Skip past the current decision point"
+          enabled={advanceEnabled}
           onClick={() => { void postAction('advance') }}
+          extraClass={styles.btnDecision}
         >
-          Advance
-        </button>
+          <ChevronsRight size={10} />
+        </RunnerBtn>
+
         <div className={styles.rerouteWrapper}>
-          <button
-            type="button"
-            className={`${styles.btn} ${!rerouteEnabled ? styles.btnDisabled : ''}`}
-            disabled={!rerouteEnabled}
-            aria-label="Reroute to different adapter"
-            {...(rerouteEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
+          <RunnerBtn
+            label="Reroute"
+            tooltip="Switch to a different AI adapter mid-run"
+            enabled={rerouteEnabled}
             onClick={() => setShowReroute((v) => !v)}
+            extraClass={styles.btnDecision}
           >
-            Reroute
-          </button>
+            <Shuffle size={10} />
+          </RunnerBtn>
           {showReroute && rerouteEnabled && (
             <ReroutePopover
               onClose={() => setShowReroute(false)}
@@ -92,27 +93,30 @@ export function FlowControlBar(): JSX.Element {
             />
           )}
         </div>
-        <button
-          type="button"
-          className={`${styles.btn} ${!retryEnabled ? styles.btnDisabled : ''}`}
-          disabled={!retryEnabled}
-          aria-label="Retry after error"
-          {...(retryEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
+
+        <RunnerBtn
+          label="Retry"
+          tooltip="Retry the current blocked stage"
+          enabled={retryEnabled}
           onClick={() => { void postAction('retry') }}
+          extraClass={styles.btnDecision}
         >
-          Retry
-        </button>
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnAbort} ${!abortEnabled ? styles.btnDisabled : ''}`}
-          disabled={!abortEnabled}
-          aria-label="Abort run"
-          {...(abortEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
+          <RotateCcw size={10} />
+        </RunnerBtn>
+
+        <div className={styles.sep} />
+
+        <RunnerBtn
+          label="Abort"
+          tooltip="Stop the run completely"
+          enabled={abortEnabled}
           onClick={() => setShowAbort((v) => !v)}
+          abortStyle
         >
-          Abort
-        </button>
+          <Square size={10} />
+        </RunnerBtn>
       </div>
+
       {showAbort && (
         <AbortConfirmStrip
           onDone={() => setShowAbort(false)}
