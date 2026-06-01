@@ -446,6 +446,10 @@ def next_action(args: dict) -> dict:
                 result["instructions"] = None
         return result
 
+    # Terminal state — no agent to dispatch to
+    if state_info["current_state"] == "DONE":
+        return {"done": True}
+
     instructions = build_prompt(flow_config, state_info["current_state"], storage_path)
     agent = flow_config["agent_map"][state_info["current_state"]]
     menu = build_menu_payload(flow_config, state_info["current_state"], storage_path)
