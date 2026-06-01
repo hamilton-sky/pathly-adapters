@@ -17,7 +17,7 @@ import { Settings } from './components/Settings'
 import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
-import { ChatPanel } from './components/ChatPanel'
+import { HQ } from './components/HQ'
 import { Toaster } from './components/Toaster'
 import { themes } from './theme'
 import appStyles from './App.module.css'
@@ -233,7 +233,7 @@ function MainApp(): JSX.Element | null {
         <PanelErrorBoundary><Sidebar /></PanelErrorBoundary>
         <PanelErrorBoundary><MainPanel /></PanelErrorBoundary>
         {chatOpen && (
-          <PanelErrorBoundary><ChatPanel /></PanelErrorBoundary>
+          <PanelErrorBoundary><HQ /></PanelErrorBoundary>
         )}
       </div>
       <PanelErrorBoundary><Terminal /></PanelErrorBoundary>

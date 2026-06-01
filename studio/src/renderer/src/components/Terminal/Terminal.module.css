@@ -244,6 +244,19 @@
   color: var(--t-blue) !important;
 }
 
+.iconBtnAntigravity {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t-green);
+  border-left: 2px solid var(--t-green) !important;
+  padding-left: 6px;
+}
+
+.iconBtnAntigravity:hover {
+  background: rgba(74, 222, 128, 0.1) !important;
+  color: var(--t-green) !important;
+}
+
 /* ── Panel-level buttons (split, close) ── */
 .splitIconBtn {
   background: none;

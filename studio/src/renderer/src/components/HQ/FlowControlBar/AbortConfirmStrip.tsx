@@ -1,0 +1,37 @@
+import styles from './AbortConfirmStrip.module.css'
+
+const RUNNER_BASE = 'http://127.0.0.1:8765'
+
+interface AbortConfirmStripProps {
+  onDone: () => void
+  onCancel: () => void
+  onError: (msg: string) => void
+}
+
+export function AbortConfirmStrip({ onDone, onCancel, onError }: AbortConfirmStripProps): JSX.Element {
+  async function handleConfirm(): Promise<void> {
+    try {
+      const res = await fetch(`${RUNNER_BASE}/runner/abort`, { method: 'POST' })
+      if (!res.ok) {
+        onError(`abort failed: ${res.status}`)
+      }
+    } catch {
+      onError('abort failed: network error')
+    }
+    onDone()
+  }
+
+  return (
+    <div className={styles.strip} role="alert">
+      <span className={styles.label}>Abort the current run?</span>
+      <div className={styles.actions}>
+        <button type="button" className={styles.confirmBtn} onClick={() => { void handleConfirm() }} aria-label="Confirm abort">
+          Confirm abort
+        </button>
+        <button type="button" className={styles.cancelBtn} onClick={onCancel} aria-label="Cancel abort">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}

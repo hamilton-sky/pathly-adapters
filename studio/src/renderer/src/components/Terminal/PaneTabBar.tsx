@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ExternalLink, Trash2, X } from 'lucide-react'
 import type { TerminalTab } from './types'
 import { Tooltip } from '../ui'
-import { ClaudeIcon, CodexIcon, ShellIcon } from './BrandIcons'
+import { AntigravityIcon, ClaudeIcon, CodexIcon, ShellIcon } from './BrandIcons'
 import styles from './Terminal.module.css'
 
 interface PaneTabBarProps {
@@ -23,6 +23,7 @@ function TabBrandIcon({ kind }: { kind?: TerminalTab['kind'] }): JSX.Element | n
   if (kind === 'shell' || !kind) return <ShellIcon size={13} />
   if (kind === 'claude') return <ClaudeIcon size={13} />
   if (kind === 'codex')  return <CodexIcon  size={13} />
+  if (kind === 'antigravity') return <AntigravityIcon size={13} />
   return null
 }
 
@@ -90,6 +91,7 @@ export function PaneTabBar({
             </span>
           )}
           <button
+            type="button"
             title="Pop out to its own window"
             onClick={(e) => { e.stopPropagation(); onPopout(tab.id) }}
             className={styles.popoutBtn}
@@ -97,12 +99,14 @@ export function PaneTabBar({
             <ExternalLink size={10} />
           </button>
           <button
+            type="button"
             title="Hide from full terminal"
             aria-label="Hide from full terminal"
             onClick={(e) => { e.stopPropagation(); onHideTab(tab.id, e) }}
             className={styles.hideTabBtn}
           ><X size={11} /></button>
           <button
+            type="button"
             title="Kill terminal and close tab"
             aria-label="Kill terminal and close tab"
             onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
@@ -112,13 +116,14 @@ export function PaneTabBar({
       ))}
       <div className={styles.actionGroup}>
         <Tooltip label="New shell tab" shortcut="Ctrl+Shift+S" placement="top">
-          <button onClick={() => onAddTab(pane)} className={styles.iconBtn}>
+          <button type="button" onClick={() => onAddTab(pane)} className={styles.iconBtn}>
             <ShellIcon size={12} />
             Shell
           </button>
         </Tooltip>
         <Tooltip label="Launch Claude Code" shortcut="Ctrl+Shift+C" placement="top">
           <button
+            type="button"
             onClick={() => onLaunch('claude', 'Claude', pane)}
             className={`${styles.iconBtn} ${styles.iconBtnClaude}`}
           >
@@ -128,11 +133,22 @@ export function PaneTabBar({
         </Tooltip>
         <Tooltip label="Launch OpenAI Codex" shortcut="Ctrl+Shift+X" placement="top">
           <button
+            type="button"
             onClick={() => onLaunch('codex', 'Codex', pane)}
             className={`${styles.iconBtn} ${styles.iconBtnCodex}`}
           >
             <CodexIcon size={12} />
             Codex
+          </button>
+        </Tooltip>
+        <Tooltip label="Launch Antigravity" placement="top">
+          <button
+            type="button"
+            onClick={() => onLaunch('agy', 'Antigravity', pane)}
+            className={`${styles.iconBtn} ${styles.iconBtnAntigravity}`}
+          >
+            <AntigravityIcon size={12} />
+            Antigravity
           </button>
         </Tooltip>
       </div>

@@ -63,6 +63,7 @@ export function TerminalLauncher(): JSX.Element {
         <div className={styles.terminalSplitDivider} />
         <button
           ref={chevronRef}
+          type="button"
           className={styles.terminalSplitChevron}
           onClick={openDropdown}
           aria-label="Open terminal launcher"
@@ -76,17 +77,17 @@ export function TerminalLauncher(): JSX.Element {
           className={styles.terminalDropdown}
           style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right }}
         >
-          <button className={styles.terminalDropdownItem} onClick={() => void launchWithKind(undefined, `Shell ${tabs.length + 1}`)}>
+          <button type="button" className={styles.terminalDropdownItem} onClick={() => void launchWithKind(undefined, `Shell ${tabs.length + 1}`)}>
             + Shell
           </button>
           <div className={styles.terminalDropdownDivider} />
-          <button className={styles.terminalDropdownItem} onClick={() => void launchWithKind('claude', 'Claude')}>
+          <button type="button" className={styles.terminalDropdownItem} onClick={() => void launchWithKind('claude', 'Claude')}>
             <ClaudeIcon size={13} /> Claude Code
           </button>
-          <button className={styles.terminalDropdownItem} onClick={() => void launchWithKind('codex', 'Codex')}>
+          <button type="button" className={styles.terminalDropdownItem} onClick={() => void launchWithKind('codex', 'Codex')}>
             <CodexIcon size={13} /> Codex
           </button>
-          <button className={styles.terminalDropdownItem} onClick={() => void launchWithKind('agy', 'Antigravity')}>
+          <button type="button" className={styles.terminalDropdownItem} onClick={() => void launchWithKind('agy', 'Antigravity')}>
             <AntigravityIcon size={13} /> Antigravity
           </button>
         </div>,

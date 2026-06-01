@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Maximize2, Minimize2, ExternalLink, Trash2, X } from 'lucide-react'
 import { useTerminalStore } from '../../../store/terminalStore'
-import { ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
+import { AntigravityIcon, ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
 import * as xtermRegistry from '../../Terminal/xtermRegistry'
 import styles from './MiniTerminalCard.module.css'
 
@@ -9,7 +9,7 @@ type ViewState = 'banner' | 'peek'
 
 interface MiniTerminalCardProps {
   tabId: string
-  target: 'claude' | 'codex' | 'shell'
+  target: 'claude' | 'codex' | 'shell' | 'antigravity'
   status: 'running' | 'done' | 'error'
   previewLines: string[]
   onOpenFullTerminal: () => void
@@ -20,6 +20,7 @@ interface MiniTerminalCardProps {
 function TargetIcon({ target }: { target: MiniTerminalCardProps['target'] }): JSX.Element {
   if (target === 'claude') return <ClaudeIcon size={14} />
   if (target === 'codex') return <CodexIcon size={14} />
+  if (target === 'antigravity') return <AntigravityIcon size={14} />
   return <ShellIcon size={14} />
 }
 

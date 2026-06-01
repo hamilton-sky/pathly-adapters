@@ -1,0 +1,83 @@
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  min-height: 26px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotIdle {
+  background: var(--text-muted);
+}
+
+.dotRunning {
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.dotPaused {
+  background: var(--yellow);
+}
+
+.dotBlocked {
+  background: var(--orange, #f97316);
+}
+
+.dotError {
+  background: var(--red, #ef4444);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.stage {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.adapterChip {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--chip-color, var(--text-muted));
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.adapterChipEmpty {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.cost {
+  color: var(--text-secondary);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.session {
+  color: var(--text-secondary);
+}
+
+.sessionDegraded {
+  color: var(--yellow);
+}
+
+.error {
+  color: var(--red, #ef4444);
+  font-size: 11px;
+  width: 100%;
+}

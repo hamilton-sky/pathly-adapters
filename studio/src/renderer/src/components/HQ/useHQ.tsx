@@ -20,7 +20,7 @@ import * as xtermRegistry from '../Terminal/xtermRegistry'
 import { feedBuffer, buildSystemPrompt } from './chatUtils'
 import type { PathlyMenuItem } from '../../lib/pathlyContext'
 
-export function useChatPanel() {
+export function useHQ() {
   const [inputValue, setInputValue] = useState('')
   const [llmAvailable, setLlmAvailable] = useState<boolean | null>(null)
   const [pathlyContext, setPathlyContext] = useState<Awaited<ReturnType<typeof buildPathlyContext>> | null>(null)
@@ -80,12 +80,13 @@ export function useChatPanel() {
   const claudeTabId = tabIdByKind.claude ?? tabs.find((tab) => tab.kind === 'claude')?.id ?? null
   const codexTabId = tabIdByKind.codex ?? tabs.find((tab) => tab.kind === 'codex')?.id ?? null
   const shellTabId = tabIdByKind.shell ?? tabs.find((tab) => tab.kind === 'shell')?.id ?? null
+  const antigravityTabId = tabIdByKind.antigravity ?? tabs.find((tab) => tab.kind === 'antigravity')?.id ?? null
 
   const TARGET_COLORS: Record<'claude' | 'codex' | 'shell' | 'antigravity', string> = {
     claude: '#38BDF8', codex: '#F59E0B', shell: '#86EFAC', antigravity: '#4285F4',
   }
-  const currentTabId = targetKind === 'claude' ? claudeTabId : targetKind === 'codex' ? codexTabId : shellTabId
-  const currentOutput = targetKind === 'claude' ? claudeOutput : targetKind === 'codex' ? codexOutput : shellOutput
+  const currentTabId = targetKind === 'claude' ? claudeTabId : targetKind === 'codex' ? codexTabId : targetKind === 'antigravity' ? antigravityTabId : shellTabId
+  const currentOutput = targetKind === 'claude' ? claudeOutput : targetKind === 'codex' ? codexOutput : targetKind === 'antigravity' ? outputByTarget.antigravity : shellOutput
   const hasActiveTerminal = !!currentTabId
   const miniTerminalVisible = hasActiveTerminal && !hiddenMiniCards[targetKind]
 
@@ -102,8 +103,8 @@ export function useChatPanel() {
   const [menuDismissedKey, setMenuDismissedKey] = useState<string | null>(null)
   const menuVisible = activeMenu !== null && menuKey !== menuDismissedKey
 
-  const terminalBuffers = useRef<Record<string, string>>({ claude: '', codex: '', shell: '' })
-  const idleTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({ claude: null, codex: null, shell: null })
+  const terminalBuffers = useRef<Record<string, string>>({ claude: '', codex: '', shell: '', antigravity: '' })
+  const idleTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({ claude: null, codex: null, shell: null, antigravity: null })
   const streamTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streamPending = useRef<ReturnType<typeof splitThinkingContent> | null>(null)
 
@@ -129,7 +130,7 @@ export function useChatPanel() {
   }
 
   useEffect(() => {
-    const kinds = ['claude', 'codex', 'shell'] as const
+    const kinds = ['claude', 'codex', 'shell', 'antigravity'] as const
     const unsubs: Array<(() => void) | undefined> = []
 
     for (const kind of kinds) {
@@ -155,7 +156,7 @@ export function useChatPanel() {
     }
 
     return () => {
-      terminalBuffers.current = { claude: '', codex: '', shell: '' }
+      terminalBuffers.current = { claude: '', codex: '', shell: '', antigravity: '' }
       for (const kind of kinds) {
         if (idleTimers.current[kind]) clearTimeout(idleTimers.current[kind]!)
       }
@@ -502,7 +503,7 @@ export function useChatPanel() {
   }
 
   function renderTerminalCard(
-    kind: 'claude' | 'codex' | 'shell',
+    kind: 'claude' | 'codex' | 'shell' | 'antigravity',
     tabId: string | null,
     output: typeof claudeOutput
   ): JSX.Element | null {
@@ -597,6 +598,7 @@ export function useChatPanel() {
     claudeTabId,
     codexTabId,
     shellTabId,
+    antigravityTabId,
     TARGET_COLORS,
     currentTabId,
     currentOutput,

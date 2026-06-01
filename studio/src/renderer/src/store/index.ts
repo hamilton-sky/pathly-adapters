@@ -3,6 +3,9 @@ import { useProjectStore } from './projectStore'
 import type { UiState } from './uiStore'
 import type { ProjectState } from './projectStore'
 
+export { useRunnerStore } from './runnerStore'
+export type { RunnerStatus, SessionKind, DecisionMenuItem } from './runnerStore'
+
 type StoreState = UiState & ProjectState
 
 export function useStore(): StoreState
