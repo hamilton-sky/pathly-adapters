@@ -295,7 +295,7 @@ def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -
 
 
 def _count_planned_convs(storage_path: Path) -> int:
-    """Count conversation rows matching the # column pattern in PROGRESS.md."""
+    """Count unique conversation numbers in the # column of PROGRESS.md."""
     progress_file = storage_path / "PROGRESS.md"
     if not progress_file.exists():
         return 0
@@ -303,7 +303,12 @@ def _count_planned_convs(storage_path: Path) -> int:
         text = progress_file.read_text(encoding="utf-8")
     except OSError:
         return 0
-    return sum(1 for line in text.splitlines() if re.search(r"\|\s*\d+\s*\|", line))
+    numbers: set[str] = set()
+    for line in text.splitlines():
+        m = re.match(r"^\s*\|\s*(\d+)\s*\|", line)
+        if m:
+            numbers.add(m.group(1))
+    return len(numbers)
 
 
 def _get_head_sha(project_root: str) -> str:
