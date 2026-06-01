@@ -466,3 +466,52 @@ def test_escalate_response_not_continuable(tmp_path):
     assert result["decision"] == "escalate"
     assert result.get("blocked") is True
     assert "next_state" not in result
+
+
+# ── preferred_adapter tests ───────────────────────────────────────────────────
+
+def test_resolve_adapter_state_in_map():
+    flow = {**ROUTING_FLOW, "adapter_map": {"default": "claude", "BUILDING": "codex"}}
+    assert fsm_ops._resolve_adapter(flow, "BUILDING") == "codex"
+
+
+def test_resolve_adapter_state_not_in_map_uses_default():
+    flow = {**ROUTING_FLOW, "adapter_map": {"default": "claude", "REVIEWING": "codex"}}
+    assert fsm_ops._resolve_adapter(flow, "BUILDING") == "claude"
+
+
+def test_resolve_adapter_no_adapter_map_returns_empty():
+    assert fsm_ops._resolve_adapter(ROUTING_FLOW, "BUILDING") == ""
+
+
+def test_next_action_preferred_adapter_from_state(tmp_path, monkeypatch):
+    flow = {**ROUTING_FLOW, "adapter_map": {"default": "claude", "BUILDING": "codex"}}
+    _patch_load_flow(monkeypatch, flow)
+    _patch_build_prompt(monkeypatch)
+
+    result = next_action({"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)})
+    assert result["preferred_adapter"] == "codex"
+
+
+def test_next_action_preferred_adapter_fallback_to_default(tmp_path, monkeypatch):
+    flow = {**ROUTING_FLOW, "adapter_map": {"default": "claude", "REVIEWING": "codex"}}
+    _patch_load_flow(monkeypatch, flow)
+    _patch_build_prompt(monkeypatch)
+
+    result = next_action({"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)})
+    assert result["preferred_adapter"] == "claude"
+
+
+def test_next_action_preferred_adapter_empty_when_no_map(tmp_path, monkeypatch):
+    _patch_load_flow(monkeypatch, ROUTING_FLOW)
+    _patch_build_prompt(monkeypatch)
+
+    result = next_action({"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)})
+    assert result["preferred_adapter"] == ""
+
+
+def test_blocked_response_carries_preferred_adapter():
+    state_info = {"current_state": "REVIEWING", "conv": 1, "retry_count": 0, "limits": {}}
+    feedback = {"target_agent": "builder", "file": "REVIEW_FAILURES.md"}
+    result = fsm_ops._blocked_response(feedback, state_info, preferred_adapter="codex")
+    assert result["preferred_adapter"] == "codex"

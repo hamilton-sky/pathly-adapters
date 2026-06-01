@@ -183,6 +183,12 @@ def _stage_brief(state_info: dict, storage_path: Path) -> dict:
     }
 
 
+def _resolve_adapter(flow_config: dict, state_name: str) -> str:
+    # slot reserved: per-feature STATE.json override (follow-up work)
+    adapter_map = flow_config.get("adapter_map") or {}
+    return adapter_map.get(state_name) or adapter_map.get("default") or ""
+
+
 def _response_envelope(
     *,
     state_info: dict,
@@ -192,6 +198,7 @@ def _response_envelope(
     menu: dict | None,
     current_state_value: str | None = None,
     include_storage_path: bool = True,
+    preferred_adapter: str = "",
 ) -> dict:
     result = {
         "schema_version": _SCHEMA_VERSION,
@@ -200,6 +207,7 @@ def _response_envelope(
         "conv": state_info["conv"],
         "role": agent,
         "agent": agent,
+        "preferred_adapter": preferred_adapter,
         "agent_hint": _agent_hint(agent, instructions),
         "stage_brief": _stage_brief(state_info, storage_path),
         "warnings": [],
@@ -213,7 +221,7 @@ def _response_envelope(
     return result
 
 
-def _blocked_response(feedback: dict, state_info: dict, storage_path: Path | None = None) -> dict:
+def _blocked_response(feedback: dict, state_info: dict, storage_path: Path | None = None, preferred_adapter: str = "") -> dict:
     decision = "escalate" if feedback["target_agent"] == "human" else "block"
     result = {
         "schema_version": _SCHEMA_VERSION,
@@ -222,6 +230,7 @@ def _blocked_response(feedback: dict, state_info: dict, storage_path: Path | Non
         "conv": state_info["conv"],
         "role": feedback["target_agent"],
         "agent": feedback["target_agent"],
+        "preferred_adapter": preferred_adapter,
         "agent_hint": _agent_hint(feedback["target_agent"], feedback.get("instructions")),
         "stage_brief": {
             "state": state_info["current_state"],
@@ -423,7 +432,8 @@ def next_action(args: dict) -> dict:
     feedback = route_feedback(flow_config, storage_path)
 
     if feedback is not None:
-        result = _blocked_response(feedback, state_info, storage_path)
+        result = _blocked_response(feedback, state_info, storage_path,
+                                   preferred_adapter=_resolve_adapter(flow_config, state_info["current_state"]))
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
@@ -445,6 +455,7 @@ def next_action(args: dict) -> dict:
         agent=agent,
         instructions=instructions,
         menu=menu,
+        preferred_adapter=_resolve_adapter(flow_config, state_info["current_state"]),
     )
     result["limits"] = state_info["limits"]
     return result
@@ -500,7 +511,8 @@ def complete_stage(args: dict) -> dict:
 
     feedback = route_feedback(flow_config, storage_path)
     if feedback is not None:
-        result = _blocked_response(feedback, state_info, storage_path)
+        result = _blocked_response(feedback, state_info, storage_path,
+                                   preferred_adapter=_resolve_adapter(flow_config, state_info["current_state"]))
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
@@ -569,7 +581,8 @@ def complete_stage(args: dict) -> dict:
         feedback = route_feedback(flow_config, storage_path)
         if feedback is None:
             feedback = {"target_agent": "human", "file": gate_failure.get("feedback_file", "HUMAN_QUESTIONS.md")}
-        result = _blocked_response(feedback, state_info, storage_path)
+        result = _blocked_response(feedback, state_info, storage_path,
+                                   preferred_adapter=_resolve_adapter(flow_config, state_info["current_state"]))
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
@@ -630,6 +643,7 @@ def complete_stage(args: dict) -> dict:
         instructions=instructions,
         menu=menu,
         current_state_value=next_state,
+        preferred_adapter=_resolve_adapter(flow_config, next_state),
     )
     result["limits"] = state_info["limits"]
     return result
