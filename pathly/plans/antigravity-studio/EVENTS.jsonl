@@ -9,3 +9,4 @@
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "schema_version": 1, "ts": "2026-06-01T14:22:40Z"}
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":2,"result":"DONE","tokens_in":35106,"tokens_out":8777,"total_tokens":43883,"cost_usd":0.237099,"tool_uses":37,"wall_seconds":201,"ts":"2026-06-01T14:26:55Z","schema_version":1}
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":3,"result":"DONE","tokens_in":22945,"tokens_out":5736,"total_tokens":28681,"cost_usd":0.154869,"tool_uses":21,"wall_seconds":134,"ts":"2026-06-01T14:32:27Z","schema_version":1}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":3,"result":"DONE","tokens_in":52244,"tokens_out":13061,"total_tokens":65305,"cost_usd":0.352647,"tool_uses":64,"wall_seconds":500,"ts":"2026-06-01T14:47:34Z","schema_version":1}
