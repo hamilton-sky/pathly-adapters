@@ -4,7 +4,7 @@ import { Terminal, ChevronDown } from 'lucide-react'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { IconButton } from '../ui'
-import { AntigravityIcon, ClaudeIcon, CodexIcon } from '../Terminal/BrandIcons'
+import { TERMINAL_OPTIONS } from '../../lib/terminalOptions'
 import { launchTerminal } from '../../lib/launchTerminal'
 import styles from './TopBar.module.css'
 
@@ -77,19 +77,22 @@ export function TerminalLauncher(): JSX.Element {
           className={styles.terminalDropdown}
           style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right }}
         >
-          <button type="button" className={styles.terminalDropdownItem} onClick={() => void launchWithKind(undefined, `Shell ${tabs.length + 1}`)}>
-            + Shell
-          </button>
-          <div className={styles.terminalDropdownDivider} />
-          <button type="button" className={styles.terminalDropdownItem} onClick={() => void launchWithKind('claude', 'Claude')}>
-            <ClaudeIcon size={13} /> Claude Code
-          </button>
-          <button type="button" className={styles.terminalDropdownItem} onClick={() => void launchWithKind('codex', 'Codex')}>
-            <CodexIcon size={13} /> Codex
-          </button>
-          <button type="button" className={styles.terminalDropdownItem} onClick={() => void launchWithKind('agy', 'Antigravity')}>
-            <AntigravityIcon size={13} /> Antigravity
-          </button>
+          {TERMINAL_OPTIONS.map((opt, i) => (
+            <React.Fragment key={opt.kind}>
+              {i === 1 && <div className={styles.terminalDropdownDivider} />}
+              <button
+                type="button"
+                className={styles.terminalDropdownItem}
+                onClick={() => void launchWithKind(
+                  opt.command,
+                  opt.kind === 'shell' ? `Shell ${tabs.length + 1}` : opt.label
+                )}
+              >
+                {opt.icon(13)}
+                {opt.kind === 'shell' ? '+ Shell' : opt.label}
+              </button>
+            </React.Fragment>
+          ))}
         </div>,
         document.body
       )}

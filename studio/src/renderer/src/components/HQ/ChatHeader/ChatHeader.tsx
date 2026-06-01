@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X, Zap, SquarePen, History, ChevronDown } from 'lucide-react'
 import type { TerminalKind } from '../../../store/chatStore'
 import { Tooltip } from '../../ui'
-import { AntigravityIcon, ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
+import { TERMINAL_OPTIONS } from '../../../lib/terminalOptions'
 import styles from './ChatHeader.module.css'
 
 export interface SessionSummary {
@@ -25,12 +25,6 @@ interface ChatHeaderProps {
   onSelectSession?: (id: string) => void
 }
 
-const TARGET_OPTIONS: Array<{ kind: TerminalKind; label: string; icon: (s: number) => JSX.Element }> = [
-  { kind: 'claude',      label: 'Claude',      icon: (s) => <ClaudeIcon size={s} /> },
-  { kind: 'codex',       label: 'Codex',       icon: (s) => <CodexIcon size={s} /> },
-  { kind: 'shell',       label: 'Shell',       icon: (s) => <ShellIcon size={s} /> },
-  { kind: 'antigravity', label: 'Antigravity', icon: (s) => <AntigravityIcon size={s} /> },
-]
 
 export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigravityTab, targetKind, onSetTarget, onToggleChat, onClearChat, sessions = [], onSelectSession }: ChatHeaderProps): JSX.Element {
   const [targetOpen, setTargetOpen] = useState(false)
@@ -45,7 +39,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
     antigravity: hasAntigravityTab,
   }
 
-  const current = TARGET_OPTIONS.find((o) => o.kind === targetKind) ?? TARGET_OPTIONS[0]
+  const current = TERMINAL_OPTIONS.find((o) => o.kind === targetKind) ?? TERMINAL_OPTIONS[0]
 
   useEffect(() => {
     if (!targetOpen) return
@@ -102,7 +96,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
 
         {targetOpen && (
           <div className={styles.targetDropdown}>
-            {TARGET_OPTIONS.map((opt) => (
+            {TERMINAL_OPTIONS.map((opt) => (
               <button
                 key={opt.kind}
                 type="button"

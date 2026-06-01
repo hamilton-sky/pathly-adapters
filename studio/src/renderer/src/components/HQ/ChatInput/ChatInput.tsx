@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Square, TerminalSquare, ChevronUp } from 'lucide-react'
 import { useChatStore } from '../../../store/chatStore'
 import { ModelSelector } from '../ModelSelector/ModelSelector'
-import { ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
+import { TERMINAL_OPTIONS } from '../../../lib/terminalOptions'
 import styles from './ChatInput.module.css'
 
 
@@ -81,28 +81,20 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
         <div ref={groupRef} className={styles.terminalGroup}>
           {dropdownOpen && (
             <div className={styles.terminalDropdown}>
-              {(['shell', 'claude', 'codex'] as const).map((kind) => {
-                const labels = { shell: '+ Shell', claude: 'Claude Code', codex: 'Codex' }
-                const icons = {
-                  shell: <ShellIcon size={14} />,
-                  claude: <ClaudeIcon size={14} />,
-                  codex: <CodexIcon size={14} />,
-                }
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    className={styles.terminalDropdownItem}
-                    onClick={() => {
-                      setDropdownOpen(false)
-                      onLaunchMiniTerminal?.(kind)
-                    }}
-                  >
-                    {icons[kind]}
-                    {labels[kind]}
-                  </button>
-                )
-              })}
+              {TERMINAL_OPTIONS.map((opt) => (
+                <button
+                  key={opt.kind}
+                  type="button"
+                  className={styles.terminalDropdownItem}
+                  onClick={() => {
+                    setDropdownOpen(false)
+                    onLaunchMiniTerminal?.(opt.kind)
+                  }}
+                >
+                  {opt.icon(14)}
+                  {opt.kind === 'shell' ? '+ Shell' : opt.label}
+                </button>
+              ))}
             </div>
           )}
           <button

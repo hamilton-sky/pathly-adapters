@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ExternalLink, Trash2, X } from 'lucide-react'
 import type { TerminalTab } from './types'
 import { Tooltip } from '../ui'
-import { AntigravityIcon, ClaudeIcon, CodexIcon, ShellIcon } from './BrandIcons'
+import { TERMINAL_OPTIONS } from '../../lib/terminalOptions'
 import styles from './Terminal.module.css'
 
 interface PaneTabBarProps {
@@ -20,11 +20,8 @@ interface PaneTabBarProps {
 }
 
 function TabBrandIcon({ kind }: { kind?: TerminalTab['kind'] }): JSX.Element | null {
-  if (kind === 'shell' || !kind) return <ShellIcon size={13} />
-  if (kind === 'claude') return <ClaudeIcon size={13} />
-  if (kind === 'codex')  return <CodexIcon  size={13} />
-  if (kind === 'antigravity') return <AntigravityIcon size={13} />
-  return null
+  const opt = TERMINAL_OPTIONS.find((o) => o.kind === (kind ?? 'shell'))
+  return opt ? opt.icon(13) : null
 }
 
 export function PaneTabBar({
@@ -115,42 +112,30 @@ export function PaneTabBar({
         </div>
       ))}
       <div className={styles.actionGroup}>
-        <Tooltip label="New shell tab" shortcut="Ctrl+Shift+S" placement="top">
-          <button type="button" onClick={() => onAddTab(pane)} className={styles.iconBtn}>
-            <ShellIcon size={12} />
-            Shell
-          </button>
-        </Tooltip>
-        <Tooltip label="Launch Claude Code" shortcut="Ctrl+Shift+C" placement="top">
-          <button
-            type="button"
-            onClick={() => onLaunch('claude', 'Claude', pane)}
-            className={`${styles.iconBtn} ${styles.iconBtnClaude}`}
-          >
-            <ClaudeIcon size={12} />
-            Claude
-          </button>
-        </Tooltip>
-        <Tooltip label="Launch OpenAI Codex" shortcut="Ctrl+Shift+X" placement="top">
-          <button
-            type="button"
-            onClick={() => onLaunch('codex', 'Codex', pane)}
-            className={`${styles.iconBtn} ${styles.iconBtnCodex}`}
-          >
-            <CodexIcon size={12} />
-            Codex
-          </button>
-        </Tooltip>
-        <Tooltip label="Launch Antigravity" placement="top">
-          <button
-            type="button"
-            onClick={() => onLaunch('agy', 'Antigravity', pane)}
-            className={`${styles.iconBtn} ${styles.iconBtnAntigravity}`}
-          >
-            <AntigravityIcon size={12} />
-            Antigravity
-          </button>
-        </Tooltip>
+        {TERMINAL_OPTIONS.map((opt) => {
+          const tooltipProps = opt.kind === 'shell'
+            ? { label: 'New shell tab', shortcut: 'Ctrl+Shift+S' }
+            : opt.kind === 'claude'
+            ? { label: 'Launch Claude Code', shortcut: 'Ctrl+Shift+C' }
+            : opt.kind === 'codex'
+            ? { label: 'Launch OpenAI Codex', shortcut: 'Ctrl+Shift+X' }
+            : { label: `Launch ${opt.label}` }
+          const kindClass = opt.kind !== 'shell'
+            ? styles[`iconBtn${opt.kind.charAt(0).toUpperCase()}${opt.kind.slice(1)}`]
+            : undefined
+          return (
+            <Tooltip key={opt.kind} {...tooltipProps} placement="top">
+              <button
+                type="button"
+                onClick={() => opt.kind === 'shell' ? onAddTab(pane) : onLaunch(opt.command, opt.label, pane)}
+                className={`${styles.iconBtn}${kindClass ? ` ${kindClass}` : ''}`}
+              >
+                {opt.icon(12)}
+                {opt.kind === 'claude' ? 'Claude' : opt.label}
+              </button>
+            </Tooltip>
+          )
+        })}
       </div>
     </div>
   )
