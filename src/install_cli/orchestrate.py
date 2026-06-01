@@ -23,7 +23,7 @@ from .materialize import (
 
 # Must stay in sync with detect_hosts() — any host returned by detect_hosts()
 # must appear here, or auto-detected installs will fail with a confusing error.
-ALLOWED_HOSTS = {"claude", "codex", "copilot"}
+ALLOWED_HOSTS = {"claude", "codex", "copilot", "antigravity"}
 
 _AGENT_GROUPS = {
     "architect": "planning",

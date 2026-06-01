@@ -4,6 +4,9 @@ _HOST_MARKERS: dict[str, list[Path]] = {
     "claude": [
         Path.home() / ".claude",
     ],
+    "antigravity": [
+        Path.home() / ".gemini" / "antigravity-cli",
+    ],
     "codex": [
         Path.home() / ".codex",
         Path.home() / ".openai-codex",

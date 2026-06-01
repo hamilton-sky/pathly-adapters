@@ -1,0 +1,8 @@
+host: antigravity
+destination: ~/.gemini/antigravity-cli/agents/
+skills:
+  destination: ~/.gemini/antigravity-cli/skills/
+  structure: nested
+templates:
+  destination: ~/.gemini/antigravity-cli/plugins/pathly/templates
+telemetry: true
