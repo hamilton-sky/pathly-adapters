@@ -175,6 +175,18 @@ def test_validate_adapter_map_unknown_adapter_fails(monkeypatch, tmp_path, capsy
     assert "cursor" in out
 
 
+def test_validate_adapter_map_unknown_default_value_fails(monkeypatch, tmp_path, capsys):
+    """The 'default' key's own value must also be in _KNOWN_ADAPTERS."""
+    flow = _minimal_flow(adapter_map={"default": "cursor"})
+    flow_file = tmp_path / "bad_default_value.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "cursor" in out
+
+
 def test_validate_adapter_map_unknown_state_key_fails(monkeypatch, tmp_path, capsys):
     flow = _minimal_flow(adapter_map={"default": "claude", "NONEXISTENT": "codex"})
     flow_file = tmp_path / "bad_state_key.flow.yaml"
@@ -186,7 +198,7 @@ def test_validate_adapter_map_unknown_state_key_fails(monkeypatch, tmp_path, cap
     assert "NONEXISTENT" in out
 
 
-def test_validate_flow_without_adapter_map_still_passes(monkeypatch, tmp_path, capsys):
+def test_validate_flow_without_adapter_map_still_passes(monkeypatch, tmp_path):
     flow = _minimal_flow()
     flow_file = tmp_path / "no_adapter_map.flow.yaml"
     flow_file.write_text(yaml.dump(flow), encoding="utf-8")
@@ -195,7 +207,7 @@ def test_validate_flow_without_adapter_map_still_passes(monkeypatch, tmp_path, c
     assert code == 0
 
 
-def test_validate_team_flow_with_adapter_map_still_passes(monkeypatch, capsys):
+def test_validate_team_flow_with_adapter_map_still_passes(monkeypatch):
     """team.flow.yaml has no adapter_map — validator must still pass cleanly."""
     code = _run_cli(str(FLOWS_DIR / "team.flow.yaml"), monkeypatch)
     assert code == 0
