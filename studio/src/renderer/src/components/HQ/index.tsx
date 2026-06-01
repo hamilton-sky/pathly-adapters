@@ -24,7 +24,7 @@ export function HQ(): JSX.Element {
     >
       {/* Left-edge drag handle — drag to resize */}
       <div className={styles.resizeHandle} onMouseDown={chat.onDragStart} />
-      <ChatHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} hasAntigravityTab={chat.hasAntigravityTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={chat.handleClearAll} onLaunch={(kind) => { void chat.launchMiniTerminal(kind) }} sessions={chat.brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
+      <ChatHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} hasAntigravityTab={chat.hasAntigravityTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={chat.handleClearAll} sessions={chat.brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
       <FlowControlBar />
       <StageStatusStrip />
       <SkillsPanel onSkillClick={chat.handleSkillClick} />
