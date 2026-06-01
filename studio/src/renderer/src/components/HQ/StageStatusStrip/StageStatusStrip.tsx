@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react'
 import { useRunnerStore } from '../../../store/runnerStore'
 import type { RunnerStatus } from '../../../store/runnerStore'
 import styles from './StageStatusStrip.module.css'
@@ -33,6 +34,13 @@ export function StageStatusStrip(): JSX.Element {
   const costDisplay = cost === 0 && status === 'idle' ? '—' : `$${cost.toFixed(3)}`
   const adapterColor = adapter ? (ADAPTER_COLORS[adapter] ?? 'var(--text-muted)') : undefined
   const sessionLabel = sessionKind ? SESSION_LABELS[sessionKind] : null
+  const chipRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (chipRef.current && adapterColor !== undefined) {
+      chipRef.current.style.setProperty('--chip-color', adapterColor)
+    }
+  }, [adapterColor])
 
   return (
     <div className={styles.strip}>
@@ -40,8 +48,8 @@ export function StageStatusStrip(): JSX.Element {
       <span className={styles.stage}>{stage ?? '—'}</span>
       {adapter && (
         <span
+          ref={chipRef}
           className={styles.adapterChip}
-          style={{ '--chip-color': adapterColor } as React.CSSProperties}
           aria-hidden="true"
         >
           {adapter}

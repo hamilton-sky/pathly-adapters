@@ -92,6 +92,7 @@ export function PathlyMenuCard({
                   item={item}
                   onError={(msg) => setRunnerState({ errorMessage: msg })}
                   onDone={() => setDecisionMenu(null)}
+                  onRevert={() => setDecisionMenu(decisionMenu)}
                 />
               ))}
             </div>

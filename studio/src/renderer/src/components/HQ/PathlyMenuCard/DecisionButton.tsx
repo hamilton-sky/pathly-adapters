@@ -6,9 +6,10 @@ interface DecisionButtonProps {
   item: DecisionMenuItem
   onError: (msg: string) => void
   onDone: () => void
+  onRevert: () => void
 }
 
-export function DecisionButton({ item, onError, onDone }: DecisionButtonProps): JSX.Element {
+export function DecisionButton({ item, onError, onDone, onRevert }: DecisionButtonProps): JSX.Element {
   const [disabled, setDisabled] = useState(false)
   const [displayText, setDisplayText] = useState('')
 
@@ -24,19 +25,20 @@ export function DecisionButton({ item, onError, onDone }: DecisionButtonProps): 
 
   async function handleClick(): Promise<void> {
     setDisabled(true)
+    onDone()
     try {
       const res = await fetch('http://127.0.0.1:8765/runner/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ choice: item.id }),
       })
-      if (res.ok) {
-        onDone()
-      } else {
+      if (!res.ok) {
+        onRevert()
         setDisabled(false)
         onError(`decision failed: ${res.status}`)
       }
     } catch {
+      onRevert()
       setDisabled(false)
       onError('decision failed: network error')
     }
@@ -47,8 +49,8 @@ export function DecisionButton({ item, onError, onDone }: DecisionButtonProps): 
       type="button"
       className={`${styles.decisionBtn} ${disabled ? styles.decisionBtnDisabled : ''}`}
       aria-label={item.label}
-      aria-disabled={disabled}
       disabled={disabled}
+      {...(disabled ? { 'aria-disabled': 'true' } : { 'aria-disabled': 'false' })}
       onClick={() => { void handleClick() }}
     >
       {displayText}

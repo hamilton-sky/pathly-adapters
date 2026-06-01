@@ -65,7 +65,7 @@ export function ReroutePopover({ onClose, onError }: ReroutePopoverProps): JSX.E
           <span
             key={key}
             className={`${styles.chip} ${selected === key ? styles.chipActive : ''}`}
-            style={{ '--chip-color': ADAPTERS[key].color } as React.CSSProperties}
+            ref={(el) => { if (el) el.style.setProperty('--chip-color', ADAPTERS[key].color) }}
           />
         ))}
       </div>

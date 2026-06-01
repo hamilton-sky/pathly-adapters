@@ -18,7 +18,7 @@ These two stories cover the full Studio upgrade. They build sequentially: S1 del
 **As a** Pathly Studio user, **I want** the ChatPanel renamed to HQ with a control bar and a live status strip, **so that** I can start, pause, resume, advance, reroute, retry, or abort a pipeline run from one place and see what stage and adapter are currently active.
 
 **Acceptance Criteria:**
-- [ ] Folder `studio/src/renderer/src/components/ChatPanel/` is renamed to `HQ/`; hook renamed `useChatPanel.tsx` → `useHQ.ts`; all import sites updated; the Studio tab label reads "HQ".
+- [ ] Folder `studio/src/renderer/src/components/ChatPanel/` is renamed to `HQ/`; hook renamed `useChatPanel.tsx` → `useHQ.tsx`; all import sites updated; the Studio tab label reads "HQ".
 - [ ] `ChatHeader.tsx` renders a subtitle or tooltip element per `DESIGN.md` (element is present in the DOM, content non-empty).
 - [ ] `runnerStore` exists in `studio/src/renderer/src/store/runnerStore.ts` and is merged into `store/index.ts`; it exposes at minimum `status`, `stage`, `adapter`, `cost`, `sessionKind` fields and `setRunnerState` / `resetRunner` actions.
 - [ ] `FlowControlBar` renders seven buttons: Start, Pause, Resume, Advance, Reroute, Retry, Abort. Each button carries `type="button"` and an `aria-label`. Clicking Start sends `POST http://127.0.0.1:8765/runner/start`; Pause → `/runner/pause`; Resume → `/runner/resume`; Advance → `/runner/advance`; Retry → `/runner/retry`. (Reroute and Abort have their own AC below.)
