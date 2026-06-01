@@ -23,47 +23,47 @@
   color: var(--text-primary);
 }
 
-.pills {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 8px;
+/* ── Target selector dropdown ── */
+
+.targetWrapper {
+  position: relative;
   flex: 1;
-  min-width: 0;        /* allow shrinking below content size */
-  overflow: hidden;    /* clip instead of pushing buttons off screen */
+  min-width: 0;
 }
 
-.pill {
-  display: flex;
+.targetBtn {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: 11px;
-  padding: 2px 8px 2px 4px;
+  padding: 2px 6px 2px 4px;
   border-radius: 12px;
   background: var(--bg-surface1);
   color: var(--text-muted);
   border: 1px solid transparent;
   cursor: pointer;
   transition: border-color 150ms ease-out, background 150ms ease-out;
+  white-space: nowrap;
 }
 
-.pillCompact {
-  padding-right: 4px;
-}
-
-.pillSelected {
+.targetBtn:hover,
+.targetBtnOpen {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 15%, var(--bg-surface1));
   color: var(--accent);
 }
 
-.pillIcon {
-  width: 14px;
-  height: 14px;
+.targetIcon {
+  width: 13px;
+  height: 13px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.targetLabel {
+  font-size: 11px;
 }
 
 .dot {
@@ -78,6 +78,55 @@
   background: var(--accent);
 }
 
+.targetDropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 148px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  z-index: 200;
+  overflow: hidden;
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  padding: 4px;
+}
+
+.targetItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: background 120ms ease-out;
+}
+
+.targetItem:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.targetItemSelected {
+  color: var(--accent);
+}
+
+.targetItemIcon {
+  width: 13px;
+  height: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Icon buttons (new session, history, close) ── */
+
 .closeBtn {
   background: none;
   border: none;
@@ -88,7 +137,7 @@
   border-radius: 4px;
   transition: opacity 150ms ease-out;
   color: var(--text-primary);
-  flex-shrink: 0;    /* never get squeezed off-screen by pills */
+  flex-shrink: 0;
 }
 
 .closeBtn:hover {
@@ -100,7 +149,8 @@
   background: var(--bg-surface1);
 }
 
-/* Sessions badge */
+/* ── Sessions badge ── */
+
 .sessionsBadge {
   position: absolute;
   top: 0px;
@@ -114,7 +164,12 @@
   pointer-events: none;
 }
 
-/* Sessions dropdown wrapper */
+.sessionsBadgeAccent {
+  background: var(--accent);
+}
+
+/* ── Sessions dropdown ── */
+
 .sessionsWrapper {
   position: relative;
   flex-shrink: 0;
@@ -124,7 +179,6 @@
   position: relative;
 }
 
-/* Dropdown panel */
 .sessionsDropdown {
   position: absolute;
   top: calc(100% + 6px);
@@ -196,8 +250,4 @@
   font-size: 10px;
   opacity: 0.6;
   color: var(--text-muted);
-}
-
-.sessionsBadgeAccent {
-  background: var(--accent);
 }

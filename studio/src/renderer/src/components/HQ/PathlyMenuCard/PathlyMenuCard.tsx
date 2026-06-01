@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import type { PathlyMenu, PathlyMenuItem, PushedMenu } from '../../../lib/pathlyContext'
+import { useRunnerStore } from '../../../store/runnerStore'
+import { DecisionButton } from './DecisionButton'
 import styles from './PathlyMenuCard.module.css'
 
 interface PathlyMenuCardProps {
@@ -26,6 +28,9 @@ export function PathlyMenuCard({
 }: PathlyMenuCardProps): JSX.Element {
   const pushed = isPushedMenu(menu)
   const panelRef = useRef<HTMLDivElement>(null)
+  const decisionMenu = useRunnerStore((s) => s.decisionMenu)
+  const setDecisionMenu = useRunnerStore((s) => s.setDecisionMenu)
+  const setRunnerState = useRunnerStore((s) => s.setRunnerState)
 
   const remainingMs = pushed
     ? Math.max(0, menu.ttl * 1000 - (Date.now() - menu.pushedAt))
@@ -79,29 +84,42 @@ export function PathlyMenuCard({
           {menu.subtitle ? (
             <p className={styles.subtitle}>{menu.subtitle}</p>
           ) : null}
-          <div className={styles.items}>
-            {menu.items.length > 0 ? menu.items.map((item) => (
-              <button
-                type="button"
-                key={`${item.label}-${item.command}`}
-                className={`${styles.item} ${onSelect ? styles.itemClickable : ''}`}
-                onClick={onSelect ? () => onSelect(item) : undefined}
-                aria-label={`Run: ${item.label}`}
-              >
-                <div className={styles.itemTop}>
-                  <span className={styles.itemLabel}>{item.label}</span>
-                  <code className={styles.itemCommand}>{item.command}</code>
+          {decisionMenu !== null ? (
+            <div className={styles.decisionItems} aria-live="polite">
+              {decisionMenu.map((item) => (
+                <DecisionButton
+                  key={item.id}
+                  item={item}
+                  onError={(msg) => setRunnerState({ errorMessage: msg })}
+                  onDone={() => setDecisionMenu(null)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className={styles.items}>
+              {menu.items.length > 0 ? menu.items.map((item) => (
+                <button
+                  type="button"
+                  key={`${item.label}-${item.command}`}
+                  className={`${styles.item} ${onSelect ? styles.itemClickable : ''}`}
+                  onClick={onSelect ? () => onSelect(item) : undefined}
+                  aria-label={`Run: ${item.label}`}
+                >
+                  <div className={styles.itemTop}>
+                    <span className={styles.itemLabel}>{item.label}</span>
+                    <code className={styles.itemCommand}>{item.command}</code>
+                  </div>
+                  <div className={styles.itemDescription}>
+                    {item.description}
+                  </div>
+                </button>
+              )) : (
+                <div className={styles.empty}>
+                  {menu.empty_message}
                 </div>
-                <div className={styles.itemDescription}>
-                  {item.description}
-                </div>
-              </button>
-            )) : (
-              <div className={styles.empty}>
-                {menu.empty_message}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

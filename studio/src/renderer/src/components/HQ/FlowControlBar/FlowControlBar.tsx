@@ -27,8 +27,9 @@ export function FlowControlBar(): JSX.Element {
   const pauseEnabled = status === 'running'
   const resumeEnabled = status === 'paused'
   const advanceEnabled = status === 'blocked'
-  const rerouteEnabled = status === 'running' || status === 'paused'
+  const rerouteEnabled = status === 'blocked'
   const retryEnabled = status === 'error'
+  const abortEnabled = status !== 'idle'
 
   return (
     <div className={styles.wrapper}>
@@ -38,7 +39,7 @@ export function FlowControlBar(): JSX.Element {
           className={`${styles.btn} ${!startEnabled ? styles.btnDisabled : ''}`}
           disabled={!startEnabled}
           aria-label="Start run"
-          aria-disabled={!startEnabled}
+          {...(startEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
           onClick={() => { void postAction('start') }}
         >
           Start
@@ -48,7 +49,7 @@ export function FlowControlBar(): JSX.Element {
           className={`${styles.btn} ${!pauseEnabled ? styles.btnDisabled : ''}`}
           disabled={!pauseEnabled}
           aria-label="Pause run"
-          aria-disabled={!pauseEnabled}
+          {...(pauseEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
           onClick={() => { void postAction('pause') }}
         >
           Pause
@@ -58,7 +59,7 @@ export function FlowControlBar(): JSX.Element {
           className={`${styles.btn} ${!resumeEnabled ? styles.btnDisabled : ''}`}
           disabled={!resumeEnabled}
           aria-label="Resume run"
-          aria-disabled={!resumeEnabled}
+          {...(resumeEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
           onClick={() => { void postAction('resume') }}
         >
           Resume
@@ -68,7 +69,7 @@ export function FlowControlBar(): JSX.Element {
           className={`${styles.btn} ${!advanceEnabled ? styles.btnDisabled : ''}`}
           disabled={!advanceEnabled}
           aria-label="Advance past decision"
-          aria-disabled={!advanceEnabled}
+          {...(advanceEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
           onClick={() => { void postAction('advance') }}
         >
           Advance
@@ -79,7 +80,7 @@ export function FlowControlBar(): JSX.Element {
             className={`${styles.btn} ${!rerouteEnabled ? styles.btnDisabled : ''}`}
             disabled={!rerouteEnabled}
             aria-label="Reroute to different adapter"
-            aria-disabled={!rerouteEnabled}
+            {...(rerouteEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
             onClick={() => setShowReroute((v) => !v)}
           >
             Reroute
@@ -96,15 +97,17 @@ export function FlowControlBar(): JSX.Element {
           className={`${styles.btn} ${!retryEnabled ? styles.btnDisabled : ''}`}
           disabled={!retryEnabled}
           aria-label="Retry after error"
-          aria-disabled={!retryEnabled}
+          {...(retryEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
           onClick={() => { void postAction('retry') }}
         >
           Retry
         </button>
         <button
           type="button"
-          className={`${styles.btn} ${styles.btnAbort}`}
+          className={`${styles.btn} ${styles.btnAbort} ${!abortEnabled ? styles.btnDisabled : ''}`}
+          disabled={!abortEnabled}
           aria-label="Abort run"
+          {...(abortEnabled ? { 'aria-disabled': 'false' } : { 'aria-disabled': 'true' })}
           onClick={() => setShowAbort((v) => !v)}
         >
           Abort

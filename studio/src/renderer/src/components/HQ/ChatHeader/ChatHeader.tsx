@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Zap, SquarePen, History } from 'lucide-react'
+import { X, Zap, SquarePen, History, ChevronDown } from 'lucide-react'
 import type { TerminalKind } from '../../../store/chatStore'
 import { Tooltip } from '../../ui'
-import { ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
+import { AntigravityIcon, ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
 import styles from './ChatHeader.module.css'
 
 export interface SessionSummary {
@@ -16,6 +16,7 @@ interface ChatHeaderProps {
   hasClaudeTab: boolean
   hasCodexTab: boolean
   hasShellTab: boolean
+  hasAntigravityTab: boolean
   targetKind: TerminalKind
   onSetTarget: (kind: TerminalKind) => void
   onToggleChat: () => void
@@ -24,22 +25,36 @@ interface ChatHeaderProps {
   onSelectSession?: (id: string) => void
 }
 
-export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, targetKind, onSetTarget, onToggleChat, onClearChat, sessions = [], onSelectSession }: ChatHeaderProps): JSX.Element {
-  const headerRef = useRef<HTMLDivElement>(null)
-  const [compact, setCompact] = useState(false)
+const TARGET_OPTIONS: Array<{ kind: TerminalKind; label: string; icon: (s: number) => JSX.Element }> = [
+  { kind: 'claude',      label: 'Claude',      icon: (s) => <ClaudeIcon size={s} /> },
+  { kind: 'codex',       label: 'Codex',       icon: (s) => <CodexIcon size={s} /> },
+  { kind: 'shell',       label: 'Shell',       icon: (s) => <ShellIcon size={s} /> },
+  { kind: 'antigravity', label: 'Antigravity', icon: (s) => <AntigravityIcon size={s} /> },
+]
+
+export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigravityTab, targetKind, onSetTarget, onToggleChat, onClearChat, sessions = [], onSelectSession }: ChatHeaderProps): JSX.Element {
+  const [targetOpen, setTargetOpen] = useState(false)
   const [sessionsOpen, setSessionsOpen] = useState(false)
+  const targetRef = useRef<HTMLDivElement>(null)
   const sessionsRef = useRef<HTMLDivElement>(null)
 
+  const activeByKind: Record<TerminalKind, boolean> = {
+    claude: hasClaudeTab,
+    codex: hasCodexTab,
+    shell: hasShellTab,
+    antigravity: hasAntigravityTab,
+  }
+
+  const current = TARGET_OPTIONS.find((o) => o.kind === targetKind) ?? TARGET_OPTIONS[0]
+
   useEffect(() => {
-    const el = headerRef.current
-    if (!el) return
-    const update = (): void => setCompact(el.getBoundingClientRect().width < 360)
-    update()
-    if (typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+    if (!targetOpen) return
+    const handler = (e: MouseEvent): void => {
+      if (!targetRef.current?.contains(e.target as Node)) setTargetOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [targetOpen])
 
   useEffect(() => {
     if (!sessionsOpen) return
@@ -49,12 +64,6 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, targetKind,
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [sessionsOpen])
-
-  const targetPills: Array<{ kind: TerminalKind; label: string; icon: JSX.Element; active: boolean }> = [
-    { kind: 'claude', label: 'claude', icon: <ClaudeIcon size={14} />, active: hasClaudeTab },
-    { kind: 'codex', label: 'codex', icon: <CodexIcon size={14} />, active: hasCodexTab },
-    { kind: 'shell', label: 'shell', icon: <ShellIcon size={14} />, active: hasShellTab },
-  ]
 
   function formatActivity(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime()
@@ -66,31 +75,48 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, targetKind,
     return `${Math.floor(hrs / 24)}d ago`
   }
 
-
   return (
-    <div ref={headerRef} className={styles.header}>
+    <div className={styles.header}>
       <div className={styles.titleRow}>
         <span className={styles.title}>
           <Zap size={13} /> HQ
         </span>
       </div>
 
-      <div className={styles.pills}>
-        {targetPills.map((pill) => (
-          <Tooltip key={pill.kind} label={`Focus ${pill.label} terminal`} placement="bottom">
-            <button
-              type="button"
-              className={`${styles.pill} ${targetKind === pill.kind ? styles.pillSelected : ''} ${compact ? styles.pillCompact : ''}`}
-              onClick={() => onSetTarget(pill.kind)}
-              aria-label={`Focus ${pill.label} terminal`}
-              title={compact ? `Focus ${pill.label}` : undefined}
-            >
-              <span className={styles.pillIcon}>{pill.icon}</span>
-              <span className={`${styles.dot} ${pill.active ? styles.dotActive : ''}`} />
-              {!compact && pill.label}
-            </button>
-          </Tooltip>
-        ))}
+      {/* Target selector — single dropdown replacing the pill row */}
+      <div ref={targetRef} className={styles.targetWrapper}>
+        <Tooltip label="Select target terminal" placement="bottom">
+          <button
+            type="button"
+            className={`${styles.targetBtn} ${targetOpen ? styles.targetBtnOpen : ''}`}
+            onClick={() => setTargetOpen((v) => !v)}
+            aria-label="Select target terminal"
+            {...(targetOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+          >
+            <span className={styles.targetIcon}>{current.icon(13)}</span>
+            <span className={`${styles.dot} ${activeByKind[targetKind] ? styles.dotActive : ''}`} />
+            <span className={styles.targetLabel}>{current.label}</span>
+            <ChevronDown size={10} />
+          </button>
+        </Tooltip>
+
+        {targetOpen && (
+          <div className={styles.targetDropdown}>
+            {TARGET_OPTIONS.map((opt) => (
+              <button
+                key={opt.kind}
+                type="button"
+                className={`${styles.targetItem} ${targetKind === opt.kind ? styles.targetItemSelected : ''}`}
+                onClick={() => { onSetTarget(opt.kind); setTargetOpen(false) }}
+                aria-label={`Target ${opt.label}`}
+              >
+                <span className={styles.targetItemIcon}>{opt.icon(13)}</span>
+                <span className={`${styles.dot} ${activeByKind[opt.kind] ? styles.dotActive : ''}`} />
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* New session */}
@@ -121,9 +147,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, targetKind,
 
         {sessionsOpen && (
           <div className={styles.sessionsDropdown}>
-            <div className={styles.sessionsHeader}>
-              Conversations
-            </div>
+            <div className={styles.sessionsHeader}>Conversations</div>
             {sessions.length === 0 ? (
               <div className={styles.sessionsEmpty}>
                 No sessions yet.

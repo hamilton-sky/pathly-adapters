@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useRunnerStore } from '../../store/runnerStore'
+import type { DecisionMenuItem, RunnerStatus, SessionKind } from '../../store/runnerStore'
 import { useBrightskyStore } from '../../store/brightskyStore'
 import { brightskyClient } from '../../lib/brightskyClient'
 import { useChatStore } from '../../store/chatStore'
@@ -98,6 +100,7 @@ export function useHQ() {
   const hasClaudeTab = tabs.some((tab) => tab.kind === 'claude')
   const hasCodexTab = tabs.some((tab) => tab.kind === 'codex')
   const hasShellTab = tabs.some((tab) => tab.kind === 'shell')
+  const hasAntigravityTab = tabs.some((tab) => tab.kind === 'antigravity')
   const activeMenu = pathlyContext?.menu ?? null
   const menuKey = activeMenu ? `${activeMenu.state}:${activeMenu.feature}` : null
   const [menuDismissedKey, setMenuDismissedKey] = useState<string | null>(null)
@@ -207,6 +210,64 @@ export function useHQ() {
     )
     return unsubscribe
   }, [projectPath])
+
+  useEffect(() => {
+    const { setRunnerState, setDecisionMenu } = useRunnerStore.getState()
+    const lastCostRef = { current: 0 }
+    const retryCountRef = { current: 0 }
+    let es: EventSource | null = null          // hoisted — accessible in cleanup
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
+
+    function connect(): void {
+      try {
+        es = new EventSource('http://127.0.0.1:8765/events/runner')
+        es.onopen = () => { retryCountRef.current = 0 }  // reset backoff on successful connect
+        es.onmessage = (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data as string) as { type: string; [key: string]: unknown }
+            if (data.type === 'STAGE_CHANGE') {
+              setRunnerState({
+                stage: data.stage as string,
+                adapter: data.adapter as string | null,
+                status: data.status as RunnerStatus,
+              })
+            } else if (data.type === 'DECISION_MENU') {
+              setRunnerState({ status: 'blocked' })
+              setDecisionMenu(data.items as DecisionMenuItem[])
+            } else if (data.type === 'RUNNER_STATUS') {
+              setRunnerState({ status: data.status as RunnerStatus })
+            } else if (data.type === 'COST_UPDATE') {
+              const now = Date.now()
+              if (now - lastCostRef.current >= 200) {
+                lastCostRef.current = now
+                setRunnerState({ cost: data.cost_usd as number })
+              }
+            } else if (data.type === 'SESSION') {
+              setRunnerState({ sessionKind: data.kind as SessionKind })
+            } else if (data.type === 'RUNNER_ERROR') {
+              setRunnerState({ errorMessage: data.message as string, status: 'error' })
+            }
+          } catch { /* ignore parse errors */ }
+        }
+        es.onerror = () => {
+          es?.close()
+          es = null
+          // Exponential backoff: 3s → 6s → 12s → … capped at 30s
+          const delay = Math.min(3000 * Math.pow(2, retryCountRef.current), 30000)
+          retryCountRef.current += 1
+          setRunnerState({ errorMessage: 'Reconnecting...' })
+          reconnectTimeout = setTimeout(connect, delay)
+        }
+      } catch { /* EventSource not available — silently skip */ }
+    }
+
+    connect()
+
+    return () => {
+      if (reconnectTimeout !== null) clearTimeout(reconnectTimeout)
+      es?.close()    // now accessible — closes the live connection on unmount
+    }
+  }, [])
 
   useEffect(() => {
     preEmbedSkills(loadSkills(), (pct) => setEmbedProgress(pct))
@@ -611,6 +672,7 @@ export function useHQ() {
     hasClaudeTab,
     hasCodexTab,
     hasShellTab,
+    hasAntigravityTab,
     activeMenu,
     menuVisible,
     menuDismissedKey,

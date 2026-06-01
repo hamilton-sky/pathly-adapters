@@ -170,3 +170,34 @@
   opacity: 0.45;
   color: var(--text-muted);
 }
+
+/* ── Decision mode ── */
+.decisionItems {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.decisionBtn {
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-mantle);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: inherit;
+  transition: background 100ms ease;
+}
+
+.decisionBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.decisionBtnDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

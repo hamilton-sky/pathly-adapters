@@ -1,4 +1,4 @@
-import styles from '../ChatPanel.module.css'
+import styles from '../index.module.css'
 
 interface AutomationCardProps {
   intent: string
