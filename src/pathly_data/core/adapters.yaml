@@ -1,0 +1,18 @@
+claude:
+  terminal_kind: claude
+  headless: [claude, "-p", "{prompt}", "--model", "{model}", "--output-format", json]
+  autonomy_flag: "--dangerously-skip-permissions"
+  resume: {mode: flag, flag: "--resume", arg: "{session_id}"}
+  parse: claude_json
+codex:
+  terminal_kind: codex
+  headless: [codex, exec, "{prompt}", "--model", "{model}"]
+  autonomy_flag: "--full-auto"
+  resume: {mode: flag, flag: "--continue"}
+  parse: codex_json
+copilot:
+  terminal_kind: shell
+  headless: null
+  autonomy_flag: null
+  resume: null
+  parse: null
