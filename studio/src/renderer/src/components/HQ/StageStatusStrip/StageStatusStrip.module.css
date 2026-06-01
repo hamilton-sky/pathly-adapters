@@ -42,6 +42,21 @@
   50% { opacity: 0.35; }
 }
 
+.topic {
+  color: var(--text-muted);
+  font-weight: 400;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sep {
+  color: var(--text-muted);
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
 .stage {
   color: var(--text-primary);
   font-weight: 500;

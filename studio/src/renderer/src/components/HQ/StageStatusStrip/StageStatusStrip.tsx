@@ -25,6 +25,7 @@ function dotClass(status: RunnerStatus): string {
 
 export function StageStatusStrip(): JSX.Element {
   const status = useRunnerStore((s) => s.status)
+  const topic = useRunnerStore((s) => s.topic)
   const stage = useRunnerStore((s) => s.stage)
   const adapter = useRunnerStore((s) => s.adapter)
   const cost = useRunnerStore((s) => s.cost)
@@ -45,6 +46,8 @@ export function StageStatusStrip(): JSX.Element {
   return (
     <div className={styles.strip}>
       <span className={dotClass(status)} aria-label={`Status: ${status}`} />
+      {topic && <span className={styles.topic}>{topic}</span>}
+      {topic && <span className={styles.sep} aria-hidden="true">·</span>}
       <span className={styles.stage}>{stage ?? '—'}</span>
       {adapter && (
         <span
