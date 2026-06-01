@@ -270,6 +270,17 @@ export function useHQ() {
   }, [])
 
   useEffect(() => {
+    fetch('http://127.0.0.1:8765/status')
+      .then((r) => r.json())
+      .then((data: Record<string, unknown>) => {
+        if (data.feature && data.project_root) {
+          useRunnerStore.getState().setRunnerConfig(data.feature as string, data.project_root as string)
+        }
+      })
+      .catch(() => { /* server may be offline */ })
+  }, [])
+
+  useEffect(() => {
     preEmbedSkills(loadSkills(), (pct) => setEmbedProgress(pct))
       .then(() => { setEmbedProgress(100); setEmbedReady(true) })
       .catch(() => { setEmbedProgress(0); setEmbedReady(false) })

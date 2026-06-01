@@ -32,11 +32,12 @@ export function ReroutePopover({ onClose, onError }: ReroutePopoverProps): JSX.E
   }, [onClose])
 
   async function handleReroute(): Promise<void> {
+    const { topic } = useRunnerStore.getState()
     try {
       const res = await fetch(`${RUNNER_BASE}/runner/reroute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adapter: selected }),
+        body: JSON.stringify({ topic, adapter: selected }),
       })
       if (!res.ok) onError(`reroute failed: ${res.status}`)
     } catch {

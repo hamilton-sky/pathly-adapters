@@ -1,3 +1,4 @@
+import { useRunnerStore } from '../../../store/runnerStore'
 import styles from './AbortConfirmStrip.module.css'
 
 const RUNNER_BASE = 'http://127.0.0.1:8765'
@@ -10,8 +11,13 @@ interface AbortConfirmStripProps {
 
 export function AbortConfirmStrip({ onDone, onCancel, onError }: AbortConfirmStripProps): JSX.Element {
   async function handleConfirm(): Promise<void> {
+    const { topic } = useRunnerStore.getState()
     try {
-      const res = await fetch(`${RUNNER_BASE}/runner/abort`, { method: 'POST' })
+      const res = await fetch(`${RUNNER_BASE}/runner/abort`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic }),
+      })
       if (!res.ok) {
         onError(`abort failed: ${res.status}`)
       }

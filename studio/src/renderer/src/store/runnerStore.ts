@@ -16,9 +16,12 @@ interface RunnerState {
   sessionKind: SessionKind | null
   decisionMenu: DecisionMenuItem[] | null
   errorMessage: string | null
-  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu'>>) => void
+  topic: string | null
+  projectRoot: string | null
+  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig'>>) => void
   resetRunner: () => void
   setDecisionMenu: (items: DecisionMenuItem[] | null) => void
+  setRunnerConfig: (topic: string, projectRoot: string) => void
 }
 
 const initialState = {
@@ -29,6 +32,8 @@ const initialState = {
   sessionKind: null,
   decisionMenu: null,
   errorMessage: null,
+  topic: null,
+  projectRoot: null,
 }
 
 export const useRunnerStore = create<RunnerState>()((set) => ({
@@ -36,4 +41,5 @@ export const useRunnerStore = create<RunnerState>()((set) => ({
   setRunnerState: (patch) => set((s) => ({ ...s, ...patch })),
   resetRunner: () => set((s) => ({ ...s, ...initialState })),
   setDecisionMenu: (items) => set((s) => ({ ...s, decisionMenu: items })),
+  setRunnerConfig: (topic, projectRoot) => set((s) => ({ ...s, topic, projectRoot })),
 }))

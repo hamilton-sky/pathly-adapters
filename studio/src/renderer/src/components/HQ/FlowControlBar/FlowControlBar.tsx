@@ -12,13 +12,20 @@ type Action = 'start' | 'pause' | 'resume' | 'advance' | 'retry'
 
 export function FlowControlBar(): JSX.Element {
   const status = useRunnerStore((s) => s.status)
+  const topic = useRunnerStore((s) => s.topic)
   const setRunnerState = useRunnerStore((s) => s.setRunnerState)
   const [showAbort, setShowAbort] = useState(false)
   const [showReroute, setShowReroute] = useState(false)
 
-  async function postAction(action: Action): Promise<void> {
+  async function postAction(action: Action, extraBody: Record<string, unknown> = {}): Promise<void> {
+    const { topic, projectRoot } = useRunnerStore.getState()
+    const body: Record<string, unknown> = { topic, ...extraBody }
     try {
-      const res = await fetch(`${RUNNER_BASE}/runner/${action}`, { method: 'POST' })
+      const res = await fetch(`${RUNNER_BASE}/runner/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
       if (!res.ok) setRunnerState({ errorMessage: `${action} failed: ${res.status}` })
     } catch {
       setRunnerState({ errorMessage: `${action} failed: network error` })
@@ -37,7 +44,10 @@ export function FlowControlBar(): JSX.Element {
     <div className={styles.wrapper}>
       <div className={styles.bar}>
         {/* Lifecycle group */}
-        <RunnerBtn label="Start" tooltip="Start a new pipeline run" enabled={startEnabled} onClick={() => { void postAction('start') }} extraClass={startEnabled ? styles.btnPrimary : ''}>
+        <RunnerBtn label="Start" tooltip="Start a new pipeline run" enabled={startEnabled} onClick={() => {
+          const { projectRoot } = useRunnerStore.getState()
+          void postAction('start', { flow: 'team', project_root: projectRoot ?? '', max_iterations: 20, max_cost_usd: 5.0 })
+        }} extraClass={startEnabled ? styles.btnPrimary : ''}>
           <Play size={12} />
         </RunnerBtn>
         <RunnerBtn label="Pause" tooltip="Pause the running pipeline" enabled={pauseEnabled} onClick={() => { void postAction('pause') }}>
@@ -61,7 +71,10 @@ export function FlowControlBar(): JSX.Element {
             <ReroutePopover onClose={() => setShowReroute(false)} onError={(msg) => setRunnerState({ errorMessage: msg })} />
           )}
         </div>
-        <RunnerBtn label="Retry" tooltip="Retry the current blocked stage" enabled={retryEnabled} onClick={() => { void postAction('retry') }} extraClass={styles.btnDecision}>
+        <RunnerBtn label="Retry" tooltip="Retry the current blocked stage" enabled={retryEnabled} onClick={() => {
+          const { projectRoot } = useRunnerStore.getState()
+          void postAction('retry', { flow: 'team', project_root: projectRoot ?? '', max_iterations: 20, max_cost_usd: 5.0 })
+        }} extraClass={styles.btnDecision}>
           <RotateCcw size={12} />
         </RunnerBtn>
 
@@ -72,6 +85,10 @@ export function FlowControlBar(): JSX.Element {
           <Square size={12} />
         </RunnerBtn>
       </div>
+
+      {topic === null && (
+        <div className={styles.noTopicWarning}>No active feature — server offline or no feature loaded</div>
+      )}
 
       {showAbort && (
         <AbortConfirmStrip

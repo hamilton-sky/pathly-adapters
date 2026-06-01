@@ -87,3 +87,9 @@
 .rerouteWrapper {
   position: relative;
 }
+
+.noTopicWarning {
+  font-size: 10px;
+  color: var(--yellow, #eab308);
+  padding: 0 10px 4px;
+}

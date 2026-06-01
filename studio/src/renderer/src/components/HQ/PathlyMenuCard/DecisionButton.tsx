@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { DecisionMenuItem } from '../../../store/runnerStore'
+import { useRunnerStore } from '../../../store/runnerStore'
 import styles from './PathlyMenuCard.module.css'
 
 interface DecisionButtonProps {
@@ -26,11 +27,12 @@ export function DecisionButton({ item, onError, onDone, onRevert }: DecisionButt
   async function handleClick(): Promise<void> {
     setDisabled(true)
     onDone()
+    const { topic } = useRunnerStore.getState()
     try {
       const res = await fetch('http://127.0.0.1:8765/runner/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ choice: item.id }),
+        body: JSON.stringify({ topic, decision: item.id }),
       })
       if (!res.ok) {
         onRevert()
