@@ -47,3 +47,52 @@ MUST invoke `log-agent-done` at the close of every building session, even if tok
 
 ### Source
 Feature: fsm-friction-fixes | Stage: implementation | Date: 2026-06-01
+
+---
+
+## [hq-panel] Include POST body schema for every API endpoint in the plan
+
+### Pattern
+Every runner button sent an empty POST body because CONVERSATION_PROMPTS.md only listed endpoint URLs, never body fields. The correct body schema was discovered at runtime by reading `http_server.py`. This also caused a field-name mismatch (`choice` vs `decision`) that wasn't caught until live testing.
+
+### Rule
+MUST include a `body:` example object alongside every endpoint URL listed in CONVERSATION_PROMPTS.md — URL alone is not a complete API contract.
+
+### Injection
+- In the conversation prompt for any feature touching an HTTP API, add a table: `| Endpoint | Method | Required body fields |` with one row per endpoint before the scope list.
+- Example row: `| /runner/start | POST | { topic, flow, project_root, max_iterations, max_cost_usd } |`
+
+### Source
+Feature: hq-panel | Stage: implementation | Date: 2026-06-01
+
+---
+
+## [hq-panel] Split wide conversations — rename, store, and new components are three separate conversations
+
+### Pattern
+Conv 1 packed a folder rename, a new Zustand store, and three new component trees into a single 64K-token conversation. The overloaded scope produced 9 review violations that a narrower prompt would have avoided. A more focused Conv 1 would have been cheaper and cleaner.
+
+### Rule
+MUST scope each building conversation to a single concern category: rename/move OR new store layer OR new component tree. Never combine all three in one prompt.
+
+### Injection
+- When planning a feature that includes both a structural refactor (rename/move) and new components, create at least two conversations: Conv N for rename/move only, Conv N+1 for new components.
+
+### Source
+Feature: hq-panel | Stage: planning | Date: 2026-06-01
+
+---
+
+## [hq-panel] Reviewer exit contract must include writing REVIEW.md
+
+### Pattern
+The FSM gate blocked REVIEWING→TESTING because REVIEW.md was missing — the reviewer completed its work but didn't write the required artifact. The plan didn't specify REVIEW.md as a required output of the review stage.
+
+### Rule
+MUST add "write pathly/plans/<feature>/REVIEW.md with round number + PASS/FAIL verdict" to the reviewer's done criteria in every CONVERSATION_PROMPTS.md review section.
+
+### Injection
+- Add to every reviewer section in CONVERSATION_PROMPTS.md: "Write `pathly/plans/<feature>/REVIEW.md` summarising the round (N violations, verdict PASS/FAIL). This file is required for the FSM gate to advance to TESTING."
+
+### Source
+Feature: hq-panel | Stage: review | Date: 2026-06-01

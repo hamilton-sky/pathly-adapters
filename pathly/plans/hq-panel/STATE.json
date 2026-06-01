@@ -1,7 +1,10 @@
 {
-  "current": "TESTING",
+  "current": "DONE",
   "feature": "hq-panel",
   "rigor": "standard",
   "conv": 2,
-  "updated_at": "2026-06-01T16:14:02Z"
+  "updated_at": "2026-06-01T17:00:00Z",
+  "conv_start_sha": "984427639ef4fc1a6bcc0aaea94b750e25c40b55",
+  "convs_total": 2,
+  "convs_done": 2
 }

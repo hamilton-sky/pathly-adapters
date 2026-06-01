@@ -212,6 +212,7 @@ export function useHQ() {
   }, [projectPath])
 
   useEffect(() => {
+    if (!activeTopic) return   // topic required by server — skip until one is active
     const { setRunnerState, setDecisionMenu } = useRunnerStore.getState()
     const lastCostRef = { current: 0 }
     const retryCountRef = { current: 0 }
@@ -220,7 +221,8 @@ export function useHQ() {
 
     function connect(): void {
       try {
-        es = new EventSource('http://127.0.0.1:8765/events/runner')
+        const url = `http://127.0.0.1:8765/events/runner?topic=${encodeURIComponent(activeTopic ?? '')}`
+        es = new EventSource(url)
         es.onopen = () => { retryCountRef.current = 0 }  // reset backoff on successful connect
         es.onmessage = (e: MessageEvent) => {
           try {
@@ -267,7 +269,7 @@ export function useHQ() {
       if (reconnectTimeout !== null) clearTimeout(reconnectTimeout)
       es?.close()    // now accessible — closes the live connection on unmount
     }
-  }, [])
+  }, [activeTopic])
 
   useEffect(() => {
     fetch('http://127.0.0.1:8765/status')
