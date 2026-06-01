@@ -14,6 +14,7 @@ logger = logging.getLogger("pathly.runner")
 import yaml
 from importlib.resources import files
 
+from pathly_orchestrator.adapters import resolve_command
 from pathly_orchestrator.fsm_http_client import next_action, complete_stage
 
 
@@ -68,21 +69,14 @@ def invoke_agent(
     topic: str = "",
     timeout: int = 600,
     storage_path: Path | None = None,
+    adapter: str = "claude",
+    session: str | None = None,
 ) -> None:
     prompt = (
         f"You are running pathly stage {state!r} for topic {topic!r}.\n\n"
         f"{instructions}"
     )
-    cmd = [
-        "claude",
-        "-p",
-        prompt,
-        "--model",
-        model,
-        "--dangerously-skip-permissions",
-        "--output-format",
-        "json",
-    ]
+    cmd = resolve_command(adapter, prompt, model, session=session)["argv"]
     t_start = time.monotonic()
     proc = subprocess.Popen(
         cmd,
