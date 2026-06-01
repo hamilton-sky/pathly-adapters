@@ -478,3 +478,54 @@ MUST write skill count acceptance criteria as "matching claude adapter's current
 
 ### Source
 Feature: antigravity-adapter | Stage: test | Date: 2026-06-01
+
+---
+
+## [antigravity-studio] TerminalKind exhaustiveness audit must be a done-condition, not a reviewer catch
+
+### Pattern
+Conv 2 added `'antigravity'` to the TerminalKind union and fixed exhaustiveness in the explicitly listed files. `useHQ.tsx` (listed as `useChatPanel.tsx`) was partially fixed — arrays and switch statements in the same file were missed. The reviewer found all 4 residual gaps in pass 1, requiring a full fix cycle. A single grep in the Conv 2 done-condition would have caught them.
+
+### Rule
+MUST include as a Conv N done-condition: "grep `useHQ\|useChatPanel` for every array and switch statement that dispatches on TerminalKind. Confirm the new kind appears in each." Any conversation that adds a new TerminalKind value must treat exhaustiveness-in-useHQ.tsx as a required done-condition, not a reviewer responsibility.
+
+### Injection
+- Add to CONVERSATION_PROMPTS.md for any TerminalKind-expanding conversation: "Done-condition includes: grep `useHQ.tsx` (or `useChatPanel.tsx`) for `terminalBuffers`, `idleTimers`, `renderTerminalCard`, and `currentTabId` — confirm each reference includes the new kind."
+- Add to USER_STORIES.md acceptance criteria for renderer kind stories: "AC: grep useHQ.tsx — all TerminalKind dispatch arrays include the new value."
+
+### Source
+Feature: antigravity-studio | Stage: review | Date: 2026-06-01
+
+---
+
+## [antigravity-studio] CLI launch stories must cover both launch surfaces (topbar and tab-strip)
+
+### Pattern
+S3.1 specified "Antigravity option in topbar terminal launcher dropdown". The terminal tab-strip (`PaneTabBar.tsx`) has its own action group with launch buttons for each CLI — this was never in S3.1's acceptance criteria. The designer's scan of the live component tree caught it, and the builder added the button in the same fix cycle. Without the designer consult, it would have shipped as a silent gap.
+
+### Rule
+MUST include both `TerminalLauncher.tsx` (topbar) and `PaneTabBar.tsx` (tab-strip action group) in any story that adds a new CLI launch option. These are two separate launch surfaces, and any story scoped to "add a terminal launch button" must explicitly list both.
+
+### Injection
+- Add to USER_STORIES.md template for CLI-launch stories: "AC: Antigravity button appears in (a) topbar terminal launcher dropdown (`TerminalLauncher.tsx`) AND (b) terminal tab-strip action group (`PaneTabBar.tsx`)."
+- Add to FEATURE_INDEX.md for Studio UI stories: note both launch surfaces as file targets whenever a new terminal kind is added.
+
+### Source
+Feature: antigravity-studio | Stage: review | Date: 2026-06-01
+
+---
+
+## [antigravity-studio] Verify all FEATURE_INDEX.md file paths against the live repo before finalising the plan
+
+### Pattern
+The plan listed `useChatPanel.tsx` as the file target for Phase 2. The file had been renamed to `useHQ.tsx`. The builder had to glob for the correct file, adding orientation overhead and contributing to incomplete exhaustiveness fixes (partial context caused by the rename). Two reviewer fix cycles resulted.
+
+### Rule
+MUST run a glob against every file path listed in FEATURE_INDEX.md during the planning phase and fix any path that does not resolve to a live file before IMPLEMENTATION_PLAN.md is finalised. A stale path in the plan is a near-certain reviewer fix cycle.
+
+### Injection
+- Add to planner instructions: "After writing FEATURE_INDEX.md, glob each file path in the live repo. For any path that does not exist, find the correct path (use Glob with the filename) and update FEATURE_INDEX.md before proceeding."
+- Add to CONVERSATION_PROMPTS.md phase preamble: "Before making any edits, verify that the file paths in this conversation prompt exist in the live repo. If a path does not exist, glob for the current location and proceed with the correct path."
+
+### Source
+Feature: antigravity-studio | Stage: planning / building | Date: 2026-06-01
