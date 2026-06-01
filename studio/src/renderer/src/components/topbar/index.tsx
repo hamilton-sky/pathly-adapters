@@ -63,9 +63,6 @@ export function TopBar(): JSX.Element {
         </div>
 
         <div className={styles.right}>
-          <Tooltip label={badgeLabel} placement="bottom">
-            <span className={monitorSource === 'sse' ? styles.badgeLive : styles.badgeWatch}>●</span>
-          </Tooltip>
           <IconButton
             data-testid="topbar-chat-toggle"
             data-label="Chat"

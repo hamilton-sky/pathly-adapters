@@ -7,8 +7,9 @@
   padding: 0 16px;
   padding-right: 154px; /* reserve space for native Win11 min/max/close overlay (3×46px + margin) */
   height: 36px;
+  min-width: 600px;
   background: var(--bg-mantle);
-  border-bottom: 1px solid var(--bg-surface0);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12);
   flex-shrink: 0;
   overflow: hidden;
   -webkit-app-region: drag;
@@ -424,29 +425,35 @@
 .navBtn {
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border-radius: 6px;
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  padding: 0 14px;
-  height: 36px;
+  padding: 0 10px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  transition: color 120ms ease-out, border-color 120ms ease-out;
+  transition: color 120ms ease-out, background 120ms ease-out;
   white-space: nowrap;
 }
 
 .navBtn:hover {
+  background: var(--bg-surface0);
   color: var(--text-primary);
 }
 
 .navBtnActive {
-  color: var(--text-primary);
-  border-bottom-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
   font-weight: 600;
+}
+
+.navBtnActive:hover {
+  background: var(--accent);
+  color: #fff;
+  opacity: 0.9;
 }
 
 .navBtn:focus-visible {
