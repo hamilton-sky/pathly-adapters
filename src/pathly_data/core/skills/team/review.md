@@ -174,8 +174,6 @@ If autoFlow: log human response "auto-advance".
 Mark Conv N as DONE in `pathly/plans/[feature]/PROGRESS.md`.
 
 **Write-or-delete transition artifacts:**
-- If more TODO conversations remain: write `<storage_path>/MORE_CONVS_NEEDED.md` (one-line note).
-  Else: delete `<storage_path>/MORE_CONVS_NEEDED.md` if it exists.
 - If REVIEW_FAILURES.md was written this run: it already exists — keep it.
   If reviewer passed cleanly (no REVIEW_FAILURES.md written): delete `<storage_path>/feedback/REVIEW_FAILURES.md` if it exists.
 

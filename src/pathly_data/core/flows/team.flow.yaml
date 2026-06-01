@@ -69,7 +69,12 @@ transition_rules:
   REVIEWING:
     on_artifact:
       REVIEW_FAILURES.md: BUILDING
-      MORE_CONVS_NEEDED.md: BUILDING
+      MORE_CONVS_NEEDED.md: BUILDING   # backwards-compat fallback — one release window
+    on_state_counter:
+      field: convs_done
+      op: lt
+      compare_to: convs_total
+      next: BUILDING
     default: TESTING
   TESTING:
     on_artifact:

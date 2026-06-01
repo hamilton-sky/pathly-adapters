@@ -153,6 +153,34 @@ def evaluate_transition_rules(
                 if entry["contains"] in contents:
                     return entry["next"]
 
+    # Level 2.5 — on_state_counter
+    on_state_counter = rule.get("on_state_counter")
+    if on_state_counter is not None:
+        field = on_state_counter.get("field")
+        op = on_state_counter.get("op")
+        compare_to = on_state_counter.get("compare_to")
+        next_s = on_state_counter.get("next")
+        _ops = {
+            "lt": lambda a, b: a < b,
+            "lte": lambda a, b: a <= b,
+            "eq": lambda a, b: a == b,
+            "gte": lambda a, b: a >= b,
+            "gt": lambda a, b: a > b,
+            "ne": lambda a, b: a != b,
+        }
+        op_fn = _ops.get(op)
+        if op_fn is not None and field and compare_to and next_s:
+            try:
+                state_file = storage_path / "STATE.json"
+                if state_file.exists():
+                    state_doc = json.loads(state_file.read_text(encoding="utf-8"))
+                    field_val = int(state_doc[field])
+                    compare_val = int(state_doc[compare_to])
+                    if op_fn(field_val, compare_val):
+                        return next_s
+            except (KeyError, ValueError, TypeError, json.JSONDecodeError, OSError):
+                pass  # fall through gracefully
+
     # Level 3 — decide
     decide = rule.get("decide")
     if decide is not None:
@@ -331,6 +359,16 @@ def run_transition_actions(
                 content = progress_file.read_text(encoding="utf-8")
                 if mark == "conv_done":
                     content = content.replace(f"| {conv} |", f"| {conv} | DONE |", 1)
+                    state_file = storage_path / "STATE.json"
+                    if state_file.exists():
+                        try:
+                            state_doc = json.loads(state_file.read_text(encoding="utf-8"))
+                            state_doc["convs_done"] = int(state_doc.get("convs_done", 0)) + 1
+                            tmp = storage_path / "STATE.json.tmp"
+                            tmp.write_text(json.dumps(state_doc, indent=2) + "\n", encoding="utf-8")
+                            tmp.replace(state_file)
+                        except (json.JSONDecodeError, OSError, ValueError):
+                            pass
                 elif mark == "all_phases_done":
                     content = re.sub(r"\|\s*\[ \]\s*\|", "| [x] |", content)
                 progress_file.write_text(content, encoding="utf-8")

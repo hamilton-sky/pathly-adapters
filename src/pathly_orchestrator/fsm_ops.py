@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 import subprocess
 from importlib.resources import files
 from pathlib import Path
@@ -293,6 +294,18 @@ def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
+def _count_planned_convs(storage_path: Path) -> int:
+    """Count conversation rows matching the # column pattern in PROGRESS.md."""
+    progress_file = storage_path / "PROGRESS.md"
+    if not progress_file.exists():
+        return 0
+    try:
+        text = progress_file.read_text(encoding="utf-8")
+    except OSError:
+        return 0
+    return sum(1 for line in text.splitlines() if re.search(r"\|\s*\d+\s*\|", line))
+
+
 def _get_head_sha(project_root: str) -> str:
     try:
         result = subprocess.run(
@@ -379,6 +392,24 @@ def next_action(args: dict) -> dict:
             baseline["truncated"] = True
         stamped_state["build_baseline"] = baseline
         needs_write = True
+
+    if stamped_state.get("convs_total") is None:
+        total = _count_planned_convs(storage_path)
+        stamped_state["convs_total"] = total
+        stamped_state["convs_done"] = 0
+        needs_write = True
+    else:
+        current_total = _count_planned_convs(storage_path)
+        if current_total != stamped_state.get("convs_total"):
+            append_event(
+                storage_path,
+                {
+                    "type": "WARNING",
+                    "reason": "convs_total_mismatch",
+                    "persisted": stamped_state.get("convs_total"),
+                    "current": current_total,
+                },
+            )
 
     if needs_write:
         write_state(storage_path, state_info["current_state"], stamped_state)

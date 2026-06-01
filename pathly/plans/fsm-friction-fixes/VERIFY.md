@@ -1,18 +1,15 @@
 RESULT: PASS
 
-## Conv 2 — Scope gate preexisting-dirty snapshot
+## Conv 3 — Multi-conversation routing (on_state_counter)
 
 | AC | Verified |
 |---|---|
-| AC-S2-1: build_baseline.preexisting_dirty written on BUILDING entry | ✓ |
-| AC-S2-2: _scope_clean new signature; subtracts preexisting from diff+untracked | ✓ |
-| AC-S2-3: src/pathly_orchestrator/ exemption removed; pathly/plans/ and *.tsbuildinfo remain | ✓ |
-| AC-S2-4: complete_stage clears build_baseline | ✓ |
-| AC-S2-6: absent build_baseline emits GATE_SKIPPED reason=no_build_baseline | ✓ |
-| AC-S2-7: three tests rewritten + test_scope_gate_no_declared_scope updated and passing | ✓ |
-| python -m pytest tests/test_gates.py tests/test_fsm_ops.py -q — no failures | ✓ |
+| AC-S3-1: `_count_planned_convs` present; returns 0 for absent PROGRESS.md | ✓ |
+| AC-S3-2: `convs_total`/`convs_done` stamped on first `next_action`; mismatch warning on subsequent calls | ✓ |
+| AC-S3-3: `on_state_counter` in `evaluate_transition_rules`; all 6 ops; graceful fallthrough on miss/error/unknown-op | ✓ |
+| AC-S3-4: `team.flow.yaml` REVIEWING block updated; `MORE_CONVS_NEEDED.md` fallback retained | ✓ |
+| AC-S3-5: `update_progress` action increments `convs_done` on `mark: conv_done` | ✓ |
+| AC-S3-6: `review.md` MORE_CONVS_NEEDED instruction removed; `pathly-setup claude --apply` and `python -m build` exit 0 | ✓ |
+| AC-S3-7: 4 new counter tests pass; `test_next_action_initial_state` still passes | ✓ |
 
-Note: AC-S2-5 (500-entry cap GATE_DEGRADED) is implemented in run_gates; covered by the
-truncated flag logic (build_baseline.truncated → GATE_DEGRADED + permissive).
-
-Full suite: 218 passed, 3 skipped.
+Full suite: 223 passed, 3 skipped.

@@ -1,1 +1,1 @@
-Conv 1 reviewed and passed. Convs 2 and 3 remain TODO.
+Convs 1 and 2 reviewed and passed. Conv 3 remains TODO.

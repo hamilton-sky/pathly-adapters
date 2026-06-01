@@ -336,6 +336,33 @@ def test_scope_gate_no_build_baseline(tmp_path):
     assert skipped[0]["reason"] == "no_build_baseline"
 
 
+def test_scope_gate_degraded_truncated_baseline(tmp_path):
+    """build_baseline.truncated=True → GATE_DEGRADED emitted and gate passes (permissive)."""
+    storage = _storage(tmp_path)
+    (storage / "SCOPE.md").write_text("Files:\n- `src/foo.py`\n", encoding="utf-8")
+    (storage / "STATE.json").write_text(
+        json.dumps({
+            "current": "A",
+            "build_baseline": {
+                "started_at": "2025-01-01T00:00:00+00:00",
+                "preexisting_dirty": ["x.py"] * 500,
+                "truncated": True,
+            },
+        }),
+        encoding="utf-8",
+    )
+
+    flow = _make_flow_with_scope_gate()
+    result = run_gates(flow, "A", "B", storage, "test-feature", 1)
+    assert result is None  # gate passes in permissive mode
+
+    events_file = storage / "EVENTS.jsonl"
+    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    degraded = [e for e in events if e.get("type") == "GATE_DEGRADED"]
+    assert len(degraded) == 1
+    assert degraded[0]["gate"] == "scope_gate"
+
+
 def test_verify_gate_pass_marker_in_body_not_line1(tmp_path):
     """Pass marker present in body but NOT on line 1 — gate must fail (line-1 sentinel)."""
     p = tmp_path / "VERIFY.md"
