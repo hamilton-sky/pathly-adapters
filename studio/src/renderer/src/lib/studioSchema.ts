@@ -72,6 +72,13 @@ const STUDIO_SCHEMA: StudioElement[] = [
     label: 'Codex',
     description: 'Open a Codex terminal session.',
   },
+  {
+    id: 'topbar-antigravity',
+    screen: 'TopBar',
+    type: 'button',
+    label: 'Antigravity',
+    description: 'Open an Antigravity (agy) terminal session.',
+  },
   // Sidebar
   {
     id: 'sidebar-workspace-tab',

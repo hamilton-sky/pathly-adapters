@@ -4,7 +4,7 @@ import { Terminal, ChevronDown } from 'lucide-react'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { IconButton } from '../ui'
-import { ClaudeIcon, CodexIcon } from '../Terminal/BrandIcons'
+import { AntigravityIcon, ClaudeIcon, CodexIcon } from '../Terminal/BrandIcons'
 import { launchTerminal } from '../../lib/launchTerminal'
 import styles from './TopBar.module.css'
 
@@ -85,6 +85,9 @@ export function TerminalLauncher(): JSX.Element {
           </button>
           <button className={styles.terminalDropdownItem} onClick={() => void launchWithKind('codex', 'Codex')}>
             <CodexIcon size={13} /> Codex
+          </button>
+          <button className={styles.terminalDropdownItem} onClick={() => void launchWithKind('agy', 'Antigravity')}>
+            <AntigravityIcon size={13} /> Antigravity
           </button>
         </div>,
         document.body
