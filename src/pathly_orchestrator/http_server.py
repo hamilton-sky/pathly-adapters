@@ -126,6 +126,10 @@ app = Flask(__name__)
 
 @app.before_request
 def _log_request():
+    # Health endpoint bypasses all middleware — must respond before rate-limiting.
+    if request.path == "/health":
+        return None
+
     # Handle CORS preflight (OPTIONS) before any routing or rate limiting.
     # The browser sends this before every cross-origin POST with Content-Type: application/json.
     if request.method == "OPTIONS":

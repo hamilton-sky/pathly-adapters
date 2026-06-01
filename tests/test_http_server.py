@@ -26,17 +26,34 @@ def test_health_returns_ok(client):
     assert data["status"] == "ok"
 
 
-def test_rate_limit_blocks_after_limit(client):
+def test_rate_limit_blocks_after_limit(client, monkeypatch):
     from pathly_orchestrator import http_server
+    monkeypatch.setenv("PATHLY_FF_RATE_LIMITING", "true")
     orig = http_server._RATE_LIMIT_MAX
     http_server._RATE_LIMIT_MAX = 3
     http_server._rate_counters.clear()
     try:
         for _ in range(3):
-            r = client[0].get("/health")
+            r = client[0].get("/metrics")
             assert r.status_code == 200
-        r = client[0].get("/health")
+        r = client[0].get("/metrics")
         assert r.status_code == 429
+    finally:
+        http_server._RATE_LIMIT_MAX = orig
+        http_server._rate_counters.clear()
+
+
+def test_health_bypasses_rate_limit(client, monkeypatch):
+    """Health endpoint must never be rate-limited regardless of request volume."""
+    from pathly_orchestrator import http_server
+    monkeypatch.setenv("PATHLY_FF_RATE_LIMITING", "true")
+    orig = http_server._RATE_LIMIT_MAX
+    http_server._RATE_LIMIT_MAX = 1
+    http_server._rate_counters.clear()
+    try:
+        for _ in range(5):
+            r = client[0].get("/health")
+            assert r.status_code == 200, "/health must always return 200 regardless of rate-limit"
     finally:
         http_server._RATE_LIMIT_MAX = orig
         http_server._rate_counters.clear()

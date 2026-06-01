@@ -1,6 +1,7 @@
 ---
 name: Implementation Plan
 ---
+
 # Adapter Integration Contract — Implementation Plan
 
 ## Overview

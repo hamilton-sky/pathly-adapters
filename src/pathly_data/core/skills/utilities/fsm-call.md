@@ -25,25 +25,7 @@ and stop.
 
 ## Step 2 - Ensure server is running
 
-```bash
-curl -s --max-time 1 http://127.0.0.1:8765/health
-```
-
-If it returns `{"status":"ok"}`, proceed to Step 3.
-
-If it fails or times out:
-1. Start the server in the background:
-   ```bash
-   python -m pathly_orchestrator.http_server &
-   ```
-2. Wait 2 seconds, then retry the health check once.
-3. If still unavailable:
-   ```
-   FSM server unavailable. Start it with:
-     python -m pathly_orchestrator.http_server
-   (Run in a separate terminal, then retry.)
-   ```
-   Stop.
+Call `pathly-fsm-call <subcommand> ...` — the helper handles health-check, auto-start, and retry automatically.
 
 ## Step 3 - POST to endpoint
 

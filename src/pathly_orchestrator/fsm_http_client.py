@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -74,17 +76,48 @@ def _health_ok(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> bool:
     return payload.get("status") == "ok"
 
 
-def _start_server() -> None:
+def _pid_file() -> Path:
     try:
-        subprocess.Popen(
+        import platformdirs
+        cache_dir = Path(platformdirs.user_cache_dir("pathly"))
+    except ImportError:
+        cache_dir = Path.home() / ".cache" / "pathly"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / "fsm.pid"
+
+
+def _start_server(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
+    pid_path = _pid_file()
+    if pid_path.exists():
+        try:
+            int(pid_path.read_text().strip())  # validate PID is parseable
+            if _health_ok(host=host, port=port):
+                return
+        except (ValueError, OSError):
+            pass
+        pid_path.unlink(missing_ok=True)
+
+    try:
+        kwargs: dict = {
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if os.name == "nt":
+            kwargs["creationflags"] = (
+                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            )
+        else:
+            kwargs["start_new_session"] = True
+
+        proc = subprocess.Popen(
             [sys.executable, "-m", _SERVER_MODULE],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            **kwargs,
         )
+        pid_path.write_text(str(proc.pid))
     except OSError as exc:
         raise RuntimeError(
             "FSM server unavailable. Start it with:\n"
-            "  python -m pathly_orchestrator.http_server\n"
+            "  pathly-fsm-http\n"
             "(Run in a separate terminal, then retry.)"
         ) from exc
 
@@ -93,15 +126,14 @@ def ensure_server_running(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT)
     if _health_ok(host=host, port=port):
         return
 
-    _start_server()
-    time.sleep(2)
-    if _health_ok(host=host, port=port):
-        return
+    _start_server(host=host, port=port)
+    for _ in range(30):
+        if _health_ok(host=host, port=port):
+            return
+        time.sleep(0.25)
 
     raise RuntimeError(
-        "FSM server unavailable. Start it with:\n"
-        "  python -m pathly_orchestrator.http_server\n"
-        "(Run in a separate terminal, then retry.)"
+        "FSM server did not start within 7.5 s — run `pathly-fsm-http` to diagnose."
     )
 
 

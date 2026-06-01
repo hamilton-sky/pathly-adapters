@@ -1,6 +1,7 @@
 ---
 name: Architecture Proposal
 ---
+
 # Adapter Integration Contract — Architecture Proposal
 
 ## Contract boundary
