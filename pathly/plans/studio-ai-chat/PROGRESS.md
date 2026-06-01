@@ -41,7 +41,7 @@
 | Conv | Phases | Track | Stories | Status | Verify |
 |------|--------|-------|---------|--------|--------|
 | 0 | 0a–0c | Core | S0.1, S0.2, S0.3 | DONE | `cd studio && npm run typecheck` + visual check in Studio |
-| 1 | 1 | Core | S1.1, S1.2 | DONE | `curl http://127.0.0.1:8765/status` |
+| 1 | 1 | Core | S1.1, S1.2 | DONE | `pathly-fsm-call next-action --flow "team" --topic "<feature>" --project-root "C:/Users/Yafit/pathly-adapters"` |
 | 2 | 4–8 | Core | S2.1, S2.2, S2.3, S2.4 | DONE | `cd studio && npm run typecheck` |
 | 3 | 9–11 | Core | S3.1, S3.2 | DONE | `cd studio && npm run typecheck` |
 | 4 | 12–14 | Core | S4.1, S4.2 | DONE | `cd studio && npm run typecheck` |

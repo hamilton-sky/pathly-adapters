@@ -164,7 +164,7 @@ Renderer calls window.pathly.terminal.write(tabId, "/pathly <skill>\n")
 > The Python server is only needed for FSM state (`/status`). No `chat_agent.py` needed.
 
 **File:** `src/pathly_orchestrator/http_server.py` — MODIFY
-**Done when:** `curl http://127.0.0.1:8765/status` returns current FSM stage without mutating state
+**Done when:** the read-only FSM status endpoint returns current FSM stage without mutating state
 **Delivers:** S1.2
 **Details:**
 - **Add route `GET /status`** — read-only FSM state endpoint:

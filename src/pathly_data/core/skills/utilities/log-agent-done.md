@@ -91,13 +91,11 @@ If the file does not exist, create it. If the directory does not exist, stop wit
 
 ## Step 4 — POST telemetry to HTTP backend
 
-Check server health:
-```bash
-curl -s --max-time 1 http://127.0.0.1:8765/health
-```
+Check server health with a real JSON-capable client or the FSM HTTP health
+endpoint. Do not use shell-escaped `curl` JSON on PowerShell.
 
 If unavailable:
-1. Start in background: `python -m pathly_orchestrator.http_server &`
+1. Start in background: `pathly-fsm-http`
 2. Wait 2 seconds, retry once.
 3. If still unavailable: print `log-agent-done: HTTP backend unavailable, skipping telemetry` and stop (do not fail).
 
@@ -117,12 +115,7 @@ pathly-fsm-call record-activity \
   --cost-usd <cost_usd>
 ```
 
-If the helper is unavailable, POST telemetry directly:
-```bash
-curl -s -X POST http://127.0.0.1:8765/record_activity \
-  -H "Content-Type: application/json" \
-  -d '{"agent":"<agent>","feature":"<feature>","summary":"<summary>","conversation":<conversation>,"total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"wall_seconds":<wall_seconds>,"duration_ms":<duration_ms>,"input_tokens":<tokens_in>,"output_tokens":<tokens_out>,"cost_usd":<cost_usd>}'
-```
+If the helper is unavailable, use a JSON-capable client or the `pathly_orchestrator.fsm_http_client` module directly. Do not hand-roll shell-escaped JSON with `curl` on PowerShell.
 
 If response contains `"status":"recorded"`: silent success.
 If error: print `log-agent-done warning: <error>` and continue.

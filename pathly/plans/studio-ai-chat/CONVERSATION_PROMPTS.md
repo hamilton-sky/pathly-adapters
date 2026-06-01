@@ -124,7 +124,7 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 ## Conversation 1: Python Chat Agent Server (Phases 1–3)
 
 **Stories delivered:** S1.1, S1.2
-**Verify:** `curl -X POST http://127.0.0.1:8765/chat -H "Content-Type: application/json" -d '{"message":"explain build","matchedSkill":"build","history":[]}'` returns 200 and streams SSE
+**Verify:** use a JSON-capable client against `POST /chat` and confirm it returns 200 and streams SSE
 
 **Prompt to paste:**
 ```
@@ -174,7 +174,7 @@ Architectural rules:
 - PATHLY_CHAT_MODEL env var (default phi4-mini) must be respected.
 - Do NOT touch studio/ (frontend), IPC handlers, or anything outside the Python backend.
 
-Verify: curl -X POST http://127.0.0.1:8765/chat -H "Content-Type: application/json" -d '{"message":"explain build","matchedSkill":"build","history":[]}' --no-buffer
+Verify: use a JSON-capable client against `POST /chat` with `--no-buffer`
 Expected: streaming SSE chunks, explanation references the matched skill name.
 
 After done, update pathly/plans/studio-ai-chat/PROGRESS.md phases 1–3 to DONE.

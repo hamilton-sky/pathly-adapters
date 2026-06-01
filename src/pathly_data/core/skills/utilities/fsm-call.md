@@ -25,11 +25,12 @@ and stop.
 
 ## Step 2 - Ensure server is running
 
-Call `pathly-fsm-call <subcommand> ...` — the helper handles health-check, auto-start, and retry automatically.
+Call `pathly-fsm-call <subcommand> ...` - the helper handles health-check,
+auto-start, and retry automatically.
 
 ## Step 3 - POST to endpoint
 
-Prefer the helper CLI:
+Use the helper CLI as the canonical transport:
 
 ```bash
 pathly-fsm-call next-action \
@@ -42,15 +43,9 @@ Use `pathly-fsm-call complete-stage` for stage advancement and
 `pathly-fsm-call record-activity` for telemetry. Omit `--decision` and
 `--resolved-file` unless needed.
 
-If the helper is unavailable, fall back to direct HTTP.
-
-Build the JSON body from the parsed fields (omit `decision` and `resolved_files` if not provided):
-
-```bash
-curl -s -X POST http://127.0.0.1:8765/<action> \
-  -H "Content-Type: application/json" \
-  -d '<body>'
-```
+If the helper is unavailable, fall back to direct HTTP only in a debug
+session, and use a real JSON encoder rather than hand-built shell escaping.
+Do not rely on raw `curl` examples as the primary contract.
 
 ## Step 4 - Return response
 

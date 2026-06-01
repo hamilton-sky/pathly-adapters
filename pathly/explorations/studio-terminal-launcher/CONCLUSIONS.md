@@ -1,0 +1,54 @@
+# Conclusions — studio-terminal-launcher
+
+## Answer
+
+Adding Antigravity (`agy`) as a fourth terminal in the studio requires changes to **7 files** across two layers (main process + renderer). The pattern is well-established — claude and codex were added the same way.
+
+## Exact changes needed
+
+### Layer 1: Main process (Electron)
+
+**`studio/src/main/ipc/terminal.ts`** — 2 edits
+1. Add `'agy'` to `ALLOWED_SHELLS` allowlist (line 13)
+2. Add `'agy'` to `resolveShell()` Windows/non-Windows dispatch (lines 38–48) — same pattern as `'codex'`
+
+### Layer 2: Renderer (React/TypeScript)
+
+**`studio/src/renderer/src/types/terminal.ts`** — 1 edit
+- Add `'antigravity'` to `TerminalKind` type union
+
+**`studio/src/renderer/src/store/chatStore.ts`** — 1 edit
+- Add `'antigravity'` to `TerminalKind` union in store
+
+**`studio/src/renderer/src/lib/launchTerminal.ts`** — 2 edits
+- Add `agy → antigravity` to kind determination chain (line 21)
+- Add `antigravity` prompt pattern (likely `'> '`, same as claude/codex)
+
+**`studio/src/renderer/src/components/topbar/TerminalLauncher.tsx`** — 1 edit
+- Add Antigravity option to the Shell / Claude / Codex dropdown
+
+**`studio/src/renderer/src/components/Terminal/BrandIcons.tsx`** — 1 edit
+- Add `AntigravityIcon` component (Google Antigravity brand, or `agy` letter icon)
+
+**`studio/src/renderer/src/lib/studioSchema.ts`** — 1 edit
+- Add `'topbar-antigravity'` item alongside `topbar-shell`, `topbar-claude-code`, `topbar-codex`
+
+## Natural conversation split (3 conversations)
+
+| Conv | Scope | Files |
+|---|---|---|
+| 1 | Main process wiring | `terminal.ts` (ALLOWED_SHELLS + resolveShell) |
+| 2 | Renderer types + logic | `types/terminal.ts`, `chatStore.ts`, `launchTerminal.ts` |
+| 3 | UI components | `TerminalLauncher.tsx`, `BrandIcons.tsx`, `studioSchema.ts` |
+
+## Open question before planning
+**What icon/brand should the Antigravity terminal button use?**
+Options:
+- Google `G` icon in Antigravity blue
+- The `agy` text as a pill badge (like the Codex icon treatment)
+- A custom rocket/gravity icon
+
+This affects `BrandIcons.tsx` and should be decided before Conv 3.
+
+## Recommendation
+Create a new plan `pathly/plans/antigravity-studio/` — the studio UI changes are independent of the adapter data changes and the existing `antigravity-adapter` plan is already at the 4-conversation cap.
