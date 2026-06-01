@@ -4,10 +4,16 @@
   border-bottom: 1px solid var(--border);
 }
 
-.bar {
+.rows {
   display: flex;
+  flex-direction: column;
   gap: 4px;
   padding: 5px 10px;
+}
+
+.row {
+  display: flex;
+  gap: 4px;
   align-items: center;
 }
 
@@ -76,14 +82,11 @@
   color: #fff;
 }
 
-/* ── Group separator ── */
-.sep {
-  width: 1px;
-  height: 14px;
-  background: var(--border);
-  flex-shrink: 0;
-  align-self: center;
-  margin: 0 2px;
+/* ── Abort pushed to far right within its row ── */
+.rowDecision {
+  display: flex;
+  gap: 4px;
+  align-items: center;
 }
 
 .rerouteWrapper {
