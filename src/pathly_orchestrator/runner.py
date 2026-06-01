@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("pathly.runner")
 
@@ -71,12 +72,19 @@ def invoke_agent(
     storage_path: Path | None = None,
     adapter: str = "claude",
     session: str | None = None,
-) -> None:
+    autonomy: bool = True,
+    _abort_ref=None,
+) -> dict[str, Any]:
+    """Invoke an adapter subprocess and return {cost_usd, session_id}.
+
+    _abort_ref: optional RunnerState-like object; if its _abort_flag is set,
+    the subprocess is killed and RuntimeError('aborted') is raised.
+    """
     prompt = (
         f"You are running pathly stage {state!r} for topic {topic!r}.\n\n"
         f"{instructions}"
     )
-    cmd = resolve_command(adapter, prompt, model, session=session)["argv"]
+    cmd = resolve_command(adapter, prompt, model, session=session, autonomy=autonomy)["argv"]
     t_start = time.monotonic()
     proc = subprocess.Popen(
         cmd,
@@ -84,22 +92,70 @@ def invoke_agent(
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
     )
+    if _abort_ref is not None:
+        # Store proc reference so abort_run() can kill it
+        try:
+            from pathly_orchestrator import supervisor as _sup
+            with _sup._lock:
+                _abort_ref._proc = proc
+        except Exception:
+            pass
+
+    stdout_bytes: bytes = b""
     try:
-        stdout_bytes, _ = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        raise RuntimeError(f"Claude subprocess timed out after {timeout}s")
+        # Poll for abort while waiting for the subprocess
+        if _abort_ref is not None:
+            while True:
+                try:
+                    stdout_bytes, _ = proc.communicate(timeout=0.5)
+                    break
+                except subprocess.TimeoutExpired:
+                    abort_now = False
+                    try:
+                        from pathly_orchestrator import supervisor as _sup
+                        with _sup._lock:
+                            abort_now = _abort_ref._abort_flag
+                    except Exception:
+                        pass
+                    if abort_now:
+                        proc.kill()
+                        try:
+                            from pathly_orchestrator import supervisor as _sup
+                            with _sup._lock:
+                                _abort_ref._proc = None
+                        except Exception:
+                            pass
+                        raise RuntimeError("aborted")
+                    # Check overall timeout
+                    if time.monotonic() - t_start > timeout:
+                        proc.kill()
+                        raise RuntimeError(f"Claude subprocess timed out after {timeout}s")
+        else:
+            try:
+                stdout_bytes, _ = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                raise RuntimeError(f"Claude subprocess timed out after {timeout}s")
+    finally:
+        if _abort_ref is not None:
+            try:
+                from pathly_orchestrator import supervisor as _sup
+                with _sup._lock:
+                    _abort_ref._proc = None
+            except Exception:
+                pass
 
     wall_seconds = int(time.monotonic() - t_start)
 
     if proc.returncode != 0:
         raise RuntimeError(f"Claude subprocess exited with code {proc.returncode}")
 
-    # Parse JSON output for cost + token counts
+    # Parse JSON output for cost + token counts + session_id
     cost_usd = 0.0
     tokens_in = 0
     tokens_out = 0
     tool_uses = 0
+    session_id_out: str | None = None
     try:
         output = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
         # Try every field name Claude CLI has used across versions
@@ -110,6 +166,7 @@ def invoke_agent(
             or output.get("total_cost")
             or 0.0
         )
+        session_id_out = output.get("session_id") or None
         usage = output.get("usage") or output.get("inputUsage") or {}
         tokens_in = int(
             (usage.get("input_tokens") or usage.get("inputTokens") or 0)
@@ -153,6 +210,8 @@ def invoke_agent(
         _patch_last_agent_done(
             storage_path, cost_usd, tokens_in, tokens_out, wall_seconds, tool_uses
         )
+
+    return {"cost_usd": cost_usd, "session_id": session_id_out}
 
 
 def handle_blocked(response: dict) -> None:
