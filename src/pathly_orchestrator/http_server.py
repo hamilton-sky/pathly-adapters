@@ -802,6 +802,378 @@ def menu_events_endpoint():
     )
 
 
+# ── Runner SSE client registry ───────────────────────────────────────────────
+# Keyed by topic; each value is a list of per-client queues.
+_runner_clients: dict[str, list[queue.Queue]] = {}
+_runner_lock = threading.Lock()
+
+
+def _broadcast_runner(topic: str, payload: dict) -> None:
+    """Broadcast a runner event to all /events/runner clients subscribed to *topic*."""
+    raw = json.dumps(payload)
+    with _runner_lock:
+        clients = _runner_clients.get(topic, [])
+        dead = [q for q in clients if q.full()]
+        for q in dead:
+            clients.remove(q)
+        for q in clients:
+            try:
+                q.put_nowait(raw)
+            except queue.Full:
+                pass
+
+
+# ── /runner/* control endpoints ───────────────────────────────────────────────
+
+def _topic_from_body(data: dict) -> str | None:
+    topic = data.get("topic", "")
+    return topic if isinstance(topic, str) and topic.strip() else None
+
+
+@app.route("/runner/start", methods=["POST"])
+def runner_start():
+    """Start a supervised run for a topic.
+
+    Required body fields: topic, flow, project_root, max_iterations, max_cost_usd.
+    Returns 409 if a run for that topic is already active.
+    """
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        required = {"topic", "flow", "project_root", "max_iterations", "max_cost_usd"}
+        missing = required - set(data.keys())
+        if missing:
+            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+
+        topic = data.get("topic", "")
+        if not isinstance(topic, str) or not topic.strip():
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+
+        for field_name in ("flow", "project_root"):
+            val = data.get(field_name, "")
+            if not isinstance(val, str) or not val.strip():
+                return jsonify({"error": f"Field '{field_name}' must be a non-empty string"}), 400
+
+        max_iterations = data.get("max_iterations")
+        if not isinstance(max_iterations, int) or max_iterations <= 0:
+            return jsonify({"error": "Field 'max_iterations' must be a positive integer"}), 400
+
+        max_cost_usd = data.get("max_cost_usd")
+        if not isinstance(max_cost_usd, (int, float)) or max_cost_usd <= 0:
+            return jsonify({"error": "Field 'max_cost_usd' must be a positive number"}), 400
+
+        model = data.get("model", "claude-sonnet-4-6") or "claude-sonnet-4-6"
+        timeout = data.get("timeout", 600)
+        if not isinstance(timeout, int) or timeout <= 0:
+            timeout = 600
+        autonomy = data.get("autonomy", {})
+        if not isinstance(autonomy, dict):
+            autonomy = {}
+
+        _sup.start_run(
+            topic=topic,
+            flow=data["flow"],
+            project_root=data["project_root"],
+            model=model,
+            timeout=timeout,
+            max_iterations=max_iterations,
+            max_cost_usd=float(max_cost_usd),
+            autonomy=autonomy,
+            broadcast_fn=_broadcast_runner,
+        )
+        return jsonify({"status": "started", "topic": topic}), 200
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        logging.exception("runner_start error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/pause", methods=["POST"])
+def runner_pause():
+    """Pause an active run at its next boundary."""
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json() or {}
+        topic = _topic_from_body(data)
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+        _sup.pause_run(topic)
+        return jsonify({"status": "pausing", "topic": topic}), 200
+    except KeyError:
+        return jsonify({"error": f"No run found for topic"}), 404
+    except Exception as exc:
+        logging.exception("runner_pause error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/resume", methods=["POST"])
+def runner_resume():
+    """Resume a paused run."""
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json() or {}
+        topic = _topic_from_body(data)
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+        _sup.resume_run(topic)
+        return jsonify({"status": "resumed", "topic": topic}), 200
+    except KeyError:
+        return jsonify({"error": "No run found for topic"}), 404
+    except Exception as exc:
+        logging.exception("runner_resume error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/advance", methods=["POST"])
+def runner_advance():
+    """Advance a paused run by one stage (resume + re-pause after next boundary).
+
+    This is a thin control shim — it unpauses the loop; the boundary logic in
+    the supervisor handles the actual step semantics.
+    """
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json() or {}
+        topic = _topic_from_body(data)
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+        _sup.resume_run(topic)
+        return jsonify({"status": "advancing", "topic": topic}), 200
+    except KeyError:
+        return jsonify({"error": "No run found for topic"}), 404
+    except Exception as exc:
+        logging.exception("runner_advance error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/decision", methods=["POST"])
+def runner_decision():
+    """Supply a decision for an awaiting_decision run.
+
+    Required: topic, decision (must be a key in pending_menu.options).
+    """
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        topic = _topic_from_body(data)
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+
+        decision = data.get("decision", "")
+        if not isinstance(decision, str) or not decision.strip():
+            return jsonify({"error": "Field 'decision' must be a non-empty string"}), 400
+
+        state = _sup.get_state(topic)
+        if state is None:
+            return jsonify({"error": "No run found for topic"}), 404
+        if state.status != "awaiting_decision":
+            return jsonify({"error": f"Run is not awaiting a decision (status={state.status})"}), 409
+
+        if state.pending_menu:
+            options = state.pending_menu.get("options", {})
+            if options and decision not in options:
+                return jsonify({"error": f"Invalid decision {decision!r}; valid options: {list(options)}"}), 400
+
+        _sup.supply_decision(topic, decision)
+        return jsonify({"status": "accepted", "topic": topic, "decision": decision}), 200
+    except KeyError:
+        return jsonify({"error": "No run found for topic"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        logging.exception("runner_decision error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/reroute", methods=["POST"])
+def runner_reroute():
+    """Override the adapter for the next stage of an active run."""
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        topic = _topic_from_body(data)
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+
+        adapter = data.get("adapter", "")
+        if not isinstance(adapter, str) or not adapter.strip():
+            return jsonify({"error": "Field 'adapter' must be a non-empty string"}), 400
+
+        _sup.reroute_run(topic, adapter)
+        return jsonify({"status": "rerouted", "topic": topic, "adapter": adapter}), 200
+    except KeyError:
+        return jsonify({"error": "No run found for topic"}), 404
+    except Exception as exc:
+        logging.exception("runner_reroute error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/retry", methods=["POST"])
+def runner_retry():
+    """Retry a run that ended in error by starting it fresh.
+
+    Thin wrapper: clears error state from registry then delegates to start_run
+    with the same parameters.  Requires full start params (caps required).
+    """
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        topic = _topic_from_body(data)
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+
+        state = _sup.get_state(topic)
+        if state is not None and state.status in {"running", "paused", "awaiting_decision"}:
+            return jsonify({"error": f"Run is currently active (status={state.status}); abort it first"}), 409
+
+        # Evict from registry so start_run won't reject it as active
+        from pathly_orchestrator.supervisor import _lock, _registry
+        with _lock:
+            _registry.pop(topic, None)
+
+        required = {"flow", "project_root", "max_iterations", "max_cost_usd"}
+        missing = required - set(data.keys())
+        if missing:
+            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+
+        max_iterations = data.get("max_iterations")
+        if not isinstance(max_iterations, int) or max_iterations <= 0:
+            return jsonify({"error": "Field 'max_iterations' must be a positive integer"}), 400
+
+        max_cost_usd = data.get("max_cost_usd")
+        if not isinstance(max_cost_usd, (int, float)) or max_cost_usd <= 0:
+            return jsonify({"error": "Field 'max_cost_usd' must be a positive number"}), 400
+
+        model = data.get("model", "claude-sonnet-4-6") or "claude-sonnet-4-6"
+        timeout = data.get("timeout", 600)
+        if not isinstance(timeout, int) or timeout <= 0:
+            timeout = 600
+        autonomy = data.get("autonomy", {})
+        if not isinstance(autonomy, dict):
+            autonomy = {}
+
+        _sup.start_run(
+            topic=topic,
+            flow=data["flow"],
+            project_root=data["project_root"],
+            model=model,
+            timeout=timeout,
+            max_iterations=max_iterations,
+            max_cost_usd=float(max_cost_usd),
+            autonomy=autonomy,
+            broadcast_fn=_broadcast_runner,
+        )
+        return jsonify({"status": "retried", "topic": topic}), 200
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        logging.exception("runner_retry error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/abort", methods=["POST"])
+def runner_abort():
+    """Hard-abort an active run; kills in-flight subprocess within ~2s."""
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json() or {}
+        topic = _topic_from_body(data)
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+        _sup.abort_run(topic)
+        return jsonify({"status": "aborting", "topic": topic}), 200
+    except KeyError:
+        return jsonify({"error": "No run found for topic"}), 404
+    except Exception as exc:
+        logging.exception("runner_abort error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/status", methods=["GET"])
+def runner_status():
+    """Return the current RunnerState for a topic.
+
+    Query param: topic (required).
+    """
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        topic = request.args.get("topic", "").strip()
+        if not topic:
+            return jsonify({"error": "Query parameter 'topic' is required"}), 400
+
+        state = _sup.get_state(topic)
+        if state is None:
+            return jsonify({"error": "No run found for topic"}), 404
+
+        return jsonify(state.public_dict()), 200
+    except Exception as exc:
+        logging.exception("runner_status error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/events/runner", methods=["GET"])
+def runner_events_endpoint():
+    """SSE endpoint: streams runner lifecycle events for a given topic.
+
+    Query param: topic (required).
+
+    Event types (see FEATURE_INDEX.md):
+      connected, STAGE_CHANGE, DECISION_MENU, RUNNER_STATUS, COST_UPDATE, SESSION, RUNNER_ERROR
+    """
+    from flask import Response, stream_with_context
+
+    topic = request.args.get("topic", "").strip()
+    if not topic:
+        return jsonify({"error": "Query parameter 'topic' is required"}), 400
+
+    q: queue.Queue = queue.Queue(maxsize=50)
+    with _runner_lock:
+        _runner_clients.setdefault(topic, []).append(q)
+
+    def generate():
+        try:
+            yield 'data: {"type":"connected"}\n\n'
+            while True:
+                try:
+                    data = q.get(timeout=25)
+                    yield f"data: {data}\n\n"
+                except queue.Empty:
+                    yield ": keepalive\n\n"
+        finally:
+            with _runner_lock:
+                clients = _runner_clients.get(topic, [])
+                if q in clients:
+                    clients.remove(q)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.route("/events/stream", methods=["GET"])
 def events_stream():
     """SSE endpoint: streams new EVENTS.jsonl lines to the Studio UI."""

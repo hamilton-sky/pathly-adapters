@@ -1,0 +1,4 @@
+{"type":"STATE_TRANSITION","from":"IDLE","to":"BUILDING","schema_version":1,"ts":"2026-06-01T14:18:22Z"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance","ts":"2026-06-01T14:18:22Z"}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"result":"DONE","tokens_in":14579,"tokens_out":3645,"total_tokens":18224,"cost_usd":0.098410,"tool_uses":10,"wall_seconds":78,"ts":"2026-06-01T14:20:45Z","schema_version":1}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-01T14:20:50Z"}
