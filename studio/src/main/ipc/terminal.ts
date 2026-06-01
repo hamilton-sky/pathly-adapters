@@ -35,6 +35,20 @@ function isValidCwd(dir: string): boolean {
   }
 }
 
+/** Resolve the absolute path to agy.exe — checks known install location first, falls back to PATH. */
+function resolveAgyPath(): string {
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA ?? ''
+    const knownPath = join(localAppData, 'agy', 'bin', 'agy.exe')
+    if (fs.existsSync(knownPath)) return knownPath
+    // Also check npm bin (our fallback copy)
+    const appData = process.env.APPDATA ?? ''
+    const npmPath = join(appData, 'npm', 'agy.exe')
+    if (fs.existsSync(npmPath)) return npmPath
+  }
+  return 'agy'  // rely on PATH on non-Windows or if known paths don't exist
+}
+
 function resolveShell(command: string | undefined): { shell: string; args: string[] } {
   if (process.platform !== 'win32') {
     if (command === 'claude' || command === 'codex' || command === 'agy') {
@@ -44,7 +58,11 @@ function resolveShell(command: string | undefined): { shell: string; args: strin
   }
   if (command === 'claude') return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'claude'] }
   if (command === 'codex')  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'codex'] }
-  if (command === 'agy')    return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'agy'] }
+  if (command === 'agy') {
+    // Use absolute path so Studio finds agy regardless of its inherited PATH
+    const agyExe = resolveAgyPath()
+    return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `& '${agyExe}'`] }
+  }
   return { shell: 'powershell.exe', args: [] }
 }
 
