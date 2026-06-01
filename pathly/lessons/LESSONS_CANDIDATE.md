@@ -427,3 +427,54 @@ criterion that contains a step count (wizard steps, nav clicks, form fields, ite
 
 ### Source
 Feature: wizard-e2e-flow | Stage: test | Date: 2026-05-31
+
+---
+
+## [antigravity-adapter] Scope gate baseline must be set to a clean post-feature-commit SHA
+
+### Pattern
+The scope gate compares `conv_start_sha` (stored in STATE.json) to HEAD. When unrelated commits (e.g., cross-adapter `dispatch_skill.yaml` additions) fall in the same diff window as Conv N work, the scope gate fires spuriously — once per `complete_stage` call, regardless of `resolved_files`. The FSM re-evaluates the git diff live each time and recreates SCOPE_VIOLATION.md.
+
+### Rule
+MUST commit Conv N work and update `conv_start_sha` in STATE.json to the resulting HEAD SHA before advancing any scope gate. A scope gate resolution that doesn't include a fresh baseline commit will loop indefinitely.
+
+### Injection
+- Add to CONVERSATION_PROMPTS.md Conv N: "After verify passes, commit all changes. Record the commit SHA and update `pathly/plans/<feature>/STATE.json` `conv_start_sha` to this SHA before calling complete_stage."
+- Add to FSM gate documentation: "SCOPE_VIOLATION.md is recreated on every complete_stage call if the scope check fails — resolved_files does not suppress re-evaluation."
+
+### Source
+Feature: antigravity-adapter | Stage: building | Date: 2026-06-01
+
+---
+
+## [antigravity-adapter] VERIFY.md must be written at Conv N-1 conclusion, not discovered at gate time
+
+### Pattern
+The `verify_gate` blocks BUILDING→REVIEWING unless `VERIFY.md` exists with "RESULT: PASS" on line 1. For Conv 4 (the final conversation), VERIFY.md was absent because it was never listed in Conv 3's done-conditions. The gate halted the pipeline and required a manual file creation + pipeline retry.
+
+### Rule
+MUST include "Write VERIFY.md with 'RESULT: PASS' as line 1" in the done-conditions of the final implementation conversation, not as a discovered step at gate time.
+
+### Injection
+- Add to CONVERSATION_PROMPTS.md final conversation: "After verify command passes, write `RESULT: PASS` to `pathly/plans/<feature>/VERIFY.md`. Include a one-line summary of what was verified (e.g., dry-run output, test counts)."
+- Add to plan template: "Phase N (final) done-conditions: [...] + VERIFY.md written with 'RESULT: PASS'."
+
+### Source
+Feature: antigravity-adapter | Stage: building | Date: 2026-06-01
+
+---
+
+## [antigravity-adapter] Adapter skill counts drift when new skills added to claude without propagating to other adapters
+
+### Pattern
+The antigravity adapter was built targeting 19 claude skills (the count at planning time). By Conv 3, claude had 34 skills. The 15 new skills were never propagated to antigravity. The tester caught the drift, but only because it counted the claude adapter's YAMLs directly — not because the plan had a "stay in sync" criterion.
+
+### Rule
+MUST write skill count acceptance criteria as "matching claude adapter's current set" (a relative count, not an absolute number), and include a sync check as an explicit acceptance criterion: "antigravity _meta/ skill YAML count == claude _meta/ skill YAML count."
+
+### Injection
+- Add to USER_STORIES.md S3.x (skill YAML stories): "Acceptance criterion: count of antigravity skill YAMLs must equal count of claude skill YAMLs. Run: `diff <(ls src/pathly_data/adapters/claude/_meta/*_skill.yaml | wc -l) <(ls src/pathly_data/adapters/antigravity/_meta/*_skill.yaml | wc -l)`."
+- Add to any new adapter plan: "Include a parity check vs claude adapter as a final tester acceptance criterion."
+
+### Source
+Feature: antigravity-adapter | Stage: test | Date: 2026-06-01

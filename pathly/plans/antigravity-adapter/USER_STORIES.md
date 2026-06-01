@@ -62,12 +62,12 @@ Google Antigravity (`agy` CLI) was launched in November 2025 (v2.0 at Google I/O
 ---
 
 ### Story S3.1: Skill YAML files
-**As an** Antigravity user, **I want** all 19 Pathly skills available via the `agy` CLI, **so that** I can run commands like `agy "pathly go"` or invoke `/pathly build` from the Antigravity skill menu.
+**As an** Antigravity user, **I want** all Pathly skills available via the `agy` CLI, **so that** I can run commands like `agy "pathly go"` or invoke `/pathly build` from the Antigravity skill menu.
 
 **Acceptance Criteria:**
-- [ ] `src/pathly_data/adapters/antigravity/_meta/` contains exactly 19 skill YAML files matching the claude adapter's set: `archive`, `build`, `end`, `go`, `help`, `lessons`, `meet`, `pause`, `pathly`, `plan`, `po`, `prd-import`, `retro`, `review`, `scout-path`, `start`, `storm`, `test`, `verify-state`
+- [ ] `src/pathly_data/adapters/antigravity/_meta/` contains skill YAML files matching the claude adapter's set (currently 34: the 19 original skills plus 15 added since the plan was written — `dispatch`, `archive-artifacts`, `back`, `commit`, `debug`, `design`, `explore`, `ff`, `fix`, `fsm-call`, `log-agent-done`, `log`, `quick-fix`, `status`, `team`)
 - [ ] Each skill YAML has `skill` and `natural_language` fields; `filename` field follows the nested pattern `<skill>/SKILL.md` (matching codex structure)
-- [ ] `pathly-setup antigravity --dry-run` after Conv 3 lists 19 skill files under the skills destination
+- [ ] `pathly-setup antigravity --dry-run` after Conv 3 lists all skill files under the skills destination
 - [ ] `python -m pytest tests/ -q` passes with no new failures after Conv 3
 
 **Edge Cases:**
