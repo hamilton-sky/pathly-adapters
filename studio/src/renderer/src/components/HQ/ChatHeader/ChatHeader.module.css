@@ -41,16 +41,14 @@
 .targetBtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  padding: 2px 6px 2px 4px;
-  border-radius: 12px;
+  gap: 4px;
+  padding: 3px 5px;
+  border-radius: 6px;
   background: var(--bg-surface1);
   color: var(--text-muted);
   border: 1px solid transparent;
   cursor: pointer;
   transition: border-color 150ms ease-out, background 150ms ease-out;
-  white-space: nowrap;
 }
 
 .targetBtn:hover,
@@ -67,10 +65,6 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.targetLabel {
-  font-size: 11px;
 }
 
 .dot {

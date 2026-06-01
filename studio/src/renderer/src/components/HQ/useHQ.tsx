@@ -223,7 +223,7 @@ export function useHQ() {
       try {
         const url = `http://127.0.0.1:8765/events/runner?topic=${encodeURIComponent(activeTopic ?? '')}`
         es = new EventSource(url)
-        es.onopen = () => { retryCountRef.current = 0 }  // reset backoff on successful connect
+        es.onopen = () => { retryCountRef.current = 0; setRunnerState({ errorMessage: null }) }  // reset backoff + clear error banner on reconnect
         es.onmessage = (e: MessageEvent) => {
           try {
             const data = JSON.parse(e.data as string) as { type: string; [key: string]: unknown }
@@ -257,7 +257,7 @@ export function useHQ() {
           // Exponential backoff: 3s → 6s → 12s → … capped at 30s
           const delay = Math.min(3000 * Math.pow(2, retryCountRef.current), 30000)
           retryCountRef.current += 1
-          setRunnerState({ errorMessage: 'Reconnecting...' })
+          setRunnerState({ errorMessage: 'Server offline — reconnecting…' })
           reconnectTimeout = setTimeout(connect, delay)
         }
       } catch { /* EventSource not available — silently skip */ }

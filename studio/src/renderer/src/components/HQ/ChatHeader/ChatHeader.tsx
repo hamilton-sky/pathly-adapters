@@ -90,7 +90,6 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
           >
             <span className={styles.targetIcon}>{current.icon(13)}</span>
             <span className={`${styles.dot} ${activeByKind[targetKind] ? styles.dotActive : ''}`} />
-            <span className={styles.targetLabel}>{current.label}</span>
             <ChevronDown size={10} />
           </button>
         </Tooltip>
