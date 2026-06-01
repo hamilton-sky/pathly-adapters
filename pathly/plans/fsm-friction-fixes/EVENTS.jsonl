@@ -7,3 +7,8 @@
 {"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-01T00:30:23Z"}
 {"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-01T00:31:01Z"}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_baseline_sha", "schema_version": 1, "ts": "2026-06-01T00:31:01Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-01T00:31:02Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "tokens_in": 38337, "tokens_out": 9584, "total_tokens": 47921, "cost_usd": 0.258773, "tool_uses": 21, "wall_seconds": 86, "ts": "2026-06-01T00:33:09Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-01T00:33:36Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "cost_usd": 0.0, "tool_uses": 0, "wall_seconds": 480, "ts": "2026-06-01T05:50:23Z", "schema_version": 1}
+{"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_baseline_sha", "schema_version": 1, "ts": "2026-06-01T05:50:30Z"}

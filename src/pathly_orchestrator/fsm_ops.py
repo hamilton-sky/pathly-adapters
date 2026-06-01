@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import subprocess
 from importlib.resources import files
@@ -336,9 +337,6 @@ def next_action(args: dict) -> dict:
             "storage_path": str(storage_path),
         }
 
-    # Stamp conv_start_sha once per conversation start so scope_gate can baseline the diff.
-    # Only write if not already present — re-calling next_action mid-conversation must not
-    # advance the baseline.
     state_file = storage_path / "STATE.json"
     prior_state: dict = {}
     if state_file.exists():
@@ -346,11 +344,45 @@ def next_action(args: dict) -> dict:
             prior_state = json.loads(state_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             prior_state = {}
+
+    stamped_state = dict(prior_state)
+    needs_write = False
+
     if not prior_state.get("conv_start_sha"):
-        sha = _get_head_sha(project_root)
-        stamped_state = dict(prior_state)
-        stamped_state["conv_start_sha"] = sha
+        stamped_state["conv_start_sha"] = _get_head_sha(project_root)
+        needs_write = True
+
+    if state_info["current_state"] == "BUILDING" and not prior_state.get("build_baseline"):
+        try:
+            dirty_run = subprocess.run(
+                ["git", "status", "--porcelain=v1"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            dirty_paths = sorted(set(
+                line[3:].strip()
+                for line in dirty_run.stdout.splitlines()
+                if line.strip()
+            )) if dirty_run.returncode == 0 else []
+        except Exception:
+            dirty_paths = []
+        truncated = len(dirty_paths) > 500
+        if truncated:
+            dirty_paths = dirty_paths[:500]
+        baseline: dict = {
+            "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "preexisting_dirty": dirty_paths,
+        }
+        if truncated:
+            baseline["truncated"] = True
+        stamped_state["build_baseline"] = baseline
+        needs_write = True
+
+    if needs_write:
         write_state(storage_path, state_info["current_state"], stamped_state)
+        prior_state = stamped_state
 
     feedback = route_feedback(flow_config, storage_path)
 
@@ -534,9 +566,9 @@ def complete_stage(args: dict) -> dict:
     )
 
     prior_state = dict(state_before or {})
-    # Clear the per-conversation git baseline so the *next* conversation
-    # gets a fresh SHA stamp from next_action — not the previous conv's baseline.
+    # Clear per-conversation baselines so the next conversation gets fresh snapshots.
     prior_state.pop("conv_start_sha", None)
+    prior_state.pop("build_baseline", None)
     write_state(storage_path, next_state, prior_state)
 
     append_event(

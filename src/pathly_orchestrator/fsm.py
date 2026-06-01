@@ -360,7 +360,7 @@ def _write_gate_feedback(storage_path: Path, on_fail: str, reason: str) -> None:
     target.write_text(reason, encoding="utf-8")
 
 
-def _scope_clean(storage_path: Path, scope_file: str, baseline_sha: str | None) -> bool:
+def _scope_clean(storage_path: Path, scope_file: str, preexisting_dirty: set[str] | None) -> bool:
     import re as _re
 
     scope_path = storage_path / scope_file
@@ -371,8 +371,6 @@ def _scope_clean(storage_path: Path, scope_file: str, baseline_sha: str | None) 
             text = scope_path.read_text(encoding="utf-8")
         except OSError:
             text = ""
-        # Extract backtick-quoted tokens from each line individually so code-block
-        # fences (``` ... ```) don't swallow adjacent inline paths.
         for line in text.splitlines():
             for match in _re.finditer(r"`([^`\r\n]+)`", line):
                 candidate = match.group(1).strip()
@@ -386,19 +384,11 @@ def _scope_clean(storage_path: Path, scope_file: str, baseline_sha: str | None) 
         )
         return True
 
-    if not baseline_sha:
-        append_event(
-            storage_path,
-            {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_baseline_sha"},
-        )
-        return True
-
-    # Project root is 3 levels up from storage_path (pathly/plans/{topic}/)
     project_root = storage_path.parent.parent.parent
 
     try:
-        result = subprocess.run(
-            ["git", "diff", "--name-only", baseline_sha],
+        diff_result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD"],
             cwd=str(project_root),
             capture_output=True,
             text=True,
@@ -411,25 +401,36 @@ def _scope_clean(storage_path: Path, scope_file: str, baseline_sha: str | None) 
         )
         return True
 
-    if result.returncode != 0:
+    if diff_result.returncode != 0:
         append_event(
             storage_path,
             {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "git_diff_failed"},
         )
         return True
 
-    # Paths automatically exempt from the scope gate regardless of declaration:
-    # - pathly/plans/ — FSM-managed artifacts (EVENTS.jsonl, STATE.json, feedback/, etc.)
-    # - *.tsbuildinfo — TypeScript incremental build cache, modified by typecheck runs
-    def _is_exempt(p: str) -> bool:
-        return (
-            p.startswith("pathly/plans/")
-            or p.startswith("src/pathly_orchestrator/")
-            or p.endswith(".tsbuildinfo")
+    try:
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain=v1"],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
+        untracked = {
+            line[3:].strip()
+            for line in status_result.stdout.splitlines()
+            if line.startswith("??")
+        } if status_result.returncode == 0 else set()
+    except Exception:
+        untracked = set()
 
-    changed_paths = [p for p in result.stdout.splitlines() if p.strip()]
-    for path in changed_paths:
+    all_dirty = {p for p in diff_result.stdout.splitlines() if p.strip()} | untracked
+    builder_touched = all_dirty - (preexisting_dirty or set())
+
+    def _is_exempt(p: str) -> bool:
+        return p.startswith("pathly/plans/") or p.endswith(".tsbuildinfo")
+
+    for path in builder_touched:
         if not _is_exempt(path) and path not in declared:
             return False
 
@@ -445,19 +446,9 @@ def run_gates(
     conv: int,
 ) -> dict | None:
     gates = flow.get("gates", {})
-    # Gates are evaluated fail-fast: stop at the first failure so feedback is unambiguous.
     applicable = gates.get(f"{prev_state}->{next_state}", []) + gates.get(
         f"->{next_state}", []
     )
-    # Read conv_start_sha once for scope_gate use
-    state_file = storage_path / "STATE.json"
-    conv_start_sha: str | None = None
-    if state_file.exists():
-        try:
-            state_doc = json.loads(state_file.read_text(encoding="utf-8"))
-            conv_start_sha = state_doc.get("conv_start_sha") or None
-        except (json.JSONDecodeError, OSError):
-            pass
 
     for gate in applicable:
         gtype = gate["type"]
@@ -492,7 +483,28 @@ def run_gates(
                 return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "scope_gate":
             scope_file = gate["scope_file"]
-            if not _scope_clean(storage_path, scope_file, conv_start_sha):
+            state_file = storage_path / "STATE.json"
+            build_baseline: dict | None = None
+            if state_file.exists():
+                try:
+                    state_doc = json.loads(state_file.read_text(encoding="utf-8"))
+                    build_baseline = state_doc.get("build_baseline")
+                except (json.JSONDecodeError, OSError):
+                    pass
+            if build_baseline is None:
+                append_event(
+                    storage_path,
+                    {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline"},
+                )
+                continue
+            if build_baseline.get("truncated") or len(build_baseline.get("preexisting_dirty", [])) > 500:
+                append_event(
+                    storage_path,
+                    {"type": "GATE_DEGRADED", "gate": "scope_gate", "reason": "preexisting_dirty_truncated"},
+                )
+                continue
+            preexisting = set(build_baseline.get("preexisting_dirty", []))
+            if not _scope_clean(storage_path, scope_file, preexisting):
                 reason = f"Scope gate failed: changes outside declared scope in {scope_file}"
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
                 append_event(
