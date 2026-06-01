@@ -160,3 +160,18 @@ def test_invalid_host_exits_nonzero(tmp_path):
         f"Expected non-zero exit for invalid host.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
     assert "nonexistent_host_xyz" in result.stderr or "unsupported" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# test_antigravity_dry_run_exits_0
+# ---------------------------------------------------------------------------
+
+@pytest.mark.slow
+def test_antigravity_dry_run_exits_0(tmp_path):
+    (tmp_path / ".gemini" / "antigravity-cli").mkdir(parents=True)
+    result = _run_install_cli(["antigravity", "--dry-run"], tmp_path)
+    assert result.returncode == 0, (
+        f"Expected exit 0 for antigravity dry-run.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
+    assert "[antigravity]" in result.stdout
+    assert "Would write" in result.stdout

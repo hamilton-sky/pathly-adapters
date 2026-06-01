@@ -4,3 +4,9 @@
 {"type":"STAGE_COMPLETE","stage":"DESIGNING","next":"BUILDING","ts":"2026-06-01T12:15:10.9091368Z"}
 {"type": "STATE_TRANSITION", "from": "DESIGNING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-01T12:43:19Z"}
 {"type":"ACTION_DONE","action":"commit","topic":"antigravity-adapter","ts":"2026-06-01T13:03:24.1952104Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 4, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "cost_usd": 0.0, "tool_uses": 0, "wall_seconds": 96, "ts": "2026-06-01T13:33:06Z", "schema_version": 1}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-01T13:33:14Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-01T13:34:10Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-06-01T13:35:51Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-01T13:35:51Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-01T13:36:24Z"}

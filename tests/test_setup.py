@@ -27,6 +27,24 @@ def test_host_markers_cover_all_supported_hosts():
     assert "copilot" in _HOST_MARKERS
 
 
+def test_host_markers_cover_antigravity():
+    assert "antigravity" in _HOST_MARKERS
+
+
+def test_detect_antigravity_when_dir_exists(tmp_path):
+    agy_dir = tmp_path / ".gemini" / "antigravity-cli"
+    agy_dir.mkdir(parents=True)
+    with patch("install_cli.detect._HOST_MARKERS", {"antigravity": [agy_dir]}):
+        result = detect_hosts()
+    assert "antigravity" in result
+
+
+def test_detect_antigravity_when_dir_missing(tmp_path):
+    with patch("install_cli.detect._HOST_MARKERS", {"antigravity": [tmp_path / "nonexistent"]}):
+        result = detect_hosts()
+    assert "antigravity" not in result
+
+
 def test_detect_claude_when_dir_missing(tmp_path):
     with patch("install_cli.detect._HOST_MARKERS", {"claude": [tmp_path / "nonexistent"]}):
         result = detect_hosts()
