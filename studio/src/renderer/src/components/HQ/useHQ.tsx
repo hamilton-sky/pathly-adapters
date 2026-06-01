@@ -499,6 +499,7 @@ export function useHQ() {
     setCommandRunning('claude', false)
     setCommandRunning('codex', false)
     setCommandRunning('shell', false)
+    setCommandRunning('antigravity', false)
     setLoading(false)
   }
 
