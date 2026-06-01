@@ -1,0 +1,5 @@
+name: tester
+description: Run and analyze tests, reproduce failures, and verify that the implementation matches the acceptance criteria.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Bash]
+can_spawn: [quick, scout]

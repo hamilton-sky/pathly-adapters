@@ -1,0 +1,5 @@
+name: architect
+description: Technical architecture design, layer decisions, system design, trade-off analysis, and deep design sessions. Use when the HOW needs to be figured out - layer structure, dependency direction, technology choices, design patterns.
+model: gemini-2.5-pro
+tools: [Read, Glob, Grep, Write, Edit]
+can_spawn: [quick, scout, web-researcher]

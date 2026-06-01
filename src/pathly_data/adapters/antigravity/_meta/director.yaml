@@ -1,0 +1,5 @@
+name: director
+description: Route the current request to the lightest safe Pathly workflow, choose the next step, and keep the pipeline moving.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Write, Bash]
+can_spawn: [quick, scout, web-researcher]

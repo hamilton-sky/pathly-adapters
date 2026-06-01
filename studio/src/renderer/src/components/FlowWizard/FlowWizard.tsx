@@ -10,6 +10,7 @@ import { Step2States } from './Step2States/Step2States'
 import { Step3Transitions } from './Step3Transitions/Step3Transitions'
 import { Step4Agents } from './Step4Agents/Step4Agents'
 import { Step4Quality } from './Step4Quality/Step4Quality'
+import { Step5AdapterRouting } from './Step5AdapterRouting/Step5AdapterRouting'
 import { Step5Review } from './Step5Review/Step5Review'
 import { Step0Entry } from './Step0Entry/Step0Entry'
 import { YamlPreview } from './YamlPreview/YamlPreview'
@@ -19,7 +20,7 @@ import { validateStep } from './FlowWizard.validation'
 import { FieldError } from '../ui'
 import styles from './FlowWizard.module.css'
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 6
 
 export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const { pathlyUserHome } = useStore()
@@ -31,6 +32,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const [states, setStates] = useState(['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'TESTING', 'DONE'])
   const [transitions, setTransitions] = useState<Transition[]>([])
   const [agentMap, setAgentMap] = useState<Record<string, string>>({})
+  const [adapterMap, setAdapterMap] = useState<Record<string, string>>({ default: 'claude' })
   const [gates, setGates] = useState<Record<string, Gate[]>>({})
   const [feedbackRoutes, setFeedbackRoutes] = useState<FeedbackRoute[]>([
     { tag: 'HUMAN_QUESTIONS', agent: 'human' },
@@ -54,8 +56,8 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const terminalState = validStates[validStates.length - 1] ?? ''
 
   const yamlPreview = useMemo(
-    () => generateYaml(flowName || 'my-flow', storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules),
-    [flowName, storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules]
+    () => generateYaml(flowName || 'my-flow', storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules, adapterMap),
+    [flowName, storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules, adapterMap]
   )
 
   const draftPath = pathlyUserHome ? `${pathlyUserHome}/flows/${DRAFT_FILE_NAME}` : ''
@@ -99,10 +101,11 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
       gates,
       feedbackRoutes,
       transitionRules,
-      storagePath
+      storagePath,
+      adapterMap
     }
     void writeFile(draftPath, serializeDraft(draft)).then(() => setHasDraft(true)).catch(() => {})
-  }, [draftLoaded, draftPath, flowName, description, step, selectedTemplateId, states, transitions, agentMap, gates, feedbackRoutes, transitionRules, storagePath])
+  }, [draftLoaded, draftPath, flowName, description, step, selectedTemplateId, states, transitions, agentMap, gates, feedbackRoutes, transitionRules, storagePath, adapterMap])
 
   function applyTemplate(template: WizardTemplate | null): void {
     if (!template) return
@@ -124,6 +127,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     setFeedbackRoutes(draft.feedbackRoutes)
     setTransitionRules(draft.transitionRules)
     setStoragePath(draft.storagePath)
+    setAdapterMap(draft.adapterMap ?? { default: 'claude' })
   }
 
   function resumeDraft(): void {
@@ -137,6 +141,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     setStates(['DONE'])
     setTransitions([])
     setAgentMap({})
+    setAdapterMap({ default: 'claude' })
     setGates({})
     setFeedbackRoutes([])
     setTransitionRules({})
@@ -217,6 +222,21 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
 
   function updateAgent(state: string, value: string): void {
     setAgentMap((prev) => ({ ...prev, [state]: value }))
+  }
+
+  function updateAdapter(key: string, value: string): void {
+    setAdapterMap((prev) => {
+      if (!value && key !== 'default') {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      }
+      return { ...prev, [key]: value }
+    })
+  }
+
+  function resetAdapterMap(): void {
+    setAdapterMap({ default: 'claude' })
   }
 
   async function handleSave(): Promise<void> {
@@ -308,6 +328,14 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
               />
             )}
             {step === 5 && (
+              <Step5AdapterRouting
+                nonTerminalStates={nonTerminalStates}
+                adapterMap={adapterMap}
+                onUpdateAdapter={updateAdapter}
+                onReset={resetAdapterMap}
+              />
+            )}
+            {step === 6 && (
               <>
                 <Step4Quality
                   transitions={transitions.filter((tr) => tr.from.trim() && tr.to.trim())}

@@ -1,0 +1,5 @@
+name: quick
+description: Fast targeted investigation or answer on a small, bounded question.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Bash]
+can_spawn: []

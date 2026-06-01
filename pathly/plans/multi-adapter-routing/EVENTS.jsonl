@@ -6,3 +6,5 @@
 {"type": "GATE_FAILED", "gate": "require_artifact", "transition": "REVIEWING->TESTING", "schema_version": 1, "ts": "2026-06-01T12:16:13Z"}
 {"type": "FEEDBACK_RESOLVED", "file": "HUMAN_QUESTIONS.md", "schema_version": 1, "ts": "2026-06-01T12:17:08Z"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "schema_version": 1, "ts": "2026-06-01T12:17:08Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-06-01T12:33:11.367612+00:00"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "cost_usd": 0.0, "tool_uses": 0, "wall_seconds": 844, "ts": "2026-06-01T12:33:43.421163+00:00", "schema_version": 1}

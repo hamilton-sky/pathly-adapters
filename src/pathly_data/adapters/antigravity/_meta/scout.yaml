@@ -1,0 +1,5 @@
+name: scout
+description: Read-only parallel research over a scoped area, producing concise findings for a parent agent.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Bash]
+can_spawn: [quick]

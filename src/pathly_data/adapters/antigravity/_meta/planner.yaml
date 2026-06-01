@@ -1,0 +1,5 @@
+name: planner
+description: Break work into phases, define implementation order, and write the plan with clear story boundaries and verification steps.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Write, Edit]
+can_spawn: [quick, scout]

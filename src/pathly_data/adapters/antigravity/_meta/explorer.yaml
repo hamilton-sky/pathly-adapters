@@ -1,0 +1,5 @@
+name: explorer
+description: Read-only codebase and docs investigation, context gathering, and focused exploration. Use when you need facts before deciding.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Bash]
+can_spawn: [quick]

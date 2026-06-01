@@ -8,7 +8,8 @@ export function generateYaml(
   transitions: Transition[],
   gates: Record<string, Gate[]>,
   feedbackRoutes: FeedbackRoute[],
-  transitionRules: Record<string, TransitionRule>
+  transitionRules: Record<string, TransitionRule>,
+  adapterMap: Record<string, string> = {}
 ): string {
   const transitionMap: Record<string, string[]> = {}
   for (const tr of transitions) {
@@ -34,6 +35,21 @@ export function generateYaml(
   for (const s of states) {
     if (agentMap[s]) {
       lines.push(`  ${s}: ${agentMap[s]}`)
+    }
+  }
+
+  // adapter_map — omit when trivially default (only { default: 'claude' }, no state overrides)
+  const adapterKeys = Object.keys(adapterMap)
+  if (adapterKeys.length > 0 && !(adapterKeys.length === 1 && adapterMap['default'] === 'claude')) {
+    lines.push(``)
+    lines.push(`adapter_map:`)
+    if ('default' in adapterMap) {
+      lines.push(`  default: ${adapterMap['default']}`)
+    }
+    for (const s of states) {
+      if (adapterMap[s]) {
+        lines.push(`  ${s}: ${adapterMap[s]}`)
+      }
     }
   }
 

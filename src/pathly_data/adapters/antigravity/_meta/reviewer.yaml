@@ -1,0 +1,5 @@
+name: reviewer
+description: Review code or plans for correctness, regressions, missing tests, and implementation risks.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep]
+can_spawn: [quick, scout]

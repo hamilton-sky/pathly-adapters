@@ -1,0 +1,5 @@
+name: web-researcher
+description: Search external documentation or product information when live web verification is needed.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Bash]
+can_spawn: [quick]

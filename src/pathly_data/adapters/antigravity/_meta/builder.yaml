@@ -1,0 +1,5 @@
+name: builder
+description: Write code, fix bugs, implement features, refactor existing code, and run tests. Use for all coding execution tasks after the plan is clear.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Edit, Write, Bash, TodoWrite]
+can_spawn: [quick, scout]

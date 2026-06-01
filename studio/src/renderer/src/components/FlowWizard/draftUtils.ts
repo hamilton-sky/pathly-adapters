@@ -13,6 +13,7 @@ export interface WizardDraft {
   feedbackRoutes: FeedbackRoute[]
   transitionRules: Record<string, TransitionRule>
   storagePath: string
+  adapterMap: Record<string, string>
 }
 
 export const DRAFT_FILE_NAME = '.flow-wizard-draft.json'

@@ -1,0 +1,5 @@
+name: po
+description: Clarify requirements, capture user stories, and remove ambiguity before planning or implementation starts.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Write, Edit]
+can_spawn: [quick]
