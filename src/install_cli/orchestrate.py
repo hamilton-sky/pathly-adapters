@@ -48,6 +48,7 @@ _SKILL_GROUPS = {
     "commit": "development",
     "debug": "development",
     "design": "development",
+    "dispatch": "utilities",
     "end": "flow",
     "explore": "development",
     "ff": "flow",

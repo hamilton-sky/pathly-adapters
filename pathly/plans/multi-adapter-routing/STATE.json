@@ -1,7 +1,6 @@
 {
-  "current": "REVIEWING",
+  "current": "TESTING",
   "feature": "multi-adapter-routing",
   "rigor": "standard",
-  "updated_at": "2026-06-01T12:33:03.881774+00:00",
-  "conv_start_sha": "eb4f5d4eb89df51a0f111aa1ca05dc74c8ee02e8"
+  "updated_at": "2026-06-01T13:00:58.838871+00:00"
 }

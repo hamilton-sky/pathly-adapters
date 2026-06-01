@@ -2,3 +2,4 @@
 {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "DESIGNING", "schema_version": 1, "ts": "2026-06-01T12:13:45Z"}
 {"type":"FILE_CREATED","file":"DESIGN.md","ts":"2026-06-01T12:15:10.9091368Z"}
 {"type":"STAGE_COMPLETE","stage":"DESIGNING","next":"BUILDING","ts":"2026-06-01T12:15:10.9091368Z"}
+{"type": "STATE_TRANSITION", "from": "DESIGNING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-01T12:43:19Z"}
