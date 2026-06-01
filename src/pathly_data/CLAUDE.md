@@ -70,6 +70,27 @@ Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that 
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
 - `codex_subagent` — **frozen legacy field**; present for backward compat only — new adapters must read `agent_hint`, not `codex_subagent`
 
+## Canonical `adapter_map` shape
+
+`adapter_map` is an **optional** top-level key in any `.flow.yaml`. When present it tells the FSM which CLI adapter should handle each pipeline stage. The FSM emits `preferred_adapter` in every `/next_action` response — passive relay only; it never launches processes.
+
+```yaml
+adapter_map:
+  default: claude          # REQUIRED if adapter_map is present; must be in {claude, codex, copilot}
+  BUILDING: codex          # optional per-state override; key must be a declared state
+  REVIEWING: claude
+```
+
+**Resolution precedence (highest → lowest):**
+1. *(reserved: per-feature STATE.json override — follow-up, not implemented yet)*
+2. `adapter_map[current_state]`
+3. `adapter_map["default"]`
+4. `""` — no `adapter_map`; fully backward-compatible
+
+**Known adapter set:** `claude`, `codex`, `copilot`. The FSM validator (`state.py`) enforces this set and requires `default`. Studio serializer (`utils.ts`) must conform to this exact shape — a round-trip test enforces it.
+
+---
+
 ## Adapter sync rule — CRITICAL
 
 `core/` is the **single source of truth**. The three adapters (`claude/`, `codex/`, `copilot/`) are derived outputs.

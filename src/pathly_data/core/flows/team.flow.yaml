@@ -46,6 +46,14 @@ role_map:
   REVIEWING: reviewer
   TESTING: tester
   RETRO: retro
+# adapter_map (optional): route pipeline stages to different CLI adapters.
+# 'default' is required; every value must be in {claude, codex, copilot}.
+# Every non-default key must be a declared state in 'states'.
+# Omitting this block is fully backward-compatible (preferred_adapter returns "").
+# adapter_map:
+#   default: claude          # used for any stage not listed below
+#   BUILDING: codex          # optional per-state override
+#   REVIEWING: claude
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human

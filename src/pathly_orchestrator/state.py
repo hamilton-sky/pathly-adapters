@@ -43,6 +43,8 @@ STATES: dict[str, list[str]] = _SCHEMA["transitions"]
 VALID_STATES: frozenset[str] = frozenset(STATES.keys())
 TRANSITIONS: dict[str, list[str]] = STATES
 
+_KNOWN_ADAPTERS: frozenset[str] = frozenset({"claude", "codex", "copilot"})
+
 _REQUIRED_FLOW_KEYS = {
     "storage_path",
     "states",
@@ -55,6 +57,7 @@ _KNOWN_OPTIONAL_FLOW_KEYS = {
     "version",
     "flow",
     "transition_actions",
+    "adapter_map",
 }
 _ACTION_VOCAB = {
     "git_commit",
@@ -140,6 +143,23 @@ def validate_flow_cli() -> None:
                     errors.append(
                         f"Unknown action type '{action_type}' in transition_actions[{key}]"
                     )
+
+    # adapter_map validation (optional field — omitting it is fully backward compatible)
+    if "adapter_map" in flow:
+        adapter_map = flow["adapter_map"] or {}
+        if "default" not in adapter_map:
+            errors.append("adapter_map: 'default' key is required")
+        declared_states = set(flow.get("states") or [])
+        for key, value in adapter_map.items():
+            if value not in _KNOWN_ADAPTERS:
+                errors.append(
+                    f"adapter_map['{key}']: unknown adapter '{value}'"
+                    f" (known: {sorted(_KNOWN_ADAPTERS)})"
+                )
+            if key != "default" and key not in declared_states:
+                errors.append(
+                    f"adapter_map key '{key}' is not a declared state in 'states'"
+                )
 
     # Addition 1 — Agent-contract validation (warning only; contracts may not ship with adapters)
     for agent in (flow.get("agent_map") or {}).values():

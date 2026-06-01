@@ -125,3 +125,77 @@ def test_validate_exits_1_on_invalid_transition_key(monkeypatch, tmp_path, capsy
     assert code == 1
     out = capsys.readouterr().out
     assert "does not exist in transitions" in out
+
+
+# ── validate_flow_cli(): adapter_map validation ───────────────────────────────
+
+def _minimal_flow(**extra) -> dict:
+    base = {
+        "storage_path": "plans/{topic}/",
+        "states": ["BUILDING", "REVIEWING"],
+        "transitions": {"BUILDING": ["REVIEWING"], "REVIEWING": []},
+        "agent_map": {"BUILDING": "builder", "REVIEWING": "reviewer"},
+        "feedback_routing": {},
+        "transition_actions": {},
+    }
+    base.update(extra)
+    return base
+
+
+def test_validate_adapter_map_well_formed_passes(monkeypatch, tmp_path, capsys):
+    flow = _minimal_flow(adapter_map={"default": "claude", "BUILDING": "codex"})
+    flow_file = tmp_path / "good_adapter_map.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "OK:" in out
+
+
+def test_validate_adapter_map_missing_default_fails(monkeypatch, tmp_path, capsys):
+    flow = _minimal_flow(adapter_map={"BUILDING": "codex"})
+    flow_file = tmp_path / "no_default.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "default" in out
+
+
+def test_validate_adapter_map_unknown_adapter_fails(monkeypatch, tmp_path, capsys):
+    flow = _minimal_flow(adapter_map={"default": "claude", "BUILDING": "cursor"})
+    flow_file = tmp_path / "bad_adapter.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "cursor" in out
+
+
+def test_validate_adapter_map_unknown_state_key_fails(monkeypatch, tmp_path, capsys):
+    flow = _minimal_flow(adapter_map={"default": "claude", "NONEXISTENT": "codex"})
+    flow_file = tmp_path / "bad_state_key.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "NONEXISTENT" in out
+
+
+def test_validate_flow_without_adapter_map_still_passes(monkeypatch, tmp_path, capsys):
+    flow = _minimal_flow()
+    flow_file = tmp_path / "no_adapter_map.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 0
+
+
+def test_validate_team_flow_with_adapter_map_still_passes(monkeypatch, capsys):
+    """team.flow.yaml has no adapter_map — validator must still pass cleanly."""
+    code = _run_cli(str(FLOWS_DIR / "team.flow.yaml"), monkeypatch)
+    assert code == 0
