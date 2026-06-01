@@ -3,7 +3,7 @@ name: Progress
 ---
 # Multi-Adapter Runner — Progress
 
-## Status: IN PROGRESS (Conv 2 complete)
+## Status: IN PROGRESS (Conv 3 complete — awaiting hard CI gate)
 
 ## Story Status
 
@@ -11,7 +11,7 @@ name: Progress
 |-------|-------|--------------|--------|
 | S1 | Adapter→command contract | Conv 1 | DONE |
 | S2 | Controllable autonomous supervisor | Conv 2 | DONE |
-| S3 | Control API + /events/runner SSE | Conv 3 | TODO |
+| S3 | Control API + /events/runner SSE | Conv 3 | DONE |
 
 ## Conversation Breakdown
 
@@ -19,7 +19,7 @@ name: Progress
 |------|--------|---------|--------|--------|
 | 1 | 0-4 | S1 | DONE | `python -m pytest tests/ -q` + `python scripts/gen_adapters_ts.py` |
 | 2 | 5-7 | S2 | DONE | `python -m pytest tests/ -q` |
-| 3 | 8-10 | S3 | TODO | `python -m pytest tests/ -q` + curl `/runner/start` and `/events/runner` |
+| 3 | 8-10 | S3 | DONE | `python -m pytest tests/ -q` + curl `/runner/start` and `/events/runner` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts.
 
@@ -38,9 +38,9 @@ See **CONVERSATION_PROMPTS.md** for exact prompts.
 | 2 | 5 RunnerState | `src/pathly_orchestrator/supervisor.py` | State + registry + JSON mirror | Registry works; stale→error on startup | DONE |
 | 2 | 6 Loop + caps + abort | `src/pathly_orchestrator/supervisor.py` | Threaded loop, boundary caps, hard abort | Caps stop run; abort kills ~2s | DONE |
 | 2 | 7 Decision + session | `supervisor.py`, `runner.py` | FSM-fed decision; continue-vs-new | input() replaced; session resolved | DONE |
-| 3 | 8 Control endpoints | `src/pathly_orchestrator/http_server.py` | 8 POST + status | Endpoints thin; caps required; 409 | TODO |
-| 3 | 9 SSE stream | `src/pathly_orchestrator/http_server.py` | /events/runner + _broadcast_runner | Events stream; existing SSE intact | TODO |
-| 3 | 10 Tests | `tests/` | Endpoint + SSE coverage | All pass | TODO |
+| 3 | 8 Control endpoints | `src/pathly_orchestrator/http_server.py` | 8 POST + status | Endpoints thin; caps required; 409 | DONE |
+| 3 | 9 SSE stream | `src/pathly_orchestrator/http_server.py` | /events/runner + _broadcast_runner | Events stream; existing SSE intact | DONE |
+| 3 | 10 Tests | `tests/` | Endpoint + SSE coverage | All pass | DONE |
 
 ## Prerequisites
 - `multi-adapter-routing` Conv 1 shipped (preferred_adapter).

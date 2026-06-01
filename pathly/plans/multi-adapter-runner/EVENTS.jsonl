@@ -1,3 +1,4 @@
 {"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-06-01T13:43:17.305613+00:00"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "tokens_in": 36175, "tokens_out": 9044, "total_tokens": 45219, "cost_usd": 0.244185, "tool_uses": 32, "wall_seconds": 281, "ts": "2026-06-01T13:43:48.062800+00:00", "schema_version": 1}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "tokens_in": 49563, "tokens_out": 12391, "total_tokens": 61954, "cost_usd": 0.334552, "tool_uses": 32, "wall_seconds": 436, "ts": "2026-06-01T14:18:17.174566+00:00", "schema_version": 1}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "tokens_in": 48941, "tokens_out": 12235, "total_tokens": 61176, "cost_usd": 0.33035, "tool_uses": 16, "wall_seconds": 220, "ts": "2026-06-01T14:25:33.812418+00:00", "schema_version": 1}
