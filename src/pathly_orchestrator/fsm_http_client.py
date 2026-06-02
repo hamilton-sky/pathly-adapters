@@ -20,6 +20,7 @@ _HEALTH_PATH = "/health"
 _NEXT_ACTION_PATH = "/next_action"
 _COMPLETE_STAGE_PATH = "/complete_stage"
 _RECORD_ACTIVITY_PATH = "/record_activity"
+_RECORD_PHASE_PATH = "/record_phase"
 
 
 def _base_url(host: str, port: int) -> str:
@@ -167,6 +168,16 @@ def record_activity(
     return _request_json("POST", _RECORD_ACTIVITY_PATH, payload, host=host, port=port)
 
 
+def record_phase(
+    payload: dict,
+    *,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+) -> dict:
+    ensure_server_running(host=host, port=port)
+    return _request_json("POST", _RECORD_PHASE_PATH, payload, host=host, port=port)
+
+
 def _filter_none(values: dict[str, object | None]) -> dict[str, object]:
     return {key: value for key, value in values.items() if value is not None}
 
@@ -237,6 +248,29 @@ def _main_record_activity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _main_record_phase(args: argparse.Namespace) -> int:
+    ensure_server_running(host=args.host, port=args.port)
+    payload = _filter_none(
+        {
+            "feature": args.feature,
+            "agent": args.agent,
+            "phase": args.phase,
+            "event_type": args.event_type,
+            "conv": args.conv,
+            "summary": args.summary,
+        }
+    )
+    raw = _request_raw(
+        "POST",
+        _RECORD_PHASE_PATH,
+        payload,
+        host=args.host,
+        port=args.port,
+    )
+    print(raw)
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="pathly-fsm-call",
@@ -290,6 +324,22 @@ def main() -> None:
     record_activity_parser.add_argument("--wall-seconds", type=int, default=0)
     _add_common_net_args(record_activity_parser)
     record_activity_parser.set_defaults(func=_main_record_activity)
+
+    record_phase_parser = subparsers.add_parser(
+        "record-phase",
+        help="Call POST /record_phase (PHASE_START or PHASE_DONE event).",
+    )
+    record_phase_parser.add_argument("--feature", required=True)
+    record_phase_parser.add_argument("--agent", required=True)
+    record_phase_parser.add_argument("--phase", required=True)
+    record_phase_parser.add_argument(
+        "--event-type", required=True, dest="event_type",
+        choices=["PHASE_START", "PHASE_DONE"],
+    )
+    record_phase_parser.add_argument("--conv", type=int, default=None)
+    record_phase_parser.add_argument("--summary", default=None)
+    _add_common_net_args(record_phase_parser)
+    record_phase_parser.set_defaults(func=_main_record_phase)
 
     args = parser.parse_args()
     try:
