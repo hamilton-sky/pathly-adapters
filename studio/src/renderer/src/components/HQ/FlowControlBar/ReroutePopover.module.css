@@ -65,7 +65,7 @@
 }
 
 .rerouteBtn:hover {
-  opacity: 0.85;
+  filter: brightness(1.1);
 }
 
 .cancelBtn {
@@ -77,8 +77,11 @@
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
 }
 
 .cancelBtn:hover {
-  background: var(--bg-base);
+  background: var(--btn-b-hover-bg);
+  border-color: var(--btn-b-hover-border);
+  color: var(--btn-b-hover-color);
 }

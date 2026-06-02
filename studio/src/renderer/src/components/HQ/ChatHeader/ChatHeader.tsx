@@ -75,7 +75,6 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
         <span className={styles.title}>
           <Zap size={13} /> HQ
         </span>
-        <span className={styles.subtitle}>Pipeline Control</span>
       </div>
 
       {/* Target selector — single dropdown replacing the pill row */}

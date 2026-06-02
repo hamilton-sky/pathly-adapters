@@ -29,7 +29,7 @@
   text-transform: uppercase;
   letter-spacing: var(--type-label-spacing);
   padding: 4px 12px 2px;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .chips {

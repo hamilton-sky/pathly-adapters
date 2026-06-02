@@ -28,9 +28,9 @@
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--bg-surface0);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--btn-b-hover-bg);
+  border-color: var(--btn-b-hover-border);
+  color: var(--btn-b-hover-color);
 }
 
 /* ── Primary (Start when idle) ── */

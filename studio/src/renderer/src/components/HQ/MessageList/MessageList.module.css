@@ -71,7 +71,7 @@
 /* Elapsed time during streaming */
 .timer {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-left: 6px;
   font-variant-numeric: tabular-nums;
   vertical-align: middle;

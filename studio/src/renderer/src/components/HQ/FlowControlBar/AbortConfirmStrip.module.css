@@ -45,5 +45,7 @@
 }
 
 .cancelBtn:hover {
-  background: var(--bg-surface0, var(--bg-mantle));
+  background: var(--btn-b-hover-bg);
+  border-color: var(--btn-b-hover-border);
+  color: var(--btn-b-hover-color);
 }

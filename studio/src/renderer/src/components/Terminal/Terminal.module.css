@@ -9,6 +9,7 @@
 .panel {
   --t-claude-hover: rgba(167, 139, 250, 0.1);
   --t-codex-hover: rgba(96, 170, 255, 0.1);
+  --t-btn-hover-bg: color-mix(in srgb, var(--t-accent) 10%, var(--t-surface1));
   display: flex;
   flex-direction: column;
   background: var(--t-bg);
@@ -206,11 +207,13 @@
 .popoutBtn:hover {
   color: var(--t-accent);
   border-color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
 }
 
 .hideTabBtn:hover {
-  color: var(--t-text);
-  border-color: var(--t-surface1);
+  color: var(--t-accent);
+  border-color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
 }
 
 .popoutBtn:focus-visible,
@@ -261,8 +264,8 @@
   padding: 0 5px;
 }
 .splitLauncherMain:hover {
-  background: var(--t-surface0);
-  color: var(--t-text);
+  background: var(--t-btn-hover-bg);
+  color: var(--t-accent);
 }
 .splitLauncherDivider {
   width: 1px;
@@ -284,8 +287,8 @@
   padding: 0;
 }
 .splitLauncherChevron:hover {
-  background: var(--t-surface0);
-  color: var(--t-text);
+  background: var(--t-btn-hover-bg);
+  color: var(--t-accent);
 }
 .splitLauncherMain:focus-visible,
 .splitLauncherChevron:focus-visible {
@@ -322,6 +325,7 @@
 }
 .launcherDropdownItem:hover {
   background: var(--bg-surface1);
+  color: var(--text-primary);
 }
 .launcherDropdownItemActive {
   color: var(--text-primary);
@@ -349,8 +353,8 @@
 }
 
 .iconBtn:hover {
-  color: var(--t-text);
-  background: var(--t-surface0);
+  color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
 }
 
 .iconBtn:focus-visible {
@@ -408,6 +412,13 @@
   display: flex;
   align-items: center;
   color: var(--t-text-muted);
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.splitIconBtn:hover {
+  color: var(--t-accent);
+  border-color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
 }
 
 .splitIconBtnActive {
@@ -562,8 +573,9 @@
 
 .instancesHeaderBtn:hover,
 .instancesHeaderBtn:focus-visible {
-  color: var(--t-text);
-  border-color: var(--t-surface1);
+  color: var(--t-accent);
+  border-color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
   outline: none;
 }
 
@@ -583,8 +595,8 @@
 
 .instancesRailToggle:hover,
 .instancesRailToggle:focus-visible {
-  color: var(--t-text);
-  background: var(--t-surface0);
+  color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
   outline: none;
 }
 
@@ -632,8 +644,9 @@
 
 .instanceMain:hover,
 .instanceMain:focus-visible {
-  color: var(--t-text);
-  border-color: var(--t-surface1);
+  color: var(--t-accent);
+  border-color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
   outline: none;
 }
 
@@ -667,8 +680,9 @@
 
 .instanceActionBtn:hover,
 .instanceActionBtn:focus-visible {
-  color: var(--t-text);
-  border-color: var(--t-surface1);
+  color: var(--t-accent);
+  border-color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
   outline: none;
 }
 
@@ -718,8 +732,8 @@
 }
 
 .treeGroupHeader:hover {
-  background: var(--t-surface0);
-  color: var(--t-text);
+  background: var(--t-btn-hover-bg);
+  color: var(--t-accent);
 }
 
 .treeGroupChevron {
@@ -800,7 +814,8 @@
 
 .emptyBtn:hover {
   border-color: var(--t-accent);
-  color: var(--t-text);
+  color: var(--t-accent);
+  background: var(--t-btn-hover-bg);
 }
 
 .emptyBtn:focus-visible {

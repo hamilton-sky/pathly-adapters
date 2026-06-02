@@ -71,7 +71,7 @@
 /* Shrinks before tabMeta is hidden, but not before targetLabel */
 .statusText {
   font-size: var(--font-size-xs);
-  color: var(--text-dim);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -81,7 +81,7 @@
 /* Shrinks first — lowest priority in meta zone */
 .tabMeta {
   font-size: var(--font-size-xs);
-  color: var(--text-dim);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -104,7 +104,7 @@
   justify-content: center;
   border: none;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--text-muted);
   cursor: pointer;
   border-radius: 4px;
   transition: background 120ms ease-out, color 120ms ease-out;
@@ -133,11 +133,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .empty {
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-style: italic;
 }
 

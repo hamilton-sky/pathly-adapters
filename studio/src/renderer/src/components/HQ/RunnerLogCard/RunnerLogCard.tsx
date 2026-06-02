@@ -49,25 +49,29 @@ export function RunnerLogCard({ historicalRun, docked = false }: RunnerLogCardPr
 
   const cardClass = docked ? `${styles.card} ${styles.cardDocked}` : styles.card
 
+  const doneText = `${doneCount} stage${doneCount !== 1 ? 's' : ''} done`
+  const stageLabel = currentEntry?.stage ? `${doneText} — ${currentEntry.stage}` : doneText
+
   return (
     <div className={cardClass} {...(isRunning ? { 'data-running': 'true' } : {})}>
       <div className={styles.headerRow}>
-        <span className={dotClass} aria-label={`Runner status: ${historicalRun ? 'done' : status}`} />
-        <span className={styles.stageName}>
-          {currentEntry
-            ? `${doneCount} stage${doneCount !== 1 ? 's' : ''} done — ${currentEntry.stage}`
-            : `${doneCount} stage${doneCount !== 1 ? 's' : ''} done`}
-        </span>
-        {!historicalRun && (
+        {!historicalRun ? (
           <button
             type="button"
-            className={styles.toggleBtn}
+            className={styles.headerToggle}
             onClick={handleToggle}
             aria-label={logCardExpanded ? 'Collapse stage log' : 'Expand stage log'}
             {...(logCardExpanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
           >
+            <span className={dotClass} />
+            <span className={styles.stageName}>{stageLabel}</span>
             <span className={styles.chevron} data-open={logCardExpanded ? 'true' : 'false'}>▾</span>
           </button>
+        ) : (
+          <div className={styles.headerStatic}>
+            <span className={dotClass} />
+            <span className={styles.stageName}>{stageLabel}</span>
+          </div>
         )}
         {!historicalRun && activeRunnerTabId !== null && (
           <button type="button" className={styles.jumpBtn} onClick={handleJump}>

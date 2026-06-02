@@ -17,7 +17,7 @@
 
 .downloadLabel {
   font-size: var(--font-size-xs);
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-family: var(--font-family-mono);
 }
 
@@ -96,7 +96,7 @@
   padding: 2px 7px;
   border-radius: 8px;
   background: var(--bg-surface1);
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .modelPillActive {
@@ -150,7 +150,7 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--text-dim);
+  color: var(--text-muted);
   transition: background 120ms ease-out, color 120ms ease-out;
   flex-shrink: 0;
 }
@@ -187,7 +187,7 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--text-dim);
+  color: var(--text-muted);
   transition: background 120ms ease-out, color 120ms ease-out;
   flex-shrink: 0;
   padding: 0;

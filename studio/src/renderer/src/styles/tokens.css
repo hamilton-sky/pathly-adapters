@@ -1,4 +1,4 @@
-/* ─── Dark (Pathly Dark) — default ─────────────────────────── */
+﻿/* â”€â”€â”€ Dark (Pathly Dark) â€” default â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
   --font-family-base: 'Geist', 'Inter', system-ui, sans-serif;
   --font-family-mono: 'Geist Mono', 'JetBrains Mono', 'Fira Code', monospace;
@@ -31,7 +31,6 @@
   --text-primary:   #E2E8F0;
   --text-secondary: #A8BBCC;
   --text-muted:     #8899B0;
-  --text-dim:       #64748B;
 
   --accent:  #38BDF8;
   --blue:    #60A5FA;
@@ -56,7 +55,7 @@
   --runner-bg-hover:  rgba(45, 212, 191, 0.14);
   --runner-bg-active: rgba(45, 212, 191, 0.20);
 
-  /* ─── Button interaction tokens ─────────────────────── */
+  /* â”€â”€â”€ Button interaction tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   --btn-b-hover-bg:     color-mix(in srgb, var(--accent) 12%, var(--bg-surface1));
   --btn-b-hover-border: var(--accent);
   --btn-b-hover-color:  var(--accent);
@@ -65,7 +64,7 @@
   --btn-c-hover-color:  var(--accent);
 }
 
-/* ─── Pathly Light ──────────────────────────────────────────── */
+/* â”€â”€â”€ Pathly Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="light"] {
   --bg-base:     #F8FAFC;
   --bg-mantle:   #F0F9FF;
@@ -76,7 +75,6 @@
   --text-primary:   #0F172A;
   --text-secondary: #334155;
   --text-muted:     #475569;
-  --text-dim:       #64748B;
 
   --accent:  #0369A1;
   --blue:    #1D4ED8;
@@ -102,7 +100,7 @@
   --runner-bg-active: rgba(15, 118, 110, 0.20);
 }
 
-/* ─── Nord ──────────────────────────────────────────────────── */
+/* â”€â”€â”€ Nord â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="nord"] {
   --bg-base:     #2e3440;
   --bg-mantle:   #242933;
@@ -113,7 +111,6 @@
   --text-primary:   #eceff4;
   --text-secondary: #d8dee9;
   --text-muted:     #8fa1b3;
-  --text-dim:       #4c566a;
 
   --accent:  #88c0d0;
   --blue:    #81a1c1;
@@ -139,7 +136,7 @@
   --runner-bg-active: rgba(143, 188, 187, 0.20);
 }
 
-/* ─── Mocha (Catppuccin) ────────────────────────────────────── */
+/* â”€â”€â”€ Mocha (Catppuccin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="mocha"] {
   --bg-base:     #1e1e2e;
   --bg-mantle:   #181825;
@@ -150,7 +147,6 @@
   --text-primary:   #cdd6f4;
   --text-secondary: #bac2de;
   --text-muted:     #9399b2;
-  --text-dim:       #6c7086;
 
   --accent:  #cba6f7;
   --blue:    #89b4fa;
@@ -176,7 +172,7 @@
   --runner-bg-active: rgba(148, 226, 213, 0.20);
 }
 
-/* ─── Solarized Dark ────────────────────────────────────────── */
+/* â”€â”€â”€ Solarized Dark â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="solarized"] {
   --bg-base:     #002b36;
   --bg-mantle:   #00212b;
@@ -187,7 +183,6 @@
   --text-primary:   #fdf6e3;
   --text-secondary: #eee8d5;
   --text-muted:     #93a1a1;
-  --text-dim:       #657b83;
 
   --accent:  #268bd2;
   --blue:    #2aa198;
@@ -213,7 +208,7 @@
   --runner-bg-active: rgba(108, 113, 196, 0.20);
 }
 
-/* ─── Dracula ───────────────────────────────────────────────── */
+/* â”€â”€â”€ Dracula â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="dracula"] {
   --bg-base:     #282a36;
   --bg-mantle:   #191a21;
@@ -224,7 +219,6 @@
   --text-primary:   #f8f8f2;
   --text-secondary: #b0b2c8;
   --text-muted:     #b0b2c8;
-  --text-dim:       #6272a4;
 
   --accent:  #bd93f9;
   --blue:    #8be9fd;
@@ -250,7 +244,7 @@
   --runner-bg-active: rgba(255, 184, 108, 0.20);
 }
 
-/* ─── Rosé Pine ─────────────────────────────────────────────── */
+/* â”€â”€â”€ RosÃ© Pine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="rose-pine"] {
   --bg-base:     #191724;
   --bg-mantle:   #12111a;
@@ -261,7 +255,6 @@
   --text-primary:   #e0def4;
   --text-secondary: #c4c0d9;
   --text-muted:     #908caa;
-  --text-dim:       #6e6a86;
 
   --accent:  #c4a7e7;
   --blue:    #9ccfd8;
@@ -287,7 +280,7 @@
   --runner-bg-active: rgba(235, 188, 186, 0.20);
 }
 
-/* ─── Solarized Light ───────────────────────────────────────── */
+/* â”€â”€â”€ Solarized Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="solarized-light"] {
   --bg-base:     #fdf6e3;
   --bg-mantle:   #eee8d5;
@@ -298,7 +291,6 @@
   --text-primary:   #002b36;
   --text-secondary: #3a6270;
   --text-muted:     #526f75;
-  --text-dim:       #93a1a1;
 
   --accent:  #268bd2;
   --blue:    #2aa198;
@@ -324,7 +316,7 @@
   --runner-bg-active: rgba(108, 113, 196, 0.20);
 }
 
-/* ─── Catppuccin Latte ──────────────────────────────────────── */
+/* â”€â”€â”€ Catppuccin Latte â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="latte"] {
   --bg-base:     #eff1f5;
   --bg-mantle:   #e6e9ef;
@@ -335,7 +327,6 @@
   --text-primary:   #4c4f69;
   --text-secondary: #5c5f77;
   --text-muted:     #6c6f85;
-  --text-dim:       #8c8fa1;
 
   --accent:  #8839ef;
   --blue:    #1e66f5;
@@ -361,7 +352,7 @@
   --runner-bg-active: rgba(23, 146, 153, 0.20);
 }
 
-/* ─── Paper ─────────────────────────────────────────────────── */
+/* â”€â”€â”€ Paper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="paper"] {
   --bg-base:     #ffffff;
   --bg-mantle:   #f9f9f7;
@@ -372,7 +363,6 @@
   --text-primary:   #1a1a1a;
   --text-secondary: #4a4a4a;
   --text-muted:     #6a6a6a;
-  --text-dim:       #9a9a9a;
 
   --accent:  #c75c2a;
   --blue:    #2563eb;
@@ -398,7 +388,7 @@
   --runner-bg-active: rgba(8, 145, 178, 0.20);
 }
 
-/* ─── Rosé Pine Dawn ────────────────────────────────────────── */
+/* â”€â”€â”€ RosÃ© Pine Dawn â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="rose-pine-dawn"] {
   --bg-base:     #faf4ed;
   --bg-mantle:   #f4ede6;
@@ -409,7 +399,6 @@
   --text-primary:   #575279;
   --text-secondary: #6b6496;
   --text-muted:     #797593;
-  --text-dim:       #9893a5;
 
   --accent:  #b4637a;
   --blue:    #56949f;
@@ -435,7 +424,7 @@
   --runner-bg-active: rgba(144, 122, 169, 0.20);
 }
 
-/* ─── Mint ──────────────────────────────────────────────────── */
+/* â”€â”€â”€ Mint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 [data-theme="mint"] {
   --bg-base:     #f0faf5;
   --bg-mantle:   #e8f5ef;
@@ -446,7 +435,6 @@
   --text-primary:   #1a3028;
   --text-secondary: #2d5040;
   --text-muted:     #527a63;
-  --text-dim:       #7aaa8e;
 
   --accent:  #0891b2;
   --blue:    #1a6fa0;
