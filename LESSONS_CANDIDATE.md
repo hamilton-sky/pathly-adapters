@@ -96,3 +96,35 @@ MUST add "write pathly/plans/<feature>/REVIEW.md with round number + PASS/FAIL v
 
 ### Source
 Feature: hq-panel | Stage: review | Date: 2026-06-01
+
+---
+
+## [brightsky-chat-connect] Multi-conversation TESTING gate missing
+
+### Pattern
+FSM advanced to TESTING after Conv 1 review passed, before Conv 2 was built, causing a gate failure and wasted bounce-back.
+
+### Rule
+MUST explicitly state in the plan which conversation number gates TESTING entry; do not rely on implicit sequencing.
+
+### Injection
+- Add to IMPLEMENTATION_PLAN.md under "Pipeline gates": "TESTING gate: blocked until Conv N (final conversation) is DONE."
+
+### Source
+Feature: brightsky-chat-connect | Stage: planning | Date: 2026-06-02
+
+---
+
+## [brightsky-chat-connect] Over-stuffed conversation causes multi-pass builder
+
+### Pattern
+Conv 2 packed WebSocket client + UI wiring (5 phases, 6 stories) into one conversation, requiring two builder passes and 87% of total cost.
+
+### Rule
+MUST split conversations when a single conversation contains both a new service/client class AND multiple UI component changes — these are different cognitive domains.
+
+### Injection
+- Add to conversation breakdown: "If a conv touches both a new lib/ class and 2+ components, split it."
+
+### Source
+Feature: brightsky-chat-connect | Stage: planning | Date: 2026-06-02
