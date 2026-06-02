@@ -21,9 +21,7 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
         onClick={toggleSkillsPanel}
         {...(skillsPanelOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
-        <span className={styles.title}>
-          {'Controls'}
-        </span>
+        <span className={styles.title}>/pathly</span>
         {skillsPanelOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
       </button>
 
