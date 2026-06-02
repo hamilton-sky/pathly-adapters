@@ -258,6 +258,7 @@ def _main_record_phase(args: argparse.Namespace) -> int:
             "event_type": args.event_type,
             "conv": args.conv,
             "summary": args.summary,
+            "project_root": getattr(args, "project_root", None),
         }
     )
     raw = _request_raw(
@@ -338,6 +339,7 @@ def main() -> None:
     )
     record_phase_parser.add_argument("--conv", type=int, default=None)
     record_phase_parser.add_argument("--summary", default=None)
+    record_phase_parser.add_argument("--project-root", default=None, dest="project_root")
     _add_common_net_args(record_phase_parser)
     record_phase_parser.set_defaults(func=_main_record_phase)
 

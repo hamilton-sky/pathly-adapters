@@ -109,14 +109,16 @@ pathly-fsm-call record-phase \
   --feature "<feature>" \
   --agent "<agent>" \
   --phase "<phase>" \
-  --event-type PHASE_START
+  --event-type PHASE_START \
+  --project-root "<project_root>"
 
 # On PHASE_DONE:
 pathly-fsm-call record-phase \
   --feature "<feature>" \
   --agent "<agent>" \
   --phase "<phase>" \
-  --event-type PHASE_DONE
+  --event-type PHASE_DONE \
+  --project-root "<project_root>"
 ```
 
 - `<feature>` — the feature slug (folder name under `pathly/plans/`)

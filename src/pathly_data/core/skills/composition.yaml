@@ -31,6 +31,18 @@ defaults:
 #   - development/* installed by pathly-setup as ~/.claude/skills/pathly-*.md (human drives the loop)
 # Manifest keys are the core-skills-relative path without ".md" (e.g. "development/build").
 # `spawn-rules` is gated on `can_spawn`: dropped for adapters that cannot spawn sub-agents.
+blocks:
+  full-build:
+    - completion-report
+    - scout-choreography
+    - feedback-protocol
+    - { name: spawn-rules, requires: can_spawn }
+  lite-build:
+    - scout-choreography
+  review-strict:
+    - scout-choreography
+    - { name: spawn-rules, requires: can_spawn }
+
 skills:
   team/build:
     fragments:

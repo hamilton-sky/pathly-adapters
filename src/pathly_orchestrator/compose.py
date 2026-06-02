@@ -121,6 +121,54 @@ def _coerce_caps(adapter_caps: Any) -> dict:
 
 # ── Resolver ──────────────────────────────────────────────────────────────────
 
+def resolve_block(
+    block_name: str,
+    adapter_caps: Any,
+    *,
+    user_blocks: dict | None = None,
+    manifest: dict | None = None,
+) -> list[str]:
+    """Return the list of fragment bodies for ``block_name`` under the given adapter caps.
+
+    ``user_blocks`` entries take precedence over manifest blocks of the same name.
+    Raises ``KeyError`` if ``block_name`` is not found in the merged block map.
+    """
+    caps = _coerce_caps(adapter_caps)
+    if manifest is None:
+        manifest = load_manifest()
+    merged_blocks = {**manifest.get("blocks", {}), **(user_blocks or {})}
+    if block_name not in merged_blocks:
+        raise KeyError(block_name)
+    fragments_dir = manifest.get("fragments_dir", "fragments")
+    result: list[str] = []
+    for entry in merged_blocks[block_name]:
+        name, requires = _entry_parts(entry)
+        if requires and not caps.get(requires):
+            continue
+        result.append(_read_fragment(fragments_dir, name).rstrip())
+    return result
+
+
+def compose_skill_with_block(
+    skill: str,
+    block_name: str,
+    adapter_caps: Any,
+    *,
+    user_blocks: dict | None = None,
+    manifest: dict | None = None,
+) -> str:
+    """Return the assembled markdown for ``skill`` with ``block_name`` fragments appended."""
+    caps = _coerce_caps(adapter_caps)
+    if manifest is None:
+        manifest = load_manifest()
+    skill_body = _read_skill_body(skill)
+    fragment_bodies = resolve_block(
+        block_name, caps, user_blocks=user_blocks, manifest=manifest
+    )
+    parts = [skill_body.rstrip()] + fragment_bodies
+    return "\n\n".join(parts) + "\n"
+
+
 def compose_skill(skill: str, adapter_caps: Any, *, manifest: dict | None = None) -> str:
     """Return the assembled markdown for ``skill`` under the given adapter caps.
 
@@ -195,3 +243,23 @@ def validate_composition(manifest: dict | None = None) -> None:
             if name in seen:
                 raise ValueError(f"composition: duplicate include {name!r} in skill {skill!r}")
             seen.add(name)
+
+    # blocks (optional — absent key is backward-compatible)
+    if "blocks" not in manifest:
+        return
+    for block_name, entries in manifest["blocks"].items():
+        if not isinstance(entries, list):
+            raise ValueError(f"blocks[{block_name!r}]: must be a list")
+        seen_block: set[str] = set()
+        for entry in entries:
+            try:
+                name, requires = _entry_parts(entry)
+            except ValueError as exc:
+                raise ValueError(f"blocks[{block_name!r}]: {exc}") from exc
+            if name not in known_fragments:
+                raise ValueError(f"blocks[{block_name!r}]: unknown fragment {name!r}")
+            if requires is not None and requires not in _KNOWN_CAPABILITIES:
+                raise ValueError(f"blocks[{block_name!r}]: unknown capability {requires!r}")
+            if name in seen_block:
+                raise ValueError(f"blocks[{block_name!r}]: duplicate fragment {name!r}")
+            seen_block.add(name)

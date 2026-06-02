@@ -14,6 +14,7 @@ from pathly_orchestrator.compose import (
     adapter_caps_for,
     compose_skill,
     load_manifest,
+    resolve_block,
     validate_composition,
 )
 
@@ -284,3 +285,71 @@ def test_dev_build_drops_spawn_rules_for_non_spawn_adapter():
     assert _SPAWN_RULES_MARKER not in out
     assert "## Completion report" in out
     assert "## Scout choreography" in out
+
+
+# ── Block resolver tests ──────────────────────────────────────────────────────
+
+def test_valid_default_blocks_pass_validation():
+    """The shipped manifest's blocks (full-build, lite-build, review-strict) are all valid."""
+    validate_composition()  # raises on any problem
+
+
+def test_block_unknown_fragment_raises():
+    manifest = {
+        "fragments_dir": "fragments",
+        "defaults": [],
+        "skills": {},
+        "blocks": {"bad": ["nonexistent-fragment"]},
+    }
+    with pytest.raises(ValueError, match="nonexistent-fragment"):
+        validate_composition(manifest)
+
+
+def test_block_unknown_requires_capability_raises():
+    manifest = {
+        "fragments_dir": "fragments",
+        "defaults": [],
+        "skills": {},
+        "blocks": {"bad": [{"name": "completion-report", "requires": "bad-cap"}]},
+    }
+    with pytest.raises(ValueError, match="bad-cap"):
+        validate_composition(manifest)
+
+
+def test_block_duplicate_fragment_raises():
+    manifest = {
+        "fragments_dir": "fragments",
+        "defaults": [],
+        "skills": {},
+        "blocks": {"bad": ["completion-report", "completion-report"]},
+    }
+    with pytest.raises(ValueError, match="duplicate|completion-report"):
+        validate_composition(manifest)
+
+
+def test_manifest_without_blocks_key_passes_validation():
+    manifest = {
+        "fragments_dir": "fragments",
+        "defaults": [],
+        "skills": {},
+    }
+    validate_composition(manifest)  # no exception expected
+
+
+def test_resolve_block_gated_fragment_dropped_when_cap_false():
+    """full-build has spawn-rules gated on can_spawn; passing empty caps drops it."""
+    result = resolve_block("full-build", {})
+    spawn_rules_text = _SPAWN_RULES_MARKER
+    assert all(spawn_rules_text not in item for item in result)
+
+
+def test_resolve_block_unknown_block_raises_key_error():
+    with pytest.raises(KeyError):
+        resolve_block("no-such-block", {})
+
+
+def test_user_block_overrides_core_block():
+    """A user_blocks entry for an existing block name replaces it entirely."""
+    user_blocks = {"full-build": ["completion-report"]}
+    result = resolve_block("full-build", {}, user_blocks=user_blocks)
+    assert len(result) == 1
