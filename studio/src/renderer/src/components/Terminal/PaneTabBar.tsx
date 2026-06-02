@@ -3,6 +3,7 @@ import { ExternalLink, Trash2, X } from 'lucide-react'
 import type { TerminalTab } from './types'
 import { Tooltip } from '../ui'
 import { TERMINAL_OPTIONS } from '../../lib/terminalOptions'
+import { SplitLauncher } from './SplitLauncher'
 import styles from './Terminal.module.css'
 
 interface PaneTabBarProps {
@@ -51,20 +52,28 @@ export function PaneTabBar({
       {tabs.map((tab) => (
         <div
           key={tab.id}
-          onClick={() => onSelectTab(tab.id)}
           className={`${styles.tab} ${tab.id === activeTabId ? styles.tabActive : styles.tabInactive}`}
         >
-          <span
-            className={`${styles.statusDot} ${
-              tab.status === 'running' ? styles.statusRunning :
-              tab.status === 'error'   ? styles.statusError :
-              tab.status === 'done'    ? styles.statusDone :
-              styles.statusIdle
-            }`}
-            aria-label={`Status: ${tab.status ?? 'idle'}`}
-          />
-          <TabBrandIcon kind={tab.kind} />
-          <span className={styles.instanceNumericId}>#{tab.numericId}</span>
+          <Tooltip label={`${tab.label} #${tab.numericId}`} delay={400} placement="bottom">
+            <button
+              type="button"
+              className={styles.tabIconArea}
+              onClick={() => onSelectTab(tab.id)}
+              onDoubleClick={(e) => startEdit(tab.id, tab.label, e)}
+              aria-label={`Select tab: ${tab.label}`}
+            >
+              <span
+                className={`${styles.statusDot} ${
+                  tab.status === 'running' ? styles.statusRunning :
+                  tab.status === 'error'   ? styles.statusError :
+                  tab.status === 'done'    ? styles.statusDone :
+                  styles.statusIdle
+                }`}
+                aria-label={`Status: ${tab.status ?? 'idle'}`}
+              />
+              <TabBrandIcon kind={tab.kind} />
+            </button>
+          </Tooltip>
           {editingId === tab.id ? (
             <input
               autoFocus
@@ -82,61 +91,36 @@ export function PaneTabBar({
               }}
               onClick={(e) => e.stopPropagation()}
             />
-          ) : (
-            <span onDoubleClick={(e) => startEdit(tab.id, tab.label, e)}>
-              {tab.label}
-            </span>
-          )}
-          <button
-            type="button"
-            title="Pop out to its own window"
-            onClick={(e) => { e.stopPropagation(); onPopout(tab.id) }}
-            className={styles.popoutBtn}
-          >
-            <ExternalLink size={10} />
-          </button>
-          <button
-            type="button"
-            title="Hide from full terminal"
-            aria-label="Hide from full terminal"
-            onClick={(e) => { e.stopPropagation(); onHideTab(tab.id, e) }}
-            className={styles.hideTabBtn}
-          ><X size={11} /></button>
-          <button
-            type="button"
-            title="Kill terminal and close tab"
-            aria-label="Kill terminal and close tab"
-            onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
-            className={styles.closeTabBtn}
-          ><Trash2 size={11} /></button>
+          ) : null}
+          <div className={styles.tabActions}>
+            <button
+              type="button"
+              aria-label="Pop out to its own window"
+              onClick={(e) => { e.stopPropagation(); onPopout(tab.id) }}
+              className={styles.popoutBtn}
+            >
+              <ExternalLink size={10} />
+            </button>
+            <button
+              type="button"
+              aria-label="Hide from full terminal"
+              onClick={(e) => { e.stopPropagation(); onHideTab(tab.id, e) }}
+              className={styles.hideTabBtn}
+            >
+              <X size={11} />
+            </button>
+            <button
+              type="button"
+              aria-label="Kill terminal and close tab"
+              onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
+              className={styles.closeTabBtn}
+            >
+              <Trash2 size={11} />
+            </button>
+          </div>
         </div>
       ))}
-      <div className={styles.actionGroup}>
-        {TERMINAL_OPTIONS.map((opt) => {
-          const tooltipProps = opt.kind === 'shell'
-            ? { label: 'New shell tab', shortcut: 'Ctrl+Shift+S' }
-            : opt.kind === 'claude'
-            ? { label: 'Launch Claude Code', shortcut: 'Ctrl+Shift+C' }
-            : opt.kind === 'codex'
-            ? { label: 'Launch OpenAI Codex', shortcut: 'Ctrl+Shift+X' }
-            : { label: `Launch ${opt.label}` }
-          const kindClass = opt.kind !== 'shell'
-            ? styles[`iconBtn${opt.kind.charAt(0).toUpperCase()}${opt.kind.slice(1)}`]
-            : undefined
-          return (
-            <Tooltip key={opt.kind} {...tooltipProps} placement="top">
-              <button
-                type="button"
-                onClick={() => opt.kind === 'shell' ? onAddTab(pane) : onLaunch(opt.command, opt.label, pane)}
-                className={`${styles.iconBtn}${kindClass ? ` ${kindClass}` : ''}`}
-              >
-                {opt.icon(12)}
-                {opt.kind === 'claude' ? 'Claude' : opt.label}
-              </button>
-            </Tooltip>
-          )
-        })}
-      </div>
+      <SplitLauncher pane={pane} onAddTab={onAddTab} onLaunch={onLaunch} />
     </div>
   )
 }
