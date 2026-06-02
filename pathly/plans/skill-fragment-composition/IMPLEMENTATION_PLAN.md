@@ -57,5 +57,25 @@ Strict `1 → 2 → 3`. Conv 2 depends on the manifest from Conv 1; Conv 3 depen
 - **3-adapter sync rule** (pathly_data/CLAUDE.md) → Conv 3 uses the official build step only; staleness test enforces it.
 - **Macro/micro boundary** → reviewer must reject any fragment that contains FSM-transition/next-state logic.
 
+## Architecture finding — development vs team split (Conv 2)
+
+There are **two** build/review/test skill families, and they are not duplicates:
+
+- `core/skills/development/{build,review,test}.md` — the **interactive** `/pathly build` command.
+  Installed by `pathly-setup` as `~/.claude/skills/pathly-*/SKILL.md` (via `_SKILL_GROUPS["build"]="development"`).
+  The **human** drives the loop: git pre-flight prompt, scope confirmation, self-chaining in fast mode.
+- `core/skills/team/{build,review,test}.md` — the **runner** orchestration skill. NOT installed;
+  assembled only at runtime by `build_prompt()` (`agent_map["BUILDING"]="team/build"`). The **Python
+  FSM/supervisor** drives the loop: no human prompts, full feedback ladder + guards, returns to orchestrator.
+
+They share a *middle* (analyze→scout→implement, `<usage>`+log-agent-done, builder/scout spawning) which
+is today copy-pasted — that is the duplication this feature removes. Decision (locked): the manifest
+covers **both families**, sharing fragments, each keeping its distinct body. This also makes both
+resolver callers real — runtime `build_prompt` composes `team/*`; build-time `pathly-setup`/`stitch_skill`
+composes the installed `development/*`, so the S3 adapter-staleness test has something to bite on.
+
+**Manifest key convention:** core-skills-relative path without `.md` — `team/build`, `development/build`.
+At build time this is derived as `f"{_SKILL_GROUPS[skill]}/{skill}"`.
+
 ## Out of scope
 Track 2 (live logging), Track 3 (flow wizard), and converting design/plan/storm/retro. See USER_STORIES "Out of scope".

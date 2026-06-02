@@ -28,7 +28,11 @@ defaults:
 # body in the same change, or shared sections will appear twice.
 skills: {}
 
-# Conv 3 will add (atomically with body reduction in team/build.md, review.md, test.md):
+# Conv 3 will add (atomically with body reduction). Two skill FAMILIES share the same
+# fragments but keep distinct bodies (see IMPLEMENTATION_PLAN "development vs team split"):
+#   - team/*        runner-only, assembled at runtime by build_prompt() (FSM drives the loop)
+#   - development/* installed by pathly-setup as ~/.claude/skills/pathly-*.md (human drives the loop)
+# Manifest keys are the core-skills-relative path without ".md" (e.g. "development/build").
 #
 # skills:
 #   team/build:
@@ -37,12 +41,12 @@ skills: {}
 #       - feedback-protocol
 #       - { name: spawn-rules, requires: can_spawn }
 #   team/review:
-#     fragments:
-#       - scout-choreography
-#       - feedback-protocol
-#       - { name: spawn-rules, requires: can_spawn }
+#     fragments: [scout-choreography, feedback-protocol, { name: spawn-rules, requires: can_spawn }]
 #   team/test:
-#     fragments:
-#       - scout-choreography
-#       - feedback-protocol
-#       - { name: spawn-rules, requires: can_spawn }
+#     fragments: [scout-choreography, feedback-protocol]
+#   development/build:
+#     fragments: [scout-choreography, { name: spawn-rules, requires: can_spawn }]
+#   development/review:
+#     fragments: [scout-choreography, { name: spawn-rules, requires: can_spawn }]
+#   development/test:
+#     fragments: [scout-choreography]

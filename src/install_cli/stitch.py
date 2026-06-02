@@ -4,12 +4,35 @@ from pathlib import Path
 import yaml
 
 
+def _compose_or_read(core_path: Path, compose_key: str | None, adapter: str | None) -> str:
+    """Return the composed skill body when it's in the composition manifest, else raw.
+
+    A skill absent from the manifest's ``skills:`` map composes to its raw body, so
+    this is a behaviour-preserving no-op until that skill is converted.
+    """
+    raw = core_path.read_text(encoding="utf-8")
+    if not compose_key:
+        return raw
+    try:
+        from pathly_orchestrator.compose import compose_skill, load_manifest
+
+        if compose_key in (load_manifest().get("skills") or {}):
+            return compose_skill(compose_key, adapter or "claude")
+    except Exception:
+        # Composition is additive; never let a manifest problem break the installer.
+        # (validate_composition is the loud build-time gate; this path stays resilient.)
+        return raw
+    return raw
+
+
 def stitch_skill(
     core_path: Path,
     meta_path: Path,
     *,
     flows_dest: Path | None = None,
     host_instructions: str | None = None,
+    compose_key: str | None = None,
+    adapter: str | None = None,
 ) -> str:
     with open(meta_path, encoding="utf-8") as f:
         try:
@@ -30,7 +53,7 @@ def stitch_skill(
     else:
         if not core_path.exists():
             raise FileNotFoundError(f"Core skill file not found: {core_path}")
-        body = core_path.read_text(encoding="utf-8")
+        body = _compose_or_read(core_path, compose_key, adapter)
 
     if meta.get("strip_frontmatter"):
         body = re.sub(r"^---\n.*?\n---\n", "", body, count=1, flags=re.DOTALL)

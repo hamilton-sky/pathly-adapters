@@ -73,7 +73,7 @@ the composed form and the three adapters kept in sync, **so that** the architect
 on the highest-payoff skills without a risky big-bang of all seven.
 
 **Acceptance Criteria:**
-- [ ] `team/build.md`, `team/review.md`, `team/test.md` are reduced to their stage-specific bodies; their shared sections now come from fragments via the manifest.
+- [ ] Both skill families — `team/{build,review,test}.md` (runner) **and** `development/{build,review,test}.md` (interactive, the ones `pathly-setup` actually installs) — are reduced to their distinct bodies; their shared middle now comes from fragments via the manifest. The two families keep different bodies (FSM-driven vs human-driven) but share fragments.
 - [ ] `pathly-setup claude --apply` + `python -m build` regenerate all three adapters (claude/codex/copilot) from the composed core with no manual `_meta` edits. (anti-drift)
 - [ ] A test fails if a committed adapter skill is stale relative to the composed core output. (failure-case criterion)
 - [ ] `python -m pytest tests/ -q` is green; the existing runner/FSM tests still pass unchanged.

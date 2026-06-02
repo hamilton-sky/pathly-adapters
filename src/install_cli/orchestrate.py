@@ -208,11 +208,18 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
             )
             try:
                 filename = skill_meta.get("filename", default_filename)
+                # Manifest key = core-skills-relative path without ".md" (e.g. "development/build").
+                _grp = _SKILL_GROUPS.get(skill_meta["skill"])
+                compose_key = (
+                    f"{_grp}/{skill_meta['skill']}" if _grp else skill_meta["skill"]
+                )
                 skill_files[filename] = stitch_skill(
                     core_file,
                     meta_file,
                     flows_dest=dest,
                     host_instructions=host_instructions,
+                    compose_key=compose_key,
+                    adapter=host,
                 )
                 if host == "codex" and filename.endswith("/SKILL.md"):
                     skill_dir = filename.removesuffix("/SKILL.md")

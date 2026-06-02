@@ -100,7 +100,15 @@ def _load_agent_text(agent: str) -> str:
 
 def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     agent = flow_config["agent_map"][state_name]
-    agent_text = _load_agent_text(agent)
+    if "/" in agent:
+        # Stage skill — compose fragments for the live adapter. Skills absent from
+        # the composition manifest are returned raw, so this is a no-op until converted.
+        from pathly_orchestrator.compose import compose_skill
+
+        adapter = _resolve_adapter(flow_config, state_name) or "claude"
+        agent_text = compose_skill(agent, adapter)
+    else:
+        agent_text = _load_agent_text(agent)
     context = (
         f"\n\n## Current task\n"
         f"Feature: {storage_path.name}\n"
