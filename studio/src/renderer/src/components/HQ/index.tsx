@@ -10,6 +10,7 @@ import { StepQueue } from './StepQueue/StepQueue'
 import { FlowControlBar } from './FlowControlBar/FlowControlBar'
 import { StageStatusStrip } from './StageStatusStrip/StageStatusStrip'
 import { RunnerLogCard } from './RunnerLogCard/RunnerLogCard'
+import { useRunnerStore } from '../../store/runnerStore'
 import { useBrightskyStore } from '../../store/brightskyStore'
 import styles from './index.module.css'
 
@@ -17,6 +18,7 @@ export function HQ(): JSX.Element {
   const chat = useHQ()
   const thinkingLabel = useBrightskyStore((s) => s.thinkingLabel)
   const toolCallInProgress = useBrightskyStore((s) => s.toolCallInProgress)
+  const runHistory = useRunnerStore((s) => s.runHistory)
 
   return (
     <div
@@ -28,6 +30,7 @@ export function HQ(): JSX.Element {
       <ChatHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} hasAntigravityTab={chat.hasAntigravityTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={chat.handleClearAll} sessions={chat.brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
       <FlowControlBar />
       <StageStatusStrip />
+      <RunnerLogCard docked />
       <SkillsPanel onSkillClick={chat.handleSkillClick} />
       {/* Pipeline menu — permanent, FSM-state-driven */}
       {chat.menuVisible ? <PathlyMenuCard menu={chat.activeMenu!} onSelect={chat.handleMenuSelect} isOpen={chat.menuCardOpen} onToggle={() => chat.setMenuCardOpen((v) => !v)} /> : null}
@@ -81,7 +84,9 @@ export function HQ(): JSX.Element {
       {chat.renderTerminalCard('codex', chat.codexTabId, chat.codexOutput)}
       {chat.renderTerminalCard('shell', chat.shellTabId, chat.shellOutput)}
       {chat.renderTerminalCard('antigravity', chat.antigravityTabId, chat.outputByTarget.antigravity)}
-      <RunnerLogCard />
+      {runHistory.map((run, i) => (
+        <RunnerLogCard key={i} historicalRun={run} />
+      ))}
       <ChatInput
         value={chat.inputValue}
         onChange={chat.setInputValue}

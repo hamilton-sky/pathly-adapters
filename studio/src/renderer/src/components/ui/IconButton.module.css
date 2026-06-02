@@ -1,0 +1,66 @@
+/* ─── Base ───────────────────────────────────────────────────────── */
+.btn {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg-surface1));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn:active:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 25%, var(--bg-surface1));
+}
+
+.btn:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn[data-active="true"] {
+  background: var(--bg-surface1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─── Variants ───────────────────────────────────────────────────── */
+.variantDanger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--red, #ef4444) 15%, var(--bg-surface1));
+  border-color: var(--red, #ef4444);
+  color: var(--red, #ef4444);
+}
+
+.variantDanger:active:not(:disabled) {
+  background: color-mix(in srgb, var(--red, #ef4444) 25%, var(--bg-surface1));
+}
+
+.variantMuted:hover:not(:disabled) {
+  color: var(--text-secondary);
+  background: var(--bg-surface1);
+  border-color: transparent;
+}
+
+/* ─── Sizes ──────────────────────────────────────────────────────── */
+.sizeMd {
+  width: 28px;
+  height: 28px;
+}

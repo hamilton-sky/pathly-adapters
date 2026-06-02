@@ -337,7 +337,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                   <IconButton onClick={(e) => onInlineCreateFile(section, e)} title="New file">
                     <Plus size={12} />
                   </IconButton>
-                  <IconButton onClick={() => onDeleteCustomSection?.(section.dir)} title="Delete section" style={{ color: 'var(--red, #e05252)' }}>
+                  <IconButton onClick={() => onDeleteCustomSection?.(section.dir)} title="Delete section" variant="danger">
                     <Trash2 size={12} />
                   </IconButton>
                 </>

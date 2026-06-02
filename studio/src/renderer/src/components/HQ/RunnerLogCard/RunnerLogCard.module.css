@@ -202,3 +202,15 @@
   border-top: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
 }
+
+/* ─── Docked modifier (inside runner card zone, below FlowControlBar) ── */
+.cardDocked {
+  border-radius: 0;
+  border-right: none;
+  border-left-width: 3px;
+}
+
+.cardDocked[data-running="true"] {
+  position: static;
+  z-index: auto;
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Zap, SquarePen, History, ChevronDown } from 'lucide-react'
 import type { TerminalKind } from '../../../store/chatStore'
-import { Tooltip } from '../../ui'
+import { Tooltip, IconButton } from '../../ui'
 import { TERMINAL_OPTIONS } from '../../../lib/terminalOptions'
 import styles from './ChatHeader.module.css'
 
@@ -114,30 +114,26 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
       </div>
 
       {/* New session */}
-      <Tooltip label="New session" placement="bottom">
-        <button type="button" className={styles.closeBtn} onClick={onClearChat} aria-label="New session">
-          <SquarePen size={13} />
-        </button>
-      </Tooltip>
+      <IconButton onClick={onClearChat} title="New session" placement="bottom">
+        <SquarePen size={13} />
+      </IconButton>
 
       {/* Sessions history dropdown */}
       <div ref={sessionsRef} className={styles.sessionsWrapper}>
-        <Tooltip label="Session history" placement="bottom">
-          <button
-            type="button"
-            className={`${styles.closeBtn} ${sessionsOpen ? styles.closeBtnActive : ''}`}
-            onClick={() => setSessionsOpen((v) => !v)}
-            aria-label="Session history"
-            {...(sessionsOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-          >
-            <History size={13} />
-            {sessions.length > 0 && (
-              <span className={`${styles.sessionsBadge} ${styles.sessionsBadgeAccent}`}>
-                {sessions.length > 9 ? '9+' : sessions.length}
-              </span>
-            )}
-          </button>
-        </Tooltip>
+        <IconButton
+          title="Session history"
+          placement="bottom"
+          active={sessionsOpen}
+          onClick={() => setSessionsOpen((v) => !v)}
+          aria-expanded={sessionsOpen ? 'true' : 'false'}
+        >
+          <History size={13} />
+          {sessions.length > 0 && (
+            <span className={`${styles.sessionsBadge} ${styles.sessionsBadgeAccent}`}>
+              {sessions.length > 9 ? '9+' : sessions.length}
+            </span>
+          )}
+        </IconButton>
 
         {sessionsOpen && (
           <div className={styles.sessionsDropdown}>
@@ -169,11 +165,9 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
         )}
       </div>
 
-      <Tooltip label="Close chat panel" placement="bottom">
-        <button type="button" className={styles.closeBtn} onClick={onToggleChat} aria-label="Close chat panel">
-          <X size={14} />
-        </button>
-      </Tooltip>
+      <IconButton onClick={onToggleChat} title="Close chat panel" placement="bottom">
+        <X size={14} />
+      </IconButton>
     </div>
   )
 }

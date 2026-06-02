@@ -1,4 +1,6 @@
 import { useRunnerStore } from '../../../store/runnerStore'
+import type { HistoricalRun } from '../../../store/runnerStore'
+import type { StageLogEntry } from '../../../store/runnerStore'
 import { RunnerLogRow } from './RunnerLogRow'
 import styles from './RunnerLogCard.module.css'
 
@@ -8,25 +10,32 @@ function fmtDate(ts: number | null): string {
   return d.toTimeString().slice(0, 8)
 }
 
-export function RunnerLogCard(): JSX.Element | null {
-  const stageLog = useRunnerStore((s) => s.stageLog)
+interface RunnerLogCardProps {
+  historicalRun?: HistoricalRun
+  docked?: boolean
+}
+
+export function RunnerLogCard({ historicalRun, docked = false }: RunnerLogCardProps = {}): JSX.Element | null {
+  const storeStageLog = useRunnerStore((s) => s.stageLog)
   const status = useRunnerStore((s) => s.status)
-  const cost = useRunnerStore((s) => s.cost)
+  const storeCost = useRunnerStore((s) => s.cost)
   const logCardExpanded = useRunnerStore((s) => s.logCardExpanded)
-  const runStartedAt = useRunnerStore((s) => s.runStartedAt)
+  const storeRunStartedAt = useRunnerStore((s) => s.runStartedAt)
   const activeRunnerTabId = useRunnerStore((s) => s.activeRunnerTabId)
 
-  if (stageLog.length === 0) return null
+  const stageLog: StageLogEntry[] = historicalRun ? historicalRun.stageLog : storeStageLog
+  const cost = historicalRun ? historicalRun.cost : storeCost
+  const runStartedAt = historicalRun ? historicalRun.runStartedAt : storeRunStartedAt
 
-  const isRunning = status === 'running'
+  if (!historicalRun && stageLog.length === 0) return null
+
+  const isRunning = !historicalRun && status === 'running'
   const currentEntry = stageLog[stageLog.length - 1]
   const doneCount = stageLog.filter((e) => e.endedAt !== null).length
 
   const dotClass = isRunning
     ? `${styles.dot} ${styles.dotRunning}`
     : `${styles.dot} ${styles.dotIdle}`
-
-  const cardClass = styles.card
 
   function handleToggle(): void {
     useRunnerStore.getState().setLogCardExpanded(!logCardExpanded)
@@ -36,29 +45,37 @@ export function RunnerLogCard(): JSX.Element | null {
     useRunnerStore.getState().jumpToLiveTab()
   }
 
+  const expanded = historicalRun ? true : logCardExpanded
+
+  const cardClass = docked ? `${styles.card} ${styles.cardDocked}` : styles.card
+
   return (
-    <div className={cardClass} data-running={isRunning}>
+    <div className={cardClass} {...(isRunning ? { 'data-running': 'true' } : {})}>
       <div className={styles.headerRow}>
-        <span className={dotClass} aria-label={`Runner status: ${status}`} />
+        <span className={dotClass} aria-label={`Runner status: ${historicalRun ? 'done' : status}`} />
         <span className={styles.stageName}>
-          {doneCount} stage{doneCount !== 1 ? 's' : ''} done — {currentEntry.stage}
+          {currentEntry
+            ? `${doneCount} stage${doneCount !== 1 ? 's' : ''} done — ${currentEntry.stage}`
+            : `${doneCount} stage${doneCount !== 1 ? 's' : ''} done`}
         </span>
-        <button
-          type="button"
-          className={styles.toggleBtn}
-          onClick={handleToggle}
-          aria-label={logCardExpanded ? 'Collapse stage log' : 'Expand stage log'}
-          {...(logCardExpanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-        >
-          <span className={styles.chevron} data-open={logCardExpanded ? 'true' : 'false'}>▾</span>
-        </button>
-        {activeRunnerTabId !== null && (
+        {!historicalRun && (
+          <button
+            type="button"
+            className={styles.toggleBtn}
+            onClick={handleToggle}
+            aria-label={logCardExpanded ? 'Collapse stage log' : 'Expand stage log'}
+            {...(logCardExpanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+          >
+            <span className={styles.chevron} data-open={logCardExpanded ? 'true' : 'false'}>▾</span>
+          </button>
+        )}
+        {!historicalRun && activeRunnerTabId !== null && (
           <button type="button" className={styles.jumpBtn} onClick={handleJump}>
             live ↗
           </button>
         )}
       </div>
-      <div className={logCardExpanded ? `${styles.body} ${styles.bodyOpen}` : styles.body}>
+      <div className={expanded ? `${styles.body} ${styles.bodyOpen}` : styles.body}>
         <table className={styles.table}>
           <colgroup>
             <col className={styles.colStage} />

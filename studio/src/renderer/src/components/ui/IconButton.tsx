@@ -1,7 +1,5 @@
-import { useState } from 'react'
-import { useTheme } from '../../useTheme'
 import { Tooltip } from './Tooltip'
-import styles from './ui.module.css'
+import styles from './IconButton.module.css'
 
 interface IconButtonProps {
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
@@ -11,7 +9,10 @@ interface IconButtonProps {
   placement?: 'top' | 'bottom' | 'left' | 'right'
   children: React.ReactNode
   disabled?: boolean
-  style?: React.CSSProperties
+  variant?: 'default' | 'danger' | 'muted'
+  active?: boolean
+  size?: 'sm' | 'md'
+  'aria-expanded'?: 'true' | 'false'
   'data-testid'?: string
   'data-label'?: string
 }
@@ -24,44 +25,34 @@ export function IconButton({
   placement = 'bottom',
   children,
   disabled = false,
-  style,
+  variant,
+  active = false,
+  size,
+  'aria-expanded': ariaExpanded,
   'data-testid': dataTestId,
   'data-label': dataLabel,
 }: IconButtonProps): JSX.Element {
-  const t = useTheme()
-  const [hovered, setHovered] = useState(false)
-
-  const baseStyle: React.CSSProperties = {
-    width: '24px',
-    height: '24px',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: hovered && !disabled ? t.bgSurface0 : 'transparent',
-    border: 'none',
-    borderRadius: '4px',
-    color: hovered && !disabled ? t.textPrimary : t.textSecondary,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.5 : 1,
-    flexShrink: 0,
-    transition: 'background var(--transition-base), color var(--transition-base)',
-    padding: 0,
-    ...style,
-  }
+  const classNames = [
+    styles.btn,
+    variant === 'danger' ? styles.variantDanger : '',
+    variant === 'muted' ? styles.variantMuted : '',
+    size === 'md' ? styles.sizeMd : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <Tooltip label={title} description={description} shortcut={shortcut} placement={placement}>
       <button
         type="button"
-        className={`pathly-btn ${styles.focusVisible}`}
-        style={baseStyle}
+        className={classNames}
         disabled={disabled}
         onClick={onClick}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
         aria-label={title}
         data-testid={dataTestId}
         data-label={dataLabel}
+        {...(active ? { 'data-active': 'true' } : {})}
+        {...(ariaExpanded !== undefined ? { 'aria-expanded': ariaExpanded } : {})}
       >
         {children}
       </button>
