@@ -211,7 +211,20 @@ def _run_stage_via_terminal(
             raise RuntimeError(
                 f"terminal_spawn_timeout: Studio did not spawn PTY for {tab_id} within 5s"
             )
-        result_evt.wait()
+        # Wait up to 30 min for the PTY to report its result.
+        # Without a timeout, a crashed or unresponsive terminal hangs the supervisor forever.
+        # (The PTY exit handler in terminal.ts POSTs /runner/terminal/result; if that POST
+        # never arrives — e.g. the process exited before the exit handler fired, or the POST
+        # failed — result_evt is never set and the thread blocks indefinitely.)
+        _TERMINAL_RESULT_TIMEOUT = 1800
+        if not result_evt.wait(timeout=_TERMINAL_RESULT_TIMEOUT):
+            with _lock:
+                _terminal_started_events.pop(run_id, None)
+                _terminal_result_events.pop(run_id, None)
+            raise RuntimeError(
+                f"terminal_result_timeout: PTY for {tab_id} did not report a result within "
+                f"{_TERMINAL_RESULT_TIMEOUT}s — the process likely crashed without sending an exit callback"
+            )
         with _lock:
             data = _terminal_result_data.pop(run_id, {})
             _terminal_started_events.pop(run_id, None)
