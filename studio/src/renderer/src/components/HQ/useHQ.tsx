@@ -234,6 +234,12 @@ export function useHQ() {
                 adapter: data.adapter as string | null,
                 status: data.status as RunnerStatus,
               })
+              const log = useRunnerStore.getState().stageLog
+              const last = log[log.length - 1]
+              const isReconnect = last && last.endedAt === null && last.stage === (data.stage as string)
+              if (!isReconnect) {
+                useRunnerStore.getState().recordStageStart(data.stage as string, data.adapter as string | null, null)
+              }
             } else if (data.type === 'DECISION_MENU') {
               setRunnerState({ status: 'blocked' })
               setDecisionMenu(data.items as DecisionMenuItem[])
@@ -261,7 +267,7 @@ export function useHQ() {
               useTerminalStore.setState((s) => ({
                 tabs: s.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
               }))
-              useRunnerStore.getState().recordStageStart(stage, adapter, tab_id)
+              useRunnerStore.getState().attachTerminalToStage(tab_id, 'terminal')
               void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id)
                 .then(() => window.pathly.terminal.spawn(tab_id, cwd, adapter === 'shell' ? undefined : adapter))
                 .then(() => {
@@ -278,7 +284,7 @@ export function useHQ() {
             } else if (data.type === 'TERMINAL_SIGNAL') {
               const signal = data.signal as string
               if (signal === 'term') {
-                const tabId = useRunnerStore.getState().activeRunnerTabId
+                const tabId = (data.tab_id as string | undefined) ?? useRunnerStore.getState().activeRunnerTabId
                 if (tabId) void window.pathly.terminal.kill(tabId).catch(() => { /* PTY may already be gone */ })
               }
             }

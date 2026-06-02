@@ -102,7 +102,7 @@
 - [ ] `src/pathly_data/core/skills/utilities/log-phase.md` exists and documents the `curl` call to `/record_phase`
 - [ ] The utility skill accepts arguments: `feature`, `agent`, `phase`, `event_type`, and optional `scouts_count`
 - [ ] `plan.md` calls `log-phase` at the boundary of each of its named phases
-- [ ] `grep "log-phase" src/pathly_data/core/skills/development/plan.md` returns at least 2 matches
+- [ ] `grep "log-phase" src/pathly_data/core/skills/planning/plan.md` returns at least 2 matches
 
 ---
 
@@ -117,7 +117,7 @@
 - [ ] `design.md` has a `phase: analyze` section that runs before the main design script
 - [ ] `storm.md` has a `phase: analyze` section that runs before interactive conversation
 - [ ] Both files call `log-phase PHASE_START analyze` at the top of their analyze section
-- [ ] `grep -n "phase: analyze" src/pathly_data/core/skills/development/design.md src/pathly_data/core/skills/development/storm.md` returns at least 2 matches
+- [ ] `grep -n "Phase: analyze" src/pathly_data/core/skills/development/design.md src/pathly_data/core/skills/planning/storm.md` returns at least 2 matches
 
 ---
 

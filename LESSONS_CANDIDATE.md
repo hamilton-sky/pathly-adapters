@@ -128,3 +128,36 @@ MUST split conversations when a single conversation contains both a new service/
 
 ### Source
 Feature: brightsky-chat-connect | Stage: planning | Date: 2026-06-02
+
+---
+
+### Lesson — pathly-observability (2026-06-02)
+
+### Observation
+Test acceptance criteria with grep commands had wrong file paths (development/ vs planning/) and case mismatches (phase: vs Phase:). This caused 2 false test failures requiring a full builder fix cycle.
+
+### Rule
+SHOULD validate grep/shell verification commands in USER_STORIES.md against actual file paths before handoff to builder. A one-line smoke test at plan time prevents a test-fix loop.
+
+### Injection
+- Add to tester.md rigor_contract (standard+): 'Before reporting FAIL, confirm the grep path exists: stat the file first.'
+- Add to planner rigor_contract (strict): 'Validate all grep verification commands in USER_STORIES.md against the actual repo structure.'
+
+### Source
+Feature: pathly-observability | Stage: testing | Date: 2026-06-02
+
+---
+
+### Lesson — pathly-observability (2026-06-02)
+
+### Observation
+fast/auto mode (build -> review auto-chain, PROGRESS.md auto-update) worked perfectly for a 5-conversation pipeline. No regressions, no manual steps needed.
+
+### Rule
+MAY use fast/auto mode by default for standard-rigor features with clean tests. It is production-stable.
+
+### Injection
+- go.md: 'For standard rigor with no open feedback, default to fast mode unless user requests manual gates.'
+
+### Source
+Feature: pathly-observability | Stage: pipeline | Date: 2026-06-02

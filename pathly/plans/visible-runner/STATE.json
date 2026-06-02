@@ -1,1 +1,9 @@
-{"current": "REVIEWING", "feature": "visible-runner", "rigor": "standard", "updated_at": "2026-06-02T10:02:03Z"}
+{
+  "current": "BUILDING",
+  "feature": "visible-runner",
+  "rigor": "standard",
+  "updated_at": "2026-06-02T12:15:00Z",
+  "conv_start_sha": "61705df79e3812f50ed877230c5a1c013825d99e",
+  "convs_total": 3,
+  "convs_done": 2
+}

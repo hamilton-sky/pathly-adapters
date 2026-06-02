@@ -1,1 +1,8 @@
-{"current": "TESTING", "feature": "pathly-observability", "rigor": "standard", "updated_at": "2026-06-02T11:13:00Z"}
+{
+  "current": "DONE",
+  "feature": "pathly-observability",
+  "rigor": "standard",
+  "updated_at": "2026-06-02T11:13:00Z",
+  "convs_total": 5,
+  "convs_done": 0
+}

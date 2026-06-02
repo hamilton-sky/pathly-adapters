@@ -13,6 +13,7 @@ export interface StageLogEntry {
   stage: string
   adapter: string | null
   tabId: string | null
+  mode: 'terminal' | 'headless' | null
   startedAt: number
   endedAt: number | null
   exitCode: number | null
@@ -32,12 +33,13 @@ interface RunnerState {
   activeRunnerTabId: string | null
   logCardExpanded: boolean
   runStartedAt: number | null
-  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab'>>) => void
+  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab'>>) => void
   resetRunner: () => void
   setDecisionMenu: (items: DecisionMenuItem[] | null) => void
   setRunnerConfig: (topic: string, projectRoot: string) => void
   recordStageStart: (stage: string, adapter: string | null, tabId: string | null) => void
   recordStageEnd: (exitCode: number) => void
+  attachTerminalToStage: (tabId: string | null, mode: 'terminal' | 'headless') => void
   setActiveRunnerTabId: (tabId: string | null) => void
   setLogCardExpanded: (expanded: boolean) => void
   jumpToLiveTab: () => void
@@ -69,8 +71,14 @@ export const useRunnerStore = create<RunnerState>()((set, get) => ({
     ...s,
     activeRunnerTabId: tabId,
     runStartedAt: s.stageLog.length === 0 ? Date.now() : s.runStartedAt,
-    stageLog: [...s.stageLog, { stage, adapter, tabId, startedAt: Date.now(), endedAt: null, exitCode: null }],
+    stageLog: [...s.stageLog, { stage, adapter, tabId, mode: null, startedAt: Date.now(), endedAt: null, exitCode: null }],
   })),
+  attachTerminalToStage: (tabId, mode) => set((s) => {
+    if (s.stageLog.length === 0) return s
+    const updated = [...s.stageLog]
+    updated[updated.length - 1] = { ...updated[updated.length - 1], tabId, mode }
+    return { ...s, activeRunnerTabId: tabId, stageLog: updated }
+  }),
   recordStageEnd: (exitCode) => set((s) => {
     if (s.stageLog.length === 0) return s
     const updated = [...s.stageLog]
