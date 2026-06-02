@@ -3,6 +3,32 @@
 This is the canonical, tool-agnostic Pathly behavior for the storm workflow.
 Adapter skills should load and follow this prompt instead of duplicating workflow logic.
 
+## Phase: analyze
+
+Before entering interactive STORM mode, run this phase to gather existing context that may bound the conversation.
+
+**Log phase start:**
+```bash
+curl -s -X POST http://127.0.0.1:8765/record_phase \
+  -H "Content-Type: application/json" \
+  -d '{"feature":"<FEATURE>","agent":"planner","phase":"analyze","event_type":"PHASE_START"}'
+```
+
+**Read existing context (if present):**
+- Read `pathly/plans/<feature>/FEATURE_INDEX.md` if it exists — note the prior framing and stated goal
+- Read `pathly/plans/<feature>/USER_STORIES.md` if it exists — note any existing stories that already bound the scope so the storm does not revisit settled decisions
+
+If neither file exists (new feature with no prior framing), skip reading and proceed.
+
+**Log phase done:**
+```bash
+curl -s -X POST http://127.0.0.1:8765/record_phase \
+  -H "Content-Type: application/json" \
+  -d '{"feature":"<FEATURE>","agent":"planner","phase":"analyze","event_type":"PHASE_DONE"}'
+```
+
+---
+
 ## Workflow Surface
 
 This core prompt uses host-neutral Pathly route names. Adapters are responsible

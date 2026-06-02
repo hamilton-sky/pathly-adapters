@@ -3,6 +3,40 @@
 Design intelligence step for the Pathly pipeline.
 Runs **after plan, before build** — generates a `DESIGN.md` artifact the builder uses as its visual spec.
 
+## Phase: analyze
+
+Before generating the design system, run this phase to understand what constraints already exist.
+
+**Log phase start:**
+```bash
+curl -s -X POST http://127.0.0.1:8765/record_phase \
+  -H "Content-Type: application/json" \
+  -d '{"feature":"<FEATURE>","agent":"designer","phase":"analyze","event_type":"PHASE_START"}'
+```
+
+**Read existing plan artifacts (if present):**
+- Read `pathly/plans/<feature>/USER_STORIES.md` — extract acceptance criteria that constrain the design
+- Read `pathly/plans/<feature>/IMPLEMENTATION_PLAN.md` — note any architecture decisions that affect UI shape
+- Glob `pathly/plans/<feature>/DESIGN*.md` — identify any prior design artifacts to avoid duplicating work
+
+**Summarize design constraints** in 3–5 bullet points covering:
+- Target user / use case from the stories
+- Key screens or flows implied by the stories
+- Stack or component library constraints from the implementation plan
+- Existing design tokens or style decisions already in place
+- Any explicit design requirements called out in the plan
+
+Print the bullet summary before continuing.
+
+**Log phase done:**
+```bash
+curl -s -X POST http://127.0.0.1:8765/record_phase \
+  -H "Content-Type: application/json" \
+  -d '{"feature":"<FEATURE>","agent":"designer","phase":"analyze","event_type":"PHASE_DONE"}'
+```
+
+---
+
 ## Step 1 — Resolve Feature & Stack
 
 **Find active feature:**
