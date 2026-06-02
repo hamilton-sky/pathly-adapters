@@ -9,6 +9,16 @@ export interface DecisionMenuItem {
   label: string
 }
 
+export interface AgentQuestionOption {
+  label: string
+  description?: string
+}
+
+export interface AgentQuestion {
+  question: string
+  options: AgentQuestionOption[]
+}
+
 export interface StageLogEntry {
   stage: string
   adapter: string | null
@@ -48,7 +58,9 @@ interface RunnerState {
   logCardExpanded: boolean
   runStartedAt: number | null
   runHistory: HistoricalRun[]
-  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory' | 'removeHistoricalRun' | 'recordStagePrompt' | 'recordStageResult'>>) => void
+  agentQuestion: AgentQuestion | null
+  setAgentQuestion: (q: AgentQuestion | null) => void
+  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory' | 'removeHistoricalRun' | 'recordStagePrompt' | 'recordStageResult' | 'setAgentQuestion'>>) => void
   resetRunner: () => void
   setDecisionMenu: (items: DecisionMenuItem[] | null) => void
   setRunnerConfig: (topic: string, projectRoot: string) => void
@@ -80,6 +92,7 @@ const initialState = {
   logCardExpanded: false,
   runStartedAt: null,
   runHistory: [] as HistoricalRun[],
+  agentQuestion: null as AgentQuestion | null,
 }
 
 export const useRunnerStore = create<RunnerState>()((set, get) => ({
@@ -87,6 +100,7 @@ export const useRunnerStore = create<RunnerState>()((set, get) => ({
   setRunnerState: (patch) => set((s) => ({ ...s, ...patch })),
   resetRunner: () => set((s) => ({ ...s, ...initialState })),
   setDecisionMenu: (items) => set((s) => ({ ...s, decisionMenu: items })),
+  setAgentQuestion: (q) => set((s) => ({ ...s, agentQuestion: q })),
   setRunnerConfig: (topic, projectRoot) => set((s) => ({ ...s, topic, projectRoot })),
   recordStageStart: (stage, adapter, tabId) => set((s) => ({
     ...s,

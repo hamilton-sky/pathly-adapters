@@ -69,6 +69,11 @@ class RunnerState:
     # Reroute override — set by /runner/reroute for the *next* stage only
     _reroute_adapter: Optional[str] = field(default=None, repr=False, compare=False)
 
+    # Agent question — set while waiting for user to answer a denied AskUserQuestion
+    _awaiting_agent_answer: bool = field(default=False, repr=False, compare=False)
+    _agent_question_answer: Optional[str] = field(default=None, repr=False, compare=False)
+    _agent_question_event: threading.Event = field(default_factory=threading.Event, repr=False, compare=False)
+
     # Active terminal tab id — set while a terminal-mode stage is in flight
     active_tab_id: str = ""
 
@@ -236,6 +241,57 @@ def _run_stage_via_terminal(
 
 
 # ── Loop thread ────────────────────────────────────────────────────────────────
+
+def _await_agent_question(
+    state: RunnerState,
+    topic: str,
+    ask_q: dict,
+    broadcast_fn: Optional[Callable],
+) -> Optional[str]:
+    """Surface a denied AskUserQuestion to the user via SSE and wait for their answer.
+    Returns the answer string, or None if the run was aborted.
+    """
+    tool_input = ask_q.get("tool_input") or {}
+    questions = tool_input.get("questions") or []
+    if not questions:
+        return None
+    first_q = questions[0]
+    question_text = first_q.get("question", "")
+    options = first_q.get("options") or []
+
+    with _lock:
+        state._awaiting_agent_answer = True
+        state._agent_question_answer = None
+        state._agent_question_event.clear()
+
+    if broadcast_fn:
+        try:
+            broadcast_fn(topic, {
+                "type": "AGENT_QUESTION",
+                "topic": topic,
+                "question": question_text,
+                "options": options,
+            })
+        except Exception as exc:
+            logger.warning("broadcast_fn error: %s", exc)
+
+    # Wait for user answer or abort
+    while True:
+        with _lock:
+            if state._abort_flag:
+                state._awaiting_agent_answer = False
+                return None
+            answer = state._agent_question_answer
+        if answer is not None:
+            break
+        time.sleep(0.05)
+
+    with _lock:
+        state._awaiting_agent_answer = False
+        state._agent_question_answer = None
+
+    return answer
+
 
 def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
     from pathly_orchestrator import fsm_http_client as fhc
@@ -426,6 +482,61 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     }
                 )
                 return
+
+            # ── Handle agent questions (AskUserQuestion denied in headless mode) ──────
+            _MAX_QUESTION_ROUNDS = 3
+            for _q_round in range(_MAX_QUESTION_ROUNDS):
+                ask_q = (invoke_result or {}).get("ask_user_question")
+                if not ask_q:
+                    break
+
+                tool_input = ask_q.get("tool_input") or {}
+                qs = tool_input.get("questions") or []
+                q_text = qs[0].get("question", "") if qs else ""
+
+                answer = _await_agent_question(state, topic, ask_q, broadcast_fn)
+                if answer is None:
+                    # Aborted while waiting for answer
+                    with _lock:
+                        _set_status(state, "aborted", broadcast_fn)
+                    return
+
+                with _lock:
+                    _set_status(state, "running", broadcast_fn)
+
+                # Build retry instructions: prepend the user's answer so the agent
+                # continues the stage task with the information it needed
+                answer_block = (
+                    f"CONTEXT — The user answered your question before you continue:\n"
+                    f"Q: {q_text}\n"
+                    f"A: {answer}\n\n"
+                    f"Now proceed with the original task using this answer.\n\n"
+                )
+                retry_run_id = f"{run_id}-q{_q_round + 1}"
+                retry_session = (invoke_result or {}).get("session_id") or session_id
+                try:
+                    invoke_result = _run_stage_via_terminal(
+                        state,
+                        answer_block + instructions,
+                        preferred_adapter,
+                        model,
+                        retry_run_id,
+                        broadcast_fn,
+                        session=retry_session,
+                        autonomy=autonomy_for_adapter,
+                    )
+                except RuntimeError as exc:
+                    with _lock:
+                        state.error_kind = "subprocess"
+                        _set_status(state, "error", broadcast_fn)
+                    _broadcast({
+                        "type": "RUNNER_ERROR",
+                        "topic": topic,
+                        "message": str(exc),
+                        "kind": "subprocess",
+                    })
+                    return
+            # (end agent-question retry loop)
 
             # ── Update cost + session from invoke result ───────────────────────
             new_cost = (invoke_result or {}).get("cost_usd", 0.0) or 0.0
@@ -812,6 +923,18 @@ def supply_decision(topic: str, decision: str) -> None:
             raise ValueError(f"Topic {topic!r} is not awaiting a decision (status={state.status})")
         state._decision = decision
         state._decision_event.set()
+
+
+def supply_agent_answer(topic: str, answer: str) -> None:
+    """Supply a user answer for a stage that asked a question (denied AskUserQuestion)."""
+    with _lock:
+        state = _registry.get(topic)
+        if state is None:
+            raise KeyError(topic)
+        if not state._awaiting_agent_answer:
+            raise ValueError(f"Topic {topic!r} is not awaiting an agent answer")
+        state._agent_question_answer = answer
+        state._agent_question_event.set()
 
 
 def reroute_run(topic: str, adapter: str) -> None:

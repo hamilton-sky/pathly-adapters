@@ -88,7 +88,16 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
         cost_usd = float(cost or 0.0)
     except (TypeError, ValueError):
         cost_usd = 0.0
-    return {"cost_usd": cost_usd, "session_id": session_id or None}
+
+    # Extract AskUserQuestion denial if present
+    permission_denials = payload.get("permission_denials") or []
+    ask_user_question = None
+    for denial in (permission_denials if isinstance(permission_denials, list) else []):
+        if isinstance(denial, dict) and denial.get("tool_name") == "AskUserQuestion":
+            ask_user_question = denial
+            break
+
+    return {"cost_usd": cost_usd, "session_id": session_id or None, "ask_user_question": ask_user_question}
 
 
 def _patch_last_agent_done(

@@ -1123,6 +1123,31 @@ def runner_decision():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@app.route("/runner/agent-answer", methods=["POST"])
+def runner_agent_answer():
+    """Supply a user answer for a stage that asked a question via AskUserQuestion (denied in headless mode)."""
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json() or {}
+        topic = _topic_from_body(data)
+        answer = data.get("answer", "")
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+        if not isinstance(answer, str) or not answer.strip():
+            return jsonify({"error": "Field 'answer' must be a non-empty string"}), 400
+
+        _sup.supply_agent_answer(topic, answer.strip())
+        return jsonify({"status": "accepted", "topic": topic}), 200
+    except KeyError:
+        return jsonify({"error": "No run found for topic"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        logging.exception("runner_agent_answer error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @app.route("/runner/reroute", methods=["POST"])
 def runner_reroute():
     """Override the adapter for the next stage of an active run."""

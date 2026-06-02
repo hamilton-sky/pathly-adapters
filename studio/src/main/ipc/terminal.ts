@@ -86,22 +86,61 @@ interface ClaudeJsonResult {
     cache_read_input_tokens: number
     cache_creation_input_tokens: number
   }
+  permission_denials?: Array<{
+    tool_name: string
+    tool_use_id?: string
+    tool_input?: unknown
+  }>
+}
+
+/** Extract the balanced { … } object starting at position 0.
+ *  Handles string escaping so embedded braces inside strings are ignored. */
+function extractBalancedJson(s: string): string | null {
+  let depth = 0
+  let inString = false
+  let escape = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (escape) { escape = false; continue }
+    if (c === '\\' && inString) { escape = true; continue }
+    if (c === '"') { inString = !inString; continue }
+    if (inString) continue
+    if (c === '{') depth++
+    else if (c === '}') {
+      depth--
+      if (depth === 0) return s.slice(0, i + 1)
+    }
+  }
+  return null
 }
 
 function parseClaudeJsonResult(stdout: string): ClaudeJsonResult | null {
   // Strip ANSI escape sequences
   const stripped = stdout.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
-  // Look for a JSON line with "type":"result" (scan from end — it's the last output)
-  const lines = stripped.split('\n')
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const t = lines[i].trim()
-    if (t.startsWith('{') && t.includes('"type"')) {
-      try {
-        const parsed = JSON.parse(t) as { type?: string } & ClaudeJsonResult
-        if (parsed.type === 'result') return parsed
-      } catch { /* not valid JSON */ }
-    }
-  }
+
+  // Claude emits {"type":"result",...} as compact JSON on one logical line, but
+  // the PTY terminal wraps it at the column width with \r\n sequences.  We find
+  // the marker, walk back to the opening brace, flatten the PTY wrapping in
+  // that section, then extract a balanced { } object before parsing.
+  const idxA = stripped.lastIndexOf('"type":"result"')
+  const idxB = stripped.lastIndexOf('"type": "result"')
+  const markerIdx = Math.max(idxA, idxB)
+  if (markerIdx === -1) return null
+
+  // Walk backward to find the opening brace for this object
+  let start = markerIdx
+  while (start > 0 && stripped[start] !== '{') start--
+  if (stripped[start] !== '{') return null
+
+  // Flatten PTY-introduced \r\n wrapping within the JSON section only
+  const flat = stripped.slice(start).replace(/\r\n/g, '').replace(/\r/g, '')
+  const json = extractBalancedJson(flat)
+  if (!json) return null
+
+  try {
+    const parsed = JSON.parse(json) as { type?: string } & ClaudeJsonResult
+    if (parsed.type === 'result') return parsed
+  } catch { /* malformed */ }
   return null
 }
 

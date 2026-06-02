@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useRunnerStore } from '../../store/runnerStore'
-import type { DecisionMenuItem, RunnerStatus, SessionKind } from '../../store/runnerStore'
+import type { DecisionMenuItem, RunnerStatus, SessionKind, AgentQuestionOption } from '../../store/runnerStore'
 import { useBrightskyStore } from '../../store/brightskyStore'
 import { brightskyClient } from '../../lib/brightskyClient'
 import { useChatStore } from '../../store/chatStore'
@@ -248,8 +248,18 @@ export function useHQ() {
               setDecisionMenu(data.items as DecisionMenuItem[])
               useRunnerStore.getState().setLogCardExpanded(true)
               useToastStore.getState().push('Runner is waiting for your decision', 'info')
+            } else if (data.type === 'AGENT_QUESTION') {
+              setRunnerState({ status: 'blocked' })
+              useRunnerStore.getState().setAgentQuestion({
+                question: data.question as string,
+                options: data.options as AgentQuestionOption[],
+              })
+              useToastStore.getState().push('Agent is waiting for your answer', 'info')
             } else if (data.type === 'RUNNER_STATUS') {
               setRunnerState({ status: data.status as RunnerStatus })
+              if (data.status === 'running') {
+                useRunnerStore.getState().setAgentQuestion(null)
+              }
             } else if (data.type === 'COST_UPDATE') {
               const now = Date.now()
               if (now - lastCostRef.current >= 200) {
@@ -730,6 +740,16 @@ export function useHQ() {
     return null
   }
 
+  function handleAgentAnswer(answer: string): void {
+    if (!activeTopic) return
+    useRunnerStore.getState().setAgentQuestion(null)
+    fetch('http://127.0.0.1:8765/runner/agent-answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: activeTopic, answer }),
+    }).catch(() => { /* non-blocking */ })
+  }
+
   function handleMenuSelect(item: PathlyMenuItem): void {
     if (!projectPath) return
     setMenuDismissedKey(menuKey)
@@ -822,6 +842,7 @@ export function useHQ() {
     handleClearAll,
     renderTerminalCard,
     handleMenuSelect,
+    handleAgentAnswer,
     queueAssistantStream,
     finishAssistantStream,
     chatMode,

@@ -10,6 +10,7 @@ import { StepQueue } from './StepQueue/StepQueue'
 import { FlowControlBar } from './FlowControlBar/FlowControlBar'
 import { StageStatusStrip } from './StageStatusStrip/StageStatusStrip'
 import { RunnerLogCard } from './RunnerLogCard/RunnerLogCard'
+import { AgentQuestionCard } from './AgentQuestionCard/AgentQuestionCard'
 import { useRunnerStore } from '../../store/runnerStore'
 import { useBrightskyStore } from '../../store/brightskyStore'
 import styles from './index.module.css'
@@ -19,6 +20,7 @@ export function HQ(): JSX.Element {
   const thinkingLabel = useBrightskyStore((s) => s.thinkingLabel)
   const toolCallInProgress = useBrightskyStore((s) => s.toolCallInProgress)
   const runHistory = useRunnerStore((s) => s.runHistory)
+  const agentQuestion = useRunnerStore((s) => s.agentQuestion)
 
   return (
     <div
@@ -31,6 +33,9 @@ export function HQ(): JSX.Element {
       <FlowControlBar />
       <StageStatusStrip />
       <RunnerLogCard docked />
+      {agentQuestion && (
+        <AgentQuestionCard question={agentQuestion} onAnswer={chat.handleAgentAnswer} />
+      )}
       {runHistory.map((run, i) => (
         <RunnerLogCard key={`hist-${i}`} historicalRun={run} onDismiss={() => useRunnerStore.getState().removeHistoricalRun(i)} />
       ))}

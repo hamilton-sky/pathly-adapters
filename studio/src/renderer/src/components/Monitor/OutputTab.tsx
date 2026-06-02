@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { marked } from 'marked'
 import { useRunnerStore } from '../../store/runnerStore'
 import type { StageLogEntry } from '../../store/runnerStore'
 import styles from './OutputTab.module.css'
@@ -34,6 +35,7 @@ export function OutputTab(): JSX.Element {
 function OutputRow({ entry }: { entry: StageLogEntry }): JSX.Element {
   const [expanded, setExpanded] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
+  const [promptView, setPromptView] = useState<'raw' | 'preview'>('raw')
 
   const durationSec = entry.durationMs != null ? (entry.durationMs / 1000).toFixed(1) + 's' : '—'
   const costStr = entry.costUsd != null ? '$' + entry.costUsd.toFixed(3) : '—'
@@ -70,16 +72,42 @@ function OutputRow({ entry }: { entry: StageLogEntry }): JSX.Element {
           )}
           {entry.prompt != null && (
             <>
-              <button
-                type="button"
-                className={styles.promptToggle}
-                onClick={() => setPromptOpen((v) => !v)}
-                {...(promptOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-              >
-                {promptOpen ? 'Hide prompt ▲' : 'Show prompt ▾'}
-              </button>
-              {promptOpen && (
+              <div className={styles.promptHeader}>
+                <button
+                  type="button"
+                  className={styles.promptToggle}
+                  onClick={() => setPromptOpen((v) => !v)}
+                  {...(promptOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+                >
+                  {promptOpen ? 'Hide prompt ▲' : 'Show prompt ▾'}
+                </button>
+                {promptOpen && (
+                  <div className={styles.viewBar} role="group" aria-label="Prompt view mode">
+                    <button
+                      type="button"
+                      className={promptView === 'raw' ? `${styles.viewBtn} ${styles.viewBtnActive}` : styles.viewBtn}
+                      onClick={() => setPromptView('raw')}
+                    >
+                      Raw
+                    </button>
+                    <button
+                      type="button"
+                      className={promptView === 'preview' ? `${styles.viewBtn} ${styles.viewBtnActive}` : styles.viewBtn}
+                      onClick={() => setPromptView('preview')}
+                    >
+                      Preview
+                    </button>
+                  </div>
+                )}
+              </div>
+              {promptOpen && promptView === 'raw' && (
                 <div className={styles.promptBox}>{entry.prompt}</div>
+              )}
+              {promptOpen && promptView === 'preview' && (
+                <div
+                  className={styles.promptPreview}
+                  dangerouslySetInnerHTML={{ __html: marked(entry.prompt) as string }}
+                />
               )}
             </>
           )}
