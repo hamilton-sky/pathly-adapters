@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 import re
 import subprocess
 from importlib.resources import files
@@ -103,10 +104,22 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     if "/" in agent:
         # Stage skill — compose fragments for the live adapter. Skills absent from
         # the composition manifest are returned raw, so this is a no-op until converted.
-        from pathly_orchestrator.compose import compose_skill
+        from pathly_orchestrator.compose import compose_skill, compose_skill_with_block
 
         adapter = _resolve_adapter(flow_config, state_name) or "claude"
-        agent_text = compose_skill(agent, adapter)
+        composition = flow_config.get("composition", {})
+        block_name = composition.get(state_name)
+        if block_name:
+            try:
+                agent_text = compose_skill_with_block(agent, block_name, adapter)
+            except KeyError:
+                logging.getLogger(__name__).warning(
+                    "composition-blocks: unknown block %r for state %r — falling back to compose_skill",
+                    block_name, state_name
+                )
+                agent_text = compose_skill(agent, adapter)
+        else:
+            agent_text = compose_skill(agent, adapter)
     else:
         agent_text = _load_agent_text(agent)
     context = (

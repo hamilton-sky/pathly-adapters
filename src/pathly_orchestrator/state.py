@@ -58,6 +58,7 @@ _KNOWN_OPTIONAL_FLOW_KEYS = {
     "flow",
     "transition_actions",
     "adapter_map",
+    "composition",
 }
 _ACTION_VOCAB = {
     "git_commit",
@@ -160,6 +161,31 @@ def validate_flow_cli() -> None:
                 errors.append(
                     f"adapter_map key '{key}' is not a declared state in 'states'"
                 )
+
+    # composition: validation (optional field — omitting it is fully backward compatible)
+    if "composition" in flow:
+        composition = flow["composition"]
+        if not isinstance(composition, dict):
+            errors.append("composition: value must be a dict mapping state names to block names")
+        else:
+            declared_states = set(flow.get("states") or [])
+            from pathly_orchestrator.compose import resolve_block
+            for state_key, block_name in composition.items():
+                if state_key not in declared_states:
+                    errors.append(
+                        f"composition key '{state_key}' is not a declared state in 'states'"
+                    )
+                if not isinstance(block_name, str) or not block_name:
+                    errors.append(
+                        f"composition['{state_key}']: block name must be a non-empty string"
+                    )
+                    continue
+                try:
+                    resolve_block(block_name, None)
+                except KeyError:
+                    errors.append(
+                        f"composition['{state_key}']: unknown block name '{block_name}'"
+                    )
 
     # Addition 1 — Agent-contract validation (warning only; contracts may not ship with adapters)
     for agent in (flow.get("agent_map") or {}).values():

@@ -211,3 +211,63 @@ def test_validate_team_flow_with_adapter_map_still_passes(monkeypatch):
     """team.flow.yaml has no adapter_map — validator must still pass cleanly."""
     code = _run_cli(str(FLOWS_DIR / "team.flow.yaml"), monkeypatch)
     assert code == 0
+
+
+# ── validate_flow_cli(): composition key validation ───────────────────────────
+
+def test_validate_flow_without_composition_key_passes(monkeypatch, tmp_path):
+    """Flows with no composition: key must validate cleanly (backward-compatible)."""
+    flow = _minimal_flow()
+    flow_file = tmp_path / "no_composition.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 0
+
+
+def test_validate_composition_valid_state_and_block_passes(monkeypatch, tmp_path, capsys):
+    """Flow with composition: {BUILDING: full-build} passes when BUILDING is declared."""
+    flow = _minimal_flow(composition={"BUILDING": "full-build"})
+    flow_file = tmp_path / "good_composition.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "OK:" in out
+
+
+def test_validate_composition_value_not_dict_fails(monkeypatch, tmp_path, capsys):
+    """Flow with composition: as a non-dict value must fail validation."""
+    flow = _minimal_flow(composition="full-build")
+    flow_file = tmp_path / "bad_composition_type.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "composition" in out
+
+
+def test_validate_composition_undeclared_state_key_fails(monkeypatch, tmp_path, capsys):
+    """Flow with composition: referencing a state not in states: must fail."""
+    flow = _minimal_flow(composition={"NONEXISTENT": "full-build"})
+    flow_file = tmp_path / "bad_composition_state.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "NONEXISTENT" in out
+
+
+def test_validate_composition_unknown_block_name_fails(monkeypatch, tmp_path, capsys):
+    """Flow with composition: referencing an unknown block name must fail."""
+    flow = _minimal_flow(composition={"BUILDING": "no-such-block"})
+    flow_file = tmp_path / "bad_composition_block.flow.yaml"
+    flow_file.write_text(yaml.dump(flow), encoding="utf-8")
+
+    code = _run_cli(str(flow_file), monkeypatch)
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "no-such-block" in out
