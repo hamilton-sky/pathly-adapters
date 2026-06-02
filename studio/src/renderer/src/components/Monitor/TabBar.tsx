@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FlowSession } from '../../types/index'
 import { extractTopic, flowTypeLabel, truncate } from './utils'
 import styles from './Monitor.module.css'
+
+const PAGE_SIZE = 3
 
 interface Props {
   sessions: Record<string, FlowSession>
@@ -10,29 +12,34 @@ interface Props {
 }
 
 export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element {
-  const keys = Object.keys(sessions)
-  const focusedTabRef = useRef<number>(keys.indexOf(activeTab ?? keys[0]))
+  const keys = useMemo(() => Object.keys(sessions), [sessions])
+  const [page, setPage] = useState(0)
+  const totalPages = Math.ceil(keys.length / PAGE_SIZE)
   const tablistRef = useRef<HTMLDivElement>(null)
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, idx: number): void => {
+  // When active tab changes, jump to its page
+  useEffect(() => {
+    if (activeTab == null) return
+    const idx = keys.indexOf(activeTab)
+    if (idx < 0) return
+    setPage(Math.floor(idx / PAGE_SIZE))
+  }, [activeTab, keys])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, globalIdx: number): void => {
     if (e.key === 'ArrowRight') {
       e.preventDefault()
-      const nextIdx = (idx + 1) % keys.length
+      const nextIdx = (globalIdx + 1) % keys.length
       onTabSelect(keys[nextIdx])
-      focusedTabRef.current = nextIdx
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault()
-      const prevIdx = (idx - 1 + keys.length) % keys.length
+      const prevIdx = (globalIdx - 1 + keys.length) % keys.length
       onTabSelect(keys[prevIdx])
-      focusedTabRef.current = prevIdx
     }
   }, [keys, onTabSelect])
 
-  const visible = keys.slice(0, 4)
-  const overflow = keys.slice(4)
+  const visible = keys.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
   const allSameTopic = keys.length > 0 && keys.every((k) => extractTopic(k) === extractTopic(keys[0]))
 
-  // Set aria-selected imperatively to avoid JSX expression lint false-positive
   useEffect(() => {
     if (!tablistRef.current) return
     tablistRef.current.querySelectorAll<HTMLButtonElement>('[role="tab"][data-key]').forEach((btn) => {
@@ -43,11 +50,22 @@ export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element
 
   return (
     <div className={styles.tabBar}>
-      {/* tablist must only contain role="tab" children — overflow button lives outside */}
+      {totalPages > 1 && (
+        <button
+          type="button"
+          className={styles.tabNavBtn}
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
+          {...(page === 0 ? { disabled: true } : {})}
+          aria-label="Previous tabs"
+        >
+          ‹
+        </button>
+      )}
       <div ref={tablistRef} role="tablist" aria-label="Active flows" className={styles.tabListInner}>
         {visible.map((sessionKey, idx) => {
           const session = sessions[sessionKey]
-          const isActive = activeTab === sessionKey || (activeTab === null && idx === 0)
+          const globalIdx = page * PAGE_SIZE + idx
+          const isActive = activeTab === sessionKey || (activeTab === null && globalIdx === 0)
           const label = allSameTopic
             ? flowTypeLabel(session.flowKey)
             : `${flowTypeLabel(session.flowKey)}/${truncate(extractTopic(sessionKey), 10)}`
@@ -59,7 +77,7 @@ export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element
               role="tab"
               tabIndex={isActive ? 0 : -1}
               onClick={() => onTabSelect(sessionKey)}
-              onKeyDown={(e) => handleKeyDown(e, idx)}
+              onKeyDown={(e) => handleKeyDown(e, globalIdx)}
               className={`${styles.tab} ${isActive ? styles.tabActive : ''}`}
             >
               {label}
@@ -70,13 +88,15 @@ export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element
           )
         })}
       </div>
-      {overflow.length > 0 && (
+      {totalPages > 1 && (
         <button
           type="button"
-          className={styles.tabOverflow}
-          onClick={() => { /* overflow dropdown — Post-MVP */ }}
+          className={styles.tabNavBtn}
+          onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+          {...(page === totalPages - 1 ? { disabled: true } : {})}
+          aria-label="Next tabs"
         >
-          …
+          ›
         </button>
       )}
     </div>

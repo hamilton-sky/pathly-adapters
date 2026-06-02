@@ -5,5 +5,11 @@
   "updated_at": "2026-06-02T13:30:00.000000+00:00",
   "conv_start_sha": "05835b1c819e3097e9454b8d2eb1090aab15accf",
   "convs_total": 2,
-  "convs_done": 1
+  "convs_done": 1,
+  "build_baseline": {
+    "started_at": "2026-06-02T13:49:58.564080+00:00",
+    "preexisting_dirty": [
+      "pathly/plans/chat-stop-proxy/RUNNER_STATE.json"
+    ]
+  }
 }

@@ -23,9 +23,9 @@ export function HeaderBar({ effectiveTopic }: Props): JSX.Element {
   useInjectCSS(LIVE_BADGE_CSS)
 
   const flow = fsmState?.flow as string | undefined
-  const topic = fsmState?.feature
-    ? truncate(fsmState.feature as string, 32)
-    : effectiveTopic ? truncate(effectiveTopic, 32) : '—'
+  const topic = effectiveTopic
+    ? truncate(effectiveTopic, 32)
+    : fsmState?.feature ? truncate(fsmState.feature as string, 32) : '—'
   const conv = fsmState?.conv != null
     ? String(fsmState.conv)
     : fsmState?.current_conversation != null

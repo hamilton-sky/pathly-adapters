@@ -1,0 +1,23 @@
+{
+  "topic": "gitnexus-integration",
+  "flow": "team",
+  "project_root": "C:\\Users\\Yafit\\pathly-adapters",
+  "model": "claude-sonnet-4-6",
+  "timeout": 600,
+  "run_id": "6cea014e-e703-4d87-87f7-f7bda02b7943",
+  "status": "error",
+  "current_state": "PLANNING",
+  "current_adapter": "claude",
+  "iterations": 1,
+  "max_iterations": 20,
+  "cost_usd_so_far": 0.0,
+  "max_cost_usd": 5.0,
+  "autonomy": {},
+  "pending_menu": null,
+  "error_kind": "subprocess",
+  "open_session": {
+    "adapter": "claude",
+    "session_id": null,
+    "resumable": true
+  }
+}

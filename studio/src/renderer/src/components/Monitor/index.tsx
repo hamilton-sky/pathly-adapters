@@ -26,7 +26,6 @@ export function Monitor(): JSX.Element {
 
   return (
     <div className={styles.panel}>
-      <HeaderBar effectiveTopic={effectiveTopic} />
       {showTabBar && (
         <TabBar
           sessions={activeFlowSessions}
@@ -34,6 +33,7 @@ export function Monitor(): JSX.Element {
           onTabSelect={setActiveMonitorTab}
         />
       )}
+      <HeaderBar effectiveTopic={effectiveTopic} />
       <PlanProgressSection topic={effectiveTopic} />
       <HealthCheck />
       <FsmView />
