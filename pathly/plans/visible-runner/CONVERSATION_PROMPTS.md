@@ -154,14 +154,37 @@ Architectural rules:
 - All buttons must have type="button".
 - Component files ≤ 150 lines. Extract sub-components if needed.
 
-Verify: `node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json && node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json`
-After verification passes, update pathly/plans/visible-runner/PROGRESS.md phases 4–9 to DONE.
+Verify (step 1 — typecheck):
+`node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json && node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json`
 
-If verification fails and the fix requires out-of-scope changes, stop and report.
-If fundamentally broken, rollback with git checkout on affected files and retry.
+If typecheck fails: fix, do not proceed to step 2.
+If fundamentally broken: rollback with git checkout on affected files and retry.
+
+Verify (step 2 — end-to-end smoke test, required before marking Conv 2 DONE):
+
+Typecheck alone does not prove the data path works. Run the following manual smoke test and record the result in PROGRESS.md before closing Conv 2.
+
+```
+1. Start the Python supervisor with PATHLY_TERMINAL_MODE=1 set in the environment.
+2. Open Studio and connect HQ to a test topic (e.g. "smoke-test").
+3. POST /runner/start with a single-stage plan (STORM only, nano rigor).
+4. Confirm in the Studio terminal pane: a new tab "claude — storm" opens with
+   a teal left border within 5 seconds.
+5. Confirm the PTY streams output live in the xterm viewport.
+6. Wait for the stage to complete (or send a short prompt that exits quickly).
+7. Confirm in the supervisor logs: /runner/terminal/result was received with
+   non-null stdout_tail and the stage advanced in _loop.
+8. Confirm in the Studio HQ: StageStatusStrip shows the stage as done,
+   cost updated.
 ```
 
-**Expected output:** Both typecheck commands exit 0. TERMINAL_SPAWN opens a teal-bordered tab; PTY exit POSTs result to runner.
+Pass criteria: all 8 steps produce the expected output.
+Fail criteria: if step 4 (tab does not open within 5s) or step 7 (result never received) fails, stop — do NOT proceed to Conv 3. Diagnose and fix before advancing.
+
+After both steps pass, update pathly/plans/visible-runner/PROGRESS.md phases 4–9 to DONE.
+```
+
+**Expected output:** Typecheck clean AND smoke test passes all 8 steps. The parser and callback lifecycle are proven before any Conv 3 UI work begins.
 **Files touched:** `tokens.css`, `terminal.ts`, `types/terminal.ts`, `runnerStore.ts`, `useHQ.tsx`, `PaneTabBar.tsx`, `Terminal.module.css`
 
 ---

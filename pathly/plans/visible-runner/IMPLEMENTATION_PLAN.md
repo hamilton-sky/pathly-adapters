@@ -240,7 +240,7 @@ In the SSE event switch:
 ## Phase 8: terminal.ts — buffer + result POST on PTY exit   ← Conversation: 2
 
 **File:** `studio/src/main/ipc/terminal.ts`
-**Done when:** `grep -n "terminal/result\|stdout_tail\|ptyOutputBuf" studio/src/main/ipc/terminal.ts` returns matches in the exit handler.
+**Done when:** `grep -n "terminal/result\|stdout_tail\|ptyOutputBuf" studio/src/main/ipc/terminal.ts` returns matches in the exit handler AND the Conv 2 end-to-end smoke test (see CONVERSATION_PROMPTS.md) passes all 8 steps. Typecheck alone is not sufficient — the data path must be proven live before Conv 3 begins.
 **Depends on:** Phase 7
 **Details:**
 
