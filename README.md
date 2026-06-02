@@ -82,11 +82,23 @@ pathly-studio                       # launch the local Pathly Studio desktop UI
 Pathly skills communicate with the Python FSM engine over HTTP. The server runs locally on port 8765 and is auto-started by the `fsm-call` skill when needed - no manual setup required.
 
 ```
-POST http://127.0.0.1:8765/next_action       ← get current state + agent instructions
-POST http://127.0.0.1:8765/complete_stage    ← advance FSM to next state
-POST http://127.0.0.1:8765/record_activity   ← write telemetry to ~/.pathly/activity.jsonl
-GET  http://127.0.0.1:8765/events/stream     ← SSE stream of EVENTS.jsonl (used by Studio)
-GET  http://127.0.0.1:8765/health            ← liveness check
+POST http://127.0.0.1:8765/next_action            ← get current state + agent instructions
+POST http://127.0.0.1:8765/complete_stage         ← advance FSM to next state
+POST http://127.0.0.1:8765/record_activity        ← write telemetry to ~/.pathly/activity.jsonl
+GET  http://127.0.0.1:8765/events/stream          ← SSE stream of EVENTS.jsonl
+GET  http://127.0.0.1:8765/events/runner?topic=X  ← SSE stream of runner events (used by Studio)
+GET  http://127.0.0.1:8765/health                 ← liveness check
+POST http://127.0.0.1:8765/shutdown               ← graceful server exit (used by Electron on restart)
+
+# Runner endpoints (Studio ↔ supervisor)
+POST http://127.0.0.1:8765/runner/start
+POST http://127.0.0.1:8765/runner/pause
+POST http://127.0.0.1:8765/runner/resume
+POST http://127.0.0.1:8765/runner/advance
+POST http://127.0.0.1:8765/runner/retry
+POST http://127.0.0.1:8765/runner/abort
+POST http://127.0.0.1:8765/runner/terminal/result    ← PTY exit callback from Studio
+POST http://127.0.0.1:8765/runner/terminal/started   ← PTY started confirmation from Studio
 ```
 
 Start it manually if needed:
@@ -102,18 +114,23 @@ The `fsm-call` skill (shared by all FSM-using skills) handles health-check, auto
 This repository also ships Pathly Studio, a local Electron UI for inspecting and
 driving Pathly workflows:
 
-- Canvas: visual flow editing and validation for shipped flow YAMLs.
-- Plan: project-local plan files and workflow artifacts.
-- Monitor: live FSM events from `GET /events/stream`.
-- Conductor: chat-driven workflow control with Claude, Codex, and shell targets.
-- Terminal: full bottom terminal plus chat mini-terminal cards that share the
+- **Canvas**: visual flow editing and validation for shipped flow YAMLs.
+- **Plan**: project-local plan files and workflow artifacts.
+- **Monitor**: live FSM events from `GET /events/stream`.
+- **Conductor**: chat-driven workflow control with Claude, Codex, and shell targets.
+- **Terminal**: full bottom terminal plus chat mini-terminal cards that share the
   same xterm/PTY tab through `xtermRegistry`.
+- **HQ / Runner**: visual pipeline control panel — Start, Pause, Resume, Advance, Reroute, Abort. Each pipeline stage spawns a visible terminal tab with the agent running non-interactively; you can watch the output in real time. Skills are injected via argv at spawn time — no disk-installed skill files required for automated runs.
 
 Studio terminal behavior is intentionally shared, not duplicated: the mini card
 and full terminal reparent one xterm instance per `tabId`. The chat card can be
 hidden without killing the process; the bin action kills/disposes/removes the
 terminal instance. The full terminal also has a hamburger-controlled instance
 rail for focusing, hiding, and killing open terminal sessions.
+
+Studio always restarts the FSM server on launch — it gracefully shuts down any
+stale instance (POST `/shutdown`) and force-kills by port if needed, ensuring the
+latest server code is always running.
 
 Launch it from an installed package with:
 

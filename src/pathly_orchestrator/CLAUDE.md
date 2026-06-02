@@ -29,6 +29,33 @@ pathly-fsm-call complete-stage \
 If you need to debug the raw HTTP server, use a real JSON-capable client rather
 than shell-escaped `curl` strings on PowerShell.
 
+### Runner endpoints (Studio ↔ supervisor)
+
+```
+POST /runner/start                   ← Studio FlowControlBar: start a new pipeline run
+POST /runner/pause                   ← pause running pipeline
+POST /runner/resume                  ← resume paused pipeline
+POST /runner/advance                 ← skip past current block
+POST /runner/retry                   ← retry blocked stage
+POST /runner/abort                   ← abort run completely
+POST /runner/terminal/result         ← PTY exit callback: { run_id, topic, exit_code, stdout_tail, wall_seconds, user_initiated }
+POST /runner/terminal/started        ← PTY started confirmation: { run_id, topic, tab_id }
+GET  /events/runner?topic=<topic>    ← SSE stream of runner events for Studio
+POST /shutdown                       ← graceful server shutdown (used by Electron on restart)
+```
+
+### SSE events (GET /events/runner)
+
+| Event type | Payload fields | Purpose |
+|---|---|---|
+| `RUN_STARTED` | `topic`, `run_id` | pipeline run began |
+| `RUN_COMPLETE` | `topic`, `run_id`, `status` | pipeline finished (done/aborted/error) |
+| `TERMINAL_SPAWN` | `tab_id`, `run_id`, `label`, `cwd`, `argv[]`, `adapter` | Studio should open a new terminal tab and spawn the PTY |
+| `TERMINAL_STARTED` | `tab_id`, `run_id` | PTY confirmed running |
+| `SESSION` | `kind` (new/continue), `session_id` | adapter session continuity signal |
+| `RUNNER_WARNING` | `message` | non-fatal warning to surface as a toast |
+| `STATUS` | `status`, `stage`, `adapter`, `cost_usd`, `session_kind` | periodic state sync |
+
 ## `/next_action` response contract
 
 Every `/next_action` response includes the following top-level fields:
@@ -50,6 +77,23 @@ Every `/next_action` response includes the following top-level fields:
 ## FSM recovery
 
 The `orchestrator` agent (haiku) can reconstruct state from `EVENTS.jsonl` if `STATE.json` is lost or corrupt. It is deterministic - same event log always produces the same state.
+
+## Visible runner (supervisor.py)
+
+`supervisor.py` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.
+
+**Stage flow:**
+1. `supervisor.py` calls `/next_action` → gets `agent_hint.instructions` (full prompt)
+2. Builds `argv = ['claude', '-p', '<instructions>', '--model', ..., '--print', '--output-format=json', '--dangerously-skip-permissions']`
+3. Emits `TERMINAL_SPAWN` SSE with `{ tab_id, run_id, argv, cwd, label, adapter }`
+4. Studio opens a PTY tab (`node-pty`) and spawns the process via the `argv`
+5. Studio POSTs `/runner/terminal/started` when PTY is up
+6. PTY exits → `terminal.ts` POSTs `/runner/terminal/result` with exit code and stdout tail
+7. `supervisor.py` receives the result, calls `/complete_stage`, advances to next stage
+
+Same-adapter consecutive stages share a `session_id`. Cross-adapter transitions start a new session.
+
+On Windows, the argv is passed to PowerShell via `-EncodedCommand` (base64 UTF-16LE) to handle arbitrary prompt content safely.
 
 ## CLI shortcuts
 

@@ -28,9 +28,24 @@ User → /pathly <cmd>           skills (installed at ~/.claude/skills/pathly-*)
      → pathly-fsm MCP server   HTTP FSM at http://127.0.0.1:8765
      → Agent(subagent_type=…)  Claude Code sub-agents (architect, builder, reviewer, …)
      → pathly/plans/<feature>/ filesystem state
+
+Studio → Start button          FlowControlBar → POST /runner/start
+       → supervisor.py         drives FSM + spawns agents as visible terminals
+       → TERMINAL_SPAWN SSE    Studio opens a PTY tab (node-pty) per pipeline stage
+       → terminal:spawn IPC    argv injected: ['claude', '-p', '<full prompt>', '--print', ...]
+       → PTY exits             POST /runner/terminal/result → FSM continues
 ```
 
 **Adapter install step:** `pathly-setup <host> --apply` stitches `core/agents/` and `core/skills/` with adapter-specific `_meta/*.yaml` files and writes deployable files to the host's install directory. Three adapters: `claude` → `~/.claude/`, `codex` → `~/.codex/` + `~/.agents/`, `copilot` → `~/.vscode/extensions/pathly/`.
+
+**Skill delivery — two modes:**
+
+| Mode | Trigger | How prompt reaches CLI | Skill files needed on disk? |
+|---|---|---|---|
+| **Interactive** | User types `/pathly build` | CLI reads `~/.claude/skills/pathly-build.md` | Yes — run `pathly-setup claude --apply` |
+| **Runner** | Studio Start button | `supervisor.py` injects full prompt via `-p` argv | No — prompt assembled in Python at runtime |
+
+In runner mode Pathly is the single source of truth for skill content. The CLI receives the complete prompt as a command-line argument and exits when done — it never reads a skill file.
 
 **FSM response contract (`agent_hint`):** Every `/next_action` response includes:
 - `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)

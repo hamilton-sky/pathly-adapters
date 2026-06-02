@@ -41,7 +41,45 @@ npx electron-vite build    # full Electron build (run from repo root)
 
 ## IPC pattern
 
-Main process exposes handlers via `ipcMain.handle(...)`. Renderer calls them via `window.api.*` (contextBridge). When adding a new IPC channel, register it in both `src/main/` and the preload script.
+Main process exposes handlers via `ipcMain.handle(...)`. Renderer calls them via `window.pathly.*` (contextBridge). When adding a new IPC channel, register it in `src/main/ipc/`, the preload (`src/main/preload/index.ts`), and the type declaration (`src/renderer/src/types/global.d.ts`).
+
+## Terminal IPC — runner mode
+
+`terminal:spawn` accepts an optional `argv` array for non-interactive (runner) mode:
+
+```ts
+// Interactive — opens a shell session the user can type into
+window.pathly.terminal.spawn(tabId, cwd, 'claude')
+
+// Runner — spawns claude non-interactively; exits when done
+window.pathly.terminal.spawn(tabId, cwd, undefined, ['claude', '-p', '...', '--print', '--dangerously-skip-permissions'])
+```
+
+On Windows, `terminal.ts` encodes the argv as a base64 PowerShell `-EncodedCommand` to handle newlines, quotes, and other special characters in the prompt safely.
+
+**Runner tab lifecycle:**
+1. `terminal:register-runner(tabId, topic, runId, label)` — called before spawn to link the tab to a pipeline run
+2. `terminal:spawn(tabId, cwd, undefined, argv)` — spawns the PTY
+3. PTY exits → `terminal.ts` POSTs `/runner/terminal/result` automatically (exit code, stdout tail, wall time)
+
+## FSM server lifecycle
+
+On every app launch, `index.ts` ensures a clean FSM server:
+1. Check if port 8765 is occupied (`isFsmRunning`)
+2. If yes → POST `/shutdown` (graceful, 800ms timeout)
+3. Re-check; if still occupied → `forceKillPort` via `netstat -ano` + `taskkill /F` (Windows) or `lsof | kill -9` (macOS/Linux)
+4. Start fresh FSM server process
+
+This guarantees the new server always starts, even against old server versions that predate the `/shutdown` endpoint.
+
+## Key Zustand stores
+
+| Store | File | Purpose |
+|---|---|---|
+| `runnerStore` | `store/runnerStore.ts` | pipeline status, stage, adapter, cost, error — driven by SSE |
+| `terminalStore` | `store/terminalStore.ts` | terminal tabs registry; `addTab` registers, `openTab` reveals panel |
+
+`RunnerStatus` union: `'idle' | 'running' | 'paused' | 'blocked' | 'error' | 'done' | 'aborted'`
 
 ---
 

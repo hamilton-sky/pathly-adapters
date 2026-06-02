@@ -5,7 +5,7 @@ import { registerWatcherHandlers } from './ipc/watcher'
 import { registerFsmHandlers } from './ipc/fsm'
 import { registerShellHandlers } from './ipc/shell'
 import { registerTerminalHandlers, killAllPtys } from './ipc/terminal'
-import { spawn, ChildProcess } from 'child_process'
+import { spawn, ChildProcess, execSync } from 'child_process'
 import net from 'net'
 import { getPythonPath } from './python'
 import { registerSetupHandlers } from './setup'
@@ -35,6 +35,19 @@ async function shutdownExistingFsm(): Promise<void> {
   } catch {
     // Server didn't respond — already gone or too old to have /shutdown
   }
+}
+
+function forceKillPort(port: number): void {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync('netstat -ano', { encoding: 'utf8' })
+      const match = out.split('\n').find((l) => l.includes(`:${port}`) && l.includes('LISTENING'))
+      const pid = match?.trim().split(/\s+/).pop()
+      if (pid && /^\d+$/.test(pid)) execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' })
+    } else {
+      execSync(`lsof -ti:${port} | xargs kill -9`, { stdio: 'ignore' })
+    }
+  } catch { /* already gone */ }
 }
 
 function startFsmServer(): void {
@@ -96,6 +109,13 @@ app.whenReady().then(async () => {
   if (alreadyRunning) {
     console.log('[FSM] server already running — shutting down stale instance')
     await shutdownExistingFsm()
+    const stillRunning = await isFsmRunning()
+    if (stillRunning) {
+      console.log('[FSM] graceful shutdown failed — force-killing port')
+      const port = parseInt(process.env['PATHLY_FSM_HTTP_PORT'] ?? '8765', 10)
+      forceKillPort(port)
+      await new Promise((r) => setTimeout(r, 300))
+    }
   }
   startFsmServer()
 
