@@ -84,9 +84,16 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
   // Windows: -EncodedCommand (base64 UTF-16LE) has a hard ~32 KB limit from Win32's CreateProcess.
   // Pathly stage prompts easily exceed this. Write a .ps1 script to a temp file instead —
   // no length constraints, PowerShell single-quoted strings handle any content safely.
+  //
+  // IMPORTANT: write with UTF-8 BOM (﻿) so PowerShell 5.1 reads the file as UTF-8.
+  // Without the BOM, PS5.1 falls back to CP1252, where the UTF-8 bytes for → (E2 86 92)
+  // decode as â†' — and 0x92 in CP1252 is the RIGHT SINGLE QUOTATION MARK ('), which
+  // PowerShell treats as a string terminator, breaking the quoted prompt argument.
+  // Also escape U+2018/U+2019 (curly quotes) that PS5.1 accepts as quote delimiters.
   const tmpScript = path.join(os.tmpdir(), `pathly-runner-${Date.now()}.ps1`)
-  const psArgs = argv.map((a) => `'${a.replace(/'/g, "''")}'`).join(' ')
-  fs.writeFileSync(tmpScript, `& ${psArgs}\r\n`, { encoding: 'utf8' })
+  const psArgs = argv.map((a) => `'${a.replace(/['‘’]/g, "''")}'`).join(' ')
+  const bom = Buffer.from([0xEF, 0xBB, 0xBF])
+  fs.writeFileSync(tmpScript, Buffer.concat([bom, Buffer.from(`& ${psArgs}\r\n`, 'utf8')]))
   return {
     shell: 'powershell.exe',
     args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', tmpScript],
