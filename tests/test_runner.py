@@ -11,6 +11,8 @@ from pathly_orchestrator.runner import (
     handle_blocked,
     handle_decide,
     invoke_agent,
+    parse_result,
+    resolve_argv,
     resolve_stage,
     run_flow,
 )
@@ -182,3 +184,31 @@ def test_invoke_agent_nonzero_exit():
     with patch("subprocess.Popen", return_value=mock_proc):
         with pytest.raises(RuntimeError, match="exited with code 1"):
             invoke_agent("do stuff", "/proj", "claude-sonnet-4-6")
+
+
+def test_resolve_argv_claude_adds_json_output():
+    argv = resolve_argv("claude", "prompt", "model")
+    assert "--output-format=json" in argv
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ('{"cost_usd": 1.25, "session_id": "s1"}', (1.25, "s1")),
+        ("\x1b[31m{\"cost_usd\": 2, \"session_id\": \"s2\"}\x1b[0m", (2.0, "s2")),
+        ("", (0.0, None)),
+        ('{"cost_usd": 1}\n{"cost_usd": 3, "session_id": "s3"}\n', (3.0, "s3")),
+        ('{"cost_usd": 4, "session_id": "s4"\n', (0.0, None)),
+        ('{"total_cost_usd": 5, "sessionId": "s5"}\nDone.', (5.0, "s5")),
+    ],
+)
+def test_parse_result_cases(raw, expected):
+    cost, session_id = expected
+    result = parse_result("claude", raw)
+    assert result["cost_usd"] == cost
+    assert result["session_id"] == session_id
+
+
+def test_parse_result_codex_shape_drift():
+    result = parse_result("codex", '{"cost": 6, "sessionId": "codex-1"}')
+    assert result == {"cost_usd": 6.0, "session_id": "codex-1"}

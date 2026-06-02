@@ -141,6 +141,18 @@ def test_runner_start_409_when_already_active(client, tmp_path):
     assert "already active" in data["error"]
 
 
+def test_runner_terminal_started_unknown_run_id(client):
+    c, _ = client
+    r = c.post("/runner/terminal/started", json={"topic": "t", "run_id": "x", "tab_id": "tab", "pid": 0})
+    assert r.status_code == 404
+
+
+def test_runner_terminal_result_unknown_run_id(client):
+    c, _ = client
+    r = c.post("/runner/terminal/result", json={"topic": "t", "run_id": "x", "exit_code": 0, "stdout_tail": ""})
+    assert r.status_code == 404
+
+
 # ── Phase 8: /runner/decision — validates decision ∈ options ─────────────────
 
 def test_runner_decision_missing_topic(client):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import subprocess
 import sys
 import time
@@ -18,6 +19,8 @@ from importlib.resources import files
 from pathly_orchestrator.adapters import resolve_command
 from pathly_orchestrator.fsm_http_client import next_action, complete_stage
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
 
 def _storage_path(flow: str, project_root: str, topic: str) -> Path:
     text = (
@@ -28,6 +31,63 @@ def _storage_path(flow: str, project_root: str, topic: str) -> Path:
     flow_config = yaml.safe_load(text)
     template = flow_config["storage_path"]
     return Path(project_root) / template.format(topic=topic)
+
+
+def resolve_argv(
+    adapter: str,
+    prompt: str,
+    model: str,
+    session: str | None = None,
+    autonomy: bool = True,
+) -> list[str]:
+    argv = resolve_command(
+        adapter,
+        prompt,
+        model,
+        session=session,
+        autonomy=autonomy,
+    )["argv"]
+    if adapter == "claude" and "--output-format=json" not in argv:
+        argv = [*argv, "--print", "--output-format=json"]
+    return argv
+
+
+def _extract_json_payload(raw_output: str) -> dict[str, Any]:
+    cleaned = _ANSI_RE.sub("", raw_output or "").strip()
+    if not cleaned:
+        return {}
+    decoder = json.JSONDecoder()
+    for idx in range(len(cleaned)):
+        if cleaned[idx] not in "{[":
+            continue
+        try:
+            payload, _ = decoder.raw_decode(cleaned, idx)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return {}
+
+
+def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
+    payload = _extract_json_payload(raw_output)
+    if adapter == "codex":
+        cost = payload.get("cost_usd", payload.get("cost", 0.0))
+        session_id = payload.get("session_id") or payload.get("sessionId")
+    else:
+        cost = (
+            payload.get("cost_usd")
+            or payload.get("total_cost_usd")
+            or payload.get("totalCost")
+            or payload.get("total_cost")
+            or 0.0
+        )
+        session_id = payload.get("session_id") or payload.get("sessionId")
+    try:
+        cost_usd = float(cost or 0.0)
+    except (TypeError, ValueError):
+        cost_usd = 0.0
+    return {"cost_usd": cost_usd, "session_id": session_id or None}
 
 
 def _patch_last_agent_done(
@@ -84,7 +144,7 @@ def invoke_agent(
         f"You are running pathly stage {state!r} for topic {topic!r}.\n\n"
         f"{instructions}"
     )
-    cmd = resolve_command(adapter, prompt, model, session=session, autonomy=autonomy)["argv"]
+    cmd = resolve_argv(adapter, prompt, model, session=session, autonomy=autonomy)
     t_start = time.monotonic()
     proc = subprocess.Popen(
         cmd,
@@ -157,16 +217,12 @@ def invoke_agent(
     tool_uses = 0
     session_id_out: str | None = None
     try:
-        output = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
+        raw_text = stdout_bytes.decode("utf-8", errors="replace")
+        parsed = parse_result(adapter, raw_text)
+        output = _extract_json_payload(raw_text)
         # Try every field name Claude CLI has used across versions
-        cost_usd = float(
-            output.get("cost_usd")
-            or output.get("total_cost_usd")
-            or output.get("totalCost")
-            or output.get("total_cost")
-            or 0.0
-        )
-        session_id_out = output.get("session_id") or None
+        cost_usd = float(parsed.get("cost_usd", 0.0) or 0.0)
+        session_id_out = parsed.get("session_id") or None
         usage = output.get("usage") or output.get("inputUsage") or {}
         tokens_in = int(
             (usage.get("input_tokens") or usage.get("inputTokens") or 0)

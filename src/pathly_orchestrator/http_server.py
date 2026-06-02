@@ -893,6 +893,56 @@ def runner_start():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@app.route("/runner/terminal/started", methods=["POST"])
+def runner_terminal_started():
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json() or {}
+        topic = _topic_from_body(data)
+        run_id = data.get("run_id", "")
+        tab_id = data.get("tab_id", "")
+        if not topic or not isinstance(run_id, str) or not run_id:
+            return jsonify({"error": "unknown run_id"}), 404
+        with _sup._lock:
+            evt = _sup._terminal_started_events.get(run_id)
+            if evt is None:
+                return jsonify({"error": "unknown run_id"}), 404
+            evt.set()
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("runner_terminal_started error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@app.route("/runner/terminal/result", methods=["POST"])
+def runner_terminal_result():
+    try:
+        from pathly_orchestrator import supervisor as _sup
+        from pathly_orchestrator.runner import parse_result
+
+        data = request.get_json() or {}
+        topic = _topic_from_body(data)
+        run_id = data.get("run_id", "")
+        if not topic or not isinstance(run_id, str) or not run_id:
+            return jsonify({"error": "unknown run_id"}), 404
+        with _sup._lock:
+            evt = _sup._terminal_result_events.get(run_id)
+            if evt is None:
+                return jsonify({"error": "unknown run_id"}), 404
+            _sup._terminal_result_data[run_id] = {
+                "result": parse_result("claude", data.get("stdout_tail", "")),
+                "exit_code": data.get("exit_code"),
+                "wall_seconds": data.get("wall_seconds"),
+                "user_initiated": data.get("user_initiated"),
+            }
+            evt.set()
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("runner_terminal_result error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @app.route("/runner/pause", methods=["POST"])
 def runner_pause():
     """Pause an active run at its next boundary."""

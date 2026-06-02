@@ -105,6 +105,9 @@ class RunnerState:
 
 _registry: dict[str, RunnerState] = {}
 _lock = threading.Lock()
+_terminal_started_events: dict[str, threading.Event] = {}
+_terminal_result_events: dict[str, threading.Event] = {}
+_terminal_result_data: dict[str, dict] = {}
 
 
 def _mirror_path(state: RunnerState) -> Path:
@@ -156,6 +159,66 @@ def _set_status(state: RunnerState, status: str, broadcast_fn: Optional[Callable
             )
         except Exception as exc:
             logger.warning("broadcast_fn error: %s", exc)
+
+
+def _run_stage_via_terminal(
+    state: RunnerState,
+    instructions: str,
+    adapter: str,
+    model: str,
+    run_id: str,
+    broadcast_fn: Optional[Callable],
+) -> dict:
+    from pathly_orchestrator.runner import invoke_agent, resolve_argv
+
+    argv = resolve_argv(adapter, instructions, model, session=None, autonomy=True)
+    tab_id = f"runner-{run_id[:8]}"
+    label = f"{adapter} â€” {state.current_state or state.status}"
+    payload = {
+        "type": "TERMINAL_SPAWN",
+        "topic": state.topic,
+        "run_id": run_id,
+        "tab_id": tab_id,
+        "label": label,
+        "adapter": adapter,
+        "argv": argv,
+        "cwd": state.project_root,
+        "prompt": instructions,
+        "stage": state.current_state,
+    }
+    if broadcast_fn:
+        broadcast_fn(state.topic, payload)
+    with _lock:
+        started = _terminal_started_events.setdefault(run_id, threading.Event())
+        result_evt = _terminal_result_events.setdefault(run_id, threading.Event())
+    if not started.wait(timeout=5):
+        if broadcast_fn:
+            broadcast_fn(
+                state.topic,
+                {
+                    "type": "RUNNER_WARNING",
+                    "topic": state.topic,
+                    "run_id": run_id,
+                    "reason": "terminal_spawn_timeout",
+                    "stage": state.current_state,
+                },
+            )
+        return invoke_agent(
+            instructions,
+            state.project_root,
+            model,
+            state=state.current_state,
+            topic=state.topic,
+            timeout=state.timeout,
+            storage_path=Path(state.project_root) / "pathly" / "plans" / state.topic,
+            adapter=adapter,
+        )
+    result_evt.wait()
+    with _lock:
+        data = _terminal_result_data.pop(run_id, {})
+        _terminal_started_events.pop(run_id, None)
+        _terminal_result_events.pop(run_id, None)
+    return data.get("result", {})
 
 
 # ── Loop thread ────────────────────────────────────────────────────────────────
@@ -328,19 +391,15 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             )
 
             # ── Invoke agent ──────────────────────────────────────────────────
+            run_id = f"{topic}-{state.iterations + 1}-{int(time.time() * 1000)}"
             try:
-                invoke_result = invoke_agent(
+                invoke_result = _run_stage_via_terminal(
+                    state,
                     instructions,
-                    project_root,
+                    preferred_adapter,
                     model,
-                    state=current_fsm_state,
-                    topic=topic,
-                    timeout=timeout,
-                    storage_path=storage_path,
-                    adapter=preferred_adapter,
-                    session=session_id,
-                    autonomy=autonomy_for_adapter,
-                    _abort_ref=state,
+                    run_id,
+                    broadcast_fn,
                 )
             except RuntimeError as exc:
                 with _lock:
