@@ -32,13 +32,14 @@ export function FlowControlBar(): JSX.Element {
     }
   }
 
-  const startEnabled = status === 'idle'
+  const activeRun = status === 'running' || status === 'paused' || status === 'blocked'
+  const startEnabled = !activeRun
   const pauseEnabled = status === 'running'
   const resumeEnabled = status === 'paused'
   const advanceEnabled = status === 'blocked'
   const rerouteEnabled = status === 'blocked'
   const retryEnabled = status === 'blocked'
-  const abortEnabled = status !== 'idle'
+  const abortEnabled = activeRun
 
   return (
     <div className={styles.wrapper}>

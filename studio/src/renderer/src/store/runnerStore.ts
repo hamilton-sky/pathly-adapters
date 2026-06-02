@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { useTerminalStore } from './terminalStore'
 
-export type RunnerStatus = 'idle' | 'running' | 'paused' | 'blocked' | 'error' | 'done'
+export type RunnerStatus = 'idle' | 'running' | 'paused' | 'blocked' | 'error' | 'done' | 'aborted'
 export type SessionKind = 'opened' | 'continued' | 'degraded'
 
 export interface DecisionMenuItem {

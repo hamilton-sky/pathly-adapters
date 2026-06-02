@@ -295,6 +295,7 @@ export function useHQ() {
               }
             } else if (data.type === 'RUN_STARTED') {
               useRunnerStore.getState().snapshotRun()
+              useRunnerStore.getState().setRunnerState({ errorMessage: null, cost: 0, stage: null, adapter: null, sessionKind: null })
             }
           } catch { /* ignore parse errors */ }
         }
