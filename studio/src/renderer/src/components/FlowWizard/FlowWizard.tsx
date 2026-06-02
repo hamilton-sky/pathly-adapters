@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store'
 import { readFile, writeFile } from '../../services/pathlyApi'
-import type { Props, Transition, Gate, TransitionRule, FeedbackRoute } from './types'
+import type { Props, Transition, Gate, TransitionRule, FeedbackRoute, BlockMap } from './types'
 import { generateYaml } from './utils'
 import { StepIndicator } from './StepIndicator/StepIndicator'
 import { WizardFooter } from './WizardFooter/WizardFooter'
@@ -33,6 +33,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const [transitions, setTransitions] = useState<Transition[]>([])
   const [agentMap, setAgentMap] = useState<Record<string, string>>({})
   const [adapterMap, setAdapterMap] = useState<Record<string, string>>({ default: 'claude' })
+  const [blockMap, setBlockMap] = useState<BlockMap>({})
   const [gates, setGates] = useState<Record<string, Gate[]>>({})
   const [feedbackRoutes, setFeedbackRoutes] = useState<FeedbackRoute[]>([
     { tag: 'HUMAN_QUESTIONS', agent: 'human' },
@@ -56,8 +57,8 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const terminalState = validStates[validStates.length - 1] ?? ''
 
   const yamlPreview = useMemo(
-    () => generateYaml(flowName || 'my-flow', storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules, adapterMap),
-    [flowName, storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules, adapterMap]
+    () => generateYaml(flowName || 'my-flow', storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules, adapterMap, blockMap),
+    [flowName, storagePath, validStates, agentMap, transitions, gates, feedbackRoutes, transitionRules, adapterMap, blockMap]
   )
 
   const draftPath = pathlyUserHome ? `${pathlyUserHome}/flows/${DRAFT_FILE_NAME}` : ''
@@ -102,10 +103,11 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
       feedbackRoutes,
       transitionRules,
       storagePath,
-      adapterMap
+      adapterMap,
+      blockMap
     }
     void writeFile(draftPath, serializeDraft(draft)).then(() => setHasDraft(true)).catch(() => {})
-  }, [draftLoaded, draftPath, flowName, description, step, selectedTemplateId, states, transitions, agentMap, gates, feedbackRoutes, transitionRules, storagePath, adapterMap])
+  }, [draftLoaded, draftPath, flowName, description, step, selectedTemplateId, states, transitions, agentMap, gates, feedbackRoutes, transitionRules, storagePath, adapterMap, blockMap])
 
   function applyTemplate(template: WizardTemplate | null): void {
     if (!template) return
@@ -128,6 +130,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     setTransitionRules(draft.transitionRules)
     setStoragePath(draft.storagePath)
     setAdapterMap(draft.adapterMap ?? { default: 'claude' })
+    setBlockMap(draft.blockMap ?? {})
   }
 
   function resumeDraft(): void {
@@ -142,6 +145,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     setTransitions([])
     setAgentMap({})
     setAdapterMap({ default: 'claude' })
+    setBlockMap({})
     setGates({})
     setFeedbackRoutes([])
     setTransitionRules({})
@@ -222,6 +226,10 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
 
   function updateAgent(state: string, value: string): void {
     setAgentMap((prev) => ({ ...prev, [state]: value }))
+  }
+
+  function updateBlock(state: string, value: string): void {
+    setBlockMap((prev) => ({ ...prev, [state]: value }))
   }
 
   function updateAdapter(key: string, value: string): void {
@@ -325,6 +333,8 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
                 terminalState={terminalState}
                 agentMap={agentMap}
                 onUpdateAgent={updateAgent}
+                blockMap={blockMap}
+                onUpdateBlock={updateBlock}
               />
             )}
             {step === 5 && (

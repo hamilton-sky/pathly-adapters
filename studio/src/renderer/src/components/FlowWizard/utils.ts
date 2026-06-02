@@ -9,7 +9,8 @@ export function generateYaml(
   gates: Record<string, Gate[]>,
   feedbackRoutes: FeedbackRoute[],
   transitionRules: Record<string, TransitionRule>,
-  adapterMap: Record<string, string> = {}
+  adapterMap: Record<string, string> = {},
+  blockMap: Record<string, string> = {}
 ): string {
   const transitionMap: Record<string, string[]> = {}
   for (const tr of transitions) {
@@ -50,6 +51,16 @@ export function generateYaml(
       if (adapterMap[s]) {
         lines.push(`  ${s}: ${adapterMap[s]}`)
       }
+    }
+  }
+
+  // composition — emit only when at least one state has a non-empty block binding
+  const nonEmptyBlocks = Object.entries(blockMap).filter(([, v]) => v)
+  if (nonEmptyBlocks.length > 0) {
+    lines.push(``)
+    lines.push(`composition:`)
+    for (const [state, block] of nonEmptyBlocks) {
+      lines.push(`  ${state}: ${block}`)
     }
   }
 

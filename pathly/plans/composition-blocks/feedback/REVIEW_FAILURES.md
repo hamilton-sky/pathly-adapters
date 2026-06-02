@@ -1,13 +1,19 @@
-# Review Failures — Conv 2
+# Review Failures — Conv 3
 
-Two IMPL violations found and fixed inline before PASS:
+## [IMPL] 1 — BlockAuthorForm/index.tsx — Wrong filename
+studio/CLAUDE.md mandates `ComponentName/ComponentName.tsx`. File must be `BlockAuthorForm/BlockAuthorForm.tsx`, not `BlockAuthorForm/index.tsx`.
 
-1. **[IMPL] fsm_ops.py:115** — `import logging` was nested inside `except` block. Fixed: moved to module top-level imports (line 7).
+## [IMPL] 2 — BlockAuthorForm — Component not integrated; user-blocks.json write missing
+Phase 6 spec: "Write/merge result into ${pathlyUserHome}/user-blocks.json". The component delegates to onSave but no parent calls writeFile. Component is never imported anywhere — dead code.
+Fix: Component should write user-blocks.json directly. Add a "New block" button + BlockAuthorForm toggle in Step4Agents so the form is reachable and triggers the write.
 
-2. **[IMPL] state.py:184** — `resolve_block(block_name, {})` passed empty dict where `set[str] | None` is expected. Fixed: changed to `resolve_block(block_name, None)`.
+## [IMPL] 3 — Step4Agents/Step4Agents.tsx:31 — Direct window.pathly.fs.read instead of readFile wrapper
+All wizard-layer files use `import { readFile } from '../../services/pathlyApi'`. Step4Agents calls `window.pathly.fs.read()` directly — inconsistent with the layer pattern.
+Fix: import `readFile` from `../../../services/pathlyApi` and use it.
 
-One [ARCH] violation waived:
+## [IMPL] 4 — Step4Agents/Step4Agents.tsx:37,40 — Wrong console.warn prefix
+Messages say "BlockAuthorForm:" but the code is in Step4Agents.tsx.
+Fix: change to "Step4Agents:".
 
-3. **[ARCH] state.py:172 — WAIVED** — Reviewer claimed `state.py → compose.py` dependency violates a `compose → state → fsm` layering diagram. Premise is incorrect: `compose.py` has zero internal project imports (no import from `state.py` or `fsm_ops.py`), so no cycle exists. The dependency is a clean DAG. Architecture proposal mandates block-name validation in the flow validator; `resolve_block` from `compose.py` is the correct API to call.
-
-All tests pass after fixes: 395 passed, 3 skipped.
+## Warning (non-blocking, fix anyway)
+FlowWizard.tsx `startBlank` function resets all state fields but does not call `setBlockMap({})`. Stale blockMap values survive a "start blank" action.

@@ -1,4 +1,4 @@
-import type { FeedbackRoute, Gate, Transition, TransitionRule } from './types'
+import type { BlockMap, FeedbackRoute, Gate, Transition, TransitionRule } from './types'
 
 export interface WizardDraft {
   version: 1
@@ -14,6 +14,7 @@ export interface WizardDraft {
   transitionRules: Record<string, TransitionRule>
   storagePath: string
   adapterMap: Record<string, string>
+  blockMap: BlockMap
 }
 
 export const DRAFT_FILE_NAME = '.flow-wizard-draft.json'

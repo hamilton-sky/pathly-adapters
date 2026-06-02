@@ -31,3 +31,5 @@ export interface Props {
   onClose: () => void
   onCreated: (filePath: string) => void
 }
+
+export type BlockMap = Record<string, string>

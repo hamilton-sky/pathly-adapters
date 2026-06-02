@@ -1,8 +1,8 @@
 {
-  "current": "BUILDING",
+  "current": "TESTING",
   "feature": "composition-blocks",
   "rigor": "lite",
-  "updated_at": "2026-06-02T23:11:07.629115+00:00",
+  "updated_at": "2026-06-02T23:27:39.146229+00:00",
   "convs_total": 4,
-  "convs_done": 2
+  "convs_done": 3
 }
