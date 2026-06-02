@@ -26,9 +26,7 @@ export function RunnerLogCard(): JSX.Element | null {
     ? `${styles.dot} ${styles.dotRunning}`
     : `${styles.dot} ${styles.dotIdle}`
 
-  const cardClass = isRunning
-    ? `${styles.card} ${styles.cardRunning}`
-    : styles.card
+  const cardClass = styles.card
 
   function handleToggle(): void {
     useRunnerStore.getState().setLogCardExpanded(!logCardExpanded)

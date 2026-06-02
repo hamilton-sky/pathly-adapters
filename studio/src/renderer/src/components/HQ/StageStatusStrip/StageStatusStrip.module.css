@@ -118,7 +118,7 @@
 }
 
 .liveBtn:active {
-  background: rgba(45, 212, 191, 0.20);
+  background: var(--runner-bg-active);
 }
 
 @keyframes pillEnter {
