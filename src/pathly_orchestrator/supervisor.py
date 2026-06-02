@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -180,26 +179,9 @@ def _run_stage_via_terminal(
     session: Optional[str] = None,
     autonomy: bool = True,
 ) -> dict:
-    from pathly_orchestrator.runner import invoke_agent, resolve_argv
+    from pathly_orchestrator.runner import resolve_argv
 
-    # Gate: terminal mode is only active when PATHLY_TERMINAL_MODE=1.
-    # Without the gate, fall straight to headless so tests (which patch invoke_agent)
-    # and pre-Conv-2 deployments are not blocked by a 5-second spawn timeout.
-    if os.environ.get("PATHLY_TERMINAL_MODE") != "1":
-        return invoke_agent(
-            instructions,
-            state.project_root,
-            model,
-            state=state.current_state,
-            topic=state.topic,
-            timeout=state.timeout,
-            storage_path=Path(state.project_root) / "pathly" / "plans" / state.topic,
-            adapter=adapter,
-            session=session,
-            autonomy=autonomy,
-        )
-
-    argv = resolve_argv(adapter, instructions, model, session=None, autonomy=True)
+    argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy)
     tab_id = f"runner-{run_id[:8]}"
     label = f"{adapter} — {state.current_state or state.status}"
     with _lock:
@@ -223,31 +205,11 @@ def _run_stage_via_terminal(
             started = _terminal_started_events.setdefault(run_id, threading.Event())
             result_evt = _terminal_result_events.setdefault(run_id, threading.Event())
         if not started.wait(timeout=5):
-            if broadcast_fn:
-                broadcast_fn(
-                    state.topic,
-                    {
-                        "type": "RUNNER_WARNING",
-                        "topic": state.topic,
-                        "run_id": run_id,
-                        "reason": "terminal_spawn_timeout",
-                        "stage": state.current_state,
-                    },
-                )
             with _lock:
                 _terminal_started_events.pop(run_id, None)
                 _terminal_result_events.pop(run_id, None)
-            return invoke_agent(
-                instructions,
-                state.project_root,
-                model,
-                state=state.current_state,
-                topic=state.topic,
-                timeout=state.timeout,
-                storage_path=Path(state.project_root) / "pathly" / "plans" / state.topic,
-                adapter=adapter,
-                session=session,
-                autonomy=autonomy,
+            raise RuntimeError(
+                f"terminal_spawn_timeout: Studio did not spawn PTY for {tab_id} within 5s"
             )
         result_evt.wait()
         with _lock:
@@ -264,16 +226,12 @@ def _run_stage_via_terminal(
 
 def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
     from pathly_orchestrator import fsm_http_client as fhc
-    from pathly_orchestrator.runner import invoke_agent
     from pathly_orchestrator.adapters import resolve_command
 
     flow = state.flow
     topic = state.topic
     project_root = state.project_root
     model = state.model
-    timeout = state.timeout
-
-    storage_path = Path(project_root) / "pathly" / "plans" / topic
 
     def _broadcast(payload: dict) -> None:
         if broadcast_fn:
@@ -409,7 +367,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     "type": "SESSION",
                     "topic": topic,
                     "adapter": preferred_adapter,
-                    "action": session_action,
+                    "kind": session_action,
                     "degraded": degraded,
                 }
             )
@@ -482,8 +440,8 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
 
             # ── Resolve stage (feedback loop + decide) ────────────────────────
             result = _resolve_stage_supervised(
-                state, flow, topic, project_root, model, current_fsm_state,
-                timeout, storage_path, broadcast_fn, fhc, invoke_agent
+                state, flow, topic, project_root, model,
+                broadcast_fn, fhc
             )
 
             if result is None:
@@ -535,12 +493,8 @@ def _resolve_stage_supervised(
     topic: str,
     project_root: str,
     model: str,
-    _fsm_state: str,
-    timeout: int,
-    storage_path: Path,
     broadcast_fn: Optional[Callable],
     fhc,
-    invoke_agent_fn,
 ) -> Optional[dict]:
     """Run the complete_stage feedback loop without blocking input().
 
@@ -694,18 +648,17 @@ def _resolve_stage_supervised(
                     return None
                 autonomy_for_adapter = state.autonomy.get(state.current_adapter, True)
 
+            fb_run_id = f"{topic}-fb{feedback_rounds}-{int(time.time() * 1000)}"
             try:
-                invoke_agent_fn(
+                _run_stage_via_terminal(
+                    state,
                     fb_instructions,
-                    project_root,
+                    state.current_adapter or "claude",
                     model,
-                    state=f"resolving {file_}",
-                    topic=topic,
-                    timeout=timeout,
-                    storage_path=storage_path,
-                    adapter=state.current_adapter or "claude",
+                    fb_run_id,
+                    broadcast_fn,
+                    session=None,
                     autonomy=autonomy_for_adapter,
-                    _abort_ref=state,
                 )
             except RuntimeError as exc:
                 with _lock:

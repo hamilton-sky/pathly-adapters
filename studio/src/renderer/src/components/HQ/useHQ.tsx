@@ -256,6 +256,8 @@ export function useHQ() {
               }
             } else if (data.type === 'SESSION') {
               setRunnerState({ sessionKind: data.kind as SessionKind })
+            } else if (data.type === 'RUNNER_WARNING') {
+              useToastStore.getState().push(`Runner warning: ${(data.reason as string) ?? 'unknown'}`, 'info')
             } else if (data.type === 'RUNNER_ERROR') {
               setRunnerState({ errorMessage: data.message as string, status: 'error' })
             } else if (data.type === 'TERMINAL_SPAWN') {
