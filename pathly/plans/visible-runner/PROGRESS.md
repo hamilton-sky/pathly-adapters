@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | 1 | 0–3 | S1, S3, S7 | DONE | `python -m pytest tests/ -q` |
 | 2 | 4–9 | S1, S2, S3 | DONE | `studio/node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json && studio/node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json` |
-| 3 | 10–13 | S4, S5, S6 | TODO | `node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json` |
+| 3 | 10–13 | S4, S5, S6 | DONE | `node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 

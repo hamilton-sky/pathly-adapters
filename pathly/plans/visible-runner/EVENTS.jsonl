@@ -14,3 +14,6 @@
 {"type":"RETRY","key":"conv-3:REVIEW_FAILURES.md","ts":"2026-06-02T12:17:33Z"}
 {"type":"STATE_TRANSITION","to":"BUILDING","ts":"2026-06-02T12:17:33Z"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "tokens_in": 22297, "tokens_out": 5574, "total_tokens": 27871, "cost_usd": 0.150501, "tool_uses": 23, "wall_seconds": 108, "ts": "2026-06-02T12:20:09.039328+00:00", "schema_version": 1}
+{"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":3,"result":"PASS","tokens_in":0,"tokens_out":0,"cost_usd":0,"tool_uses":6,"wall_seconds":45,"ts":"2026-06-02T12:25:00Z"}
+{"type":"STATE_TRANSITION","to":"TESTING","ts":"2026-06-02T12:25:00Z"}
+{"type":"HUMAN_RESPONSE","value":"auto-advance"}

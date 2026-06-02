@@ -1,8 +1,8 @@
 {
-  "current": "BUILDING",
+  "current": "TESTING",
   "feature": "visible-runner",
   "rigor": "standard",
-  "updated_at": "2026-06-02T12:15:20.509310+00:00",
+  "updated_at": "2026-06-02T12:25:00.000000+00:00",
   "convs_total": 3,
-  "convs_done": 2
+  "convs_done": 3
 }
