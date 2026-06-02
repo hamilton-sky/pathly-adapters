@@ -67,11 +67,22 @@ function resolveShell(command: string | undefined): { shell: string; args: strin
   if (command === 'claude') return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'claude'] }
   if (command === 'codex')  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'codex'] }
   if (command === 'agy') {
-    // Use absolute path so Studio finds agy regardless of its inherited PATH
     const agyExe = resolveAgyPath()
     return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `& '${agyExe}'`] }
   }
   return { shell: 'powershell.exe', args: [] }
+}
+
+/** Spawn a specific argv non-interactively — used by the runner so the PTY exits when the agent finishes. */
+function resolveRunnerShell(argv: string[]): { shell: string; args: string[] } {
+  if (process.platform !== 'win32') {
+    return { shell: argv[0], args: argv.slice(1) }
+  }
+  // Windows: encode as base64 PowerShell command — handles any chars in the prompt (newlines, quotes, etc.)
+  // Single-quoted PS strings are fully literal; '' is the only escape (a literal single quote).
+  const psArgs = argv.map((a) => `'${a.replace(/'/g, "''")}'`).join(' ')
+  const encoded = Buffer.from(`& ${psArgs}`, 'utf16le').toString('base64')
+  return { shell: 'powershell.exe', args: ['-EncodedCommand', encoded] }
 }
 
 export function killAllPtys(): void {
@@ -85,27 +96,36 @@ export function killAllPtys(): void {
 }
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
-  ipcMain.handle('terminal:spawn', (event, tabId: string, cwd: string, command?: string) => {
+  ipcMain.handle('terminal:spawn', (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[]) => {
     if (!pty) throw new Error('node-pty is not available')
     if (activePtys.has(tabId)) {
       throw new Error('Tab already exists')
-    }
-
-    // Phase 1: validate command against allowlist
-    if (command !== undefined && !ALLOWED_SHELLS.has(command)) {
-      throw new Error('Shell not allowed: ' + command)
     }
 
     if (!cwd) {
       throw new Error('Working directory is required')
     }
 
-    // Phase 2: validate cwd is within the user's home directory
     if (!isValidCwd(cwd)) {
       throw new Error('Invalid working directory: ' + cwd)
     }
 
-    const { shell, args: shellArgs } = resolveShell(command)
+    let shell: string
+    let shellArgs: string[]
+
+    if (runnerArgv && runnerArgv.length > 0) {
+      // Runner mode: use full argv so the agent exits when done (non-interactive)
+      if (!ALLOWED_SHELLS.has(runnerArgv[0])) {
+        throw new Error('Shell not allowed: ' + runnerArgv[0])
+      }
+      ;({ shell, args: shellArgs } = resolveRunnerShell(runnerArgv))
+    } else {
+      // Interactive mode: just the adapter name
+      if (command !== undefined && !ALLOWED_SHELLS.has(command)) {
+        throw new Error('Shell not allowed: ' + command)
+      }
+      ;({ shell, args: shellArgs } = resolveShell(command))
+    }
 
     const ptyProcess = pty.spawn(shell, shellArgs, {
       name: 'xterm-color',

@@ -274,12 +274,10 @@ export function useHQ() {
                 tabs: s.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
               }))
               useRunnerStore.getState().attachTerminalToStage(tab_id, 'terminal')
+              const argv = Array.isArray(data.argv) ? (data.argv as string[]) : undefined
               void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id, label)
-                .then(() => window.pathly.terminal.spawn(tab_id, cwd, adapter === 'shell' ? undefined : adapter))
+                .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv))
                 .then(() => {
-                  if (prompt) {
-                    setTimeout(() => { void window.pathly.terminal.write(tab_id, prompt + '\n') }, 300)
-                  }
                   fetch('http://127.0.0.1:8765/runner/terminal/started', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

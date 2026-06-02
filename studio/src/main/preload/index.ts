@@ -48,8 +48,8 @@ contextBridge.exposeInMainWorld('pathly', {
     },
   },
   terminal: {
-    spawn: (tabId: string, cwd: string, command?: string): Promise<void> =>
-      ipcRenderer.invoke('terminal:spawn', tabId, cwd, command),
+    spawn: (tabId: string, cwd: string, command?: string, argv?: string[]): Promise<void> =>
+      ipcRenderer.invoke('terminal:spawn', tabId, cwd, command, argv),
     write: (tabId: string, data: string): void =>
       ipcRenderer.send('terminal:write', tabId, data),
     resize: (tabId: string, cols: number, rows: number): Promise<void> =>
@@ -190,7 +190,7 @@ declare global {
         onWorkspaceChanged?: (cb: () => void) => () => void
       }
       terminal: {
-        spawn: (tabId: string, cwd: string, command?: string) => Promise<void>
+        spawn: (tabId: string, cwd: string, command?: string, argv?: string[]) => Promise<void>
         write: (tabId: string, data: string) => void
         resize: (tabId: string, cols: number, rows: number) => Promise<void>
         kill: (tabId: string) => Promise<void>
