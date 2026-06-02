@@ -94,6 +94,8 @@ transition_actions:
       message: 'feat: complete building stage'
   RETRO->DONE:
     - skill: archive-artifacts
+scope_gate:
+  exempt_prefixes: []
 gates:
   BUILDING->REVIEWING:
     - type: verify_gate

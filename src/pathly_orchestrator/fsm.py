@@ -398,7 +398,7 @@ def _write_gate_feedback(storage_path: Path, on_fail: str, reason: str) -> None:
     target.write_text(reason, encoding="utf-8")
 
 
-def _scope_clean(storage_path: Path, scope_file: str, preexisting_dirty: set[str] | None) -> bool:
+def _scope_clean(storage_path: Path, scope_file: str, preexisting_dirty: set[str] | None, flow: dict | None = None) -> bool:
     import re as _re
 
     scope_path = storage_path / scope_file
@@ -465,8 +465,14 @@ def _scope_clean(storage_path: Path, scope_file: str, preexisting_dirty: set[str
     all_dirty = {p for p in diff_result.stdout.splitlines() if p.strip()} | untracked
     builder_touched = all_dirty - (preexisting_dirty or set())
 
+    extra_prefixes: list[str] = []
+    if flow:
+        extra_prefixes = flow.get("scope_gate", {}).get("exempt_prefixes", []) or []
+
     def _is_exempt(p: str) -> bool:
-        return p.startswith("pathly/plans/") or p.endswith(".tsbuildinfo")
+        if p.startswith("pathly/plans/") or p.endswith(".tsbuildinfo"):
+            return True
+        return any(p.startswith(prefix) for prefix in extra_prefixes)
 
     for path in builder_touched:
         if not _is_exempt(path) and path not in declared:
@@ -542,7 +548,7 @@ def run_gates(
                 )
                 continue
             preexisting = set(build_baseline.get("preexisting_dirty", []))
-            if not _scope_clean(storage_path, scope_file, preexisting):
+            if not _scope_clean(storage_path, scope_file, preexisting, flow=flow):
                 reason = f"Scope gate failed: changes outside declared scope in {scope_file}"
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
                 append_event(
