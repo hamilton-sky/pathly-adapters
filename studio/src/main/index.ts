@@ -18,12 +18,23 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 let fsmServer: ChildProcess | null = null
 
+const FSM_BASE = `http://127.0.0.1:${process.env['PATHLY_FSM_HTTP_PORT'] ?? '8765'}`
+
 function isFsmRunning(): Promise<boolean> {
   return new Promise((resolve) => {
     const port = parseInt(process.env['PATHLY_FSM_HTTP_PORT'] ?? '8765', 10)
     const s = net.connect(port, '127.0.0.1', () => { s.destroy(); resolve(true) })
     s.on('error', () => resolve(false))
   })
+}
+
+async function shutdownExistingFsm(): Promise<void> {
+  try {
+    await fetch(`${FSM_BASE}/shutdown`, { method: 'POST', signal: AbortSignal.timeout(800) })
+    await new Promise((r) => setTimeout(r, 400))
+  } catch {
+    // Server didn't respond — already gone or too old to have /shutdown
+  }
 }
 
 function startFsmServer(): void {
@@ -82,11 +93,11 @@ function createWindow(projectPath?: string): BrowserWindow {
 
 app.whenReady().then(async () => {
   const alreadyRunning = await isFsmRunning()
-  if (!alreadyRunning) {
-    startFsmServer()
-  } else {
-    console.log('[FSM] server already running, skipping spawn')
+  if (alreadyRunning) {
+    console.log('[FSM] server already running — shutting down stale instance')
+    await shutdownExistingFsm()
   }
+  startFsmServer()
 
   const mainWin = createWindow()
   registerIpcHandlers(mainWin)

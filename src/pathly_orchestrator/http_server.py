@@ -252,6 +252,13 @@ def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
         stop.wait(0.1)
 
 
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    """Graceful shutdown — lets Studio restart with updated code."""
+    threading.Timer(0.1, lambda: os._exit(0)).start()
+    return jsonify({"ok": True})
+
+
 @app.route("/health", methods=["GET"])
 def health():
     """Deep health check."""

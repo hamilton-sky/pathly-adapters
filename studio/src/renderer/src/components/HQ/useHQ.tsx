@@ -269,6 +269,7 @@ export function useHQ() {
               const prompt = (data.prompt as string | undefined) ?? ''
               const stage = (data.stage as string | undefined) ?? ''
               useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'])
+              useTerminalStore.getState().openTab(tab_id)
               useTerminalStore.setState((s) => ({
                 tabs: s.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
               }))
