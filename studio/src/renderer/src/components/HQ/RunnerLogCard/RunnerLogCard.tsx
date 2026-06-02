@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useRunnerStore } from '../../../store/runnerStore'
 import type { HistoricalRun } from '../../../store/runnerStore'
 import type { StageLogEntry } from '../../../store/runnerStore'
@@ -22,6 +23,7 @@ export function RunnerLogCard({ historicalRun, docked = false }: RunnerLogCardPr
   const logCardExpanded = useRunnerStore((s) => s.logCardExpanded)
   const storeRunStartedAt = useRunnerStore((s) => s.runStartedAt)
   const activeRunnerTabId = useRunnerStore((s) => s.activeRunnerTabId)
+  const [histExpanded, setHistExpanded] = useState(false)
 
   const stageLog: StageLogEntry[] = historicalRun ? historicalRun.stageLog : storeStageLog
   const cost = historicalRun ? historicalRun.cost : storeCost
@@ -38,14 +40,18 @@ export function RunnerLogCard({ historicalRun, docked = false }: RunnerLogCardPr
     : `${styles.dot} ${styles.dotIdle}`
 
   function handleToggle(): void {
-    useRunnerStore.getState().setLogCardExpanded(!logCardExpanded)
+    if (historicalRun) {
+      setHistExpanded((v) => !v)
+    } else {
+      useRunnerStore.getState().setLogCardExpanded(!logCardExpanded)
+    }
   }
 
   function handleJump(): void {
     useRunnerStore.getState().jumpToLiveTab()
   }
 
-  const expanded = historicalRun ? true : logCardExpanded
+  const expanded = historicalRun ? histExpanded : logCardExpanded
 
   const cardClass = docked ? `${styles.card} ${styles.cardDocked}` : styles.card
 
@@ -55,24 +61,17 @@ export function RunnerLogCard({ historicalRun, docked = false }: RunnerLogCardPr
   return (
     <div className={cardClass} {...(isRunning ? { 'data-running': 'true' } : {})}>
       <div className={styles.headerRow}>
-        {!historicalRun ? (
-          <button
-            type="button"
-            className={styles.headerToggle}
-            onClick={handleToggle}
-            aria-label={logCardExpanded ? 'Collapse stage log' : 'Expand stage log'}
-            {...(logCardExpanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-          >
-            <span className={dotClass} />
-            <span className={styles.stageName}>{stageLabel}</span>
-            <span className={styles.chevron} data-open={logCardExpanded ? 'true' : 'false'}>▾</span>
-          </button>
-        ) : (
-          <div className={styles.headerStatic}>
-            <span className={dotClass} />
-            <span className={styles.stageName}>{stageLabel}</span>
-          </div>
-        )}
+        <button
+          type="button"
+          className={styles.headerToggle}
+          onClick={handleToggle}
+          aria-label={expanded ? 'Collapse stage log' : 'Expand stage log'}
+          {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+        >
+          <span className={dotClass} />
+          <span className={styles.stageName}>{stageLabel}</span>
+          <span className={styles.chevron} data-open={expanded ? 'true' : 'false'}>▾</span>
+        </button>
         {!historicalRun && activeRunnerTabId !== null && (
           <button type="button" className={styles.jumpBtn} onClick={handleJump}>
             live ↗
