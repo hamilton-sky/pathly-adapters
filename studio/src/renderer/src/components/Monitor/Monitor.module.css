@@ -116,6 +116,15 @@
 .tabNavBtn:disabled { opacity: 0.25; cursor: default; }
 .tabNavBtn:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 
+.tabCounter {
+  font-size: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--text-muted);
+  padding: 0 6px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
 /* ── Output/Events sub-tab bar ───────────────────── */
 .viewTabBar {
   display: flex;

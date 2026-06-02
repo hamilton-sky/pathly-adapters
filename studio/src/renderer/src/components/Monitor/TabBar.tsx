@@ -39,6 +39,8 @@ export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element
 
   const visible = keys.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
   const allSameTopic = keys.length > 0 && keys.every((k) => extractTopic(k) === extractTopic(keys[0]))
+  const rangeStart = page * PAGE_SIZE + 1
+  const rangeEnd = Math.min((page + 1) * PAGE_SIZE, keys.length)
 
   useEffect(() => {
     if (!tablistRef.current) return
@@ -89,15 +91,20 @@ export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element
         })}
       </div>
       {totalPages > 1 && (
-        <button
-          type="button"
-          className={styles.tabNavBtn}
-          onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-          {...(page === totalPages - 1 ? { disabled: true } : {})}
-          aria-label="Next tabs"
-        >
-          ›
-        </button>
+        <>
+          <span className={styles.tabCounter} aria-label={`Showing tabs ${rangeStart} to ${rangeEnd} of ${keys.length}`}>
+            {rangeStart}–{rangeEnd} / {keys.length}
+          </span>
+          <button
+            type="button"
+            className={styles.tabNavBtn}
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            {...(page === totalPages - 1 ? { disabled: true } : {})}
+            aria-label="Next tabs"
+          >
+            ›
+          </button>
+        </>
       )}
     </div>
   )
