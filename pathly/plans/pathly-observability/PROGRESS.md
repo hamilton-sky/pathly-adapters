@@ -8,6 +8,7 @@
 | 2 | Skill phase logging | S-04, S-05, S-06 | TODO | Conv 1 tests green |
 | 3 | design.md + storm.md phases | S-07 | TODO | none |
 | 4 | Agent contracts + adapter propagation | S-08, S-09 | TODO | `pathly-setup claude --apply && pathly-setup codex --apply` |
+| 5 | Pipeline auto-chain: fast→review + PROGRESS.md on pass | S-10, S-11 | TODO | `pathly-setup claude --apply` |
 
 ## Story completion
 
@@ -22,6 +23,8 @@
 | S-07 | Three-phase structure in design.md and storm.md | 3 | [ ] |
 | S-08 | Rigor contract tables in agent files | 4 | [ ] |
 | S-09 | stage_brief sections in agent files | 4 | [ ] |
+| S-10 | fast/auto mode chains build → review | 5 | [ ] |
+| S-11 | Reviewer marks conv DONE in PROGRESS.md on pass | 5 | [ ] |
 
 ## Notes
 

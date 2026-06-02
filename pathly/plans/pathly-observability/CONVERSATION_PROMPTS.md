@@ -437,3 +437,112 @@ File: src/pathly_data/core/agents/planning/architect.md
 File: src/pathly_data/core/agents/building/designer.md
 Done when: grep returns ≥6 matches each for "Rigor contract" and "Stage brief"; both pathly-setup calls exit 0
 ```
+
+---
+
+## Conv 5 — Pipeline auto-chain: fast→review + PROGRESS.md on pass
+
+**Stories delivered:** S-10, S-11
+**Gate:** Conv 4 complete (or can run independently — no code dependency on agent files)
+**Verify command:** `pathly-setup claude --apply`
+
+```
+phase: implement
+
+FEATURE: pathly-observability
+CONVERSATION: 5 of 5 — Pipeline auto-chain: fast→review + PROGRESS.md on pass
+STORIES: S-10 (fast/auto chains build→review), S-11 (reviewer marks DONE in PROGRESS.md)
+
+## Phase 0 — Pre-flight (L-001)
+
+Before editing:
+1. Read both core skill files in full to understand their current structure:
+   - src/pathly_data/core/skills/development/build.md
+   - src/pathly_data/core/skills/development/review.md
+2. Confirm the auto-chain lines already exist (they were added manually and may already be present).
+   If they are already correct, skip Task 1 and/or Task 2 — do NOT rewrite existing correct content.
+3. Run `pathly-setup --help` to confirm it is available.
+
+## Context
+
+Current state:
+- build.md: The "Workflow Surface" section parses $ARGUMENTS. The exit contract section ends with
+  a line saying "Do not invoke any other skill." This must be replaced with the auto-chain logic.
+  NOTE: The manual edit may already be present — check before touching.
+- review.md: Has three phases (Analyze, Scout, Review) with log-phase calls added in Conv 2.
+  No exit contract exists yet. One must be added after the report format section.
+  NOTE: The manual edit may already be present — check before touching.
+
+## Task 1 — build.md: recognize fast as auto, add auto-chain (S-10)
+
+In src/pathly_data/core/skills/development/build.md:
+
+1. In the "Workflow Surface" section, find the line that parses $ARGUMENTS for "auto".
+   Change it to recognise both "auto" and "fast" as auto-flow mode triggers.
+   Target line pattern: `if a second word "auto" is present`
+   New text: `if a second word "auto" or "fast" is present`
+
+2. In the "Exit contract" section, find the line:
+   `Do not invoke any other skill. The orchestrator reads STATE.json and decides what comes next.`
+   Replace it with:
+   ```
+   **Auto-chain (fast/auto mode only):** If auto-flow mode is active and verification passed,
+   after `log-agent-done` completes invoke the `review` skill with `<feature> <N>`
+   (e.g. `pathly-observability 2`). If verification failed, do NOT chain — stop and report.
+
+   In non-auto mode: do not invoke any other skill. The orchestrator reads STATE.json and decides what comes next.
+   ```
+
+## Task 2 — review.md: add pipeline review mode + exit contract (S-11)
+
+In src/pathly_data/core/skills/development/review.md:
+
+1. In the "Workflow Surface" section, after the existing bullet list of diff targets, add:
+   ```
+   - `<feature> <N>` (e.g. `pathly-observability 2`) → **pipeline review**: review `git diff HEAD~1 HEAD`,
+     load that feature's `ARCHITECTURE_PROPOSAL.md` for scope context, then run the exit contract on pass/fail
+   ```
+
+2. After the final line of the "Report format" section (`If violations found: list each one. Do NOT auto-fix. Report only.`),
+   append a new "Exit contract" section:
+
+   ```markdown
+   ## Exit contract (pipeline review only — when called as `<feature> <N>`)
+
+   **On PASS:**
+
+   1. Update `pathly/plans/<feature>/PROGRESS.md` — in the Conversation Breakdown table, find the row
+      for conversation `<N>` and change its Status cell from `TODO` to `DONE`.
+   2. Check PROGRESS.md: if all conversation rows are now `DONE`, next state = `"TESTING"`; otherwise `"BUILDING"`.
+   3. Write `pathly/plans/<feature>/STATE.json`:
+      {"current": "<next_state>", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
+   4. Append to `pathly/plans/<feature>/EVENTS.jsonl`:
+      {"type":"STATE_TRANSITION","to":"<next_state>","ts":"<iso-timestamp>"}
+   5. Invoke the `log-agent-done` skill with:
+      {"agent":"reviewer","feature":"<feature>","conversation":<N>,"result":"PASS"}
+
+   **On FAIL:**
+
+   1. Write violations to `pathly/plans/<feature>/feedback/REVIEW_FAILURES.md`.
+   2. Write `pathly/plans/<feature>/STATE.json` with `"current": "REVIEW_FAILED"`.
+   3. Append {"type":"STATE_TRANSITION","to":"REVIEW_FAILED","ts":"<iso-timestamp>"} to EVENTS.jsonl.
+   4. Do NOT update PROGRESS.md — the conversation is not DONE until violations are resolved.
+   ```
+
+## Task 3 — Propagate to claude adapter
+
+Run: `pathly-setup claude --apply`
+Confirm exit code 0.
+Spot-check: `grep -A2 "fast\|auto.*mode" ~/.claude/skills/pathly-build/SKILL.md | head -5`
+Spot-check: `grep "Exit contract\|REVIEW_FAILED" ~/.claude/skills/pathly-review/SKILL.md | head -5`
+
+## Done when
+
+1. `grep "fast\|auto.*mode" src/pathly_data/core/skills/development/build.md` shows updated line
+2. `grep "Exit contract\|REVIEW_FAILED\|TESTING" src/pathly_data/core/skills/development/review.md` returns ≥3 matches
+3. `pathly-setup claude --apply` exits 0
+
+File: src/pathly_data/core/skills/development/build.md
+File: src/pathly_data/core/skills/development/review.md
+Done when: grep checks pass; pathly-setup claude --apply exits 0
+```

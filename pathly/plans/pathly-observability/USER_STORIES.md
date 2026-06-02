@@ -147,3 +147,35 @@
 - [ ] Each `stage_brief` states: the stage name, primary output artifact, and one-line done condition
 - [ ] `grep -r "Stage brief\|stage_brief" src/pathly_data/core/agents/` returns at least 6 matches
 - [ ] Adapter propagation runs without error: `pathly-setup claude --apply && pathly-setup codex --apply`
+
+---
+
+## S-10: fast/auto mode chains build → review automatically
+
+**As a** developer running `/pathly build <feature> fast`,
+**I want** the build skill to automatically invoke the reviewer after a successful build,
+**so that** I don't have to manually trigger review after each conversation.
+
+### Acceptance criteria
+
+- [ ] `build.md` recognises both `"auto"` and `"fast"` as auto-flow mode triggers
+- [ ] In auto-flow mode, after `log-agent-done` completes and verification passed, `build.md` invokes `review <feature> <N>`
+- [ ] In auto-flow mode, if verification failed, `build.md` does NOT chain to review — it stops and reports
+- [ ] In non-auto mode (no `fast`/`auto` arg), `build.md` behaviour is unchanged — no auto-chain
+- [ ] `grep "fast\|auto.*mode" src/pathly_data/core/skills/development/build.md` shows the updated auto-detection line
+
+---
+
+## S-11: Reviewer marks conversation DONE in PROGRESS.md on pass
+
+**As a** pipeline operator,
+**I want** the review skill to update `PROGRESS.md` and `STATE.json` when it passes,
+**so that** conversation progress is tracked automatically without manual orchestrator calls.
+
+### Acceptance criteria
+
+- [ ] When called as `review <feature> <N>` and reviewer returns PASS: the Conv `<N>` row in PROGRESS.md changes from `TODO` to `DONE`
+- [ ] After marking DONE: if all convs are DONE, STATE.json transitions to `"TESTING"`; otherwise to `"BUILDING"`
+- [ ] A `STATE_TRANSITION` event and an `AGENT_DONE` (reviewer) event are appended to EVENTS.jsonl on pass
+- [ ] When reviewer returns FAIL: `REVIEW_FAILURES.md` is written, STATE.json → `"REVIEW_FAILED"`, PROGRESS.md is NOT updated
+- [ ] `grep "Exit contract\|REVIEW_FAILED\|TESTING" src/pathly_data/core/skills/development/review.md` returns at least 3 matches

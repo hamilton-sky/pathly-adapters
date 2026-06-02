@@ -51,20 +51,32 @@ If `rigor = strict`, do not skip risk questions. Explicitly ask about security, 
 ## Step 3: Gather Codebase Context
 
 **Phase 1 — Analyze:**
+log-phase PHASE_START analyze
+
 Spawn `planner` with `phase: analyze`. Pass the feature name and rigor level.
 Parse the returned `## NEEDS_CONTEXT` block.
 
+log-phase PHASE_DONE analyze
+
 **Phase 2 — Scout:**
+log-phase PHASE_START scout
+
 If `NEEDS_CONTEXT` is not `none`: call `scout-path` with the block, `ROLE: planner`, `FEATURE: [feature name]`. Use the returned summary as Scout Findings.
 If `NEEDS_CONTEXT` is `none`: findings = none. Skip scout-path.
 
+log-phase PHASE_DONE scout (include scouts_count = number of entries passed to scout-path, or 0 if skipped)
+
 **Phase 3 — Plan:**
+log-phase PHASE_START plan
+
 Spawn `planner` with `phase: plan`. Inject:
 ```
 ## Scout Findings
 [compressed summary from Phase 2, or "none" if skipped]
 ```
 Plus all existing context: rigor level, `STORM_SEED` contents if it existed, `PO_NOTES` contents if it exists.
+
+log-phase PHASE_DONE plan
 
 ## Template Path Resolution
 

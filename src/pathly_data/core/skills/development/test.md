@@ -49,6 +49,8 @@ No USER_STORIES.md found for <feature>. Cannot run acceptance tests without stor
 
 ## Step 1 — Analyze (tester phase: analyze)
 
+log-phase PHASE_START analyze
+
 Spawn the **tester** agent with `phase: analyze`:
 
 ```
@@ -59,9 +61,13 @@ List what test infrastructure and context you need before verifying — output N
 
 Parse the `## NEEDS_CONTEXT` block it returns.
 
+log-phase PHASE_DONE analyze
+
 ---
 
 ## Step 2 — Scout (if NEEDS_CONTEXT has entries)
+
+log-phase PHASE_START scout
 
 If the block is not `none`, spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
 - `type: quick` → spawn `quick` with `ROLE: tester` + the question
@@ -71,9 +77,13 @@ Use the returned compressed summary as `## Test Context`.
 
 If the block is `none`, set Test Context to `none` and skip this step.
 
+log-phase PHASE_DONE scout (include scouts_count = number of entries spawned, or 0 if skipped)
+
 ---
 
 ## Step 3 — Test (tester phase: test)
+
+log-phase PHASE_START test
 
 Spawn the **tester** agent with `phase: test`:
 
@@ -88,6 +98,8 @@ Run the verify command(s) to check each acceptance criterion.
 For each criterion: PASS / FAIL / NOT COVERED.
 If any FAIL or NOT COVERED: write pathly/plans/<feature>/feedback/TEST_FAILURES.md.
 ```
+
+log-phase PHASE_DONE test
 
 ---
 

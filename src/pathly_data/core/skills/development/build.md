@@ -8,7 +8,7 @@ Adapter skills should load and follow this prompt instead of duplicating workflo
 This core prompt uses host-neutral Pathly route names. Adapters are responsible
 for rendering those routes in their host-native form.
 
-Parse `$ARGUMENTS`: the first word is the **plan folder name** (FEATURE), and if a second word "auto" is present, that signals non-interactive auto-flow mode. For example, `continue refactor-main auto` -> plan = `refactor-main`, auto mode = true.
+Parse `$ARGUMENTS`: the first word is the **plan folder name** (FEATURE), and if a second word "auto" **or "fast"** is present, that signals non-interactive auto-flow mode. For example, `refactor-main auto` or `refactor-main fast` → plan = `refactor-main`, auto mode = true.
 
 ## Feature detection
 
@@ -43,6 +43,8 @@ Run `git status` (without -uall flag).
 For non-trivial conversations (touches multiple files or an unfamiliar area), run a three-phase build before Step 5:
 
 **Phase 1 — Analyze:**
+log-phase PHASE_START analyze
+
 Spawn `builder` with `phase: analyze` prepended to the conversation prompt:
 ```
 phase: analyze
@@ -50,14 +52,22 @@ phase: analyze
 ```
 Parse the `## NEEDS_CONTEXT` block it returns. If the block says `none`: skip Phase 2.
 
+log-phase PHASE_DONE analyze
+
 **Phase 2 — Scout (if NEEDS_CONTEXT has entries):**
+log-phase PHASE_START scout
+
 Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
 - `type: quick` → spawn `quick` with `ROLE: builder` + the question
 - `type: scout` → spawn `scout` with `ROLE: builder` + scope + question
 
 Use the returned compressed summary as Scout Findings.
 
+log-phase PHASE_DONE scout (include scouts_count = number of entries spawned)
+
 **Phase 3 — Implement (Step 5):**
+log-phase PHASE_START implement
+
 Spawn `builder` with `phase: implement`, injecting findings:
 ```
 phase: implement
@@ -125,6 +135,8 @@ Options: (a) expand scope, (b) rollback with git checkout and retry
 
 Attempt up to 2 fixes. If still failing, stop and report.
 
+log-phase PHASE_DONE implement
+
 ## Step 7: Report completion
 
 After successful verification, report:
@@ -162,7 +174,9 @@ Then invoke the `log-agent-done` skill with:
 ```
 (wall_seconds is the fallback computed from BUILD_START; log-agent-done prefers duration_ms if > 0)
 
-Do not invoke any other skill. The orchestrator reads STATE.json and decides what comes next.
+**Auto-chain (fast/auto mode only):** If auto-flow mode is active and verification passed, after `log-agent-done` completes invoke the `review` skill with `<feature> <N>` (e.g. `pathly-observability 2`). If verification failed, do NOT chain — stop and report.
+
+In non-auto mode: do not invoke any other skill. The orchestrator reads STATE.json and decides what comes next.
 
 ## Edge Cases
 

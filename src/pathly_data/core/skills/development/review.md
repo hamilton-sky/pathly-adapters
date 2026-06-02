@@ -13,27 +13,40 @@ Review code at $ARGUMENTS against this project's architectural standards.
 - `staged` or empty → review `git diff --staged`
 - `last` → review `git diff HEAD~1 HEAD`
 - file path → review that specific file
+- `<feature> <N>` (e.g. `pathly-observability 2`) → **pipeline review**: review `git diff HEAD~1 HEAD`, load that feature's `ARCHITECTURE_PROPOSAL.md` for scope context, then run the exit contract on pass/fail
 
 ## Pre-review context gathering
 
 **Phase 1 — Analyze:**
+log-phase PHASE_START analyze
+
 Spawn `reviewer` with `phase: analyze`. Pass the diff target (`$ARGUMENTS`).
 Parse the returned `## NEEDS_CONTEXT` block.
 
+log-phase PHASE_DONE analyze
+
 **Phase 2 — Scout:**
+log-phase PHASE_START scout
+
 If `NEEDS_CONTEXT` is not `none`: spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
 - `type: quick` → spawn `quick` with `ROLE: reviewer` + the question
 - `type: scout` → spawn `scout` with `ROLE: reviewer` + scope + question
 Use the returned summary as findings.
 If `NEEDS_CONTEXT` is `none`: findings = none.
 
+log-phase PHASE_DONE scout (include scouts_count = number of entries spawned, or 0 if skipped)
+
 **Phase 3 — Review:**
+log-phase PHASE_START review
+
 Spawn `reviewer` with the full review prompt. Inject:
 ```
 ## Applicable Rules
 [compressed summary from Phase 2, or "none" if skipped]
 ```
 Keep Steps 1–3 and the report format inside the reviewer's spawn prompt.
+
+log-phase PHASE_DONE review
 
 ## Step 1 — Get the diff
 
@@ -80,3 +93,29 @@ For failures use these prefixes:
 If all checks pass: `PASS — no violations found.`
 
 If violations found: list each one. Do NOT auto-fix. Report only.
+
+## Exit contract (pipeline review only — when called as `<feature> <N>`)
+
+**On PASS:**
+
+1. Update `pathly/plans/<feature>/PROGRESS.md` — in the Conversation Breakdown table, find the row for conversation `<N>` and change its Status cell from `TODO` to `DONE`.
+2. Check PROGRESS.md: if all conversation rows are now `DONE`, next state = `"TESTING"`; otherwise next state = `"BUILDING"`.
+3. Write `pathly/plans/<feature>/STATE.json`:
+   ```json
+   {"current": "<next_state>", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
+   ```
+4. Append to `pathly/plans/<feature>/EVENTS.jsonl`:
+   ```
+   {"type":"STATE_TRANSITION","to":"<next_state>","ts":"<iso-timestamp>"}
+   ```
+5. Invoke the `log-agent-done` skill with:
+   ```json
+   {"agent":"reviewer","feature":"<feature>","conversation":<N>,"result":"PASS"}
+   ```
+
+**On FAIL:**
+
+1. Write violations to `pathly/plans/<feature>/feedback/REVIEW_FAILURES.md`.
+2. Write `pathly/plans/<feature>/STATE.json` with `"current": "REVIEW_FAILED"`.
+3. Append `{"type":"STATE_TRANSITION","to":"REVIEW_FAILED","ts":"<iso-timestamp>"}` to EVENTS.jsonl.
+4. Do NOT update PROGRESS.md — the conversation is not DONE until violations are resolved.
