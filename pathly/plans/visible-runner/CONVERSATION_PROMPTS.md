@@ -122,22 +122,29 @@ In terminal.ts, add a per-tab output buffer `Map<string, string[]>` called `ptyO
 In the pty onData handler: append chunk to `ptyOutput.get(tabId) ?? []`. Trim to last 500 entries.
 In the terminal:spawn handler: if the tabId starts with 'runner-', store `{run_id: tabId's run_id portion, topic: stored from a module-level map, spawnedAt: Date.now()}` in a `runnerTabMeta: Map<string, RunnerTabMeta>` map.
 On PTY exit event for a runner tab:
-1. Walk `ptyOutput.get(tabId)` in reverse, find the last line that JSON.parse succeeds on. Store as `finalJson` (or null).
-2. Write a done/abort marker to xterm: if exitCode === 0, write `\r\n\x1b[32m── done ──\x1b[0m\r\n`; else write `\r\n\x1b[31m── aborted ──\x1b[0m\r\n`. Send via `event.sender.send('terminal:data:' + tabId, markerText)`.
-3. Compute `wall_seconds = (Date.now() - spawnedAt) / 1000`.
-4. POST to `http://127.0.0.1:8765/runner/terminal/result` with `{topic, run_id, exit_code: exitCode, final_json: finalJson, wall_seconds}`. Use `fetch()` — no blocking needed, fire and forget.
-5. Clean up: delete entries from `ptyOutput` and `runnerTabMeta`.
+1. Write the completion banner to xterm (NOT to PTY stdin) via `event.sender.send('terminal:data:' + tabId, banner)`:
+   - exitCode === 0: `\r\n\x1b[2m──\x1b[0m \x1b[1;32m[label] DONE\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
+   - exitCode !== 0: `\r\n\x1b[2m──\x1b[0m \x1b[1;31m[label] ABORTED\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
+2. Compute `wall_seconds = (Date.now() - spawnedAt) / 1000`.
+3. Determine `userInitiated: boolean` — true if exit was triggered by `terminal:kill` from a TERMINAL_SIGNAL handler (track via `ptyKilledByRunner: Set<string>`).
+4. POST to `http://127.0.0.1:8765/runner/terminal/result` with `{topic, run_id, exit_code: exitCode, stdout_tail: ptyOutputBuf.get(tabId) ?? '', wall_seconds, user_initiated: userInitiated}`. Python-side `runner.parse_result()` handles JSON extraction — do NOT attempt JSON parsing in terminal.ts. Use `fetch()` — fire and forget with one retry.
+5. Clean up: delete entries from `ptyOutputBuf`, `ptyKilledByRunner`, and `runnerTabMeta`.
 Note: a first-click warning (S2, AC 2.2) would write ANSI yellow text to xterm when a terminal:write arrives for a runner tab — this is a bonus if within scope, but not required for typecheck to pass.
 
 Phase 9 — PaneTabBar runner tab styling:
-Read PaneTabBar.tsx. In the tab render, check `tab.runnerOwned === true` and apply an additional CSS class `styles.runnerTab`. In PaneTabBar.module.css, add:
+Read PaneTabBar.tsx. The terminal uses one shared CSS file — `Terminal.module.css` — there is NO separate `PaneTabBar.module.css`. In the tab render loop apply classes: `cn(styles.tab, tab.runnerOwned && styles.tabRunner, isActive ? styles.tabActive : styles.tabInactive)`. In `Terminal.module.css`, add after the existing `.tabInactive` block:
 ```css
-.runnerTab {
-  border-left: 2px solid var(--runtime);
+.tabRunner {
+  border-left: 2px solid var(--runtime);  /* tab container — different element from .iconBtnClaude border-left */
   background: var(--runner-bg);
+  opacity: 1 !important;  /* override .tabInactive opacity:0.6 so runner tabs stay fully visible when not focused */
+  transition: background 120ms ease-out;
+}
+.tabRunner:hover {
+  background: var(--runner-bg-hover);
 }
 ```
-No inline styles.
+No inline styles. `.tabActive` border-bottom and `.tabRunner` border-left coexist on the same element — both render correctly.
 
 Do NOT touch RunnerLogCard, StageStatusStrip [live] button, or DECISION_MENU toast — those are in Conversation 3.
 
@@ -155,7 +162,7 @@ If fundamentally broken, rollback with git checkout on affected files and retry.
 ```
 
 **Expected output:** Both typecheck commands exit 0. TERMINAL_SPAWN opens a teal-bordered tab; PTY exit POSTs result to runner.
-**Files touched:** `tokens.css`, `terminal.ts`, `types/terminal.ts`, `runnerStore.ts`, `useHQ.tsx`, `PaneTabBar.tsx`, `PaneTabBar.module.css`
+**Files touched:** `tokens.css`, `terminal.ts`, `types/terminal.ts`, `runnerStore.ts`, `useHQ.tsx`, `PaneTabBar.tsx`, `Terminal.module.css`
 
 ---
 

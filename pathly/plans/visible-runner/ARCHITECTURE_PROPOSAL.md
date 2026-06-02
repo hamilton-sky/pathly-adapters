@@ -63,6 +63,10 @@ The renderer calls `window.pathly.terminal.spawn()` (already in preload). The ma
 
 `terminal.ts` (Electron main process, Node.js) uses `fetch()` to POST the result to the HTTP server. This is the only new direction of communication. It is fire-and-forget with one retry on network error.
 
+`terminal.ts` POSTs `stdout_tail` (raw last-64KB of PTY output) rather than attempting JSON extraction itself. Result parsing belongs to the Python adapter layer: `runner.parse_result(adapter, stdout_tail)` reuses the same output parser that `invoke_agent()` already calls on headless subprocess stdout. This keeps the renderer dumb and the adapter contract in one place.
+
+The `user_initiated` boolean in the result POST distinguishes "agent finished" from "user killed the tab" — the supervisor treats `user_initiated: true` as a clean abort (does not increment feedback counter).
+
 ---
 
 ## State ownership
@@ -71,9 +75,12 @@ The renderer calls `window.pathly.terminal.spawn()` (already in preload). The ma
 |---|---|---|
 | PTY process handle | Electron main (terminal.ts) | `activePtys` Map |
 | Terminal tab list | React renderer (terminalStore) | Zustand store |
-| PTY output buffer | Electron main (terminal.ts) | `ptyOutput` Map |
-| Run active flag, threading.Event | Python supervisor | Module-level dicts |
+| PTY output buffer (64KB tail) | Electron main (terminal.ts) | `ptyOutputBuf` Map |
+| Runner tab metadata (run_id, topic) | Electron main (terminal.ts) | `runnerTabMeta` Map |
+| Run active flag, terminal_mode | Python supervisor | `RunnerState` fields |
+| threading.Events (started/result) | Python supervisor | Module-level dicts, under `_lock` |
 | Stage log, logCardExpanded | React renderer (runnerStore) | Zustand store |
+| studio_window_id | React renderer (module const) | UUID constant, set once at startup |
 | FSM state | Python FSM (fsm_ops.py) | plans/FEATURE/STATE.json |
 
 No state is duplicated across boundaries. Each boundary communicates state changes as events, not as polls.
@@ -126,6 +133,12 @@ The card rebuilds the duration column from `endedAt - startedAt` at render time 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
 | `resolve_argv` and headless path diverge | Low | Both use same function; unit test covers argv construction |
-| PTY output buffer grows unbounded | Low | Capped at 500 lines |
+| PTY output buffer grows unbounded | Low | Capped at last 64 KB; flow-controlled via high/low watermark |
 | `result_event` never fires (network error) | Medium | One retry in terminal.ts; supervisor needs a max-stage timeout (EC-6) |
-| Tab ID collision on runner restart | Low | Pre-check in TERMINAL_SPAWN handler (EC-7) |
+| Tab ID collision on runner restart | Low | `runnerOwned` field on TerminalTab used everywhere — no string-prefix sniffing |
+| Multi-window ghost PTY | Medium | `studio_window_id` in started POST; supervisor broadcasts `TERMINAL_CLAIMED`; losing window kills orphan PTY |
+| ConPTY hang on Windows (process does not exit) | Medium | `useConpty: false` configurable fallback via `PATHLY_CONPTY=0`; `node-pty` in `asarUnpack` |
+| 5s dead-wait per stage between Conv 1 and Conv 2 | High (if not gated) | `TERMINAL_SPAWN` broadcast gated on `PATHLY_TERMINAL_MODE=1` env var |
+| `_terminal_started_events` dict-resize race | Low | All dict mutations under `supervisor._lock` |
+| SSE missed event on reconnect | Low | Python SSE server emits `id:` fields; Studio re-polls `/runner/status` on `EventSource` reconnect |
+| xterm.js FitAddon crash on hidden tab | Low | Guard `fit()` with non-zero dimension check before calling on tab activation |

@@ -43,9 +43,10 @@
 | `studio/src/renderer/src/store/runnerStore.ts` | 2 | Add `stageLog`, `activeRunnerTabId`, `logCardExpanded`; actions `recordStageStart`, `recordStageEnd`, `setActiveRunnerTabId`, `setLogCardExpanded` |
 | `studio/src/renderer/src/store/terminalStore.ts` | 2 | No changes — used as-is via `addTab` + `openTab` |
 | `studio/src/renderer/src/types/terminal.ts` | 2 | Add `runnerOwned?: boolean` field to `TerminalTab` type |
-| `studio/src/main/ipc/terminal.ts` | 2 | Buffer PTY output; on exit extract last JSON line and POST to `/runner/terminal/result` |
-| `studio/src/renderer/src/components/HQ/useHQ.tsx` | 2 | Handle `TERMINAL_SPAWN` and `TERMINAL_SIGNAL` SSE events |
-| `studio/src/renderer/src/components/Terminal/PaneTabBar.tsx` | 2 | Add `runnerOwned` tab visual treatment (`.runnerTab` CSS class) |
+| `studio/src/main/ipc/terminal.ts` | 2 | Buffer PTY output (64KB tail, flow-controlled); on exit POST `stdout_tail` to `/runner/terminal/result` — no JSON parsing in terminal.ts |
+| `studio/src/renderer/src/components/HQ/useHQ.tsx` | 2 | Handle `TERMINAL_SPAWN`, `TERMINAL_CLAIMED`, `TERMINAL_SIGNAL`, `RUNNER_WARNING` SSE events |
+| `studio/src/renderer/src/components/Terminal/PaneTabBar.tsx` | 2 | Add `runnerOwned` tab check → apply `.tabRunner` class |
+| `studio/src/renderer/src/components/Terminal/Terminal.module.css` | 2 | Add `.tabRunner` and `.tabRunner:hover` — no separate PaneTabBar.module.css exists |
 | `studio/src/renderer/src/components/HQ/RunnerLogCard/RunnerLogCard.tsx` | 3 | New component — flat sticky card with stage history |
 | `studio/src/renderer/src/components/HQ/RunnerLogCard/RunnerLogCard.module.css` | 3 | New CSS module |
 | `studio/src/renderer/src/components/HQ/StageStatusStrip/StageStatusStrip.tsx` | 3 | Add `[live ↗]` button when `status === 'running'` |
@@ -58,7 +59,7 @@
 | Conv | Title | Stories | Status | Key files touched |
 |---|---|---|---|---|
 | 1 | Backend contracts | S1, S3, S7 | TODO | `supervisor.py`, `http_server.py`, `runner.py` |
-| 2 | Studio wiring | S1, S2, S3 | TODO | `terminal.ts`, `useHQ.tsx`, `PaneTabBar.tsx`, `runnerStore.ts`, `tokens.css` |
+| 2 | Studio wiring | S1, S2, S3 | TODO | `terminal.ts`, `useHQ.tsx`, `PaneTabBar.tsx`, `Terminal.module.css`, `runnerStore.ts`, `tokens.css` |
 | 3 | RunnerLogCard + polish | S4, S5, S6 | TODO | `RunnerLogCard/`, `StageStatusStrip.tsx` |
 
 ---
@@ -82,4 +83,4 @@
 3. **Abort via SSE**: Supervisor broadcasts `TERMINAL_SIGNAL {signal:"term"}` → Studio calls `window.pathly.terminal.kill(tabId)`. Supervisor never holds the PTY PID.
 4. **Pause between stages only**: No mid-stage PTY pause. `_pause_flag` is checked at stage boundaries as today.
 5. **New tab per stage**: Each stage opens a new terminal tab (preserves scroll history). Tabs stay open after pipeline ends.
-6. **Result extraction**: Studio buffers PTY output; on PTY exit, walks buffer backwards for last valid JSON line and POSTs it to `/runner/terminal/result`.
+6. **Result extraction**: Studio buffers last 64KB of PTY output (`ptyOutputBuf`); on PTY exit, POSTs raw `stdout_tail` to `/runner/terminal/result`. Python's `runner.parse_result(adapter, stdout_tail)` handles all JSON extraction — renderer stays dumb, adapter parsing stays in one place.
