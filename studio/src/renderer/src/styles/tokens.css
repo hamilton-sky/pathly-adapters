@@ -34,6 +34,10 @@
   --red-bg:          rgba(248, 113, 113, 0.13);
   --red-bg-hover:    rgba(248, 113, 113, 0.80);
   --red-border:      rgba(248, 113, 113, 0.40);
+
+  --runner-bg:       rgba(45, 212, 191, 0.08);
+  --runner-border:   rgba(45, 212, 191, 0.30);
+  --runner-bg-hover: rgba(45, 212, 191, 0.14);
 }
 
 /* ─── Pathly Light ──────────────────────────────────────────── */
@@ -65,6 +69,10 @@
   --red-bg:          rgba(220, 38, 38, 0.13);
   --red-bg-hover:    rgba(220, 38, 38, 0.80);
   --red-border:      rgba(220, 38, 38, 0.40);
+
+  --runner-bg:       rgba(15, 118, 110, 0.08);
+  --runner-border:   rgba(15, 118, 110, 0.30);
+  --runner-bg-hover: rgba(15, 118, 110, 0.14);
 }
 
 /* ─── Nord ──────────────────────────────────────────────────── */
@@ -96,6 +104,10 @@
   --red-bg:          rgba(191, 97, 106, 0.13);
   --red-bg-hover:    rgba(191, 97, 106, 0.80);
   --red-border:      rgba(191, 97, 106, 0.40);
+
+  --runner-bg:       rgba(143, 188, 187, 0.08);
+  --runner-border:   rgba(143, 188, 187, 0.30);
+  --runner-bg-hover: rgba(143, 188, 187, 0.14);
 }
 
 /* ─── Mocha (Catppuccin) ────────────────────────────────────── */
@@ -127,6 +139,10 @@
   --red-bg:          rgba(243, 139, 168, 0.13);
   --red-bg-hover:    rgba(243, 139, 168, 0.80);
   --red-border:      rgba(243, 139, 168, 0.40);
+
+  --runner-bg:       rgba(148, 226, 213, 0.08);
+  --runner-border:   rgba(148, 226, 213, 0.30);
+  --runner-bg-hover: rgba(148, 226, 213, 0.14);
 }
 
 /* ─── Solarized Dark ────────────────────────────────────────── */
@@ -158,6 +174,10 @@
   --red-bg:          rgba(220, 50, 47, 0.13);
   --red-bg-hover:    rgba(220, 50, 47, 0.80);
   --red-border:      rgba(220, 50, 47, 0.40);
+
+  --runner-bg:       rgba(108, 113, 196, 0.08);
+  --runner-border:   rgba(108, 113, 196, 0.30);
+  --runner-bg-hover: rgba(108, 113, 196, 0.14);
 }
 
 /* ─── Dracula ───────────────────────────────────────────────── */
@@ -189,6 +209,10 @@
   --red-bg:          rgba(255, 85, 85, 0.13);
   --red-bg-hover:    rgba(255, 85, 85, 0.80);
   --red-border:      rgba(255, 85, 85, 0.40);
+
+  --runner-bg:       rgba(255, 184, 108, 0.08);
+  --runner-border:   rgba(255, 184, 108, 0.30);
+  --runner-bg-hover: rgba(255, 184, 108, 0.14);
 }
 
 /* ─── Rosé Pine ─────────────────────────────────────────────── */
@@ -220,6 +244,10 @@
   --red-bg:          rgba(235, 111, 146, 0.13);
   --red-bg-hover:    rgba(235, 111, 146, 0.80);
   --red-border:      rgba(235, 111, 146, 0.40);
+
+  --runner-bg:       rgba(235, 188, 186, 0.08);
+  --runner-border:   rgba(235, 188, 186, 0.30);
+  --runner-bg-hover: rgba(235, 188, 186, 0.14);
 }
 
 /* ─── Solarized Light ───────────────────────────────────────── */
@@ -251,6 +279,10 @@
   --red-bg:          rgba(220, 50, 47, 0.13);
   --red-bg-hover:    rgba(220, 50, 47, 0.80);
   --red-border:      rgba(220, 50, 47, 0.40);
+
+  --runner-bg:       rgba(108, 113, 196, 0.08);
+  --runner-border:   rgba(108, 113, 196, 0.30);
+  --runner-bg-hover: rgba(108, 113, 196, 0.14);
 }
 
 /* ─── Catppuccin Latte ──────────────────────────────────────── */
@@ -282,6 +314,10 @@
   --red-bg:          rgba(210, 15, 57, 0.13);
   --red-bg-hover:    rgba(210, 15, 57, 0.80);
   --red-border:      rgba(210, 15, 57, 0.40);
+
+  --runner-bg:       rgba(23, 146, 153, 0.08);
+  --runner-border:   rgba(23, 146, 153, 0.30);
+  --runner-bg-hover: rgba(23, 146, 153, 0.14);
 }
 
 /* ─── Paper ─────────────────────────────────────────────────── */
@@ -313,6 +349,10 @@
   --red-bg:          rgba(220, 38, 38, 0.13);
   --red-bg-hover:    rgba(220, 38, 38, 0.80);
   --red-border:      rgba(220, 38, 38, 0.40);
+
+  --runner-bg:       rgba(8, 145, 178, 0.08);
+  --runner-border:   rgba(8, 145, 178, 0.30);
+  --runner-bg-hover: rgba(8, 145, 178, 0.14);
 }
 
 /* ─── Rosé Pine Dawn ────────────────────────────────────────── */
@@ -344,6 +384,10 @@
   --red-bg:          rgba(192, 51, 74, 0.13);
   --red-bg-hover:    rgba(192, 51, 74, 0.80);
   --red-border:      rgba(192, 51, 74, 0.40);
+
+  --runner-bg:       rgba(144, 122, 169, 0.08);
+  --runner-border:   rgba(144, 122, 169, 0.30);
+  --runner-bg-hover: rgba(144, 122, 169, 0.14);
 }
 
 /* ─── Mint ──────────────────────────────────────────────────── */
@@ -375,4 +419,8 @@
   --red-bg:          rgba(192, 57, 43, 0.13);
   --red-bg-hover:    rgba(192, 57, 43, 0.80);
   --red-border:      rgba(192, 57, 43, 0.40);
+
+  --runner-bg:       rgba(99, 102, 168, 0.08);
+  --runner-border:   rgba(99, 102, 168, 0.30);
+  --runner-bg-hover: rgba(99, 102, 168, 0.14);
 }

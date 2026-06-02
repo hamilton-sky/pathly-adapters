@@ -1,0 +1,2 @@
+{"type":"STATE_TRANSITION","to":"PLANNING","feature":"pathly-observability","ts":"2026-06-02T10:30:00Z","schema_version":1}
+{"type":"AGENT_DONE","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":23379,"tokens_out":5845,"total_tokens":29224,"cost_usd":0.157830,"tool_uses":13,"wall_seconds":376,"ts":"2026-06-02T10:30:00Z","schema_version":1}

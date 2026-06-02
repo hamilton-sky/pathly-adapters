@@ -68,7 +68,9 @@ contextBridge.exposeInMainWorld('pathly', {
       const listener = (_e: Electron.IpcRendererEvent, tabId: string): void => cb(tabId)
       ipcRenderer.on('terminal:exit', listener)
       return () => ipcRenderer.removeListener('terminal:exit', listener)
-    }
+    },
+    registerRunner: (tabId: string, topic: string, runId: string): Promise<void> =>
+      ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId),
   },
   clipboard: {
     read: (): Promise<string> => ipcRenderer.invoke('clipboard:read'),
@@ -195,6 +197,7 @@ declare global {
         popout: (tabId: string, label: string) => Promise<void>
         onData: (tabId: string, cb: (data: string) => void) => () => void
         onExit: (cb: (tabId: string) => void) => () => void
+        registerRunner: (tabId: string, topic: string, runId: string) => Promise<void>
       }
       clipboard: {
         read: () => Promise<string>

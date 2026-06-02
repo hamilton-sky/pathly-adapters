@@ -50,6 +50,7 @@ declare global {
         resize: (tabId: string, cols: number, rows: number) => Promise<void>
         onData: (tabId: string, cb: (data: string) => void) => () => void
         onExit: (cb: (tabId: string) => void) => () => void
+        registerRunner: (tabId: string, topic: string, runId: string) => Promise<void>
       }
       setup: {
         isNeeded: () => Promise<boolean>

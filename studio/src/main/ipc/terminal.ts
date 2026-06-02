@@ -17,6 +17,12 @@ const activePtys = new Map<string, import('node-pty').IPty>()
 const ptyWindows = new Map<string, BrowserWindow>()
 // Maps tabId → webContentsId of the sender that spawned it
 const ptyOwners = new Map<string, number>()
+// Maps tabId → accumulated output lines for runner result reporting
+const ptyOutput = new Map<string, string[]>()
+// Maps tabId → runner metadata registered before spawn
+const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number }>()
+// Tracks tabs killed by the user (not by the runner exiting naturally)
+const ptyKilledByRunner = new Set<string>()
 
 function sendToWindow(tabId: string, channel: string, ...args: unknown[]): void {
   const win = ptyWindows.get(tabId)
@@ -71,6 +77,9 @@ export function killAllPtys(): void {
   activePtys.clear()
   ptyWindows.clear()
   ptyOwners.clear()
+  ptyOutput.clear()
+  runnerTabMeta.clear()
+  ptyKilledByRunner.clear()
 }
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
@@ -111,12 +120,45 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
 
     ptyProcess.onData((data: string) => {
       sendToWindow(tabId, `terminal:data:${tabId}`, data)
+      if (runnerTabMeta.has(tabId)) {
+        const lines = ptyOutput.get(tabId) ?? []
+        lines.push(data)
+        if (lines.length > 500) lines.splice(0, lines.length - 500)
+        ptyOutput.set(tabId, lines)
+      }
     })
 
-    ptyProcess.onExit(() => {
+    ptyProcess.onExit(({ exitCode }) => {
       activePtys.delete(tabId)
       ptyOwners.delete(tabId)
       sendToWindow(tabId, 'terminal:exit', tabId)
+      const meta = runnerTabMeta.get(tabId)
+      if (meta) {
+        const userInitiated = ptyKilledByRunner.has(tabId)
+        const stdoutTail = (ptyOutput.get(tabId) ?? []).join('')
+        const wallSeconds = (Date.now() - meta.spawnedAt) / 1000
+        runnerTabMeta.delete(tabId)
+        ptyOutput.delete(tabId)
+        ptyKilledByRunner.delete(tabId)
+        const banner = exitCode === 0
+          ? '\r\n\x1b[2m──\x1b[0m \x1b[1;32mDONE\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n'
+          : '\r\n\x1b[2m──\x1b[0m \x1b[1;31mABORTED\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n'
+        sendToWindow(tabId, `terminal:data:${tabId}`, banner)
+        const postBody = JSON.stringify({
+          run_id: meta.run_id,
+          topic: meta.topic,
+          exit_code: exitCode,
+          stdout_tail: stdoutTail,
+          wall_seconds: wallSeconds,
+          user_initiated: userInitiated,
+        })
+        const doPost = () => fetch('http://127.0.0.1:8765/runner/terminal/result', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: postBody,
+        })
+        doPost().catch(() => setTimeout(() => doPost().catch(() => { /* give up */ }), 1000))
+      }
       ptyWindows.delete(tabId)
     })
 
@@ -142,11 +184,18 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     if (ptyOwners.get(tabId) !== event.sender.id) return
     const p = activePtys.get(tabId)
     if (p) {
+      if (runnerTabMeta.has(tabId)) {
+        ptyKilledByRunner.add(tabId)
+      }
       p.kill()
       activePtys.delete(tabId)
       ptyOwners.delete(tabId)
       ptyWindows.delete(tabId)
     }
+  })
+
+  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string) => {
+    runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now() })
   })
 
   ipcMain.handle('terminal:popout', (event, tabId: string, label: string) => {

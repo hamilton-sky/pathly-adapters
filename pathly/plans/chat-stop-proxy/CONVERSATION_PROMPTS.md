@@ -13,8 +13,9 @@ Before writing any code, verify the live state of all files this feature touches
 ### Steps
 
 1. Verify these files exist (glob or read each):
-   - `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx`
-   - `studio/src/renderer/src/components/ChatPanel/index.tsx`
+   - `studio/src/renderer/src/components/HQ/ChatInput/ChatInput.tsx`
+   - `studio/src/renderer/src/components/HQ/useHQ.tsx`
+   - `studio/src/renderer/src/components/HQ/index.tsx`
    - `studio/src/renderer/src/store/chatStore.ts`
    - `studio/src/renderer/src/lib/llmBridge.ts`
    - `studio/src/renderer/src/lib/launchTerminal.ts`
@@ -45,9 +46,9 @@ confirmed by direct read; PROGRESS.md updated.
 **Stories:** S-01, S-02, S-03
 
 ### Verify before edit
-Read `ChatInput.tsx` and `ChatPanel/index.tsx` before touching either file.
-Confirm the exact line ranges for the Send button (lines 94-105) and `handleSend`
-(lines 226-404) are consistent with the scout findings.
+Read `HQ/ChatInput/ChatInput.tsx` and `HQ/useHQ.tsx` before touching either file.
+Confirm the exact line ranges for the Send button and `handleSend` by reading
+the live files — line numbers may have shifted since the plan was written.
 
 ### Phase 1.1 — Design pass (ui-ux-pro-max)
 
@@ -63,9 +64,9 @@ Get the design spec approved (or self-approved as the builder) before proceeding
 
 ### Phase 1.2 — ChatInput
 
-**File:** `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx`
+**File:** `studio/src/renderer/src/components/HQ/ChatInput/ChatInput.tsx`
 
-Add to props interface (near lines 8-13):
+Add to props interface (read the file first to find the actual line numbers):
 ```
 isLoading?: boolean
 onStop?: () => void
@@ -83,9 +84,11 @@ Enter key guard:
 **Done when:** Component compiles with no TypeScript errors; `<Square>` renders when
 `isLoading=true`; Enter blocked during loading.
 
-### Phase 1.3 — ChatPanel
+### Phase 1.3 — Wire stop in useHQ + index
 
-**File:** `studio/src/renderer/src/components/ChatPanel/index.tsx`
+**Files:**
+- `studio/src/renderer/src/components/HQ/useHQ.tsx` — add `handleStop`
+- `studio/src/renderer/src/components/HQ/index.tsx` — pass `onStop` to `<ChatInput>`
 
 Add `handleStop`:
 ```typescript
@@ -142,9 +145,17 @@ Update `pathly/plans/chat-stop-proxy/PROGRESS.md` — mark all Conv 1 items comp
 **Stories:** S-04, S-05, S-06
 
 ### Verify before edit
-Read `chatStore.ts`, `ChatInput.tsx`, `ChatPanel/index.tsx`, and `launchTerminal.ts`
-before touching any file. Confirm `writeToTerminal` signature and `window.pathly.terminal.onData`
-usage in ChatPanel lines 165-199.
+Read these files before touching any of them:
+- `studio/src/renderer/src/store/chatStore.ts`
+- `studio/src/renderer/src/components/HQ/ChatInput/ChatInput.tsx`
+- `studio/src/renderer/src/components/HQ/useHQ.tsx`  ← handleSend lives here, NOT in index.tsx
+- `studio/src/renderer/src/components/HQ/index.tsx`  ← ChatInput is mounted here
+- `studio/src/renderer/src/components/HQ/MessageList/MessageList.tsx`
+- `studio/src/renderer/src/lib/launchTerminal.ts`
+
+Confirm `writeToTerminal` signature and `window.pathly.terminal.onData` usage in `useHQ.tsx`
+(search for `writeToTerminal` — it was previously referenced at ChatPanel/index.tsx lines 165-199
+but handleSend now lives in useHQ.tsx).
 
 ### Phase 2.1 — Design pass (ui-ux-pro-max)
 
@@ -180,7 +191,7 @@ no other store fields affected; no TypeScript errors.
 
 ### Phase 2.3 — ChatInput toggle UI
 
-**File:** `studio/src/renderer/src/components/ChatPanel/ChatInput.tsx`
+**File:** `studio/src/renderer/src/components/HQ/ChatInput/ChatInput.tsx`
 
 Add to props interface:
 ```typescript
@@ -193,12 +204,14 @@ Clicking each state calls `onModeChange` with the correct mode value.
 
 **Done when:** Toggle renders; clicking calls `onModeChange`; no TypeScript errors.
 
-### Phase 2.4 — ChatPanel routing
+### Phase 2.4 — Routing + prop wiring
 
-**File:** `studio/src/renderer/src/components/ChatPanel/index.tsx`
+**Files:**
+- `studio/src/renderer/src/components/HQ/useHQ.tsx` — add `chatMode` branch in `handleSend`
+- `studio/src/renderer/src/components/HQ/index.tsx` — pass `chatMode` and `onModeChange` down to `<ChatInput>`
 
-1. Read `chatMode` and `setChatMode` from `chatStore`.
-2. Pass `chatMode` and `onModeChange={setChatMode}` to `<ChatInput>`.
+1. In `useHQ.tsx`: read `chatMode` and `setChatMode` from `chatStore`. Add the `chatMode === 'claude'` branch to `handleSend` (see below).
+2. In `index.tsx`: pass `chatMode={chatMode}` and `onModeChange={setChatMode}` to `<ChatInput>`.
 3. In `handleSend`, after input validation, branch on `chatMode`:
 
 **`chatMode === 'claude'` path:**
@@ -232,7 +245,7 @@ surfaces a recoverable message; LLM mode unaffected.
 
 ### Phase 2.5 — CC badge
 
-**File:** `studio/src/renderer/src/components/ChatPanel/index.tsx` or `studio/src/renderer/src/components/ChatPanel/MessageList.tsx` (message bubble component)
+**File:** `studio/src/renderer/src/components/HQ/MessageList/MessageList.tsx`
 
 When rendering an assistant message where `source === 'claude-code'`, render a `CC` badge
 in the bubble header per Phase 2.1 design spec.

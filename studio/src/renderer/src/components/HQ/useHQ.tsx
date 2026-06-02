@@ -6,6 +6,7 @@ import { brightskyClient } from '../../lib/brightskyClient'
 import { useChatStore } from '../../store/chatStore'
 import { useAutomationStore } from '../../store/automationStore'
 import { useTerminalStore } from '../../store/terminalStore'
+import type { TerminalTab } from '../../types/terminal'
 import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { writeToTerminal } from '../../lib/launchTerminal'
@@ -248,6 +249,38 @@ export function useHQ() {
               setRunnerState({ sessionKind: data.kind as SessionKind })
             } else if (data.type === 'RUNNER_ERROR') {
               setRunnerState({ errorMessage: data.message as string, status: 'error' })
+            } else if (data.type === 'TERMINAL_SPAWN') {
+              const tab_id = data.tab_id as string
+              const run_id = data.run_id as string
+              const adapter = data.adapter as string
+              const label = (data.label as string | undefined) ?? adapter
+              const cwd = (data.cwd as string | undefined) ?? useRunnerStore.getState().projectRoot ?? ''
+              const prompt = (data.prompt as string | undefined) ?? ''
+              const stage = (data.stage as string | undefined) ?? ''
+              useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'])
+              useTerminalStore.setState((s) => ({
+                tabs: s.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
+              }))
+              useRunnerStore.getState().recordStageStart(stage, adapter, tab_id)
+              void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id)
+                .then(() => window.pathly.terminal.spawn(tab_id, cwd, adapter === 'shell' ? undefined : adapter))
+                .then(() => {
+                  if (prompt) {
+                    setTimeout(() => { void window.pathly.terminal.write(tab_id, prompt + '\n') }, 300)
+                  }
+                  fetch('http://127.0.0.1:8765/runner/terminal/started', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tab_id, run_id, topic: activeTopic, pid: 0 }),
+                  }).catch(() => { /* non-blocking */ })
+                })
+                .catch(() => { /* spawn failure — PTY unavailable */ })
+            } else if (data.type === 'TERMINAL_SIGNAL') {
+              const signal = data.signal as string
+              if (signal === 'term') {
+                const tabId = useRunnerStore.getState().activeRunnerTabId
+                if (tabId) void window.pathly.terminal.kill(tabId).catch(() => { /* PTY may already be gone */ })
+              }
             }
           } catch { /* ignore parse errors */ }
         }

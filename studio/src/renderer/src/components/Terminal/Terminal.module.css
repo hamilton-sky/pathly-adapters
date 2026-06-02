@@ -159,6 +159,16 @@
   color: var(--t-text);
 }
 
+.tabRunner {
+  background: var(--runner-bg, rgba(45, 212, 191, 0.08));
+  border-left: 2px solid var(--runner-border, rgba(45, 212, 191, 0.30));
+  opacity: 1;
+}
+
+.tabRunner:hover {
+  background: var(--runner-bg-hover, rgba(45, 212, 191, 0.14));
+}
+
 .labelInput {
   background: transparent;
   border: none;

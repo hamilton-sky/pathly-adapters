@@ -52,7 +52,7 @@ export function PaneTabBar({
       {tabs.map((tab) => (
         <div
           key={tab.id}
-          className={`${styles.tab} ${tab.id === activeTabId ? styles.tabActive : styles.tabInactive}`}
+          className={`${styles.tab} ${tab.id === activeTabId ? styles.tabActive : styles.tabInactive}${tab.runnerOwned ? ` ${styles.tabRunner}` : ''}`}
         >
           <Tooltip label={`${tab.label} #${tab.numericId}`} delay={400} placement="bottom">
             <button

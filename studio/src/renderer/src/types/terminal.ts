@@ -7,4 +7,5 @@ export interface TerminalTab {
   status?: 'idle' | 'running' | 'error' | 'done'
   plan?: string
   stage?: string
+  runnerOwned?: boolean
 }
