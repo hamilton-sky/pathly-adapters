@@ -1,0 +1,48 @@
+# Skill fragment composition manifest
+#
+# Declares which reusable fragment skills each stage skill composes. Keyed by SKILL NAME
+# (e.g. team/build), not by flow-state, so a skill reused across flows composes identically.
+#
+# Resolver contract (implemented in Conv 2, src/pathly_orchestrator/compose.py):
+#   assembled prompt = [stage-specific skill body] + [defaults + skill fragments, declared order]
+#   - `defaults` apply ONLY to skills present in the `skills:` map below.
+#   - A skill ABSENT from `skills:` is loaded raw and unchanged (no fragments, no defaults).
+#   - A fragment entry may be a bare string (`feedback-protocol`) or an object with a gate
+#     (`{ name: spawn-rules, requires: can_spawn }`); a gated fragment is dropped when the
+#     active adapter's capability is false.
+#
+# Conv 1 (this commit) ships fragments + manifest as INERT DATA: `skills:` is empty, so no
+# skill is reduced and nothing is composed yet — zero behaviour change, no duplication window.
+# Conv 3 adds the team/build|review|test entries ATOMICALLY with body reduction.
+
+version: 1
+fragments_dir: fragments
+
+# Applied to every skill listed in `skills:` (and only those), before that skill's own fragments.
+defaults:
+  - progress-logging
+  - completion-report
+
+# Map of <skill name> -> { fragments: [...] }.
+# Intentionally EMPTY until Conv 3. Do not populate without reducing the corresponding skill
+# body in the same change, or shared sections will appear twice.
+skills: {}
+
+# Conv 3 will add (atomically with body reduction in team/build.md, review.md, test.md):
+#
+# skills:
+#   team/build:
+#     fragments:
+#       - scout-choreography
+#       - feedback-protocol
+#       - { name: spawn-rules, requires: can_spawn }
+#   team/review:
+#     fragments:
+#       - scout-choreography
+#       - feedback-protocol
+#       - { name: spawn-rules, requires: can_spawn }
+#   team/test:
+#     fragments:
+#       - scout-choreography
+#       - feedback-protocol
+#       - { name: spawn-rules, requires: can_spawn }
