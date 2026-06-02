@@ -276,6 +276,7 @@ export function useHQ() {
                 tabs: s.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
               }))
               useRunnerStore.getState().attachTerminalToStage(tab_id, 'terminal')
+              if (prompt) useRunnerStore.getState().recordStagePrompt(prompt)
               const argv = Array.isArray(data.argv) ? (data.argv as string[]) : undefined
               void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id, label)
                 .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv))
@@ -324,6 +325,23 @@ export function useHQ() {
       es?.close()    // now accessible — closes the live connection on unmount
     }
   }, [activeTopic])
+
+  useEffect(() => {
+    const unsub = window.pathly.terminal.onStageResult((tabId, data) => {
+      const r = data as { result?: string; total_cost_usd?: number; duration_ms?: number; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } }
+      useRunnerStore.getState().recordStageResult(
+        tabId,
+        r.result ?? '',
+        r.total_cost_usd ?? 0,
+        r.usage?.input_tokens ?? 0,
+        r.usage?.output_tokens ?? 0,
+        r.usage?.cache_read_input_tokens ?? 0,
+        r.usage?.cache_creation_input_tokens ?? 0,
+        r.duration_ms ?? 0,
+      )
+    })
+    return unsub
+  }, [])
 
   // Sync active tab → runner: when the user switches feature tabs, bind the runner to that feature.
   useEffect(() => {

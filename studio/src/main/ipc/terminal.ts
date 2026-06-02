@@ -76,6 +76,35 @@ function resolveShell(command: string | undefined): { shell: string; args: strin
   return { shell: 'powershell.exe', args: [] }
 }
 
+interface ClaudeJsonResult {
+  result: string
+  total_cost_usd: number
+  duration_ms: number
+  usage: {
+    input_tokens: number
+    output_tokens: number
+    cache_read_input_tokens: number
+    cache_creation_input_tokens: number
+  }
+}
+
+function parseClaudeJsonResult(stdout: string): ClaudeJsonResult | null {
+  // Strip ANSI escape sequences
+  const stripped = stdout.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
+  // Look for a JSON line with "type":"result" (scan from end — it's the last output)
+  const lines = stripped.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const t = lines[i].trim()
+    if (t.startsWith('{') && t.includes('"type"')) {
+      try {
+        const parsed = JSON.parse(t) as { type?: string } & ClaudeJsonResult
+        if (parsed.type === 'result') return parsed
+      } catch { /* not valid JSON */ }
+    }
+  }
+  return null
+}
+
 /** Spawn a specific argv non-interactively — used by the runner so the PTY exits when the agent finishes. */
 function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; tempScript?: string } {
   if (process.platform !== 'win32') {
@@ -180,6 +209,11 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       if (meta) {
         const userInitiated = ptyKilledByRunner.has(tabId)
         const stdoutTail = (ptyOutput.get(tabId) ?? []).join('')
+        // Parse the claude --output-format=json result
+        const stageResult = parseClaudeJsonResult(stdoutTail)
+        if (stageResult) {
+          sendToWindow(tabId, 'terminal:stage-result', tabId, stageResult)
+        }
         const wallSeconds = (Date.now() - meta.spawnedAt) / 1000
         runnerTabMeta.delete(tabId)
         ptyOutput.delete(tabId)

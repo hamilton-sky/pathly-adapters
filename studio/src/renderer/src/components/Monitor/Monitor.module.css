@@ -111,6 +111,34 @@
 
 .tabOverflow:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 
+/* ── Output/Events sub-tab bar ───────────────────── */
+.viewTabBar {
+  display: flex;
+  border-bottom: 1px solid var(--bg-surface0);
+  background: var(--bg-mantle);
+  flex-shrink: 0;
+}
+
+.viewTab {
+  padding: 5px 14px;
+  font-size: 11px;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--text-muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+
+.viewTab:hover { color: var(--text-secondary); }
+.viewTab:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
+
+.viewTabActive {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
 .tabDot {
   color: var(--runtime);
   font-size: 8px;

@@ -51,6 +51,7 @@ declare global {
         onData: (tabId: string, cb: (data: string) => void) => () => void
         onExit: (cb: (tabId: string) => void) => () => void
         registerRunner: (tabId: string, topic: string, runId: string, label?: string) => Promise<void>
+        onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void) => () => void
       }
       setup: {
         isNeeded: () => Promise<boolean>
