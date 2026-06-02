@@ -34,11 +34,12 @@ _SHARED_SECTIONS = [
 
 # ── Inert-seam: real (empty) manifest is a no-op ────────────────────────────
 
-@pytest.mark.parametrize("skill", ["development/build", "development/review", "development/test"])
+@pytest.mark.parametrize("skill", ["development/design", "development/debug", "development/explore"])
 def test_unconverted_skill_composes_raw_body(skill):
     """A skill ABSENT from the manifest composes byte-identical to its raw body.
 
-    The development/* family is not yet converted, so it must remain a no-op.
+    These development/* skills are not in the composition manifest, so the
+    resolver must return their raw body unchanged — the inert-seam guarantee.
     """
     from pathly_orchestrator.compose import _read_skill_body
 
@@ -221,4 +222,65 @@ def test_team_build_drops_spawn_rules_for_non_spawn_adapter():
     assert _SPAWN_RULES_MARKER not in out
     # the non-gated shared sections still compose in
     assert "## Feedback protocol" in out
+    assert "## Scout choreography" in out
+
+
+# ── Converted development/* family: golden snapshots + exactly-once guarantee ─
+
+_CONVERTED_DEV_SKILLS = ["development/build", "development/review", "development/test"]
+
+
+@pytest.mark.parametrize("skill", _CONVERTED_DEV_SKILLS)
+def test_dev_skill_matches_golden_snapshot(skill):
+    """Composed claude output must match the reviewed snapshot — fails on drift."""
+    snap = _SNAPSHOT_DIR / (skill.replace("/", "__") + ".claude.md")
+    assert snap.exists(), f"missing golden snapshot: {snap}"
+    expected = snap.read_text(encoding="utf-8")
+    assert compose_skill(skill, "claude") == expected
+
+
+@pytest.mark.parametrize("skill", _CONVERTED_DEV_SKILLS)
+def test_dev_skill_shared_sections_appear_at_most_once(skill):
+    """No shared section may appear twice (no duplication between body and fragment)."""
+    out = compose_skill(skill, "claude")
+    for heading in _SHARED_SECTIONS:
+        assert out.count(heading) <= 1, f"{skill}: {heading!r} duplicated"
+
+
+def test_dev_build_includes_completion_scout_and_spawn():
+    """development/build composes completion-report + scout-choreography + spawn-rules.
+
+    It is the only development skill that records BUILD_START, so it keeps the
+    completion-report fragment. It has no feedback-protocol.
+    """
+    out = compose_skill("development/build", "claude")
+    assert out.count("## Completion report") == 1
+    assert out.count("## Scout choreography") == 1
+    assert out.count(_SPAWN_RULES_MARKER) == 1
+    assert out.count("## Feedback protocol") == 0
+
+
+def test_dev_review_includes_scout_and_spawn_only():
+    """development/review keeps its own PASS/FAIL exit — scout + spawn-rules, no completion-report."""
+    out = compose_skill("development/review", "claude")
+    assert out.count("## Scout choreography") == 1
+    assert out.count(_SPAWN_RULES_MARKER) == 1
+    assert out.count("## Completion report") == 0
+    assert out.count("## Feedback protocol") == 0
+
+
+def test_dev_test_includes_scout_only():
+    """development/test composes scout-choreography only — no spawn-rules, no completion-report."""
+    out = compose_skill("development/test", "claude")
+    assert out.count("## Scout choreography") == 1
+    assert _SPAWN_RULES_MARKER not in out
+    assert out.count("## Completion report") == 0
+    assert out.count("## Feedback protocol") == 0
+
+
+def test_dev_build_drops_spawn_rules_for_non_spawn_adapter():
+    """development/build drops spawn-rules when the adapter can't spawn, keeps the rest."""
+    out = compose_skill("development/build", {"can_spawn": False})
+    assert _SPAWN_RULES_MARKER not in out
+    assert "## Completion report" in out
     assert "## Scout choreography" in out

@@ -11,17 +11,18 @@
 #     (`{ name: spawn-rules, requires: can_spawn }`); a gated fragment is dropped when the
 #     active adapter's capability is false.
 #
-# Conv 3 (this commit) converts the team/* runner family: each entry below lands ATOMICALLY
-# with the matching body reduction, so every shared section appears exactly once (body OR
-# fragment, never both). The development/* family is converted in a follow-up checkpoint.
+# Conv 3 converts BOTH skill families (team/* runner + development/* interactive). Each entry
+# lands ATOMICALLY with the matching body reduction, so every shared section appears exactly
+# once (body OR fragment, never both).
 
 version: 1
 fragments_dir: fragments
 
 # Applied to every skill listed in `skills:` (and only those), before that skill's own fragments.
+# Only the universal no-op seam is a default; `completion-report` is opted-in per skill because
+# development/review and development/test keep their own PASS/FAIL exit models.
 defaults:
   - progress-logging
-  - completion-report
 
 # Map of <skill name> -> { fragments: [...] }.
 # Two skill FAMILIES share the same fragments but keep distinct bodies (see IMPLEMENTATION_PLAN
@@ -33,23 +34,30 @@ defaults:
 skills:
   team/build:
     fragments:
+      - completion-report
       - scout-choreography
       - feedback-protocol
       - { name: spawn-rules, requires: can_spawn }
   team/review:
     fragments:
+      - completion-report
       - scout-choreography
       - feedback-protocol
       - { name: spawn-rules, requires: can_spawn }
   team/test:
     fragments:
+      - completion-report
       - scout-choreography
       - feedback-protocol
-
-# Follow-up checkpoint adds the development/* family (atomically with body reduction):
-#   development/build:
-#     fragments: [scout-choreography, { name: spawn-rules, requires: can_spawn }]
-#   development/review:
-#     fragments: [scout-choreography, { name: spawn-rules, requires: can_spawn }]
-#   development/test:
-#     fragments: [scout-choreography]
+  development/build:
+    fragments:
+      - completion-report
+      - scout-choreography
+      - { name: spawn-rules, requires: can_spawn }
+  development/review:
+    fragments:
+      - scout-choreography
+      - { name: spawn-rules, requires: can_spawn }
+  development/test:
+    fragments:
+      - scout-choreography

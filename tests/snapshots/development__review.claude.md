@@ -120,3 +120,57 @@ If violations found: list each one. Do NOT auto-fix. Report only.
 2. Write `pathly/plans/<feature>/STATE.json` with `"current": "REVIEW_FAILED"`.
 3. Append `{"type":"STATE_TRANSITION","to":"REVIEW_FAILED","ts":"<iso-timestamp>"}` to EVENTS.jsonl.
 4. Do NOT update PROGRESS.md — the conversation is not DONE until violations are resolved.
+
+## Live progress logging
+
+(Track 2 will add: POST milestones to /runner/log as you work, so the Studio
+Monitor can render mid-stage progress in its event log. For now this fragment is
+an intentional no-op seam — it adds no behaviour.)
+
+## Scout choreography (analyze → scout → compress)
+
+The stage agent (builder / reviewer / tester) declares what context it needs *before* doing the
+work, scouts gather that context in parallel, and the findings are compressed into the work prompt.
+
+### Phase 1 — Analyze
+
+Spawn the stage agent with `phase: analyze`. It outputs a `## NEEDS_CONTEXT` block **only** —
+the list of things it must know before implementing / reviewing / testing.
+
+NEEDS_CONTEXT format (one entry per line):
+```
+  - type: scout | scope: <files or directories> | question: <specific question>
+  - type: quick | question: <specific question>
+```
+
+Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2 (or use only the stage's
+default scout entry, where one is defined).
+
+### Phase 2 — Scout (parallel, max 4)
+
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: <stage agent>` + the question
+- `type: scout` → spawn `scout` with `ROLE: <stage agent>` + scope + question
+
+Compress all returned findings into a short summary and inject it into the Phase 3 work prompt
+as the stage's findings section.
+
+## Sub-agent spawning rules
+
+This stage runs on a host that can spawn sub-agents (Task / subagent capability).
+
+- **Never execute work yourself** — spawn the right subagent for each step.
+- Treat the FSM as a deterministic filesystem machine: read disk, process one event, emit one action.
+- After every agent completes, check for feedback files before advancing.
+- Spawn scouts and parallel workers up to a maximum of 4 at once.
+
+Map each action to its subagent (the stage skill lists the exact roles for that stage):
+
+| Action | Spawn |
+|---|---|
+| Implement | `builder` |
+| Review changes | `reviewer` |
+| Verify acceptance criteria | `tester` |
+| Clarify requirement | `planner` |
+| Clarify / redesign architecture | `architect` |
+| Scout context | `scout` or `quick` (with `ROLE:` set to the stage agent) |
