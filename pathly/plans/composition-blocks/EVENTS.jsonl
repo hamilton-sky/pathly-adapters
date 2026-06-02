@@ -42,3 +42,8 @@
 {"type":"STATE_TRANSITION","to":"REVIEW_FAILED","ts":"2026-06-02T23:23:22.316174+00:00"}
 {"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":3,"result":"PASS","tokens_in":32818,"tokens_out":8204,"total_tokens":41022,"cost_usd":0.221490,"tool_uses":22,"wall_seconds":241,"ts":"2026-06-02T23:27:39.146229+00:00","schema_version":1}
 {"type":"STATE_TRANSITION","to":"TESTING","ts":"2026-06-02T23:27:39.146229+00:00"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "test", "agent": "tester", "feature": "composition-blocks", "ts": "2026-06-02T23:37:47Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "test", "agent": "tester", "feature": "composition-blocks", "ts": "2026-06-02T23:43:24Z"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "schema_version": 1, "ts": "2026-06-02T23:43:58Z"}
+{"type":"AGENT_DONE","agent":"tester","model":"claude-sonnet-4-6","conversation":4,"result":"PASS","tokens_in":49121,"tokens_out":12280,"total_tokens":61401,"cost_usd":0.331563,"tool_uses":38,"wall_seconds":309,"ts":"2026-06-03T00:05:00.000000+00:00","schema_version":1}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "schema_version": 1, "ts": "2026-06-02T23:44:32Z"}
