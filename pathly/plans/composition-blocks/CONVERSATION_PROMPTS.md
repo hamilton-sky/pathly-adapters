@@ -93,7 +93,7 @@ Phase 3 — `src/pathly_orchestrator/compose.py` + `tests/test_compose.py`:
 - Add the eight block test cases listed in IMPLEMENTATION_PLAN.md Phase 3 to `tests/test_compose.py`.
 
 **Architectural rules:**
-- Read `src/pathly_adapters/CLAUDE.md` for project rules before implementing.
+- Read the root `CLAUDE.md` and `src/pathly_orchestrator/CLAUDE.md` for project rules before implementing.
 - Assembly rule: fragments joined with `\n\n`, each part rstripped — same as existing `compose_skill`.
 - No new public API beyond `resolve_block` and `compose_skill_with_block`.
 - Do not touch any file outside the three listed above.
@@ -156,7 +156,7 @@ Phase 5 — `src/pathly_orchestrator/fsm_ops.py`:
 - Read ARCHITECTURE_PROPOSAL.md for how `pathlyUserHome` / user blocks path is surfaced to the Python runtime.
 
 **Architectural rules:**
-- Read `src/pathly_adapters/CLAUDE.md` before implementing.
+- Read the root `CLAUDE.md` and `src/pathly_orchestrator/CLAUDE.md` before implementing.
 - `composition:` is config on an existing state — never a new FSM state or transition.
 - Backward-compatibility is non-negotiable: flows with no `composition:` key must behave identically to pre-feature behavior.
 
