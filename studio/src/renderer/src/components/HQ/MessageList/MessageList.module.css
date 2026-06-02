@@ -59,6 +59,21 @@
   color: var(--accent);
 }
 
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ccTag {
+  font-size: 10px;
+  font-family: var(--font-family-mono);
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
 .content {
   font-size: 13px;
   line-height: 1.6;

@@ -11,6 +11,7 @@ export interface Message {
   status: 'idle' | 'streaming' | 'done'
   tokens?: number
   mode?: 'chat' | 'automation'
+  source?: string
   automationPlan?: {
     intent: string
     steps: import('../types/automation').AutomationStep[]
@@ -37,6 +38,7 @@ export interface ChatState {
   isEmbedding: boolean
   embedReady: boolean
   embedProgress: number   // 0–100 while model downloads, 100 when ready
+  chatMode: 'llm' | 'claude'
 
   // ── message actions ──────────────────────────────────────
   addMessage: (msg: Message) => void
@@ -57,6 +59,7 @@ export interface ChatState {
   setIsEmbedding: (b: boolean) => void
   setEmbedReady: (b: boolean) => void
   setEmbedProgress: (n: number) => void
+  setChatMode: (mode: 'llm' | 'claude') => void
 }
 
 const emptyTarget = (): TargetOutput => ({ lines: [], running: false })
@@ -72,6 +75,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   isEmbedding: false,
   embedReady: false,
   embedProgress: 0,
+  chatMode: 'llm',
 
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
@@ -127,4 +131,5 @@ export const useChatStore = create<ChatState>()((set) => ({
   setIsEmbedding: (b) => set({ isEmbedding: b }),
   setEmbedReady: (b) => set({ embedReady: b }),
   setEmbedProgress: (n) => set({ embedProgress: n }),
+  setChatMode: (mode) => set({ chatMode: mode }),
 }))

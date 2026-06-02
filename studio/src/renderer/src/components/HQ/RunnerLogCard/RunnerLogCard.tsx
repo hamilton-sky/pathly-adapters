@@ -14,9 +14,10 @@ function fmtDate(ts: number | null): string {
 interface RunnerLogCardProps {
   historicalRun?: HistoricalRun
   docked?: boolean
+  onDismiss?: () => void
 }
 
-export function RunnerLogCard({ historicalRun, docked = false }: RunnerLogCardProps = {}): JSX.Element | null {
+export function RunnerLogCard({ historicalRun, docked = false, onDismiss }: RunnerLogCardProps = {}): JSX.Element | null {
   const storeStageLog = useRunnerStore((s) => s.stageLog)
   const status = useRunnerStore((s) => s.status)
   const storeCost = useRunnerStore((s) => s.cost)
@@ -75,6 +76,11 @@ export function RunnerLogCard({ historicalRun, docked = false }: RunnerLogCardPr
         {!historicalRun && activeRunnerTabId !== null && (
           <button type="button" className={styles.jumpBtn} onClick={handleJump}>
             live ↗
+          </button>
+        )}
+        {historicalRun && onDismiss && (
+          <button type="button" className={styles.dismissBtn} onClick={onDismiss} aria-label="Dismiss run">
+            ×
           </button>
         )}
       </div>

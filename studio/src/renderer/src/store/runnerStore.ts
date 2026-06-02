@@ -40,7 +40,7 @@ interface RunnerState {
   logCardExpanded: boolean
   runStartedAt: number | null
   runHistory: HistoricalRun[]
-  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory'>>) => void
+  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory' | 'removeHistoricalRun'>>) => void
   resetRunner: () => void
   setDecisionMenu: (items: DecisionMenuItem[] | null) => void
   setRunnerConfig: (topic: string, projectRoot: string) => void
@@ -52,6 +52,7 @@ interface RunnerState {
   jumpToLiveTab: () => void
   snapshotRun: () => void
   resetRunHistory: () => void
+  removeHistoricalRun: (index: number) => void
 }
 
 const initialState = {
@@ -114,4 +115,7 @@ export const useRunnerStore = create<RunnerState>()((set, get) => ({
     }))
   },
   resetRunHistory: () => set({ runHistory: [] }),
+  removeHistoricalRun: (index) => set((s) => ({
+    runHistory: s.runHistory.filter((_, i) => i !== index),
+  })),
 }))

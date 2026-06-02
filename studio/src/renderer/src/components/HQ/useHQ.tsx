@@ -65,6 +65,8 @@ export function useHQ() {
   const setLoading = useChatStore((s) => s.setLoading)
   const isLoading = useChatStore((s) => s.isLoading)
   const setCommandRunning = useChatStore((s) => s.setCommandRunning)
+  const chatMode = useChatStore((s) => s.chatMode)
+  const setChatMode = useChatStore((s) => s.setChatMode)
 
   const automationStatus = useAutomationStore((s) => s.status)
   const automationMessages = messages.filter((m) => m.mode === 'automation')
@@ -392,6 +394,39 @@ export function useHQ() {
       status: 'done' as const,
     }
     addMessage(userMsg)
+
+    if (chatMode === 'claude') {
+      setLoading(true)
+      const assistantMsg = {
+        id: crypto.randomUUID(),
+        role: 'assistant' as const,
+        content: '',
+        status: 'streaming' as const,
+        source: 'claude-code',
+      }
+      addMessage(assistantMsg)
+      try {
+        const addBackgroundTab = (id: string, label: string, _pane?: 'left' | 'right', kind?: 'shell' | 'claude' | 'codex' | 'antigravity'): void => {
+          addTabSilent(id, label, kind)
+          xtermRegistry.getOrCreate(id, { fontSize: 12 })
+        }
+        await writeToTerminal(
+          'claude',
+          text,
+          projectPath,
+          tabs,
+          addBackgroundTab,
+          open,
+          toggle,
+          rememberTabForKind,
+          openTab,
+        )
+      } catch {
+        updateLastMessage({ content: 'Claude Code terminal is not available. Please open the terminal first.', status: 'done' })
+        setLoading(false)
+      }
+      return
+    }
 
     if (useModelStore.getState().selectedModelId === 'brightsky') {
       await handleBrightskySend(text)
@@ -765,5 +800,7 @@ export function useHQ() {
     handleMenuSelect,
     queueAssistantStream,
     finishAssistantStream,
+    chatMode,
+    setChatMode,
   }
 }

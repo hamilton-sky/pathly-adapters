@@ -32,7 +32,7 @@ export function HQ(): JSX.Element {
       <StageStatusStrip />
       <RunnerLogCard docked />
       {runHistory.map((run, i) => (
-        <RunnerLogCard key={`hist-${i}`} historicalRun={run} />
+        <RunnerLogCard key={`hist-${i}`} historicalRun={run} onDismiss={() => useRunnerStore.getState().removeHistoricalRun(i)} />
       ))}
       <SkillsPanel onSkillClick={chat.handleSkillClick} />
       {/* Pipeline menu — permanent, FSM-state-driven */}

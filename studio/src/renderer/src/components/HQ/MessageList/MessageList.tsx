@@ -50,9 +50,14 @@ export function MessageList(): JSX.Element {
     <div className={styles.list}>
       {messages.map((msg) => (
         <div key={msg.id} className={styles.message}>
-          <span className={`${styles.badge} ${msg.role === 'user' ? styles.badgeUser : styles.badgeAssistant}`}>
-            {msg.role === 'user' ? 'You' : 'Conductor'}
-          </span>
+          <div className={styles.badgeRow}>
+            <span className={`${styles.badge} ${msg.role === 'user' ? styles.badgeUser : styles.badgeAssistant}`}>
+              {msg.role === 'user' ? 'You' : 'Conductor'}
+            </span>
+            {msg.role === 'assistant' && (msg as { source?: string }).source === 'claude-code' && (
+              <span className={styles.ccTag}>CC</span>
+            )}
+          </div>
           {msg.role === 'assistant' && msg.thinking && (
             <ThinkingBlock thinking={msg.thinking} status={msg.status} />
           )}
