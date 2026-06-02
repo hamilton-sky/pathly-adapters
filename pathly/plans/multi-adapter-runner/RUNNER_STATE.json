@@ -1,0 +1,18 @@
+{
+  "topic": "multi-adapter-runner",
+  "flow": "team",
+  "project_root": "C:\\Users\\Yafit\\pathly-adapters",
+  "model": "claude-sonnet-4-6",
+  "timeout": 600,
+  "status": "done",
+  "current_state": "",
+  "current_adapter": "",
+  "iterations": 0,
+  "max_iterations": 20,
+  "cost_usd_so_far": 0.0,
+  "max_cost_usd": 5.0,
+  "autonomy": {},
+  "pending_menu": null,
+  "error_kind": null,
+  "open_session": null
+}

@@ -282,7 +282,15 @@ def handle_blocked(response: dict) -> None:
         )
 
 
-def handle_decide(flow: str, topic: str, project_root: str, response: dict) -> dict:
+def handle_decide(
+    flow: str,
+    topic: str,
+    project_root: str,
+    response: dict,
+    interactive: bool = True,
+) -> dict:
+    if not interactive:
+        raise RuntimeError("interactive decision required but running headless")
     print(f"\n? {response['question']}")
     for key, value in response.get("options", {}).items():
         print(f"  [{key}] {value}")

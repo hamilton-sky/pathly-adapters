@@ -66,6 +66,7 @@ export function Terminal(): JSX.Element {
     if (!api) return
     return api.onExit((tabId) => {
       xtermRegistry.write(tabId, '\r\n[process exited]\r\n')
+      useTerminalStore.getState().updateTabStatus(tabId, 'done')
     })
   }, [])
 

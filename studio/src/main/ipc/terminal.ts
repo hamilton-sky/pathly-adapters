@@ -20,9 +20,11 @@ const ptyOwners = new Map<string, number>()
 // Maps tabId → accumulated output lines for runner result reporting
 const ptyOutput = new Map<string, string[]>()
 // Maps tabId → runner metadata registered before spawn
-const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number }>()
+const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number; label: string }>()
 // Tracks tabs killed by the user (not by the runner exiting naturally)
 const ptyKilledByRunner = new Set<string>()
+// Tracks runner tabs that have already shown the autonomous-mode warning
+const runnerWarnShown = new Set<string>()
 
 function sendToWindow(tabId: string, channel: string, ...args: unknown[]): void {
   const win = ptyWindows.get(tabId)
@@ -140,9 +142,10 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         runnerTabMeta.delete(tabId)
         ptyOutput.delete(tabId)
         ptyKilledByRunner.delete(tabId)
+        const label = meta.label || tabId
         const banner = exitCode === 0
-          ? '\r\n\x1b[2m──\x1b[0m \x1b[1;32mDONE\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n'
-          : '\r\n\x1b[2m──\x1b[0m \x1b[1;31mABORTED\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n'
+          ? `\r\n\x1b[2m──\x1b[0m \x1b[1;32m${label} DONE\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
+          : `\r\n\x1b[2m──\x1b[0m \x1b[1;31m${label} ABORTED\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
         sendToWindow(tabId, `terminal:data:${tabId}`, banner)
         const postBody = JSON.stringify({
           run_id: meta.run_id,
@@ -170,6 +173,10 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     if (ptyOwners.get(tabId) !== event.sender.id) return
     const MAX_WRITE = 65536 // 64KB
     if (typeof data !== 'string' || data.length > MAX_WRITE) return
+    if (tabId.startsWith('runner-') && !runnerWarnShown.has(tabId)) {
+      runnerWarnShown.add(tabId)
+      event.sender.send(`terminal:data:${tabId}`, '\r\n\x1b[33m[!] Autonomous mode active — input will be forwarded to the agent\x1b[0m\r\n')
+    }
     activePtys.get(tabId)?.write(data)
   })
 
@@ -194,8 +201,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     }
   })
 
-  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string) => {
-    runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now() })
+  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string) => {
+    runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now(), label: label ?? tabId })
   })
 
   ipcMain.handle('terminal:popout', (event, tabId: string, label: string) => {

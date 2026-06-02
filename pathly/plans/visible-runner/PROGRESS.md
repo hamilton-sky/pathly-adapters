@@ -1,18 +1,18 @@
 # visible-runner — Progress
 
-## Status: IN PROGRESS
+## Status: COMPLETE
 
 ## Story Status
 
 | Story | Title | Delivered by | Status |
 |---|---|---|---|
-| S1 | Live terminal tab per stage | Conv 1+2 | TODO |
-| S2 | User can type to intervene | Conv 2 | TODO |
-| S3 | Runner lifecycle controls with terminal tabs | Conv 1+2 | TODO |
-| S4 | RunnerLogCard in HQ chat | Conv 3 | TODO |
-| S5 | Live jump button | Conv 3 | TODO |
-| S6 | Decision point visibility | Conv 3 | TODO |
-| S7 | Headless fallback | Conv 1 | TODO |
+| S1 | Live terminal tab per stage | Conv 1+2 | DONE |
+| S2 | User can type to intervene | Conv 2 | DONE |
+| S3 | Runner lifecycle controls with terminal tabs | Conv 1+2 | DONE |
+| S4 | RunnerLogCard in HQ chat | Conv 3 | DONE |
+| S5 | Live jump button | Conv 3 | DONE |
+| S6 | Decision point visibility | Conv 3 | DONE |
+| S7 | Headless fallback | Conv 1 | DONE |
 
 ## Conversation Breakdown
 
@@ -38,10 +38,10 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 2 | 7 useHQ SSE handlers | `studio/src/renderer/src/components/HQ/useHQ.tsx` | Handle TERMINAL_SPAWN + TERMINAL_SIGNAL | grep for both event names returns matches | DONE |
 | 2 | 8 terminal.ts result POST | `studio/src/main/ipc/terminal.ts` | Buffer PTY output; POST result on exit | grep for `/runner/terminal/result` returns match | DONE |
 | 2 | 9 PaneTabBar styling | `studio/src/renderer/src/components/Terminal/PaneTabBar.tsx` | runnerOwned tab CSS class | grep for `runnerOwned\|runnerTab` returns matches | DONE |
-| 3 | 10 RunnerLogCard | `studio/src/renderer/src/components/HQ/RunnerLogCard/RunnerLogCard.tsx` | New flat card component | file exists + typecheck passes | TODO |
-| 3 | 11 Live button | `studio/src/renderer/src/components/HQ/StageStatusStrip/StageStatusStrip.tsx` | [live ↗] pill button | grep for `liveBtn` returns match | TODO |
-| 3 | 12 DECISION_MENU | `studio/src/renderer/src/components/HQ/useHQ.tsx` | Auto-expand + toast | grep for `waiting for your decision` returns match | TODO |
-| 3 | 13 Wire LogCard | `studio/src/renderer/src/components/HQ/HQPanel.tsx` | Mount RunnerLogCard in panel | grep for `RunnerLogCard` in HQPanel returns match | TODO |
+| 3 | 10 RunnerLogCard | `studio/src/renderer/src/components/HQ/RunnerLogCard/RunnerLogCard.tsx` | New flat card component | file exists + typecheck passes | DONE |
+| 3 | 11 Live button | `studio/src/renderer/src/components/HQ/StageStatusStrip/StageStatusStrip.tsx` | [live ↗] pill button | grep for `liveBtn` returns match | DONE |
+| 3 | 12 DECISION_MENU | `studio/src/renderer/src/components/HQ/useHQ.tsx` | Auto-expand + toast | grep for `waiting for your decision` returns match | DONE |
+| 3 | 13 Wire LogCard | `studio/src/renderer/src/components/HQ/HQPanel.tsx` | Mount RunnerLogCard in panel | grep for `RunnerLogCard` in HQPanel returns match | DONE |
 
 ## Prerequisites
 

@@ -937,7 +937,7 @@ def runner_start():
         if not isinstance(autonomy, dict):
             autonomy = {}
 
-        _sup.start_run(
+        state = _sup.start_run(
             topic=topic,
             flow=data["flow"],
             project_root=data["project_root"],
@@ -948,7 +948,7 @@ def runner_start():
             autonomy=autonomy,
             broadcast_fn=_broadcast_runner,
         )
-        return jsonify({"status": "started", "topic": topic}), 200
+        return jsonify({"status": "started", "topic": topic, "run_id": state.run_id}), 200
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
     except Exception as exc:
@@ -993,8 +993,14 @@ def runner_terminal_result():
             evt = _sup._terminal_result_events.get(run_id)
             if evt is None:
                 return jsonify({"error": "unknown run_id"}), 404
+            runner_state = _sup._registry.get(topic)
+            if runner_state is not None:
+                adapter = runner_state.current_adapter or "claude"
+            else:
+                logger.warning("runner_terminal_result: no RunnerState found for topic %r, falling back to 'claude'", topic)
+                adapter = "claude"
             _sup._terminal_result_data[run_id] = {
-                "result": parse_result("claude", data.get("stdout_tail", "")),
+                "result": parse_result(adapter, data.get("stdout_tail", "")),
                 "exit_code": data.get("exit_code"),
                 "wall_seconds": data.get("wall_seconds"),
                 "user_initiated": data.get("user_initiated"),

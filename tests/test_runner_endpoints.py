@@ -100,6 +100,7 @@ def test_runner_start_launches_run(client, tmp_path):
 
     # Patch supervisor.start_run so no real thread is launched
     mock_state = MagicMock()
+    mock_state.run_id = "test-run-id-abc"
     mock_state.public_dict.return_value = {"status": "running", "topic": topic}
 
     with patch("pathly_orchestrator.supervisor.start_run", return_value=mock_state) as mock_start:
@@ -115,6 +116,7 @@ def test_runner_start_launches_run(client, tmp_path):
     data = json.loads(r.data)
     assert data["status"] == "started"
     assert data["topic"] == topic
+    assert data["run_id"] == "test-run-id-abc"
     mock_start.assert_called_once()
     call_kwargs = mock_start.call_args.kwargs
     assert call_kwargs["max_iterations"] == 5

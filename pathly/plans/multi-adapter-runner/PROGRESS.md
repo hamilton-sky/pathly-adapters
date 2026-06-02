@@ -3,7 +3,7 @@ name: Progress
 ---
 # Multi-Adapter Runner — Progress
 
-## Status: IN PROGRESS (Conv 3 complete — awaiting hard CI gate)
+## Status: COMPLETE
 
 ## Story Status
 
@@ -47,4 +47,4 @@ See **CONVERSATION_PROMPTS.md** for exact prompts.
 - `tests/` green at baseline.
 
 ## Blocked By
-- Upstream: `multi-adapter-routing` Conv 1.
+- None.

@@ -42,6 +42,7 @@ class RunnerState:
     model: str
     timeout: int
 
+    run_id: str = ""
     status: str = "idle"
     current_state: str = ""
     current_adapter: str = ""
@@ -69,6 +70,12 @@ class RunnerState:
     # Reroute override — set by /runner/reroute for the *next* stage only
     _reroute_adapter: Optional[str] = field(default=None, repr=False, compare=False)
 
+    # Active terminal tab id — set while a terminal-mode stage is in flight
+    active_tab_id: str = ""
+
+    # Broadcast callback — stored so abort_run() can send SSE without a broadcast_fn arg
+    _broadcast_fn: Optional[Callable] = field(default=None, repr=False, compare=False)
+
     # Kind string for error state
     error_kind: Optional[str] = None
 
@@ -80,6 +87,7 @@ class RunnerState:
             "project_root": self.project_root,
             "model": self.model,
             "timeout": self.timeout,
+            "run_id": self.run_id,
             "status": self.status,
             "current_state": self.current_state,
             "current_adapter": self.current_adapter,
@@ -194,56 +202,62 @@ def _run_stage_via_terminal(
     argv = resolve_argv(adapter, instructions, model, session=None, autonomy=True)
     tab_id = f"runner-{run_id[:8]}"
     label = f"{adapter} — {state.current_state or state.status}"
-    payload = {
-        "type": "TERMINAL_SPAWN",
-        "topic": state.topic,
-        "run_id": run_id,
-        "tab_id": tab_id,
-        "label": label,
-        "adapter": adapter,
-        "argv": argv,
-        "cwd": state.project_root,
-        "prompt": instructions,
-        "stage": state.current_state,
-    }
-    if broadcast_fn:
-        broadcast_fn(state.topic, payload)
     with _lock:
-        started = _terminal_started_events.setdefault(run_id, threading.Event())
-        result_evt = _terminal_result_events.setdefault(run_id, threading.Event())
-    if not started.wait(timeout=5):
+        state.active_tab_id = tab_id
+    try:
+        payload = {
+            "type": "TERMINAL_SPAWN",
+            "topic": state.topic,
+            "run_id": run_id,
+            "tab_id": tab_id,
+            "label": label,
+            "adapter": adapter,
+            "argv": argv,
+            "cwd": state.project_root,
+            "prompt": instructions,
+            "stage": state.current_state,
+        }
         if broadcast_fn:
-            broadcast_fn(
-                state.topic,
-                {
-                    "type": "RUNNER_WARNING",
-                    "topic": state.topic,
-                    "run_id": run_id,
-                    "reason": "terminal_spawn_timeout",
-                    "stage": state.current_state,
-                },
-            )
+            broadcast_fn(state.topic, payload)
         with _lock:
+            started = _terminal_started_events.setdefault(run_id, threading.Event())
+            result_evt = _terminal_result_events.setdefault(run_id, threading.Event())
+        if not started.wait(timeout=5):
+            if broadcast_fn:
+                broadcast_fn(
+                    state.topic,
+                    {
+                        "type": "RUNNER_WARNING",
+                        "topic": state.topic,
+                        "run_id": run_id,
+                        "reason": "terminal_spawn_timeout",
+                        "stage": state.current_state,
+                    },
+                )
+            with _lock:
+                _terminal_started_events.pop(run_id, None)
+                _terminal_result_events.pop(run_id, None)
+            return invoke_agent(
+                instructions,
+                state.project_root,
+                model,
+                state=state.current_state,
+                topic=state.topic,
+                timeout=state.timeout,
+                storage_path=Path(state.project_root) / "pathly" / "plans" / state.topic,
+                adapter=adapter,
+                session=session,
+                autonomy=autonomy,
+            )
+        result_evt.wait()
+        with _lock:
+            data = _terminal_result_data.pop(run_id, {})
             _terminal_started_events.pop(run_id, None)
             _terminal_result_events.pop(run_id, None)
-        return invoke_agent(
-            instructions,
-            state.project_root,
-            model,
-            state=state.current_state,
-            topic=state.topic,
-            timeout=state.timeout,
-            storage_path=Path(state.project_root) / "pathly" / "plans" / state.topic,
-            adapter=adapter,
-            session=session,
-            autonomy=autonomy,
-        )
-    result_evt.wait()
-    with _lock:
-        data = _terminal_result_data.pop(run_id, {})
-        _terminal_started_events.pop(run_id, None)
-        _terminal_result_events.pop(run_id, None)
-    return data.get("result", {})
+        return data.get("result", {})
+    finally:
+        with _lock:
+            state.active_tab_id = ""
 
 
 # ── Loop thread ────────────────────────────────────────────────────────────────
@@ -727,6 +741,7 @@ def start_run(
     broadcast_fn: Optional[Callable] = None,
 ) -> RunnerState:
     """Start a new supervised run for *topic*.  Raises ValueError if already active."""
+    import uuid as _uuid
     with _lock:
         existing = _registry.get(topic)
         if existing and existing.status in {"running", "paused", "awaiting_decision"}:
@@ -741,10 +756,25 @@ def start_run(
             max_iterations=max_iterations,
             max_cost_usd=max_cost_usd,
             autonomy=autonomy or {},
+            run_id=str(_uuid.uuid4()),
+            _broadcast_fn=broadcast_fn,
         )
         _registry[topic] = state
         state.status = "running"
         _write_mirror(state)
+
+    if broadcast_fn:
+        try:
+            broadcast_fn(
+                topic,
+                {
+                    "type": "RUN_STARTED",
+                    "topic": topic,
+                    "run_id": state.run_id,
+                },
+            )
+        except Exception as exc:
+            logger.warning("broadcast_fn error: %s", exc)
 
     t = threading.Thread(
         target=_loop,
@@ -780,12 +810,30 @@ def abort_run(topic: str) -> None:
             raise KeyError(topic)
         state._abort_flag = True
         proc = state._proc
+        active_tab_id = state.active_tab_id
+        run_id = state.run_id
+        broadcast_fn = state._broadcast_fn
 
     if proc is not None:
         try:
             proc.kill()
         except Exception:
             pass
+
+    if active_tab_id and broadcast_fn:
+        try:
+            broadcast_fn(
+                topic,
+                {
+                    "type": "TERMINAL_SIGNAL",
+                    "topic": topic,
+                    "signal": "term",
+                    "tab_id": active_tab_id,
+                    "run_id": run_id,
+                },
+            )
+        except Exception as exc:
+            logger.warning("broadcast_fn error: %s", exc)
 
 
 def supply_decision(topic: str, decision: str) -> None:

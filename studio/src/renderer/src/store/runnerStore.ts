@@ -19,6 +19,12 @@ export interface StageLogEntry {
   exitCode: number | null
 }
 
+export interface HistoricalRun {
+  stageLog: StageLogEntry[]
+  runStartedAt: number | null
+  cost: number
+}
+
 interface RunnerState {
   status: RunnerStatus
   stage: string | null
@@ -33,7 +39,8 @@ interface RunnerState {
   activeRunnerTabId: string | null
   logCardExpanded: boolean
   runStartedAt: number | null
-  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab'>>) => void
+  runHistory: HistoricalRun[]
+  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory'>>) => void
   resetRunner: () => void
   setDecisionMenu: (items: DecisionMenuItem[] | null) => void
   setRunnerConfig: (topic: string, projectRoot: string) => void
@@ -43,6 +50,8 @@ interface RunnerState {
   setActiveRunnerTabId: (tabId: string | null) => void
   setLogCardExpanded: (expanded: boolean) => void
   jumpToLiveTab: () => void
+  snapshotRun: () => void
+  resetRunHistory: () => void
 }
 
 const initialState = {
@@ -59,6 +68,7 @@ const initialState = {
   activeRunnerTabId: null,
   logCardExpanded: false,
   runStartedAt: null,
+  runHistory: [] as HistoricalRun[],
 }
 
 export const useRunnerStore = create<RunnerState>()((set, get) => ({
@@ -94,4 +104,14 @@ export const useRunnerStore = create<RunnerState>()((set, get) => ({
     if (!ts.open) ts.toggle()
     ts.openTab(activeRunnerTabId)
   },
+  snapshotRun: () => {
+    if (get().stageLog.length === 0) return
+    set((s) => ({
+      runHistory: [...s.runHistory, { stageLog: s.stageLog, runStartedAt: s.runStartedAt, cost: s.cost }],
+      stageLog: [],
+      runStartedAt: null,
+      activeRunnerTabId: null,
+    }))
+  },
+  resetRunHistory: () => set({ runHistory: [] }),
 }))

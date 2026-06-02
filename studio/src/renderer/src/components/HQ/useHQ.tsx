@@ -271,7 +271,7 @@ export function useHQ() {
                 tabs: s.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
               }))
               useRunnerStore.getState().attachTerminalToStage(tab_id, 'terminal')
-              void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id)
+              void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id, label)
                 .then(() => window.pathly.terminal.spawn(tab_id, cwd, adapter === 'shell' ? undefined : adapter))
                 .then(() => {
                   if (prompt) {
@@ -290,6 +290,8 @@ export function useHQ() {
                 const tabId = (data.tab_id as string | undefined) ?? useRunnerStore.getState().activeRunnerTabId
                 if (tabId) void window.pathly.terminal.kill(tabId).catch(() => { /* PTY may already be gone */ })
               }
+            } else if (data.type === 'RUN_STARTED') {
+              useRunnerStore.getState().snapshotRun()
             }
           } catch { /* ignore parse errors */ }
         }

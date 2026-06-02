@@ -26,6 +26,7 @@ export interface TerminalState {
   rememberTabForKind(kind: TerminalKind, id: string): void
   appendScrollback(tabId: string, chunk: string): void
   clearScrollback(tabId: string): void
+  updateTabStatus(id: string, status: TerminalTab['status']): void
 }
 
 export const useTerminalStore = create<TerminalState>()((set) => ({
@@ -162,4 +163,7 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
         [tabId]: [],
       },
     })),
+
+  updateTabStatus: (id, status) =>
+    set((s) => ({ tabs: s.tabs.map((t) => t.id === id ? { ...t, status } : t) })),
 }))

@@ -17,3 +17,7 @@
 {"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":3,"result":"PASS","tokens_in":0,"tokens_out":0,"cost_usd":0,"tool_uses":6,"wall_seconds":45,"ts":"2026-06-02T12:25:00Z"}
 {"type":"STATE_TRANSITION","to":"TESTING","ts":"2026-06-02T12:25:00Z"}
 {"type":"HUMAN_RESPONSE","value":"auto-advance"}
+{"type":"STATE_TRANSITION","to":"RETRO","ts":"2026-06-02T13:00:00Z"}
+{"type":"AGENT_DONE","agent":"tester","model":"claude-sonnet-4-6","conversation":0,"result":"PASS","tokens_in":0,"tokens_out":0,"total_tokens":0,"cost_usd":0,"tool_uses":0,"wall_seconds":0,"ts":"2026-06-02T13:00:00Z","schema_version":1}
+{"type":"STATE_TRANSITION","to":"DONE","ts":"2026-06-02T13:30:00.000000+00:00"}
+{"type":"AGENT_DONE","agent":"quick","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":0,"tokens_out":0,"total_tokens":0,"cost_usd":0,"tool_uses":0,"wall_seconds":0,"ts":"2026-06-02T13:30:00.000000+00:00","schema_version":1}
