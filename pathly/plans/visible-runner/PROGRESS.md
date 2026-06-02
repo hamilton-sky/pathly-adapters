@@ -1,6 +1,6 @@
 # visible-runner — Progress
 
-## Status: NOT STARTED
+## Status: IN PROGRESS
 
 ## Story Status
 
@@ -18,7 +18,7 @@
 
 | Conv | Phases | Stories | Status | Verify |
 |---|---|---|---|---|
-| 1 | 0–3 | S1, S3, S7 | TODO | `python -m pytest tests/ -q` |
+| 1 | 0–3 | S1, S3, S7 | DONE | `python -m pytest tests/ -q` |
 | 2 | 4–9 | S1, S2, S3 | TODO | `node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json && node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json` |
 | 3 | 10–13 | S4, S5, S6 | TODO | `node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json` |
 
@@ -28,10 +28,10 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 
 | Conv | Phase | File | Description | Done when | Status |
 |---|---|---|---|---|---|
-| 1 | 0 Pre-flight | `src/pathly_orchestrator/supervisor.py` | Run pytest baseline | `python -m pytest tests/ -q` exits 0 | TODO |
-| 1 | 1 Extract argv builder | `src/pathly_orchestrator/runner.py` | `resolve_argv()` function extracted | `grep -n "def resolve_argv" src/pathly_orchestrator/runner.py` returns match | TODO |
-| 1 | 2 HTTP endpoints | `src/pathly_orchestrator/http_server.py` | Add `/runner/terminal/started` + `/runner/terminal/result` | curl to `/runner/terminal/started` returns `{"ok":true}` | TODO |
-| 1 | 3 _loop refactor | `src/pathly_orchestrator/supervisor.py` | Add `_run_stage_via_terminal()` with threading.Event and fallback | `grep -n "_run_stage_via_terminal\|TERMINAL_SPAWN" src/pathly_orchestrator/supervisor.py` returns matches | TODO |
+| 1 | 0 Pre-flight | `src/pathly_orchestrator/supervisor.py` | Run pytest baseline | `python -m pytest tests/ -q` exits 0 | DONE |
+| 1 | 1 Extract argv builder | `src/pathly_orchestrator/runner.py` | `resolve_argv()` function extracted | `grep -n "def resolve_argv" src/pathly_orchestrator/runner.py` returns match | DONE |
+| 1 | 2 HTTP endpoints | `src/pathly_orchestrator/http_server.py` | Add `/runner/terminal/started` + `/runner/terminal/result` | curl to `/runner/terminal/started` returns `{"ok":true}` | DONE |
+| 1 | 3 _loop refactor | `src/pathly_orchestrator/supervisor.py` | Add `_run_stage_via_terminal()` with threading.Event and fallback | `grep -n "_run_stage_via_terminal\|TERMINAL_SPAWN" src/pathly_orchestrator/supervisor.py` returns matches | DONE |
 | 2 | 4 CSS tokens | `studio/src/renderer/src/styles/tokens.css` | Add `--runner-bg` + `--runner-border` | `grep -n "runner-bg" studio/src/renderer/src/styles/tokens.css` returns 2+ matches | TODO |
 | 2 | 5 TerminalTab type | `studio/src/renderer/src/types/terminal.ts` | Add `runnerOwned?: boolean` | grep for field returns match | TODO |
 | 2 | 6 runnerStore additions | `studio/src/renderer/src/store/runnerStore.ts` | Add stageLog, activeRunnerTabId, logCardExpanded | grep for all 3 fields returns matches | TODO |

@@ -57,6 +57,7 @@ def _extract_json_payload(raw_output: str) -> dict[str, Any]:
     if not cleaned:
         return {}
     decoder = json.JSONDecoder()
+    last: dict[str, Any] = {}
     for idx in range(len(cleaned)):
         if cleaned[idx] not in "{[":
             continue
@@ -65,8 +66,8 @@ def _extract_json_payload(raw_output: str) -> dict[str, Any]:
         except json.JSONDecodeError:
             continue
         if isinstance(payload, dict):
-            return payload
-    return {}
+            last = payload
+    return last
 
 
 def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -168,12 +169,31 @@ def _run_stage_via_terminal(
     model: str,
     run_id: str,
     broadcast_fn: Optional[Callable],
+    session: Optional[str] = None,
+    autonomy: bool = True,
 ) -> dict:
     from pathly_orchestrator.runner import invoke_agent, resolve_argv
 
+    # Gate: terminal mode is only active when PATHLY_TERMINAL_MODE=1.
+    # Without the gate, fall straight to headless so tests (which patch invoke_agent)
+    # and pre-Conv-2 deployments are not blocked by a 5-second spawn timeout.
+    if os.environ.get("PATHLY_TERMINAL_MODE") != "1":
+        return invoke_agent(
+            instructions,
+            state.project_root,
+            model,
+            state=state.current_state,
+            topic=state.topic,
+            timeout=state.timeout,
+            storage_path=Path(state.project_root) / "pathly" / "plans" / state.topic,
+            adapter=adapter,
+            session=session,
+            autonomy=autonomy,
+        )
+
     argv = resolve_argv(adapter, instructions, model, session=None, autonomy=True)
     tab_id = f"runner-{run_id[:8]}"
-    label = f"{adapter} â€” {state.current_state or state.status}"
+    label = f"{adapter} — {state.current_state or state.status}"
     payload = {
         "type": "TERMINAL_SPAWN",
         "topic": state.topic,
@@ -203,6 +223,9 @@ def _run_stage_via_terminal(
                     "stage": state.current_state,
                 },
             )
+        with _lock:
+            _terminal_started_events.pop(run_id, None)
+            _terminal_result_events.pop(run_id, None)
         return invoke_agent(
             instructions,
             state.project_root,
@@ -212,6 +235,8 @@ def _run_stage_via_terminal(
             timeout=state.timeout,
             storage_path=Path(state.project_root) / "pathly" / "plans" / state.topic,
             adapter=adapter,
+            session=session,
+            autonomy=autonomy,
         )
     result_evt.wait()
     with _lock:
@@ -400,6 +425,8 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     model,
                     run_id,
                     broadcast_fn,
+                    session=session_id,
+                    autonomy=autonomy_for_adapter,
                 )
             except RuntimeError as exc:
                 with _lock:
