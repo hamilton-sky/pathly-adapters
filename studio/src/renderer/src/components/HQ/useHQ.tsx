@@ -271,20 +271,28 @@ export function useHQ() {
     }
   }, [activeTopic])
 
+  // Sync active tab → runner: when the user switches feature tabs, bind the runner to that feature.
   useEffect(() => {
-    if (!projectPath) return   // wait until the store has the project root
+    if (activeTopic && projectPath) {
+      useRunnerStore.getState().setRunnerConfig(activeTopic, projectPath)
+    }
+  }, [activeTopic, projectPath])
+
+  // Fallback: if no tab is open yet, ask the server which feature was last active.
+  useEffect(() => {
+    if (activeTopic || !projectPath) return   // tab already set — no need to query
     const url = `http://127.0.0.1:8765/status?project_root=${encodeURIComponent(projectPath)}`
     fetch(url)
       .then((r) => r.json())
       .then((data: Record<string, unknown>) => {
         const feature = data.feature as string | undefined
         const root = (data.project_root as string | undefined) ?? projectPath
-        if (feature) {
+        if (feature && !useRunnerStore.getState().topic) {
           useRunnerStore.getState().setRunnerConfig(feature, root)
         }
       })
       .catch(() => { /* server may be offline */ })
-  }, [projectPath])
+  }, [activeTopic, projectPath])
 
   useEffect(() => {
     preEmbedSkills(loadSkills(), (pct) => setEmbedProgress(pct))
