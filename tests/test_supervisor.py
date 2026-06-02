@@ -27,7 +27,7 @@ from pathly_orchestrator.supervisor import (
 
 _NEXT_ACTION = "pathly_orchestrator.fsm_http_client.next_action"
 _COMPLETE_STAGE = "pathly_orchestrator.fsm_http_client.complete_stage"
-_INVOKE_AGENT = "pathly_orchestrator.runner.invoke_agent"
+_RUN_STAGE = "pathly_orchestrator.supervisor._run_stage_via_terminal"
 
 
 def _na(state: str = "STORMING", adapter: str = "claude") -> dict:
@@ -151,7 +151,7 @@ def test_start_run_single_stage_done(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, return_value=_invoke_result()),
+        patch(_RUN_STAGE, return_value=_invoke_result()),
     ):
         state = start_run(
             topic=topic,
@@ -178,7 +178,7 @@ def test_start_run_two_stages(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, return_value=_invoke_result()),
+        patch(_RUN_STAGE, return_value=_invoke_result()),
     ):
         state = start_run(
             topic=topic,
@@ -224,7 +224,7 @@ def test_cap_exceeded_cost(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, return_value=_invoke_result(cost=5.0)),
+        patch(_RUN_STAGE, return_value=_invoke_result(cost=5.0)),
     ):
         state = start_run(
             topic=topic,
@@ -263,7 +263,7 @@ def test_cap_exceeded_cost_stops_loop(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, side_effect=fake_invoke),
+        patch(_RUN_STAGE, side_effect=fake_invoke),
     ):
         state = start_run(
             topic=topic,
@@ -303,7 +303,7 @@ def test_cap_exceeded_iterations(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=fake_na),
         patch(_COMPLETE_STAGE, side_effect=fake_cs),
-        patch(_INVOKE_AGENT, side_effect=fake_invoke),
+        patch(_RUN_STAGE, side_effect=fake_invoke),
     ):
         state = start_run(
             topic=topic,
@@ -341,7 +341,7 @@ def test_abort_stops_run(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, side_effect=fake_invoke),
+        patch(_RUN_STAGE, side_effect=fake_invoke),
     ):
         state = start_run(
             topic=topic,
@@ -381,7 +381,7 @@ def test_pause_and_resume(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=fake_na),
         patch(_COMPLETE_STAGE, side_effect=fake_cs),
-        patch(_INVOKE_AGENT, return_value=_invoke_result(cost=0.1)),
+        patch(_RUN_STAGE, return_value=_invoke_result(cost=0.1)),
     ):
         state = start_run(
             topic=topic,
@@ -442,7 +442,7 @@ def test_decision_point_awaiting_and_resume(tmp_path):
     with (
         patch(_NEXT_ACTION, return_value=_na("STORMING")),
         patch(_COMPLETE_STAGE, side_effect=fake_cs),
-        patch(_INVOKE_AGENT, return_value=_invoke_result()),
+        patch(_RUN_STAGE, return_value=_invoke_result()),
     ):
         state = start_run(
             topic=topic,
@@ -496,7 +496,7 @@ def test_session_continuity_same_adapter(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, side_effect=fake_invoke),
+        patch(_RUN_STAGE, side_effect=fake_invoke),
     ):
         state = start_run(
             topic=topic,
@@ -534,7 +534,7 @@ def test_session_fresh_on_adapter_change(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, side_effect=fake_invoke),
+        patch(_RUN_STAGE, side_effect=fake_invoke),
     ):
         state = start_run(
             topic=topic,
@@ -564,7 +564,9 @@ def test_reroute_overrides_adapter_for_next_stage(tmp_path):
     second_invoke_may_proceed = threading.Event()
 
     def fake_invoke(*args, **kwargs):
-        adapter = kwargs.get("adapter", "claude")
+        # _run_stage_via_terminal(state, instructions, adapter, model, ...)
+        # adapter is the 3rd positional arg; fall back to kwarg for safety.
+        adapter = args[2] if len(args) > 2 else kwargs.get("adapter", "claude")
         used_adapters.append(adapter)
         if len(used_adapters) == 1:
             first_invoke_done.set()
@@ -578,7 +580,7 @@ def test_reroute_overrides_adapter_for_next_stage(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, side_effect=fake_invoke),
+        patch(_RUN_STAGE, side_effect=fake_invoke),
     ):
         state = start_run(
             topic=topic,
@@ -613,7 +615,7 @@ def test_cost_accumulated_across_stages(tmp_path):
     with (
         patch(_NEXT_ACTION, side_effect=na_calls),
         patch(_COMPLETE_STAGE, side_effect=cs_calls),
-        patch(_INVOKE_AGENT, return_value={"cost_usd": 0.25, "session_id": None}),
+        patch(_RUN_STAGE, return_value={"cost_usd": 0.25, "session_id": None}),
     ):
         state = start_run(
             topic=topic,
@@ -638,7 +640,7 @@ def test_mirror_written_on_completion(tmp_path):
     with (
         patch(_NEXT_ACTION, return_value=_na("STORMING")),
         patch(_COMPLETE_STAGE, return_value=_cs_done()),
-        patch(_INVOKE_AGENT, return_value=_invoke_result()),
+        patch(_RUN_STAGE, return_value=_invoke_result()),
     ):
         state = start_run(
             topic=topic,

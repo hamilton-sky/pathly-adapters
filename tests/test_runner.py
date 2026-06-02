@@ -211,4 +211,8 @@ def test_parse_result_cases(raw, expected):
 
 def test_parse_result_codex_shape_drift():
     result = parse_result("codex", '{"cost": 6, "sessionId": "codex-1"}')
-    assert result == {"cost_usd": 6.0, "session_id": "codex-1"}
+    assert result == {
+        "cost_usd": 6.0,
+        "session_id": "codex-1",
+        "ask_user_question": None,
+    }
