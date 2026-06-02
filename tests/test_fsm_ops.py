@@ -134,7 +134,7 @@ def test_complete_stage_after_planning(tmp_path):
     storage = _storage_path(tmp_path)
     state_file = storage / "STATE.json"
     state_file.write_text(json.dumps({"current": "PLANNING"}), encoding="utf-8")
-    (storage / "IMPLEMENTATION_PLAN.md").write_text("plan content", encoding="utf-8")
+    (storage / "IMPLEMENTATION_PLAN.md").write_text("## Conversation 1\nplan content", encoding="utf-8")
 
     result = complete_stage({
         "flow": "team",

@@ -166,19 +166,60 @@ def _agent_hint(agent: str, instructions: str | None) -> dict:
 
 def _stage_brief(state_info: dict, storage_path: Path) -> dict:
     feedback_dir = storage_path / "feedback"
-    open_feedback = []
+    open_feedback: list[str] = []
+    feedback_age_hours: float | None = None
+
     if feedback_dir.exists():
+        oldest_mtime: float | None = None
         for item in sorted(feedback_dir.iterdir()):
-            if item.is_file():
+            if item.is_file() and item.suffix == ".md":
                 open_feedback.append(item.name)
+                try:
+                    mtime = item.stat().st_mtime
+                    if oldest_mtime is None or mtime < oldest_mtime:
+                        oldest_mtime = mtime
+                except OSError:
+                    pass
+        if oldest_mtime is not None:
+            age = (datetime.datetime.now().timestamp() - oldest_mtime) / 3600
+            feedback_age_hours = round(age, 1)
+
+    # 1.1 — last 3 EVENTS.jsonl entries for agent context
+    recent_events: list[dict] = []
+    events_file = storage_path / "EVENTS.jsonl"
+    if events_file.exists():
+        try:
+            lines = [ln for ln in events_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
+            for line in lines[-3:]:
+                try:
+                    recent_events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        except OSError:
+            pass
+
+    # 1.3 — most recent CONSULT_*.md for meet.md auto-injection
+    recent_consult: str | None = None
+    if feedback_dir.exists():
+        try:
+            consult_files = sorted(
+                [f for f in feedback_dir.iterdir() if f.name.startswith("CONSULT_") and f.suffix == ".md"],
+                key=lambda f: f.stat().st_mtime,
+                reverse=True,
+            )
+            if consult_files:
+                recent_consult = consult_files[0].read_text(encoding="utf-8")
+        except OSError:
+            pass
+
     return {
         "state": state_info["current_state"],
         "conv": state_info["conv"],
         "retry_count": state_info.get("retry_count", 0),
         "open_feedback": open_feedback,
-        "feedback_age_hours": None,
-        "recent_events": [],
-        "recent_consult": None,
+        "feedback_age_hours": feedback_age_hours,  # 1.4 — TTL visibility
+        "recent_events": recent_events,
+        "recent_consult": recent_consult,
         "plan_path": str(storage_path),
     }
 
@@ -223,6 +264,21 @@ def _response_envelope(
 
 def _blocked_response(feedback: dict, state_info: dict, storage_path: Path | None = None, preferred_adapter: str = "") -> dict:
     decision = "escalate" if feedback["target_agent"] == "human" else "block"
+    brief = _stage_brief(state_info, storage_path) if storage_path else {
+        "state": state_info["current_state"],
+        "conv": state_info["conv"],
+        "retry_count": state_info.get("retry_count", 0),
+        "open_feedback": [feedback["file"]],
+        "feedback_age_hours": None,
+        "recent_events": [],
+        "recent_consult": None,
+        "plan_path": "",
+    }
+    warnings: list[dict] = [{"code": "open_feedback", "file": feedback["file"]}]
+    age = brief.get("feedback_age_hours")
+    if age is not None and age >= 4:
+        warnings.append({"code": "feedback_stale", "file": feedback["file"], "age_hours": age,
+                         "message": f"⚠ {feedback['file']} has been open for {age}h — review before continuing."})
     result = {
         "schema_version": _SCHEMA_VERSION,
         "decision": decision,
@@ -232,17 +288,8 @@ def _blocked_response(feedback: dict, state_info: dict, storage_path: Path | Non
         "agent": feedback["target_agent"],
         "preferred_adapter": preferred_adapter,
         "agent_hint": _agent_hint(feedback["target_agent"], feedback.get("instructions")),
-        "stage_brief": {
-            "state": state_info["current_state"],
-            "conv": state_info["conv"],
-            "retry_count": state_info.get("retry_count", 0),
-            "open_feedback": [feedback["file"]],
-            "feedback_age_hours": None,
-            "recent_events": [],
-            "recent_consult": None,
-            "plan_path": "",
-        },
-        "warnings": [{"code": "open_feedback", "file": feedback["file"]}],
+        "stage_brief": brief,
+        "warnings": warnings,
         "limits": state_info["limits"],
         "storage_path": str(storage_path) if storage_path else "",
         "blocked": True,

@@ -88,7 +88,7 @@ def test_recover_state_limits_per_state(tmp_path):
 
 def test_evaluate_l1_artifact_present(tmp_path):
     flow = _load_team_flow()
-    (tmp_path / "IMPLEMENTATION_PLAN.md").write_text("plan", encoding="utf-8")
+    (tmp_path / "IMPLEMENTATION_PLAN.md").write_text("## Conversation 1\nsome plan", encoding="utf-8")
     result = evaluate_transition_rules(flow, "PLANNING", tmp_path)
     assert result == "DESIGNING"
 
@@ -100,14 +100,23 @@ def test_evaluate_l1_artifact_absent(tmp_path):
 
 
 def test_evaluate_l1_before_l2(tmp_path):
-    flow = copy.deepcopy(_load_team_flow())
-    flow["transition_rules"]["PLANNING"]["on_content"] = [
-        {"file": "SOME_FILE.md", "contains": "trigger", "next": "REVIEWING"}
-    ]
-    (tmp_path / "IMPLEMENTATION_PLAN.md").write_text("plan", encoding="utf-8")
-    (tmp_path / "SOME_FILE.md").write_text("trigger", encoding="utf-8")
-    result = evaluate_transition_rules(flow, "PLANNING", tmp_path)
-    assert result == "DESIGNING"
+    # L1 (on_artifact) fires before L2 (on_content) — use a synthetic flow to avoid
+    # coupling to team.flow.yaml's transition_rules structure
+    flow = {
+        "states": ["ALPHA", "BETA", "GAMMA"],
+        "transitions": {"ALPHA": ["BETA"], "BETA": [], "GAMMA": []},
+        "transition_rules": {
+            "ALPHA": {
+                "on_artifact": {"EXISTS.md": "BETA"},
+                "on_content": [{"file": "TRIGGER.md", "contains": "go", "next": "GAMMA"}],
+                "default": "ALPHA",
+            }
+        },
+    }
+    (tmp_path / "EXISTS.md").write_text("exists", encoding="utf-8")
+    (tmp_path / "TRIGGER.md").write_text("go", encoding="utf-8")
+    result = evaluate_transition_rules(flow, "ALPHA", tmp_path)
+    assert result == "BETA"  # L1 fired first
 
 
 def test_evaluate_l2_contains_match(tmp_path):

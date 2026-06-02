@@ -38,11 +38,13 @@ def recover_state(storage_path: Path, flow: dict) -> dict:
     """
     state_file = storage_path / "STATE.json"
 
+    corrupted_state = False
     if state_file.exists():
         try:
             state_doc = json.loads(state_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             state_doc = {}
+            corrupted_state = True
         current_state = state_doc.get("current", flow["states"][0])
         conv = state_doc.get("current_conversation", 0)
     else:
@@ -75,6 +77,7 @@ def recover_state(storage_path: Path, flow: dict) -> dict:
         "conv": conv,
         "open_feedback_files": open_feedback_files,
         "limits": limits,
+        "corrupted_state": corrupted_state,
     }
 
 
@@ -225,8 +228,10 @@ def route_feedback(flow: dict, storage_path: Path) -> dict | None:
     feedback_routing = flow.get("feedback_routing", {})
     human_files = {"HUMAN_QUESTIONS.md", "BLOCKED_ON_HUMAN.md"}
 
+    known_filenames: set[str] = set()
     for stem, agent in feedback_routing.items():
         filename = stem if stem.endswith(".md") else f"{stem}.md"
+        known_filenames.add(filename)
         if filename in md_files:
             result = {"file": filename, "target_agent": agent}
             if filename in human_files:
@@ -237,6 +242,15 @@ def route_feedback(flow: dict, storage_path: Path) -> dict | None:
                 except OSError:
                     result["instructions"] = ""
             return result
+
+    unmatched = md_files - known_filenames
+    if unmatched:
+        filename = sorted(unmatched)[0]
+        return {
+            "file": filename,
+            "target_agent": "human",
+            "instructions": f"Unrecognized feedback file: {filename}. Review and resolve manually.",
+        }
 
     return None
 

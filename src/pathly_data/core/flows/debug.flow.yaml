@@ -34,6 +34,7 @@ role_map:
   FIXING: builder
   VERIFYING: reviewer
 feedback_routing:
+  REPRO_QUESTIONS: human
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
 transition_actions:

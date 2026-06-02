@@ -23,6 +23,7 @@ starts.
 - Classify the user intent into `tiny_change`, `new_feature`, `brainstorm`,
   `resume`, `test`, `fix_or_review`, `retro`, or `unclear`.
 - Choose the lightest safe workflow.
+- Before invoking the route, print one line: `Routing to <workflow> — classified as: <intent>. Wrong? Try /pathly <alternative> instead.`
 - If an active feature exists, call `fsm-call` or the packaged
   `pathly-fsm-call` helper and render the returned menu payload instead of
   printing a static menu block.

@@ -65,12 +65,16 @@ feedback_routing:
   TEST_FAILURES: builder
 transition_rules:
   PLANNING:
-    on_artifact:
-      IMPLEMENTATION_PLAN.md: DESIGNING
+    on_content:
+      - file: IMPLEMENTATION_PLAN.md
+        contains: "## Conversation"
+        next: DESIGNING
     default: PLANNING
   DESIGNING:
-    on_artifact:
-      DESIGN.md: BUILDING
+    on_content:
+      - file: DESIGN.md
+        contains: "## Design System Output"
+        next: BUILDING
     default: DESIGNING
   BUILDING:
     default: REVIEWING

@@ -1,6 +1,8 @@
 # Pathly System Improvement Recommendations
 
-_Written 2026-05-28. Covers agents, skills, flow YAML design, and the Python FSM engine._
+_Written 2026-05-28. Updated 2026-06-02. Covers agents, skills, flow YAML design, and the Python FSM engine._
+
+**Status key:** ✅ Done · ⏳ In scope (planned) · ⬜ Not yet started
 
 ---
 
@@ -13,7 +15,7 @@ rating and — for Python fixes — shows the exact code change.
 
 ## 1. Agents & Skills
 
-### 1.1 Agent Context Bridging — HIGH impact / MEDIUM effort
+### 1.1 Agent Context Bridging — HIGH impact / MEDIUM effort ✅ DONE
 
 **Problem:** Each agent conversation starts cold. The FSM knows the current state,
 retry count, open feedback files, last events, and plan paths — but none of this is
@@ -28,7 +30,7 @@ data — it just needs to format and include it in the instructions it returns.
 
 ---
 
-### 1.2 Rigor Level Behavioral Specification — HIGH impact / LOW effort
+### 1.2 Rigor Level Behavioral Specification — HIGH impact / LOW effort ✅ DONE
 
 **Problem:** `go.md` classifies intent and chooses nano/lite/standard/strict, but
 the actual behavioral differences are not defined per agent. Does a `nano` builder
@@ -48,7 +50,7 @@ that role:
 
 ---
 
-### 1.3 `meet.md` Consultation Auto-Injection — MEDIUM impact / LOW effort
+### 1.3 `meet.md` Consultation Auto-Injection — MEDIUM impact / LOW effort ✅ DONE
 
 **Problem:** Consultations write to `pathly/plans/<feature>/consults/` as read-only
 notes. Nothing surfaces them to the next builder. A user who consults the architect
@@ -61,7 +63,7 @@ is present in your stage brief, incorporate it before acting."
 
 ---
 
-### 1.4 Feedback TTL and Stale-Feedback Warning — MEDIUM impact / LOW effort
+### 1.4 Feedback TTL and Stale-Feedback Warning — MEDIUM impact / LOW effort ✅ DONE
 
 **Problem:** `HUMAN_QUESTIONS.md` blocks the pipeline with no timeout or escalation.
 `verify-state.md` checks for stale feedback, but it is entirely user-triggered. A
@@ -75,7 +77,7 @@ resolution, just visibility.
 
 ---
 
-### 1.5 Cross-Stage Lesson Injection — MEDIUM impact / LOW effort
+### 1.5 Cross-Stage Lesson Injection — MEDIUM impact / LOW effort ✅ DONE (plan.md enforces LESSONS.md at Step 1)
 
 **Problem:** `lessons.md` synthesizes patterns into `pathly/lessons/LESSONS.md`, but
 this file is never automatically fed back into subsequent features. A planner starting
@@ -90,7 +92,7 @@ system is learning. If it is not yet enforced, wire it in as a required pre-step
 
 ---
 
-### 1.6 Gate Expansion Beyond BUILDING→REVIEWING — MEDIUM impact / MEDIUM effort
+### 1.6 Gate Expansion Beyond BUILDING→REVIEWING — MEDIUM impact / MEDIUM effort ✅ DONE
 
 **Problem:** `verify_gate` and `scope_gate` only fire on `BUILDING→REVIEWING`.
 Other transitions rely on artifact presence alone. `PLANNING→DESIGNING` only checks
@@ -107,7 +109,7 @@ Empty or placeholder artifacts gate through unnoticed.
 
 ---
 
-### 1.7 Director Correction Path — LOW impact / LOW effort
+### 1.7 Director Correction Path — LOW impact / LOW effort ✅ DONE
 
 **Problem:** If `go.md`'s director routes to the wrong skill, the user must re-invoke
 with a clearer prompt and gets no feedback on the routing decision.
@@ -119,7 +121,7 @@ One sentence, states the classification, gives the correction path.
 
 ---
 
-### 1.8 Debug Flow: Add REPRODUCING State — LOW-MEDIUM impact / LOW effort
+### 1.8 Debug Flow: Add REPRODUCING State — LOW-MEDIUM impact / LOW effort ✅ DONE (state + tester agent already in debug.flow.yaml; REPRO_QUESTIONS→human routing added)
 
 **Problem:** `debug.flow.yaml` jumps from `PROBLEM → INVESTIGATING`. Reproducing the
 bug is often the hardest step and is currently invisible — the scout goes straight
@@ -135,7 +137,7 @@ This makes debug sessions more rigorous and gives better artifacts for post-mort
 
 ---
 
-### 1.9 Scout Protocol Simplification — LOW impact / LOW effort
+### 1.9 Scout Protocol Simplification — LOW impact / LOW effort ✅ DONE
 
 **Problem:** The current scout rules impose complex cognitive load on the builder:
 min 2 scouts when used, max 4, each covers 2-3 files, all launched in parallel in
@@ -252,7 +254,7 @@ conversations.
 
 ---
 
-### 2.4 Hardcoded scope gate exemptions — NOT YET FIXED
+### 2.4 Hardcoded scope gate exemptions — ✅ FIXED (pathly-observability Conv 1)
 
 **File:** `src/pathly_orchestrator/fsm.py` — `_scope_clean()` — lines ~425-430
 
@@ -276,7 +278,7 @@ behavior explicit and configurable without changing `fsm.py` for each project.
 
 ---
 
-### 2.5 `route_feedback` silently ignores unrecognized feedback files — NOT YET FIXED
+### 2.5 `route_feedback` silently ignores unrecognized feedback files — ✅ FIXED
 
 **File:** `src/pathly_orchestrator/fsm.py` — `route_feedback()`
 
@@ -303,7 +305,7 @@ if unmatched:
 
 ---
 
-### 2.6 Corrupt `STATE.json` silently defaults — HARDENING RECOMMENDATION
+### 2.6 Corrupt `STATE.json` silently defaults — ✅ FIXED
 
 **File:** `src/pathly_orchestrator/fsm.py` — `recover_state()`
 
@@ -326,20 +328,20 @@ except (json.JSONDecodeError, OSError):
 
 ## 3. Prioritized Roadmap
 
-| # | Recommendation | Impact | Effort | Area |
-|---|---|---|---|---|
-| 1 | Agent context bridging (stage brief injection) | High | Medium | Agents/FSM |
-| 2 | Rigor level behavioral spec per agent | High | Low | Agents/Skills |
-| 3 | Fix `_verify_passed` scan all lines | High | Low | **Python (done)** |
-| 4 | Fix `conv_start_sha` stale baseline | High | Low | **Python (done)** |
-| 5 | `meet.md` consult auto-injection | Medium | Low | Skills |
-| 6 | Feedback TTL visibility in `next_action` | Medium | Low | FSM/Skills |
-| 7 | Cross-stage lesson injection (verify wiring) | Medium | Low | Skills |
-| 8 | Gate expansion to PLANNING→DESIGNING | Medium | Medium | Flow YAML |
-| 9 | Replace `assert` with `raise` | Medium | Low | **Python (done)** |
-| 10 | Unrecognized feedback file fallback routing | Medium | Low | Python |
-| 11 | Corrupt STATE.json warning flag | Low | Low | Python |
-| 12 | Scope gate exempt_prefixes in flow YAML | Low | Medium | Python/YAML |
-| 13 | Director routing explanation line | Low | Low | Skills |
-| 14 | Debug flow: add REPRODUCING state | Low | Low | Flow YAML |
-| 15 | Scout protocol simplification (drop min-2) | Low | Low | Agents |
+| # | Recommendation | Impact | Effort | Area | Status |
+|---|---|---|---|---|---|
+| 1 | Agent context bridging (stage brief injection) | High | Medium | Agents/FSM | ✅ done |
+| 2 | Rigor level behavioral spec per agent | High | Low | Agents/Skills | ✅ done |
+| 3 | Fix `_verify_passed` scan all lines | High | Low | Python | ✅ done |
+| 4 | Fix `conv_start_sha` stale baseline | High | Low | Python | ✅ done |
+| 5 | `meet.md` consult auto-injection | Medium | Low | Skills | ✅ done |
+| 6 | Feedback TTL visibility in `next_action` | Medium | Low | FSM/Skills | ✅ done |
+| 7 | Cross-stage lesson injection (verify wiring) | Medium | Low | Skills | ✅ done |
+| 8 | Gate expansion to PLANNING→DESIGNING | Medium | Medium | Flow YAML | ✅ done |
+| 9 | Replace `assert` with `raise` | Medium | Low | Python | ✅ done |
+| 10 | Unrecognized feedback file fallback routing | Medium | Low | Python | ✅ done |
+| 11 | Corrupt STATE.json warning flag | Low | Low | Python | ✅ done |
+| 12 | Scope gate exempt_prefixes in flow YAML | Low | Medium | Python/YAML | ✅ done |
+| 13 | Director routing explanation line | Low | Low | Skills | ✅ done |
+| 14 | Debug flow: add REPRODUCING state | Low | Low | Flow YAML | ✅ done |
+| 15 | Scout protocol simplification (drop min-2) | Low | Low | Agents | ✅ done |
