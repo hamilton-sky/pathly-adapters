@@ -7,8 +7,8 @@
 | 1 | Python infrastructure | S-01, S-02, S-03 | DONE | `python -m pytest tests/ -q` |
 | 2 | Skill phase logging | S-04, S-05, S-06 | DONE | Conv 1 tests green |
 | 3 | design.md + storm.md phases | S-07 | DONE | none |
-| 4 | Agent contracts + adapter propagation | S-08, S-09 | TODO | `pathly-setup claude --apply && pathly-setup codex --apply` |
-| 5 | Pipeline auto-chain: fast→review + PROGRESS.md on pass | S-10, S-11 | TODO | `pathly-setup claude --apply` |
+| 4 | Agent contracts + adapter propagation | S-08, S-09 | DONE | `pathly-setup claude --apply && pathly-setup codex --apply` |
+| 5 | Pipeline auto-chain: fast→review + PROGRESS.md on pass | S-10, S-11 | DONE | `pathly-setup claude --apply` |
 
 ## Story completion
 

@@ -8,3 +8,11 @@
 {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":3,"result":"DONE","tokens_in":17848,"tokens_out":4462,"total_tokens":22310,"cost_usd":0.120474,"tool_uses":17,"wall_seconds":84,"ts":"2026-06-02T10:58:40Z","schema_version":1}
 {"type":"STATE_TRANSITION","to":"BUILDING","ts":"2026-06-02T11:00:37Z"}
 {"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":3,"result":"PASS","tokens_in":0,"tokens_out":0,"total_tokens":0,"cost_usd":0,"tool_uses":0,"wall_seconds":0,"ts":"2026-06-02T11:00:37Z","schema_version":1}
+{"type":"STATE_TRANSITION","to":"REVIEWING","ts":"2026-06-02T11:04:53Z"}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":4,"result":"DONE","tokens_in":26769,"tokens_out":6692,"total_tokens":33461,"cost_usd":0.180687,"tool_uses":31,"wall_seconds":161,"ts":"2026-06-02T11:04:53Z","schema_version":1}
+{"type":"STATE_TRANSITION","to":"BUILDING","ts":"2026-06-02T11:10:00Z"}
+{"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":4,"result":"PASS","tokens_in":0,"tokens_out":0,"total_tokens":0,"cost_usd":0,"tool_uses":0,"wall_seconds":0,"ts":"2026-06-02T11:10:00Z","schema_version":1}
+{"type":"STATE_TRANSITION","to":"REVIEWING","ts":"2026-06-02T11:11:00Z"}
+{"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":5,"result":"DONE","tokens_in":0,"tokens_out":0,"total_tokens":0,"cost_usd":0.0,"tool_uses":0,"wall_seconds":51,"ts":"2026-06-02T11:11:51Z","schema_version":1}
+{"type":"STATE_TRANSITION","to":"TESTING","ts":"2026-06-02T11:13:00Z"}
+{"type":"AGENT_DONE","agent":"reviewer","model":"claude-sonnet-4-6","conversation":5,"result":"PASS","tokens_in":0,"tokens_out":0,"total_tokens":0,"cost_usd":0,"tool_uses":0,"wall_seconds":0,"ts":"2026-06-02T11:13:00Z","schema_version":1}
