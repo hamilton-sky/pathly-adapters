@@ -1,6 +1,7 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
 import { join } from 'path'
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
 
 let pty: typeof import('node-pty') | null = null
@@ -25,6 +26,8 @@ const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt
 const ptyKilledByRunner = new Set<string>()
 // Tracks runner tabs that have already shown the autonomous-mode warning
 const runnerWarnShown = new Set<string>()
+// Maps tabId → temp .ps1 script path created for that runner (Windows only)
+const runnerScripts = new Map<string, string>()
 
 function sendToWindow(tabId: string, channel: string, ...args: unknown[]): void {
   const win = ptyWindows.get(tabId)
@@ -74,25 +77,33 @@ function resolveShell(command: string | undefined): { shell: string; args: strin
 }
 
 /** Spawn a specific argv non-interactively — used by the runner so the PTY exits when the agent finishes. */
-function resolveRunnerShell(argv: string[]): { shell: string; args: string[] } {
+function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; tempScript?: string } {
   if (process.platform !== 'win32') {
     return { shell: argv[0], args: argv.slice(1) }
   }
-  // Windows: encode as base64 PowerShell command — handles any chars in the prompt (newlines, quotes, etc.)
-  // Single-quoted PS strings are fully literal; '' is the only escape (a literal single quote).
+  // Windows: -EncodedCommand (base64 UTF-16LE) has a hard ~32 KB limit from Win32's CreateProcess.
+  // Pathly stage prompts easily exceed this. Write a .ps1 script to a temp file instead —
+  // no length constraints, PowerShell single-quoted strings handle any content safely.
+  const tmpScript = path.join(os.tmpdir(), `pathly-runner-${Date.now()}.ps1`)
   const psArgs = argv.map((a) => `'${a.replace(/'/g, "''")}'`).join(' ')
-  const encoded = Buffer.from(`& ${psArgs}`, 'utf16le').toString('base64')
-  return { shell: 'powershell.exe', args: ['-EncodedCommand', encoded] }
+  fs.writeFileSync(tmpScript, `& ${psArgs}\r\n`, { encoding: 'utf8' })
+  return {
+    shell: 'powershell.exe',
+    args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', tmpScript],
+    tempScript: tmpScript,
+  }
 }
 
 export function killAllPtys(): void {
   activePtys.forEach((p) => { try { p.kill() } catch { /* ignore */ } })
+  runnerScripts.forEach((scriptPath) => { try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } })
   activePtys.clear()
   ptyWindows.clear()
   ptyOwners.clear()
   ptyOutput.clear()
   runnerTabMeta.clear()
   ptyKilledByRunner.clear()
+  runnerScripts.clear()
 }
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
@@ -112,13 +123,15 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
 
     let shell: string
     let shellArgs: string[]
+    let tempScript: string | undefined
 
     if (runnerArgv && runnerArgv.length > 0) {
       // Runner mode: use full argv so the agent exits when done (non-interactive)
       if (!ALLOWED_SHELLS.has(runnerArgv[0])) {
         throw new Error('Shell not allowed: ' + runnerArgv[0])
       }
-      ;({ shell, args: shellArgs } = resolveRunnerShell(runnerArgv))
+      ;({ shell, args: shellArgs, tempScript } = resolveRunnerShell(runnerArgv))
+      if (tempScript) runnerScripts.set(tabId, tempScript)
     } else {
       // Interactive mode: just the adapter name
       if (command !== undefined && !ALLOWED_SHELLS.has(command)) {
@@ -153,6 +166,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     ptyProcess.onExit(({ exitCode }) => {
       activePtys.delete(tabId)
       ptyOwners.delete(tabId)
+      const scriptPath = runnerScripts.get(tabId)
+      if (scriptPath) { runnerScripts.delete(tabId); try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } }
       sendToWindow(tabId, 'terminal:exit', tabId)
       const meta = runnerTabMeta.get(tabId)
       if (meta) {
