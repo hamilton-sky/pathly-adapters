@@ -97,6 +97,14 @@ POST /runner/terminal/result
 - `invoke_agent()` calls both `resolve_argv()` and `parse_result()` internally — no behavior change on the headless path.
 - For the claude adapter, use `--print --output-format=json` (single clean JSON object to stdout) rather than `--output-format=stream-json` (NDJSON stream) so `parse_result` can reliably find the result without scanning multiple lines.
 - The function must include the `--output-format=json` flag (or adapter equivalent) so PTY and headless modes share the same argv.
+- **`parse_result` must have dedicated tests before Phase 3 ships.** Required test cases:
+  1. Clean JSON stdout (headless path, no ANSI) → correct `cost_usd` + `session_id`
+  2. ANSI escape sequences wrapping output → still parses correctly after strip
+  3. Empty output / all-whitespace → returns `{"cost_usd": 0, "session_id": None}` without raising
+  4. Multiple JSON fragments / NDJSON stream → picks correct final result object
+  5. Truncated last line (PTY chunk boundary) → does not crash, falls back gracefully
+  6. Adapter-specific shape drift (codex vs claude result schema) → adapter-branched parsing handles each
+  7. Output with non-JSON trailing lines (e.g. "Done." after the JSON) → still finds the JSON
 **Verify:** `python -m pytest tests/ -q`
 
 ---
@@ -181,8 +189,8 @@ logCardExpanded: boolean
 runStartedAt: number | null
 ```
 Add actions:
-- `recordStageStart(stage: string, adapter: string | null, tabId: string | null)` — pushes entry with `startedAt: Date.now()`, `mode: null`, sets `activeRunnerTabId`, sets `runStartedAt` if `stageLog` was empty. **Ownership note:** this action is called by the existing `STAGE_CHANGE` SSE handler (Phase 7 update), not by `TERMINAL_SPAWN`. Every stage gets an entry; `TERMINAL_SPAWN` later attaches `tabId` and sets `mode: 'terminal'`.
-- `attachTerminalToStage(tabId: string, mode: 'terminal' | 'headless')` — updates last stageLog entry's `tabId` and `mode`. Called by the `TERMINAL_SPAWN` handler. If `RUNNER_WARNING` arrives instead, caller passes `mode: 'headless'`.
+- `recordStageStart(stage: string, adapter: string | null, tabId: string | null)` — pushes entry with `startedAt: Date.now()`, `mode: null`, sets `activeRunnerTabId`, sets `runStartedAt` if `stageLog` was empty. **Ownership note:** this action is called by the existing `STAGE_CHANGE` SSE handler (Phase 7 update), not by `TERMINAL_SPAWN`. Every stage gets an entry; `TERMINAL_SPAWN` later attaches `tabId` and sets `mode: 'terminal'`. **Reconnect guard:** if `stageLog` already has an open entry (no `endedAt`) with the same stage name, treat as no-op — do not push a duplicate row.
+- `attachTerminalToStage(tabId: string | null, mode: 'terminal' | 'headless')` — updates last stageLog entry's `tabId` and `mode`. Called by the `TERMINAL_SPAWN` handler. If `RUNNER_WARNING` arrives instead, caller passes `mode: 'headless'`. **Defensive guard:** if `stageLog` is empty when this fires (TERMINAL_SPAWN arrived before STAGE_CHANGE due to network reordering), create a placeholder entry `{stage: 'unknown', adapter: null, startedAt: Date.now(), ...}` rather than crashing.
 - `recordStageEnd(exitCode: number | null)` — updates last entry with `endedAt: Date.now()`, `exitCode`.
 - `setActiveRunnerTabId(tabId: string | null)` — sets field.
 - `setLogCardExpanded(expanded: boolean)` — sets field.
@@ -198,6 +206,18 @@ Add actions:
 **Depends on:** Phase 6
 **Details:**
 **Note on SSE ordering:** Supervisor always broadcasts `STAGE_CHANGE` before `TERMINAL_SPAWN` for the same stage (Phase 3). The `STAGE_CHANGE` handler must call `recordStageStart(stage, adapter, null)` to initialise the stageLog entry before `TERMINAL_SPAWN` arrives. Update the existing `STAGE_CHANGE` case to add this call.
+
+**SSE reconnect guard:** when `EventSource` fires `onerror` and reconnects, the renderer may miss events that arrived during the gap. Add a reconnect handler:
+```typescript
+es.onerror = () => {
+  // on reconnect, re-poll supervisor state to rebuild current run state
+  fetch('http://127.0.0.1:8765/runner/status?topic=' + topic)
+    .then(r => r.json())
+    .then(data => runnerStore.setRunnerState(data))
+    .catch(() => {});
+};
+```
+This ensures `stage`, `status`, and `cost` are always current even if SSE events were missed. It does not re-open terminal tabs (PTY ownership belongs to Electron main and is unaffected by renderer reconnects).
 
 In the SSE event switch:
 - `STAGE_CHANGE`: existing handler — add call to `runnerStore.recordStageStart(stage, adapter, null)` here (previously missing).
@@ -302,8 +322,9 @@ In the SSE event switch:
   @keyframes cardEnter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
   ```
-- Collapsed: status dot (reuse `.dotRunning` pulse class) + `N stages done — [current stage]` + `[▾]` toggle + `[Jump ↗]` button.
+- Collapsed: status dot (reuse `.dotRunning` pulse class) + `N stages done — [current stage]` + `[▾]` toggle + `[Jump ↗]` button (hidden if `activeRunnerTabId` is null, i.e. current stage is headless).
 - Expanded: table of stages (columns: stage name, adapter, timestamp, duration, status dot; use `<colgroup>` for explicit widths: stage flex-1, adapter 60px, timestamp 58px, duration 52px, status 24px); footer row showing run start time + total stages + `$cost`. Table font-size 11px, `font-variant-numeric: tabular-nums`.
+- **Headless row display:** when `stageLog[i].mode === 'headless'`, render the adapter column as `— headless` in `var(--text-muted)` (dim, italic). The row has no `[Jump ↗]` affordance. This makes the fallback explicitly visible rather than an invisible implementation detail — the operator can see which stages ran in the terminal and which fell back.
 - Expand/collapse animation: CSS `max-height` transition, `0 → 600px`, 200ms ease-out. Do NOT use a JS-driven height animation. Guard `bodyOpen` class toggle on the expand/collapse state.
 - `[▾]` / `[▴]` toggle: rotate a single chevron icon via `data-open="true/false"` → `transform: rotate(180deg/0deg)`, `transition: transform 150ms ease-out`. Calls `runnerStore.setLogCardExpanded(!logCardExpanded)`.
 - `[Jump ↗]` and `[live ↗]` share the same visual language: same border-radius (3px), same font-size (10px), same `var(--runtime)` color.

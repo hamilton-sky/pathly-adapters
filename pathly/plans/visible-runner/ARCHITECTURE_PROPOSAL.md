@@ -87,6 +87,31 @@ No state is duplicated across boundaries. Each boundary communicates state chang
 
 ---
 
+## Terminal run state machine
+
+Every `run_id` moves through these states exactly once, in one direction. No state may be re-entered. All transitions are guarded under `supervisor._lock`.
+
+```
+State       Entry condition                                  Valid next states
+──────────  ───────────────────────────────────────────────  ─────────────────────────
+pending     _run_stage_via_terminal() called, Event inserted  → claimed, headless
+claimed     POST /terminal/started received (first one wins)  → completed, aborted
+headless    5s timeout fires before /started arrives          → completed (invoke_agent)
+completed   POST /terminal/result received (exit_code any)   — terminal state
+aborted     _abort_flag set OR user_initiated=true in result  — terminal state
+```
+
+**Monotonicity rules:**
+- `/terminal/started` arriving while state is `headless` → return 409, no state change.
+- `/terminal/started` arriving while state is already `claimed` → return 409 (second window lost the race).
+- `/terminal/result` arriving while state is `pending` or `headless` before `invoke_agent` returns → discard (runner did not claim the terminal path).
+- Any duplicate `/terminal/result` for the same `run_id` → no-op, return `{"ok": true}` (idempotent).
+- On `aborted`: if result Event is still being waited on, set it immediately so `_loop` unblocks; the `exit_code` in the stored result is ignored, stage is marked as user-aborted not failed.
+
+**Registry cleanup:** on every terminal completion path (completed, aborted, headless fallback), pop `run_id` from `_terminal_started_events`, `_terminal_result_events`, and `_terminal_result_data`. Never leave stale keys in the dicts.
+
+---
+
 ## Headless fallback design
 
 The headless fallback is intentional, not a workaround. It ensures the pipeline is never blocked by UI availability:
