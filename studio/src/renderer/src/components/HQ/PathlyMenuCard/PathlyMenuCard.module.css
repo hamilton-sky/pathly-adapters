@@ -69,16 +69,15 @@
   border: none;
   cursor: pointer;
   border-radius: 4px;
-  color: inherit;
-  opacity: 0.5;
-  transition: opacity 100ms ease, background 100ms ease;
+  color: var(--text-dim);
+  transition: background 100ms ease, color 100ms ease;
   padding: 0;
   font-family: inherit;
 }
 
 .dismissBtn:hover {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--btn-b-hover-color);
+  background: var(--btn-b-hover-bg);
 }
 
 /* ── Progress bar (pushed menus only) ── */
@@ -101,12 +100,11 @@
 }
 
 .subtitle {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   padding: 2px 12px 6px;
-  opacity: 0.6;
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--text-dim);
 }
 
 .items {
@@ -130,11 +128,11 @@
 }
 
 .itemClickable:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--btn-c-hover-bg);
 }
 
 .itemClickable:active {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--btn-b-active-bg);
 }
 
 .itemTop {
@@ -151,24 +149,21 @@
 }
 
 .itemCommand {
-  font-size: 10px;
-  opacity: 0.6;
-  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  color: var(--text-dim);
 }
 
 .itemDescription {
   margin-top: 2px;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   line-height: 1.35;
-  opacity: 0.55;
-  color: var(--text-secondary);
+  color: var(--text-dim);
 }
 
 .empty {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   padding: 4px 12px;
-  opacity: 0.45;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 /* ── Decision mode ── */
@@ -194,7 +189,9 @@
 }
 
 .decisionBtn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--btn-b-hover-bg);
+  border-color: var(--btn-b-hover-border);
+  color: var(--btn-b-hover-color);
 }
 
 .decisionBtnDisabled {

@@ -35,7 +35,7 @@
   flex-shrink: 0;
   transition: background 0.12s, color 0.12s;
 }
-.backBtn:hover { background: var(--bg-surface0); color: var(--text-primary); }
+.backBtn:hover { background: var(--btn-b-hover-bg); border-color: var(--btn-b-hover-border); color: var(--btn-b-hover-color); }
 .backBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 
@@ -142,7 +142,7 @@
   white-space: nowrap;
   transition: background 0.12s, color 0.12s;
 }
-.terminalBtn:hover { background: var(--bg-surface0); color: var(--text-primary); }
+.terminalBtn:hover { background: var(--btn-b-hover-bg); border-color: var(--btn-b-hover-border); color: var(--btn-b-hover-color); }
 .terminalBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .publishBtn {
@@ -157,7 +157,7 @@
   white-space: nowrap;
   transition: opacity 0.12s;
 }
-.publishBtn:hover { opacity: 0.85; }
+.publishBtn:hover { filter: brightness(1.1); }
 .publishBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 .publishBtn:disabled { opacity: 0.5; cursor: default; }
 
@@ -190,7 +190,7 @@
   padding: 0 4px;
   transition: color 0.12s;
 }
-.logClose:hover { color: var(--text-primary); }
+.logClose:hover { color: var(--btn-b-hover-color); background: var(--btn-b-hover-bg); }
 .logClose:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .logBody {

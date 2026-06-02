@@ -16,9 +16,8 @@
 }
 
 .downloadLabel {
-  font-size: 10px;
-  opacity: 0.75;
-  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  color: var(--text-dim);
   font-family: var(--font-family-mono);
 }
 
@@ -93,11 +92,11 @@
 }
 
 .modelPill {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   padding: 2px 7px;
   border-radius: 8px;
   background: var(--bg-surface1);
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .modelPillActive {
@@ -132,6 +131,10 @@
   flex-shrink: 0;
 }
 
+.sendButton:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
 .sendButton:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -147,15 +150,14 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  opacity: 0.7;
-  color: inherit;
-  transition: opacity 120ms ease-out, background 120ms ease-out, color 120ms ease-out;
+  color: var(--text-dim);
+  transition: background 120ms ease-out, color 120ms ease-out;
   flex-shrink: 0;
 }
 
 .terminalBtn:hover {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--btn-b-hover-color);
+  background: var(--btn-b-hover-bg);
 }
 
 /* Active terminal kinds — color + full brightness */
@@ -185,17 +187,16 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  opacity: 0.55;
-  color: inherit;
-  transition: opacity 120ms ease-out, background 120ms ease-out;
+  color: var(--text-dim);
+  transition: background 120ms ease-out, color 120ms ease-out;
   flex-shrink: 0;
   padding: 0;
   border-radius: 0 6px 6px 0;
 }
 
 .terminalChevron:hover {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--btn-b-hover-color);
+  background: var(--btn-b-hover-bg);
 }
 
 .terminalDropdown {
@@ -229,7 +230,8 @@
 }
 
 .terminalDropdownItem:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--btn-c-hover-bg);
+  color: var(--btn-c-hover-color);
 }
 
 .terminalSep {

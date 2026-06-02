@@ -37,16 +37,16 @@
 }
 
 .targetLabel {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--type-label-spacing);
   flex-shrink: 0;
 }
 
-.targetLabel[data-target="claude"] { color: #38BDF8; }
-.targetLabel[data-target="codex"]  { color: #F59E0B; }
-.targetLabel[data-target="shell"]  { color: #86EFAC; }
+.targetLabel[data-target="claude"] { color: var(--accent); }
+.targetLabel[data-target="codex"]  { color: var(--yellow); }
+.targetLabel[data-target="shell"]  { color: var(--green); }
 
 .statusDot {
   width: 7px;
@@ -70,8 +70,8 @@
 
 /* Shrinks before tabMeta is hidden, but not before targetLabel */
 .statusText {
-  font-size: 10px;
-  opacity: 0.72;
+  font-size: var(--font-size-xs);
+  color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -80,8 +80,8 @@
 
 /* Shrinks first — lowest priority in meta zone */
 .tabMeta {
-  font-size: 10px;
-  opacity: 0.4;
+  font-size: var(--font-size-xs);
+  color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -104,21 +104,20 @@
   justify-content: center;
   border: none;
   background: transparent;
-  color: inherit;
+  color: var(--text-dim);
   cursor: pointer;
   border-radius: 4px;
-  opacity: 0.65;
-  transition: opacity 120ms ease-out, background 120ms ease-out;
+  transition: background 120ms ease-out, color 120ms ease-out;
 }
 
 .iconBtn:hover {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--btn-b-hover-color);
+  background: var(--btn-b-hover-bg);
 }
 
 .dangerBtn:hover {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.12);
+  color: var(--red);
+  background: var(--red-bg);
 }
 
 /* ── Preview row (BANNER state) ─────────────────────────── */
@@ -134,11 +133,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 0.72;
+  color: var(--text-dim);
 }
 
 .empty {
-  opacity: 0.38;
+  color: var(--text-dim);
   font-style: italic;
 }
 

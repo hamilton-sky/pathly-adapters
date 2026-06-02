@@ -17,20 +17,19 @@
 }
 
 .title {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--type-label-spacing);
 }
 
 .sectionLabel {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: var(--type-label-spacing);
   padding: 4px 12px 2px;
-  opacity: 0.55;
-  color: var(--text-secondary);
+  color: var(--text-dim);
 }
 
 .chips {
@@ -62,5 +61,7 @@
 }
 
 .chip:hover {
-  opacity: 0.75;
+  border-color: var(--btn-b-hover-border);
+  color: var(--btn-b-hover-color);
+  background: var(--btn-b-hover-bg);
 }

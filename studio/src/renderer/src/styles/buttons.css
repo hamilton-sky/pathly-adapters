@@ -1,0 +1,74 @@
+/* ─── Global button classes — imported once in main.tsx ─────── */
+/* These are the two non-icon button patterns used app-wide.     */
+/* Icon-only buttons use the IconButton component instead.       */
+
+/* ─── Class B: Bordered action button ───────────────────────── */
+/* FlowControlBar, TopBar backBtn/terminalBtn/navBtn,            */
+/* PathlyMenuCard.decisionBtn, SkillsPanel.chip                  */
+.pathly-btn-b {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-mantle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.pathly-btn-b:hover:not(:disabled) {
+  background: var(--btn-b-hover-bg);
+  border-color: var(--btn-b-hover-border);
+  color: var(--btn-b-hover-color);
+}
+
+.pathly-btn-b:active:not(:disabled) {
+  background: var(--btn-b-active-bg);
+}
+
+.pathly-btn-b:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.pathly-btn-b:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ─── Class C: Menu row item ─────────────────────────────────── */
+/* All dropdowns: terminal, target, session, topbar, vsCode,     */
+/* PathlyMenuCard items                                           */
+.pathly-btn-c {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  text-align: left;
+  white-space: nowrap;
+  transition: background 100ms ease-out, color 100ms ease-out;
+}
+
+.pathly-btn-c:hover {
+  background: var(--btn-c-hover-bg);
+  color: var(--btn-c-hover-color);
+}
+
+.pathly-btn-c:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
