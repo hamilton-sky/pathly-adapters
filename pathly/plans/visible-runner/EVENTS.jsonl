@@ -8,3 +8,5 @@
 {"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "tokens_in": 0, "tokens_out": 0, "cost_usd": 0, "tool_uses": 0, "wall_seconds": 0, "ts": "2026-06-02T12:15:00Z"}
 {"type": "HUMAN_RESPONSE", "value": "auto-advance"}
 {"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-06-02T12:15:00Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "tokens_in": 46251, "tokens_out": 11563, "total_tokens": 57814, "cost_usd": 0.312198, "tool_uses": 45, "wall_seconds": 257, "ts": "2026-06-02T12:15:20.509310+00:00", "schema_version": 1}
+{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "2026-06-02T12:15:20.509310+00:00"}

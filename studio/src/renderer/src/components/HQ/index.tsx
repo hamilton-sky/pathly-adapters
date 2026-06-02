@@ -9,6 +9,7 @@ import { AutomationCard } from './AutomationCard/AutomationCard'
 import { StepQueue } from './StepQueue/StepQueue'
 import { FlowControlBar } from './FlowControlBar/FlowControlBar'
 import { StageStatusStrip } from './StageStatusStrip/StageStatusStrip'
+import { RunnerLogCard } from './RunnerLogCard/RunnerLogCard'
 import { useBrightskyStore } from '../../store/brightskyStore'
 import styles from './index.module.css'
 
@@ -80,6 +81,7 @@ export function HQ(): JSX.Element {
       {chat.renderTerminalCard('codex', chat.codexTabId, chat.codexOutput)}
       {chat.renderTerminalCard('shell', chat.shellTabId, chat.shellOutput)}
       {chat.renderTerminalCard('antigravity', chat.antigravityTabId, chat.outputByTarget.antigravity)}
+      <RunnerLogCard />
       <ChatInput
         value={chat.inputValue}
         onChange={chat.setInputValue}

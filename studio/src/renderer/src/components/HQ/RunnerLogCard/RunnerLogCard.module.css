@@ -1,0 +1,204 @@
+/* ─── Card shell ─────────────────────────────────────────────── */
+.card {
+  border-left: 3px solid var(--runner-border);
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface0);
+  overflow: hidden;
+  animation: cardEnter 180ms ease-out both;
+  transition: border-left-color 200ms ease-out;
+  flex-shrink: 0;
+}
+
+.card[data-running="true"] {
+  border-left-color: var(--runtime);
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}
+
+/* ─── Header row ─────────────────────────────────────────────── */
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+}
+
+.stageName {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 11px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Status dot ─────────────────────────────────────────────── */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotRunning {
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.dotIdle {
+  background: var(--text-muted);
+}
+
+.dotDone {
+  background: var(--green);
+}
+
+.dotError {
+  background: var(--red);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+/* ─── Toggle button ──────────────────────────────────────────── */
+.toggleBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0 2px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.toggleBtn:hover {
+  color: var(--text-secondary);
+}
+
+.chevron {
+  display: inline-block;
+  transition: transform 150ms ease-out;
+}
+
+.chevron[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+.chevron[data-open="false"] {
+  transform: rotate(0deg);
+}
+
+/* ─── Jump button ────────────────────────────────────────────── */
+.jumpBtn {
+  background: transparent;
+  border: 1px solid var(--runner-border);
+  color: var(--runtime);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.jumpBtn:hover {
+  background: var(--runner-bg-hover);
+  border-color: var(--runtime);
+}
+
+/* ─── Expand/collapse body ───────────────────────────────────── */
+.body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 200ms ease-out;
+}
+
+.bodyOpen {
+  max-height: 600px;
+}
+
+/* ─── Table ──────────────────────────────────────────────────── */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.colStage    { /* flex-1: auto width */ }
+.colAdapter  { width: 60px; }
+.colTime     { width: 58px; }
+.colDuration { width: 52px; }
+.colStatus   { width: 24px; }
+
+.th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.row:hover {
+  background: var(--bg-surface1);
+}
+
+.cellStage {
+  color: var(--text-primary);
+  padding: 3px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.cellAdapter {
+  color: var(--text-secondary);
+  padding: 3px 6px;
+}
+
+.cellAdapterHeadless {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 3px 6px;
+}
+
+.cellTime {
+  color: var(--text-muted);
+  padding: 3px 6px;
+}
+
+.cellDuration {
+  color: var(--runtime);
+  padding: 3px 6px;
+}
+
+.cellStatus {
+  padding: 3px 6px;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────── */
+.footer {
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}

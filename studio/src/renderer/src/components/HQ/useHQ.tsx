@@ -11,6 +11,7 @@ import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext, invalidatePathlyContext, subscribeToMenuUpdates, type PushedMenu } from '../../lib/pathlyContext'
+import { useToastStore } from '../../store/toastStore'
 import { hasEmbeddedSkills, matchIntent, matchIntentByName, preEmbedSkills } from '../../lib/embedRouter'
 import { askLlm, getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
 import { splitThinkingContent } from '../../lib/thinkingParser'
@@ -243,6 +244,8 @@ export function useHQ() {
             } else if (data.type === 'DECISION_MENU') {
               setRunnerState({ status: 'blocked' })
               setDecisionMenu(data.items as DecisionMenuItem[])
+              useRunnerStore.getState().setLogCardExpanded(true)
+              useToastStore.getState().push('Runner is waiting for your decision', 'info')
             } else if (data.type === 'RUNNER_STATUS') {
               setRunnerState({ status: data.status as RunnerStatus })
             } else if (data.type === 'COST_UPDATE') {

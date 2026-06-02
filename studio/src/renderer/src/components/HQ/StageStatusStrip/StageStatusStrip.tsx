@@ -31,6 +31,7 @@ export function StageStatusStrip(): JSX.Element {
   const cost = useRunnerStore((s) => s.cost)
   const sessionKind = useRunnerStore((s) => s.sessionKind)
   const errorMessage = useRunnerStore((s) => s.errorMessage)
+  const activeRunnerTabId = useRunnerStore((s) => s.activeRunnerTabId)
 
   const costDisplay = cost === 0 && status === 'idle' ? '—' : `$${cost.toFixed(3)}`
   const adapterColor = adapter ? (ADAPTER_COLORS[adapter] ?? 'var(--text-muted)') : undefined
@@ -60,6 +61,16 @@ export function StageStatusStrip(): JSX.Element {
       )}
       {!adapter && (
         <span className={styles.adapterChipEmpty} aria-hidden="true">no adapter</span>
+      )}
+      {status === 'running' && activeRunnerTabId !== null && (
+        <button
+          type="button"
+          className={styles.liveBtn}
+          onClick={() => useRunnerStore.getState().jumpToLiveTab()}
+          aria-label="Jump to live terminal"
+        >
+          live ↗
+        </button>
       )}
       <span className={styles.cost}>{costDisplay}</span>
       {sessionLabel && (
