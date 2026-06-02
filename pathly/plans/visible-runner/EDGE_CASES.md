@@ -18,11 +18,12 @@
 
 **Trigger:** `window.pathly.terminal.spawn(tab_id, cwd, "claude")` fails because `claude` is not in the PATH.
 
-**Failure mode:** PTY exits immediately with a non-zero code. `terminal.ts` exit handler fires with `exitCode ≠ 0`. `final_json` is null.
+**Failure mode:** PTY exits immediately with a non-zero code. `terminal.ts` exit handler fires with `exitCode ≠ 0`. `stdout_tail` will be empty or contain only the shell error message.
 
 **Mitigation:**
-- `terminal.ts` still POSTs `/runner/terminal/result {exit_code: 1, final_json: null}`.
-- Supervisor treats `final_json: null` + `exit_code != 0` as a subprocess error — same as today's headless error path.
+- `terminal.ts` still POSTs `/runner/terminal/result {exit_code: 1, stdout_tail: "", wall_seconds: ...}`.
+- Supervisor calls `runner.parse_result(adapter, stdout_tail)` — empty output returns `{"cost_usd": 0, "session_id": None}` without raising.
+- Supervisor treats `exit_code != 0` as a subprocess error — same as today's headless error path.
 - `RUNNER_ERROR` SSE fires; StageStatusStrip shows red dot; `errorMessage` is set.
 - Resolution: user fixes PATH, then clicks Retry.
 
@@ -32,10 +33,10 @@
 
 **Trigger:** Agent writes non-JSON output (e.g., hits an auth error and prints a plain-text error message, or the `--output-format=json` flag is not supported by this adapter version).
 
-**Failure mode:** Reverse scan finds no parseable JSON. `final_json = null`.
+**Failure mode:** `stdout_tail` contains no parseable JSON. `parse_result()` returns `{"cost_usd": 0, "session_id": None}` (the empty-output fallback defined in Phase 1 test case 3).
 
 **Mitigation:**
-- `final_json: null` is a valid POST body field. Supervisor handles it like `invoke_agent` returning a degraded result: `cost_usd=0`, `session_id=None`.
+- `terminal.ts` POSTs `stdout_tail` as-is — it never attempts JSON parsing. Python's `parse_result(adapter, stdout_tail)` handles the degraded case gracefully: `cost_usd=0`, `session_id=None`.
 - `RUNNER_WARNING` or `RUNNER_ERROR` depending on severity (builder to decide based on existing error handling logic).
 - No crash in supervisor.
 
@@ -51,7 +52,7 @@
 3. Supervisor's abort handling (already in `_loop`) checks for active run_id → broadcasts `TERMINAL_SIGNAL {signal: "term"}`.
 4. `useHQ` receives `TERMINAL_SIGNAL` → calls `window.pathly.terminal.kill(activeRunnerTabId)`.
 5. PTY receives SIGTERM → exits with non-zero code.
-6. `terminal.ts` exit handler writes `── Runner aborted ──` (red ANSI) to xterm and POSTs `/runner/terminal/result {exit_code: 9, final_json: null}`.
+6. `terminal.ts` exit handler writes the ANSI abort banner to xterm and POSTs `/runner/terminal/result {exit_code: 9, stdout_tail: "", wall_seconds: ..., user_initiated: true}`.
 7. Supervisor's `result_event` fires → `_run_stage_via_terminal` returns → `_loop` sees `_abort_flag` → stops loop.
 
 **Risk:** Race between abort flag and stage completion. If the agent finishes naturally at the same moment, `result_event` fires with `exit_code: 0` and abort flag is ignored for that stage. This is acceptable — the supervisor will check `_abort_flag` at the top of the next iteration and stop.

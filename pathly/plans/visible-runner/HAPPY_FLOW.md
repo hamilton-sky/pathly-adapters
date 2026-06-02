@@ -39,11 +39,10 @@ Claude's output streams into the xterm viewport. Yafit can read every tool call 
 ### 5. Claude finishes STORM stage
 
 Claude exits cleanly (exit code 0). `terminal.ts` exit handler:
-- Reverse-scans output buffer → finds `{"cost_usd": 0.12, "session_id": "sess_abc", ...}` → `finalJson`.
-- Writes `\r\n\x1b[32m── claude — storm  DONE ──\x1b[0m\r\n` to xterm.
-- POSTs `/runner/terminal/result {exit_code: 0, final_json: {cost_usd: 0.12, ...}}`.
+- Writes the ANSI completion banner to xterm: `\r\n\x1b[2m──\x1b[0m \x1b[1;32mclaude — storm DONE\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
+- POSTs `/runner/terminal/result {exit_code: 0, stdout_tail: "<last 64KB of PTY output>", wall_seconds: 3.1, user_initiated: false}`. No JSON parsing happens in terminal.ts.
 
-Supervisor's `result_event["abc123"]` fires. `_run_stage_via_terminal` returns the result dict. `_loop` updates cost, increments iteration, calls `complete_stage()` → FSM advances to PLAN.
+Supervisor's `result_event["abc123"]` fires. `_run_stage_via_terminal` calls `runner.parse_result("claude", stdout_tail)` → extracts `{cost_usd: 0.12, session_id: "sess_abc"}`. `_loop` updates cost, increments iteration, calls `complete_stage()` → FSM advances to PLAN.
 
 ### 6. RunnerLogCard shows stage history
 

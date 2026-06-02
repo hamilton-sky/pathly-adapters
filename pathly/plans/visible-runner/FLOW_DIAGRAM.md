@@ -32,14 +32,13 @@
   │                     │          │               │               │
   │                     │          └───── exit ────┤               │
   │                     │                          │               │
-  │                     │                          │  scan buffer  │
-  │                     │                          │  find JSON    │
-  │                     │                          │  write DONE ─►xterm
+  │                     │                          │  write DONE ─►xterm (ANSI banner)
   │ "─── DONE ───"      │                          │               │
   │◄────────────────────│◄─ terminal:data ─────────│               │
   │                     │                          │               │
   │                     │  POST /terminal/result ──────────────────►│
-  │                     │                          │               │
+  │                     │  {stdout_tail, exit_code} │  parse_result(adapter, stdout_tail)
+  │                     │  no JSON parsing here     │  → {cost_usd, session_id}
   │                     │                          │  result_event fires
   │                     │                          │  _loop: complete_stage()
   │                     │◄── SSE: STAGE_CHANGE ───────────────────│

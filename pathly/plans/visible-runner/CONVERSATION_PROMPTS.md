@@ -25,14 +25,24 @@ Implement visible-runner Conversation 1 (Phases 0–3) from pathly/plans/visible
 Phase 0 — Pre-flight:
 Run `python -m pytest tests/ -q` and record the exit code and any failures. Stop here if tests fail — do not continue if the baseline is broken.
 
-Phase 1 — Extract argv builder:
-In `runner.py`, extract argv construction from `invoke_agent()` into a new `resolve_argv(adapter, prompt, model, session=None, autonomy=None) → list[str]` function. `invoke_agent()` calls `resolve_argv()` internally. The argv must include `--output-format=json` (or adapter equivalent) so PTY and headless modes share the same argv construction.
+Phase 1 — Extract argv builder and result parser:
+In `runner.py`:
+1. Extract argv construction from `invoke_agent()` into `resolve_argv(adapter, prompt, model, session=None, autonomy=None) → list[str]`. `invoke_agent()` calls `resolve_argv()` internally. Argv must include `--output-format=json` (or adapter equivalent).
+2. Extract output parsing from `invoke_agent()` into `parse_result(adapter: str, raw_output: str) → dict`. For claude, use `--print --output-format=json` which emits a single clean JSON object to stdout. `invoke_agent()` calls `parse_result()` internally — no behavior change.
+3. Write tests for `parse_result` covering all 7 cases before Phase 3 ships:
+   - Clean JSON stdout → correct cost_usd + session_id
+   - ANSI escape sequences in output → parses correctly after strip
+   - Empty output → returns {"cost_usd": 0, "session_id": None} without raising
+   - Multiple JSON fragments (NDJSON) → picks correct final result object
+   - Truncated last line → does not crash, falls back gracefully
+   - Adapter shape drift (codex vs claude schema) → adapter-branched parsing handles each
+   - Non-JSON trailing lines after JSON → still finds the JSON
 
 Phase 2 — HTTP callback endpoints:
 In `http_server.py`, add two new POST routes:
 - `POST /runner/terminal/started`: body `{topic, run_id, tab_id, pid}`. Finds the active RunnerState by topic, sets a `threading.Event` keyed by `run_id` (stored in a dict on the supervisor module or RunnerState). Returns `{"ok": true}`.
-- `POST /runner/terminal/result`: body `{topic, run_id, exit_code, final_json, wall_seconds}`. Stores the result and sets a second threading.Event to unblock `_run_stage_via_terminal`. Returns `{"ok": true}`.
-Both return `{"error": "unknown run_id"}` if not found.
+- `POST /runner/terminal/result`: body `{topic, run_id, exit_code, stdout_tail, wall_seconds, user_initiated}`. Stores the result and sets a second threading.Event to unblock `_run_stage_via_terminal`. Calls `runner.parse_result(adapter, stdout_tail)` to extract cost/session — no JSON parsing in terminal.ts. Returns `{"ok": true}`.
+Both return `{"error": "unknown run_id"}` if not found. Return `{"error": "already_headless", "code": 409}` from `/terminal/started` if run already fell back. All dict mutations under `supervisor._lock`.
 Follow the existing handler registration pattern in http_server.py exactly.
 
 Phase 3 — _run_stage_via_terminal:
