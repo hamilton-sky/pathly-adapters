@@ -260,6 +260,7 @@ export function Terminal(): JSX.Element {
             tabs={tabs}
             activeTabIds={[activeTabIdLeft, activeTabIdRight]}
             hiddenTabIds={hiddenTabIds}
+            splitEnabled={splitEnabled}
             onClosePanel={() => setInstancesRailOpen(false)}
             onOpenTab={openTab}
             onHideTab={handleHideTab}

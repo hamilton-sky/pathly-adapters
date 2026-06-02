@@ -738,6 +738,14 @@
   padding-left: 8px;
 }
 
+.paneEmptyHint {
+  display: block;
+  padding-left: 16px;
+  font-size: 11px;
+  opacity: 0.4;
+  color: var(--t-text-muted);
+}
+
 .emptyHint {
   position: absolute;
   inset: 0;

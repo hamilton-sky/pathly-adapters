@@ -8,6 +8,7 @@ interface TerminalInstancesRailProps {
   tabs: TerminalTab[]
   activeTabIds: Array<string | null>
   hiddenTabIds: Record<string, boolean>
+  splitEnabled?: boolean
   onClosePanel: () => void
   onOpenTab: (id: string) => void
   onHideTab: (id: string) => void
@@ -139,10 +140,64 @@ function PlanGroup({ plan, stage, tabs, activeTabIds, hiddenTabIds, onOpenTab, o
   )
 }
 
+interface PaneGroupProps {
+  label: string
+  tabs: TerminalTab[]
+  activeTabIds: Array<string | null>
+  hiddenTabIds: Record<string, boolean>
+  onOpenTab: (id: string) => void
+  onHideTab: (id: string) => void
+  onKillTab: (id: string) => void
+}
+
+function PaneGroup({ label, tabs: paneTabs, activeTabIds, hiddenTabIds, onOpenTab, onHideTab, onKillTab }: PaneGroupProps): JSX.Element {
+  const [expanded, setExpanded] = useState(true)
+  return (
+    <div className={styles.treeGroup}>
+      <button
+        type="button"
+        className={styles.treeGroupHeader}
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <ChevronDown
+          size={11}
+          className={`${styles.treeGroupChevron} ${expanded ? '' : styles.treeGroupChevronCollapsed}`}
+        />
+        <span className={styles.instanceLabel}>{label}</span>
+        <span className={styles.treeGroupBadge}>{paneTabs.length}</span>
+      </button>
+      {expanded && (
+        <div className={styles.treeGroupItems}>
+          {paneTabs.map((tab) => {
+            const hidden = Boolean(hiddenTabIds[tab.id])
+            const active = activeTabIds.includes(tab.id) && !hidden
+            return (
+              <TabRow
+                key={tab.id}
+                tab={tab}
+                active={active}
+                hidden={hidden}
+                onOpenTab={onOpenTab}
+                onHideTab={onHideTab}
+                onKillTab={onKillTab}
+              />
+            )
+          })}
+          {paneTabs.length === 0 && (
+            <span className={styles.paneEmptyHint}>empty</span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function TerminalInstancesRail({
   tabs,
   activeTabIds,
   hiddenTabIds,
+  splitEnabled,
   onClosePanel,
   onOpenTab,
   onHideTab,
@@ -165,7 +220,28 @@ export function TerminalInstancesRail({
         </button>
       </div>
       <div className={styles.instancesList}>
-        {!hasAnyPlan ? (
+        {splitEnabled ? (
+          <>
+            <PaneGroup
+              label="Left"
+              tabs={tabs.filter((t) => t.pane === 'left')}
+              activeTabIds={activeTabIds}
+              hiddenTabIds={hiddenTabIds}
+              onOpenTab={onOpenTab}
+              onHideTab={onHideTab}
+              onKillTab={onKillTab}
+            />
+            <PaneGroup
+              label="Right"
+              tabs={tabs.filter((t) => t.pane === 'right')}
+              activeTabIds={activeTabIds}
+              hiddenTabIds={hiddenTabIds}
+              onOpenTab={onOpenTab}
+              onHideTab={onHideTab}
+              onKillTab={onKillTab}
+            />
+          </>
+        ) : !hasAnyPlan ? (
           // Backwards-compatible flat list when no tab has a plan
           tabs.map((tab) => {
             const hidden = Boolean(hiddenTabIds[tab.id])
