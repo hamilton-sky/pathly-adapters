@@ -6,6 +6,8 @@ while the real manifest's `skills:` map is empty, every skill composes
 byte-identical to its raw body.
 """
 
+from pathlib import Path
+
 import pytest
 
 from pathly_orchestrator.compose import (
@@ -18,12 +20,26 @@ from pathly_orchestrator.compose import (
 # A distinctive line from fragments/spawn-rules.md — used to assert gating.
 _SPAWN_RULES_MARKER = "## Sub-agent spawning rules"
 
+_SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
+
+# The five shared-section H2 headings; each must appear exactly once in a composed skill.
+_SHARED_SECTIONS = [
+    "## Live progress logging",
+    "## Completion report",
+    "## Scout choreography",
+    "## Feedback protocol",
+    "## Sub-agent spawning rules",
+]
+
 
 # ── Inert-seam: real (empty) manifest is a no-op ────────────────────────────
 
-@pytest.mark.parametrize("skill", ["team/build", "development/build"])
-def test_empty_manifest_composes_raw_body(skill):
-    """With `skills: {}`, every skill composes byte-identical to its raw body."""
+@pytest.mark.parametrize("skill", ["development/build", "development/review", "development/test"])
+def test_unconverted_skill_composes_raw_body(skill):
+    """A skill ABSENT from the manifest composes byte-identical to its raw body.
+
+    The development/* family is not yet converted, so it must remain a no-op.
+    """
     from pathly_orchestrator.compose import _read_skill_body
 
     raw = _read_skill_body(skill)
@@ -155,7 +171,54 @@ def test_validator_rejects_unknown_capability():
 
 def test_load_manifest_shape():
     manifest = load_manifest()
-    assert manifest.get("skills") == {}, "skills map must stay empty until Conv 3"
     assert "progress-logging" in [
         e if isinstance(e, str) else e.get("name") for e in manifest.get("defaults", [])
     ]
+
+
+# ── Converted team/* family: golden snapshots + exactly-once guarantee ───────
+
+_CONVERTED_TEAM_SKILLS = ["team/build", "team/review", "team/test"]
+
+
+@pytest.mark.parametrize("skill", _CONVERTED_TEAM_SKILLS)
+def test_team_skill_matches_golden_snapshot(skill):
+    """Composed claude output must match the reviewed snapshot — fails on drift."""
+    snap = _SNAPSHOT_DIR / (skill.replace("/", "__") + ".claude.md")
+    assert snap.exists(), f"missing golden snapshot: {snap}"
+    expected = snap.read_text(encoding="utf-8")
+    assert compose_skill(skill, "claude") == expected
+
+
+@pytest.mark.parametrize("skill", _CONVERTED_TEAM_SKILLS)
+def test_team_skill_shared_sections_appear_at_most_once(skill):
+    """No shared section may appear twice (no duplication between body and fragment)."""
+    out = compose_skill(skill, "claude")
+    for heading in _SHARED_SECTIONS:
+        assert out.count(heading) <= 1, f"{skill}: {heading!r} duplicated"
+
+
+def test_team_build_and_review_include_all_five_sections():
+    """build/review compose every shared section exactly once (spawn-rules included)."""
+    for skill in ("team/build", "team/review"):
+        out = compose_skill(skill, "claude")
+        for heading in _SHARED_SECTIONS:
+            assert out.count(heading) == 1, f"{skill}: {heading!r} not exactly once"
+
+
+def test_team_test_omits_spawn_rules():
+    """team/test has no spawn-rules in its manifest entry."""
+    out = compose_skill("team/test", "claude")
+    assert _SPAWN_RULES_MARKER not in out
+    for heading in _SHARED_SECTIONS:
+        if heading != _SPAWN_RULES_MARKER:
+            assert out.count(heading) == 1
+
+
+def test_team_build_drops_spawn_rules_for_non_spawn_adapter():
+    """A converted skill drops spawn-rules when the adapter can't spawn."""
+    out = compose_skill("team/build", {"can_spawn": False})
+    assert _SPAWN_RULES_MARKER not in out
+    # the non-gated shared sections still compose in
+    assert "## Feedback protocol" in out
+    assert "## Scout choreography" in out

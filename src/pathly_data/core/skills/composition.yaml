@@ -11,9 +11,9 @@
 #     (`{ name: spawn-rules, requires: can_spawn }`); a gated fragment is dropped when the
 #     active adapter's capability is false.
 #
-# Conv 1 (this commit) ships fragments + manifest as INERT DATA: `skills:` is empty, so no
-# skill is reduced and nothing is composed yet — zero behaviour change, no duplication window.
-# Conv 3 adds the team/build|review|test entries ATOMICALLY with body reduction.
+# Conv 3 (this commit) converts the team/* runner family: each entry below lands ATOMICALLY
+# with the matching body reduction, so every shared section appears exactly once (body OR
+# fragment, never both). The development/* family is converted in a follow-up checkpoint.
 
 version: 1
 fragments_dir: fragments
@@ -24,26 +24,29 @@ defaults:
   - completion-report
 
 # Map of <skill name> -> { fragments: [...] }.
-# Intentionally EMPTY until Conv 3. Do not populate without reducing the corresponding skill
-# body in the same change, or shared sections will appear twice.
-skills: {}
-
-# Conv 3 will add (atomically with body reduction). Two skill FAMILIES share the same
-# fragments but keep distinct bodies (see IMPLEMENTATION_PLAN "development vs team split"):
+# Two skill FAMILIES share the same fragments but keep distinct bodies (see IMPLEMENTATION_PLAN
+# "development vs team split"):
 #   - team/*        runner-only, assembled at runtime by build_prompt() (FSM drives the loop)
 #   - development/* installed by pathly-setup as ~/.claude/skills/pathly-*.md (human drives the loop)
 # Manifest keys are the core-skills-relative path without ".md" (e.g. "development/build").
-#
-# skills:
-#   team/build:
-#     fragments:
-#       - scout-choreography
-#       - feedback-protocol
-#       - { name: spawn-rules, requires: can_spawn }
-#   team/review:
-#     fragments: [scout-choreography, feedback-protocol, { name: spawn-rules, requires: can_spawn }]
-#   team/test:
-#     fragments: [scout-choreography, feedback-protocol]
+# `spawn-rules` is gated on `can_spawn`: dropped for adapters that cannot spawn sub-agents.
+skills:
+  team/build:
+    fragments:
+      - scout-choreography
+      - feedback-protocol
+      - { name: spawn-rules, requires: can_spawn }
+  team/review:
+    fragments:
+      - scout-choreography
+      - feedback-protocol
+      - { name: spawn-rules, requires: can_spawn }
+  team/test:
+    fragments:
+      - scout-choreography
+      - feedback-protocol
+
+# Follow-up checkpoint adds the development/* family (atomically with body reduction):
 #   development/build:
 #     fragments: [scout-choreography, { name: spawn-rules, requires: can_spawn }]
 #   development/review:

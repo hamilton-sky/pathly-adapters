@@ -151,3 +151,112 @@ Mark Conv N as DONE in `pathly/plans/[feature]/PROGRESS.md`.
   If reviewer passed cleanly (no REVIEW_FAILURES.md written): delete `<storage_path>/feedback/REVIEW_FAILURES.md` if it exists.
 
 Return. Orchestrator determines next state from transition_rules.
+
+## Live progress logging
+
+(Track 2 will add: POST milestones to /runner/log as you work, so the Studio
+Monitor can render mid-stage progress in its event log. For now this fragment is
+an intentional no-op seam — it adds no behaviour.)
+
+## Completion report (usage parse + log-agent-done)
+
+After the stage agent completes (Phase 3), parse the `<usage>` block from its response:
+- `total_tokens`: the number after `total_tokens:` (0 if absent)
+- `tool_uses`: the number after `tool_uses:` (0 if absent)
+- `duration_ms`: the number after `duration_ms:` (0 if absent)
+
+Compute the `wall_seconds` fallback: run
+`python -c "import time; print(int(time.time()) - <STAGE>_START)"` using the `<STAGE>_START`
+integer recorded at the start of this stage.
+
+Then invoke the `log-agent-done` skill with:
+```json
+{"agent":"<agent>","feature":"<FEATURE>","conversation":<N>,"result":"<RESULT>","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
+```
+(`wall_seconds` is the fallback computed from `<STAGE>_START`; `log-agent-done` prefers
+`duration_ms` if > 0.)
+
+Return. The orchestrator determines the next state from `transition_rules`.
+
+## Scout choreography (analyze → scout → compress)
+
+The stage agent (builder / reviewer / tester) declares what context it needs *before* doing the
+work, scouts gather that context in parallel, and the findings are compressed into the work prompt.
+
+### Phase 1 — Analyze
+
+Spawn the stage agent with `phase: analyze`. It outputs a `## NEEDS_CONTEXT` block **only** —
+the list of things it must know before implementing / reviewing / testing.
+
+NEEDS_CONTEXT format (one entry per line):
+```
+  - type: scout | scope: <files or directories> | question: <specific question>
+  - type: quick | question: <specific question>
+```
+
+Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2 (or use only the stage's
+default scout entry, where one is defined).
+
+### Phase 2 — Scout (parallel, max 4)
+
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: <stage agent>` + the question
+- `type: scout` → spawn `scout` with `ROLE: <stage agent>` + scope + question
+
+Compress all returned findings into a short summary and inject it into the Phase 3 work prompt
+as the stage's findings section.
+
+## Feedback protocol
+
+All feedback files live in `pathly/plans/[feature]/feedback/`. File exists = issue open.
+Absent = resolved.
+
+Priority order (highest first): `HUMAN_QUESTIONS.md` › `ARCH_FEEDBACK.md` › `DESIGN_QUESTIONS.md` ›
+`IMPL_QUESTIONS.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`
+
+When you write a feedback file, use the shared feedback protocol formats and then report blocked.
+The orchestrator routes the highest-priority open file to the responsible agent, one at a time,
+before advancing.
+
+### Guard — feedback-open check
+
+Before spawning the stage agent, scan `pathly/plans/<feature>/feedback/`. If any file exists:
+1. Identify the highest-priority file using the order above.
+2. Log file created for that file.
+3. Route to the responsible agent (see the stage's feedback routing section).
+4. When resolved and the file is deleted: log file deleted. Re-scan.
+5. Only proceed when no feedback files remain.
+
+### Guard — retry-count check
+
+Before routing any feedback file to its agent:
+1. Check the retry count for `conv-N:FILE.md` in EVENTS.jsonl.
+2. If > 2: write `HUMAN_QUESTIONS.md` with an escalation message, log file created for
+   `HUMAN_QUESTIONS.md`. Stop and report the retry limit exceeded.
+3. If ≤ 2: after routing the fix agent, log retry for `conv-N:FILE.md`.
+
+Max 2 feedback cycles per conversation per feedback file. If exceeded, escalate to
+`HUMAN_QUESTIONS.md`.
+
+Exception: `IMPL_QUESTIONS.md` and `DESIGN_QUESTIONS.md` are clarification requests — exempt
+from retry counting.
+
+## Sub-agent spawning rules
+
+This stage runs on a host that can spawn sub-agents (Task / subagent capability).
+
+- **Never execute work yourself** — spawn the right subagent for each step.
+- Treat the FSM as a deterministic filesystem machine: read disk, process one event, emit one action.
+- After every agent completes, check for feedback files before advancing.
+- Spawn scouts and parallel workers up to a maximum of 4 at once.
+
+Map each action to its subagent (the stage skill lists the exact roles for that stage):
+
+| Action | Spawn |
+|---|---|
+| Implement | `builder` |
+| Review changes | `reviewer` |
+| Verify acceptance criteria | `tester` |
+| Clarify requirement | `planner` |
+| Clarify / redesign architecture | `architect` |
+| Scout context | `scout` or `quick` (with `ROLE:` set to the stage agent) |
