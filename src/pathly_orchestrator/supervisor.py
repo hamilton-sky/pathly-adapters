@@ -182,7 +182,7 @@ def _run_stage_via_terminal(
     from pathly_orchestrator.runner import resolve_argv
 
     argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy)
-    tab_id = f"runner-{run_id[:8]}"
+    tab_id = f"runner-{run_id[-10:]}"
     label = f"{adapter} — {state.current_state or state.status}"
     with _lock:
         state.active_tab_id = tab_id

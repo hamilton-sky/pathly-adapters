@@ -31,6 +31,9 @@ export function HQ(): JSX.Element {
       <FlowControlBar />
       <StageStatusStrip />
       <RunnerLogCard docked />
+      {runHistory.map((run, i) => (
+        <RunnerLogCard key={`hist-${i}`} historicalRun={run} />
+      ))}
       <SkillsPanel onSkillClick={chat.handleSkillClick} />
       {/* Pipeline menu — permanent, FSM-state-driven */}
       {chat.menuVisible ? <PathlyMenuCard menu={chat.activeMenu!} onSelect={chat.handleMenuSelect} isOpen={chat.menuCardOpen} onToggle={() => chat.setMenuCardOpen((v) => !v)} /> : null}
@@ -84,9 +87,6 @@ export function HQ(): JSX.Element {
       {chat.renderTerminalCard('codex', chat.codexTabId, chat.codexOutput)}
       {chat.renderTerminalCard('shell', chat.shellTabId, chat.shellOutput)}
       {chat.renderTerminalCard('antigravity', chat.antigravityTabId, chat.outputByTarget.antigravity)}
-      {runHistory.map((run, i) => (
-        <RunnerLogCard key={i} historicalRun={run} />
-      ))}
       <ChatInput
         value={chat.inputValue}
         onChange={chat.setInputValue}
@@ -100,6 +100,8 @@ export function HQ(): JSX.Element {
         onLaunchMiniTerminal={(kind) => { void chat.launchMiniTerminal(kind) }}
         miniTerminalActive={chat.miniTerminalVisible}
         miniTerminalKind={chat.hasActiveTerminal ? chat.targetKind : undefined}
+        chatMode={chat.chatMode}
+        onModeChange={chat.setChatMode}
       />
     </div>
   )
