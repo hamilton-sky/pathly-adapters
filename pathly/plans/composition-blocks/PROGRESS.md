@@ -18,7 +18,7 @@
 
 | Conv | Phases | Stories | Status | Verify |
 |---|---|---|---|---|
-| 0 | Pre-flight | — | TODO | `python -m pytest tests/ -q` (record baseline) |
+| 0 | Pre-flight | — | DONE | `python -m pytest tests/ -q` (record baseline) |
 | 1 | 1, 2, 3 | S1, S2, S3 | TODO | `python -m pytest tests/test_compose.py -q` |
 | 2 | 4, 5 | S4, S5 | TODO | `python -m pytest tests/ -q` |
 | 3 | 6, 7 | S6, S7 | TODO | `node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json` |
@@ -29,7 +29,7 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 
 | Conv | Phase | File | Description | Done when | Status |
 |---|---|---|---|---|---|
-| 0 | Pre-flight | (read-only) | Record baseline test counts + typecheck result; glob-verify all touchpoint paths | Baseline recorded in feedback/PREFLIGHT.md | TODO |
+| 0 | Pre-flight | (read-only) | Record baseline test counts + typecheck result; glob-verify all touchpoint paths | Baseline recorded in feedback/PREFLIGHT.md | DONE |
 | 1 | Phase 1 | `src/pathly_data/core/skills/composition.yaml` | Add `blocks:` map with 3 default blocks | File has `blocks:` key; `validate_composition()` clean | TODO |
 | 1 | Phase 2 | `src/pathly_orchestrator/compose.py` | Add `resolve_block` + `compose_skill_with_block` | Valid call returns string; unknown block raises | TODO |
 | 1 | Phase 3 | `src/pathly_orchestrator/compose.py` + `tests/test_compose.py` | Extend `validate_composition` for blocks; add block unit tests | All new tests pass; existing tests unaffected | TODO |
