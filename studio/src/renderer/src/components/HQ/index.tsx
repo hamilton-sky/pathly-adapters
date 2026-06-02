@@ -100,8 +100,6 @@ export function HQ(): JSX.Element {
         onLaunchMiniTerminal={(kind) => { void chat.launchMiniTerminal(kind) }}
         miniTerminalActive={chat.miniTerminalVisible}
         miniTerminalKind={chat.hasActiveTerminal ? chat.targetKind : undefined}
-        chatMode={chat.chatMode}
-        onModeChange={chat.setChatMode}
       />
     </div>
   )
