@@ -50,8 +50,12 @@ curl -s -X POST http://127.0.0.1:8765/record_phase \
   -d '{"feature":"my-feature","agent":"builder","phase":"scout","event_type":"PHASE_DONE","conv":2,"scouts_count":3}'
 ```
 
-## Silent failure
+## Server availability — start-if-needed
 
-If the HTTP server is not running, the curl command will fail silently (due to `-s` flag and
-no error handling). This is the intended behavior — phase logging must never block or fail
-skill execution.
+Same contract as `log-agent-done`: if the HTTP server is not reachable:
+1. Start the server in the background: `pathly-fsm-http`
+2. Wait 2 seconds, then retry the call once.
+3. If the retry also fails: skip silently and continue — phase logging must never block execution.
+
+This ensures phase logging works on any adapter (Codex, Copilot, CLI) where the
+FSM server is not automatically managed by the host environment.
