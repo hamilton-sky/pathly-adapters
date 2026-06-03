@@ -1,18 +1,6 @@
 {
   "convs_total": 4,
-  "convs_done": 3,
+  "convs_done": 2,
   "current": "BUILDING",
-  "updated_at": "2026-06-03T16:10:00Z",
-  "conv_start_sha": "35121a12b35a70fadabf26a38d860709b09b9d16",
-  "build_baseline": {
-    "started_at": "2026-06-03T17:21:19.930328+00:00",
-    "preexisting_dirty": [
-      "pathly/plans/brightsky-agent-upgrade/EVENTS.jsonl",
-      "pathly/plans/brightsky-agent-upgrade/RUNNER_STATE.json",
-      "pathly/plans/brightsky-agent-upgrade/STATE.json",
-      "studio/src/main/preload/index.ts",
-      "studio/src/renderer/src/lib/brightskyClient.ts",
-      "studio/src/renderer/src/lib/studioAnalyzer.ts"
-    ]
-  }
+  "updated_at": "2026-06-03T16:10:00Z"
 }

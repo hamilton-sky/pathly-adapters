@@ -762,7 +762,7 @@ def record_activity_endpoint():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
-_VALID_PHASES = {"analyze", "scout", "implement", "review", "test", "plan", "design", "storm"}
+_VALID_PHASES = {"analyze", "build", "design", "implement", "plan", "review", "scout", "storm", "test"}
 _VALID_EVENT_TYPES = {"PHASE_START", "PHASE_DONE"}
 
 

@@ -152,8 +152,6 @@ git diff HEAD -- . ":(exclude)pathly/plans/"
 
 ### If no feedback files — PASS
 
-log-phase PHASE_DONE review
-
 Run the Completion report with `agent: reviewer`, `result: PASS`, using `REVIEW_START` from Phase 0.
 
 ## Advance
