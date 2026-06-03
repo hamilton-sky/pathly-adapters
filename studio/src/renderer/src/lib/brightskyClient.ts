@@ -91,9 +91,6 @@ export class BrightskyClient {
         useChatStore.getState().updateLastMessage({ content: this.streamContent })
         if (payload?.isDone === true) {
           this.streamInProgress = false
-          const { thinking, content: finalContent } = splitThinkingContent(this.streamContent)
-          useChatStore.getState().updateLastMessage({ content: finalContent || this.streamContent, thinking, status: 'done' })
-          this.streamContent = ''
         }
       } else if (type === 'stream_end') {
         useBrightskyStore.getState().setThinkingLabel(null)
@@ -138,12 +135,21 @@ export class BrightskyClient {
     ws.onclose = () => {
       useBrightskyStore.getState().setConnected(false)
       if (this.streamInProgress) {
-        const current = useChatStore.getState().messages
-        const last = current[current.length - 1]
-        const prev = (last?.content as string | undefined) ?? ''
-        useChatStore.getState().updateLastMessage({
-          content: prev + '\n\n_(incomplete — connection lost)_',
-        })
+        if (this.streamContent) {
+          const { thinking, content: finalContent } = splitThinkingContent(this.streamContent)
+          useChatStore.getState().updateLastMessage({
+            content: (finalContent || this.streamContent) + '\n\n_(incomplete — connection lost)_',
+            thinking,
+            status: 'done',
+          })
+        } else {
+          const current = useChatStore.getState().messages
+          const last = current[current.length - 1]
+          const prev = (last?.content as string | undefined) ?? ''
+          useChatStore.getState().updateLastMessage({
+            content: prev + '\n\n_(incomplete — connection lost)_',
+          })
+        }
       }
       this.streamInProgress = false
       this.streamContent = ''

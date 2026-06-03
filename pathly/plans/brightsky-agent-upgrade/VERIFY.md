@@ -1,2 +1,2 @@
 RESULT: PASS
-Verified: conversations 1 and 2 complete — both TypeScript configs pass zero errors; 6 new studio tools in studioAnalyzer.ts and fsm:runSkill IPC + reasoning box splitThinkingContent wired.
+Verified: conversation 3 complete — 7 StudioBridgeTool subclasses added, all registered in mcp.module.ts, Gemini forced for pathly_chat with search tools in unified-ai.service.ts, npx tsc --noEmit exits 0 with no new errors.
