@@ -255,3 +255,44 @@ def test_tail_agent_done_yields_and_stops(tmp_path):
 
     assert len(results) == 1
     assert results[0]["type"] == "AGENT_DONE"
+
+
+# ── build_pipeline_history_block ──────────────────────────────────────────────
+
+def test_pipeline_history_block_format(tmp_path):
+    import json
+    from pathly_orchestrator.runner import build_pipeline_history_block
+
+    events_path = tmp_path / "EVENTS.jsonl"
+    entries = [
+        {"type": "AGENT_DONE", "agent": "builder", "conversation": 1, "summary": "added event constant", "ts": "2026-01-01T00:00:01Z"},
+        {"type": "AGENT_DONE", "agent": "reviewer", "conversation": 1, "summary": "review PASS", "ts": "2026-01-01T00:00:02Z"},
+        {"type": "AGENT_DONE", "agent": "builder", "conversation": 2, "summary": "wired supervisor", "ts": "2026-01-01T00:00:03Z"},
+    ]
+    events_path.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+
+    block = build_pipeline_history_block(str(events_path))
+
+    assert block.startswith("\n## Pipeline History\n")
+    assert "- **builder (conv 1)**: added event constant" in block
+    assert "- **reviewer (conv 1)**: review PASS" in block
+    assert "- **builder (conv 2)**: wired supervisor" in block
+    lines = [l for l in block.splitlines() if l.startswith("- ")]
+    assert lines[0] == "- **builder (conv 1)**: added event constant"
+    assert lines[2] == "- **builder (conv 2)**: wired supervisor"
+
+
+def test_pipeline_history_empty_when_no_events(tmp_path):
+    import json
+    from pathly_orchestrator.runner import build_pipeline_history_block
+
+    # Non-existent path returns ""
+    assert build_pipeline_history_block(str(tmp_path / "nonexistent.jsonl")) == ""
+
+    # File with no AGENT_DONE lines returns ""
+    events_path = tmp_path / "EVENTS.jsonl"
+    events_path.write_text(
+        json.dumps({"type": "PHASE_START", "phase": "build", "ts": "2026-01-01T00:00:00Z"}) + "\n",
+        encoding="utf-8",
+    )
+    assert build_pipeline_history_block(str(events_path)) == ""

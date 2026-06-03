@@ -180,7 +180,11 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
         f"State: {state_name}\n"
         f"Storage path: {storage_path}\n"
     )
-    return agent_text + context
+    from pathly_orchestrator.runner import build_pipeline_history_block
+    import os
+    events_path = os.path.join(project_root, "pathly", "plans", feature, "EVENTS.jsonl")
+    history = build_pipeline_history_block(events_path)
+    return agent_text + context + history
 
 
 def build_prompt_for_agent(

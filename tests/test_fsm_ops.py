@@ -515,3 +515,37 @@ def test_blocked_response_carries_preferred_adapter():
     feedback = {"target_agent": "builder", "file": "REVIEW_FAILURES.md"}
     result = fsm_ops._blocked_response(feedback, state_info, preferred_adapter="codex")
     assert result["preferred_adapter"] == "codex"
+
+
+def test_build_prompt_includes_pipeline_history(tmp_path):
+    """build_prompt appends ## Pipeline History when EVENTS.jsonl has AGENT_DONE entries."""
+    from unittest.mock import patch
+    from pathly_orchestrator.fsm_ops import build_prompt
+
+    # Set up temp project root: pathly/plans/test-feature/EVENTS.jsonl
+    feature = "test-feature"
+    plan_dir = tmp_path / "pathly" / "plans" / feature
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    events_path = plan_dir / "EVENTS.jsonl"
+    events_path.write_text(
+        json.dumps({
+            "type": "AGENT_DONE",
+            "agent": "builder",
+            "conversation": 1,
+            "summary": "smoke test entry",
+            "ts": "2026-01-01T00:00:00Z",
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    storage_path = plan_dir  # storage_path.name == feature, .parent.parent.parent == tmp_path
+    flow_config = {
+        "agent_map": {"BUILDING": "quick"},
+        "composition": {},
+    }
+
+    with patch("pathly_orchestrator.fsm_ops._load_agent_text", return_value="base agent text"):
+        result = build_prompt(flow_config, "BUILDING", storage_path)
+
+    assert "## Pipeline History" in result, f"History block missing from prompt:\n{result}"
+    assert "smoke test entry" in result, f"History entry missing from prompt:\n{result}"

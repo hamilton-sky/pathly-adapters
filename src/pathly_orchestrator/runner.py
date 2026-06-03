@@ -219,6 +219,42 @@ def tail_agent_done(
             time.sleep(poll_interval)
 
 
+def build_pipeline_history_block(events_path: str, max_items: int = 10) -> str:
+    """Return a markdown ## Pipeline History block from AGENT_DONE events in events_path.
+
+    Returns "" if the file is absent or has no AGENT_DONE lines.
+    Entries are ordered oldest-first; at most max_items are included.
+    """
+    try:
+        path = Path(events_path)
+        if not path.exists():
+            return ""
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+
+    entries = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") == "AGENT_DONE":
+            agent = ev.get("agent", "?")
+            conv = ev.get("conversation", "?")
+            summary = ev.get("summary") or "(no summary)"
+            entries.append(f"- **{agent} (conv {conv})**: {summary}")
+
+    if not entries:
+        return ""
+
+    entries = entries[-max_items:]
+    return "\n## Pipeline History\n\n" + "\n".join(entries)
+
+
 def invoke_agent(
     instructions: str,
     project_root: str,
