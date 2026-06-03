@@ -120,12 +120,16 @@ def _patch_last_agent_done(
         return
     lines = events_file.read_text(encoding="utf-8").splitlines()
     patched = False
+    patched_agent: str | None = None
+    patched_conv: int | None = None
     for i in range(len(lines) - 1, -1, -1):
         try:
             ev = json.loads(lines[i])
         except json.JSONDecodeError:
             continue
         if ev.get("type") == "AGENT_DONE":
+            patched_agent = ev.get("agent")
+            patched_conv = ev.get("conversation")
             ev["cost_usd"] = cost_usd
             ev["tokens_in"] = tokens_in
             ev["tokens_out"] = tokens_out
@@ -136,6 +140,21 @@ def _patch_last_agent_done(
             break
     if patched:
         events_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # Append BILLING_UPDATE so the SSE forward-tailer re-broadcasts corrected values.
+        billing: dict[str, object] = {
+            "type": "BILLING_UPDATE",
+            "agent": patched_agent,
+            "conversation": patched_conv,
+            "cost_usd": cost_usd,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "total_tokens": tokens_in + tokens_out,
+            "wall_seconds": wall_seconds,
+            "tool_uses": tool_uses,
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        with open(events_file, "a", encoding="utf-8") as _f:
+            _f.write(json.dumps(billing) + "\n")
 
 
 def read_last_agent_done(storage_path: Path) -> dict[str, Any] | None:

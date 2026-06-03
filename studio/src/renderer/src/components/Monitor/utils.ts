@@ -105,3 +105,32 @@ export function fmtCost(n: number): string {
 }
 
 export const EMPTY_TOOLTIP = 'Waiting for AGENT_DONE events with telemetry'
+
+/**
+ * Merge a BILLING_UPDATE event into its corresponding AGENT_DONE entry.
+ * Finds the last AGENT_DONE for the same (agent, conversation) and overlays
+ * the corrected cost/token/tool fields, then drops the BILLING_UPDATE itself.
+ * Called by the SSE message handler so Studio shows correct values after
+ * _patch_last_agent_done rewrites a line in-place.
+ */
+export function mergeBillingUpdate(events: FsmEvent[], update: FsmEvent): FsmEvent[] {
+  let lastIdx = -1
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i]
+    if (e.type === 'AGENT_DONE' && e.agent === update.agent && e.conversation === update.conversation) {
+      lastIdx = i
+      break
+    }
+  }
+  if (lastIdx === -1) return events
+  const result = [...events]
+  result[lastIdx] = {
+    ...result[lastIdx],
+    tool_uses: update.tool_uses ?? result[lastIdx].tool_uses,
+    wall_seconds: update.wall_seconds ?? result[lastIdx].wall_seconds,
+    cost_usd: update.cost_usd ?? result[lastIdx].cost_usd,
+    tokens_in: update.tokens_in ?? result[lastIdx].tokens_in,
+    tokens_out: update.tokens_out ?? result[lastIdx].tokens_out,
+  }
+  return result
+}

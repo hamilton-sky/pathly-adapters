@@ -25,6 +25,11 @@
   animation: pulse 1.4s ease-in-out infinite;
 }
 
+.dotFinalizing {
+  background: var(--yellow);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
 .dotPaused {
   background: var(--yellow);
 }

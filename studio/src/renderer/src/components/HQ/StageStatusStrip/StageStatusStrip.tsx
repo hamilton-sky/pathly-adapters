@@ -17,6 +17,7 @@ const ADAPTER_COLORS: Record<string, string> = {
 
 function dotClass(status: RunnerStatus): string {
   if (status === 'running') return `${styles.dot} ${styles.dotRunning}`
+  if (status === 'finalizing') return `${styles.dot} ${styles.dotFinalizing}`
   if (status === 'paused') return `${styles.dot} ${styles.dotPaused}`
   if (status === 'blocked') return `${styles.dot} ${styles.dotBlocked}`
   if (status === 'error') return `${styles.dot} ${styles.dotError}`
@@ -49,7 +50,9 @@ export function StageStatusStrip(): JSX.Element {
       <span className={dotClass(status)} aria-label={`Status: ${status}`} />
       {topic && <span className={styles.topic}>{topic}</span>}
       {topic && <span className={styles.sep} aria-hidden="true">·</span>}
-      <span className={styles.stage}>{stage ?? '—'}</span>
+      <span className={styles.stage}>
+        {status === 'finalizing' ? `${stage ?? '—'} — finalizing…` : (stage ?? '—')}
+      </span>
       {adapter && (
         <span
           ref={chipRef}

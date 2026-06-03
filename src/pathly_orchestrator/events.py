@@ -90,5 +90,13 @@ TYPE_STAGE_RECONCILIATION_FAILURE = "STAGE_RECONCILIATION_FAILURE"
 # Written when a PTY billing POST does not arrive within the reconciliation
 # window after an early FSM advance.
 
+TYPE_BILLING_UPDATE = "BILLING_UPDATE"
+# Schema: {"type": "BILLING_UPDATE", "agent": str, "conversation": int|null,
+#           "cost_usd": float, "tokens_in": int, "tokens_out": int,
+#           "total_tokens": int, "wall_seconds": int, "tool_uses": int,
+#           "ts": str (ISO-8601)}
+# Appended after _patch_last_agent_done rewrites an AGENT_DONE line in-place,
+# so the SSE forward-tailer re-broadcasts the corrected values to Studio.
+
 AGENTS = {"planner", "builder", "reviewer", "tester", "architect", "retro", "explore"}
 RESULTS = {"PASS", "FAIL", "DONE", "BLOCKED"}

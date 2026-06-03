@@ -298,6 +298,8 @@ export function useHQ() {
                   }).catch(() => { /* non-blocking */ })
                 })
                 .catch(() => { /* spawn failure — PTY unavailable */ })
+            } else if (data.type === 'TERMINAL_AGENT_DONE') {
+              setRunnerState({ status: 'finalizing' })
             } else if (data.type === 'TERMINAL_SIGNAL') {
               const signal = data.signal as string
               if (signal === 'term') {

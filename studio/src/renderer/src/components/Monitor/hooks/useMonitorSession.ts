@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useStore } from '../../../store'
 import { usePlanFiles } from '../../../hooks/usePlanFiles'
 import { watchStart, readFile, onWatchEvent } from '../../../services/pathlyApi'
-import { getFlowYamlName, extractTopic } from '../utils'
+import { getFlowYamlName, extractTopic, mergeBillingUpdate } from '../utils'
 import type { FsmEvent } from '../../../types/index'
 
 export function useMonitorSession(): { effectiveTopic: string | null; showTabBar: boolean } {
@@ -219,7 +219,11 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
       try {
         const event = JSON.parse(ev.data) as FsmEvent
         if (event.type === 'connected') return
-        setEvents([...eventsRef.current, event])
+        if (event.type === 'BILLING_UPDATE') {
+          setEvents(mergeBillingUpdate(eventsRef.current, event))
+        } else {
+          setEvents([...eventsRef.current, event])
+        }
       } catch { /* skip malformed */ }
     }
 

@@ -355,6 +355,16 @@ def _run_stage_via_terminal(
                     "result": agent_done_data.get("summary", ""),
                 }
 
+                if broadcast_fn:
+                    broadcast_fn(state.topic, {
+                        "type": "TERMINAL_AGENT_DONE",
+                        "tab_id": tab_id,
+                        "run_id": run_id,
+                        "ts": datetime.datetime.now(datetime.timezone.utc).strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        ),
+                    })
+
                 recon_t = threading.Thread(
                     target=_reconciliation_window,
                     args=(run_id, state.current_state, state.topic, events_path),
