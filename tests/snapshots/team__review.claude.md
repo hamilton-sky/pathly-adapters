@@ -49,6 +49,8 @@ State snapshots are written to `pathly/plans/<feature>/STATE.json`.
   If this is not the final conversation and none of those conditions apply → skip directly to Advance.
 - `standard` or `strict`: reviewer runs after **every** builder conversation.
 
+log-phase PHASE_START review
+
 ## Phase 0 — Record review start time
 
 Run: `python -c "import time; print(int(time.time()))"` and note the printed integer as `REVIEW_START`.
@@ -149,6 +151,8 @@ git diff HEAD -- . ":(exclude)pathly/plans/"
 - If output is **non-empty**: re-run from Phase 1 — Analyze above.
 
 ### If no feedback files — PASS
+
+log-phase PHASE_DONE review
 
 Run the Completion report with `agent: reviewer`, `result: PASS`, using `REVIEW_START` from Phase 0.
 

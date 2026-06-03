@@ -304,6 +304,23 @@ export function useHQ() {
                 const tabId = (data.tab_id as string | undefined) ?? useRunnerStore.getState().activeRunnerTabId
                 if (tabId) void window.pathly.terminal.kill(tabId).catch(() => { /* PTY may already be gone */ })
               }
+            } else if (data.type === 'STAGE_RESULT') {
+              // Server-side enriched result — reliable fallback when PTY stdout
+              // parsing misses the final JSON (e.g. long builds, buffer overflow).
+              const tabId = data.tab_id as string
+              if (tabId) {
+                const r = data as { result?: string; total_cost_usd?: number; duration_ms?: number; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } }
+                useRunnerStore.getState().recordStageResult(
+                  tabId,
+                  r.result ?? '',
+                  r.total_cost_usd ?? 0,
+                  r.usage?.input_tokens ?? 0,
+                  r.usage?.output_tokens ?? 0,
+                  r.usage?.cache_read_input_tokens ?? 0,
+                  r.usage?.cache_creation_input_tokens ?? 0,
+                  r.duration_ms ?? 0,
+                )
+              }
             } else if (data.type === 'RUN_STARTED') {
               useRunnerStore.getState().snapshotRun()
               useRunnerStore.getState().setRunnerState({ errorMessage: null, status: 'running', cost: 0, stage: null, adapter: null, sessionKind: null })

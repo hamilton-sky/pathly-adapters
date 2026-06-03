@@ -40,6 +40,8 @@ State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
 ## Execution
 
+log-phase PHASE_START build
+
 Read `pathly/plans/[feature]/PROGRESS.md`. Find the first conversation row with status TODO. This is Conv N.
 
 ### Phase 1 — Analyze
@@ -127,6 +129,8 @@ Verified: conversation N complete — <one-sentence summary of what was verified
 
 Replace `<feature>` with the feature slug and `N` with the conversation number.
 The first line **must** be `RESULT: PASS` verbatim (case-sensitive, no leading whitespace).
+
+log-phase PHASE_DONE build
 
 Then run the Completion report with `agent: builder`, `result: DONE`, using `BUILD_START` from Phase 2.5.
 

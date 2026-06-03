@@ -1027,6 +1027,22 @@ def runner_terminal_result():
             except Exception as exc:
                 logger.warning("runner_terminal_result: EVENTS.jsonl read failed: %s", exc)
 
+        # Broadcast STAGE_RESULT so Studio renderer can update the stageLog
+        # directly — this is the reliable path when PTY stdout parsing fails
+        # (e.g. long-running builds where the final JSON scrolls out of the buffer).
+        tab_id = runner_state.active_tab_id if runner_state is not None else ""
+        if tab_id and topic:
+            _broadcast_runner(topic, {
+                "type": "STAGE_RESULT",
+                "topic": topic,
+                "run_id": run_id,
+                "tab_id": tab_id,
+                "result": parsed.get("result", ""),
+                "total_cost_usd": parsed.get("cost_usd", 0.0),
+                "duration_ms": int((data.get("wall_seconds") or 0) * 1000),
+                "usage": parsed.get("usage", {}),
+            })
+
         with _sup._lock:
             _sup._terminal_result_data[run_id] = {
                 "result": parsed,
