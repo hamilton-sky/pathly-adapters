@@ -217,3 +217,41 @@ def test_parse_result_codex_shape_drift():
         "ask_user_question": None,
         "result": "",
     }
+
+
+# ── tail_agent_done ───────────────────────────────────────────────────────────
+
+def test_tail_agent_done_yields_and_stops(tmp_path):
+    import threading
+    import time
+    import json
+    from pathly_orchestrator.runner import tail_agent_done
+
+    events_file = tmp_path / "EVENTS.jsonl"
+    build_start = {"type": "BUILD_START", "ts": "2026-01-01T00:00:00Z"}
+    events_file.write_text(json.dumps(build_start) + "\n", encoding="utf-8")
+
+    after_ts = "2026-01-01T00:00:00Z"
+    stop_evt = threading.Event()
+    results = []
+
+    def _run():
+        for event in tail_agent_done(str(events_file), after_ts, stop_evt, poll_interval=0.05):
+            results.append(event)
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+
+    agent_done = {"type": "AGENT_DONE", "ts": "2026-01-01T00:01:00Z", "result": "DONE"}
+    with open(str(events_file), "ab") as f:
+        f.write((json.dumps(agent_done) + "\n").encode("utf-8"))
+
+    deadline = time.monotonic() + 2.0
+    while not results and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+    stop_evt.set()
+    thread.join(timeout=2.0)
+
+    assert len(results) == 1
+    assert results[0]["type"] == "AGENT_DONE"

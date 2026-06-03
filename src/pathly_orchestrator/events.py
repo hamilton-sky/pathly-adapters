@@ -84,6 +84,11 @@ TYPE_FILE_DELETED = "FILE_DELETED"
 TYPE_RETRY = "RETRY"
 TYPE_NO_DIFF = "NO_DIFF"
 TYPE_STATE_TRANSITION = "STATE_TRANSITION"
+TYPE_STAGE_RECONCILIATION_FAILURE = "STAGE_RECONCILIATION_FAILURE"
+# Schema: {"type": "STAGE_RECONCILIATION_FAILURE", "topic": str, "stage": str,
+#           "exit_code": int, "ts": str (ISO-8601)}
+# Written when a PTY billing POST does not arrive within the reconciliation
+# window after an early FSM advance.
 
 AGENTS = {"planner", "builder", "reviewer", "tester", "architect", "retro", "explore"}
 RESULTS = {"PASS", "FAIL", "DONE", "BLOCKED"}

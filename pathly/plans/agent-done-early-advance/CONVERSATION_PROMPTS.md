@@ -291,3 +291,268 @@ cd studio && npx tsc --noEmit
 
 Then write `pathly/plans/agent-done-early-advance/VERIFY.md` (append) with:
 - Commands run, outputs, files changed (absolute paths), status PASS or FAIL.
+
+---
+
+## Conv 4 — Interactive mode: visible PTY, kill on AGENT_DONE
+
+**Stories delivered:** S-7
+
+Read `FEATURE_INDEX.md` first at `pathly/plans/agent-done-early-advance/FEATURE_INDEX.md`.
+
+### Context
+
+Conv 2 must be DONE before starting this conversation (check PROGRESS.md).
+
+This conversation adds interactive mode: when `PATHLY_RUNNER_INTERACTIVE=1`, agents run
+in a visible, non-headless PTY. The `--print` and `--output-format=json` flags are stripped
+from the spawn argv so Claude Code runs interactively. When the watcher (built in Conv 2)
+detects AGENT_DONE in EVENTS.jsonl, the supervisor emits a `TERMINAL_KILL` SSE — Studio
+closes the tab — rather than waiting for a natural PTY exit.
+
+Interactive mode requires early advance (`PATHLY_RUNNER_EARLY_ADVANCE=1`); the supervisor
+raises a `RuntimeError` (surfaced as `RUNNER_WARNING` SSE) if the combination is invalid.
+
+### Phase 0 — Pre-flight (mandatory before writing any code)
+
+Run the following and confirm all pass:
+```
+python -c "from pathly_orchestrator.events import TYPE_STAGE_RECONCILIATION_FAILURE; print('ok')"
+python -c "from pathly_orchestrator.runner import tail_agent_done; print('ok')"
+python -c "from pathly_orchestrator.feature_flags import FeatureFlags; assert FeatureFlags().early_advance is False; print('ok')"
+python -m pytest tests/test_supervisor.py -q
+```
+
+Do not write any code until Phase 0 passes.
+
+### Phase 1 — `events.py`: add `STAGE_INTERACTIVE_DONE` constant
+
+In `src/pathly_orchestrator/events.py`, after `TYPE_STAGE_RECONCILIATION_FAILURE`, add:
+
+```python
+TYPE_STAGE_INTERACTIVE_DONE = "STAGE_INTERACTIVE_DONE"
+# Schema: {"type": "STAGE_INTERACTIVE_DONE", "topic": str, "stage": str, "ts": str}
+# Written when interactive mode kills the PTY after early AGENT_DONE detection.
+```
+
+Verify:
+```
+python -c "from pathly_orchestrator.events import TYPE_STAGE_INTERACTIVE_DONE; print('PASS')"
+```
+
+### Phase 2 — `feature_flags.py`: add `interactive` property
+
+In `src/pathly_orchestrator/feature_flags.py`, add to the `FeatureFlags` class after `early_advance`:
+
+```python
+@property
+def interactive(self) -> bool:
+    return self._bool("PATHLY_RUNNER_INTERACTIVE", False)
+```
+
+Verify:
+```
+python -c "from pathly_orchestrator.feature_flags import FeatureFlags; assert FeatureFlags().interactive is False; print('PASS')"
+```
+
+### Phase 3 — `supervisor.py`: strip headless flags in interactive mode
+
+Find the method that builds the PTY `argv` (the one that currently appends `--print`
+and `--output-format=json`). Wrap those two flags in a guard:
+
+```python
+if not feature_flags.interactive:
+    argv += ["--print", "--output-format=json"]
+```
+
+Also add a startup guard wherever `feature_flags` is first read in the run path:
+
+```python
+if feature_flags.interactive and not feature_flags.early_advance:
+    msg = "PATHLY_RUNNER_INTERACTIVE=1 requires PATHLY_RUNNER_EARLY_ADVANCE=1"
+    _emit_sse("RUNNER_WARNING", {"message": msg})
+    raise RuntimeError(msg)
+```
+
+Do NOT change any other argv items — `-p <prompt>`, `--model`, `--dangerously-skip-permissions`
+must remain regardless of mode.
+
+### Phase 4 — `supervisor.py`: kill PTY on AGENT_DONE in interactive mode
+
+In the fast-path branch of `_run_stage_via_terminal()` (the block that fires when
+`_agent_done_events[run_id]` wins the race), extend the existing logic:
+
+```python
+if fired_early == "agent_done":
+    _advance_fsm_with_agent_done_data(run_id)
+    if feature_flags.interactive:
+        _emit_sse("TERMINAL_KILL", {"tab_id": current_tab_id, "run_id": run_id})
+        _write_event(TYPE_STAGE_INTERACTIVE_DONE, {
+            "topic": topic,
+            "stage": current_stage,
+            "ts": _now_iso(),
+        })
+        _cleanup_run_id(run_id)   # pops all four dicts; no reconciliation window
+    else:
+        _start_reconciliation_window(run_id, timeout=30)
+    return
+```
+
+`_cleanup_run_id` must pop: `_terminal_result_events`, `_terminal_result_data`,
+`_agent_done_events`, `_agent_done_stop_events` for `run_id`. No reconciliation window
+in interactive mode — the PTY was killed, so no billing POST will ever arrive.
+
+### Phase 5 — `test_supervisor.py`: two new interactive-mode tests
+
+**Test 1 `test_interactive_mode_kills_pty_on_agent_done`:**
+- Monkeypatch `PATHLY_RUNNER_INTERACTIVE=1` and `PATHLY_RUNNER_EARLY_ADVANCE=1`.
+- Mock `tail_agent_done` to yield one AGENT_DONE immediately.
+- Assert `TERMINAL_KILL` SSE was emitted with the correct `tab_id`.
+- Assert `TYPE_STAGE_INTERACTIVE_DONE` is written to EVENTS.jsonl.
+- Assert `TYPE_STAGE_RECONCILIATION_FAILURE` is NOT written.
+- Assert `_terminal_result_events[run_id]` is absent after the call.
+
+**Test 2 `test_interactive_mode_strips_headless_flags`:**
+- Monkeypatch `PATHLY_RUNNER_INTERACTIVE=1` and `PATHLY_RUNNER_EARLY_ADVANCE=1`.
+- Capture the `argv` passed to the PTY spawn.
+- Assert `"--print"` is NOT in argv.
+- Assert `"--output-format=json"` is NOT in argv.
+- Assert `"-p"` IS in argv.
+
+### Phase 6 — Final verify
+
+```
+python -m pytest tests/ -q
+```
+
+All tests must pass. Append to `pathly/plans/agent-done-early-advance/VERIFY.md`:
+- Commands run, outputs, files changed (absolute paths), status PASS or FAIL.
+
+---
+
+## Conv 5 — Pipeline History context injection
+
+**Stories delivered:** S-8
+
+Read `FEATURE_INDEX.md` first at `pathly/plans/agent-done-early-advance/FEATURE_INDEX.md`.
+
+### Context
+
+This conversation is independent of Conv 4. It can be built any time after Conv 1.
+
+Every stage prompt currently lacks awareness of what previous agents accomplished.
+This conversation adds a `## Pipeline History` block — generated from EVENTS.jsonl
+AGENT_DONE entries — appended to every prompt returned by `build_prompt()` in
+`fsm_ops.py`. Agents receive a compact summary of prior work without needing to re-read
+all plan files.
+
+### Phase 0 — Pre-flight
+
+```
+python -c "from pathly_orchestrator.runner import read_last_agent_done; print('ok')"
+python -c "from pathly_orchestrator.fsm_ops import build_prompt; print('ok')"
+python -m pytest tests/ -q
+```
+
+All must pass. Do not write any code until Phase 0 passes.
+
+Also read `src/pathly_orchestrator/fsm_ops.py` (specifically `build_prompt()`) to
+understand where the history block must be appended.
+
+### Phase 1 — `runner.py`: add `build_pipeline_history_block()`
+
+In `src/pathly_orchestrator/runner.py`, add the following function.
+Place it after `tail_agent_done()`:
+
+```python
+def build_pipeline_history_block(events_path: str, max_items: int = 10) -> str:
+    """
+    Return a markdown ## Pipeline History block from AGENT_DONE events in
+    events_path. Returns "" if the file is absent or has no AGENT_DONE lines.
+    Entries are ordered oldest-first; at most max_items are included.
+    """
+```
+
+Behaviour requirements:
+- Returns `""` if `events_path` does not exist.
+- Reads the whole file; collects lines where `type == "AGENT_DONE"`.
+- Orders oldest → newest (file order is chronological).
+- Keeps the last `max_items` entries; drop older ones if count exceeds the limit.
+- Formats each entry as: `- **{agent} (conv {conversation})**: {summary}`
+  — use `"?"` if `conversation` is missing, `"(no summary)"` if `summary` is missing.
+- Returns:
+  ```
+  \n## Pipeline History\n\n<entry1>\n<entry2>\n...
+  ```
+- Skip blank lines and JSON parse errors silently.
+
+### Phase 2 — Unit tests for `build_pipeline_history_block`
+
+In `tests/test_runner.py`, add:
+
+**`test_pipeline_history_block_format`:**
+1. Write a temp EVENTS.jsonl with 3 AGENT_DONE entries:
+   - builder, conv 1, summary "added event constant"
+   - reviewer, conv 1, summary "review PASS"
+   - builder, conv 2, summary "wired supervisor"
+2. Call `build_pipeline_history_block(path)`.
+3. Assert the block starts with `"\n## Pipeline History\n"`.
+4. Assert all 3 formatted lines are present in order.
+5. Assert line format matches `"- **builder (conv 1)**: added event constant"` etc.
+
+**`test_pipeline_history_empty_when_no_events`:**
+1. Call `build_pipeline_history_block` on a nonexistent path — assert `""`.
+2. Write a temp EVENTS.jsonl with only non-AGENT_DONE lines — assert `""`.
+
+Verify:
+```
+python -m pytest tests/test_runner.py -k "pipeline_history" -q
+```
+
+### Phase 3 — `fsm_ops.py`: append history in `build_prompt()`
+
+In `src/pathly_orchestrator/fsm_ops.py`:
+
+1. Import `build_pipeline_history_block` from `pathly_orchestrator.runner`.
+2. Derive `events_path`:
+   ```python
+   events_path = os.path.join(project_root, "pathly", "plans", topic, "EVENTS.jsonl")
+   ```
+3. At the end of `build_prompt()`, after `_inject_prompt_vars()` returns the final text:
+   ```python
+   history = build_pipeline_history_block(events_path)
+   if history:
+       prompt_text += history
+   return prompt_text
+   ```
+
+The history block must be appended AFTER all compose fragments (after `_inject_prompt_vars`).
+It is never composed through `compose_skill()` — it is generated fresh on every call.
+
+**Done when:** A call to `build_prompt()` for a feature that has prior AGENT_DONE events
+produces a string containing `"## Pipeline History"`.
+
+### Phase 4 — Smoke test for `build_prompt()` + history injection
+
+Write a quick inline smoke test (as part of `tests/test_fsm_ops.py` or append to
+`test_runner.py`) named `test_build_prompt_includes_pipeline_history`:
+
+1. Create a temp project root with `pathly/plans/test-feature/EVENTS.jsonl` containing
+   one AGENT_DONE entry (builder, conv 1, summary "smoke test entry").
+2. Call `build_prompt(skill="team/build", topic="test-feature", project_root=tmp_root, adapter="claude")`.
+3. Assert the returned string contains `"## Pipeline History"`.
+4. Assert the returned string contains `"smoke test entry"`.
+
+Verify:
+```
+python -m pytest tests/ -k "pipeline_history" -q
+```
+
+### Phase 5 — Final verify
+
+```
+python -m pytest tests/ -q
+```
+
+All tests must pass. Append to `pathly/plans/agent-done-early-advance/VERIFY.md`:
+- Commands run, outputs, files changed (absolute paths), status PASS or FAIL.

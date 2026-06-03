@@ -111,3 +111,43 @@ Test 3 — Slow path (no regression): watcher is inactive (flag off), PTY exits 
 All three tests use `patch` / `threading.Event` mocks consistent with the existing `test_abort_stops_run` pattern.
 
 **Delivered by:** Conv 2
+
+---
+
+## S-7 — Interactive mode: visible PTY, kill on AGENT_DONE
+
+**As a** developer using Studio,
+**I want** agents to run in an interactive (non-headless) PTY when `PATHLY_RUNNER_INTERACTIVE=1`,
+**so that** I can watch the Claude Code session live, interact if needed, and have the terminal
+close automatically once the agent signals it is done.
+
+### Acceptance criteria
+- `FeatureFlags().interactive` returns `False` by default and `True` when `PATHLY_RUNNER_INTERACTIVE=1` is set.
+- `interactive=True` implies `early_advance=True`; the supervisor raises `RuntimeError` (logged + surfaced as `RUNNER_WARNING` SSE) if interactive is True but early_advance is False.
+- When `interactive=True`, the PTY argv built by the supervisor does **not** include `--print` or `--output-format=json`; all other flags (`-p <prompt>`, `--model`, `--dangerously-skip-permissions`) remain unchanged.
+- When `_agent_done_events[run_id]` fires in interactive mode, the supervisor emits a `TERMINAL_KILL` SSE event carrying the `tab_id`; Studio closes the PTY tab.
+- After PTY kill: no reconciliation window is started; a `STAGE_INTERACTIVE_DONE` event is written to EVENTS.jsonl (`type`, `topic`, `stage`, `ts`).
+- When `interactive=False` (default), all existing behavior from Conv 2 is unchanged.
+- `python -m pytest tests/test_supervisor.py -q` — all tests pass (new + existing).
+
+**Delivered by:** Conv 4
+
+---
+
+## S-8 — Pipeline History context block injected into every stage prompt
+
+**As an** agent receiving a stage prompt,
+**I want** a `## Pipeline History` section at the bottom of my instructions listing what
+previous agents accomplished,
+**so that** I have the full context of prior work without needing to re-read all plan files.
+
+### Acceptance criteria
+- `build_pipeline_history_block(events_path, max_items=10)` is importable from `pathly_orchestrator.runner`.
+- Returns an empty string when EVENTS.jsonl does not exist or contains no AGENT_DONE events.
+- When AGENT_DONE events exist, returns a block starting with `\n## Pipeline History\n`.
+- Each line follows the format: `- **{agent} (conv {conversation})**: {summary}` — one entry per AGENT_DONE, ordered oldest → newest.
+- At most `max_items` entries are included; if more exist, the oldest are dropped.
+- `build_prompt()` in `fsm_ops.py` appends the pipeline history block to the composed skill text before returning; if the block is empty, nothing is appended.
+- `python -m pytest tests/test_runner.py -k "pipeline_history" -q` passes.
+
+**Delivered by:** Conv 5

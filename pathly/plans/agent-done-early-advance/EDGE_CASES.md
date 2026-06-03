@@ -114,3 +114,68 @@ vice versa) while a run is in progress.
 **Acceptance:** No special code needed. The property re-reads `os.environ` on each
 access (verify this is the existing `_bool()` behaviour). Builder confirms with a
 code comment.
+
+---
+
+## EC-7 — Interactive mode: Studio does not acknowledge TERMINAL_KILL
+
+**Scenario:** The supervisor emits `TERMINAL_KILL` SSE but Studio is not connected or
+the SSE client drops the event. The PTY keeps running.
+
+**Behaviour:**
+- The supervisor has already advanced the FSM and cleaned up all dicts for `run_id`.
+- The PTY continues running until it naturally exits or the user closes the window.
+- No billing POST will arrive (there is no reconciliation window in interactive mode).
+- Cost data is taken from the AGENT_DONE event already in EVENTS.jsonl.
+- The orphaned PTY causes no correctness problem — it simply exits on its own.
+
+**Policy decision:** `TERMINAL_KILL` is best-effort. Interactive mode accepts the
+trade-off that a dropped kill signal leaves an orphaned-but-harmless terminal window.
+
+**Acceptance:** No code guard required. Builder adds a log line after `_emit_sse("TERMINAL_KILL", ...)`: `"[interactive] TERMINAL_KILL emitted for tab {tab_id}; PTY teardown is Studio's responsibility"`.
+
+---
+
+## EC-8 — Interactive mode enabled without early advance
+
+**Scenario:** `PATHLY_RUNNER_INTERACTIVE=1` is set but `PATHLY_RUNNER_EARLY_ADVANCE` is unset or `0`.
+
+**Behaviour:**
+- On the first run attempt, the supervisor detects the invalid combination.
+- Emits `RUNNER_WARNING` SSE with message: `"PATHLY_RUNNER_INTERACTIVE=1 requires PATHLY_RUNNER_EARLY_ADVANCE=1"`.
+- Raises `RuntimeError` with the same message; the run is aborted.
+- Studio surfaces the warning as a toast notification.
+
+**Acceptance:** `test_interactive_mode_strips_headless_flags` (Test 2 in Conv 4) implicitly
+verifies the guard runs without raising. A separate test verifies the guard raises when
+early_advance is False.
+
+---
+
+## EC-9 — Pipeline History: EVENTS.jsonl has thousands of AGENT_DONE entries
+
+**Scenario:** A long-running feature has accumulated 50+ AGENT_DONE entries across
+retries and re-runs.
+
+**Behaviour:**
+- `build_pipeline_history_block` reads the full file but keeps at most `max_items=10` entries.
+- The oldest entries are dropped; the 10 most recent are included.
+- Prompt length increase is bounded at ~10 lines regardless of pipeline length.
+
+**Acceptance:** `test_pipeline_history_block_format` uses `max_items=3` with 5 entries
+and asserts only the 3 most recent appear.
+
+---
+
+## EC-10 — Pipeline History: EVENTS.jsonl is missing `summary` or `conversation` field
+
+**Scenario:** An old or hand-crafted AGENT_DONE event is missing the `summary` or
+`conversation` field.
+
+**Behaviour:**
+- `build_pipeline_history_block` uses `"?"` for a missing `conversation` value and
+  `"(no summary)"` for a missing `summary` value.
+- The block is still generated; no exception is raised.
+
+**Acceptance:** Covered by format contract in S-8. Builder writes a defensive
+`.get("summary", "(no summary)")` and `.get("conversation", "?")` access pattern.

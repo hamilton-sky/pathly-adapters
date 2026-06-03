@@ -1,0 +1,14 @@
+{"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "schema_version": 1, "ts": "2026-06-03T22:19:05Z"}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-06-03T22:19:34Z"}
+{"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-06-03T22:19:34Z"}
+{"type": "AGENT_DONE", "agent": "planner", "conversation": 0, "result": "DONE", "summary": "Plan complete: 9 standard files covering 5 conversations — foundation layer, supervisor watcher, Studio SSE pill, interactive mode, pipeline history injection.", "total_tokens": 0, "tool_uses": 0, "duration_ms": 0, "wall_seconds": 0, "ts": "2026-06-03T22:19:34Z"}
+{"type": "WARNING", "reason": "convs_total_mismatch", "persisted": 5, "current": 0, "schema_version": 1, "ts": "2026-06-03T22:20:10Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "build", "agent": "builder", "feature": "agent-done-early-advance", "ts": "2026-06-03T22:20:34Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "builder", "feature": "agent-done-early-advance", "ts": "2026-06-03T22:20:39Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "builder", "feature": "agent-done-early-advance", "ts": "2026-06-03T22:20:59Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "builder", "feature": "agent-done-early-advance", "ts": "2026-06-03T22:21:03Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "builder", "feature": "agent-done-early-advance", "ts": "2026-06-03T22:21:27Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "implement", "agent": "builder", "feature": "agent-done-early-advance", "ts": "2026-06-03T22:21:36Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "implement", "agent": "builder", "feature": "agent-done-early-advance", "ts": "2026-06-03T22:28:09Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "agent-done-early-advance", "ts": "2026-06-03T22:28:21Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "summary": "Conv 1 complete: added TYPE_STAGE_RECONCILIATION_FAILURE to events.py, early_advance property to feature_flags.py, tail_agent_done() generator to runner.py, and test_tail_agent_done_yields_and_stops to test_runner.py; 396 tests pass.", "total_tokens": 47778, "tool_uses": 47, "wall_seconds": 418, "cost_usd": 0.0, "ts": "2026-06-03T22:28:29Z", "schema_version": 1}

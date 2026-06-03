@@ -5,7 +5,7 @@
   "model": "claude-sonnet-4-6",
   "timeout": 600,
   "run_id": "3afbb6be-418d-4aac-b779-494e9b95fcd9",
-  "status": "running",
+  "status": "error",
   "current_state": "BUILDING",
   "current_adapter": "claude",
   "iterations": 1,
@@ -14,7 +14,7 @@
   "max_cost_usd": 5.0,
   "autonomy": {},
   "pending_menu": null,
-  "error_kind": null,
+  "error_kind": "subprocess",
   "open_session": {
     "adapter": "claude",
     "session_id": null,

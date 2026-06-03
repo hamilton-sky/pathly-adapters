@@ -44,5 +44,9 @@ class FeatureFlags:
         """Enable per-IP rate limiting on HTTP endpoints."""
         return _bool("PATHLY_FF_RATE_LIMITING", True)
 
+    @property
+    def early_advance(self) -> bool:
+        return _bool("PATHLY_RUNNER_EARLY_ADVANCE", False)
+
 
 flags = FeatureFlags()

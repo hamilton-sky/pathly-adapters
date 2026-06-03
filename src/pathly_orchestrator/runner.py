@@ -7,9 +7,10 @@ import logging
 import re
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 
 logger = logging.getLogger("pathly.runner")
 
@@ -157,6 +158,45 @@ def read_last_agent_done(storage_path: Path) -> dict[str, Any] | None:
         if ev.get("type") == "AGENT_DONE":
             return ev
     return None
+
+
+def tail_agent_done(
+    path: str,
+    after_ts: str,
+    stop_evt: threading.Event,
+    poll_interval: float = 0.1,
+) -> Generator[dict, None, None]:
+    """
+    Tail EVENTS.jsonl and yield AGENT_DONE events with ts >= after_ts.
+    Tracks byte offset so no event is yielded twice.
+    Stops when stop_evt is set and no new bytes remain.
+    Does not raise if the file does not exist yet — waits until it does.
+    """
+    offset = 0
+    while True:
+        try:
+            with open(path, "rb") as f:
+                f.seek(offset)
+                new_bytes = f.read()
+        except OSError:
+            new_bytes = b""
+        if new_bytes:
+            offset += len(new_bytes)
+            for raw_line in new_bytes.split(b"\n"):
+                raw_line = raw_line.strip()
+                if not raw_line:
+                    continue
+                try:
+                    event = json.loads(raw_line)
+                except json.JSONDecodeError:
+                    continue
+                if event.get("type") == "AGENT_DONE" and event.get("ts", "") >= after_ts:
+                    yield event
+            time.sleep(poll_interval)
+        else:
+            if stop_evt.is_set():
+                return
+            time.sleep(poll_interval)
 
 
 def invoke_agent(
