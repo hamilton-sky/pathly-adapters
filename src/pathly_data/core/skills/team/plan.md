@@ -5,6 +5,15 @@ PLANNING, or by `team/discover` with arg `storm` to run Stage 1 first.
 
 Parse `$ARGUMENTS`: `FEATURE`, `rigor` (lite|standard|strict), `autoFlow`, optional `storm` flag.
 
+## Role
+
+**Stage orchestrator: Planning & Storm**
+You coordinate subagents, handle feedback routing, and log every phase boundary.
+Logging is mandatory — each `log-phase` call is part of the pipeline contract.
+
+> After each phase completes, log `log-phase PHASE_DONE <phase>` before starting the next.
+> If `pathly-fsm-call` is unavailable, skip silently — never block execution.
+
 ## FSM operations
 
 **Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
@@ -33,6 +42,8 @@ Every appended event must include `"ts": "<iso-timestamp>"` using the current IS
 
 ### Phase 1 — Analyze
 
+log-phase PHASE_START storm-analyze
+
 **Spawn** `architect` with `phase: analyze`:
 ```
 phase: analyze
@@ -50,7 +61,11 @@ Output `none` if no upfront research is needed.
 ```
 Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
+log-phase PHASE_DONE storm-analyze
+
 ### Phase 2 — Research
+
+log-phase PHASE_START storm-research
 
 Spawn all NEEDS_CONTEXT entries in parallel (max 4 total) with `ROLE: architect`:
 - `type: quick` → spawn `quick` with `ROLE: architect` + the question
@@ -62,7 +77,11 @@ Sequential only when entry B's question explicitly references entry A's answer
 (e.g. "that class", "the above", "what you found").
 Collect all findings. Synthesize into a single Research Findings block before Phase 3.
 
+log-phase PHASE_DONE storm-research
+
 ### Phase 3 — Storm
+
+log-phase PHASE_START storm
 
 **Spawn** `architect` with `phase: storm` and research findings injected:
 ```
@@ -89,6 +108,8 @@ Ready to plan? Reply 'yes' to continue, or 'no' to stop here.
 
 If autoFlow: log human response "auto-advance".
 
+log-phase PHASE_DONE storm
+
 Transition state → PLANNING. Fall through to Stage 2.
 
 ---
@@ -98,6 +119,8 @@ Transition state → PLANNING. Fall through to Stage 2.
 Record start time: run `python -c "import time; print(int(time.time()))"` and note as `PLAN_START`.
 
 ### PO Phase — Requirements
+
+log-phase PHASE_START po
 
 Before planner analysis, check whether `pathly/plans/<feature>/PO_NOTES.md` exists.
 If it exists, skip this phase entirely and proceed to Phase 1 — Analyze.
@@ -115,7 +138,11 @@ This is an unrecoverable state for the pipeline.
 If autoFlow is active, PO Phase runs non-interactively. PO writes its best-guess
 `PO_NOTES.md`, then the planner proceeds immediately.
 
+log-phase PHASE_DONE po
+
 ### Phase 1 — Analyze
+
+log-phase PHASE_START plan-analyze
 
 **Spawn** `planner` with `phase: analyze`:
 ```
@@ -134,7 +161,11 @@ Output `none` if no upfront research is needed.
 ```
 Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2.
 
+log-phase PHASE_DONE plan-analyze
+
 ### Phase 2 — Scout
+
+log-phase PHASE_START plan-scout
 
 Spawn all NEEDS_CONTEXT entries in parallel (max 4 total) with `ROLE: planner`:
 - `type: quick` → spawn `quick` with `ROLE: planner` + the question
@@ -144,7 +175,11 @@ Default: always parallel — scouts are read-only, scope overlap is not a proble
 Sequential only when entry B's question explicitly references entry A's answer.
 Collect all findings. Synthesize into a single Scout Findings block before Phase 3.
 
+log-phase PHASE_DONE plan-scout
+
 ### Phase 3 — Plan
+
+log-phase PHASE_START plan
 
 **Spawn** `planner` with `phase: plan` and scout findings injected:
 ```
@@ -169,6 +204,8 @@ After planner completes, parse the `<usage>` block from its response:
 - `duration_ms`: the number after `duration_ms:` (0 if absent)
 
 After planner completes — run the **rigor escalator** (below).
+
+log-phase PHASE_DONE plan
 
 If not autoFlow — pause:
 ```

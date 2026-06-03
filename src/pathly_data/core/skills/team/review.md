@@ -10,6 +10,15 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`. Conv N is the most recent BU
 > **Sub-agent spawning rules**, and **Live progress logging** — are composed in below from
 > fragments. This body covers only the REVIEWING-stage specifics.
 
+## Role
+
+**Stage orchestrator: Reviewing**
+You coordinate subagents, handle feedback routing, and log every phase boundary.
+Logging is mandatory — each `log-phase` call is part of the pipeline contract.
+
+> After each phase completes, log `log-phase PHASE_DONE <phase>` before starting the next.
+> If `pathly-fsm-call` is unavailable, skip silently — never block execution.
+
 ## FSM operations
 
 All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
@@ -45,6 +54,8 @@ Run: `python -c "import time; print(int(time.time()))"` and note the printed int
 
 ## Phase 1 — Analyze
 
+log-phase PHASE_START analyze
+
 **Spawn** `reviewer` with `phase: analyze` (see Scout choreography for the NEEDS_CONTEXT contract):
 ```
 phase: analyze
@@ -60,11 +71,19 @@ Output `none` if the default rules scout above is sufficient.
 ```
 If the block is `none`, use only the default rules scout in Phase 2.
 
+log-phase PHASE_DONE analyze
+
 ## Phase 2 — Scout
+
+log-phase PHASE_START scout
 
 Run the Scout choreography with `ROLE: reviewer`. Compress all findings into a short summary for Phase 3.
 
+log-phase PHASE_DONE scout
+
 ## Phase 3 — Review
+
+log-phase PHASE_START review
 
 **Spawn** `reviewer` with `phase: review` and scout findings injected:
 ```
@@ -81,6 +100,8 @@ If implementation violations found: write pathly/plans/[feature]/feedback/REVIEW
 Use the shared feedback protocol formats.
 If all clear: report PASS.
 ```
+
+log-phase PHASE_DONE review
 
 ## Feedback routing after reviewer
 

@@ -8,6 +8,15 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 > and **Live progress logging** — are composed in below from fragments. This body covers only
 > the TESTING-stage specifics.
 
+## Role
+
+**Stage orchestrator: Testing**
+You coordinate subagents, handle feedback routing, and log every phase boundary.
+Logging is mandatory — each `log-phase` call is part of the pipeline contract.
+
+> After each phase completes, log `log-phase PHASE_DONE <phase>` before starting the next.
+> If `pathly-fsm-call` is unavailable, skip silently — never block execution.
+
 ## FSM operations
 
 All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
@@ -49,6 +58,8 @@ When all DONE: append `{"type": "IMPLEMENT_COMPLETE", "ts": "<iso-timestamp>"}` 
 
 ## Phase 1 — Analyze
 
+log-phase PHASE_START analyze
+
 **Spawn** `tester` with `phase: analyze` (see Scout choreography for the NEEDS_CONTEXT contract):
 ```
 phase: analyze
@@ -62,11 +73,19 @@ Output `none` if the default test-context scout above is sufficient.
 ```
 If the block is `none`, use only the default test-context scout in Phase 2.
 
+log-phase PHASE_DONE analyze
+
 ## Phase 2 — Scout
+
+log-phase PHASE_START scout
 
 Run the Scout choreography with `ROLE: tester`. Use the returned compressed summary as `## Test Context` in Phase 3.
 
+log-phase PHASE_DONE scout
+
 ## Phase 3 — Test
+
+log-phase PHASE_START test
 
 Track `testRetryCount = 0`.
 
@@ -83,6 +102,8 @@ For each criterion: PASS / FAIL / NOT COVERED.
 If any FAIL or NOT COVERED: write pathly/plans/[feature]/feedback/TEST_FAILURES.md
 using the shared feedback protocol format.
 ```
+
+log-phase PHASE_DONE test
 
 ## Fix loop
 

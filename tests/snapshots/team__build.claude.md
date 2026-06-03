@@ -9,6 +9,15 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 > **Sub-agent spawning rules**, and **Live progress logging** — are composed in below from
 > fragments. This body covers only the BUILDING-stage specifics.
 
+## Role
+
+**Stage orchestrator: Building**
+You coordinate subagents, handle feedback routing, and log every phase boundary.
+Logging is mandatory — each `log-phase` call is part of the pipeline contract.
+
+> After each phase completes, log `log-phase PHASE_DONE <phase>` before starting the next.
+> If `pathly-fsm-call` is unavailable, skip silently — never block execution.
+
 ## FSM operations
 
 All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
@@ -34,6 +43,8 @@ Read `pathly/plans/[feature]/PROGRESS.md`. Find the first conversation row with 
 
 ### Phase 1 — Analyze
 
+log-phase PHASE_START analyze
+
 **Spawn** `builder` with `phase: analyze` (see Scout choreography for the NEEDS_CONTEXT contract):
 ```
 phase: analyze
@@ -41,15 +52,23 @@ Route to continue [feature] conversation N.
 List what you need to know before implementing — output NEEDS_CONTEXT block only.
 ```
 
+log-phase PHASE_DONE analyze
+
 ### Phase 2 — Scout
 
+log-phase PHASE_START scout
+
 Run the Scout choreography with `ROLE: builder`. Use the returned compressed summary as Scout Findings.
+
+log-phase PHASE_DONE scout
 
 ### Phase 2.5 — Record build start time
 
 Run: `python -c "import time; print(int(time.time()))"` and note the printed integer as `BUILD_START`.
 
 ### Phase 3 — Implement
+
+log-phase PHASE_START implement
 
 **Spawn** `builder` with `phase: implement`:
 ```
@@ -65,6 +84,8 @@ If you hit a technical blocker (how is this possible?): write pathly/plans/[feat
 Use the shared feedback protocol formats, then report blocked.
 Report: files changed, verify result, stories delivered.
 ```
+
+log-phase PHASE_DONE implement
 
 ### Feedback routing after builder
 

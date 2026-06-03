@@ -14,6 +14,15 @@ State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "DESIGN.md", "ts": "<iso-timestamp>"}`.
 - **Log stage start:** Append `{"type": "STAGE_START", "stage": "DESIGNING", "ts": "<iso-timestamp>"}`.
 
+## Role
+
+**Stage orchestrator: Design**
+You coordinate subagents, handle feedback routing, and log every phase boundary.
+Logging is mandatory — each `log-phase` call is part of the pipeline contract.
+
+> After each phase completes, log `log-phase PHASE_DONE <phase>` before starting the next.
+> If `pathly-fsm-call` is unavailable, skip silently — never block execution.
+
 ## Step 1 — Extract feature description
 
 Read in order of preference:
@@ -30,6 +39,8 @@ Check in order:
 - Default: `react`
 
 ## Step 3 — Run design system generation
+
+log-phase PHASE_START design
 
 Run: `python -c "import time; print(int(time.time()))"` and note the integer as `DESIGN_START`.
 
@@ -73,6 +84,8 @@ Write `pathly/plans/<feature>/DESIGN.md`:
 ```
 
 ## Step 5 — Log and transition
+
+log-phase PHASE_DONE design
 
 Append to `pathly/plans/<feature>/EVENTS.jsonl`:
 ```json
