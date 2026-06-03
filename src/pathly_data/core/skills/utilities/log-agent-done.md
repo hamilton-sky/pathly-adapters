@@ -84,7 +84,7 @@ Set `tokens_in` and `tokens_out`:
 
 Append this JSON line to `pathly/plans/<feature>/EVENTS.jsonl`:
 ```json
-{"type":"AGENT_DONE","agent":"<agent>","model":"<model>","conversation":<conversation>,"result":"<result>","tokens_in":<tokens_in>,"tokens_out":<tokens_out>,"total_tokens":<total_tokens>,"cost_usd":<cost_usd>,"tool_uses":<tool_uses>,"wall_seconds":<wall_seconds>,"ts":"<iso-timestamp>","schema_version":1}
+{"type":"AGENT_DONE","agent":"<agent>","model":"<model>","conversation":<conversation>,"result":"<result>","summary":"<summary>","tokens_in":<tokens_in>,"tokens_out":<tokens_out>,"total_tokens":<total_tokens>,"cost_usd":<cost_usd>,"tool_uses":<tool_uses>,"wall_seconds":<wall_seconds>,"ts":"<iso-timestamp>","schema_version":1}
 ```
 
 If the file does not exist, create it. If the directory does not exist, stop with an error.

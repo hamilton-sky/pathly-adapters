@@ -137,6 +137,28 @@ def _patch_last_agent_done(
         events_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def read_last_agent_done(storage_path: Path) -> dict[str, Any] | None:
+    """Return the last AGENT_DONE event from EVENTS.jsonl, or None if absent."""
+    events_file = storage_path / "EVENTS.jsonl"
+    if not events_file.exists():
+        return None
+    try:
+        lines = events_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") == "AGENT_DONE":
+            return ev
+    return None
+
+
 def invoke_agent(
     instructions: str,
     project_root: str,

@@ -215,4 +215,5 @@ def test_parse_result_codex_shape_drift():
         "cost_usd": 6.0,
         "session_id": "codex-1",
         "ask_user_question": None,
+        "result": "",
     }

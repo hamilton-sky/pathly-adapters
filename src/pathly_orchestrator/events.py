@@ -41,6 +41,7 @@ immediately when the condition is detected.
 #   cost_usd   float — cost in USD (0.0 if unknown)
 #   tool_uses  int   — number of tool calls made
 #   wall_seconds int — elapsed seconds
+#   summary    str   — (optional) semantic result text written by the agent; used as authoritative result by the supervisor
 #
 # FILE_CREATED — written when a feedback file appears in plans/<feature>/feedback/
 #   file       str   — filename, e.g. "REVIEW_FAILURES.md"
@@ -70,7 +71,7 @@ immediately when the condition is detected.
 # {"type":"AGENT_DONE","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":20000,"tokens_out":5000,"cost_usd":0.0,"tool_uses":11,"wall_seconds":105,"ts":"2026-05-11T09:01:50Z"}
 # {"type":"STATE_TRANSITION","from_state":"PLANNING","to_state":"PLAN_DONE","ts":"2026-05-11T09:01:50Z"}
 # {"type":"AGENT_SPAWNED","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"role":"Conv 1 code fixes","ts":"2026-05-11T09:05:00Z"}
-# {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"result":"DONE","tokens_in":22000,"tokens_out":4000,"cost_usd":0.0,"tool_uses":23,"wall_seconds":85,"ts":"2026-05-11T09:06:25Z"}
+# {"type":"AGENT_DONE","agent":"builder","model":"claude-sonnet-4-6","conversation":1,"result":"DONE","summary":"builder conv 1 DONE","tokens_in":22000,"tokens_out":4000,"cost_usd":0.0,"tool_uses":23,"wall_seconds":85,"ts":"2026-05-11T09:06:25Z"}
 # {"type":"STATE_TRANSITION","from_state":"BUILDING_CONV_1","to_state":"REVIEWING_CONV_1","ts":"2026-05-11T09:06:25Z"}
 
 CURRENT_SCHEMA_VERSION = 1

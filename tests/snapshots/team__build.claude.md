@@ -93,8 +93,20 @@ Both files can exist simultaneously. Route one at a time using the priority orde
 
 ## Transition to review
 
-After Phase 3 completes with no blocking feedback files, run the Completion report with
-`agent: builder`, `result: DONE`, using `BUILD_START` from Phase 2.5.
+After Phase 3 completes with no blocking feedback files:
+
+### Phase 3.5 — Write VERIFY.md
+
+Write `pathly/plans/<feature>/VERIFY.md` with this exact content (first line must be exact):
+```
+RESULT: PASS
+Verified: conversation N complete — <one-sentence summary of what was verified and the outcome>
+```
+
+Replace `<feature>` with the feature slug and `N` with the conversation number.
+The first line **must** be `RESULT: PASS` verbatim (case-sensitive, no leading whitespace).
+
+Then run the Completion report with `agent: builder`, `result: DONE`, using `BUILD_START` from Phase 2.5.
 
 Return. Orchestrator determines next state from transition_rules.
 
@@ -140,8 +152,11 @@ Compute the `wall_seconds` fallback: run
 integer recorded at the start of this stage.
 
 Then invoke the `log-agent-done` skill with:
+
+`summary` should be a one-sentence description of what the agent did and the outcome (e.g. "Implemented Conv 1 — added auth middleware to api.ts, all tests pass").
+
 ```json
-{"agent":"<agent>","feature":"<FEATURE>","conversation":<N>,"result":"<RESULT>","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
+{"agent":"<agent>","feature":"<FEATURE>","conversation":<N>,"result":"<RESULT>","summary":"<one sentence describing what was done and the outcome>","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
 ```
 (`wall_seconds` is the fallback computed from `<STAGE>_START`; `log-agent-done` prefers
 `duration_ms` if > 0.)

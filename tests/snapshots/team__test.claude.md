@@ -171,8 +171,11 @@ Compute the `wall_seconds` fallback: run
 integer recorded at the start of this stage.
 
 Then invoke the `log-agent-done` skill with:
+
+`summary` should be a one-sentence description of what the agent did and the outcome (e.g. "Implemented Conv 1 — added auth middleware to api.ts, all tests pass").
+
 ```json
-{"agent":"<agent>","feature":"<FEATURE>","conversation":<N>,"result":"<RESULT>","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
+{"agent":"<agent>","feature":"<FEATURE>","conversation":<N>,"result":"<RESULT>","summary":"<one sentence describing what was done and the outcome>","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
 ```
 (`wall_seconds` is the fallback computed from `<STAGE>_START`; `log-agent-done` prefers
 `duration_ms` if > 0.)

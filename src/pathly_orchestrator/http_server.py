@@ -996,6 +996,7 @@ def runner_terminal_result():
         run_id = data.get("run_id", "")
         if not topic or not isinstance(run_id, str) or not run_id:
             return jsonify({"error": "unknown run_id"}), 404
+
         with _sup._lock:
             evt = _sup._terminal_result_events.get(run_id)
             if evt is None:
@@ -1006,8 +1007,29 @@ def runner_terminal_result():
             else:
                 logger.warning("runner_terminal_result: no RunnerState found for topic %r, falling back to 'claude'", topic)
                 adapter = "claude"
+
+        # Parse stdout result (session_id + cost_usd) — outside the lock
+        parsed = parse_result(adapter, data.get("stdout_tail", ""))
+
+        # Enrich with EVENTS.jsonl summary (authoritative, never truncated)
+        if runner_state is not None:
+            try:
+                from pathly_orchestrator.runner import read_last_agent_done, _storage_path
+                storage = _storage_path(runner_state.flow, runner_state.project_root, runner_state.topic)
+                agent_done = read_last_agent_done(storage)
+                if agent_done is not None:
+                    summary = agent_done.get("summary", "")
+                    if summary:
+                        parsed["result"] = summary
+                    # Use EVENTS.jsonl cost as fallback when stdout didn't capture it
+                    if not parsed.get("cost_usd") and agent_done.get("cost_usd", 0.0) > 0.0:
+                        parsed["cost_usd"] = agent_done["cost_usd"]
+            except Exception as exc:
+                logger.warning("runner_terminal_result: EVENTS.jsonl read failed: %s", exc)
+
+        with _sup._lock:
             _sup._terminal_result_data[run_id] = {
-                "result": parse_result(adapter, data.get("stdout_tail", "")),
+                "result": parsed,
                 "exit_code": data.get("exit_code"),
                 "wall_seconds": data.get("wall_seconds"),
                 "user_initiated": data.get("user_initiated"),
