@@ -150,18 +150,39 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
     return { shell: argv[0], args: argv.slice(1) }
   }
   // Windows: -EncodedCommand (base64 UTF-16LE) has a hard ~32 KB limit from Win32's CreateProcess.
-  // Pathly stage prompts easily exceed this. Write a .ps1 script to a temp file instead —
-  // no length constraints, PowerShell single-quoted strings handle any content safely.
+  // Pathly stage prompts easily exceed this. Write a .ps1 script to a temp file instead.
   //
-  // IMPORTANT: write with UTF-8 BOM (﻿) so PowerShell 5.1 reads the file as UTF-8.
-  // Without the BOM, PS5.1 falls back to CP1252, where the UTF-8 bytes for → (E2 86 92)
-  // decode as â†' — and 0x92 in CP1252 is the RIGHT SINGLE QUOTATION MARK ('), which
-  // PowerShell treats as a string terminator, breaking the quoted prompt argument.
-  // Also escape U+2018/U+2019 (curly quotes) that PS5.1 accepts as quote delimiters.
+  // For arguments containing newlines OR any variant of single quote (U+0027 apostrophe,
+  // U+2018/U+2019 curly quotes) use a PowerShell here-string (@'...'@) which requires
+  // NO escaping whatsoever. Agent contracts contain contractions (Don't, can't, isn't) that
+  // would terminate a single-quoted string early if not handled this way.
+  //
+  // For short flag arguments (no newlines, no quotes) use plain single-quoted strings.
+  //
+  // IMPORTANT: write with UTF-8 BOM so PowerShell 5.1 reads the file as UTF-8.
   const tmpScript = path.join(os.tmpdir(), `pathly-runner-${Date.now()}.ps1`)
-  const psArgs = argv.map((a) => `'${a.replace(/['‘’]/g, "''")}'`).join(' ')
   const bom = Buffer.from([0xEF, 0xBB, 0xBF])
-  fs.writeFileSync(tmpScript, Buffer.concat([bom, Buffer.from(`& ${psArgs}\r\n`, 'utf8')]))
+
+  const varDecls: string[] = []
+  const callTokens: string[] = []
+
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    // Use a here-string for any arg that has newlines or single-quote variants.
+    // Here-strings only end at `'@` at column 0 — virtually impossible in prompt content.
+    if (/['''\r\n]/.test(a)) {
+      const varName = `$a${i}`
+      // PowerShell requires a newline immediately before the closing marker.
+      const body = a.endsWith('\n') ? a : `${a}\n`
+      varDecls.push(`${varName} = @'\n${body}'@`)
+      callTokens.push(varName)
+    } else {
+      callTokens.push(`'${a}'`)
+    }
+  }
+
+  const scriptLines = [...varDecls, `& ${callTokens.join(' ')}`].join('\n') + '\r\n'
+  fs.writeFileSync(tmpScript, Buffer.concat([bom, Buffer.from(scriptLines, 'utf8')]))
   return {
     shell: 'powershell.exe',
     args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', tmpScript],

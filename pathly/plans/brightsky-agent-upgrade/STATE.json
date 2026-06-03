@@ -1,6 +1,18 @@
 {
   "convs_total": 4,
   "convs_done": 0,
-  "current": "PLANNING",
-  "conv_start_sha": "39102610b90e2e99ffbacaf892a5a53a0ee5fb4e"
+  "current": "BUILDING",
+  "conv_start_sha": "39102610b90e2e99ffbacaf892a5a53a0ee5fb4e",
+  "build_baseline": {
+    "started_at": "2026-06-03T08:11:40.679558+00:00",
+    "preexisting_dirty": [
+      "pathly/plans/brightsky-agent-upgrade/EVENTS.jsonl",
+      "pathly/plans/brightsky-agent-upgrade/RUNNER_STATE.json",
+      "pathly/plans/brightsky-agent-upgrade/STATE.json",
+      "src/pathly_data/core/skills/team/build.md",
+      "studio/src/main/ipc/terminal.ts",
+      "studio/src/renderer/src/components/FlowEditor/hooks/useFlowGraph.ts",
+      "studio/src/renderer/src/components/FlowEditor/utils/flowToGraph.ts"
+    ]
+  }
 }

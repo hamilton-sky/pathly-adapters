@@ -113,7 +113,7 @@ export function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node<StateNodeDa
   // that already use short agent names (e.g. debug.flow where agent_map has 'builder').
   const feedbackArrivalsMap = new Map<string, string[]>()
   if (data.feedback_routing) {
-    const roleSource: Record<string, string> = data.role_map ?? data.agent_map
+    const roleSource: Record<string, string> = data.role_map ?? data.agent_map ?? {}
     const roleToStates = new Map<string, string[]>()
     for (const [state, role] of Object.entries(roleSource)) {
       const existing = roleToStates.get(role) ?? []
@@ -140,7 +140,7 @@ export function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node<StateNodeDa
       position: { x: 200, y: i * 140 },
       data: {
         state,
-        agent: data.agent_map[state] ?? '',
+        agent: data.agent_map?.[state] ?? '',
         outgoingStates,
         incomingStates,
         feedbackArrivals: feedbackArrivalsMap.get(state),

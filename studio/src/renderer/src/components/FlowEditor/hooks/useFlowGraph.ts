@@ -96,7 +96,7 @@ export function useFlowGraph(
             id: state,
             type: 'stateNode' as const,
             position: pos,
-            data: { state, agent: data.agent_map[state] ?? '', isStart: i === 0, outgoingStates, incomingStates },
+            data: { state, agent: data.agent_map?.[state] ?? '', isStart: i === 0, outgoingStates, incomingStates },
           }
         })
       })

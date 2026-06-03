@@ -1,1 +1,16 @@
 {"type": "STATE_TRANSITION", "from": "STORMING", "to": "PLANNING", "schema_version": 1, "ts": "2026-06-02T23:47:36Z"}
+{"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-03T00:00:00Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T07:37:55Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T07:37:58Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T07:37:58Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T07:38:00Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T07:38:00Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T07:38:02Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T07:38:02Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T08:12:00Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T08:12:02Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T08:12:02Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T08:12:04Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T08:12:04Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T08:12:06Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T08:12:06Z"}
