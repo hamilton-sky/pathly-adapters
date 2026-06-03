@@ -25,3 +25,8 @@
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-03T16:03:36Z"}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline", "schema_version": 1, "ts": "2026-06-03T16:03:49Z"}
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-03T16:03:49Z"}
+{"type": "FILE_CREATED", "file": "feedback/REVIEW_FAILURES.md", "ts": "2026-06-03T16:10:00Z"}
+{"type": "STATE_TRANSITION", "to": "REVIEW_FAILED", "from": "REVIEWING", "schema_version": 1, "ts": "2026-06-03T16:10:00Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 2, "result": "FAIL", "summary": "reviewer conv 2 FAIL \u2014 3 violations: duplicate ambient decl in preload, missing tool aliases, double splitThinkingContent call", "tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "cost_usd": 0.0, "tool_uses": 0, "wall_seconds": 0, "ts": "2026-06-03T16:10:00Z", "schema_version": 1}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T16:52:34Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEW_FAILED", "to": "REVIEWING", "note": "recovery: agent incorrectly wrote REVIEW_FAILED which is not a declared state", "schema_version": 1, "ts": "2026-06-03T17:03:07Z"}

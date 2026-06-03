@@ -13,6 +13,7 @@ State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "DESIGN.md", "ts": "<iso-timestamp>"}`.
 - **Log stage start:** Append `{"type": "STAGE_START", "stage": "DESIGNING", "ts": "<iso-timestamp>"}`.
+- **Never** append `STATE_TRANSITION` events — the FSM writes all state transitions after your AGENT_DONE.
 
 ## Role
 

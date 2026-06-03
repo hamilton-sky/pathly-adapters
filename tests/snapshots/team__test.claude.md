@@ -26,6 +26,7 @@ State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
 - **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>", "ts": "<iso-timestamp>"}`.
+- **Never** append `STATE_TRANSITION` events — the FSM writes all state transitions after your AGENT_DONE.
 
 ## Phase 0 — Record test start time
 

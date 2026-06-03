@@ -30,6 +30,7 @@ State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 - **Log retry:** Append `{"type": "RETRY", "key": "conv-N:FILE.md", "ts": "<iso-timestamp>"}`.
 - **Check retry count:** Count RETRY events in EVENTS.jsonl where `key = "conv-N:FILE.md"`.
 - **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>", "ts": "<iso-timestamp>"}`.
+- **Never** append `STATE_TRANSITION` events — the FSM writes all state transitions after your AGENT_DONE.
 
 ## Subagents (REVIEWING stage)
 

@@ -1,5 +1,7 @@
 {
   "convs_total": 4,
   "convs_done": 2,
-  "current": "REVIEWING"
+  "current": "REVIEWING",
+  "conv_start_sha": "27b84e7dd332f0debcf49f7833a22f6a53c13ac0",
+  "updated_at": "2026-06-03T16:10:00Z"
 }

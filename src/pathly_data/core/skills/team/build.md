@@ -28,6 +28,7 @@ State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
 - **Log retry:** Append `{"type": "RETRY", "key": "conv-N:FILE.md", "ts": "<iso-timestamp>"}`.
 - **Check retry count:** Count RETRY events in EVENTS.jsonl where `key = "conv-N:FILE.md"`.
+- **Never** append `STATE_TRANSITION` events — the FSM writes all state transitions after your AGENT_DONE.
 
 ## Subagents (BUILDING stage)
 
