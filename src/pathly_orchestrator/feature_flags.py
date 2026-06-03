@@ -48,5 +48,9 @@ class FeatureFlags:
     def early_advance(self) -> bool:
         return _bool("PATHLY_RUNNER_EARLY_ADVANCE", False)
 
+    @property
+    def interactive(self) -> bool:
+        return _bool("PATHLY_RUNNER_INTERACTIVE", False)
+
 
 flags = FeatureFlags()

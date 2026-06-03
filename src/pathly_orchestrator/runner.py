@@ -40,6 +40,7 @@ def resolve_argv(
     model: str,
     session: str | None = None,
     autonomy: bool = True,
+    interactive: bool = False,
 ) -> list[str]:
     argv = resolve_command(
         adapter,
@@ -48,7 +49,7 @@ def resolve_argv(
         session=session,
         autonomy=autonomy,
     )["argv"]
-    if adapter == "claude" and "--output-format=json" not in argv:
+    if adapter == "claude" and "--output-format=json" not in argv and not interactive:
         argv = [*argv, "--print", "--output-format=json"]
     return argv
 

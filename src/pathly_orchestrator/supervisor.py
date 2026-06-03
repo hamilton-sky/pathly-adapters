@@ -210,6 +210,16 @@ def _reconciliation_window(
         _terminal_started_events.pop(run_id, None)
 
 
+def _cleanup_run_id(run_id: str) -> None:
+    """Pop all four signal dicts for run_id — used by interactive mode (no reconciliation window)."""
+    with _lock:
+        _terminal_result_events.pop(run_id, None)
+        _terminal_result_data.pop(run_id, None)
+        _agent_done_events.pop(run_id, None)
+        _agent_done_stop_events.pop(run_id, None)
+    _terminal_started_events.pop(run_id, None)
+
+
 def _mirror_path(state: RunnerState) -> Path:
     return Path(state.project_root) / "pathly" / "plans" / state.topic / "RUNNER_STATE.json"
 
@@ -272,10 +282,21 @@ def _run_stage_via_terminal(
     autonomy: bool = True,
 ) -> dict:
     import datetime
+    from pathly_orchestrator.events import TYPE_STAGE_INTERACTIVE_DONE
     from pathly_orchestrator.feature_flags import FeatureFlags
     from pathly_orchestrator.runner import resolve_argv, read_last_agent_done
 
-    argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy)
+    feature_flags = FeatureFlags()
+    if feature_flags.interactive and not feature_flags.early_advance:
+        msg = "PATHLY_RUNNER_INTERACTIVE=1 requires PATHLY_RUNNER_EARLY_ADVANCE=1"
+        if broadcast_fn:
+            try:
+                broadcast_fn(state.topic, {"type": "RUNNER_WARNING", "message": msg})
+            except Exception:
+                pass
+        raise RuntimeError(msg)
+
+    argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy, interactive=feature_flags.interactive)
     tab_id = f"runner-{run_id[-10:]}"
     label = f"{adapter} — {state.current_state or state.status}"
     with _lock:
@@ -306,7 +327,6 @@ def _run_stage_via_terminal(
                 f"terminal_spawn_timeout: Studio did not spawn PTY for {tab_id} within 30s"
             )
 
-        feature_flags = FeatureFlags()
         if feature_flags.early_advance:
             # Build the EVENTS.jsonl path for this run
             events_path = str(
@@ -365,13 +385,36 @@ def _run_stage_via_terminal(
                         ),
                     })
 
-                recon_t = threading.Thread(
-                    target=_reconciliation_window,
-                    args=(run_id, state.current_state, state.topic, events_path),
-                    daemon=True,
-                    name=f"recon-window-{run_id}",
-                )
-                recon_t.start()
+                if feature_flags.interactive:
+                    if broadcast_fn:
+                        broadcast_fn(state.topic, {
+                            "type": "TERMINAL_KILL",
+                            "tab_id": tab_id,
+                            "run_id": run_id,
+                            "ts": datetime.datetime.now(datetime.timezone.utc).strftime(
+                                "%Y-%m-%dT%H:%M:%SZ"
+                            ),
+                        })
+                    now_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    try:
+                        with open(events_path, "a", encoding="utf-8") as _f:
+                            _f.write(json.dumps({
+                                "type": TYPE_STAGE_INTERACTIVE_DONE,
+                                "topic": state.topic,
+                                "stage": state.current_state,
+                                "ts": now_ts,
+                            }) + "\n")
+                    except OSError as exc:
+                        logger.warning("_run_stage_via_terminal: failed to write STAGE_INTERACTIVE_DONE: %s", exc)
+                    _cleanup_run_id(run_id)
+                else:
+                    recon_t = threading.Thread(
+                        target=_reconciliation_window,
+                        args=(run_id, state.current_state, state.topic, events_path),
+                        daemon=True,
+                        name=f"recon-window-{run_id}",
+                    )
+                    recon_t.start()
                 return result_for_fsm
 
             # Slow path: PTY result arrived first (or timeout) — cancel watcher

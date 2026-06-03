@@ -8,4 +8,7 @@ RESULT: PASS (billing-update fix)
 Verified: TYPE_BILLING_UPDATE constant added to events.py; _patch_last_agent_done in runner.py now appends BILLING_UPDATE after in-place patch; mergeBillingUpdate() added to Monitor/utils.ts; useMonitorSession.ts SSE handler routes BILLING_UPDATE to mergeBillingUpdate instead of appending — Studio EventLog now shows corrected cost/tool values after PTY exit; tsc --noEmit clean, 399 tests pass.
 
 RESULT: PASS
+Verified: conversation 4 complete — TYPE_STAGE_INTERACTIVE_DONE added to events.py; FeatureFlags.interactive property (PATHLY_RUNNER_INTERACTIVE); resolve_argv guards --print/--output-format=json via interactive param; supervisor startup guard (interactive without early_advance raises RuntimeError + RUNNER_WARNING); fast-path branch in _run_stage_via_terminal emits TERMINAL_KILL SSE, writes STAGE_INTERACTIVE_DONE, calls _cleanup_run_id (skips reconciliation window) in interactive mode; 2 new tests pass; 401 tests pass.
+
+RESULT: PASS
 Verified: conversation 3 complete — TERMINAL_AGENT_DONE SSE broadcast added to supervisor.py fast-path (before reconciliation thread start); RunnerStatus union extended with 'finalizing'; StageStatusStrip dotClass handles finalizing→dotFinalizing; stage text shows "${stage} — finalizing…" when status===finalizing; .dotFinalizing CSS class (amber pulsing); useHQ.tsx routes TERMINAL_AGENT_DONE to setRunnerState({status:'finalizing'}); 399 tests pass, tsc --noEmit clean.

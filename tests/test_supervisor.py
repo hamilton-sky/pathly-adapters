@@ -903,3 +903,78 @@ def test_slow_path_no_regression(tmp_path, monkeypatch):
         _sup._terminal_result_data.pop(run_id, None)
         _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
         _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]
+
+
+def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
+    """Interactive=1 + EarlyAdvance=1: TERMINAL_KILL emitted, STAGE_INTERACTIVE_DONE written, no recon."""
+    import pathly_orchestrator.supervisor as _sup
+
+    monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "1")
+    monkeypatch.setenv("PATHLY_RUNNER_INTERACTIVE", "1")
+
+    topic = "interactive-kill"
+    run_id = f"{topic}-001"
+    state = _make_state(tmp_path, topic=topic)
+
+    plan_dir = tmp_path / "pathly" / "plans" / topic
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    events_path = plan_dir / "EVENTS.jsonl"
+    events_path.write_text(json.dumps({
+        "type": "AGENT_DONE",
+        "agent": "builder",
+        "conversation": 4,
+        "summary": "interactive done",
+        "cost_usd": 0.02,
+        "ts": "2026-01-01T00:00:00Z",
+    }) + "\n", encoding="utf-8")
+
+    def fake_tail(path, after_ts, stop_evt, poll_interval=0.1):
+        yield {"type": "AGENT_DONE", "ts": "2026-01-01T00:01:00Z", "summary": "interactive done"}
+
+    broadcast_events: list[dict] = []
+
+    def fake_broadcast(topic_, payload):
+        broadcast_events.append(payload)
+        if payload.get("type") == "TERMINAL_SPAWN":
+            _simulate_pty_start(run_id)
+
+    with patch("pathly_orchestrator.runner.tail_agent_done", side_effect=fake_tail):
+        result = _run_stage_via_terminal(
+            state,
+            "do stuff interactively",
+            "claude",
+            "claude-sonnet-4-6",
+            run_id,
+            broadcast_fn=fake_broadcast,
+        )
+
+    kill_events = [e for e in broadcast_events if e.get("type") == "TERMINAL_KILL"]
+    assert len(kill_events) == 1, f"Expected one TERMINAL_KILL, got: {broadcast_events}"
+    assert kill_events[0].get("tab_id") is not None
+
+    content = events_path.read_text(encoding="utf-8")
+    assert "STAGE_INTERACTIVE_DONE" in content
+    assert "STAGE_RECONCILIATION_FAILURE" not in content
+
+    with _sup._lock:
+        assert run_id not in _sup._terminal_result_events  # type: ignore[attr-defined]
+
+    with _sup._lock:
+        _sup._terminal_started_events.pop(run_id, None)
+        _sup._terminal_result_events.pop(run_id, None)
+        _sup._terminal_result_data.pop(run_id, None)
+        _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
+        _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]
+
+
+def test_interactive_mode_strips_headless_flags(monkeypatch):
+    """Interactive=1 + EarlyAdvance=1: --print and --output-format=json absent from argv; -p present."""
+    monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "1")
+    monkeypatch.setenv("PATHLY_RUNNER_INTERACTIVE", "1")
+
+    from pathly_orchestrator.runner import resolve_argv
+    argv = resolve_argv("claude", "my prompt", "claude-sonnet-4-6", interactive=True)
+
+    assert "--print" not in argv, f"--print should not be in interactive argv: {argv}"
+    assert "--output-format=json" not in argv, f"--output-format=json should not be in interactive argv: {argv}"
+    assert "-p" in argv, f"-p should be in argv: {argv}"

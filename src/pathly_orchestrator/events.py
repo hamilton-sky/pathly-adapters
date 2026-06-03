@@ -98,5 +98,9 @@ TYPE_BILLING_UPDATE = "BILLING_UPDATE"
 # Appended after _patch_last_agent_done rewrites an AGENT_DONE line in-place,
 # so the SSE forward-tailer re-broadcasts the corrected values to Studio.
 
+TYPE_STAGE_INTERACTIVE_DONE = "STAGE_INTERACTIVE_DONE"
+# Schema: {"type": "STAGE_INTERACTIVE_DONE", "topic": str, "stage": str, "ts": str}
+# Written when interactive mode kills the PTY after early AGENT_DONE detection.
+
 AGENTS = {"planner", "builder", "reviewer", "tester", "architect", "retro", "explore"}
 RESULTS = {"PASS", "FAIL", "DONE", "BLOCKED"}
