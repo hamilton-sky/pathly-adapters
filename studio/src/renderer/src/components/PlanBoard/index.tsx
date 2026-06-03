@@ -146,7 +146,7 @@ export function PlanBoard(): JSX.Element {
 
     try {
       const raw = await readFile(`${base}/STATE.json`)
-      const parsed = JSON.parse(raw) as { current?: string }
+      const parsed = JSON.parse(raw ?? '{}') as { current?: string }
       setFsmState(parsed.current ?? '')
     } catch {
       setFsmState('')
@@ -154,7 +154,7 @@ export function PlanBoard(): JSX.Element {
 
     try {
       const md = await readFile(`${base}/PROGRESS.md`)
-      const rows = parseProgressMd(md)
+      const rows = parseProgressMd(md ?? '')
       setConvs(rows)
       setNoProgress(rows.length === 0)
     } catch {
@@ -165,7 +165,7 @@ export function PlanBoard(): JSX.Element {
     try {
       const raw = await readFile(`${base}/EVENTS.jsonl`)
       const parsed: EventEntry[] = []
-      for (const line of raw.split('\n')) {
+      for (const line of (raw ?? '').split('\n')) {
         const trimmed = line.trim()
         if (!trimmed) continue
         try { parsed.push(JSON.parse(trimmed) as EventEntry) } catch { /* skip malformed */ }

@@ -153,6 +153,7 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
         const yamlName = getFlowYamlName(flowName)
         readFile(`${projectPath}/src/pathly_data/core/flows/${yamlName}`)
           .then((yaml) => {
+            if (!yaml) return
             const cleanYaml = yaml.replace(/\r/g, '')
             const match = cleanYaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
             if (match) {

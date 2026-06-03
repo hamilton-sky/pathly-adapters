@@ -1,4 +1,4 @@
-export const readFile        = (path: string): Promise<string>                                                => window.pathly.fs.read(path)
+export const readFile        = (path: string): Promise<string | null>                                         => window.pathly.fs.read(path)
 export const writeFile       = (path: string, content: string): Promise<void>                                 => window.pathly.fs.write(path, content)
 export const listDir         = (dir: string): Promise<string[]>                                               => window.pathly.fs.list(dir)
 export const listDirs        = (dir: string): Promise<string[]>                                               => window.pathly.fs.listDirs(dir)

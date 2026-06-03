@@ -27,6 +27,7 @@ export function useRequiredArtifacts(currentAgent: string): string[] | null {
     if (!item) return
     readFile(item.path)
       .then((content) => {
+        if (!content) return
         const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
         if (!fmMatch) return
         const fm = jsYaml.load(fmMatch[1]) as Record<string, unknown> | null

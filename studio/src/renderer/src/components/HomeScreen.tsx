@@ -211,7 +211,7 @@ export function HomeScreen(): JSX.Element {
         if (folder === '.archive') continue
         try {
           const raw = await readFile(`${dir}/${folder}/STATE.json`)
-          const parsed = JSON.parse(raw) as { current?: string }
+          const parsed = JSON.parse(raw ?? '{}') as { current?: string }
           rows.push({ name: folder, state: parsed.current ?? '', flowType })
         } catch {
           rows.push({ name: folder, state: '', flowType })

@@ -32,6 +32,7 @@ export function Step4Agents({
     if (!pathlyUserHome) return
     const filePath = `${pathlyUserHome}/user-blocks.json`
     readFile(filePath).then((content) => {
+      if (!content) return
       try {
         const parsed = JSON.parse(content) as { blocks?: Record<string, unknown> }
         setUserBlocks(Object.keys(parsed?.blocks ?? {}))
@@ -49,8 +50,11 @@ export function Step4Agents({
     let existing: { blocks: Record<string, string[]> } = { blocks: {} }
     try {
       const content = await readFile(filePath)
-      existing = JSON.parse(content) as { blocks: Record<string, string[]> }
-    } catch { /* file not yet created */ }
+      if (content) {
+        const parsed = JSON.parse(content) as { blocks?: Record<string, string[]> }
+        existing = { blocks: parsed?.blocks ?? {} }
+      }
+    } catch { /* malformed JSON — start fresh */ }
     existing.blocks[name] = entries
     await writeFile(filePath, JSON.stringify(existing, null, 2))
     setUserBlocks(Object.keys(existing.blocks))

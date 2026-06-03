@@ -69,7 +69,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
       if (!draftPath) return
       try {
         const content = await readFile(draftPath)
-        const draft = parseDraft(content)
+        const draft = parseDraft(content ?? '')
         if (!draft || cancelled) {
           setHasDraft(false)
           setSavedDraft(null)
