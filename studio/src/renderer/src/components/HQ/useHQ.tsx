@@ -306,7 +306,7 @@ export function useHQ() {
               }
             } else if (data.type === 'RUN_STARTED') {
               useRunnerStore.getState().snapshotRun()
-              useRunnerStore.getState().setRunnerState({ errorMessage: null, cost: 0, stage: null, adapter: null, sessionKind: null })
+              useRunnerStore.getState().setRunnerState({ errorMessage: null, status: 'running', cost: 0, stage: null, adapter: null, sessionKind: null })
             } else if (data.type === 'RUN_COMPLETE') {
               // Snapshot the finished/aborted run → moves stageLog to history
               // → docked banner clears (stageLog becomes empty → card returns null)

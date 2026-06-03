@@ -46,6 +46,7 @@ export function FlowControlBar(): JSX.Element {
       <div className={styles.bar}>
         {/* Lifecycle group */}
         <RunnerBtn label="Start" tooltip="Start a new pipeline run" enabled={startEnabled} onClick={() => {
+          setRunnerState({ errorMessage: null })
           const { projectRoot } = useRunnerStore.getState()
           void postAction('start', { flow: 'team', project_root: projectRoot ?? '', max_iterations: 20, max_cost_usd: 5.0 })
         }} extraClass={startEnabled ? styles.btnPrimary : ''}>
