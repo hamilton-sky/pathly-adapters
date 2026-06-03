@@ -1,15 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { listDir, getAppRoot } from '../../../services/pathlyApi'
 import styles from './BlockAuthorForm.module.css'
 
 const CORE_BLOCK_NAMES = ['full-build', 'lite-build', 'review-strict']
 
-const FRAGMENTS: { id: string; label: string }[] = [
-  { id: 'progress-logging', label: 'progress-logging' },
-  { id: 'completion-report', label: 'completion-report' },
-  { id: 'scout-choreography', label: 'scout-choreography' },
-  { id: 'feedback-protocol', label: 'feedback-protocol' },
-  { id: 'spawn-rules', label: 'spawn-rules (requires: can_spawn)' },
-]
+/**
+ * Optional metadata for known fragments.
+ * Add an entry here when a new fragment has a host requirement.
+ * The list of fragments itself is loaded dynamically from disk.
+ */
+const FRAGMENT_META: Record<string, { requires?: string }> = {
+  'spawn-rules': { requires: 'can_spawn' },
+}
+
+interface FragmentEntry {
+  id: string
+  label: string
+}
 
 interface Props {
   onSave: (name: string, entries: string[]) => void
@@ -21,6 +28,34 @@ export function BlockAuthorForm({ onSave, onCancel }: Props): JSX.Element {
   const [selected, setSelected] = useState<string[]>([])
   const [nameError, setNameError] = useState('')
   const [fragmentError, setFragmentError] = useState('')
+  const [fragments, setFragments] = useState<FragmentEntry[]>([])
+  const [loadError, setLoadError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadFragments(): Promise<void> {
+      try {
+        const appRoot = await getAppRoot()
+        const dir = `${appRoot}/src/pathly_data/core/skills/fragments`
+        const files = await listDir(dir)
+        if (cancelled) return
+        const entries: FragmentEntry[] = files
+          .filter((f) => f.endsWith('.md') && !f.startsWith('_'))
+          .map((f) => f.replace(/\.md$/, ''))
+          .sort()
+          .map((id) => {
+            const meta = FRAGMENT_META[id]
+            const label = meta?.requires ? `${id} (requires: ${meta.requires})` : id
+            return { id, label }
+          })
+        setFragments(entries)
+      } catch {
+        if (!cancelled) setLoadError(true)
+      }
+    }
+    void loadFragments()
+    return () => { cancelled = true }
+  }, [])
 
   const isDuplicateCore = CORE_BLOCK_NAMES.includes(name.trim())
 
@@ -80,7 +115,13 @@ export function BlockAuthorForm({ onSave, onCancel }: Props): JSX.Element {
 
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>Fragments</legend>
-        {FRAGMENTS.map(({ id, label }) => (
+        {loadError && (
+          <span className={styles.loadingMsg}>Could not load fragments from disk.</span>
+        )}
+        {!loadError && fragments.length === 0 && (
+          <span className={styles.loadingMsg}>Loading…</span>
+        )}
+        {fragments.map(({ id, label }) => (
           <label key={id} className={styles.checkRow} htmlFor={`frag-${id}`}>
             <input
               id={`frag-${id}`}

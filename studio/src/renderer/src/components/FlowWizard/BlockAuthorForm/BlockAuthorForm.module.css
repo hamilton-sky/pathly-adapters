@@ -25,6 +25,8 @@
 
 .legend { font-size: var(--font-size-sm); font-weight: 600; color: var(--theme-text-secondary); padding: 0 4px; }
 
+.loadingMsg { font-size: var(--font-size-sm); color: var(--theme-text-muted); font-style: italic; }
+
 .checkRow { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 
 .fragLabel { font-size: var(--font-size-sm); color: var(--theme-text-primary); font-family: monospace; }
