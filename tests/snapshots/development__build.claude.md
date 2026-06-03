@@ -177,9 +177,10 @@ In non-auto mode: do not invoke any other skill. The orchestrator reads STATE.js
 
 ## Live progress logging
 
-When this skill says `log-phase PHASE_START <phase>` or `log-phase PHASE_DONE <phase>`,
-run the corresponding command below, filling in the actual feature name, agent role, and phase:
+Each `log-phase PHASE_START <phase>` or `log-phase PHASE_DONE <phase>` marker is a mandatory
+pipeline event. When you encounter one (or an inline `Run:` bash block replacing it), execute it immediately:
 
+Run:
 ```bash
 # On PHASE_START:
 pathly-fsm-call record-phase \

@@ -122,12 +122,13 @@ def _inject_prompt_vars(text: str, feature: str, project_root: str, agent_role: 
         event_type = m.group(1)
         phase = m.group(2)
         return (
+            f"Run:\n"
             f"```bash\n"
             f'pathly-fsm-call record-phase --feature "{feature}" --agent "{agent_role}"'
             f' --phase "{phase}" --event-type {event_type}'
             f' --project-root "{project_root}"\n'
             f"```\n"
-            f"_(phase log — skip silently if server unavailable)_"
+            f"_(skip silently if unavailable)_"
         )
 
     text = re.sub(
@@ -138,6 +139,7 @@ def _inject_prompt_vars(text: str, feature: str, project_root: str, agent_role: 
     )
     text = text.replace("<feature>", feature)
     text = text.replace("<project_root>", project_root)
+    text = text.replace("<agent>", agent_role)
     return text
 
 
