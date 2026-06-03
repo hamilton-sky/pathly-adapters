@@ -14,3 +14,10 @@
 {"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T08:12:04Z"}
 {"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T08:12:06Z"}
 {"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T08:12:06Z"}
+{"type": "GATE_FAILED", "gate": "verify_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T15:47:45Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "REVIEW_FAILURES.md", "schema_version": 1, "ts": "2026-06-03T15:53:06Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T15:53:06Z"}
+{"type": "FEEDBACK_RESOLVED", "file": "SCOPE_VIOLATION.md", "schema_version": 1, "ts": "2026-06-03T15:57:33Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-03T15:57:33Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "summary": "Conv 1 complete \u2014 6 new studio tools added to studioAnalyzer.ts; npm run typecheck passes", "tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "cost_usd": 0.0, "tool_uses": 0, "wall_seconds": 0, "ts": "2026-06-03T16:01:41Z", "schema_version": 1}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "summary": "Conv 2 complete \u2014 fsm:runSkill IPC, preload bridge, type decl, splitThinkingContent wired; npm run typecheck passes", "tokens_in": 0, "tokens_out": 0, "total_tokens": 0, "cost_usd": 0.0, "tool_uses": 0, "wall_seconds": 0, "ts": "2026-06-03T16:01:41Z", "schema_version": 1}

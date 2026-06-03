@@ -25,4 +25,20 @@ export function registerFsmHandlers(): void {
       return null
     }
   })
+
+  ipcMain.handle('fsm:runSkill', async (_event, topic: string, skill: string, projectPath: string) => {
+    try {
+      const res = await fetch(`${FSM_BASE}/runner/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, skill, flow: 'team', project_root: projectPath, max_iterations: 20, max_cost_usd: 5.0 }),
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!res.ok) return { success: false, error: `FSM returned ${res.status}` }
+      const data = (await res.json()) as { run_id?: string }
+      return { success: true, runId: data.run_id }
+    } catch (err) {
+      return { success: false, error: String(err instanceof Error ? err.message : err) }
+    }
+  })
 }

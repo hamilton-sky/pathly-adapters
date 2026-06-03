@@ -4,16 +4,20 @@
   "project_root": "C:\\Users\\Yafit\\pathly-adapters",
   "model": "claude-sonnet-4-6",
   "timeout": 600,
-  "run_id": null,
-  "status": "idle",
+  "run_id": "56c9b73a-cdd4-4ea8-b282-e0ef256cecd4",
+  "status": "running",
   "current_state": "BUILDING",
-  "current_adapter": null,
-  "iterations": 0,
+  "current_adapter": "claude",
+  "iterations": 1,
   "max_iterations": 20,
   "cost_usd_so_far": 0.0,
   "max_cost_usd": 5.0,
   "autonomy": {},
   "pending_menu": null,
   "error_kind": null,
-  "open_session": null
+  "open_session": {
+    "adapter": "claude",
+    "session_id": null,
+    "resumable": true
+  }
 }

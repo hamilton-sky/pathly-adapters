@@ -2,6 +2,7 @@ import { useBrightskyStore, BRIGHTSKY_BASE_URL } from '../store/brightskyStore'
 import { useChatStore } from '../store/chatStore'
 import { collectPathlyContext } from './pathlyContextCollector'
 import { executeStudioTool } from './studioAnalyzer'
+import { splitThinkingContent } from './thinkingParser'
 
 export class BrightskyClient {
   private ws: WebSocket | null = null
@@ -90,11 +91,15 @@ export class BrightskyClient {
         useChatStore.getState().updateLastMessage({ content: this.streamContent })
         if (payload?.isDone === true) {
           this.streamInProgress = false
+          const { thinking, content: finalContent } = splitThinkingContent(this.streamContent)
+          useChatStore.getState().updateLastMessage({ content: finalContent || this.streamContent, thinking, status: 'done' })
           this.streamContent = ''
         }
       } else if (type === 'stream_end') {
         useBrightskyStore.getState().setThinkingLabel(null)
         this.streamInProgress = false
+        const { thinking, content: finalContent } = splitThinkingContent(this.streamContent)
+        useChatStore.getState().updateLastMessage({ content: finalContent || this.streamContent, thinking, status: 'done' })
         this.streamContent = ''
       } else if (type === 'tool_call') {
         const callId = (data.callId as string | undefined) ?? ''

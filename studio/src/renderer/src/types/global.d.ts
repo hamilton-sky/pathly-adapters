@@ -35,6 +35,7 @@ declare global {
       fsm: {
         ping: () => Promise<boolean>
         state: (topic: string) => Promise<unknown>
+        runSkill: (topic: string, skill: string, projectPath: string) => Promise<{ success: boolean; runId?: string; error?: string }>
       }
       watch: {
         start: (projectPath: string, topic: string) => Promise<void>
