@@ -1,6 +1,3 @@
----
-
----
 # builder
 
 This is the canonical, tool-agnostic Pathly agent contract for the builder role.
