@@ -21,6 +21,12 @@ from pathly_orchestrator.supervisor import (
     _lock,
     _registry,
     _write_mirror,
+    _run_stage_via_terminal,
+    _terminal_started_events,
+    _terminal_result_events,
+    _terminal_result_data,
+    _agent_done_events,  # type: ignore[attr-defined]
+    _agent_done_stop_events,  # type: ignore[attr-defined]
 )
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -662,3 +668,238 @@ def test_mirror_written_on_completion(tmp_path):
 
 def test_get_state_unknown_topic():
     assert get_state("no-such-topic-xyz") is None
+
+
+# ── Early-advance tests ───────────────────────────────────────────────────────
+
+def _make_state(tmp_path, topic="ea-test") -> RunnerState:
+    return RunnerState(
+        topic=topic,
+        flow="team",
+        project_root=str(tmp_path),
+        model="claude-sonnet-4-6",
+        timeout=60,
+    )
+
+
+def _simulate_pty_start(run_id: str) -> None:
+    """Fire the terminal_started event so _run_stage_via_terminal can proceed past spawn."""
+    import pathly_orchestrator.supervisor as _sup
+    with _sup._lock:
+        evt = _sup._terminal_started_events.setdefault(run_id, threading.Event())
+    evt.set()
+
+
+def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
+    """Flag=1, AGENT_DONE fires first; FSM advance called once; no RECONCILIATION_FAILURE."""
+    import pathly_orchestrator.supervisor as _sup
+
+    monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "1")
+
+    topic = "ea-billing-ok"
+    run_id = f"{topic}-001"
+    state = _make_state(tmp_path, topic=topic)
+
+    # Write an AGENT_DONE event to EVENTS.jsonl so read_last_agent_done can find it
+    plan_dir = tmp_path / "pathly" / "plans" / topic
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    events_path = plan_dir / "EVENTS.jsonl"
+    agent_done_event = {
+        "type": "AGENT_DONE",
+        "agent": "builder",
+        "conversation": 2,
+        "summary": "built it",
+        "cost_usd": 0.05,
+        "ts": "2026-01-01T00:00:00Z",
+    }
+    events_path.write_text(json.dumps(agent_done_event) + "\n", encoding="utf-8")
+
+    advance_called = threading.Event()
+    recon_started = threading.Event()
+
+    # Patch tail_agent_done to yield one AGENT_DONE immediately then stop
+    def fake_tail(path, after_ts, stop_evt, poll_interval=0.1):
+        yield {"type": "AGENT_DONE", "ts": "2026-01-01T00:01:00Z", "summary": "built it"}
+
+    # Patch _reconciliation_window to record its start, then simulate billing arriving
+    original_recon = _sup._reconciliation_window  # type: ignore[attr-defined]
+
+    def fake_recon(run_id_, stage, topic_, events_path_, timeout=30):
+        recon_started.set()
+        # Simulate billing arriving — set the result event
+        with _sup._lock:
+            result_evt = _sup._terminal_result_events.get(run_id_)
+            _sup._terminal_result_data[run_id_] = {
+                "result": {"cost_usd": 0.07, "session_id": "s1"},
+                "exit_code": 0,
+            }
+        if result_evt is not None:
+            result_evt.set()
+        original_recon(run_id_, stage, topic_, events_path_, timeout=0.2)
+        advance_called.set()
+
+    broadcast_events = []
+
+    def fake_broadcast(topic_, payload):
+        broadcast_events.append(payload)
+        if payload.get("type") == "TERMINAL_SPAWN":
+            _simulate_pty_start(run_id)
+
+    with (
+        patch("pathly_orchestrator.runner.tail_agent_done", side_effect=fake_tail),
+        patch("pathly_orchestrator.supervisor._reconciliation_window", side_effect=fake_recon),
+    ):
+        result = _run_stage_via_terminal(
+            state,
+            "do stuff",
+            "claude",
+            "claude-sonnet-4-6",
+            run_id,
+            broadcast_fn=fake_broadcast,
+        )
+
+    advance_called.wait(timeout=3.0)
+
+    # FSM advance uses result from read_last_agent_done — result should have cost_usd
+    assert result.get("cost_usd") == 0.05
+
+    # No RECONCILIATION_FAILURE in events file
+    content = events_path.read_text(encoding="utf-8")
+    assert "STAGE_RECONCILIATION_FAILURE" not in content
+
+    # Cleanup
+    with _sup._lock:
+        _sup._terminal_started_events.pop(run_id, None)
+        _sup._terminal_result_events.pop(run_id, None)
+        _sup._terminal_result_data.pop(run_id, None)
+        _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
+        _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]
+
+
+def test_early_advance_billing_timeout(tmp_path, monkeypatch):
+    """Flag=1, reconciliation window expires; STAGE_RECONCILIATION_FAILURE written."""
+    import pathly_orchestrator.supervisor as _sup
+
+    monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "1")
+
+    topic = "ea-billing-timeout"
+    run_id = f"{topic}-001"
+    state = _make_state(tmp_path, topic=topic)
+
+    plan_dir = tmp_path / "pathly" / "plans" / topic
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    events_path = plan_dir / "EVENTS.jsonl"
+    agent_done_event = {
+        "type": "AGENT_DONE",
+        "agent": "builder",
+        "conversation": 2,
+        "summary": "built it",
+        "cost_usd": 0.05,
+        "ts": "2026-01-01T00:00:00Z",
+    }
+    events_path.write_text(json.dumps(agent_done_event) + "\n", encoding="utf-8")
+
+    recon_done = threading.Event()
+
+    def fake_tail(path, after_ts, stop_evt, poll_interval=0.1):
+        yield {"type": "AGENT_DONE", "ts": "2026-01-01T00:01:00Z"}
+
+    original_recon = _sup._reconciliation_window  # type: ignore[attr-defined]
+
+    def fake_recon(run_id_, stage, topic_, events_path_, timeout=30):
+        # Use short timeout so billing never arrives
+        original_recon(run_id_, stage, topic_, events_path_, timeout=0.1)
+        recon_done.set()
+
+    def fake_broadcast(topic_, payload):
+        if payload.get("type") == "TERMINAL_SPAWN":
+            _simulate_pty_start(run_id)
+
+    with (
+        patch("pathly_orchestrator.runner.tail_agent_done", side_effect=fake_tail),
+        patch("pathly_orchestrator.supervisor._reconciliation_window", side_effect=fake_recon),
+    ):
+        result = _run_stage_via_terminal(
+            state,
+            "do stuff",
+            "claude",
+            "claude-sonnet-4-6",
+            run_id,
+            broadcast_fn=fake_broadcast,
+        )
+
+    recon_done.wait(timeout=3.0)
+
+    # STAGE_RECONCILIATION_FAILURE must be written
+    content = events_path.read_text(encoding="utf-8")
+    assert "STAGE_RECONCILIATION_FAILURE" in content
+
+    # FSM was advanced (result returned from fast path)
+    assert "cost_usd" in result
+
+    # Cleanup
+    with _sup._lock:
+        _sup._terminal_started_events.pop(run_id, None)
+        _sup._terminal_result_events.pop(run_id, None)
+        _sup._terminal_result_data.pop(run_id, None)
+        _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
+        _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]
+
+
+def test_slow_path_no_regression(tmp_path, monkeypatch):
+    """Flag not set; PTY POST arrives normally; FSM advance once; _agent_done_events never written."""
+    import pathly_orchestrator.supervisor as _sup
+
+    # Do NOT set PATHLY_RUNNER_EARLY_ADVANCE
+    monkeypatch.delenv("PATHLY_RUNNER_EARLY_ADVANCE", raising=False)
+
+    topic = "ea-slow-path"
+    run_id = f"{topic}-001"
+    state = _make_state(tmp_path, topic=topic)
+
+    plan_dir = tmp_path / "pathly" / "plans" / topic
+    plan_dir.mkdir(parents=True, exist_ok=True)
+
+    pty_result_ready = threading.Event()
+
+    def fake_broadcast(topic_, payload):
+        if payload.get("type") == "TERMINAL_SPAWN":
+            _simulate_pty_start(run_id)
+            # Simulate PTY completing shortly after start
+            def _post_result():
+                pty_result_ready.wait(timeout=2.0)
+                with _sup._lock:
+                    _sup._terminal_result_data[run_id] = {
+                        "result": {"cost_usd": 0.03, "session_id": "s2"},
+                        "exit_code": 0,
+                    }
+                    evt = _sup._terminal_result_events.get(run_id)
+                if evt is not None:
+                    evt.set()
+            t = threading.Thread(target=_post_result, daemon=True)
+            t.start()
+            pty_result_ready.set()
+
+    result = _run_stage_via_terminal(
+        state,
+        "do stuff",
+        "claude",
+        "claude-sonnet-4-6",
+        run_id,
+        broadcast_fn=fake_broadcast,
+    )
+
+    # FSM advance once — result came from PTY data
+    assert result.get("cost_usd") == 0.03
+
+    # _agent_done_events was never populated for this run_id
+    with _sup._lock:
+        assert run_id not in _sup._agent_done_events  # type: ignore[attr-defined]
+
+    # Cleanup
+    with _sup._lock:
+        _sup._terminal_started_events.pop(run_id, None)
+        _sup._terminal_result_events.pop(run_id, None)
+        _sup._terminal_result_data.pop(run_id, None)
+        _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
+        _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]

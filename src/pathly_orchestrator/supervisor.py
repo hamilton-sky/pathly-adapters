@@ -122,6 +122,93 @@ _terminal_started_events: dict[str, threading.Event] = {}
 _terminal_result_events: dict[str, threading.Event] = {}
 _terminal_result_data: dict[str, dict] = {}
 
+# Early-advance signal channels — independent of _terminal_result_events/_terminal_result_data.
+# The watcher sets _agent_done_events[run_id] when AGENT_DONE is detected in EVENTS.jsonl.
+# _agent_done_stop_events[run_id] is set to stop the watcher thread.
+# These dicts MUST NEVER be read from or written to by the /runner/terminal/result handler.
+_agent_done_events: dict[str, threading.Event] = {}
+_agent_done_stop_events: dict[str, threading.Event] = {}
+
+
+def _agent_done_watcher(run_id: str, events_path: str, start_ts: str) -> None:
+    """Tail EVENTS.jsonl for AGENT_DONE; set _agent_done_events[run_id] on first yield.
+
+    Runs as a daemon thread when feature_flags.early_advance is True.
+    Stops when _agent_done_stop_events[run_id] is set.
+    """
+    from pathly_orchestrator.runner import tail_agent_done
+
+    with _lock:
+        stop_evt = _agent_done_stop_events.setdefault(run_id, threading.Event())
+
+    for _event in tail_agent_done(events_path, start_ts, stop_evt):
+        with _lock:
+            done_evt = _agent_done_events.get(run_id)
+            if done_evt is not None:
+                done_evt.set()
+        return
+
+
+def _reconciliation_window(
+    run_id: str,
+    stage: str,
+    topic: str,
+    events_path: str,
+    timeout: float = 30,
+) -> None:
+    """Wait up to `timeout` seconds for PTY billing POST after early FSM advance.
+
+    If billing data arrives: write a billing update event to EVENTS.jsonl.
+    If timeout: write TYPE_STAGE_RECONCILIATION_FAILURE to EVENTS.jsonl.
+    Always cleans up all four dicts for run_id.
+    """
+    import datetime
+    from pathly_orchestrator.events import TYPE_STAGE_RECONCILIATION_FAILURE
+
+    with _lock:
+        result_evt = _terminal_result_events.get(run_id)
+
+    arrived = result_evt.wait(timeout=timeout) if result_evt is not None else False
+
+    now_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        if arrived:
+            with _lock:
+                data = _terminal_result_data.pop(run_id, {})
+            billing_record = data.get("result") or {}
+            cost_usd = (billing_record.get("cost_usd") or 0.0) if isinstance(billing_record, dict) else 0.0
+            session_id = (billing_record.get("session_id")) if isinstance(billing_record, dict) else None
+            event_line = json.dumps({
+                "type": "BILLING_UPDATE",
+                "topic": topic,
+                "stage": stage,
+                "run_id": run_id,
+                "cost_usd": cost_usd,
+                "session_id": session_id,
+                "ts": now_ts,
+            })
+        else:
+            event_line = json.dumps({
+                "type": TYPE_STAGE_RECONCILIATION_FAILURE,
+                "topic": topic,
+                "stage": stage,
+                "run_id": run_id,
+                "exit_code": -1,
+                "ts": now_ts,
+            })
+        try:
+            with open(events_path, "a", encoding="utf-8") as f:
+                f.write(event_line + "\n")
+        except OSError as exc:
+            logger.warning("_reconciliation_window: failed to write event: %s", exc)
+    finally:
+        with _lock:
+            _terminal_result_events.pop(run_id, None)
+            _terminal_result_data.pop(run_id, None)
+            _agent_done_events.pop(run_id, None)
+            _agent_done_stop_events.pop(run_id, None)
+        _terminal_started_events.pop(run_id, None)
+
 
 def _mirror_path(state: RunnerState) -> Path:
     return Path(state.project_root) / "pathly" / "plans" / state.topic / "RUNNER_STATE.json"
@@ -184,7 +271,9 @@ def _run_stage_via_terminal(
     session: Optional[str] = None,
     autonomy: bool = True,
 ) -> dict:
-    from pathly_orchestrator.runner import resolve_argv
+    import datetime
+    from pathly_orchestrator.feature_flags import FeatureFlags
+    from pathly_orchestrator.runner import resolve_argv, read_last_agent_done
 
     argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy)
     tab_id = f"runner-{run_id[-10:]}"
@@ -216,11 +305,105 @@ def _run_stage_via_terminal(
             raise RuntimeError(
                 f"terminal_spawn_timeout: Studio did not spawn PTY for {tab_id} within 30s"
             )
+
+        feature_flags = FeatureFlags()
+        if feature_flags.early_advance:
+            # Build the EVENTS.jsonl path for this run
+            events_path = str(
+                (
+                    Path(state.project_root)
+                    / "pathly" / "plans" / state.topic / "EVENTS.jsonl"
+                )
+            )
+            start_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            # Register agent_done signal event before starting the watcher
+            with _lock:
+                agent_done_evt = _agent_done_events.setdefault(run_id, threading.Event())
+
+            watcher_t = threading.Thread(
+                target=_agent_done_watcher,
+                args=(run_id, events_path, start_ts),
+                daemon=True,
+                name=f"agent-done-watcher-{run_id}",
+            )
+            watcher_t.start()
+
+            # Race: AGENT_DONE vs PTY result (poll in short bursts to avoid busy-wait)
+            _TERMINAL_RESULT_TIMEOUT = 1800
+            elapsed = 0.0
+            _POLL_INTERVAL = 0.05
+            fired_early = False
+            while elapsed < _TERMINAL_RESULT_TIMEOUT:
+                if agent_done_evt.wait(timeout=_POLL_INTERVAL):
+                    fired_early = True
+                    break
+                if result_evt.is_set():
+                    break
+                elapsed += _POLL_INTERVAL
+
+            if fired_early:
+                # Fast path: AGENT_DONE detected — advance FSM, start reconciliation window
+                storage_path = (
+                    Path(state.project_root)
+                    / "pathly" / "plans" / state.topic
+                )
+                agent_done_data = read_last_agent_done(storage_path) or {}
+                result_for_fsm = {
+                    "cost_usd": agent_done_data.get("cost_usd", 0.0),
+                    "session_id": agent_done_data.get("session_id"),
+                    "result": agent_done_data.get("summary", ""),
+                }
+
+                recon_t = threading.Thread(
+                    target=_reconciliation_window,
+                    args=(run_id, state.current_state, state.topic, events_path),
+                    daemon=True,
+                    name=f"recon-window-{run_id}",
+                )
+                recon_t.start()
+                return result_for_fsm
+
+            # Slow path: PTY result arrived first (or timeout) — cancel watcher
+            with _lock:
+                stop_evt = _agent_done_stop_events.get(run_id)
+            if stop_evt is not None:
+                stop_evt.set()
+
+            if not result_evt.is_set():
+                # Timed out waiting for PTY result
+                with _lock:
+                    _terminal_started_events.pop(run_id, None)
+                    _terminal_result_events.pop(run_id, None)
+                    _agent_done_events.pop(run_id, None)
+                    _agent_done_stop_events.pop(run_id, None)
+                raise RuntimeError(
+                    f"terminal_result_timeout: PTY for {tab_id} did not report a result within "
+                    f"{_TERMINAL_RESULT_TIMEOUT}s — the process likely crashed without sending an exit callback"
+                )
+
+            with _lock:
+                data = _terminal_result_data.pop(run_id, {})
+                _terminal_started_events.pop(run_id, None)
+                _terminal_result_events.pop(run_id, None)
+                _agent_done_events.pop(run_id, None)
+                _agent_done_stop_events.pop(run_id, None)
+            exit_code = data.get("exit_code")
+            if exit_code is not None and exit_code != 0:
+                raise RuntimeError(
+                    f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
+                )
+            return data.get("result", {})
+
+        # ── Slow path (early_advance disabled) ────────────────────────────────
         # Wait up to 30 min for the PTY to report its result.
         # Without a timeout, a crashed or unresponsive terminal hangs the supervisor forever.
         # (The PTY exit handler in terminal.ts POSTs /runner/terminal/result; if that POST
         # never arrives — e.g. the process exited before the exit handler fired, or the POST
         # failed — result_evt is never set and the thread blocks indefinitely.)
+        # NOTE: _terminal_result_events[run_id] is never touched by the watcher path, so
+        # the /runner/terminal/result POST handler will always find it during any active
+        # reconciliation window — returning 200, not 404.
         _TERMINAL_RESULT_TIMEOUT = 1800
         if not result_evt.wait(timeout=_TERMINAL_RESULT_TIMEOUT):
             with _lock:

@@ -1,23 +1,5 @@
 {
   "convs_total": 5,
   "convs_done": 1,
-  "current": "BUILDING",
-  "conv_start_sha": "7986cb6c54c06dcae01d997213e5c6b8a1e38865",
-  "build_baseline": {
-    "started_at": "2026-06-03T22:20:10.533645+00:00",
-    "preexisting_dirty": [
-      "pathly/plans/agent-done-early-advance/CONVERSATION_PROMPTS.md",
-      "pathly/plans/agent-done-early-advance/EDGE_CASES.md",
-      "pathly/plans/agent-done-early-advance/EVENTS.jsonl",
-      "pathly/plans/agent-done-early-advance/FEATURE_INDEX.md",
-      "pathly/plans/agent-done-early-advance/HAPPY_FLOW.md",
-      "pathly/plans/agent-done-early-advance/IMPLEMENTATION_PLAN.md",
-      "pathly/plans/agent-done-early-advance/PROGRESS.md",
-      "pathly/plans/agent-done-early-advance/STATE.json",
-      "pathly/plans/agent-done-early-advance/USER_STORIES.md",
-      "pathly/plans/brightsky-agent-upgrade/EVENTS.jsonl",
-      "pathly/plans/brightsky-agent-upgrade/RUNNER_STATE.json",
-      "pathly/plans/brightsky-agent-upgrade/STATE.json"
-    ]
-  }
+  "current": "BUILDING"
 }
