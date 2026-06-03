@@ -1,6 +1,13 @@
 {
   "convs_total": 4,
-  "convs_done": 2,
+  "convs_done": 3,
   "current": "BUILDING",
-  "updated_at": "2026-06-03T16:10:00Z"
+  "updated_at": "2026-06-03T16:10:00Z",
+  "conv_start_sha": "a8e42785199b33e7155812c9edd24185be598757",
+  "build_baseline": {
+    "started_at": "2026-06-03T21:56:13.215064+00:00",
+    "preexisting_dirty": [
+      "pathly/plans/brightsky-agent-upgrade/RUNNER_STATE.json"
+    ]
+  }
 }

@@ -3,7 +3,7 @@ name: Progress
 ---
 # BrightSky Agent Upgrade — Progress
 
-## Status: CONV 2 DONE
+## Status: CONV 3 DONE
 
 ## Story Status
 
@@ -17,8 +17,8 @@ name: Progress
 | S-06 | Studio layout map (get_layout) | Conv 1 | DONE |
 | S-07 | Trigger a Pathly skill (run_skill) | Conv 2 | DONE |
 | S-08 | BrightSky reasoning in Reasoning box | Conv 2 | DONE |
-| S-09 | BrightSky backend: 7 new tools registered | Conv 3 | TODO |
-| S-10 | Search + YouTube tools for Pathly agent | Conv 3 | TODO |
+| S-09 | BrightSky backend: 7 new tools registered | Conv 3 | DONE |
+| S-10 | Search + YouTube tools for Pathly agent | Conv 3 | DONE |
 | S-11 | Real Gemini thinking for Pathly messages | Conv 4 | TODO |
 
 ## Conversation Breakdown
@@ -27,7 +27,7 @@ name: Progress
 |------|--------|---------|--------|--------|
 | 1 | Phase 0–5, 5a | S-01–S-06 | DONE | `npm run typecheck` from repo root |
 | 2 | Phase 6–8 | S-07, S-08 | DONE | `npm run typecheck` from repo root |
-| 3 | Phase 9–10, 10a | S-09, S-10 | TODO | `npx tsc --noEmit` in `brightsky-ai/backend/` |
+| 3 | Phase 9–10, 10a | S-09, S-10 | DONE | `npx tsc --noEmit` in `brightsky-ai/backend/` |
 | 4 | Phase 11–12 | S-11 | TODO | `npx tsc --noEmit` in `brightsky-ai/backend/` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
@@ -46,9 +46,9 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 2 | Phase 6 | `studio/src/main/ipc/fsm.ts` | Add `fsm:runSkill` IPC handler | POSTs to FSM `/runner/start` | DONE |
 | 2 | Phase 7 | `preload/index.ts`, `global.d.ts`, `studioAnalyzer.ts` | Expose `fsm.runSkill`, add type, add tool handler | `window.pathly.fsm.runSkill` callable from renderer | DONE |
 | 2 | Phase 8 | `studio/src/renderer/src/lib/brightskyClient.ts` | Call `splitThinkingContent` at stream_end | `<think>` tags populate ThinkingBlock | DONE |
-| 3 | Phase 9 | `backend/src/mcp/tools/studio-bridge-tool.ts` | Add 7 StudioBridgeTool subclasses (incl. GetLayoutTool) | Seven classes with correct toolNames exist | TODO |
-| 3 | Phase 10 | `backend/src/mcp/mcp.module.ts` | Register 7 new tools | All 7 appear in provider array | TODO |
-| 3 | Phase 10a | `backend/src/services/unified-ai.service.ts` | Pin Gemini + enable search/YouTube for pathly_chat | Provider forced to Gemini; 3 search tools in tool set | TODO |
+| 3 | Phase 9 | `backend/src/mcp/tools/studio-bridge-tool.ts` | Add 7 StudioBridgeTool subclasses (incl. GetLayoutTool) | Seven classes with correct toolNames exist | DONE |
+| 3 | Phase 10 | `backend/src/mcp/mcp.module.ts` | Register 7 new tools | All 7 appear in provider array | DONE |
+| 3 | Phase 10a | `backend/src/services/unified-ai.service.ts` | Pin Gemini + enable search/YouTube for pathly_chat | Provider forced to Gemini; 3 search tools in tool set | DONE |
 | 4 | Phase 11 | `backend/src/services/gemini.service.ts` | Add `thinkingConfig` for pathly_chat Gemini calls | Gemini thinking parts captured for pathly_chat | TODO |
 | 4 | Phase 12 | `backend/src/chat/…/reasoning-timer.service.ts` | Stream Gemini thinking as `<think>` tags; guard synthetic steps | Reasoning box shows real Gemini thinking | TODO |
 
