@@ -97,7 +97,12 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
             ask_user_question = denial
             break
 
-    return {"cost_usd": cost_usd, "session_id": session_id or None, "ask_user_question": ask_user_question}
+    return {
+        "cost_usd": cost_usd,
+        "session_id": session_id or None,
+        "ask_user_question": ask_user_question,
+        "result": payload.get("result", ""),
+    }
 
 
 def _patch_last_agent_done(

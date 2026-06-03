@@ -1,5 +1,6 @@
 {
   "convs_total": 4,
   "convs_done": 0,
-  "current": "PLANNING"
+  "current": "PLANNING",
+  "conv_start_sha": "39102610b90e2e99ffbacaf892a5a53a0ee5fb4e"
 }

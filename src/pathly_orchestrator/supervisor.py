@@ -209,12 +209,12 @@ def _run_stage_via_terminal(
         with _lock:
             started = _terminal_started_events.setdefault(run_id, threading.Event())
             result_evt = _terminal_result_events.setdefault(run_id, threading.Event())
-        if not started.wait(timeout=5):
+        if not started.wait(timeout=30):
             with _lock:
                 _terminal_started_events.pop(run_id, None)
                 _terminal_result_events.pop(run_id, None)
             raise RuntimeError(
-                f"terminal_spawn_timeout: Studio did not spawn PTY for {tab_id} within 5s"
+                f"terminal_spawn_timeout: Studio did not spawn PTY for {tab_id} within 30s"
             )
         # Wait up to 30 min for the PTY to report its result.
         # Without a timeout, a crashed or unresponsive terminal hangs the supervisor forever.
