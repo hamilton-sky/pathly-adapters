@@ -34,6 +34,7 @@ Studio → Start button          FlowControlBar → POST /runner/start
        → TERMINAL_SPAWN SSE    Studio opens a PTY tab (node-pty) per pipeline stage
        → terminal:spawn IPC    argv injected: ['claude', '-p', '<full prompt>', '--print', ...]
        → PTY exits             POST /runner/terminal/result → FSM continues
+     → EVENTS.jsonl         Claude writes AGENT_DONE with `summary` mid-run; supervisor reads it after PTY exits as the authoritative semantic result (stdout only used for session_id + cost_usd)
 ```
 
 **Adapter install step:** `pathly-setup <host> --apply` stitches `core/agents/` and `core/skills/` with adapter-specific `_meta/*.yaml` files and writes deployable files to the host's install directory. Three adapters: `claude` → `~/.claude/`, `codex` → `~/.codex/` + `~/.agents/`, `copilot` → `~/.vscode/extensions/pathly/`.
@@ -50,6 +51,7 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 **FSM response contract (`agent_hint`):** Every `/next_action` response includes:
 - `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)
 - `agent_hint.instructions` — full prompt for the next agent (Pathly role, phase, artifacts, limits)
+- `AGENT_DONE.summary` in EVENTS.jsonl — authoritative semantic result text (not truncated by PTY buffer); `--output-format=json` stdout is only used for `session_id` and `cost_usd`
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
 - `codex_subagent` — legacy compat field with frozen keys; new adapters should read `agent_hint`
 

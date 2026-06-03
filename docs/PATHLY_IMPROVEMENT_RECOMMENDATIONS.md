@@ -189,6 +189,8 @@ return False
 **Impact:** Builders whose `VERIFY.md` had any content above `RESULT: PASS` would
 hit a spurious gate failure and be routed back to the building stage unnecessarily.
 
+> **Note (2026-06-03):** The implementation took a different approach — instead of scanning all lines, the check was made strictly first-line (`lines[0].strip() == marker`) and the `team/build.md` Phase 3.5 was updated to require Claude to write `RESULT: PASS` as the very first line of VERIFY.md. This is simpler and more predictable than scanning: the skill contract enforces the format.
+
 ---
 
 ### 2.2 `assert` in production code path — FIXED

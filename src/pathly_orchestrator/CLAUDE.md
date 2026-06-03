@@ -38,7 +38,7 @@ POST /runner/resume                  ← resume paused pipeline
 POST /runner/advance                 ← skip past current block
 POST /runner/retry                   ← retry blocked stage
 POST /runner/abort                   ← abort run completely
-POST /runner/terminal/result         ← PTY exit callback: { run_id, topic, exit_code, stdout_tail, wall_seconds, user_initiated }
+POST /runner/terminal/result         ← PTY exit callback: { run_id, topic, exit_code, stdout_tail, wall_seconds, user_initiated } — enriched with AGENT_DONE.summary from EVENTS.jsonl; stdout used only for session_id + cost_usd
 POST /runner/terminal/started        ← PTY started confirmation: { run_id, topic, tab_id }
 GET  /events/runner?topic=<topic>    ← SSE stream of runner events for Studio
 POST /shutdown                       ← graceful server shutdown (used by Electron on restart)
@@ -102,3 +102,16 @@ pathly-ff      # fast-forward current feature state one step
 pathly-back    # roll back current feature state one step
 pathly-status  # show all active features and their current FSM state
 ```
+
+## Result split — stdout vs EVENTS.jsonl
+
+When a PTY stage exits, the supervisor merges two sources:
+
+| Source | Used for |
+|---|---|
+| `--output-format=json` stdout | `session_id` (session continuity) + `cost_usd` (API-accurate billing) |
+| EVENTS.jsonl `AGENT_DONE.summary` | Semantic result text — what the agent did, outcome, key files |
+
+The `summary` field is written by the agent via the `log-agent-done` skill during its run.
+It is never subject to the PTY's 500-chunk rolling output buffer.
+If `summary` is absent (e.g. legacy agent), stdout `result` is used as a fallback.

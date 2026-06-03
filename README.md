@@ -120,7 +120,7 @@ driving Pathly workflows:
 - **Conductor**: chat-driven workflow control with Claude, Codex, and shell targets.
 - **Terminal**: full bottom terminal plus chat mini-terminal cards that share the
   same xterm/PTY tab through `xtermRegistry`.
-- **HQ / Runner**: visual pipeline control panel — Start, Pause, Resume, Advance, Reroute, Abort. Each pipeline stage spawns a visible terminal tab with the agent running non-interactively; you can watch the output in real time. Skills are injected via argv at spawn time — no disk-installed skill files required for automated runs.
+- **HQ / Runner**: visual pipeline control panel — Start, Pause, Resume, Advance, Reroute, Abort. Each pipeline stage spawns a visible terminal tab with the agent running non-interactively; you can watch the output in real time. Skills are injected via argv at spawn time — no disk-installed skill files required for automated runs. When a stage completes, `cost_usd` and `session_id` are read from `--output-format=json` stdout; the semantic result text is read from the last `AGENT_DONE` event in `EVENTS.jsonl` — which is never subject to PTY output truncation.
 
 Studio terminal behavior is intentionally shared, not duplicated: the mini card
 and full terminal reparent one xterm instance per `tabId`. The chat card can be
@@ -161,10 +161,13 @@ twine upload dist/*
 
 | Doc | What's in it |
 |---|---|
+| [CLAUDE.md](CLAUDE.md) | Developer context: pipeline architecture, adapter install step, skill delivery modes, FSM response contract, agent roles |
+| [studio/CLAUDE.md](studio/CLAUDE.md) | Studio frontend: TypeScript config, typecheck commands, IPC pattern, terminal runner lifecycle |
+| [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md) | FSM layer: HTTP endpoints, runner SSE events, supervisor flow, CLI shortcuts |
+| [src/pathly_data/CLAUDE.md](src/pathly_data/CLAUDE.md) | Data & adapters: agent/skill structure, core→adapter sync rule, design subsystem |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Adapter surfaces per host (Claude, Codex, Copilot), deployment structure, how skills/agents are materialized, host detection, installed manifests |
 | [docs/FLOW_DIAGRAM.md](docs/FLOW_DIAGRAM.md) | How a user invokes Pathly from each host, install flow, what files get deployed where, host-specific entry points |
 | [docs/PATHLY_ARCHITECTURE.md](docs/PATHLY_ARCHITECTURE.md) | install_cli packages, pathly_data layout, stitch pipeline, resource loading, host adapter structure, pyproject entry points |
-| [docs/INSTALLER_DESIGN.md](docs/INSTALLER_DESIGN.md) | Design goals, implementation phases, subagent policy, user stories, main risks |
 | [docs/MULTI_TOOL_DESIGN.md](docs/MULTI_TOOL_DESIGN.md) | Current adapter structure, source-of-truth rules, current adapters, installed manifests, future adapter work |
 | [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) | Adapter release criteria: install checks for each host, pathly-setup flags, package build/publish, marketplace manifests |
 | [docs/SECURITY.md](docs/SECURITY.md) | Hook injection risks, subprocess calls in installer, file write safety, trust boundaries, marketplace manifest integrity |
@@ -172,7 +175,6 @@ twine upload dist/*
 | [src/pathly_data/core/SKILLS_OVERVIEW.md](src/pathly_data/core/SKILLS_OVERVIEW.md) | Full reference for all 29 user-facing Pathly skills + 2 internal transition-action skills, with ASCII flow diagrams |
 | [docs/API.md](docs/API.md) | FSM HTTP server endpoint contracts (request/response shapes, error codes) |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Environment variables, persistent server setup (systemd/launchd), hook configuration |
-| [docs/PHONE_NOTIFICATIONS.md](docs/PHONE_NOTIFICATIONS.md) | Design notes for phone push notifications via the FSM event stream |
 | [docs/RISK_ASSESSMENT.md](docs/RISK_ASSESSMENT.md) | Architecture risk assessment — known issues and proposed solutions |
 | [docs/PATHLY_IMPROVEMENT_RECOMMENDATIONS.md](docs/PATHLY_IMPROVEMENT_RECOMMENDATIONS.md) | Improvement recommendations: agents, skills, flow design, and Python FSM engine |
 
