@@ -53,18 +53,33 @@ export function ConfigForm({ values, onChange, compact = false }: ConfigFormProp
         {ADAPTER_OPTIONS.map((adapter) => {
           const meta = ADAPTER_META[adapter]
           const active = (values.adapters ?? []).includes(adapter)
+          if (readOnly) {
+            return (
+              <span
+                key={adapter}
+                className={styles.chip}
+                style={chipVars(active, meta)}
+                title={adapter}
+              >
+                <span className={styles.chipDot} />
+                {adapter}
+              </span>
+            )
+          }
           return (
-            <div
+            <button
               key={adapter}
+              type="button"
+              role="switch"
+              aria-checked={active ? 'true' : 'false'}
               className={styles.chip}
               style={chipVars(active, meta)}
-              onClick={readOnly ? undefined : () => toggleAdapter(adapter, !active)}
-              title={readOnly ? adapter : (active ? `Remove ${adapter}` : `Add ${adapter}`)}
-              data-label={`${adapter} Toggle`}
+              onClick={() => toggleAdapter(adapter, !active)}
+              title={active ? `Remove ${adapter}` : `Add ${adapter}`}
             >
               <span className={styles.chipDot} />
               {adapter}
-            </div>
+            </button>
           )
         })}
       </div>

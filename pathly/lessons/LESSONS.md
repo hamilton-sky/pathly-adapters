@@ -3,7 +3,7 @@
 ---
 # LESSONS.md — Active
 
-_Last updated: 2026-05-25 | Sources: 7 features_
+_Last updated: 2026-06-03 | Sources: 12 features_
 _Max 12 lessons. Planner reads this before every plan._
 
 ---
@@ -61,6 +61,40 @@ docs-sync, parallel-scout-standard, agent-architecture-refactor | Stage: plannin
 
 ---
 
+## L-004: Gate artifacts (VERIFY.md and REVIEW.md) must be in conversation prompts
+
+### Pattern
+The FSM gates require `VERIFY.md` (build→review) and `REVIEW.md` (review→test) as required artifacts. In multiple features, these were not mentioned in the conversation prompts — agents completed their work but didn't write the artifacts, causing gate failures requiring manual resolution mid-pipeline.
+
+### Rule
+MUST add the VERIFY.md write instruction to every build conversation prompt's final step, and the REVIEW.md write instruction to every review stage brief.
+
+### Injection
+- Add to every build conversation prompt final step: "After verification passes, write `pathly/plans/<feature>/VERIFY.md` with first line `RESULT: PASS` and a one-line summary of what passed."
+- Add to every reviewer brief final step: "Write `pathly/plans/<feature>/REVIEW.md` with first line `RESULT: PASS` and a summary of findings. This file is required for the FSM gate to advance to TESTING."
+
+### Sources
+enforcement-gates, hq-panel, studio-a11y-p1 | Stage: building/reviewing
+
+---
+
+## L-005: Split conversations when mixing a new service layer with UI component changes
+
+### Pattern
+Conversations that pack both a new service/client class AND multiple UI component changes produce scope overload: more review violations, higher builder cost, and harder verification. Two separate concerns compound into a single fragile prompt.
+
+### Rule
+MUST scope each building conversation to a single concern category: new service/lib layer OR UI component changes — never both in the same conversation.
+
+### Injection
+- Add to conversation breakdown rule: "If a conv touches both a new `lib/` or `hooks/` class AND 2+ component files, split it: Conv N = service layer only, Conv N+1 = component wiring."
+- Add to `IMPLEMENTATION_PLAN.md` conversation map notes: flag any conversation that mixes service + UI as a split candidate.
+
+### Sources
+hq-panel, brightsky-chat-connect | Stage: planning
+
+---
+
 ## CANDIDATE-004: Broad verify scope for "eliminate X" features
 
 ### Pattern
@@ -93,23 +127,7 @@ parallel-scout-standard | Stage: planning
 
 ---
 
-## CANDIDATE-006: VERIFY.md is not auto-created — document the manual step
-
-### Pattern
-Gates that require `VERIFY.md` to exist will block pipeline advance. Builders don't know where to write it or in what format; feedback files that trigger on its absence don't explain this.
-
-### Rule
-MUST document the `VERIFY.md` path, required first line (`RESULT: PASS`), and an example content block in any conversation prompt that triggers a verify gate.
-
-### Injection
-- Add to `CONVERSATION_PROMPTS.md` for any conv with a verify gate: "After the verify command passes, write `plans/<feature>/VERIFY.md` with first line `RESULT: PASS` and a one-line summary."
-
-### Sources
-enforcement-gates | Stage: building
-
----
-
-## CANDIDATE-007: Embed event schema in IMPLEMENTATION_PLAN
+## CANDIDATE-006: Embed event schema in IMPLEMENTATION_PLAN
 
 ### Pattern
 New event types appended to EVENTS.jsonl use inconsistent field names (`ts` vs `timestamp`). Tester catches the mismatch; fix requires adding test assertions for the canonical name.
@@ -125,7 +143,7 @@ enforcement-gates | Stage: test
 
 ---
 
-## CANDIDATE-008: Acceptance criteria for docs stories must not over-specify format
+## CANDIDATE-007: Acceptance criteria for docs stories must not over-specify format
 
 ### Pattern
 Planner writes acceptance criteria that mix document structure ("use Risk/Mitigation format") with content requirements, causing test failures when the format criterion doesn't match the existing doc style.
@@ -141,23 +159,7 @@ security-fixes | Stage: test
 
 ---
 
-## CANDIDATE-009: Redundant acceptance criteria confuse the tester
-
-### Pattern
-A story criterion logically implied by another criterion gets written explicitly. Tester flags it NOT COVERED when the implementation satisfies the root criterion but not the redundant one.
-
-### Rule
-Each acceptance criterion must be independently falsifiable — if B is always true when A is true, drop B.
-
-### Injection
-- Before writing `CONVERSATION_PROMPTS.md`: scan each story's acceptance criteria for implied/redundant entries and remove them.
-
-### Sources
-security-fixes | Stage: test
-
----
-
-## CANDIDATE-010: Security stories need at least one failure-case criterion
+## CANDIDATE-008: Security stories need at least one failure-case criterion
 
 ### Pattern
 Security fixes without an explicit failure-mode criterion pass implementation review but leave the tester verifying only the happy path.
@@ -170,3 +172,35 @@ Every security story must include at least one criterion of the form "A request/
 
 ### Sources
 security-fixes | Stage: planning
+
+---
+
+## CANDIDATE-009: Pre-flight CLAUDE.md violation scan for touchpoint files
+
+### Pattern
+When a file with pre-existing coding-standard violations (useTheme, inline styles) is listed as a touchpoint, the reviewer flags those violations as in-scope — even if they predated the feature — because the file was modified. This triggers an unplanned fix round.
+
+### Rule
+MUST grep each listed touchpoint file for known violation patterns before writing the plan. If violations exist, either add a fix phase to the plan or document them as explicitly accepted tech debt in IMPLEMENTATION_PLAN.md.
+
+### Injection
+- Add to Phase 0 in `IMPLEMENTATION_PLAN.md` for any feature touching UI component files: "Scan each touchpoint for pre-existing `useTheme()` calls and `style={{ }}` props. If found, either add a fix phase or note: 'pre-existing violation, accepted as out-of-scope for this feature.'"
+
+### Sources
+studio-a11y-p1 | Stage: review
+
+---
+
+## CANDIDATE-010: Include POST body schema for every API endpoint in conversation prompts
+
+### Pattern
+Conversation prompts listing only endpoint URLs (no body fields) cause builders to send empty or wrong-field POST bodies, discovered only at runtime.
+
+### Rule
+MUST include a `body:` example object alongside every endpoint URL listed in CONVERSATION_PROMPTS.md — URL alone is not a complete API contract.
+
+### Injection
+- In the conversation prompt for any feature touching an HTTP API, add a table: `| Endpoint | Method | Required body fields |` with one row per endpoint before the scope list.
+
+### Sources
+hq-panel | Stage: implementation

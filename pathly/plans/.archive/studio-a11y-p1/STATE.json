@@ -1,0 +1,12 @@
+{
+  "convs_total": 3,
+  "convs_done": 3,
+  "current": "DONE",
+  "conv_start_sha": "003881db282d3b57d389f47127f56940162bdf61",
+  "build_baseline": {
+    "started_at": "2026-06-03T14:43:34.190679+00:00",
+    "preexisting_dirty": [
+      "pathly/plans/studio-a11y-p1/"
+    ]
+  }
+}

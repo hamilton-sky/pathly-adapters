@@ -39,7 +39,7 @@
 }
 
 .pathly-btn-b:disabled {
-  opacity: 0.35;
+  color: var(--text-disabled);
   cursor: not-allowed;
 }
 

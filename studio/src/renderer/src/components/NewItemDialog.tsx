@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PathlyItem } from '../types'
 import { writeFile } from '../services/pathlyApi'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import styles from './NewItemDialog.module.css'
 
 interface Props {
@@ -41,6 +42,8 @@ function buildSkillFrontmatter(name: string, description: string, adapters: stri
 
 export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
+  const cardRef  = useRef<HTMLDivElement>(null)
+  useFocusTrap(cardRef)
 
   const [name, setName]           = useState('')
   const [description, setDesc]    = useState('')
@@ -105,8 +108,14 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
 
   return (
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className={styles.card}>
-        <div className={styles.header}>{titles[type]}</div>
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-item-dialog-title"
+        className={styles.card}
+      >
+        <div id="new-item-dialog-title" className={styles.header}>{titles[type]}</div>
 
         <div className={styles.body}>
           <div className={styles.fieldGroup}>
@@ -146,15 +155,19 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
                     const active = adapters.includes(adapter)
                     const meta   = ADAPTER_COLORS[adapter]
                     return (
-                      <div
+                      <button
                         key={adapter}
+                        type="button"
+                        role="switch"
+                        aria-checked={active ? 'true' : 'false'}
                         className={styles.chip}
                         style={chipVars(active, meta)}
                         onClick={() => toggleAdapter(adapter)}
+                        title={active ? `Remove ${adapter}` : `Add ${adapter}`}
                       >
                         <span className={styles.chipDot} />
                         {adapter}
-                      </div>
+                      </button>
                     )
                   })}
                 </div>

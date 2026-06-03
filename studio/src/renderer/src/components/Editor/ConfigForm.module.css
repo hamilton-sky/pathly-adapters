@@ -77,6 +77,14 @@
 /* Adapter chip — uses CSS custom props set as inline style on the element:
    --chip-color, --chip-bg, --chip-border */
 .chip {
+  /* button UA reset */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  /* chip visual styles */
   display: flex;
   align-items: center;
   gap: 5px;
@@ -92,6 +100,7 @@
   transition: opacity 0.15s, border-color 0.15s;
 }
 .chip:hover { opacity: 0.85; }
+.chip:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .chipDot {
   width: 6px;

@@ -161,3 +161,35 @@ MAY use fast/auto mode by default for standard-rigor features with clean tests. 
 
 ### Source
 Feature: pathly-observability | Stage: pipeline | Date: 2026-06-02
+
+## [studio-a11y-p1] Pre-flight CLAUDE.md violation scan for touchpoint files
+
+### Pattern
+When a file with pre-existing coding-standard violations (useTheme, inline styles) is listed as a touchpoint, the reviewer flags those violations as in-scope — even if they predated the feature — because the file was modified. This triggered an unplanned fix round.
+
+### Rule
+MUST grep each listed touchpoint file for known violation patterns before writing the plan. If violations exist, either add a fix phase to the plan or document them as explicitly accepted tech debt with a comment in IMPLEMENTATION_PLAN.md.
+
+### Injection
+- Add to Phase 0 in `IMPLEMENTATION_PLAN.md` for any feature touching UI component files: "Scan each touchpoint for pre-existing `useTheme()` calls and `style={{ }}` props. If found, either add a fix phase or note: 'pre-existing violation, accepted as out-of-scope for this feature.'"
+- Add to every build conversation prompt: "After verification passes, write `pathly/plans/<feature>/VERIFY.md` with first line `RESULT: PASS` and a one-line summary."
+
+### Source
+Feature: studio-a11y-p1 | Stage: review | Date: 2026-06-03
+
+---
+
+## [studio-a11y-p1] FSM gate artifacts must be in conversation prompts
+
+### Pattern
+The FSM gates require `VERIFY.md` (build→review) and `REVIEW.md` (review→test) as artifact gates. Neither was documented in the conversation prompts, causing two gate failures requiring manual resolution mid-pipeline.
+
+### Rule
+MUST include the VERIFY.md write instruction in every build conversation prompt, and the REVIEW.md write instruction in every review-stage brief.
+
+### Injection
+- Add to every build conversation prompt final step: "Write `pathly/plans/<feature>/VERIFY.md` with first line `RESULT: PASS` and a one-line summary of what passed."
+- Add to every review brief final step: "Write `pathly/plans/<feature>/REVIEW.md` with first line `RESULT: PASS` and a summary of findings."
+
+### Source
+Feature: studio-a11y-p1 | Stage: building/reviewing | Date: 2026-06-03
