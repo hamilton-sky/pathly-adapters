@@ -94,6 +94,8 @@ transition_rules:
     default: RETRO
 transition_actions:
   BUILDING->REVIEWING:
+    - skill: update_progress
+      mark: conv_done
     - skill: commit
       message: 'feat: complete building stage'
   RETRO->DONE:

@@ -234,6 +234,11 @@ def _run_stage_via_terminal(
             data = _terminal_result_data.pop(run_id, {})
             _terminal_started_events.pop(run_id, None)
             _terminal_result_events.pop(run_id, None)
+        exit_code = data.get("exit_code")
+        if exit_code is not None and exit_code != 0:
+            raise RuntimeError(
+                f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
+            )
         return data.get("result", {})
     finally:
         with _lock:
