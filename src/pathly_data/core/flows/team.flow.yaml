@@ -107,7 +107,7 @@ gates:
     - type: verify_gate
       artifact: VERIFY.md
       pass_marker: "RESULT: PASS"
-      on_fail: REVIEW_FAILURES.md
+      on_fail: VERIFY_FAILURES.md
     - type: scope_gate
       scope_file: CONVERSATION_PROMPTS.md
       on_fail: SCOPE_VIOLATION.md

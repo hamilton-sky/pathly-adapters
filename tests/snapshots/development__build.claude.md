@@ -202,29 +202,57 @@ pathly-fsm-call record-phase \
 - `<agent>` — the current agent role (`builder`, `reviewer`, `tester`, `designer`, etc.)
 - `<phase>` — one of `analyze`, `scout`, `implement`, `review`, `test`, `plan`, `design`, `storm`
 
-If `pathly-fsm-call` is unavailable or the server is not running, skip silently.
-Phase logging must never block the main workflow.
+**Server availability — start-if-needed (same contract as log-agent-done):**
 
-## Completion report (usage parse + log-agent-done)
+If `pathly-fsm-call` fails or the server is not reachable:
+1. Start the server in the background: `pathly-fsm-http`
+2. Wait 2 seconds, then retry the `record-phase` call once.
+3. If the retry also fails: skip silently and continue — phase logging must never block execution.
 
-After the stage agent completes (Phase 3), parse the `<usage>` block from its response:
-- `total_tokens`: the number after `total_tokens:` (0 if absent)
-- `tool_uses`: the number after `tool_uses:` (0 if absent)
-- `duration_ms`: the number after `duration_ms:` (0 if absent)
+This makes phase logging reliable on any adapter (Codex, Copilot, CLI) where the
+FSM server is not automatically managed by the host environment.
 
-Compute the `wall_seconds` fallback: run
-`python -c "import time; print(int(time.time()) - <STAGE>_START)"` using the `<STAGE>_START`
-integer recorded at the start of this stage.
+## Completion report (AGENT_DONE)
 
-Then invoke the `log-agent-done` skill with:
+After the stage agent completes, write an AGENT_DONE event **directly** to EVENTS.jsonl.
+This is **mandatory** — the supervisor reads this field as the authoritative result.
 
-`summary` should be a one-sentence description of what the agent did and the outcome (e.g. "Implemented Conv 1 — added auth middleware to api.ts, all tests pass").
+1. Compute wall_seconds: `python3 -c "import time; print(int(time.time()) - BUILD_START)"`
+2. Parse from the sub-agent's `<usage>` block: `total_tokens`, `tool_uses`, `duration_ms` (0 if absent).
+3. Write the event directly — **do not invoke a skill**, run this command:
 
-```json
-{"agent":"<agent>","feature":"<FEATURE>","conversation":<N>,"result":"<RESULT>","summary":"<one sentence describing what was done and the outcome>","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
+```bash
+python3 -c "
+import json, datetime, sys
+ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+event = {
+  'type': 'AGENT_DONE',
+  'agent': 'AGENT_ROLE',
+  'model': 'claude-sonnet-4-6',
+  'conversation': CONV_N,
+  'result': 'DONE',
+  'summary': 'SUMMARY_SENTENCE',
+  'total_tokens': TOTAL_TOKENS,
+  'tool_uses': TOOL_USES,
+  'wall_seconds': WALL_SECONDS,
+  'cost_usd': 0.0,
+  'ts': ts,
+  'schema_version': 1,
+}
+path = 'pathly/plans/<feature>/EVENTS.jsonl'
+with open(path, 'a', encoding='utf-8') as f:
+    f.write(json.dumps(event) + chr(10))
+print('AGENT_DONE written')
+"
 ```
-(`wall_seconds` is the fallback computed from `<STAGE>_START`; `log-agent-done` prefers
-`duration_ms` if > 0.)
+
+Replace the UPPER_CASE placeholders with actual values:
+- `AGENT_ROLE` — e.g. `builder`, `reviewer`, `tester`
+- `CONV_N` — integer conversation number (0 for non-build stages)
+- `SUMMARY_SENTENCE` — one sentence: what was done and the outcome
+- `TOTAL_TOKENS`, `TOOL_USES`, `WALL_SECONDS` — from `<usage>` block or wall_seconds computation
+
+`<feature>` is pre-substituted by the runner — use the value as written.
 
 Return. The orchestrator determines the next state from `transition_rules`.
 

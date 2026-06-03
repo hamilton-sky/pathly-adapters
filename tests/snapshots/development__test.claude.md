@@ -175,8 +175,15 @@ pathly-fsm-call record-phase \
 - `<agent>` — the current agent role (`builder`, `reviewer`, `tester`, `designer`, etc.)
 - `<phase>` — one of `analyze`, `scout`, `implement`, `review`, `test`, `plan`, `design`, `storm`
 
-If `pathly-fsm-call` is unavailable or the server is not running, skip silently.
-Phase logging must never block the main workflow.
+**Server availability — start-if-needed (same contract as log-agent-done):**
+
+If `pathly-fsm-call` fails or the server is not reachable:
+1. Start the server in the background: `pathly-fsm-http`
+2. Wait 2 seconds, then retry the `record-phase` call once.
+3. If the retry also fails: skip silently and continue — phase logging must never block execution.
+
+This makes phase logging reliable on any adapter (Codex, Copilot, CLI) where the
+FSM server is not automatically managed by the host environment.
 
 ## Scout choreography (analyze → scout → compress)
 

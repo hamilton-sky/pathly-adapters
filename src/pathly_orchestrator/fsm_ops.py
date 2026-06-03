@@ -99,8 +99,55 @@ def _load_agent_text(agent: str) -> str:
     )
 
 
+_SKILL_AGENT_ROLE: dict[str, str] = {
+    "team/build": "builder",
+    "team/review": "reviewer",
+    "team/test": "tester",
+    "team/plan": "planner",
+    "team/design": "designer",
+    "team/retro": "planner",
+}
+
+
+def _inject_prompt_vars(text: str, feature: str, project_root: str, agent_role: str) -> str:
+    """Replace log-phase markers and common placeholders with real values.
+
+    Converts bare `log-phase PHASE_START <phase>` lines into executable bash
+    commands so agents actually run them instead of treating them as annotations.
+    Also substitutes <feature>, <project_root>, and <agent> placeholders that
+    appear in the progress-logging and completion-report fragments.
+    """
+
+    def _make_log_phase_cmd(m: re.Match) -> str:  # type: ignore[type-arg]
+        event_type = m.group(1)
+        phase = m.group(2)
+        return (
+            f"```bash\n"
+            f'pathly-fsm-call record-phase --feature "{feature}" --agent "{agent_role}"'
+            f' --phase "{phase}" --event-type {event_type}'
+            f' --project-root "{project_root}"\n'
+            f"```\n"
+            f"_(phase log — skip silently if server unavailable)_"
+        )
+
+    text = re.sub(
+        r"^log-phase (PHASE_START|PHASE_DONE) (\w+)\s*$",
+        _make_log_phase_cmd,
+        text,
+        flags=re.MULTILINE,
+    )
+    text = text.replace("<feature>", feature)
+    text = text.replace("<project_root>", project_root)
+    return text
+
+
 def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     agent = flow_config["agent_map"][state_name]
+    feature = storage_path.name
+    project_root = str(storage_path.parent.parent.parent)
+    _role = _SKILL_AGENT_ROLE.get(agent)
+    agent_role: str = _role if _role is not None else (agent.split("/")[-1] if "/" in agent else agent)
+
     if "/" in agent:
         # Stage skill — compose fragments for the live adapter. Skills absent from
         # the composition manifest are returned raw, so this is a no-op until converted.
@@ -122,9 +169,12 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
             agent_text = compose_skill(agent, adapter)
     else:
         agent_text = _load_agent_text(agent)
+
+    agent_text = _inject_prompt_vars(agent_text, feature, project_root, agent_role)
+
     context = (
         f"\n\n## Current task\n"
-        f"Feature: {storage_path.name}\n"
+        f"Feature: {feature}\n"
         f"State: {state_name}\n"
         f"Storage path: {storage_path}\n"
     )
@@ -132,7 +182,9 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
 
 
 def build_prompt_for_agent(
-    flow_config: dict, agent_name: str, storage_path: Path
+    flow_config: dict,  # noqa: ARG001 — kept for call-site compat
+    agent_name: str,
+    storage_path: Path,
 ) -> str:
     agent_text = _load_agent_text(agent_name)
     context = (

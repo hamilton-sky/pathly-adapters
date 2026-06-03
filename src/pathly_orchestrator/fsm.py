@@ -528,7 +528,14 @@ def run_gates(
             artifact_path = storage_path / gate["artifact"]
             marker = gate["pass_marker"]
             if not _verify_passed(artifact_path, marker):
-                reason = f"Gate verification failed: {gate['artifact']} does not start with {marker!r}"
+                reason = (
+                    f"VERIFY gate failed: `{gate['artifact']}` is missing or its first line "
+                    f"is not exactly {marker!r}.\n\n"
+                    f"**Action required:** Write `pathly/plans/{storage_path.name}/{gate['artifact']}` "
+                    f"so that line 1 is exactly:\n\n"
+                    f"```\n{marker}\n```\n\n"
+                    f"No YAML frontmatter, no blank lines before it."
+                )
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
                 append_event(
                     storage_path,

@@ -24,3 +24,4 @@
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-03T16:03:04Z"}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-03T16:03:36Z"}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline", "schema_version": 1, "ts": "2026-06-03T16:03:49Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-03T16:03:49Z"}
