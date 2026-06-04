@@ -45,3 +45,15 @@
 {"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T13:03:05Z"}
 {"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T13:03:06Z"}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline", "schema_version": 1, "ts": "2026-06-04T13:10:11Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-04T13:10:12Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:10:26Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:11:45Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:11:46Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:13:08Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:13:09Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:15:29Z"}
+{"type": "FILE_CREATED", "file": "REVIEW_FAILURES.md", "ts": "2026-06-04T13:16:17Z", "schema_version": 1}
+{"type": "FILE_DELETED", "file": "REVIEW_FAILURES.md", "ts": "2026-06-04T13:17:41Z", "schema_version": 1}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 4, "result": "PASS", "summary": "Conv 4 review passed after fix: migration script now idempotent across runs (skip-if-events-present guard); PROGRESS.md updated with all stories DONE; 427 tests green.", "total_tokens": 167728, "tool_uses": 56, "wall_seconds": 442, "cost_usd": 0.905731, "ts": "2026-06-04T13:18:04Z", "schema_version": 1}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-06-04T13:18:11Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-04T13:18:12Z"}

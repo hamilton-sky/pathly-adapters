@@ -60,25 +60,23 @@ def migrate_feature(feature_dir: Path, dry_run: bool) -> None:
     conn = _db.get_db(feature_dir)
 
     if events_path.exists():
-        seen: set[tuple[str, str]] = set()
-        with open(events_path, encoding="utf-8") as f:
-            for lineno, line in enumerate(f, 1):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
-                    print(f"  [WARN] {feature}/EVENTS.jsonl line {lineno}: malformed JSON, skipping")
-                    continue
-                ts = event.get("ts", "")
-                etype = event.get("type", "")
-                key = (ts, etype)
-                if key in seen:
-                    continue
-                seen.add(key)
-                _db.append_event(conn, feature, event)
-                event_count += 1
+        existing_events = _db.read_events(conn, feature)
+        if existing_events:
+            event_count = len(existing_events)
+            print(f"  [{feature}]: events=skipped (already migrated, {event_count} rows present)")
+        else:
+            with open(events_path, encoding="utf-8") as f:
+                for lineno, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        print(f"  [WARN] {feature}/EVENTS.jsonl line {lineno}: malformed JSON, skipping")
+                        continue
+                    _db.append_event(conn, feature, event)
+                    event_count += 1
 
     if state_path.exists():
         existing = _db.read_state(conn, feature)

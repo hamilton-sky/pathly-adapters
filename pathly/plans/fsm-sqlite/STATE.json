@@ -1,5 +1,16 @@
 {
   "convs_total": 4,
-  "convs_done": 1,
-  "current": "BUILDING"
+  "convs_done": 5,
+  "current": "BUILDING",
+  "conv_start_sha": "0f77dd93b0281cf8806cc1162278fc2ab8bbe150",
+  "build_baseline": {
+    "started_at": "2026-06-04T13:18:22.421880+00:00",
+    "preexisting_dirty": [
+      "pathly/plans/fsm-sqlite/EVENTS.jsonl",
+      "pathly/plans/fsm-sqlite/PROGRESS.md",
+      "pathly/plans/fsm-sqlite/STATE.json",
+      "scripts/migrate_to_sqlite.py"
+    ]
+  },
+  "updated_at": "2026-06-04T13:18:56Z"
 }
