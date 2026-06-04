@@ -266,23 +266,51 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     ptyOwners.set(tabId, event.sender.id)
 
     // Inject the stage prompt once Claude's UI has finished rendering.
-    // Use bracketed paste (\x1b[200~...\x1b[201~) so multi-line content is treated
-    // as a single paste rather than one submit per line.
+    // Two-phase approach:
+    //   Phase 1 — if the --dangerously-skip-permissions warning screen appears, auto-dismiss it
+    //             with \r, then wait 1500 ms for the main UI to render.
+    //   Phase 2 — inject the prompt via bracketed paste (\x1b[200~...\x1b[201~) so multi-line
+    //             content is treated as a single paste rather than one submit per newline.
+    //             Send \r as a separate write 100 ms later so Claude's event loop has finished
+    //             processing the paste before it sees the Enter.
     if (initialInput) {
       let injected = false
+      let bypassDismissed = false
       let debounce: ReturnType<typeof setTimeout> | null = null
+      let outputSoFar = ''
+
       const injectPrompt = (): void => {
         if (injected) return
         injected = true
-        ptyProcess.write('\x1b[200~' + initialInput + '\x1b[201~\r')
+        ptyProcess.write('\x1b[200~' + initialInput + '\x1b[201~')
+        setTimeout(() => ptyProcess.write('\r'), 100)
       }
-      const unsubscribe = ptyProcess.onData(() => {
+
+      const unsubscribe = ptyProcess.onData((data: string) => {
         if (injected) return
-        if (debounce) clearTimeout(debounce)
-        debounce = setTimeout(() => {
-          injectPrompt()
-          unsubscribe.dispose()
-        }, 800)
+        outputSoFar += data
+
+        // Detect the bypass-permissions confirmation screen and auto-dismiss it
+        if (!bypassDismissed && outputSoFar.includes('Bypass Permissions mode')) {
+          bypassDismissed = true
+          if (debounce) clearTimeout(debounce)
+          ptyProcess.write('\r')
+          // Wait for Claude's main UI to fully render after dismissal
+          debounce = setTimeout(() => {
+            injectPrompt()
+            unsubscribe.dispose()
+          }, 1500)
+          return
+        }
+
+        // Normal path (no warning): debounce on output-stream silence
+        if (!bypassDismissed) {
+          if (debounce) clearTimeout(debounce)
+          debounce = setTimeout(() => {
+            injectPrompt()
+            unsubscribe.dispose()
+          }, 800)
+        }
       })
     }
 
