@@ -28,19 +28,21 @@ export function PanelNav(): JSX.Element {
           Canvas
         </button>
       </Tooltip>
-      {skillNotebookPath && (
-        <Tooltip label="Skill notebook" shortcut="Ctrl+2" placement="bottom">
-          <button
-            type="button"
-            data-testid="topbar-panel-notebook"
-            className={`${styles.navBtn} ${activePanel === 'skill-notebook' ? styles.navBtnActive : ''}`}
-            onClick={() => setActivePanel('skill-notebook')}
-          >
-            <BookOpen size={13} />
-            Notebook
-          </button>
-        </Tooltip>
-      )}
+      <Tooltip
+        label={skillNotebookPath ? 'Skill notebook' : 'Open a skill .md file to use the notebook'}
+        shortcut={skillNotebookPath ? 'Ctrl+2' : undefined}
+        placement="bottom"
+      >
+        <button
+          type="button"
+          data-testid="topbar-panel-notebook"
+          className={`${styles.navBtn} ${activePanel === 'skill-notebook' ? styles.navBtnActive : ''} ${!skillNotebookPath ? styles.navBtnDisabled : ''}`}
+          onClick={() => setActivePanel('skill-notebook')}
+        >
+          <BookOpen size={13} />
+          Notebook
+        </button>
+      </Tooltip>
       <Tooltip label="Live monitor" shortcut="Ctrl+3" placement="bottom">
         <button
           type="button"

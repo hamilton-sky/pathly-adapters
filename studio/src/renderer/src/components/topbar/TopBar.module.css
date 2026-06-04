@@ -461,3 +461,9 @@
   outline: var(--focus-ring);
   outline-offset: -2px;
 }
+
+.navBtnDisabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
