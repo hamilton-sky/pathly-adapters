@@ -258,24 +258,15 @@ def _cleanup_run_id(run_id: str) -> None:
     _terminal_started_events.pop(run_id, None)
 
 
-def _mirror_path(state: RunnerState) -> Path:
-    return Path(state.project_root) / "pathly" / "plans" / state.topic / "RUNNER_STATE.json"
-
-
 def _write_mirror(state: RunnerState) -> None:
-    try:
-        path = _mirror_path(state)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state.public_dict(), indent=2), encoding="utf-8")
-    except OSError as exc:
-        logger.warning("Failed to write RUNNER_STATE.json for %s: %s", state.topic, exc)
     try:
         from pathly_orchestrator import db as _db
         feature_dir = Path(state.project_root) / "pathly" / "plans" / state.topic
+        feature_dir.mkdir(parents=True, exist_ok=True)
         conn = _db.get_db(feature_dir)
         _db.write_runner_state(conn, state.topic, state.public_dict())
     except Exception as exc:
-        logger.warning("Failed to write runner_state to SQLite for %s: %s", state.topic, exc)
+        logger.warning("Failed to write runner_state SQLite for %s: %s", state.topic, exc)
 
 
 def recover_stale_mirrors(project_root: str) -> None:

@@ -45,7 +45,6 @@ def _na(state: str = "STORMING", adapter: str = "claude") -> dict:
     }
 
 
-
 def _cs_next(to: str = "PLANNING") -> dict:
     return {"next_state": to}
 
@@ -87,20 +86,23 @@ def test_runner_state_public_dict():
 
 
 def test_write_mirror_creates_file(tmp_path):
+    from pathly_orchestrator import db as _db
     state = RunnerState(
         topic="mirror-topic", flow="team",
         project_root=str(tmp_path), model="m", timeout=60
     )
     state.status = "running"
     _write_mirror(state)
-    mirror = tmp_path / "pathly" / "plans" / "mirror-topic" / "RUNNER_STATE.json"
-    assert mirror.exists()
-    data = json.loads(mirror.read_text())
+    feature_dir = tmp_path / "pathly" / "plans" / "mirror-topic"
+    conn = _db.get_db(feature_dir)
+    data = _db.read_runner_state(conn, "mirror-topic")
+    assert data is not None
     assert data["status"] == "running"
-    assert data["topic"] == "mirror-topic"
+    assert data["feature"] == "mirror-topic"
 
 
 def test_write_mirror_updates_on_status_change(tmp_path):
+    from pathly_orchestrator import db as _db
     state = RunnerState(
         topic="mirror-topic2", flow="team",
         project_root=str(tmp_path), model="m", timeout=60
@@ -109,8 +111,10 @@ def test_write_mirror_updates_on_status_change(tmp_path):
     _write_mirror(state)
     state.status = "paused"
     _write_mirror(state)
-    mirror = tmp_path / "pathly" / "plans" / "mirror-topic2" / "RUNNER_STATE.json"
-    data = json.loads(mirror.read_text())
+    feature_dir = tmp_path / "pathly" / "plans" / "mirror-topic2"
+    conn = _db.get_db(feature_dir)
+    data = _db.read_runner_state(conn, "mirror-topic2")
+    assert data is not None
     assert data["status"] == "paused"
 
 
@@ -258,7 +262,7 @@ def test_cap_exceeded_cost_stops_loop(tmp_path):
 
     invoke_call_count = []
 
-    def fake_invoke(*_args, **_kwargs):
+    def fake_invoke(*args, **kwargs):
         invoke_call_count.append(1)
         return {"cost_usd": 3.0, "session_id": None}
 
@@ -295,15 +299,15 @@ def test_cap_exceeded_iterations(tmp_path):
 
     invoke_call_count = []
 
-    def fake_invoke(*_args, **_kwargs):
+    def fake_invoke(*args, **kwargs):
         invoke_call_count.append(1)
         return {"cost_usd": 0.0, "session_id": None}
 
     # FSM always returns next_state — would loop forever without cap
-    def fake_na(_payload):
+    def fake_na(_):
         return _na(f"STAGE-{len(invoke_call_count)}")
 
-    def fake_cs(_payload):
+    def fake_cs(_):
         return _cs_next(f"STAGE-{len(invoke_call_count) + 1}")
 
     with (
@@ -375,11 +379,11 @@ def test_pause_and_resume(tmp_path):
 
     stage_count = [0]
 
-    def fake_na(payload):
+    def fake_na(_):
         stage_count[0] += 1
         return _na(f"STAGE-{stage_count[0]}")
 
-    def fake_cs(payload):
+    def fake_cs(_):
         if stage_count[0] >= 2:
             return _cs_done()
         return _cs_next(f"STAGE-{stage_count[0] + 1}")
@@ -492,7 +496,7 @@ def test_session_continuity_same_adapter(tmp_path):
 
     invoke_sessions = []
 
-    def fake_invoke(*args, **kwargs):
+    def fake_invoke(*_, **kwargs):
         invoke_sessions.append(kwargs.get("session"))
         return {"cost_usd": 0.05, "session_id": "sess-abc"}
 
@@ -530,7 +534,7 @@ def test_session_fresh_on_adapter_change(tmp_path):
 
     invoke_sessions = []
 
-    def fake_invoke(*args, **kwargs):
+    def fake_invoke(*_, **kwargs):
         invoke_sessions.append(kwargs.get("session"))
         return {"cost_usd": 0.05, "session_id": "sess-xyz"}
 
@@ -659,9 +663,11 @@ def test_mirror_written_on_completion(tmp_path):
         while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
             time.sleep(0.05)
 
-    mirror = tmp_path / "pathly" / "plans" / topic / "RUNNER_STATE.json"
-    assert mirror.exists()
-    data = json.loads(mirror.read_text())
+    from pathly_orchestrator import db as _db
+    feature_dir = tmp_path / "pathly" / "plans" / topic
+    conn = _db.get_db(feature_dir)
+    data = _db.read_runner_state(conn, topic)
+    assert data is not None
     assert data["status"] == "done"
     _fresh_registry(topic)
 
@@ -712,7 +718,7 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     # Patch _reconciliation_window to record its start, then simulate billing arriving
     original_recon = _sup._reconciliation_window  # type: ignore[attr-defined]
 
-    def fake_recon(run_id_, stage, topic_, events_path_, timeout=30):
+    def fake_recon(run_id_, stage, topic_, events_path_, **_):
         recon_started.set()
         # Simulate billing arriving — set the result event
         with _sup._lock:
@@ -728,7 +734,7 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
 
     broadcast_events = []
 
-    def fake_broadcast(topic_, payload):
+    def fake_broadcast(_, payload):
         broadcast_events.append(payload)
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
@@ -796,12 +802,12 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
 
     original_recon = _sup._reconciliation_window  # type: ignore[attr-defined]
 
-    def fake_recon(run_id_, stage, topic_, events_path_, timeout=30):
+    def fake_recon(run_id_, stage, topic_, events_path_, **_):
         # Use short timeout so billing never arrives
         original_recon(run_id_, stage, topic_, events_path_, timeout=0.1)
         recon_done.set()
 
-    def fake_broadcast(topic_, payload):
+    def fake_broadcast(_, payload):
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
             # Write AGENT_DONE to SQLite after PTY starts (after last_seq is captured)
@@ -864,7 +870,7 @@ def test_slow_path_no_regression(tmp_path, monkeypatch):
 
     pty_result_ready = threading.Event()
 
-    def fake_broadcast(topic_, payload):
+    def fake_broadcast(_, payload):
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
             # Simulate PTY completing shortly after start
@@ -925,7 +931,7 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
 
     broadcast_events: list[dict] = []
 
-    def fake_broadcast(topic_, payload):
+    def fake_broadcast(_, payload):
         broadcast_events.append(payload)
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
@@ -943,7 +949,7 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
                 })
             threading.Thread(target=_write_event, daemon=True).start()
 
-    result = _run_stage_via_terminal(
+    _run_stage_via_terminal(
         state,
         "do stuff interactively",
         "claude",

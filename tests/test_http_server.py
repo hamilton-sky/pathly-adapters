@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from unittest.mock import patch
 
 import pytest
@@ -260,3 +261,63 @@ def test_metrics_endpoint(client):
     assert r.status_code == 200
     assert b"pathly_requests_total" in r.data
     assert b"pathly_sse_clients_active" in r.data
+
+
+def test_events_stream_last_event_id_catchup(tmp_path, monkeypatch):
+    """Reconnecting with Last-Event-ID: N only receives events with seq > N.
+
+    Tests the catch-up logic end-to-end by consuming the streaming response in a
+    background thread and stopping after the initial catch-up burst is received.
+    """
+    from pathly_orchestrator import db as _db
+    from pathly_orchestrator import http_server as _hs
+
+    monkeypatch.setenv("PATHLY_PROJECT_ROOT", str(tmp_path))
+    _hs.app.config["TESTING"] = True
+    # Clear any leftover SSE state from other tests
+    with _hs._lock:
+        _hs._clients.clear()
+        _hs._tailers.clear()
+
+    topic = "sse-reconnect-test2"
+    feature_dir = tmp_path / "pathly" / "plans" / topic
+    feature_dir.mkdir(parents=True)
+
+    # Write 3 events into SQLite: seq 1 (EV_A), seq 2 (EV_B), seq 3 (EV_C)
+    conn = _db.get_db(feature_dir)
+    _db.append_event(conn, topic, {"type": "EV_A", "msg": "first"})
+    _db.append_event(conn, topic, {"type": "EV_B", "msg": "second"})
+    _db.append_event(conn, topic, {"type": "EV_C", "msg": "third"})
+
+    received: list[str] = []
+    error_holder: list[Exception] = []
+
+    def read_stream():
+        try:
+            # Use a separate test client instance to avoid state leakage
+            with _hs.app.test_client() as sc:
+                with sc.get(
+                    f"/events/stream?topic={topic}&project_root={tmp_path}",
+                    headers={"Last-Event-ID": "1"},
+                ) as resp:
+                    # Read chunks from the streaming response
+                    for chunk in resp.response:
+                        text = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+                        received.append(text)
+                        # Stop after we have the connected message (catch-up + connected)
+                        if '"type":"connected"' in text or 'type":"connected"' in text:
+                            break
+        except Exception as exc:
+            error_holder.append(exc)
+
+    t = threading.Thread(target=read_stream, daemon=True)
+    t.start()
+    t.join(timeout=5.0)
+
+    assert not error_holder, f"Stream reader raised: {error_holder[0]}"
+    body = "".join(received)
+    # Events with seq > 1 should appear in the catch-up: EV_B (seq 2) and EV_C (seq 3)
+    assert "EV_B" in body
+    assert "EV_C" in body
+    # EV_A (seq 1) must NOT appear — client already has it
+    assert "EV_A" not in body

@@ -530,3 +530,48 @@ MUST run a glob against every file path listed in FEATURE_INDEX.md during the pl
 
 ### Source
 Feature: antigravity-studio | Stage: planning / building | Date: 2026-06-01
+
+---
+
+## [fsm-sqlite] Pyright unused parameter convention: *args/**kwargs vs *_args/**_kwargs
+
+### Pattern
+Pyright's `reportUnusedVariable` warns about `*_args` and `**_kwargs` (underscore-prefixed named var-args), but NOT about `*args` and `**kwargs` (standard names), nor about `*_` (single-underscore positional). Using `*_args` or `**_kwargs` in test stubs triggered diagnostic loops across multiple edit cycles.
+
+### Rule
+MUST use `*args, **kwargs` (not `*_args`/`**_kwargs`) for test stubs that accept but don't use mixed positional and keyword arguments. Use `*_` only for positional-only sinks where no keyword args are expected.
+
+### Injection
+- Add to test writing conventions: "For mock functions that accept any args: use `def fake_fn(*args, **kwargs):` — never `*_args`/`**_kwargs`. For positional-only: `def fake_fn(*_):`. Never combine `*_` and `**_` in the same signature (SyntaxError)."
+
+### Source
+Feature: fsm-sqlite | Stage: building + review | Date: 2026-06-04
+
+---
+
+## [fsm-sqlite] Migration scripts must include idempotency as an explicit acceptance criterion
+
+### Pattern
+The migration script (migrate_to_sqlite.py) re-imported EVENTS.jsonl on every run, creating duplicate events. This was not caught until Conv 4 review. The CONVERSATION_PROMPTS.md spec noted idempotency as an architectural requirement but it was never in the acceptance criteria where the tester and reviewer would check for it.
+
+### Rule
+MUST include "idempotent across multiple runs" as an explicit, testable acceptance criterion for any migration script story — not just as an architectural note in the implementation plan.
+
+### Injection
+- Add to USER_STORIES.md migration story template: "AC: Running the script twice against the same directory produces the same result as running it once. Verify by running twice and comparing row counts."
+
+### Source
+Feature: fsm-sqlite | Stage: building + review | Date: 2026-06-04
+
+---
+
+## [fsm-sqlite] sqlite3 implicit transaction management conflicts with BEGIN IMMEDIATE
+
+### Pattern
+`mark_stale_runners()` in db.py included an explicit `BEGIN IMMEDIATE` transaction. In sqlite3's default mode, DML statements automatically begin a deferred transaction — an explicit `BEGIN IMMEDIATE` inside a function that is called from within sqlite3's auto-commit context causes "cannot start a transaction within a transaction" errors.
+
+### Rule
+MUST NOT use `BEGIN IMMEDIATE` / `BEGIN EXCLUSIVE` inside functions called by pathly_orchestrator's sqlite3 connection pool. The per-connection write lock in `_get_write_lock()` already serialises writes; no additional transaction begin is needed.
+
+### Source
+Feature: fsm-sqlite | Stage: review (conv 1) | Date: 2026-06-04

@@ -57,3 +57,14 @@
 {"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 4, "result": "PASS", "summary": "Conv 4 review passed after fix: migration script now idempotent across runs (skip-if-events-present guard); PROGRESS.md updated with all stories DONE; 427 tests green.", "total_tokens": 167728, "tool_uses": 56, "wall_seconds": 442, "cost_usd": 0.905731, "ts": "2026-06-04T13:18:04Z", "schema_version": 1}
 {"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-06-04T13:18:11Z", "schema_version": 1}
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-04T13:18:12Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-04T13:19:03Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:19:19Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 4, "result": "PASS", "summary": "Re-review passed: migration idempotency fix correct (skip-if-events-present); PROGRESS.md all stories DONE; no scope violations.", "total_tokens": 11219, "tool_uses": 2, "wall_seconds": 35, "cost_usd": 0.060583, "ts": "2026-06-04T13:19:52Z", "schema_version": 1}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-06-04T13:19:59Z", "schema_version": 1}
+{"type": "GATE_FAILED", "gate": "require_artifact", "transition": "REVIEWING->TESTING", "schema_version": 1, "ts": "2026-06-04T13:20:00Z"}
+{"type": "FILE_CREATED", "file": "REVIEW.md", "ts": "2026-06-04T13:20:40Z", "schema_version": 1}
+{"type": "FILE_DELETED", "file": "HUMAN_QUESTIONS.md", "ts": "2026-06-04T13:20:40Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "TESTING", "schema_version": 1, "ts": "2026-06-04T13:20:41Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "tester", "feature": "fsm-sqlite", "ts": "2026-06-04T13:21:09Z"}
+{"type": "STATE_TRANSITION", "from": "TESTING", "to": "RETRO", "schema_version": 1, "ts": "2026-06-04T14:40:39Z"}
+{"type": "STATE_TRANSITION", "from": "RETRO", "to": "DONE", "schema_version": 1, "ts": "2026-06-04T15:00:00Z"}

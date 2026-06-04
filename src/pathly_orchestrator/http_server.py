@@ -1447,6 +1447,26 @@ def events_stream():
             threading.Thread(target=_tail_events, args=(key, stop), daemon=True).start()
 
     def generate():
+        # Catch-up for reconnecting clients
+        try:
+            since_seq = int(request.headers.get("Last-Event-ID") or 0)
+        except (ValueError, TypeError):
+            since_seq = 0
+        if since_seq > 0:
+            try:
+                feature_dir = resolved_root / "pathly" / "plans" / topic
+                db_path = feature_dir / "pathly.db"
+                if db_path.exists():
+                    from pathly_orchestrator import db as _db
+                    catch_conn = _db.get_db(feature_dir)
+                    try:
+                        for event in _db.read_events(catch_conn, topic, since_seq=since_seq):
+                            seq = event.get("seq", 0)
+                            yield f"id: {seq}\ndata: {json.dumps(event)}\n\n"
+                    finally:
+                        catch_conn.close()
+            except Exception:
+                logger.debug("SSE catch-up error for topic %s", topic, exc_info=True)
         yield 'data: {"type":"connected"}\n\n'
         try:
             while True:
