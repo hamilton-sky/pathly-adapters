@@ -376,3 +376,98 @@ def test_no_gates_on_transition(tmp_path):
     flow = _make_flow({})
     result = run_gates(flow, "BUILDING", "REVIEWING", storage, "t", 0)
     assert result is None
+
+
+# ── plan-file exemption tests ─────────────────────────────────────────────────
+
+def test_scope_gate_plan_files_exempt(tmp_path, monkeypatch):
+    """Builder edits CONVERSATION_PROMPTS.md and PROGRESS.md only — gate passes, no GATE_FAILED."""
+    import pathly_orchestrator.fsm as fsm_mod
+
+    storage = _storage(tmp_path)
+    # Declared scope references a codebase file, but builder only touched plan files.
+    (storage / "SCOPE.md").write_text(
+        "Files:\n- `src/app.py`\n", encoding="utf-8"
+    )
+    (storage / "STATE.json").write_text(
+        json.dumps({"current": "A", "build_baseline": {"started_at": "2025-01-01T00:00:00Z", "preexisting_dirty": []}}),
+        encoding="utf-8",
+    )
+
+    def fake_run(args, **kwargs):
+        if "diff" in args:
+            return type("R", (), {
+                "returncode": 0,
+                "stdout": "pathly/plans/test-feature/CONVERSATION_PROMPTS.md\npathly/plans/test-feature/PROGRESS.md\n",
+                "stderr": "",
+            })()
+        return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)
+
+    flow = _make_flow_with_scope_gate()
+    result = run_gates(flow, "A", "B", storage, "test-feature", 1)
+    assert result is None
+    assert not (storage / "feedback" / "SCOPE_VIOLATION.md").exists()
+
+
+def test_scope_gate_plan_files_with_declared_codebase_pass(tmp_path, monkeypatch):
+    """Builder edits declared codebase files AND plan files — gate still passes."""
+    import pathly_orchestrator.fsm as fsm_mod
+
+    storage = _storage(tmp_path)
+    (storage / "SCOPE.md").write_text(
+        "Files:\n- `src/app.py`\n", encoding="utf-8"
+    )
+    (storage / "STATE.json").write_text(
+        json.dumps({"current": "A", "build_baseline": {"started_at": "2025-01-01T00:00:00Z", "preexisting_dirty": []}}),
+        encoding="utf-8",
+    )
+
+    def fake_run(args, **kwargs):
+        if "diff" in args:
+            return type("R", (), {
+                "returncode": 0,
+                "stdout": "src/app.py\npathly/plans/test-feature/CONVERSATION_PROMPTS.md\npathly/plans/test-feature/PROGRESS.md\n",
+                "stderr": "",
+            })()
+        return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)
+
+    flow = _make_flow_with_scope_gate()
+    result = run_gates(flow, "A", "B", storage, "test-feature", 1)
+    assert result is None
+    assert not (storage / "feedback" / "SCOPE_VIOLATION.md").exists()
+
+
+def test_scope_gate_plan_files_do_not_mask_undeclared_codebase(tmp_path, monkeypatch):
+    """Plan-file edits are exempt, but an undeclared codebase file still triggers GATE_FAILED."""
+    import pathly_orchestrator.fsm as fsm_mod
+
+    storage = _storage(tmp_path)
+    (storage / "SCOPE.md").write_text(
+        "Files:\n- `src/app.py`\n", encoding="utf-8"
+    )
+    (storage / "STATE.json").write_text(
+        json.dumps({"current": "A", "build_baseline": {"started_at": "2025-01-01T00:00:00Z", "preexisting_dirty": []}}),
+        encoding="utf-8",
+    )
+
+    def fake_run(args, **kwargs):
+        if "diff" in args:
+            return type("R", (), {
+                "returncode": 0,
+                # src/out_of_scope.py is not declared — should still fail
+                "stdout": "src/app.py\nsrc/out_of_scope.py\npathly/plans/test-feature/PROGRESS.md\n",
+                "stderr": "",
+            })()
+        return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)
+
+    flow = _make_flow_with_scope_gate()
+    result = run_gates(flow, "A", "B", storage, "test-feature", 1)
+    assert result is not None
+    assert result["gate_failed"] == "scope_gate"
+    assert (storage / "feedback" / "SCOPE_VIOLATION.md").exists()
