@@ -299,12 +299,13 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         const enterFallback = setTimeout(() => {
           if (!enterSent) { enterSent = true; ptyProcess.write('\r') }
         }, 2000)
+        let pasteBuf = ''
         const pasteRenderSub = ptyProcess.onData((chunk: string) => {
           if (enterSent) return
-          const s = chunk
+          pasteBuf += chunk
             .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
             .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
-          if (s.includes('Pasted text')) {
+          if (pasteBuf.includes('[Pasted text')) {
             enterSent = true
             clearTimeout(enterFallback)
             pasteRenderSub.dispose()
