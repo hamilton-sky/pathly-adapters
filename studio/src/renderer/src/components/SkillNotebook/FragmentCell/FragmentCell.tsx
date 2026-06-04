@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { GripVertical, X } from 'lucide-react'
 import styles from './FragmentCell.module.css'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
@@ -8,6 +8,7 @@ interface Props {
   fragmentName: string
   category: string
   description: string
+  isNew?: boolean
 }
 
 const CATEGORY_CLASS: Record<string, string> = {
@@ -16,11 +17,18 @@ const CATEGORY_CLASS: Record<string, string> = {
   integration: styles.badgeIntegration,
 }
 
-export default function FragmentCell({ id, fragmentName, category, description }: Props) {
+export default function FragmentCell({ id, fragmentName, category, description, isNew = false }: Props) {
   const removeCell = useSkillNotebookStore(s => s.removeCell)
+  const [showNew, setShowNew] = useState(isNew)
+
+  useEffect(() => {
+    if (!showNew) return
+    const t = setTimeout(() => setShowNew(false), 150)
+    return () => clearTimeout(t)
+  }, [showNew])
 
   return (
-    <div className={styles.cell}>
+    <div className={`${styles.cell} ${showNew ? styles.cellNew : ''}`}>
       <div
         className={styles.grip}
         draggable

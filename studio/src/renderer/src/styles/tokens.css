@@ -68,6 +68,13 @@
   --cell-body-border: var(--accent);
   --cell-fragment-border: var(--green);
   --cell-variable-highlight: var(--runtime);
+
+  --badge-core-bg: rgba(52, 211, 153, 0.13);
+  --badge-flow-bg: rgba(45, 212, 191, 0.13);
+  --badge-integration-bg: rgba(251, 191, 36, 0.15);
+  --badge-frag-bg: rgba(52, 211, 153, 0.15);
+  --insert-zone-active: rgba(56, 189, 248, 0.4);
+  --badge-body-bg: rgba(96, 165, 250, 0.15);
 }
 
 /* â”€â”€â”€ Pathly Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */

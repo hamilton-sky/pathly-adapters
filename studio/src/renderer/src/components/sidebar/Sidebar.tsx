@@ -55,6 +55,7 @@ export function Sidebar(): JSX.Element | null {
     selectedItem,
     setSelectedItem,
     setActivePanel,
+    setSkillNotebookPath,
     dirtyItems,
     activePanel,
     setLastUsedFlowPath,
@@ -150,9 +151,14 @@ export function Sidebar(): JSX.Element | null {
 
   function handleItemClick(item: PathlyItem): void {
     setSelectedItem(item)
-    setActivePanel(item.type === 'flow' ? 'flow' : 'editor')
     if (item.type === 'flow') {
+      setActivePanel('flow')
       setLastUsedFlowPath(item.path)
+    } else if (item.type === 'skill' && item.path.endsWith('.md')) {
+      setActivePanel('skill-notebook')
+      setSkillNotebookPath(item.path)
+    } else {
+      setActivePanel('editor')
     }
   }
 

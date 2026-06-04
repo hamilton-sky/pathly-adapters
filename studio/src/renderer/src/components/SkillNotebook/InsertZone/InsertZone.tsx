@@ -4,15 +4,16 @@ import styles from './InsertZone.module.css'
 interface Props {
   afterCellId: string | null
   dragActive: boolean
+  isDragging?: boolean
   onDragOver: () => void
   onDrop: (e: React.DragEvent) => void
   onDragLeave: () => void
 }
 
-export default function InsertZone({ afterCellId: _afterCellId, dragActive, onDragOver, onDrop, onDragLeave }: Props) {
+export default function InsertZone({ afterCellId: _afterCellId, dragActive, isDragging = false, onDragOver, onDrop, onDragLeave }: Props) {
   return (
     <div
-      className={`${styles.zone} ${dragActive ? styles.active : ''}`}
+      className={`${styles.zone} ${dragActive || isDragging ? styles.active : ''}`}
       onDragOver={e => {
         e.preventDefault()
         onDragOver()

@@ -1472,12 +1472,14 @@ def skills_catalog():
 
 @app.route("/skills/parse", methods=["POST"])
 def skills_parse():
-    """Parse a skill .md file into body cells.
+    """Parse a skill .md file into body cells and fragment cells.
 
     Body: {"skill_path": "src/pathly_data/core/skills/team/build.md"}
-    Returns: {"body_cells": [...], "composition_key": "team/build"}
+    Returns: {"body_cells": [...], "fragment_cells": [...], "composition_key": "team/build"}
     """
     try:
+        import uuid as _uuid
+        import yaml as _yaml
         from pathly_orchestrator.skill_parser import parse_skill_body
 
         data = request.get_json()
@@ -1502,7 +1504,47 @@ def skills_parse():
             rel = normalized.split("/")[-1]
         composition_key = rel.removesuffix(".md")
 
-        return jsonify({"body_cells": cells, "composition_key": composition_key}), 200
+        # Load fragment cells from composition.yaml if the skill is listed there
+        fragment_cells: list[dict] = []
+        skills_dir_idx = normalized.find(marker)
+        if skills_dir_idx != -1:
+            skills_dir = normalized[: skills_dir_idx + len(marker)]
+            composition_path = skills_dir + "composition.yaml"
+            try:
+                with open(composition_path, encoding="utf-8") as f:
+                    comp = _yaml.safe_load(f)
+                skill_entry = (comp.get("skills") or {}).get(composition_key)
+                if skill_entry:
+                    fragments_dir = (comp.get("fragments_dir") or "fragments")
+                    defaults = comp.get("defaults") or []
+                    all_fragment_names = list(defaults) + list(skill_entry.get("fragments") or [])
+                    for frag in all_fragment_names:
+                        if isinstance(frag, dict):
+                            frag_name = frag.get("name", "")
+                        else:
+                            frag_name = str(frag)
+                        if not frag_name:
+                            continue
+                        frag_md = f"{skills_dir}{fragments_dir}/{frag_name}.md"
+                        description = ""
+                        try:
+                            with open(frag_md, encoding="utf-8") as f:
+                                first_line = f.readline().strip()
+                                if first_line.startswith("##"):
+                                    description = first_line.lstrip("#").strip()
+                        except OSError:
+                            pass
+                        fragment_cells.append({
+                            "id": str(_uuid.uuid4()),
+                            "type": "fragment",
+                            "fragmentName": frag_name,
+                            "category": "core",
+                            "description": description,
+                        })
+            except OSError:
+                pass
+
+        return jsonify({"body_cells": cells, "fragment_cells": fragment_cells, "composition_key": composition_key}), 200
     except FileNotFoundError as e:
         return jsonify({"error": str(e), "type": "FileNotFoundError"}), 404
     except Exception as e:

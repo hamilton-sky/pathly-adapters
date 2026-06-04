@@ -13,7 +13,7 @@
 
 .zone.active {
   height: 32px;
-  background: rgba(56, 189, 248, 0.4);
+  background: var(--insert-zone-active);
   display: flex;
   align-items: center;
   justify-content: center;

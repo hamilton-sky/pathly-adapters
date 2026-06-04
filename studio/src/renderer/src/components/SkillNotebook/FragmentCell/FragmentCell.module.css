@@ -1,3 +1,12 @@
+@keyframes popIn {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.cellNew {
+  animation: popIn 150ms ease-out;
+}
+
 .cell {
   display: flex;
   align-items: flex-start;
@@ -62,17 +71,17 @@
 }
 
 .badgeCore {
-  background: rgba(52, 211, 153, 0.15);
+  background: var(--badge-frag-bg);
   color: var(--green);
 }
 
 .badgeFlow {
-  background: rgba(96, 165, 250, 0.15);
+  background: var(--badge-body-bg);
   color: var(--blue);
 }
 
 .badgeIntegration {
-  background: rgba(251, 191, 36, 0.15);
+  background: var(--badge-integration-bg);
   color: var(--yellow);
 }
 

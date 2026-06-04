@@ -32,7 +32,7 @@ interface SkillNotebookState {
   setPreview: (sections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>, tokens: number) => void
   setPreviewLoading: (loading: boolean) => void
   loadSkill: (skillPath: string) => Promise<void>
-  insertFragment: (fragmentName: string, afterCellId: string | null) => void
+  insertFragment: (fragmentName: string, afterCellId: string | null) => string
   removeCell: (cellId: string) => void
   moveCell: (cellId: string, afterCellId: string | null) => void
 }
@@ -74,14 +74,25 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skill_path: skillPath }),
       })
-      const data = await res.json() as { body_cells: Array<{ id: string; heading: string; content: string }>; composition_key: string }
+      const data = await res.json() as {
+        body_cells: Array<{ id: string; heading: string; content: string }>
+        fragment_cells?: Array<{ id: string; fragmentName: string; category: string; description: string }>
+        composition_key: string
+      }
       const bodyCells: BodyCell[] = data.body_cells.map(bc => ({
         id: bc.id,
         type: 'body',
         heading: bc.heading,
         content: bc.content,
       }))
-      get().pushCells(bodyCells)
+      const fragmentCells: FragmentCell[] = (data.fragment_cells ?? []).map(fc => ({
+        id: fc.id,
+        type: 'fragment',
+        fragmentName: fc.fragmentName,
+        category: fc.category,
+        description: fc.description,
+      }))
+      get().pushCells([...bodyCells, ...fragmentCells])
     } catch {
       get().setPreviewLoading(false)
     }
@@ -104,6 +115,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
           return next
         })()
     get().pushCells(newCells)
+    return newCell.id
   },
   removeCell: (cellId: string) => {
     const state = get()
