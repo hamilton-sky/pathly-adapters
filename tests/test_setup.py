@@ -320,3 +320,138 @@ def test_materialize_raises_on_tampered_manifest(tmp_path):
 
     with pytest.raises(RuntimeError, match="Manifest integrity check failed"):
         materialize({"agent.md": "# updated"}, tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# _apply_hooks — stop-hook path-corruption fix
+# ---------------------------------------------------------------------------
+
+def _stop_commands(settings: dict) -> list[str]:
+    """Extract all stop-hook command strings from a settings dict."""
+    return [
+        h.get("command", "")
+        for g in settings.get("hooks", {}).get("Stop", [])
+        for h in (g.get("hooks", []) if isinstance(g, dict) else [])
+        if isinstance(h, dict)
+    ]
+
+
+def test_apply_hooks_writes_settings_json(tmp_path):
+    """First install creates settings.json with the python -m stop hook."""
+    from install_cli.orchestrate import _apply_hooks
+
+    settings_path = tmp_path / ".claude" / "settings.json"
+    hooks_cfg = {
+        "settings_dest": str(settings_path),
+        "Stop": ["python -m pathly_hooks.stop_telemetry"],
+    }
+    _apply_hooks("claude", hooks_cfg, dry_run=False, repair=False)
+
+    settings = json.loads(settings_path.read_text())
+    assert "python -m pathly_hooks.stop_telemetry" in _stop_commands(settings)
+
+
+def test_apply_hooks_repair_replaces_stale_path(tmp_path):
+    """repair=True replaces the old hardcoded-path command with python -m form."""
+    from install_cli.orchestrate import _apply_hooks
+
+    settings_path = tmp_path / ".claude" / "settings.json"
+    settings_path.parent.mkdir(parents=True)
+    old_cmd = "python C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\stop_telemetry.py"
+    old_settings = {
+        "hooks": {
+            "Stop": [{"hooks": [{"type": "command", "command": old_cmd}]}]
+        }
+    }
+    settings_path.write_text(json.dumps(old_settings))
+
+    hooks_cfg = {
+        "settings_dest": str(settings_path),
+        "Stop": ["python -m pathly_hooks.stop_telemetry"],
+    }
+    _apply_hooks("claude", hooks_cfg, dry_run=False, repair=True)
+
+    cmds = _stop_commands(json.loads(settings_path.read_text()))
+    assert "python -m pathly_hooks.stop_telemetry" in cmds
+    assert old_cmd not in cmds
+
+
+def test_apply_hooks_no_repair_preserves_existing_pathly_hook(tmp_path):
+    """Without repair, an existing Pathly hook is not overwritten."""
+    from install_cli.orchestrate import _apply_hooks
+
+    settings_path = tmp_path / ".claude" / "settings.json"
+    settings_path.parent.mkdir(parents=True)
+    old_cmd = "python C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\stop_telemetry.py"
+    old_settings = {
+        "hooks": {
+            "Stop": [{"hooks": [{"type": "command", "command": old_cmd}]}]
+        }
+    }
+    settings_path.write_text(json.dumps(old_settings))
+
+    hooks_cfg = {
+        "settings_dest": str(settings_path),
+        "Stop": ["python -m pathly_hooks.stop_telemetry"],
+    }
+    _apply_hooks("claude", hooks_cfg, dry_run=False, repair=False)
+
+    cmds = _stop_commands(json.loads(settings_path.read_text()))
+    assert old_cmd in cmds
+
+
+def test_apply_hooks_preserves_non_pathly_hooks(tmp_path):
+    """Installing Pathly hooks never removes third-party hooks."""
+    from install_cli.orchestrate import _apply_hooks
+
+    settings_path = tmp_path / ".claude" / "settings.json"
+    settings_path.parent.mkdir(parents=True)
+    other_cmd = "some-other-tool --cleanup"
+    old_settings = {
+        "hooks": {
+            "Stop": [{"hooks": [{"type": "command", "command": other_cmd}]}]
+        }
+    }
+    settings_path.write_text(json.dumps(old_settings))
+
+    hooks_cfg = {
+        "settings_dest": str(settings_path),
+        "Stop": ["python -m pathly_hooks.stop_telemetry"],
+    }
+    _apply_hooks("claude", hooks_cfg, dry_run=False, repair=False)
+
+    cmds = _stop_commands(json.loads(settings_path.read_text()))
+    assert other_cmd in cmds
+    assert "python -m pathly_hooks.stop_telemetry" in cmds
+
+
+def test_apply_hooks_dry_run_does_not_write(tmp_path, capsys):
+    """dry_run=True prints a message but does not create the file."""
+    from install_cli.orchestrate import _apply_hooks
+
+    settings_path = tmp_path / ".claude" / "settings.json"
+    hooks_cfg = {
+        "settings_dest": str(settings_path),
+        "Stop": ["python -m pathly_hooks.stop_telemetry"],
+    }
+    _apply_hooks("claude", hooks_cfg, dry_run=True, repair=False)
+
+    assert not settings_path.exists()
+    captured = capsys.readouterr()
+    assert "Would update hooks" in captured.out
+
+
+def test_apply_hooks_install_yaml_uses_module_notation():
+    """install.yaml stop hook must use 'python -m' to avoid shell backslash issues."""
+    import yaml as _yaml
+
+    install_yaml = (
+        Path(__file__).parent.parent
+        / "src" / "pathly_data" / "adapters" / "claude" / "_meta" / "install.yaml"
+    )
+    cfg = _yaml.safe_load(install_yaml.read_text(encoding="utf-8"))
+    stop_cmds = cfg.get("hooks", {}).get("Stop", [])
+    assert stop_cmds, "install.yaml must declare at least one Stop hook"
+    assert all(
+        cmd.startswith("python -m") for cmd in stop_cmds
+    ), "Stop hook commands must use 'python -m' notation (no hardcoded paths)"

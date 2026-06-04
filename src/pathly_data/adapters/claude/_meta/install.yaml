@@ -8,3 +8,7 @@ skills:
 templates:
   destination: ~/.claude/plugins/pathly/templates
 telemetry: true
+hooks:
+  settings_dest: ~/.claude/settings.json
+  Stop:
+    - python -m pathly_hooks.stop_telemetry
