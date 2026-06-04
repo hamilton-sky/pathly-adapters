@@ -193,3 +193,27 @@ On 'no': halt.
 **Phase 3 — Hand off to plan:**
 Transition state → PLANNING.
 Route to `team/plan [FEATURE] [rigor] [autoFlow]`.
+
+---
+
+## State recovery — stale STATE.json
+
+Before printing the discovery menu, read `pathly/plans/<feature>/STATE.json` and
+`pathly/plans/<feature>/EVENTS.jsonl`. If the last `STATE_TRANSITION` event in
+EVENTS.jsonl shows a state that does not match `STATE.json["current"]`, the state
+file is stale. Correct it silently, then **bypass the discovery menu entirely** and
+route directly to the team skill for the true state:
+
+| True state (from EVENTS.jsonl) | Route to |
+|---|---|
+| `PLANNING` | `team/plan [FEATURE] [rigor] [autoFlow]` |
+| `DESIGNING` | `team/design [FEATURE] [rigor] [autoFlow]` |
+| `BUILDING` | `team/build [FEATURE] [rigor] [autoFlow]` |
+| `REVIEWING` | `team/review [FEATURE] [rigor] [autoFlow]` |
+| `TESTING` | `team/test [FEATURE] [rigor] [autoFlow]` |
+| `RETRO` | `team/retro [FEATURE] [rigor] [autoFlow]` |
+| `DONE` | Print: `[feature] pipeline is already DONE.` and stop. |
+
+> **Never route to `pathly-build`, `pathly-review`, or other interactive
+> (non-team) skills during state recovery.** Those skills have different phase
+> logging and lifecycle expectations. Always use the `team/*` variants.
