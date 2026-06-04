@@ -25,3 +25,37 @@
   flex-shrink: 0;
   overflow: hidden;
 }
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
+.emptyIcon {
+  opacity: 0.35;
+  margin-bottom: 4px;
+}
+
+.emptyTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.emptyHint {
+  font-size: 13px;
+  margin: 0;
+}
+
+.emptyHint code {
+  font-family: var(--font-mono);
+  background: var(--bg-surface1);
+  padding: 1px 5px;
+  border-radius: 4px;
+}

@@ -463,7 +463,5 @@
 }
 
 .navBtnDisabled {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
+  opacity: 0.5;
 }
