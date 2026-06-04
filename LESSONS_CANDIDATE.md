@@ -131,7 +131,7 @@ Feature: brightsky-chat-connect | Stage: planning | Date: 2026-06-02
 
 ---
 
-### Lesson — pathly-observability (2026-06-02)
+### Lesson ï¿½ pathly-observability (2026-06-02)
 
 ### Observation
 Test acceptance criteria with grep commands had wrong file paths (development/ vs planning/) and case mismatches (phase: vs Phase:). This caused 2 false test failures requiring a full builder fix cycle.
@@ -148,7 +148,7 @@ Feature: pathly-observability | Stage: testing | Date: 2026-06-02
 
 ---
 
-### Lesson — pathly-observability (2026-06-02)
+### Lesson ï¿½ pathly-observability (2026-06-02)
 
 ### Observation
 fast/auto mode (build -> review auto-chain, PROGRESS.md auto-update) worked perfectly for a 5-conversation pipeline. No regressions, no manual steps needed.
@@ -193,3 +193,36 @@ MUST include the VERIFY.md write instruction in every build conversation prompt,
 
 ### Source
 Feature: studio-a11y-p1 | Stage: building/reviewing | Date: 2026-06-03
+
+---
+
+## [agent-done-early-advance] Define reconciliation timeout in USER_STORIES, not analysis
+
+### Pattern
+The 30-second billing reconciliation window for early FSM advance was not specified in USER_STORIES.md. Builders discovered it during Conv 2 analysis, leading to the longest build conversation (164K tokens, 820s wall). Reviewers had no AC to validate the timeout against.
+
+### Rule
+MUST specify any timing SLAs (timeouts, windows, polling intervals) as explicit acceptance criteria in USER_STORIES.md before build begins. Do not leave "how long" as an analysis-phase discovery.
+
+### Injection
+- When a feature involves async wait windows (reconciliation, polling, retry), add AC: "Timeout defaults to X seconds; configurable via [param]."
+- In CONVERSATION_PROMPTS.md for the implementing conversation, call out the timeout value explicitly: "Use timeout=30 (configurable via param)."
+
+### Source
+Feature: agent-done-early-advance | Stage: planning | Date: 2026-06-04
+
+---
+
+## [agent-done-early-advance] Document inter-flag dependencies in ARCHITECTURE_PROPOSAL.md
+
+### Pattern
+The interactive mode constraint (interactive=True requires early_advance=True) was not documented until Conv 4. This forced a design decision mid-conversation about whether to raise RuntimeError vs. warn. Had it been documented in ARCHITECTURE_PROPOSAL.md, the decision would have been made during planning.
+
+### Rule
+MUST add an "Inter-flag dependencies" or "Preconditions" section to ARCHITECTURE_PROPOSAL.md for any feature that introduces multiple feature flags. List which flags imply other flags and the failure mode when preconditions aren't met.
+
+### Injection
+- Add to ARCHITECTURE_PROPOSAL.md template under "Feature flags": "Preconditions: list flag combinations that are invalid and the expected runtime behavior (RuntimeError / WARNING / silent degradation)."
+
+### Source
+Feature: agent-done-early-advance | Stage: architecture | Date: 2026-06-04
