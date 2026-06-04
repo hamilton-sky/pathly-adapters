@@ -1,12 +1,12 @@
 import React from 'react'
-import { LayoutGrid, Activity } from 'lucide-react'
+import { LayoutGrid, Activity, BookOpen } from 'lucide-react'
 import { useStore } from '../../store'
 import { Tooltip } from '../ui'
 import { readFile } from '../../services/pathlyApi'
 import styles from './TopBar.module.css'
 
 export function PanelNav(): JSX.Element {
-  const { activePanel, selectedItem, lastUsedFlowPath, setActivePanel, setSelectedItem, setLastUsedFlowPath } = useStore()
+  const { activePanel, selectedItem, lastUsedFlowPath, skillNotebookPath, setActivePanel, setSelectedItem, setLastUsedFlowPath } = useStore()
 
   return (
     <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexShrink: 0 }}>
@@ -28,6 +28,19 @@ export function PanelNav(): JSX.Element {
           Canvas
         </button>
       </Tooltip>
+      {skillNotebookPath && (
+        <Tooltip label="Skill notebook" shortcut="Ctrl+2" placement="bottom">
+          <button
+            type="button"
+            data-testid="topbar-panel-notebook"
+            className={`${styles.navBtn} ${activePanel === 'skill-notebook' ? styles.navBtnActive : ''}`}
+            onClick={() => setActivePanel('skill-notebook')}
+          >
+            <BookOpen size={13} />
+            Notebook
+          </button>
+        </Tooltip>
+      )}
       <Tooltip label="Live monitor" shortcut="Ctrl+3" placement="bottom">
         <button
           type="button"
