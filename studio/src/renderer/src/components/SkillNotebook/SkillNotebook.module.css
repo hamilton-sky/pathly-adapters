@@ -1,7 +1,15 @@
 .root {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   height: 100%;
+  overflow: hidden;
+}
+
+.body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -12,14 +20,8 @@
   cursor: col-resize;
 }
 
-.previewPlaceholder {
+.previewWrapper {
   width: 320px;
   flex-shrink: 0;
-  background: var(--bg-surface0);
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-sm);
-  border-left: 1px solid var(--bg-surface1);
+  overflow: hidden;
 }

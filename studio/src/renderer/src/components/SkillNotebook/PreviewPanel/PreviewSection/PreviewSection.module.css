@@ -1,0 +1,49 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.heading {
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+.badge {
+  font-size: 9px;
+  font-weight: var(--font-weight-semibold);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.badgeBody {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.badgeFrag {
+  background: rgba(52, 211, 153, 0.13);
+  color: var(--green);
+}
+
+.content {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+:global(.var-highlight) {
+  color: var(--runtime);
+  background: rgba(45, 212, 191, 0.13);
+  padding: 0 2px;
+  border-radius: 2px;
+}

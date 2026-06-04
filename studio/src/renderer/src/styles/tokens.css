@@ -64,6 +64,10 @@
   --btn-c-hover-color:  var(--accent);
 
   --text-disabled: #4A5568;
+
+  --cell-body-border: var(--accent);
+  --cell-fragment-border: var(--green);
+  --cell-variable-highlight: var(--runtime);
 }
 
 /* â”€â”€â”€ Pathly Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */

@@ -1,0 +1,93 @@
+.headerRoot {
+  background: var(--bg-surface0);
+  border-bottom: 1px solid var(--bg-surface1);
+  padding: 8px 12px 6px;
+  flex-shrink: 0;
+}
+
+.headerTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.breadcrumbMuted {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skillName {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.stageBadge {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.divider {
+  width: 1px;
+  height: 16px;
+  background: var(--bg-surface1);
+  margin: 0 2px;
+}
+
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: none;
+  background: var(--accent);
+  color: var(--bg-mantle);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition: opacity 120ms ease-out;
+}
+
+.exportBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.exportSuccess {
+  background: var(--green);
+  color: var(--bg-mantle);
+}
+
+.exportError {
+  background: var(--red);
+  color: white;
+}
