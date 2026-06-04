@@ -61,6 +61,7 @@ export default function NotebookHeader() {
             onClick={undo}
             disabled={!canUndo}
             title="Undo"
+            aria-label="Undo"
           >
             <Undo2 size={13} />
           </button>
@@ -70,6 +71,7 @@ export default function NotebookHeader() {
             onClick={redo}
             disabled={!canRedo}
             title="Redo"
+            aria-label="Redo"
           >
             <Redo2 size={13} />
           </button>

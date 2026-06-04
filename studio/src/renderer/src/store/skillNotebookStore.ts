@@ -68,19 +68,23 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
   setPreview: (sections, tokens) => set({ previewSections: sections, previewTokens: tokens, previewLoading: false }),
   setPreviewLoading: (loading) => set({ previewLoading: loading }),
   loadSkill: async (skillPath: string) => {
-    const res = await fetch('http://localhost:8765/skills/parse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skill_path: skillPath }),
-    })
-    const data = await res.json() as { body_cells: Array<{ id: string; heading: string; content: string }>; composition_key: string }
-    const bodyCells: BodyCell[] = data.body_cells.map(bc => ({
-      id: bc.id,
-      type: 'body',
-      heading: bc.heading,
-      content: bc.content,
-    }))
-    get().pushCells(bodyCells)
+    try {
+      const res = await fetch('http://localhost:8765/skills/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skill_path: skillPath }),
+      })
+      const data = await res.json() as { body_cells: Array<{ id: string; heading: string; content: string }>; composition_key: string }
+      const bodyCells: BodyCell[] = data.body_cells.map(bc => ({
+        id: bc.id,
+        type: 'body',
+        heading: bc.heading,
+        content: bc.content,
+      }))
+      get().pushCells(bodyCells)
+    } catch {
+      get().setPreviewLoading(false)
+    }
   },
   insertFragment: (fragmentName: string, afterCellId: string | null) => {
     const state = get()
