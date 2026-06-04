@@ -288,9 +288,14 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         injected = true
         clearTimeout(fallbackTimer)
         unsubscribe.dispose()
-        // ONE atomic write: bracketed paste handles multi-line content without each
-        // newline triggering a submit; \r at the end submits the whole thing.
-        ptyProcess.write('\x1b[200~' + initialInput + '\x1b[201~\r')
+        // Write the bracketed paste first (\x1b[200~...\x1b[201~).
+        // Then send \r as a SEPARATE write after 50 ms.
+        // After Ink receives \x1b[201~ (paste close) it schedules a re-render;
+        // if \r arrives in the same buffer Ink is in an intermediate state and
+        // drops the Enter. The 50 ms gap is safe here because we already confirmed
+        // Claude is ready (we saw '> '), so there is no startup-race risk.
+        ptyProcess.write('\x1b[200~' + initialInput + '\x1b[201~')
+        setTimeout(() => ptyProcess.write('\r'), 50)
       }
 
       const fallbackTimer = setTimeout(doInject, 5000)
