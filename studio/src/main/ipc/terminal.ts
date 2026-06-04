@@ -265,51 +265,53 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     // Phase 2: record ownership
     ptyOwners.set(tabId, event.sender.id)
 
-    // Inject the stage prompt once Claude's UI has finished rendering.
-    // Two-phase approach:
-    //   Phase 1 — if the --dangerously-skip-permissions warning screen appears, auto-dismiss it
-    //             with \r, then wait 1500 ms for the main UI to render.
-    //   Phase 2 — inject the prompt via bracketed paste (\x1b[200~...\x1b[201~) so multi-line
-    //             content is treated as a single paste rather than one submit per newline.
-    //             Send \r as a separate write 100 ms later so Claude's event loop has finished
-    //             processing the paste before it sees the Enter.
+    // Inject the stage prompt using the same two-phase pattern as launchTerminal.ts:
+    //
+    //   Phase 1 — if the --dangerously-skip-permissions warning screen appears,
+    //             auto-dismiss it with a bare \r and keep watching.
+    //
+    //   Phase 2 — wait for Claude's '> ' input prompt (ANSI-stripped), which is the
+    //             reliable signal that readline is ready to accept input.
+    //             Then send bracketed paste + \r as ONE atomic write.
+    //             Splitting into two writes with a delay is racy — \r can arrive while
+    //             Claude is still flushing startup output, confusing readline.
+    //             (This is the same lesson learned in launchTerminal.ts writeToTerminal.)
+    //
+    //   Fallback — if '> ' never appears within 5 s, inject anyway.
     if (initialInput) {
       let injected = false
       let bypassDismissed = false
-      let debounce: ReturnType<typeof setTimeout> | null = null
-      let outputSoFar = ''
+      let strippedBuf = ''
 
-      const injectPrompt = (): void => {
+      const doInject = (): void => {
         if (injected) return
         injected = true
-        ptyProcess.write('\x1b[200~' + initialInput + '\x1b[201~')
-        setTimeout(() => ptyProcess.write('\r'), 100)
+        clearTimeout(fallbackTimer)
+        unsubscribe.dispose()
+        // ONE atomic write: bracketed paste handles multi-line content without each
+        // newline triggering a submit; \r at the end submits the whole thing.
+        ptyProcess.write('\x1b[200~' + initialInput + '\x1b[201~\r')
       }
+
+      const fallbackTimer = setTimeout(doInject, 5000)
 
       const unsubscribe = ptyProcess.onData((data: string) => {
         if (injected) return
-        outputSoFar += data
+        // Strip ANSI escape sequences so pattern matching works reliably
+        strippedBuf += data
+          .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+          .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
 
-        // Detect the bypass-permissions confirmation screen and auto-dismiss it
-        if (!bypassDismissed && outputSoFar.includes('Bypass Permissions mode')) {
+        // Phase 1: auto-dismiss the bypass-permissions confirmation screen
+        if (!bypassDismissed && strippedBuf.includes('Bypass Permissions mode')) {
           bypassDismissed = true
-          if (debounce) clearTimeout(debounce)
           ptyProcess.write('\r')
-          // Wait for Claude's main UI to fully render after dismissal
-          debounce = setTimeout(() => {
-            injectPrompt()
-            unsubscribe.dispose()
-          }, 1500)
           return
         }
 
-        // Normal path (no warning): debounce on output-stream silence
-        if (!bypassDismissed) {
-          if (debounce) clearTimeout(debounce)
-          debounce = setTimeout(() => {
-            injectPrompt()
-            unsubscribe.dispose()
-          }, 800)
+        // Phase 2: Claude's '> ' prompt means readline is ready — inject now
+        if (strippedBuf.includes('> ')) {
+          doInject()
         }
       })
     }
