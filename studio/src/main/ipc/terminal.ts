@@ -24,8 +24,6 @@ const ptyOutput = new Map<string, string[]>()
 const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number; label: string }>()
 // Tracks tabs killed by the user (not by the runner exiting naturally)
 const ptyKilledByRunner = new Set<string>()
-// Tracks runner tabs that have already shown the autonomous-mode warning
-const runnerWarnShown = new Set<string>()
 // Maps tabId → temp .ps1 script path created for that runner (Windows only)
 const runnerScripts = new Map<string, string>()
 
@@ -144,6 +142,19 @@ function parseClaudeJsonResult(stdout: string): ClaudeJsonResult | null {
   return null
 }
 
+/** Spawn a specific argv interactively — the shell stays open after the command exits so the user can keep chatting. */
+function resolveInteractiveShell(argv: string[]): { shell: string; args: string[] } {
+  const cmd = argv[0]
+  const rest = argv.slice(1)
+  if (process.platform !== 'win32') {
+    const escaped = [cmd, ...rest].map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ')
+    return { shell: 'bash', args: ['-c', `exec ${escaped}`] }
+  }
+  // Windows: -NoExit keeps PowerShell open after the process exits so the user sees the result
+  const tokens = [cmd, ...rest].map((a) => `'${a}'`).join(' ')
+  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `& ${tokens}`] }
+}
+
 /** Spawn a specific argv non-interactively — used by the runner so the PTY exits when the agent finishes. */
 function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; tempScript?: string } {
   if (process.platform !== 'win32') {
@@ -203,7 +214,7 @@ export function killAllPtys(): void {
 }
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
-  ipcMain.handle('terminal:spawn', (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[]) => {
+  ipcMain.handle('terminal:spawn', (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[], initialInput?: string) => {
     if (!pty) throw new Error('node-pty is not available')
     if (activePtys.has(tabId)) {
       throw new Error('Tab already exists')
@@ -222,14 +233,19 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     let tempScript: string | undefined
 
     if (runnerArgv && runnerArgv.length > 0) {
-      // Runner mode: use full argv so the agent exits when done (non-interactive)
       if (!ALLOWED_SHELLS.has(runnerArgv[0])) {
         throw new Error('Shell not allowed: ' + runnerArgv[0])
       }
-      ;({ shell, args: shellArgs, tempScript } = resolveRunnerShell(runnerArgv))
+      if (initialInput) {
+        // Interactive runner: open the CLI normally so the user can keep chatting after
+        ;({ shell, args: shellArgs } = resolveInteractiveShell(runnerArgv))
+      } else {
+        // Headless runner: PTY exits when agent finishes
+        ;({ shell, args: shellArgs, tempScript } = resolveRunnerShell(runnerArgv))
+      }
       if (tempScript) runnerScripts.set(tabId, tempScript)
     } else {
-      // Interactive mode: just the adapter name
+      // Manual terminal tab: just the adapter name
       if (command !== undefined && !ALLOWED_SHELLS.has(command)) {
         throw new Error('Shell not allowed: ' + command)
       }
@@ -248,6 +264,27 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     ptyWindows.set(tabId, win)
     // Phase 2: record ownership
     ptyOwners.set(tabId, event.sender.id)
+
+    // Inject the stage prompt once Claude's UI has finished rendering.
+    // Use bracketed paste (\x1b[200~...\x1b[201~) so multi-line content is treated
+    // as a single paste rather than one submit per line.
+    if (initialInput) {
+      let injected = false
+      let debounce: ReturnType<typeof setTimeout> | null = null
+      const injectPrompt = (): void => {
+        if (injected) return
+        injected = true
+        ptyProcess.write('\x1b[200~' + initialInput + '\x1b[201~\r')
+      }
+      const unsubscribe = ptyProcess.onData(() => {
+        if (injected) return
+        if (debounce) clearTimeout(debounce)
+        debounce = setTimeout(() => {
+          injectPrompt()
+          unsubscribe.dispose()
+        }, 800)
+      })
+    }
 
     ptyProcess.onData((data: string) => {
       sendToWindow(tabId, `terminal:data:${tabId}`, data)
@@ -309,10 +346,6 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     if (ptyOwners.get(tabId) !== event.sender.id) return
     const MAX_WRITE = 65536 // 64KB
     if (typeof data !== 'string' || data.length > MAX_WRITE) return
-    if (tabId.startsWith('runner-') && !runnerWarnShown.has(tabId)) {
-      runnerWarnShown.add(tabId)
-      event.sender.send(`terminal:data:${tabId}`, '\r\n\x1b[33m[!] Autonomous mode active — input will be forwarded to the agent\x1b[0m\r\n')
-    }
     activePtys.get(tabId)?.write(data)
   })
 

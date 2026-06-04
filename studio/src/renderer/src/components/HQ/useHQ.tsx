@@ -280,6 +280,7 @@ export function useHQ() {
               const cwd = (data.cwd as string | undefined) ?? useRunnerStore.getState().projectRoot ?? ''
               const prompt = (data.prompt as string | undefined) ?? ''
               const stage = (data.stage as string | undefined) ?? ''
+              const isInteractive = !!(data.interactive as boolean | undefined)
               useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'])
               useTerminalStore.getState().openTab(tab_id)
               useTerminalStore.setState((s) => ({
@@ -288,8 +289,9 @@ export function useHQ() {
               useRunnerStore.getState().attachTerminalToStage(tab_id, 'terminal')
               if (prompt) useRunnerStore.getState().recordStagePrompt(prompt)
               const argv = Array.isArray(data.argv) ? (data.argv as string[]) : undefined
+              const initialInput = isInteractive && prompt ? prompt : undefined
               void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id, label)
-                .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv))
+                .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv, initialInput))
                 .then(() => {
                   fetch('http://127.0.0.1:8765/runner/terminal/started', {
                     method: 'POST',

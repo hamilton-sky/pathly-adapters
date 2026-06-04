@@ -44,7 +44,7 @@ declare global {
         onWorkspaceChanged?: (cb: () => void) => () => void
       }
       terminal: {
-        spawn: (tabId: string, cwd: string, command?: string, argv?: string[]) => Promise<void>
+        spawn: (tabId: string, cwd: string, command?: string, argv?: string[], initialInput?: string) => Promise<void>
         kill: (tabId: string) => Promise<void>
         popout: (tabId: string, label: string) => Promise<void>
         write: (tabId: string, data: string) => void

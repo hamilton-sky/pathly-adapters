@@ -289,7 +289,7 @@ def _run_stage_via_terminal(
     import datetime
     from pathly_orchestrator.events import TYPE_STAGE_INTERACTIVE_DONE
     from pathly_orchestrator.feature_flags import FeatureFlags
-    from pathly_orchestrator.runner import resolve_argv, read_last_agent_done
+    from pathly_orchestrator.runner import resolve_argv, resolve_interactive_argv, read_last_agent_done
 
     feature_flags = FeatureFlags()
     # state.interactive is set by the UI (POST /runner/start body); falls back to env var default
@@ -303,7 +303,10 @@ def _run_stage_via_terminal(
                 pass
         raise RuntimeError(msg)
 
-    argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy, interactive=use_interactive)
+    if use_interactive:
+        argv = resolve_interactive_argv(adapter, model, session=session, autonomy=autonomy)
+    else:
+        argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy, interactive=False)
     tab_id = f"runner-{run_id[-10:]}"
     label = f"{adapter} — {state.current_state or state.status}"
     with _lock:
@@ -320,6 +323,7 @@ def _run_stage_via_terminal(
             "cwd": state.project_root,
             "prompt": instructions,
             "stage": state.current_state,
+            "interactive": use_interactive,
         }
         if broadcast_fn:
             broadcast_fn(state.topic, payload)

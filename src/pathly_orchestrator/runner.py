@@ -34,6 +34,29 @@ def _storage_path(flow: str, project_root: str, topic: str) -> Path:
     return Path(project_root) / template.format(topic=topic)
 
 
+def resolve_interactive_argv(
+    adapter: str,
+    model: str,
+    session: str | None = None,
+    autonomy: bool = True,
+) -> list[str]:
+    """Build argv that opens the adapter interactively — no -p, no --output-format.
+    The prompt is injected later via PTY stdin (bracketed paste)."""
+    if adapter == "claude":
+        argv = ["claude", "--model", model]
+        if autonomy:
+            argv.append("--dangerously-skip-permissions")
+        if session:
+            argv.extend(["--resume", session])
+        return argv
+    if adapter == "codex":
+        argv = ["codex", "--model", model]
+        if autonomy:
+            argv.append("--full-auto")
+        return argv
+    return [adapter]
+
+
 def resolve_argv(
     adapter: str,
     prompt: str,
