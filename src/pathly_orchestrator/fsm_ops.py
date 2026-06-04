@@ -109,13 +109,13 @@ _SKILL_AGENT_ROLE: dict[str, str] = {
 }
 
 
-def _inject_prompt_vars(text: str, feature: str, project_root: str, agent_role: str) -> str:
+def _inject_prompt_vars(text: str, feature: str, project_root: str, agent_role: str, storage_path: Path | None = None) -> str:
     """Replace log-phase markers and common placeholders with real values.
 
     Converts bare `log-phase PHASE_START <phase>` lines into executable bash
     commands so agents actually run them instead of treating them as annotations.
-    Also substitutes <feature>, <project_root>, and <agent> placeholders that
-    appear in the progress-logging and completion-report fragments.
+    Also substitutes <feature>, <project_root>, <agent>, and <feature_path>
+    placeholders that appear in the progress-logging and completion-report fragments.
     """
 
     def _make_log_phase_cmd(m: re.Match) -> str:  # type: ignore[type-arg]
@@ -140,6 +140,9 @@ def _inject_prompt_vars(text: str, feature: str, project_root: str, agent_role: 
     text = text.replace("<feature>", feature)
     text = text.replace("<project_root>", project_root)
     text = text.replace("<agent>", agent_role)
+    if storage_path is not None:
+        feature_path = storage_path.as_posix().rstrip("/")
+        text = text.replace("<feature_path>", feature_path)
     return text
 
 
@@ -172,7 +175,7 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     else:
         agent_text = _load_agent_text(agent)
 
-    agent_text = _inject_prompt_vars(agent_text, feature, project_root, agent_role)
+    agent_text = _inject_prompt_vars(agent_text, feature, project_root, agent_role, storage_path=storage_path)
 
     context = (
         f"\n\n## Current task\n"

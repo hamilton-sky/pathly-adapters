@@ -73,3 +73,20 @@ skills:
   development/test:
     fragments:
       - scout-choreography
+
+  debug/build:
+    fragments:
+      - completion-report
+      - scout-choreography
+      - feedback-protocol
+      - { name: spawn-rules, requires: can_spawn }
+
+  debug/verify:
+    fragments:
+      - completion-report
+      - scout-choreography
+
+  fix/build:
+    fragments:
+      - completion-report
+      - scout-choreography

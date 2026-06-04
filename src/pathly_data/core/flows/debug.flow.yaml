@@ -25,8 +25,8 @@ agent_map:
   INVESTIGATING: scout
   REPRODUCING: tester
   ROOT_CAUSE_FOUND: README_routing
-  FIXING: builder
-  VERIFYING: review
+  FIXING: debug/build
+  VERIFYING: debug/verify
 role_map:
   INVESTIGATING: scout
   REPRODUCING: tester

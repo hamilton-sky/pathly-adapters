@@ -17,4 +17,5 @@ feedback_files:
   - IMPL_QUESTIONS.md
   - REVIEW_FAILURES.md
   - TEST_FAILURES.md
+  - VERIFY_FAILURES.md
   

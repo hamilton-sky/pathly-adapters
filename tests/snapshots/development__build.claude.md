@@ -240,7 +240,7 @@ event = {
   'ts': ts,
   'schema_version': 1,
 }
-path = 'pathly/plans/<feature>/EVENTS.jsonl'
+path = '<feature_path>/EVENTS.jsonl'
 with open(path, 'a', encoding='utf-8') as f:
     f.write(json.dumps(event) + chr(10))
 print('AGENT_DONE written')
@@ -253,7 +253,7 @@ Replace the UPPER_CASE placeholders with actual values:
 - `SUMMARY_SENTENCE` — one sentence: what was done and the outcome
 - `TOTAL_TOKENS`, `TOOL_USES`, `WALL_SECONDS` — from `<usage>` block or wall_seconds computation
 
-`<feature>` is pre-substituted by the runner — use the value as written.
+`<feature>` and `<feature_path>` are pre-substituted by the runner — use the values as written.
 
 Return. The orchestrator determines the next state from `transition_rules`.
 

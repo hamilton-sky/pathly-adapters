@@ -1,6 +1,6 @@
 ## Feedback protocol
 
-All feedback files live in `pathly/plans/[feature]/feedback/`. File exists = issue open.
+All feedback files live in `<feature_path>/feedback/`. File exists = issue open.
 Absent = resolved.
 
 Priority order (highest first): `HUMAN_QUESTIONS.md` › `ARCH_FEEDBACK.md` › `DESIGN_QUESTIONS.md` ›
@@ -12,7 +12,7 @@ before advancing.
 
 ### Guard — feedback-open check
 
-Before spawning the stage agent, scan `pathly/plans/<feature>/feedback/`. If any file exists:
+Before spawning the stage agent, scan `<feature_path>/feedback/`. If any file exists:
 1. Identify the highest-priority file using the order above.
 2. Log file created for that file.
 3. Route to the responsible agent (see the stage's feedback routing section).

@@ -20,7 +20,7 @@ transitions:
 
 agent_map:
   SCOPING: scout
-  FIXING: builder
+  FIXING: fix/build
   VERIFYING: tester
 
 role_map:
