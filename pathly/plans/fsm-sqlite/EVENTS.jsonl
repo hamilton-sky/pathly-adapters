@@ -1,0 +1,4 @@
+{"type": "STATE_TRANSITION", "to": "BUILDING", "ts": "2026-06-04T00:00:00Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:19:17Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:19:35Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "summary": "Conv 1 complete: db.py created with SQLite schema + CRUD helpers; test_db.py has 11 tests all green including concurrent-write; full suite 424 passed 0 failed.", "total_tokens": 45376, "tool_uses": 30, "wall_seconds": 22, "cost_usd": 0.24503, "ts": "2026-06-04T12:19:47Z", "schema_version": 1}

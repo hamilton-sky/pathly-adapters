@@ -3,13 +3,13 @@ name: Progress
 ---
 # fsm-sqlite — Progress
 
-## Status: NOT STARTED
+## Status: IN PROGRESS (Conv 1 complete)
 
 ## Story Status
 
 | Story | Title | Delivered by | Status |
 |-------|-------|--------------|--------|
-| S1.1 | SQLite DB layer | Conv 1 | TODO |
+| S1.1 | SQLite DB layer | Conv 1 | DONE |
 | S2.1 | EVENTS.jsonl → SQLite (event log) | Conv 2 | TODO |
 | S2.2 | STATE.json → SQLite (FSM state) | Conv 2 | TODO |
 | S3.1 | RUNNER_STATE.json → SQLite (runner state) | Conv 3 | TODO |
@@ -22,7 +22,7 @@ name: Progress
 
 | Conv | Phases | Stories | Status | Verify |
 |------|--------|---------|--------|--------|
-| 1 | 0, 1, 2 | S1.1 | TODO | `pytest tests/test_db.py -v` |
+| 1 | 0, 1, 2 | S1.1 | DONE | `pytest tests/test_db.py -v` |
 | 2 | 3, 4 | S2.1, S2.2 | TODO | `pytest tests/test_orchestrator.py tests/test_fsm.py tests/test_supervisor.py tests/test_storage.py -q` |
 | 3 | 5, 5b, 6 | S3.1, S3.2, S3.3 | TODO | `pytest tests/test_supervisor.py tests/test_http_server.py tests/test_runner.py tests/test_runner_endpoints.py -q` |
 | 4 | 7, 8 | S4.1, S4.2 | TODO | `pytest tests/ -q` |
@@ -33,9 +33,9 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 
 | Conv | Phase | File | Description | Done when | Status |
 |------|-------|------|-------------|-----------|--------|
-| 1 | 0 Pre-flight | `tests/` | Run baseline tests + verify sqlite3 | `PREFLIGHT.md` written | TODO |
-| 1 | 1 Create db.py | `src/pathly_orchestrator/db.py` | New SQLite layer — schema + all CRUD | Import succeeds, no errors | TODO |
-| 1 | 2 Create test_db.py | `tests/test_db.py` | Unit tests for all db.py helpers | `pytest tests/test_db.py -v` green | TODO |
+| 1 | 0 Pre-flight | `tests/` | Run baseline tests + verify sqlite3 | `PREFLIGHT.md` written | DONE |
+| 1 | 1 Create db.py | `src/pathly_orchestrator/db.py` | New SQLite layer — schema + all CRUD | Import succeeds, no errors | DONE |
+| 1 | 2 Create test_db.py | `tests/test_db.py` | Unit tests for all db.py helpers | `pytest tests/test_db.py -v` green | DONE |
 | 2 | 3 Migrate eventlog.py | `src/pathly_orchestrator/eventlog.py` | events + state reads/writes → SQLite | `pytest tests/test_fsm.py tests/test_orchestrator.py -q` green | TODO |
 | 2 | 4 Fix supervisor direct writes | `src/pathly_orchestrator/supervisor.py` | Remove direct .jsonl writes | grep for `.jsonl` returns 0; supervisor tests green | TODO |
 | 3 | 5 Migrate runner state | `src/pathly_orchestrator/supervisor.py` | _write_mirror() + recover_stale_mirrors() → SQLite | grep for `RUNNER_STATE.json` write returns 0; supervisor tests green | TODO |

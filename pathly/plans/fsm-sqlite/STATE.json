@@ -1,0 +1,19 @@
+{
+  "conv_start_sha": "da29280909fc336e5d4659c116711ea6a2df2ebe",
+  "convs_total": 4,
+  "convs_done": 1,
+  "current": "BUILDING",
+  "build_baseline": {
+    "started_at": "2026-06-04T12:18:28.207925+00:00",
+    "preexisting_dirty": [
+      "pathly/pipeline-walkthrough/skill-notebook-editor/",
+      "pathly/plans/codebase-architecture/EVENTS.jsonl",
+      "pathly/plans/fsm-sqlite/EVENTS.jsonl",
+      "pathly/plans/fsm-sqlite/PREFLIGHT.md",
+      "pathly/plans/fsm-sqlite/PROGRESS.md",
+      "pathly/plans/fsm-sqlite/STATE.json",
+      "src/pathly_orchestrator/db.py",
+      "tests/test_db.py"
+    ]
+  }
+}
