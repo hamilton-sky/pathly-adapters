@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { MessageSquare } from 'lucide-react'
 import { useChatStore } from '../../../store/chatStore'
+import { useUiStore } from '../../../store/uiStore'
 import { ThinkingBlock } from '../ThinkingBlock/ThinkingBlock'
 import styles from './MessageList.module.css'
 
@@ -29,8 +29,44 @@ function ThinkingDots(): JSX.Element {
   )
 }
 
+const HINTS: Record<string, { label: string; prompts: string[] }> = {
+  'skill-notebook': {
+    label: 'Skill Notebook',
+    prompts: [
+      'What fragments are available for this skill?',
+      'How do I add a review step to this skill?',
+      'Explain what this skill does',
+    ],
+  },
+  flow: {
+    label: 'Canvas',
+    prompts: [
+      'What is the current pipeline state?',
+      'How do I add a new stage?',
+      'Show me the next action for this feature',
+    ],
+  },
+  monitor: {
+    label: 'Monitor',
+    prompts: [
+      'Why did the last run fail?',
+      'How long did the last build take?',
+      'What was the cost of the last run?',
+    ],
+  },
+  default: {
+    label: 'Pathly',
+    prompts: [
+      '/pathly go — continue the current feature',
+      '/pathly build — run the next conversation',
+      '/pathly status — show all active features',
+    ],
+  },
+}
+
 export function MessageList(): JSX.Element {
   const messages = useChatStore((s) => s.messages)
+  const activePanel = useUiStore((s) => s.activePanel)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -38,10 +74,15 @@ export function MessageList(): JSX.Element {
   }, [messages])
 
   if (messages.length === 0) {
+    const hint = HINTS[activePanel] ?? HINTS.default
     return (
       <div className={styles.empty}>
-        <MessageSquare size={22} className={styles.emptyIcon} />
-        <span className={styles.emptyText}>Ask anything about your Pathly workflow.</span>
+        <span className={styles.emptyLabel}>{hint.label}</span>
+        <ul className={styles.emptyPrompts}>
+          {hint.prompts.map((p) => (
+            <li key={p} className={styles.emptyPrompt}>{p}</li>
+          ))}
+        </ul>
       </div>
     )
   }

@@ -9,27 +9,40 @@
 }
 
 .empty {
-  flex: 1;
-  min-height: 0;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 24px;
-  text-align: center;
+  gap: 6px;
+}
+
+.emptyLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
+  padding: 0 2px;
   font-family: var(--font-family-base);
 }
 
-.emptyIcon {
-  opacity: 0.4;
+.emptyPrompts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.emptyText {
-  font-size: 13px;
-  max-width: 220px;
-  line-height: 1.5;
+.emptyPrompt {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-surface1);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: default;
+  font-family: var(--font-family-base);
+  line-height: 1.4;
 }
 
 .message {
