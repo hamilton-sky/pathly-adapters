@@ -1,0 +1,58 @@
+.cell {
+  position: relative;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-surface0);
+  border-radius: 0 4px 4px 0;
+  margin: 0 8px;
+  padding: 6px 8px 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.heading {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lock {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.content {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  font-family: var(--font-family-base);
+  line-height: 1.5;
+}
+
+.toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  align-self: flex-start;
+  font-family: var(--font-family-base);
+}
+
+.toggle:hover {
+  color: var(--text-secondary);
+}

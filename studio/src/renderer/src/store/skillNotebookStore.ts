@@ -31,6 +31,10 @@ interface SkillNotebookState {
   setFeaturePath: (path: string | null) => void
   setPreview: (sections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>, tokens: number) => void
   setPreviewLoading: (loading: boolean) => void
+  loadSkill: (skillPath: string) => Promise<void>
+  insertFragment: (fragmentName: string, afterCellId: string | null) => void
+  removeCell: (cellId: string) => void
+  moveCell: (cellId: string, afterCellId: string | null) => void
 }
 
 export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
@@ -63,4 +67,61 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
   setFeaturePath: (path) => set({ featurePath: path }),
   setPreview: (sections, tokens) => set({ previewSections: sections, previewTokens: tokens, previewLoading: false }),
   setPreviewLoading: (loading) => set({ previewLoading: loading }),
+  loadSkill: async (skillPath: string) => {
+    const res = await fetch('http://localhost:8765/skills/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skill_path: skillPath }),
+    })
+    const data = await res.json() as { body_cells: Array<{ id: string; heading: string; content: string }>; composition_key: string }
+    const bodyCells: BodyCell[] = data.body_cells.map(bc => ({
+      id: bc.id,
+      type: 'body',
+      heading: bc.heading,
+      content: bc.content,
+    }))
+    get().pushCells(bodyCells)
+  },
+  insertFragment: (fragmentName: string, afterCellId: string | null) => {
+    const state = get()
+    const newCell: FragmentCell = {
+      id: crypto.randomUUID(),
+      type: 'fragment',
+      fragmentName,
+      category: '',
+      description: '',
+    }
+    const newCells = afterCellId === null
+      ? [newCell, ...state.cells]
+      : (() => {
+          const idx = state.cells.findIndex(c => c.id === afterCellId)
+          const next = [...state.cells]
+          next.splice(idx + 1, 0, newCell)
+          return next
+        })()
+    get().pushCells(newCells)
+  },
+  removeCell: (cellId: string) => {
+    const state = get()
+    const cell = state.cells.find(c => c.id === cellId)
+    if (!cell || cell.type === 'body') return
+    const newCells = state.cells.filter(c => c.id !== cellId)
+    get().pushCells(newCells)
+  },
+  moveCell: (cellId: string, afterCellId: string | null) => {
+    const state = get()
+    const cell = state.cells.find(c => c.id === cellId)
+    if (!cell || cell.type === 'body') return
+    const without = state.cells.filter(c => c.id !== cellId)
+    let newCells: NotebookCell[]
+    if (afterCellId === null) {
+      newCells = [cell, ...without]
+    } else {
+      const idx = without.findIndex(c => c.id === afterCellId)
+      const next = [...without]
+      next.splice(idx + 1, 0, cell)
+      newCells = next
+    }
+    get().pushCells(newCells)
+  },
 }))

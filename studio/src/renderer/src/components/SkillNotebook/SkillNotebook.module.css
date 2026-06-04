@@ -1,0 +1,25 @@
+.root {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  overflow: hidden;
+}
+
+.resizeHandle {
+  width: 4px;
+  background: var(--bg-surface1);
+  flex-shrink: 0;
+  cursor: col-resize;
+}
+
+.previewPlaceholder {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--bg-surface0);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  border-left: 1px solid var(--bg-surface1);
+}
