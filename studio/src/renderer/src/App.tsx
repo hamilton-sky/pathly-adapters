@@ -14,6 +14,7 @@ import { TopBar } from './components/topbar'
 import { Monitor } from './components/Monitor'
 import { PlanBoard } from './components/PlanBoard'
 import { Settings } from './components/Settings'
+import SkillNotebookPanel from './components/SkillNotebook/SkillNotebook'
 import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
@@ -52,6 +53,7 @@ function MainPanel(): JSX.Element {
     )
   if (activePanel === 'monitor') return <Monitor />
   if (activePanel === 'settings') return <Settings />
+  if (activePanel === 'skill-notebook') return <SkillNotebookPanel />
   return (
     <div className={appStyles.mainPanel}>
       <span className={appStyles.placeholder}>Select an item from the sidebar</span>
@@ -188,11 +190,11 @@ function MainApp(): JSX.Element | null {
         if (!useTerminalStore.getState().open) useTerminalStore.getState().toggle()
         return
       }
-      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings'])
+      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'skill-notebook'])
       if (!allowed.has(panelName)) {
         throw new Error(`Unknown panel: ${panelName}`)
       }
-      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings')
+      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook')
     }
     return () => {
       delete bridge.__pathlyNavigate

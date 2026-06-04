@@ -25,7 +25,7 @@ function loadLastUsedFlowPath(): string | null {
 
 export interface UiState {
   sidebarCollapsed: boolean
-  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings'
+  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook'
   dirtyItems: Set<string>
   theme: ThemeName
   preferredDark: ThemeName
@@ -37,8 +37,10 @@ export interface UiState {
   lastUsedFlowPath: string | null
   chatOpen: boolean
   skillsPanelOpen: boolean
+  skillNotebookPath: string | null
   setSidebarCollapsed: (v: boolean) => void
-  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings') => void
+  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook') => void
+  setSkillNotebookPath: (path: string | null) => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void
   setTheme: (t: ThemeName) => void
@@ -69,8 +71,10 @@ export const useUiStore = create<UiState>()(
       lastUsedFlowPath: loadLastUsedFlowPath(),
       chatOpen: false,
       skillsPanelOpen: true,
+      skillNotebookPath: null,
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setActivePanel: (p) => set({ activePanel: p }),
+      setSkillNotebookPath: (path) => set({ skillNotebookPath: path }),
       markDirty: (path) => set((s) => ({ dirtyItems: new Set([...s.dirtyItems, path]) })),
       clearDirty: (path) =>
         set((s) => {

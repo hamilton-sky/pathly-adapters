@@ -1,5 +1,7 @@
 import { useEffect, useDeferredValue, useRef, useState } from 'react'
+import React from 'react'
 import { useStore } from '../../store'
+import { useUiStore } from '../../store/uiStore'
 import type { PathlyItem, PathlyCanvasDragItem, PathlyReorgDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import { listDir, listDirs } from '../../services/pathlyApi'
@@ -7,6 +9,7 @@ import { useProjectFiles } from '../../hooks/useProjectFiles'
 import { usePlanFiles } from '../../hooks/usePlanFiles'
 import { LibraryPanel } from './panels/LibraryPanel'
 import { WorkspacePanel } from './panels/WorkspacePanel'
+import CatalogPanel from './panels/CatalogPanel/CatalogPanel'
 import { useSidebarResize } from './shell/useSidebarResize'
 import { TabBar } from './shell/TabBar'
 import { FilterRow } from './shell/FilterRow'
@@ -98,6 +101,8 @@ export function Sidebar(): JSX.Element | null {
     return () => { cancelled = true }
   }, [pathlyRoot, projectPath, projects, setPathlyRoot])
 
+  const activePanelUi = useUiStore((s) => s.activePanel)
+
   const { sidebarRef, onDragStart } = useSidebarResize()
 
   const [planOpen, setPlanOpen]       = useState(true)
@@ -106,6 +111,7 @@ export function Sidebar(): JSX.Element | null {
     try { return localStorage.getItem('pathly:sidebarTab') !== 'workspace' }
     catch { return true }
   })
+  const [catalogTab, setCatalogTab] = useState<'catalog' | 'files'>('catalog')
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
@@ -459,7 +465,30 @@ export function Sidebar(): JSX.Element | null {
 
   return (
     <div ref={sidebarRef} className={styles.sidebar}>
-      <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
+      {activePanelUi === 'skill-notebook' ? (
+        <div className={styles.tabBar} role="tablist" aria-label="Skill notebook view">
+          <button
+            type="button"
+            role="tab"
+            {...(catalogTab === 'catalog' ? { 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
+            className={`${styles.tab} ${catalogTab === 'catalog' ? styles.tabActive : ''}`}
+            onClick={() => setCatalogTab('catalog')}
+          >
+            CATALOG
+          </button>
+          <button
+            type="button"
+            role="tab"
+            {...(catalogTab === 'files' ? { 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
+            className={`${styles.tab} ${catalogTab === 'files' ? styles.tabActive : ''}`}
+            onClick={() => setCatalogTab('files')}
+          >
+            FILES
+          </button>
+        </div>
+      ) : (
+        <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
+      )}
 
       <FilterRow
         libraryOpen={libraryOpen}
@@ -470,7 +499,11 @@ export function Sidebar(): JSX.Element | null {
       />
 
       <div className={styles.treeContainer}>
-        {libraryOpen && (
+        {activePanelUi === 'skill-notebook' && catalogTab === 'catalog' && (
+          <CatalogPanel />
+        )}
+
+        {activePanelUi !== 'skill-notebook' && libraryOpen && (
           <LibraryPanel
             sections={sections}
             selectedItem={selectedItem}
@@ -492,7 +525,29 @@ export function Sidebar(): JSX.Element | null {
           />
         )}
 
-        {!libraryOpen && projectPath && (
+        {activePanelUi === 'skill-notebook' && catalogTab === 'files' && (
+          <LibraryPanel
+            sections={sections}
+            selectedItem={selectedItem}
+            filter={filter}
+            lowerFilter={lowerFilter}
+            renamingPath={renamingPath}
+            renameValue={renameValue}
+            onSelect={handleItemClick}
+            onToggleSection={toggleSection}
+            onToggleSubdir={toggleSubdir}
+            onNewUserLibraryItem={handleNewUserLibraryItem}
+            dragFromGripRef={dragFromGripRef}
+            onDragStart={handleItemDragStart}
+            onStartRename={startRename}
+            onStartDelete={setConfirmDelete}
+            onRenameChange={setRenameValue}
+            onRenameCommit={(item, itemDir) => { void commitRename(item, itemDir) }}
+            onRenameCancel={() => setRenamingPath(null)}
+          />
+        )}
+
+        {activePanelUi !== 'skill-notebook' && !libraryOpen && projectPath && (
           <WorkspacePanel
             sections={sections}
             projectPath={projectPath}
