@@ -25,6 +25,84 @@ from .materialize import (
 # must appear here, or auto-detected installs will fail with a confusing error.
 ALLOWED_HOSTS = {"claude", "codex", "copilot", "antigravity"}
 
+# Substring that identifies a hook command as Pathly-owned.
+_PATHLY_HOOK_MARKER = "pathly_hooks"
+
+
+def _apply_hooks(host: str, hooks_cfg: dict, *, dry_run: bool, repair: bool) -> None:
+    """Merge Pathly hooks into the host's settings.json.
+
+    Hook entries whose command contains 'pathly_hooks' are treated as
+    Pathly-owned.  In normal mode they are left as-is; repair=True replaces
+    them with the canonical commands from hooks_cfg.
+
+    All other settings in settings.json are preserved unchanged.
+    """
+    settings_dest_str = hooks_cfg.get("settings_dest")
+    if not settings_dest_str:
+        return
+    settings_path = Path(settings_dest_str).expanduser()
+
+    # event → [cmd, ...] (skip the settings_dest metadata key)
+    events: dict[str, list[str]] = {
+        k: ([v] if isinstance(v, str) else list(v))
+        for k, v in hooks_cfg.items()
+        if k != "settings_dest"
+    }
+    if not events:
+        return
+
+    settings: dict = {}
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            settings = {}
+
+    existing_hooks: dict = settings.get("hooks", {})
+    changed = False
+
+    for event, commands in events.items():
+        event_groups: list = list(existing_hooks.get(event, []))
+
+        pathly_indices = [
+            i for i, g in enumerate(event_groups)
+            if isinstance(g, dict) and any(
+                _PATHLY_HOOK_MARKER in h.get("command", "")
+                for h in g.get("hooks", [])
+                if isinstance(h, dict)
+            )
+        ]
+
+        new_group: dict = {
+            "hooks": [{"type": "command", "command": cmd} for cmd in commands]
+        }
+
+        if not pathly_indices:
+            event_groups.append(new_group)
+            changed = True
+        elif repair:
+            kept = [g for i, g in enumerate(event_groups) if i not in set(pathly_indices)]
+            kept.append(new_group)
+            event_groups = kept
+            changed = True
+        # else: existing Pathly hooks, repair not requested — leave as-is
+
+        existing_hooks[event] = event_groups
+
+    if not changed:
+        return
+
+    settings["hooks"] = existing_hooks
+
+    if dry_run:
+        print(f"[{host}] Would update hooks in {settings_path}")
+        return
+
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    print(f"[{host}] Updated hooks in {settings_path}")
+
 _AGENT_GROUPS = {
     "architect": "planning",
     "builder": "building",
@@ -291,6 +369,9 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 print(f"  {plugin_dest / name}")
         if host == "codex" and plugin_files:
             install_codex_plugin(plugin_files, dry_run=True)
+        hooks_cfg = install_cfg.get("hooks", {})
+        if hooks_cfg:
+            _apply_hooks(host, hooks_cfg, dry_run=True, repair=repair)
         return
 
     written_dests: list[Path] = []
@@ -346,6 +427,10 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         if host == "codex" and plugin_files:
             install_codex_plugin(plugin_files, dry_run=False)
             codex_plugin_registered = True
+
+        hooks_cfg = install_cfg.get("hooks", {})
+        if hooks_cfg:
+            _apply_hooks(host, hooks_cfg, dry_run=False, repair=repair)
 
     except Exception:
         print(f"[{host}] Install failed — rolling back.", file=sys.stderr)
