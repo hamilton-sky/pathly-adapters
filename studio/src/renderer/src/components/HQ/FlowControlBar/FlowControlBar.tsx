@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Play, Pause, SkipForward, ChevronsRight, Shuffle, RotateCcw, Square } from 'lucide-react'
+import { Play, Pause, SkipForward, ChevronsRight, Shuffle, RotateCcw, Square, Terminal, EyeOff } from 'lucide-react'
 import { useRunnerStore } from '../../../store/runnerStore'
 import { AbortConfirmStrip } from './AbortConfirmStrip'
 import { ReroutePopover } from './ReroutePopover'
@@ -13,7 +13,9 @@ type Action = 'start' | 'pause' | 'resume' | 'advance' | 'retry'
 export function FlowControlBar(): JSX.Element {
   const status = useRunnerStore((s) => s.status)
   const topic = useRunnerStore((s) => s.topic)
+  const runnerMode = useRunnerStore((s) => s.runnerMode)
   const setRunnerState = useRunnerStore((s) => s.setRunnerState)
+  const setRunnerMode = useRunnerStore((s) => s.setRunnerMode)
   const [showAbort, setShowAbort] = useState(false)
   const [showReroute, setShowReroute] = useState(false)
 
@@ -32,6 +34,18 @@ export function FlowControlBar(): JSX.Element {
     }
   }
 
+  function buildRunBody(): Record<string, unknown> {
+    const { projectRoot, maxCostUsd, maxIterations, runnerMode: mode } = useRunnerStore.getState()
+    return {
+      flow: 'team',
+      project_root: projectRoot ?? '',
+      max_iterations: maxIterations,
+      max_cost_usd: maxCostUsd,
+      interactive: mode === 'interactive',
+    }
+  }
+
+  const isInteractive = runnerMode === 'interactive'
   const activeRun = status === 'running' || status === 'paused' || status === 'blocked'
   const startEnabled = !activeRun
   const pauseEnabled = status === 'running'
@@ -45,11 +59,16 @@ export function FlowControlBar(): JSX.Element {
     <div className={styles.wrapper}>
       <div className={styles.bar}>
         {/* Lifecycle group */}
-        <RunnerBtn label="Start" tooltip="Start a new pipeline run" enabled={startEnabled} onClick={() => {
-          setRunnerState({ errorMessage: null })
-          const { projectRoot } = useRunnerStore.getState()
-          void postAction('start', { flow: 'team', project_root: projectRoot ?? '', max_iterations: 20, max_cost_usd: 5.0 })
-        }} extraClass={startEnabled ? styles.btnPrimary : ''}>
+        <RunnerBtn
+          label="Start"
+          tooltip="Start a new pipeline run"
+          enabled={startEnabled}
+          onClick={() => {
+            setRunnerState({ errorMessage: null })
+            void postAction('start', buildRunBody())
+          }}
+          extraClass={startEnabled ? styles.btnPrimary : ''}
+        >
           <Play size={12} />
         </RunnerBtn>
         <RunnerBtn label="Pause" tooltip="Pause the running pipeline" enabled={pauseEnabled} onClick={() => { void postAction('pause') }}>
@@ -73,12 +92,28 @@ export function FlowControlBar(): JSX.Element {
             <ReroutePopover onClose={() => setShowReroute(false)} onError={(msg) => setRunnerState({ errorMessage: msg })} />
           )}
         </div>
-        <RunnerBtn label="Retry" tooltip="Retry the current blocked stage" enabled={retryEnabled} onClick={() => {
-          const { projectRoot } = useRunnerStore.getState()
-          void postAction('retry', { flow: 'team', project_root: projectRoot ?? '', max_iterations: 20, max_cost_usd: 5.0 })
-        }} extraClass={styles.btnDecision}>
+        <RunnerBtn
+          label="Retry"
+          tooltip="Retry the current blocked stage"
+          enabled={retryEnabled}
+          onClick={() => { void postAction('retry', buildRunBody()) }}
+          extraClass={styles.btnDecision}
+        >
           <RotateCcw size={12} />
         </RunnerBtn>
+
+        <div className={styles.sep} />
+
+        {/* Mode toggle — interactive vs headless */}
+        <button
+          type="button"
+          className={[styles.btn, isInteractive ? styles.btnModeInteractive : styles.btnModeHeadless].join(' ')}
+          aria-label={isInteractive ? 'Switch to headless mode' : 'Switch to interactive mode'}
+          title={isInteractive ? 'Interactive — visible PTY (click to switch to headless)' : 'Headless — background run (click to switch to interactive)'}
+          onClick={() => setRunnerMode(isInteractive ? 'headless' : 'interactive')}
+        >
+          {isInteractive ? <Terminal size={12} /> : <EyeOff size={12} />}
+        </button>
 
         <div className={styles.sep} />
 

@@ -43,6 +43,8 @@ export interface HistoricalRun {
   cost: number
 }
 
+export type RunnerMode = 'interactive' | 'headless'
+
 interface RunnerState {
   status: RunnerStatus
   stage: string | null
@@ -59,11 +61,17 @@ interface RunnerState {
   runStartedAt: number | null
   runHistory: HistoricalRun[]
   agentQuestion: AgentQuestion | null
+  // ── Runner config — persists across runs (not in initialState) ──
+  runnerMode: RunnerMode
+  maxCostUsd: number
+  maxIterations: number
   setAgentQuestion: (q: AgentQuestion | null) => void
-  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory' | 'removeHistoricalRun' | 'recordStagePrompt' | 'recordStageResult' | 'setAgentQuestion'>>) => void
+  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory' | 'removeHistoricalRun' | 'recordStagePrompt' | 'recordStageResult' | 'setAgentQuestion' | 'setRunnerMode' | 'setRunConfig'>>) => void
   resetRunner: () => void
   setDecisionMenu: (items: DecisionMenuItem[] | null) => void
   setRunnerConfig: (topic: string, projectRoot: string) => void
+  setRunnerMode: (mode: RunnerMode) => void
+  setRunConfig: (patch: { maxCostUsd?: number; maxIterations?: number }) => void
   recordStageStart: (stage: string, adapter: string | null, tabId: string | null) => void
   recordStageEnd: (exitCode: number) => void
   attachTerminalToStage: (tabId: string | null, mode: 'terminal' | 'headless') => void
@@ -97,11 +105,17 @@ const initialState = {
 
 export const useRunnerStore = create<RunnerState>()((set, get) => ({
   ...initialState,
+  // ── Runner config defaults — live outside initialState so resetRunner() leaves them alone ──
+  runnerMode: 'interactive' as RunnerMode,
+  maxCostUsd: 5.0,
+  maxIterations: 20,
   setRunnerState: (patch) => set((s) => ({ ...s, ...patch })),
   resetRunner: () => set((s) => ({ ...s, ...initialState })),
   setDecisionMenu: (items) => set((s) => ({ ...s, decisionMenu: items })),
   setAgentQuestion: (q) => set((s) => ({ ...s, agentQuestion: q })),
   setRunnerConfig: (topic, projectRoot) => set((s) => ({ ...s, topic, projectRoot })),
+  setRunnerMode: (mode) => set({ runnerMode: mode }),
+  setRunConfig: (patch) => set((s) => ({ ...s, ...patch })),
   recordStageStart: (stage, adapter, tabId) => set((s) => ({
     ...s,
     activeRunnerTabId: tabId,

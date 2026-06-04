@@ -27,7 +27,7 @@ name: Progress
 |------|--------|---------|--------|--------|
 | 1 | Phase 0–5, 5a | S-01–S-06 | DONE | `npm run typecheck` from repo root |
 | 2 | Phase 6–8 | S-07, S-08 | DONE | `npm run typecheck` from repo root |
-| 3 | Phase 9–10, 10a | S-09, S-10 | DONE | `npx tsc --noEmit` in `brightsky-ai/backend/` |
+| 3 | Phase 9–10, 10a | S-09, S-10 | DONE ✓ reviewed | `npx tsc --noEmit` in `brightsky-ai/backend/` |
 | 4 | Phase 11–12 | S-11 | TODO | `npx tsc --noEmit` in `brightsky-ai/backend/` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.

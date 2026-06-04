@@ -50,3 +50,12 @@
 {"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-03T19:11:10Z"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "summary": "Conv 3 verified complete \u2014 all 7 StudioBridgeTool subclasses exist and are registered in mcp.module.ts, pathly_chat Gemini routing guard and search tools implemented in unified-ai.service.ts, npx tsc --noEmit passes", "total_tokens": 0, "tool_uses": 0, "wall_seconds": 48, "cost_usd": 0.0, "ts": "2026-06-03T22:00:22Z", "schema_version": 1}
 {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-03T22:00:30Z"}
+{"type": "FILE_CREATED", "file": "feedback/REVIEW_FAILURES.md", "ts": "2026-06-04T00:09:06Z"}
+{"type": "RETRY", "key": "conv-3:REVIEW_FAILURES.md", "ts": "2026-06-04T00:09:06Z"}
+{"type": "FILE_DELETED", "file": "feedback/REVIEW_FAILURES.md", "ts": "2026-06-04T00:12:18Z"}
+{"type": "FILE_CREATED", "file": "feedback/REVIEW_FAILURES.md", "ts": "2026-06-04T00:17:29Z"}
+{"type": "RETRY", "key": "conv-3:REVIEW_FAILURES.md", "ts": "2026-06-04T00:17:29Z"}
+{"type": "FILE_DELETED", "file": "feedback/REVIEW_FAILURES.md", "ts": "2026-06-04T00:19:03Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "summary": "Conv 3 reviewed PASS \u2014 4 violations fixed across 2 cycles: suggestedTools injection, fallback Gemini pin, fallback tools forwarding, fallback suggestedTools on return; TypeScript clean.", "total_tokens": 0, "tool_uses": 0, "wall_seconds": 887, "cost_usd": 0.0, "ts": "2026-06-04T00:19:59Z", "schema_version": 1}
+{"type": "HUMAN_RESPONSE", "value": "auto-advance", "ts": "2026-06-04T00:20:08Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-04T00:20:20Z"}

@@ -99,11 +99,28 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
             ask_user_question = denial
             break
 
+    usage = payload.get("usage") or payload.get("inputUsage") or {}
+    tokens_in = int(
+        (usage.get("input_tokens") or usage.get("inputTokens") or 0)
+        + (usage.get("cache_read_input_tokens") or 0)
+        + (usage.get("cache_creation_input_tokens") or 0)
+    )
+    tokens_out = int(usage.get("output_tokens", 0) or usage.get("outputTokens", 0))
+    messages = payload.get("messages", [])
+    tool_uses = sum(
+        1 for msg in messages
+        for block in (msg.get("content", []) if isinstance(msg.get("content"), list) else [])
+        if isinstance(block, dict) and block.get("type") == "tool_use"
+    )
+
     return {
         "cost_usd": cost_usd,
         "session_id": session_id or None,
         "ask_user_question": ask_user_question,
         "result": payload.get("result", ""),
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "tool_uses": tool_uses,
     }
 
 
@@ -352,30 +369,14 @@ def invoke_agent(
     try:
         raw_text = stdout_bytes.decode("utf-8", errors="replace")
         parsed = parse_result(adapter, raw_text)
-        output = _extract_json_payload(raw_text)
-        # Try every field name Claude CLI has used across versions
         cost_usd = float(parsed.get("cost_usd", 0.0) or 0.0)
         session_id_out = parsed.get("session_id") or None
-        usage = output.get("usage") or output.get("inputUsage") or {}
-        tokens_in = int(
-            (usage.get("input_tokens") or usage.get("inputTokens") or 0)
-            + (usage.get("cache_read_input_tokens") or 0)
-            + (usage.get("cache_creation_input_tokens") or 0)
-        )
-        tokens_out = int(usage.get("output_tokens", 0) or usage.get("outputTokens", 0))
-        # Count tool_use content blocks across all messages in the conversation
-        messages = output.get("messages", [])
-        for msg in messages:
-            for block in (
-                msg.get("content", []) if isinstance(msg.get("content"), list) else []
-            ):
-                if isinstance(block, dict) and block.get("type") == "tool_use":
-                    tool_uses += 1
-        # Print the agent's text result so the terminal isn't silent
-        result_text = output.get("result", "")
+        tokens_in = parsed.get("tokens_in", 0)
+        tokens_out = parsed.get("tokens_out", 0)
+        tool_uses = parsed.get("tool_uses", 0)
+        result_text = parsed.get("result", "")
         if result_text:
             print(result_text)
-        # Diagnostic: always log telemetry so we can verify it's being captured
         logger.info(
             "telemetry",
             extra={
@@ -387,10 +388,7 @@ def invoke_agent(
             },
         )
         if cost_usd == 0.0:
-            top_keys = [
-                k for k in output if k not in ("result", "messages", "session_id")
-            ]
-            logger.warning("cost=0 — JSON top-level keys: %s", top_keys)
+            logger.warning("cost=0 from PTY stdout — billing will arrive via BILLING_UPDATE")
     except (json.JSONDecodeError, ValueError) as exc:
         logger.warning("failed to parse claude JSON output: %s", exc)
 

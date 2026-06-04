@@ -695,6 +695,7 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     import pathly_orchestrator.supervisor as _sup
 
     monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "1")
+    monkeypatch.setenv("PATHLY_RUNNER_INTERACTIVE", "0")
 
     topic = "ea-billing-ok"
     run_id = f"{topic}-001"
@@ -781,10 +782,12 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
     import pathly_orchestrator.supervisor as _sup
 
     monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "1")
+    monkeypatch.setenv("PATHLY_RUNNER_INTERACTIVE", "0")
 
     topic = "ea-billing-timeout"
     run_id = f"{topic}-001"
     state = _make_state(tmp_path, topic=topic)
+    state.interactive = False  # test the reconciliation-window (non-interactive) path
 
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
@@ -850,12 +853,13 @@ def test_slow_path_no_regression(tmp_path, monkeypatch):
     """Flag not set; PTY POST arrives normally; FSM advance once; _agent_done_events never written."""
     import pathly_orchestrator.supervisor as _sup
 
-    # Do NOT set PATHLY_RUNNER_EARLY_ADVANCE
-    monkeypatch.delenv("PATHLY_RUNNER_EARLY_ADVANCE", raising=False)
+    monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "0")
+    monkeypatch.setenv("PATHLY_RUNNER_INTERACTIVE", "0")
 
     topic = "ea-slow-path"
     run_id = f"{topic}-001"
     state = _make_state(tmp_path, topic=topic)
+    state.interactive = False  # test the original slow path (no early advance, no interactive)
 
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)

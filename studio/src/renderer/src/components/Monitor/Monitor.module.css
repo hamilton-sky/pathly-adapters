@@ -608,3 +608,33 @@
 .evTotalsValue   { font-size: 12px; font-family: 'Fira Mono', 'Cascadia Code', 'Consolas', monospace; color: var(--text-secondary); }
 .evTotalsSummary { margin-left: auto; opacity: 0.5; font-style: italic; }
 .evTotalsMissing { margin-left: auto; opacity: 0.5; }
+.evTotalsPending { margin-left: auto; color: var(--text-muted); font-style: italic; opacity: 0.7; }
+
+/* Phase milestone color — outer phases (build/review/test), not inner sub-phases */
+.evColorPhase { color: var(--text-secondary); }
+
+/* Title row — title + dense-phase toggle */
+.evTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.evTitleRow .evTitle { margin-bottom: 0; }
+
+/* Dense-phase toggle button */
+.evDenseToggle {
+  font-size: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 3px;
+  padding: 1px 6px;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: color 120ms, border-color 120ms;
+}
+.evDenseToggle:hover         { color: var(--text-secondary); border-color: var(--text-muted); }
+.evDenseToggle:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }

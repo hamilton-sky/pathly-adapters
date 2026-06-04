@@ -49,6 +49,8 @@ class RunnerState:
     max_iterations: int = 10
     cost_usd_so_far: float = 0.0
     max_cost_usd: float = 1.0
+    # UI-configurable mode: True = visible PTY killed on AGENT_DONE; False = headless/reconciliation
+    interactive: bool = True
     autonomy: dict = field(default_factory=dict)
     pending_menu: Optional[dict] = None
 
@@ -154,16 +156,18 @@ def _reconciliation_window(
     stage: str,
     topic: str,
     events_path: str,
-    timeout: float = 30,
+    timeout: float = 600,
 ) -> None:
     """Wait up to `timeout` seconds for PTY billing POST after early FSM advance.
 
-    If billing data arrives: write a billing update event to EVENTS.jsonl.
+    If billing data arrives: patch last AGENT_DONE and append BILLING_UPDATE via _patch_last_agent_done.
     If timeout: write TYPE_STAGE_RECONCILIATION_FAILURE to EVENTS.jsonl.
     Always cleans up all four dicts for run_id.
     """
     import datetime
+    from pathlib import Path
     from pathly_orchestrator.events import TYPE_STAGE_RECONCILIATION_FAILURE
+    from pathly_orchestrator.runner import _patch_last_agent_done
 
     with _lock:
         result_evt = _terminal_result_events.get(run_id)
@@ -176,17 +180,18 @@ def _reconciliation_window(
             with _lock:
                 data = _terminal_result_data.pop(run_id, {})
             billing_record = data.get("result") or {}
-            cost_usd = (billing_record.get("cost_usd") or 0.0) if isinstance(billing_record, dict) else 0.0
-            session_id = (billing_record.get("session_id")) if isinstance(billing_record, dict) else None
-            event_line = json.dumps({
-                "type": "BILLING_UPDATE",
-                "topic": topic,
-                "stage": stage,
-                "run_id": run_id,
-                "cost_usd": cost_usd,
-                "session_id": session_id,
-                "ts": now_ts,
-            })
+            cost_usd = float((billing_record.get("cost_usd") or 0.0) if isinstance(billing_record, dict) else 0.0)
+            tokens_in = int((billing_record.get("tokens_in") or 0) if isinstance(billing_record, dict) else 0)
+            tokens_out = int((billing_record.get("tokens_out") or 0) if isinstance(billing_record, dict) else 0)
+            tool_uses = int((billing_record.get("tool_uses") or 0) if isinstance(billing_record, dict) else 0)
+            wall_seconds = int(data.get("wall_seconds") or 0)
+            try:
+                _patch_last_agent_done(
+                    Path(events_path).parent,
+                    cost_usd, tokens_in, tokens_out, wall_seconds, tool_uses,
+                )
+            except Exception as exc:
+                logger.warning("_reconciliation_window: _patch_last_agent_done failed: %s", exc)
         else:
             event_line = json.dumps({
                 "type": TYPE_STAGE_RECONCILIATION_FAILURE,
@@ -196,11 +201,11 @@ def _reconciliation_window(
                 "exit_code": -1,
                 "ts": now_ts,
             })
-        try:
-            with open(events_path, "a", encoding="utf-8") as f:
-                f.write(event_line + "\n")
-        except OSError as exc:
-            logger.warning("_reconciliation_window: failed to write event: %s", exc)
+            try:
+                with open(events_path, "a", encoding="utf-8") as f:
+                    f.write(event_line + "\n")
+            except OSError as exc:
+                logger.warning("_reconciliation_window: failed to write event: %s", exc)
     finally:
         with _lock:
             _terminal_result_events.pop(run_id, None)
@@ -287,8 +292,10 @@ def _run_stage_via_terminal(
     from pathly_orchestrator.runner import resolve_argv, read_last_agent_done
 
     feature_flags = FeatureFlags()
-    if feature_flags.interactive and not feature_flags.early_advance:
-        msg = "PATHLY_RUNNER_INTERACTIVE=1 requires PATHLY_RUNNER_EARLY_ADVANCE=1"
+    # state.interactive is set by the UI (POST /runner/start body); falls back to env var default
+    use_interactive = state.interactive
+    if use_interactive and not feature_flags.early_advance:
+        msg = "Interactive mode requires PATHLY_RUNNER_EARLY_ADVANCE=1"
         if broadcast_fn:
             try:
                 broadcast_fn(state.topic, {"type": "RUNNER_WARNING", "message": msg})
@@ -296,7 +303,7 @@ def _run_stage_via_terminal(
                 pass
         raise RuntimeError(msg)
 
-    argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy, interactive=feature_flags.interactive)
+    argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy, interactive=use_interactive)
     tab_id = f"runner-{run_id[-10:]}"
     label = f"{adapter} — {state.current_state or state.status}"
     with _lock:
@@ -385,7 +392,7 @@ def _run_stage_via_terminal(
                         ),
                     })
 
-                if feature_flags.interactive:
+                if use_interactive:
                     if broadcast_fn:
                         broadcast_fn(state.topic, {
                             "type": "TERMINAL_KILL",
@@ -1057,6 +1064,7 @@ def start_run(
     max_cost_usd: float = 1.0,
     autonomy: Optional[dict] = None,
     broadcast_fn: Optional[Callable] = None,
+    interactive: bool = True,
 ) -> RunnerState:
     """Start a new supervised run for *topic*.  Raises ValueError if already active."""
     import uuid as _uuid
@@ -1076,6 +1084,7 @@ def start_run(
             autonomy=autonomy or {},
             run_id=str(_uuid.uuid4()),
             _broadcast_fn=broadcast_fn,
+            interactive=interactive,
         )
         _registry[topic] = state
         state.status = "running"

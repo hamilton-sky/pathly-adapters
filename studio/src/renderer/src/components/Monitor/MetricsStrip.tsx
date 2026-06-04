@@ -4,12 +4,19 @@ import { useAgentTelemetry, fmtTokens, fmtWall, fmtCost, EMPTY_TOOLTIP } from '.
 import styles from './Monitor.module.css'
 
 export function MetricsStrip(): JSX.Element {
-  const { totalTokens, lastWall, totalCost, noTelemetry, eventsCount } = useAgentTelemetry()
+  const { totalTokens, lastWall, totalCost, noTelemetry, eventsCount, hasTelemetry } = useAgentTelemetry()
+
+  const billingPending = hasTelemetry && totalCost === 0
+  const costValue = billingPending ? '$…' : fmtCost(totalCost)
+  const costEmpty = !billingPending && totalCost === 0
+  const costTooltip = billingPending
+    ? 'Billing pending — BILLING_UPDATE will reconcile when agent session closes'
+    : EMPTY_TOOLTIP
 
   const tiles: { label: string; value: string; empty: boolean; tooltip?: string }[] = [
     { label: 'TOKENS', value: fmtTokens(totalTokens), empty: totalTokens === 0, tooltip: EMPTY_TOOLTIP },
     { label: 'WALL',   value: fmtWall(lastWall),      empty: lastWall == null,  tooltip: EMPTY_TOOLTIP },
-    { label: 'COST',   value: fmtCost(totalCost),     empty: totalCost === 0,   tooltip: EMPTY_TOOLTIP },
+    { label: 'COST',   value: costValue,               empty: costEmpty,         tooltip: costTooltip },
     { label: 'EVENTS', value: String(eventsCount),    empty: false },
   ]
 

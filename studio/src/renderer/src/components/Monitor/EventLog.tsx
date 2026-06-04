@@ -17,6 +17,8 @@ const FLASH_CSS = `
 }
 `
 
+const INNER_PHASES = new Set(['analyze', 'scout', 'implement'])
+
 function eventColorClass(ev: FsmEvent, retrograde?: boolean): string {
   if (retrograde) return styles.evColorRetrograde
   switch (ev.type) {
@@ -25,6 +27,11 @@ function eventColorClass(ev: FsmEvent, retrograde?: boolean): string {
       if (ev.result === 'PASS') return styles.evColorGreen
       if (ev.result === 'DONE') return styles.evColorBlue
       return styles.evColorMuted
+    case 'PHASE_START':
+    case 'PHASE_DONE': {
+      const phase = (ev as Record<string, unknown>).phase as string | undefined ?? ''
+      return INNER_PHASES.has(phase) ? styles.evColorMuted : styles.evColorPhase
+    }
     case 'FILE_CREATED':
     case 'FILE_DELETED':   return styles.evColorYellow
     case 'RETRY':          return styles.evColorRed
@@ -32,7 +39,9 @@ function eventColorClass(ev: FsmEvent, retrograde?: boolean): string {
     case 'GATE_FAILED':    return styles.evColorGateFail
     case 'GATE_SKIPPED':   return styles.evColorGateSkip
     case 'AGENT_SPAWNED':  return styles.evColorSpawned
-    case 'STAGE_COMPLETE': return styles.evColorStage
+    case 'STAGE_COMPLETE':
+    case 'IMPLEMENT_COMPLETE': return styles.evColorStage
+    case 'WARNING':        return styles.evColorYellow
     default:               return styles.evColorMuted
   }
 }
@@ -56,8 +65,49 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
       const result = ev.result ?? ''
       const tools = ev.tool_uses != null ? `  ${ev.tool_uses} tools` : ''
       const secs = ev.wall_seconds != null ? `  ${ev.wall_seconds}s` : ''
-      const cost = ev.cost_usd != null && ev.cost_usd > 0 ? `  $${ev.cost_usd.toFixed(4)}` : ''
-      return `${ts}  ${pad('AGENT_DONE', 14)}  ${ev.agent ?? '?'}${conv}  ${result}${tools}${secs}${cost}`
+      const tIn = ev.tokens_in ?? 0
+      const tOut = ev.tokens_out ?? 0
+      const total = (ev as Record<string, unknown>).total_tokens as number | undefined ?? 0
+      let tokStr = ''
+      if (tIn > 0 || tOut > 0) {
+        tokStr = `  ${(tIn / 1000).toFixed(1)}k↑${(tOut / 1000).toFixed(1)}k↓`
+      } else if (total > 0) {
+        tokStr = `  ${(total / 1000).toFixed(1)}k`
+      }
+      let costStr = ''
+      if (ev.cost_usd != null) {
+        costStr = ev.cost_usd > 0 ? `  $${ev.cost_usd.toFixed(4)}` : '  $…'
+      }
+      return `${ts}  ${pad('AGENT_DONE', 14)}  ${ev.agent ?? '?'}${conv}  ${result}${tools}${secs}${tokStr}${costStr}`
+    }
+    case 'PHASE_START': {
+      const phase = (ev as Record<string, unknown>).phase as string | undefined ?? '?'
+      const agent = (ev as Record<string, unknown>).agent as string | undefined ?? '?'
+      const conv = (ev as Record<string, unknown>).conv as number | undefined
+      const convSuffix = conv != null ? ` #${conv}` : ''
+      if (INNER_PHASES.has(phase)) {
+        return `${ts}  ${pad('·', 14)}  ${phase}`
+      }
+      return `${ts}  ${pad('PHASE', 14)}  ${agent}${convSuffix}  ${phase} ▸`
+    }
+    case 'PHASE_DONE': {
+      const phase = (ev as Record<string, unknown>).phase as string | undefined ?? '?'
+      const agent = (ev as Record<string, unknown>).agent as string | undefined ?? '?'
+      const conv = (ev as Record<string, unknown>).conv as number | undefined
+      const convSuffix = conv != null ? ` #${conv}` : ''
+      if (INNER_PHASES.has(phase)) {
+        return `${ts}  ${pad('·', 14)}  ${phase} done`
+      }
+      return `${ts}  ${pad('PHASE', 14)}  ${agent}${convSuffix}  ${phase} ✓`
+    }
+    case 'WARNING': {
+      const reason = (ev as Record<string, unknown>).reason as string | undefined ?? 'unknown'
+      const SUPPRESS = new Set(['schema_version', 'type', 'ts', 'timestamp', 'reason'])
+      const diag = Object.entries(ev as Record<string, unknown>)
+        .filter(([k]) => !SUPPRESS.has(k))
+        .map(([k, v]) => `${k}=${String(v)}`)
+        .join('  ')
+      return `${ts}  ${pad('WARNING', 14)}  ${reason}${diag ? `  (${diag})` : ''}`
     }
     case 'AGENT_SPAWNED':
       return `${ts}  ${pad('AGENT_SPAWNED', 14)}  ${ev.agent ?? '?'}${ev.conversation != null ? ` #${ev.conversation}` : ''}`
@@ -69,8 +119,10 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
       return `${ts}  ${pad('RETRY', 14)}  ${ev.key ?? ev.detail ?? ''}`
     case 'HUMAN_RESPONSE':
       return `${ts}  ${pad('HUMAN_RESPONSE', 14)}  ${ev.value ?? ''}`
-    case 'IMPLEMENT_COMPLETE':
-      return `${ts}  IMPLEMENT_COMPLETE`
+    case 'IMPLEMENT_COMPLETE': {
+      const stage = (ev as Record<string, unknown>).stage as string | undefined
+      return `${ts}  ${pad('IMPLEMENT_COMPLETE', 18)}  ${stage ? `${stage} complete` : 'all conversations done'}`
+    }
     case 'GATE_FAILED':
       return `${ts}  ${pad('GATE_FAILED', 14)}  ${ev.key ?? ev.detail ?? ''}${ev.to ? ` → ${ev.to}` : ''}`
     case 'GATE_SKIPPED':
@@ -78,9 +130,16 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
     case 'STAGE_COMPLETE':
       return `${ts}  ${pad('STAGE_COMPLETE', 14)}  ${ev.stage ?? ev.from ?? '?'} → ${ev.next ?? ev.to ?? '?'}`
     default: {
-      const { type, ts: _ts, timestamp: _ts2, ...rest } = ev
+      const {
+        type,
+        ts: _ts,
+        timestamp: _ts2,
+        schema_version: _sv,
+        feature: _feat,
+        ...rest
+      } = ev as Record<string, unknown>
       const extra = Object.entries(rest).map(([k, v]) => `${k}=${String(v)}`).join('  ')
-      return `${ts}  ${pad(type, 14)}  ${extra}`
+      return `${ts}  ${pad(String(type), 14)}  ${extra}`
     }
   }
 }
@@ -108,7 +167,9 @@ function computeRetrograde(events: FsmEvent[]): boolean[] {
 export function EventLog(): JSX.Element {
   const events = useStore((s) => s.events)
   const { totalIn, totalOut, totalTokens, agentDone } = useAgentTelemetry()
+  const billingPending = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd === 0)
   const missingCostData = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd == null)
+  const [densePhases, setDensePhases] = useState(true)
 
   useInjectCSS(FLASH_CSS)
 
@@ -120,9 +181,17 @@ export function EventLog(): JSX.Element {
   const [newCount, setNewCount] = useState(0)
   const [flashStart, setFlashStart] = useState(Infinity)
 
+  const visibleEvents = densePhases
+    ? events.filter((ev) => {
+        if (ev.type !== 'PHASE_START' && ev.type !== 'PHASE_DONE') return true
+        const phase = (ev as Record<string, unknown>).phase as string | undefined ?? ''
+        return !INNER_PHASES.has(phase)
+      })
+    : events
+
   useEffect(() => {
-    const added = events.length - prevLengthRef.current
-    prevLengthRef.current = events.length
+    const added = visibleEvents.length - prevLengthRef.current
+    prevLengthRef.current = visibleEvents.length
 
     if (added <= 0) return
 
@@ -135,10 +204,10 @@ export function EventLog(): JSX.Element {
       setNewCount(newCountRef.current)
     }
 
-    setFlashStart(events.length - added)
+    setFlashStart(visibleEvents.length - added)
     const timer = setTimeout(() => { setFlashStart(Infinity) }, 500)
     return () => clearTimeout(timer)
-  }, [events])
+  }, [visibleEvents])
 
   const handleScroll = (): void => {
     const el = logRef.current
@@ -162,17 +231,22 @@ export function EventLog(): JSX.Element {
     setNewCount(0)
   }
 
-  const retrogradeFlags = computeRetrograde(events)
+  const retrogradeFlags = computeRetrograde(visibleEvents)
 
   return (
     <div className={styles.evContainer}>
-      <div className={styles.evTitle}>Event Log</div>
+      <div className={styles.evTitleRow}>
+        <span className={styles.evTitle}>Event Log</span>
+        <button type="button" className={styles.evDenseToggle} onClick={() => setDensePhases((v) => !v)}>
+          {densePhases ? 'all phases' : 'compact'}
+        </button>
+      </div>
       <div className={styles.evLogWrapper}>
         <div ref={logRef} className={styles.evLog} onScroll={handleScroll}>
-          {events.length === 0 ? (
+          {visibleEvents.length === 0 ? (
             <div className={styles.evEmpty}>No events yet</div>
           ) : (
-            events.map((ev, i) => (
+            visibleEvents.map((ev, i) => (
               <RawEventLine
                 key={`${ev.ts ?? ''}-${ev.type}-${i}`}
                 ev={ev}
@@ -198,6 +272,11 @@ export function EventLog(): JSX.Element {
         {totalTokens > 0 && (
           <span className={`${styles.evTotalsLabel} ${styles.evTotalsSummary}`}>
             = {totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens} combined ↑
+          </span>
+        )}
+        {billingPending && !missingCostData && (
+          <span className={`${styles.evTotalsLabel} ${styles.evTotalsPending}`}>
+            (billing pending)
           </span>
         )}
         {missingCostData && (

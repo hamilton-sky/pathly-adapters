@@ -88,6 +88,24 @@
   position: relative;
 }
 
+/* ── Mode toggle (Interactive / Headless) ── */
+.btnModeInteractive {
+  border-color: var(--green, #22c55e);
+  color: var(--green, #22c55e);
+}
+
+.btnModeInteractive:hover {
+  background: color-mix(in srgb, var(--green, #22c55e) 12%, var(--bg-mantle));
+}
+
+.btnModeHeadless {
+  opacity: 0.55;
+}
+
+.btnModeHeadless:hover {
+  opacity: 1;
+}
+
 .noTopicWarning {
   font-size: 10px;
   color: var(--yellow, #eab308);

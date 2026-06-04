@@ -1,6 +1,32 @@
 {
   "convs_total": 4,
-  "convs_done": 2,
-  "current": "REVIEWING",
-  "updated_at": "2026-06-03T16:10:00Z"
+  "convs_done": 3,
+  "current": "BUILDING",
+  "updated_at": "2026-06-04T12:00:00Z",
+  "conv_start_sha": "424265f5d7f77e5dc66324a288aff91c97c3b733",
+  "build_baseline": {
+    "started_at": "2026-06-04T00:21:01.046644+00:00",
+    "preexisting_dirty": [
+      "LESSONS_CANDIDATE.md",
+      "pathly/pipeline-walkthrough/agent-done-early-advance/",
+      "pathly/pipeline-walkthrough/brightsky-agent-upgrade/artifacts/REVIEW_FAILURES_conv3_attempt1.md",
+      "pathly/plans/agent-done-early-advance/EVENTS.jsonl",
+      "pathly/plans/agent-done-early-advance/PROGRESS.md",
+      "pathly/plans/agent-done-early-advance/RETRO.md",
+      "pathly/plans/agent-done-early-advance/REVIEW.md",
+      "pathly/plans/agent-done-early-advance/STATE.json",
+      "pathly/plans/brightsky-agent-upgrade/EVENTS.jsonl",
+      "pathly/plans/brightsky-agent-upgrade/PROGRESS.md",
+      "pathly/plans/brightsky-agent-upgrade/RUNNER_STATE.json",
+      "pathly/plans/brightsky-agent-upgrade/STATE.json",
+      "src/pathly_orchestrator/feature_flags.py",
+      "src/pathly_orchestrator/runner.py",
+      "src/pathly_orchestrator/supervisor.py",
+      "studio/src/renderer/src/components/Monitor/EventLog.tsx",
+      "studio/src/renderer/src/components/Monitor/MetricsStrip.tsx",
+      "studio/src/renderer/src/components/Monitor/Monitor.module.css",
+      "tests/test_runner.py",
+      "tests/test_supervisor.py"
+    ]
+  }
 }

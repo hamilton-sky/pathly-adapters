@@ -943,6 +943,10 @@ def runner_start():
         autonomy = data.get("autonomy", {})
         if not isinstance(autonomy, dict):
             autonomy = {}
+        # interactive: True = visible PTY killed on AGENT_DONE, False = headless/reconciliation
+        interactive = data.get("interactive", True)
+        if not isinstance(interactive, bool):
+            interactive = bool(interactive)
 
         state = _sup.start_run(
             topic=topic,
@@ -954,6 +958,7 @@ def runner_start():
             max_cost_usd=float(max_cost_usd),
             autonomy=autonomy,
             broadcast_fn=_broadcast_runner,
+            interactive=interactive,
         )
         return jsonify({"status": "started", "topic": topic, "run_id": state.run_id}), 200
     except ValueError as exc:
