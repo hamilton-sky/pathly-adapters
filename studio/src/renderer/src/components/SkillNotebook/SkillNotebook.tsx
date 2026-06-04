@@ -8,6 +8,7 @@ import PreviewPanel from './PreviewPanel/PreviewPanel'
 
 export default function SkillNotebookPanel() {
   const skillNotebookPath = useUiStore((s) => s.skillNotebookPath)
+  const chatOpen = useUiStore((s) => s.chatOpen)
 
   if (!skillNotebookPath) {
     return (
@@ -24,10 +25,14 @@ export default function SkillNotebookPanel() {
       <NotebookHeader />
       <div className={styles.body}>
         <NotebookCanvas />
-        <div className={styles.resizeHandle} />
-        <div className={styles.previewWrapper}>
-          <PreviewPanel />
-        </div>
+        {!chatOpen && (
+          <>
+            <div className={styles.resizeHandle} />
+            <div className={styles.previewWrapper}>
+              <PreviewPanel />
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
