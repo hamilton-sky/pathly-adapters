@@ -35,3 +35,13 @@
 {"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T13:00:04Z"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "summary": "Conv 3: supervisor RUNNER_STATE uses db.write_runner_state; watcher polls SQLite; http_server _tail_events polls SQLite seq-numbers; runner read_last_agent_done uses SQLite; 101 tests passed.", "total_tokens": 127627, "tool_uses": 60, "wall_seconds": 997, "cost_usd": 0.689186, "ts": "2026-06-04T13:00:13Z", "schema_version": 1}
 {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline", "schema_version": 1, "ts": "2026-06-04T13:00:22Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-04T13:00:22Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:00:28Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T13:02:23Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "summary": "Review passed: all Conv 3 SQLite migration criteria satisfied; non-blocking warning on updated_at always NULL in runner_state.", "total_tokens": 67541, "tool_uses": 14, "wall_seconds": 116, "cost_usd": 0.364721, "ts": "2026-06-04T13:02:34Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-04T13:02:35Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T13:02:41Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T13:02:42Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T13:03:05Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T13:03:06Z"}
+{"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline", "schema_version": 1, "ts": "2026-06-04T13:10:11Z"}

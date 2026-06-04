@@ -1,6 +1,7 @@
 """Unit tests for pathly_orchestrator.db — all three tables."""
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 
@@ -258,3 +259,69 @@ def test_concurrent_appends(tmp_path: Path) -> None:
     seqs = [r[0] for r in rows]
     assert seqs == list(range(seqs[0], seqs[0] + 100))
     _purge_cache(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Phase 8: Backward compat — legacy dirs (no pathly.db)
+# ---------------------------------------------------------------------------
+
+def test_legacy_read_state_from_json(tmp_path: Path) -> None:
+    """eventlog.read_state falls back to STATE.json when no pathly.db exists."""
+    import pathly_orchestrator.eventlog as eventlog
+
+    feature_dir = tmp_path / "my-feature"
+    feature_dir.mkdir()
+    state = {
+        "current": "BUILD",
+        "rigor": "standard",
+        "current_conversation": 1,
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+    (feature_dir / "STATE.json").write_text(json.dumps(state), encoding="utf-8")
+
+    # No pathly.db — should read from STATE.json
+    assert not (feature_dir / "pathly.db").exists()
+    result = eventlog.read_state(str(feature_dir))
+    assert result is not None
+    assert result["current"] == "BUILD"
+    assert result["rigor"] == "standard"
+    assert result["current_conversation"] == 1
+
+
+def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
+    """eventlog.read_events falls back to EVENTS.jsonl when no pathly.db exists."""
+    import pathly_orchestrator.eventlog as eventlog
+
+    feature_dir = tmp_path / "my-feature"
+    feature_dir.mkdir()
+    lines = [
+        json.dumps({"type": "STATE_TRANSITION", "ts": "2026-01-01T00:00:01Z", "to": "BUILD", "schema_version": 1}),
+        "not valid json",
+        json.dumps({"type": "AGENT_DONE", "ts": "2026-01-01T00:00:02Z", "summary": "ok", "schema_version": 1}),
+    ]
+    (feature_dir / "EVENTS.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # No pathly.db — should read from EVENTS.jsonl; malformed line silently skipped
+    assert not (feature_dir / "pathly.db").exists()
+    result = eventlog.read_events(str(feature_dir))
+    assert len(result) == 2
+    assert result[0]["type"] == "STATE_TRANSITION"
+    assert result[1]["type"] == "AGENT_DONE"
+
+
+def test_recover_stale_mirrors_no_db(tmp_path: Path) -> None:
+    """recover_stale_mirrors does not crash when a feature dir has no pathly.db."""
+    from pathly_orchestrator.supervisor import recover_stale_mirrors
+
+    feature_dir = tmp_path / "pathly" / "plans" / "legacy-feature"
+    feature_dir.mkdir(parents=True)
+
+    state = {"current": "BUILD", "rigor": "standard", "updated_at": "2026-01-01T00:00:00Z"}
+    (feature_dir / "STATE.json").write_text(json.dumps(state), encoding="utf-8")
+
+    lines = [json.dumps({"type": "AGENT_DONE", "ts": "2026-01-01T00:00:01Z", "summary": "s", "schema_version": 1})]
+    (feature_dir / "EVENTS.jsonl").write_text("\n".join(lines), encoding="utf-8")
+
+    # No pathly.db — should not raise
+    assert not (feature_dir / "pathly.db").exists()
+    recover_stale_mirrors(str(tmp_path))

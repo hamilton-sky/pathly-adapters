@@ -1,2 +1,2 @@
 RESULT: PASS
-Verified: conversation 3 complete — supervisor.py RUNNER_STATE writes use db.write_runner_state(); watcher polls SQLite at 150ms; http_server.py _tail_events polls SQLite seq-numbers with .jsonl fallback; runner.py read_last_agent_done uses db.read_last_agent_done(); 101 targeted tests + 424 full suite passed.
+Verified: all 4 conversations complete — db.py, eventlog.py, supervisor.py, http_server.py, runner.py use SQLite; backward compat confirmed for legacy dirs; migration script tested on pathly/plans/ tree; pytest tests/ -q green.
