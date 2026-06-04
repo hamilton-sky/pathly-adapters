@@ -1,0 +1,16 @@
+{
+  "current": "BUILDING",
+  "conv_start_sha": "19d63341fbed5a1598ef732c4a13cc68ef5b6ca7",
+  "build_baseline": {
+    "started_at": "2026-06-04T09:22:40.601096+00:00",
+    "preexisting_dirty": [
+      "pathly/plans/agent-done-early-advance/PROGRESS.md",
+      "pathly/plans/brightsky-agent-upgrade/EVENTS.jsonl",
+      "pathly/plans/brightsky-agent-upgrade/RUNNER_STATE.json",
+      "pathly/plans/brightsky-agent-upgrade/STATE.json",
+      "pathly/plans/skill-notebook-editor/"
+    ]
+  },
+  "convs_total": 4,
+  "convs_done": 1
+}
