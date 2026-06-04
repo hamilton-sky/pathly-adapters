@@ -1,6 +1,6 @@
 # Progress — skill-notebook-editor
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ## Pipeline
 
@@ -11,9 +11,9 @@ Status: IN PROGRESS
 | DESIGNING | DONE | DESIGN.md + DESIGN_SPEC.md + preview.html generated |
 | BUILDING | DONE | All 4 convs complete; typecheck 0 errors |
 | REVIEWING | DONE | Final review PASS — aria-labels + loadSkill try/catch fixed |
-| TESTING | IN PROGRESS | Acceptance criteria from USER_STORIES.md |
-| RETRO | TODO | |
-| DONE | TODO | |
+| TESTING | DONE | All 8 stories + non-functional pass; 6 test fixes applied |
+| RETRO | DONE | RETRO.md written |
+| DONE | DONE | |
 
 ---
 
