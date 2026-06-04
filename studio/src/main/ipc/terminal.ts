@@ -288,14 +288,29 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         injected = true
         clearTimeout(fallbackTimer)
         unsubscribe.dispose()
-        // Write the bracketed paste first (\x1b[200~...\x1b[201~).
-        // Then send \r as a SEPARATE write after 50 ms.
-        // After Ink receives \x1b[201~ (paste close) it schedules a re-render;
-        // if \r arrives in the same buffer Ink is in an intermediate state and
-        // drops the Enter. The 50 ms gap is safe here because we already confirmed
-        // Claude is ready (we saw '> '), so there is no startup-race risk.
+        // Write the bracketed paste.
         ptyProcess.write('\x1b[200~' + initialInput + '\x1b[201~')
-        setTimeout(() => ptyProcess.write('\r'), 50)
+        // Wait for Claude to render the paste indicator '[Pasted text…]' in the
+        // terminal output — that confirms Ink has finished processing the paste
+        // and the input field is active. Then send \r to submit.
+        // Same event-driven approach as waiting for '> ' before injecting.
+        // Fallback: send \r after 2 s if the indicator never appears.
+        let enterSent = false
+        const enterFallback = setTimeout(() => {
+          if (!enterSent) { enterSent = true; ptyProcess.write('\r') }
+        }, 2000)
+        const pasteRenderSub = ptyProcess.onData((chunk: string) => {
+          if (enterSent) return
+          const s = chunk
+            .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+            .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+          if (s.includes('Pasted text')) {
+            enterSent = true
+            clearTimeout(enterFallback)
+            pasteRenderSub.dispose()
+            ptyProcess.write('\r')
+          }
+        })
       }
 
       const fallbackTimer = setTimeout(doInject, 5000)
