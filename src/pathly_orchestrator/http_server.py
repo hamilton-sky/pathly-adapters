@@ -999,7 +999,6 @@ def runner_terminal_started():
         data = request.get_json() or {}
         topic = _topic_from_body(data)
         run_id = data.get("run_id", "")
-        tab_id = data.get("tab_id", "")
         if not topic or not isinstance(run_id, str) or not run_id:
             return jsonify({"error": "unknown run_id"}), 404
         with _sup._lock:
@@ -1543,7 +1542,7 @@ def skills_preview():
         # Build adapter_caps: use fragment_names directly if provided via cells,
         # otherwise fall back to compose_skill which reads composition.yaml
         if fragment_names:
-            from pathly_orchestrator.compose import _read_skill_body, _skills_root
+            from pathly_orchestrator.compose import _read_skill_body
             from pathly_orchestrator.compose import load_manifest, _read_fragment
 
             manifest = load_manifest()
