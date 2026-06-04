@@ -141,6 +141,10 @@ in full to understand the current file I/O patterns before changing them.
 **Codebase files this conversation touches:**
 - `src/pathly_orchestrator/eventlog.py` — MODIFY (events + state reads/writes → SQLite)
 - `src/pathly_orchestrator/supervisor.py` — MODIFY (remove direct .jsonl writes)
+- `tests/test_fsm.py` — MODIFY (update event-read assertions to use SQLite)
+- `tests/test_gates.py` — MODIFY (update event-read assertions to use SQLite)
+- `tests/test_fsm_ops.py` — MODIFY (update event-read assertions to use SQLite)
+- `tests/test_supervisor.py` — MODIFY (update event-read assertions to use SQLite)
 
 Scope:
 

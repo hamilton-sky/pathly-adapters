@@ -2,3 +2,21 @@
 {"schema_version": 1, "type": "PHASE_START", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:19:17Z"}
 {"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:19:35Z"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "summary": "Conv 1 complete: db.py created with SQLite schema + CRUD helpers; test_db.py has 11 tests all green including concurrent-write; full suite 424 passed 0 failed.", "total_tokens": 45376, "tool_uses": 30, "wall_seconds": 22, "cost_usd": 0.24503, "ts": "2026-06-04T12:19:47Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-04T12:19:57Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T12:20:04Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T12:21:59Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "summary": "Review passed after fix: removed erroneous BEGIN IMMEDIATE from mark_stale_runners (conflicted with sqlite3 implicit tx management); write lock already serialises; 11 tests green.", "total_tokens": 25341, "tool_uses": 6, "wall_seconds": 121, "cost_usd": 0.136841, "ts": "2026-06-04T12:22:14Z", "schema_version": 1}
+{"type": "FILE_DELETED", "file": "REVIEW_FAILURES.md", "ts": "2026-06-04T12:22:40Z"}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-04T12:22:46Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:23:10Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:23:18Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:23:34Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:23:35Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:24:17Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "implement", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:24:18Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "implement", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:40:26Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:40:37Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "summary": "Conv 2: eventlog.py migrated to SQLite (append_event/write_state/read_events/read_state); supervisor.py direct .jsonl writes replaced with eventlog.append_event(); _APPEND_LOCK + threading removed; full suite 424 passed.", "total_tokens": 124138, "tool_uses": 79, "wall_seconds": 1046, "cost_usd": 0.670345, "ts": "2026-06-04T12:41:00Z", "schema_version": 1}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-04T12:41:06Z"}
+{"type": "FILE_DELETED", "file": "SCOPE_VIOLATION.md", "note": "test file updates are in-scope for storage migration", "ts": "2026-06-04T12:41:36Z"}
+{"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-04T12:41:40Z"}

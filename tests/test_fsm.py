@@ -430,24 +430,30 @@ def test_write_state_creates_dir(tmp_path):
 def test_append_event_creates_file(tmp_path):
     append_event(tmp_path, {"type": "A"})
     append_event(tmp_path, {"type": "B"})
-    events_file = tmp_path / "EVENTS.jsonl"
-    lines = events_file.read_text(encoding="utf-8").splitlines()
-    assert len(lines) == 2
-    for line in lines:
-        json.loads(line)
+    from pathly_orchestrator import db as _db
+    conn = _db.get_db(tmp_path)
+    events = _db.read_events(conn, tmp_path.name)
+    assert len(events) == 2
+    for e in events:
+        assert isinstance(e, dict)
 
 
 def test_append_event_ts_injected(tmp_path):
     append_event(tmp_path, {"type": "TEST"})
-    line = (tmp_path / "EVENTS.jsonl").read_text(encoding="utf-8").strip()
-    event = json.loads(line)
-    assert "ts" in event
+    from pathly_orchestrator import db as _db
+    conn = _db.get_db(tmp_path)
+    events = _db.read_events(conn, tmp_path.name)
+    assert len(events) == 1
+    assert "ts" in events[0]
 
 
 def test_append_event_preserves_other_fields(tmp_path):
     append_event(tmp_path, {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING"})
-    line = (tmp_path / "EVENTS.jsonl").read_text(encoding="utf-8").strip()
-    event = json.loads(line)
+    from pathly_orchestrator import db as _db
+    conn = _db.get_db(tmp_path)
+    events = _db.read_events(conn, tmp_path.name)
+    assert len(events) == 1
+    event = events[0]
     assert event["type"] == "STATE_TRANSITION"
     assert event["from"] == "BUILDING"
     assert event["to"] == "REVIEWING"

@@ -16,9 +16,7 @@ CLI usage (called by LLM via Bash or by the retro skill):
 from __future__ import annotations
 import json
 import logging
-import os
 import sys
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,8 +28,8 @@ from pathly_orchestrator.state import (
     VALID_STATES,
     TRANSITIONS,
 )
+from pathly_orchestrator import db as _db
 
-_APPEND_LOCK = threading.Lock()
 CURRENT_SCHEMA_VERSION = 1
 
 
@@ -71,24 +69,38 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
                     f"Must be one of {sorted(states)}"
                 )
 
-    path = _events_path(storage_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    feature_dir = _resolve_path(storage_path)
     event.setdefault("schema_version", CURRENT_SCHEMA_VERSION)
     if "ts" not in event:
         event["ts"] = _now()
-    line = json.dumps(event) + "\n"
-    with _APPEND_LOCK:
-        with open(path, "a", encoding="utf-8") as f:
-            try:
-                import fcntl
 
-                fcntl.flock(f, fcntl.LOCK_EX)  # type: ignore[attr-defined]
-                try:
-                    f.write(line)
-                finally:
-                    fcntl.flock(f, fcntl.LOCK_UN)  # type: ignore[attr-defined]
-            except ImportError:
-                f.write(line)
+    feature_dir.mkdir(parents=True, exist_ok=True)
+    conn = _db.get_db(feature_dir)
+    feature = feature_dir.name
+    _db.append_event(conn, feature, event)
+
+
+def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:
+    """Write state to SQLite (and STATE.json as a snapshot). Called by write_state() after validation."""
+    feature_dir.mkdir(parents=True, exist_ok=True)
+    if "updated_at" not in state:
+        state["updated_at"] = _now()
+    conn = _db.get_db(feature_dir)
+    _db.write_state(conn, feature, state)
+    # Also write STATE.json as a human-readable snapshot (agents and tools read it directly)
+    import os as _os
+    path = feature_dir / "STATE.json"
+    tmp_path = path.with_suffix(".tmp")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+            f.write("\n")
+            f.flush()
+            _os.fsync(f.fileno())
+        tmp_path.replace(path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def write_state(storage_path: str, state: dict, flow: dict | None = None) -> None:
@@ -101,11 +113,11 @@ def write_state(storage_path: str, state: dict, flow: dict | None = None) -> Non
                 f"Invalid state: {new_current!r}. Must be one of {sorted(states)}"
             )
 
-    path = _state_path(storage_path)
-    if path.exists() and new_current is not None:
-        try:
-            old = json.loads(path.read_text(encoding="utf-8"))
-            old_current = old.get("current")
+    feature_dir = _resolve_path(storage_path)
+    if new_current is not None:
+        existing = read_state(storage_path)
+        if existing is not None:
+            old_current = existing.get("current")
             if old_current and old_current != new_current:
                 if flow is not None:
                     transitions = flow_transitions(flow)
@@ -117,38 +129,31 @@ def write_state(storage_path: str, state: dict, flow: dict | None = None) -> Non
                         f"Invalid state transition: {old_current!r} → {new_current!r}. "
                         f"Allowed from {old_current!r}: {sorted(allowed)}"
                     )
-        except json.JSONDecodeError:
-            pass
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if "updated_at" not in state:
-        state["updated_at"] = _now()
-    tmp_path = path.with_suffix(".tmp")
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
-            f.write("\n")
-            f.flush()
-            os.fsync(f.fileno())
-        tmp_path.replace(path)
-    except Exception:
-        tmp_path.unlink(missing_ok=True)
-        raise
+    _write_state_db(feature_dir, feature_dir.name, state)
+
+
+write_state.__wrapped__ = _write_state_db  # type: ignore[attr-defined]
 
 
 def read_events(storage_path: str) -> list[dict]:
-    path = _events_path(storage_path)
-    if not path.exists():
-        return []
-    events = []
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    events.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
+    feature_dir = _resolve_path(storage_path)
+    if (feature_dir / "pathly.db").exists():
+        conn = _db.get_db(feature_dir)
+        events = _db.read_events(conn, feature_dir.name)
+    else:
+        path = _events_path(storage_path)
+        if not path.exists():
+            return []
+        events = []
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        events.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
     for event in events:
         schema_version = event.get("schema_version")
         if schema_version is None:
@@ -168,6 +173,10 @@ def read_events(storage_path: str) -> list[dict]:
 
 
 def read_state(storage_path: str) -> dict | None:
+    feature_dir = _resolve_path(storage_path)
+    if (feature_dir / "pathly.db").exists():
+        conn = _db.get_db(feature_dir)
+        return _db.read_state(conn, feature_dir.name)
     path = _state_path(storage_path)
     if not path.exists():
         return None

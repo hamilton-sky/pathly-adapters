@@ -18,6 +18,13 @@ def _storage(tmp_path: Path, topic: str = "test-feature") -> Path:
     return p
 
 
+def _read_events_from_db(storage: Path, topic: str = "test-feature") -> list[dict]:
+    """Read events from SQLite (events now stored in pathly.db, not EVENTS.jsonl)."""
+    from pathly_orchestrator import db as _db
+    conn = _db.get_db(storage)
+    return _db.read_events(conn, topic)
+
+
 def _make_flow(gates: dict) -> dict:
     return {
         "version": 1,
@@ -90,10 +97,8 @@ def test_require_artifact_fail(tmp_path):
     # on_fail file written to feedback/
     assert (storage / "feedback" / "HUMAN_QUESTIONS.md").exists()
 
-    # GATE_FAILED event recorded
-    events_file = storage / "EVENTS.jsonl"
-    assert events_file.exists()
-    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    # GATE_FAILED event recorded (now in SQLite, not EVENTS.jsonl)
+    events = _read_events_from_db(storage)
     gate_events = [e for e in events if e.get("type") == "GATE_FAILED"]
     assert len(gate_events) == 1
     assert gate_events[0]["gate"] == "require_artifact"
@@ -279,8 +284,7 @@ def test_scope_gate_fail_undeclared_path(tmp_path, monkeypatch):
     assert result["feedback_file"] == "SCOPE_VIOLATION.md"
     assert (storage / "feedback" / "SCOPE_VIOLATION.md").exists()
 
-    events_file = storage / "EVENTS.jsonl"
-    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    events = _read_events_from_db(storage)
     gate_events = [e for e in events if e.get("type") == "GATE_FAILED"]
     assert len(gate_events) == 1
     assert gate_events[0]["gate"] == "scope_gate"
@@ -308,8 +312,7 @@ def test_scope_gate_no_declared_scope(tmp_path, monkeypatch):
     result = run_gates(flow, "A", "B", storage, "test-feature", 1)
     assert result is None
 
-    events_file = storage / "EVENTS.jsonl"
-    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    events = _read_events_from_db(storage)
     skipped = [e for e in events if e.get("type") == "GATE_SKIPPED"]
     assert len(skipped) == 1
     assert skipped[0]["reason"] == "no_declared_scope"
@@ -329,8 +332,7 @@ def test_scope_gate_no_build_baseline(tmp_path):
     result = run_gates(flow, "A", "B", storage, "test-feature", 1)
     assert result is None
 
-    events_file = storage / "EVENTS.jsonl"
-    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    events = _read_events_from_db(storage)
     skipped = [e for e in events if e.get("type") == "GATE_SKIPPED"]
     assert len(skipped) == 1
     assert skipped[0]["reason"] == "no_build_baseline"
@@ -356,8 +358,7 @@ def test_scope_gate_degraded_truncated_baseline(tmp_path):
     result = run_gates(flow, "A", "B", storage, "test-feature", 1)
     assert result is None  # gate passes in permissive mode
 
-    events_file = storage / "EVENTS.jsonl"
-    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+    events = _read_events_from_db(storage)
     degraded = [e for e in events if e.get("type") == "GATE_DEGRADED"]
     assert len(degraded) == 1
     assert degraded[0]["gate"] == "scope_gate"

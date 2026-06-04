@@ -254,10 +254,11 @@ def test_complete_stage_with_valid_decision(tmp_path, monkeypatch):
     state_after = json.loads(state_file.read_text(encoding="utf-8"))
     assert state_after["current"] == "PATH_A"
 
-    events_file = storage / "EVENTS.jsonl"
-    assert events_file.exists()
-    lines = events_file.read_text(encoding="utf-8").splitlines()
-    event_types = [json.loads(l)["type"] for l in lines]
+    # Events now in SQLite, not EVENTS.jsonl
+    from pathly_orchestrator import db as _db
+    _conn = _db.get_db(storage)
+    events = _db.read_events(_conn, "test-topic")
+    event_types = [e["type"] for e in events]
     assert "DECIDE_ROUTING" in event_types
     assert "STATE_TRANSITION" in event_types
 
@@ -280,10 +281,11 @@ def test_complete_stage_with_invalid_decision(tmp_path, monkeypatch):
     assert result.get("current_state") == "PATH_A"
     assert result["decision"] == "continue"
 
-    events_file = storage / "EVENTS.jsonl"
-    assert events_file.exists()
-    lines = events_file.read_text(encoding="utf-8").splitlines()
-    decide_events = [json.loads(l) for l in lines if json.loads(l).get("type") == "DECIDE_ROUTING"]
+    # Events now in SQLite, not EVENTS.jsonl
+    from pathly_orchestrator import db as _db
+    _conn = _db.get_db(storage)
+    events = _db.read_events(_conn, "test-topic")
+    decide_events = [e for e in events if e.get("type") == "DECIDE_ROUTING"]
     assert len(decide_events) == 1
     # The implementation mutates decision to the default before logging, so decision_input is "a"
     assert decide_events[0].get("decision_input") == "a"

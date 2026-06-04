@@ -295,11 +295,11 @@ def read_runner_state(conn: sqlite3.Connection, feature: str) -> dict | None:
 def mark_stale_runners(conn: sqlite3.Connection) -> int:
     """Set status='error' for all runner_state rows currently status='running'.
 
-    Uses BEGIN IMMEDIATE to prevent a race between read and write.
+    The write lock serialises concurrent callers; no explicit BEGIN IMMEDIATE
+    is needed (it conflicts with sqlite3's implicit transaction management).
     Returns the number of rows updated.
     """
     with _get_write_lock(conn):
-        conn.execute("BEGIN IMMEDIATE")
         cur = conn.execute(
             "UPDATE runner_state SET status='error' WHERE status='running'"
         )

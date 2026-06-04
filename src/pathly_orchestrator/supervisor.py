@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from pathly_orchestrator import eventlog as _eventlog
+
 logger = logging.getLogger("pathly.supervisor")
 
 # ── RunnerState ────────────────────────────────────────────────────────────────
@@ -143,7 +145,7 @@ def _agent_done_watcher(run_id: str, events_path: str, start_ts: str) -> None:
     with _lock:
         stop_evt = _agent_done_stop_events.setdefault(run_id, threading.Event())
 
-    for _event in tail_agent_done(events_path, start_ts, stop_evt):
+    for _ in tail_agent_done(events_path, start_ts, stop_evt):
         with _lock:
             done_evt = _agent_done_events.get(run_id)
             if done_evt is not None:
@@ -193,18 +195,19 @@ def _reconciliation_window(
             except Exception as exc:
                 logger.warning("_reconciliation_window: _patch_last_agent_done failed: %s", exc)
         else:
-            event_line = json.dumps({
-                "type": TYPE_STAGE_RECONCILIATION_FAILURE,
-                "topic": topic,
-                "stage": stage,
-                "run_id": run_id,
-                "exit_code": -1,
-                "ts": now_ts,
-            })
             try:
-                with open(events_path, "a", encoding="utf-8") as f:
-                    f.write(event_line + "\n")
-            except OSError as exc:
+                _eventlog.append_event(
+                    str(Path(events_path).parent),
+                    {
+                        "type": TYPE_STAGE_RECONCILIATION_FAILURE,
+                        "topic": topic,
+                        "stage": stage,
+                        "run_id": run_id,
+                        "exit_code": -1,
+                        "ts": now_ts,
+                    },
+                )
+            except Exception as exc:
                 logger.warning("_reconciliation_window: failed to write event: %s", exc)
     finally:
         with _lock:
@@ -408,14 +411,16 @@ def _run_stage_via_terminal(
                         })
                     now_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                     try:
-                        with open(events_path, "a", encoding="utf-8") as _f:
-                            _f.write(json.dumps({
+                        _eventlog.append_event(
+                            str(Path(events_path).parent),
+                            {
                                 "type": TYPE_STAGE_INTERACTIVE_DONE,
                                 "topic": state.topic,
                                 "stage": state.current_state,
                                 "ts": now_ts,
-                            }) + "\n")
-                    except OSError as exc:
+                            },
+                        )
+                    except Exception as exc:
                         logger.warning("_run_stage_via_terminal: failed to write STAGE_INTERACTIVE_DONE: %s", exc)
                     _cleanup_run_id(run_id)
                 else:

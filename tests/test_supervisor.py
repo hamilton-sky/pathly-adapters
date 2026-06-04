@@ -833,9 +833,12 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
 
     recon_done.wait(timeout=3.0)
 
-    # STAGE_RECONCILIATION_FAILURE must be written
-    content = events_path.read_text(encoding="utf-8")
-    assert "STAGE_RECONCILIATION_FAILURE" in content
+    # STAGE_RECONCILIATION_FAILURE must be written (now in SQLite, not EVENTS.jsonl)
+    from pathly_orchestrator import db as _db
+    _db_conn = _db.get_db(plan_dir)
+    _written_events = _db.read_events(_db_conn, topic)
+    _event_types = [e["type"] for e in _written_events]
+    assert "STAGE_RECONCILIATION_FAILURE" in _event_types
 
     # FSM was advanced (result returned from fast path)
     assert "cost_usd" in result
@@ -956,9 +959,13 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
     assert len(kill_events) == 1, f"Expected one TERMINAL_KILL, got: {broadcast_events}"
     assert kill_events[0].get("tab_id") is not None
 
-    content = events_path.read_text(encoding="utf-8")
-    assert "STAGE_INTERACTIVE_DONE" in content
-    assert "STAGE_RECONCILIATION_FAILURE" not in content
+    # Events now written to SQLite, not EVENTS.jsonl
+    from pathly_orchestrator import db as _db
+    _db_conn = _db.get_db(plan_dir)
+    _written_events = _db.read_events(_db_conn, topic)
+    _event_types = [e["type"] for e in _written_events]
+    assert "STAGE_INTERACTIVE_DONE" in _event_types
+    assert "STAGE_RECONCILIATION_FAILURE" not in _event_types
 
     with _sup._lock:
         assert run_id not in _sup._terminal_result_events  # type: ignore[attr-defined]
