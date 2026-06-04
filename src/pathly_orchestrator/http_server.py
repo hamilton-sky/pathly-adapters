@@ -235,7 +235,32 @@ def _broadcast(key: tuple[str, str], line: str) -> None:
 
 def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
     topic, project_root = key
-    path = Path(project_root) / "pathly" / "plans" / topic / "EVENTS.jsonl"
+    feature_dir = Path(project_root) / "pathly" / "plans" / topic
+    db_path = feature_dir / "pathly.db"
+
+    if db_path.exists():
+        from pathly_orchestrator import db as _db
+        try:
+            conn = _db.get_db(feature_dir)
+        except Exception:
+            logger.debug("tail_events: cannot open SQLite DB, falling back to file", exc_info=True)
+            conn = None
+        if conn is not None:
+            last_seq = 0
+            while not stop.is_set():
+                try:
+                    events = _db.read_events(conn, topic, since_seq=last_seq)
+                    for event in events:
+                        seq = event.get("seq", 0)
+                        if seq > last_seq:
+                            last_seq = seq
+                        _broadcast(key, json.dumps(event))
+                except Exception:
+                    logger.debug("tail_events SQLite error", exc_info=True)
+                stop.wait(0.1)
+            return
+
+    path = feature_dir / "EVENTS.jsonl"
     pos = path.stat().st_size if path.exists() else 0
     while not stop.is_set():
         try:

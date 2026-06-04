@@ -127,30 +127,60 @@ _terminal_result_events: dict[str, threading.Event] = {}
 _terminal_result_data: dict[str, dict] = {}
 
 # Early-advance signal channels — independent of _terminal_result_events/_terminal_result_data.
-# The watcher sets _agent_done_events[run_id] when AGENT_DONE is detected in EVENTS.jsonl.
+# The watcher sets _agent_done_events[run_id] when AGENT_DONE is detected in SQLite.
 # _agent_done_stop_events[run_id] is set to stop the watcher thread.
 # These dicts MUST NEVER be read from or written to by the /runner/terminal/result handler.
 _agent_done_events: dict[str, threading.Event] = {}
 _agent_done_stop_events: dict[str, threading.Event] = {}
 
+_TERMINAL_RESULT_TIMEOUT = 1800
 
-def _agent_done_watcher(run_id: str, events_path: str, start_ts: str) -> None:
-    """Tail EVENTS.jsonl for AGENT_DONE; set _agent_done_events[run_id] on first yield.
+
+def _agent_done_watcher(
+    run_id: str,
+    feature_dir: Path,
+    feature: str,
+    last_seq: int,
+) -> None:
+    """Poll SQLite fsm_events for AGENT_DONE; set _agent_done_events[run_id] on first match.
 
     Runs as a daemon thread when feature_flags.early_advance is True.
-    Stops when _agent_done_stop_events[run_id] is set.
+    Stops when _agent_done_stop_events[run_id] is set or after _TERMINAL_RESULT_TIMEOUT seconds.
     """
-    from pathly_orchestrator.runner import tail_agent_done
+    from pathly_orchestrator import db as _db
 
     with _lock:
         stop_evt = _agent_done_stop_events.setdefault(run_id, threading.Event())
 
-    for _ in tail_agent_done(events_path, start_ts, stop_evt):
-        with _lock:
-            done_evt = _agent_done_events.get(run_id)
-            if done_evt is not None:
-                done_evt.set()
+    try:
+        conn = _db.get_db(feature_dir)
+    except Exception as exc:
+        logger.warning("_agent_done_watcher: cannot open DB for %s: %s", feature, exc)
         return
+
+    _POLL = 0.15
+    _TIMEOUT = _TERMINAL_RESULT_TIMEOUT
+    elapsed = 0.0
+    seq = last_seq
+
+    while elapsed < _TIMEOUT:
+        if stop_evt.is_set():
+            return
+        try:
+            rows = _db.read_events(conn, feature, since_seq=seq)
+        except Exception:
+            rows = []
+        for row in rows:
+            if row.get("seq", 0) > seq:
+                seq = row["seq"]
+            if row.get("type") == "AGENT_DONE":
+                with _lock:
+                    done_evt = _agent_done_events.get(run_id)
+                    if done_evt is not None:
+                        done_evt.set()
+                return
+        stop_evt.wait(_POLL)
+        elapsed += _POLL
 
 
 def _reconciliation_window(
@@ -239,17 +269,42 @@ def _write_mirror(state: RunnerState) -> None:
         path.write_text(json.dumps(state.public_dict(), indent=2), encoding="utf-8")
     except OSError as exc:
         logger.warning("Failed to write RUNNER_STATE.json for %s: %s", state.topic, exc)
+    try:
+        from pathly_orchestrator import db as _db
+        feature_dir = Path(state.project_root) / "pathly" / "plans" / state.topic
+        conn = _db.get_db(feature_dir)
+        _db.write_runner_state(conn, state.topic, state.public_dict())
+    except Exception as exc:
+        logger.warning("Failed to write runner_state to SQLite for %s: %s", state.topic, exc)
 
 
 def recover_stale_mirrors(project_root: str) -> None:
-    """On server startup, rewrite any RUNNER_STATE.json left as 'running' → 'error'.
+    """On server startup, mark any runner_state rows left as 'running' → 'error'.
 
-    Scans pathly/plans/*/RUNNER_STATE.json relative to project_root.
+    Scans pathly/plans/*/pathly.db for SQLite DBs and calls mark_stale_runners().
+    Falls back to rewriting RUNNER_STATE.json for feature dirs that have no SQLite DB.
     """
+    from pathly_orchestrator import db as _db
+
     plans_dir = Path(project_root) / "pathly" / "plans"
     if not plans_dir.is_dir():
         return
+
+    handled: set = set()
+    for db_path in plans_dir.glob("*/pathly.db"):
+        feature_dir = db_path.parent
+        try:
+            conn = _db.get_db(feature_dir)
+            count = _db.mark_stale_runners(conn)
+            if count:
+                logger.info("Marked %d stale runner(s) in %s → error", count, feature_dir.name)
+            handled.add(feature_dir)
+        except Exception as exc:
+            logger.warning("recover_stale_mirrors: SQLite mark failed for %s: %s", feature_dir.name, exc)
+
     for mirror in plans_dir.glob("*/RUNNER_STATE.json"):
+        if mirror.parent in handled:
+            continue
         try:
             data = json.loads(mirror.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -342,14 +397,20 @@ def _run_stage_via_terminal(
             )
 
         if feature_flags.early_advance:
-            # Build the EVENTS.jsonl path for this run
-            events_path = str(
-                (
-                    Path(state.project_root)
-                    / "pathly" / "plans" / state.topic / "EVENTS.jsonl"
-                )
-            )
-            start_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            feature_dir = Path(state.project_root) / "pathly" / "plans" / state.topic
+            feature = state.topic
+
+            # Capture current max seq so the watcher only sees new AGENT_DONE events
+            last_seq = 0
+            try:
+                from pathly_orchestrator import db as _db
+                _db_conn = _db.get_db(feature_dir)
+                row = _db_conn.execute(
+                    "SELECT MAX(seq) FROM fsm_events WHERE feature=?", (feature,)
+                ).fetchone()
+                last_seq = row[0] or 0
+            except Exception as exc:
+                logger.warning("_run_stage_via_terminal: could not read last_seq: %s", exc)
 
             # Register agent_done signal event before starting the watcher
             with _lock:
@@ -357,14 +418,13 @@ def _run_stage_via_terminal(
 
             watcher_t = threading.Thread(
                 target=_agent_done_watcher,
-                args=(run_id, events_path, start_ts),
+                args=(run_id, feature_dir, feature, last_seq),
                 daemon=True,
                 name=f"agent-done-watcher-{run_id}",
             )
             watcher_t.start()
 
             # Race: AGENT_DONE vs PTY result (poll in short bursts to avoid busy-wait)
-            _TERMINAL_RESULT_TIMEOUT = 1800
             elapsed = 0.0
             _POLL_INTERVAL = 0.05
             fired_early = False
@@ -412,7 +472,7 @@ def _run_stage_via_terminal(
                     now_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                     try:
                         _eventlog.append_event(
-                            str(Path(events_path).parent),
+                            str(feature_dir),
                             {
                                 "type": TYPE_STAGE_INTERACTIVE_DONE,
                                 "topic": state.topic,
@@ -424,9 +484,10 @@ def _run_stage_via_terminal(
                         logger.warning("_run_stage_via_terminal: failed to write STAGE_INTERACTIVE_DONE: %s", exc)
                     _cleanup_run_id(run_id)
                 else:
+                    events_path_for_recon = str(feature_dir / "EVENTS.jsonl")
                     recon_t = threading.Thread(
                         target=_reconciliation_window,
-                        args=(run_id, state.current_state, state.topic, events_path),
+                        args=(run_id, state.current_state, state.topic, events_path_for_recon),
                         daemon=True,
                         name=f"recon-window-{run_id}",
                     )
@@ -473,7 +534,6 @@ def _run_stage_via_terminal(
         # NOTE: _terminal_result_events[run_id] is never touched by the watcher path, so
         # the /runner/terminal/result POST handler will always find it during any active
         # reconciliation window — returning 200, not 404.
-        _TERMINAL_RESULT_TIMEOUT = 1800
         if not result_evt.wait(timeout=_TERMINAL_RESULT_TIMEOUT):
             with _lock:
                 _terminal_started_events.pop(run_id, None)

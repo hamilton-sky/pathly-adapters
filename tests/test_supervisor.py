@@ -693,6 +693,7 @@ def _simulate_pty_start(run_id: str) -> None:
 def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     """Flag=1, AGENT_DONE fires first; FSM advance called once; no RECONCILIATION_FAILURE."""
     import pathly_orchestrator.supervisor as _sup
+    from pathly_orchestrator import db as _db
 
     monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "1")
     monkeypatch.setenv("PATHLY_RUNNER_INTERACTIVE", "0")
@@ -701,26 +702,12 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     run_id = f"{topic}-001"
     state = _make_state(tmp_path, topic=topic)
 
-    # Write an AGENT_DONE event to EVENTS.jsonl so read_last_agent_done can find it
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
-    events_path = plan_dir / "EVENTS.jsonl"
-    agent_done_event = {
-        "type": "AGENT_DONE",
-        "agent": "builder",
-        "conversation": 2,
-        "summary": "built it",
-        "cost_usd": 0.05,
-        "ts": "2026-01-01T00:00:00Z",
-    }
-    events_path.write_text(json.dumps(agent_done_event) + "\n", encoding="utf-8")
+    conn = _db.get_db(plan_dir)
 
     advance_called = threading.Event()
     recon_started = threading.Event()
-
-    # Patch tail_agent_done to yield one AGENT_DONE immediately then stop
-    def fake_tail(path, after_ts, stop_evt, poll_interval=0.1):
-        yield {"type": "AGENT_DONE", "ts": "2026-01-01T00:01:00Z", "summary": "built it"}
 
     # Patch _reconciliation_window to record its start, then simulate billing arriving
     original_recon = _sup._reconciliation_window  # type: ignore[attr-defined]
@@ -745,11 +732,21 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
         broadcast_events.append(payload)
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
+            # Write AGENT_DONE to SQLite after PTY starts (after last_seq is captured)
+            def _write_event():
+                import time as _time
+                _time.sleep(0.05)
+                _db.append_event(conn, topic, {
+                    "type": "AGENT_DONE",
+                    "agent": "builder",
+                    "conversation": 2,
+                    "summary": "built it",
+                    "cost_usd": 0.05,
+                    "ts": "2026-01-01T00:00:00Z",
+                })
+            threading.Thread(target=_write_event, daemon=True).start()
 
-    with (
-        patch("pathly_orchestrator.runner.tail_agent_done", side_effect=fake_tail),
-        patch("pathly_orchestrator.supervisor._reconciliation_window", side_effect=fake_recon),
-    ):
+    with patch("pathly_orchestrator.supervisor._reconciliation_window", side_effect=fake_recon):
         result = _run_stage_via_terminal(
             state,
             "do stuff",
@@ -764,9 +761,10 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     # FSM advance uses result from read_last_agent_done — result should have cost_usd
     assert result.get("cost_usd") == 0.05
 
-    # No RECONCILIATION_FAILURE in events file
-    content = events_path.read_text(encoding="utf-8")
-    assert "STAGE_RECONCILIATION_FAILURE" not in content
+    # No RECONCILIATION_FAILURE in SQLite
+    written_events = _db.read_events(conn, topic)
+    event_types = [e["type"] for e in written_events]
+    assert "STAGE_RECONCILIATION_FAILURE" not in event_types
 
     # Cleanup
     with _sup._lock:
@@ -791,21 +789,10 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
 
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
-    events_path = plan_dir / "EVENTS.jsonl"
-    agent_done_event = {
-        "type": "AGENT_DONE",
-        "agent": "builder",
-        "conversation": 2,
-        "summary": "built it",
-        "cost_usd": 0.05,
-        "ts": "2026-01-01T00:00:00Z",
-    }
-    events_path.write_text(json.dumps(agent_done_event) + "\n", encoding="utf-8")
+    from pathly_orchestrator import db as _db
+    _db_conn = _db.get_db(plan_dir)
 
     recon_done = threading.Event()
-
-    def fake_tail(path, after_ts, stop_evt, poll_interval=0.1):
-        yield {"type": "AGENT_DONE", "ts": "2026-01-01T00:01:00Z"}
 
     original_recon = _sup._reconciliation_window  # type: ignore[attr-defined]
 
@@ -817,11 +804,21 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
     def fake_broadcast(topic_, payload):
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
+            # Write AGENT_DONE to SQLite after PTY starts (after last_seq is captured)
+            def _write_event():
+                import time as _time
+                _time.sleep(0.05)
+                _db.append_event(_db_conn, topic, {
+                    "type": "AGENT_DONE",
+                    "agent": "builder",
+                    "conversation": 2,
+                    "summary": "built it",
+                    "cost_usd": 0.05,
+                    "ts": "2026-01-01T00:00:00Z",
+                })
+            threading.Thread(target=_write_event, daemon=True).start()
 
-    with (
-        patch("pathly_orchestrator.runner.tail_agent_done", side_effect=fake_tail),
-        patch("pathly_orchestrator.supervisor._reconciliation_window", side_effect=fake_recon),
-    ):
+    with patch("pathly_orchestrator.supervisor._reconciliation_window", side_effect=fake_recon):
         result = _run_stage_via_terminal(
             state,
             "do stuff",
@@ -833,9 +830,7 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
 
     recon_done.wait(timeout=3.0)
 
-    # STAGE_RECONCILIATION_FAILURE must be written (now in SQLite, not EVENTS.jsonl)
-    from pathly_orchestrator import db as _db
-    _db_conn = _db.get_db(plan_dir)
+    # STAGE_RECONCILIATION_FAILURE must be written to SQLite
     _written_events = _db.read_events(_db_conn, topic)
     _event_types = [e["type"] for e in _written_events]
     assert "STAGE_RECONCILIATION_FAILURE" in _event_types
@@ -925,18 +920,8 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
 
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
-    events_path = plan_dir / "EVENTS.jsonl"
-    events_path.write_text(json.dumps({
-        "type": "AGENT_DONE",
-        "agent": "builder",
-        "conversation": 4,
-        "summary": "interactive done",
-        "cost_usd": 0.02,
-        "ts": "2026-01-01T00:00:00Z",
-    }) + "\n", encoding="utf-8")
-
-    def fake_tail(path, after_ts, stop_evt, poll_interval=0.1):
-        yield {"type": "AGENT_DONE", "ts": "2026-01-01T00:01:00Z", "summary": "interactive done"}
+    from pathly_orchestrator import db as _db
+    _db_conn = _db.get_db(plan_dir)
 
     broadcast_events: list[dict] = []
 
@@ -944,24 +929,34 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
         broadcast_events.append(payload)
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
+            # Write AGENT_DONE to SQLite after PTY starts (after last_seq is captured)
+            def _write_event():
+                import time as _time
+                _time.sleep(0.05)
+                _db.append_event(_db_conn, topic, {
+                    "type": "AGENT_DONE",
+                    "agent": "builder",
+                    "conversation": 4,
+                    "summary": "interactive done",
+                    "cost_usd": 0.02,
+                    "ts": "2026-01-01T00:00:00Z",
+                })
+            threading.Thread(target=_write_event, daemon=True).start()
 
-    with patch("pathly_orchestrator.runner.tail_agent_done", side_effect=fake_tail):
-        result = _run_stage_via_terminal(
-            state,
-            "do stuff interactively",
-            "claude",
-            "claude-sonnet-4-6",
-            run_id,
-            broadcast_fn=fake_broadcast,
-        )
+    result = _run_stage_via_terminal(
+        state,
+        "do stuff interactively",
+        "claude",
+        "claude-sonnet-4-6",
+        run_id,
+        broadcast_fn=fake_broadcast,
+    )
 
     kill_events = [e for e in broadcast_events if e.get("type") == "TERMINAL_KILL"]
     assert len(kill_events) == 1, f"Expected one TERMINAL_KILL, got: {broadcast_events}"
     assert kill_events[0].get("tab_id") is not None
 
     # Events now written to SQLite, not EVENTS.jsonl
-    from pathly_orchestrator import db as _db
-    _db_conn = _db.get_db(plan_dir)
     _written_events = _db.read_events(_db_conn, topic)
     _event_types = [e["type"] for e in _written_events]
     assert "STAGE_INTERACTIVE_DONE" in _event_types

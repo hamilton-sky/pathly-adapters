@@ -1,2 +1,2 @@
 RESULT: PASS
-Verified: conversation 2 complete — eventlog.py migrated to SQLite (append_event, write_state, read_events, read_state all backed by db.py); supervisor.py direct .jsonl writes replaced with eventlog.append_event(); full suite 424 passed 0 failed.
+Verified: conversation 3 complete — supervisor.py RUNNER_STATE writes use db.write_runner_state(); watcher polls SQLite at 150ms; http_server.py _tail_events polls SQLite seq-numbers with .jsonl fallback; runner.py read_last_agent_done uses db.read_last_agent_done(); 101 targeted tests + 424 full suite passed.

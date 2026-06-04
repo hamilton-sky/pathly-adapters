@@ -20,3 +20,18 @@
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-04T12:41:06Z"}
 {"type": "FILE_DELETED", "file": "SCOPE_VIOLATION.md", "note": "test file updates are in-scope for storage migration", "ts": "2026-06-04T12:41:36Z"}
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-04T12:41:40Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-04T12:42:07Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T12:42:12Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "review", "agent": "reviewer", "feature": "fsm-sqlite", "ts": "2026-06-04T12:43:11Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "summary": "Review passed: eventlog.py delegates all reads/writes to SQLite via db.py with .jsonl fallbacks; supervisor.py has no direct EVENTS.jsonl writes.", "total_tokens": 34713, "tool_uses": 8, "wall_seconds": 59, "cost_usd": 0.18745, "ts": "2026-06-04T12:43:20Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-04T12:43:21Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:43:26Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:43:26Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:43:53Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:43:53Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:44:41Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "implement", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:44:42Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "implement", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T12:59:47Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-sqlite", "ts": "2026-06-04T13:00:04Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "summary": "Conv 3: supervisor RUNNER_STATE uses db.write_runner_state; watcher polls SQLite; http_server _tail_events polls SQLite seq-numbers; runner read_last_agent_done uses SQLite; 101 tests passed.", "total_tokens": 127627, "tool_uses": 60, "wall_seconds": 997, "cost_usd": 0.689186, "ts": "2026-06-04T13:00:13Z", "schema_version": 1}
+{"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline", "schema_version": 1, "ts": "2026-06-04T13:00:22Z"}

@@ -199,7 +199,20 @@ def _patch_last_agent_done(
 
 
 def read_last_agent_done(storage_path: Path) -> dict[str, Any] | None:
-    """Return the last AGENT_DONE event from EVENTS.jsonl, or None if absent."""
+    """Return the last AGENT_DONE event for the feature, or None if absent.
+
+    Reads from SQLite (pathly.db) when available; falls back to EVENTS.jsonl.
+    """
+    db_path = storage_path / "pathly.db"
+    if db_path.exists():
+        try:
+            from pathly_orchestrator import db as _db
+            conn = _db.get_db(storage_path)
+            feature = storage_path.name
+            return _db.read_last_agent_done(conn, feature)
+        except Exception:
+            pass
+
     events_file = storage_path / "EVENTS.jsonl"
     if not events_file.exists():
         return None

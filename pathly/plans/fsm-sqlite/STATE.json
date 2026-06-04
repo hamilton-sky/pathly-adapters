@@ -1,14 +1,5 @@
 {
   "convs_total": 4,
   "convs_done": 1,
-  "current": "BUILDING",
-  "conv_start_sha": "19682dcf59b25a218784d88f582abe1c12e69f34",
-  "build_baseline": {
-    "started_at": "2026-06-04T12:22:52.877390+00:00",
-    "preexisting_dirty": [
-      "pathly/plans/fsm-sqlite/EVENTS.jsonl",
-      "pathly/plans/fsm-sqlite/STATE.json",
-      "src/pathly_orchestrator/db.py"
-    ]
-  }
+  "current": "BUILDING"
 }
