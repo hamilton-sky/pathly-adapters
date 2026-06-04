@@ -1,6 +1,7 @@
 ---
 
 ---
+
 # Lessons Candidate
 
 Patterns extracted from retros. Promote to LESSONS.md via `/lessons`.

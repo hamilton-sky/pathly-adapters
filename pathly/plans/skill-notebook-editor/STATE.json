@@ -1,14 +1,5 @@
 {
   "current": "BUILDING",
   "convs_total": 4,
-  "convs_done": 2,
-  "conv_start_sha": "33d0d7756aeed65478f2d8965785c0ece82cf6a1",
-  "build_baseline": {
-    "started_at": "2026-06-04T11:04:52.821461+00:00",
-    "preexisting_dirty": [
-      "pathly/plans/fsm-sqlite/",
-      "pathly/plans/skill-notebook-editor/EVENTS.jsonl",
-      "pathly/plans/skill-notebook-editor/STATE.json"
-    ]
-  }
+  "convs_done": 2
 }

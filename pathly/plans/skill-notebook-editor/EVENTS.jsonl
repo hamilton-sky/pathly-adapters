@@ -29,3 +29,15 @@
 {"type": "FILE_DELETED", "file": "SCOPE_VIOLATION.md", "ts": "2026-06-04T11:14:26Z", "schema_version": 1}
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-04T11:14:28Z"}
 {"type": "GATE_FAILED", "gate": "scope_gate", "transition": "BUILDING->REVIEWING", "schema_version": 1, "ts": "2026-06-04T11:16:08Z"}
+{"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING", "schema_version": 1, "ts": "2026-06-04T11:18:14Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "skill-notebook-editor", "ts": "2026-06-04T11:18:41Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "summary": "Rigor=fast (lite): Conv 2 of 4 is not the final conversation \u2014 review skipped per lite gate. Advancing to Conv 3.", "total_tokens": 0, "tool_uses": 0, "wall_seconds": 2, "cost_usd": 0.0, "ts": "2026-06-04T11:18:52Z", "schema_version": 1}
+{"type": "STATE_TRANSITION", "from": "REVIEWING", "to": "BUILDING", "schema_version": 1, "ts": "2026-06-04T11:18:58Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "builder", "feature": "skill-notebook-editor", "ts": "2026-06-04T11:19:04Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "builder", "feature": "skill-notebook-editor", "ts": "2026-06-04T11:19:28Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "builder", "feature": "skill-notebook-editor", "ts": "2026-06-04T11:19:29Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "builder", "feature": "skill-notebook-editor", "ts": "2026-06-04T11:20:40Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "implement", "agent": "builder", "feature": "skill-notebook-editor", "ts": "2026-06-04T11:20:41Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "implement", "agent": "builder", "feature": "skill-notebook-editor", "ts": "2026-06-04T11:25:44Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 3, "result": "DONE", "summary": "Conv 3 complete. skillNotebookStore extended with loadSkill/insertFragment/removeCell/moveCell. NotebookCanvas with DnD orchestration, BodyCell, FragmentCell (grip+delete), InsertZone, SkillNotebook.tsx layout. typecheck: 0 errors.", "total_tokens": 43398, "tool_uses": 32, "wall_seconds": 409, "cost_usd": 0.234349, "ts": "2026-06-04T11:25:53Z", "schema_version": 1}
+{"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline", "schema_version": 1, "ts": "2026-06-04T11:26:34Z"}
