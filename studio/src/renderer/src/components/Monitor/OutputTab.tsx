@@ -1,116 +1,101 @@
 import { useState } from 'react'
-import { marked } from 'marked'
+import { LayoutGrid, List } from 'lucide-react'
 import { useRunnerStore } from '../../store/runnerStore'
-import type { StageLogEntry } from '../../store/runnerStore'
+import type { StageLogEntry, HistoricalRun } from '../../store/runnerStore'
+import { StageCard } from './StageCard'
+import { StageModal } from './StageModal'
 import styles from './OutputTab.module.css'
+
+type ViewMode = 'grid' | 'list'
+const STORAGE_KEY = 'pathly-output-view'
+
+function readViewMode(): ViewMode {
+  try { return (localStorage.getItem(STORAGE_KEY) as ViewMode) ?? 'list' } catch { return 'list' }
+}
 
 export function OutputTab(): JSX.Element {
   const stageLog = useRunnerStore((s) => s.stageLog)
+  const runHistory = useRunnerStore((s) => s.runHistory)
   const topic = useRunnerStore((s) => s.topic)
   const cost = useRunnerStore((s) => s.cost)
+  const [viewMode, setViewMode] = useState<ViewMode>(readViewMode)
+  const [selected, setSelected] = useState<StageLogEntry | null>(null)
 
-  if (stageLog.length === 0) {
-    return (
-      <div className={styles.empty}>
-        No output yet — start a run to see stage results here.
-      </div>
-    )
+  function handleViewMode(mode: ViewMode): void {
+    try { localStorage.setItem(STORAGE_KEY, mode) } catch { /* noop */ }
+    setViewMode(mode)
+  }
+
+  if (stageLog.length === 0 && runHistory.length === 0) {
+    return <div className={styles.empty}>No output yet — start a run to see stage results here.</div>
   }
 
   return (
     <div className={styles.container}>
       <div className={styles.runHeader}>
         <span className={styles.runTopic}>{topic ?? '—'}</span>
-        <span className={styles.runMeta}>${cost.toFixed(3)} · {stageLog.length} stage{stageLog.length !== 1 ? 's' : ''}</span>
+        <div className={styles.headerRight}>
+          <span className={styles.runMeta}>${cost.toFixed(3)} · {stageLog.length} stage{stageLog.length !== 1 ? 's' : ''}</span>
+          <div className={styles.viewToggle} role="group" aria-label="Output view mode">
+            <button
+              type="button"
+              className={viewMode === 'grid' ? `${styles.toggleBtn} ${styles.toggleBtnActive}` : styles.toggleBtn}
+              onClick={() => handleViewMode('grid')}
+              aria-label="Grid view"
+            >
+              <LayoutGrid size={13} />
+            </button>
+            <button
+              type="button"
+              className={viewMode === 'list' ? `${styles.toggleBtn} ${styles.toggleBtnActive}` : styles.toggleBtn}
+              onClick={() => handleViewMode('list')}
+              aria-label="List view"
+            >
+              <List size={13} />
+            </button>
+          </div>
+        </div>
       </div>
-      <div className={styles.list}>
-        {stageLog.map((entry, i) => (
-          <OutputRow key={`${entry.stage}-${i}`} entry={entry} />
+
+      <div className={styles.scroll}>
+        {runHistory.map((run, i) => (
+          <HistoricalRunSection key={i} run={run} index={i + 1} viewMode={viewMode} onSelect={setSelected} />
         ))}
+        <div className={viewMode === 'grid' ? styles.gridContainer : styles.listContainer}>
+          {stageLog.map((entry, i) => (
+            <StageCard key={`${entry.stage}-${i}`} entry={entry} viewMode={viewMode} onClick={() => setSelected(entry)} />
+          ))}
+        </div>
       </div>
+
+      {selected && <StageModal entry={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }
 
-function OutputRow({ entry }: { entry: StageLogEntry }): JSX.Element {
+function HistoricalRunSection({ run, index, viewMode, onSelect }: { run: HistoricalRun; index: number; viewMode: ViewMode; onSelect: (e: StageLogEntry) => void }): JSX.Element {
   const [expanded, setExpanded] = useState(false)
-  const [promptOpen, setPromptOpen] = useState(false)
-  const [promptView, setPromptView] = useState<'raw' | 'preview'>('raw')
-
-  const durationSec = entry.durationMs != null ? (entry.durationMs / 1000).toFixed(1) + 's' : '—'
-  const costStr = entry.costUsd != null ? '$' + entry.costUsd.toFixed(3) : '—'
-  const exitOk = entry.exitCode === 0
-  const adapterColor = entry.adapter === 'claude' ? styles.adapterClaude : entry.adapter === 'codex' ? styles.adapterCodex : entry.adapter === 'agy' ? styles.adapterAgy : ''
+  const stageCount = run.stageLog.length
+  const timeStr = run.runStartedAt ? new Date(run.runStartedAt).toLocaleTimeString() : '—'
 
   return (
-    <div className={styles.row}>
+    <div className={styles.historicalRun}>
       <button
         type="button"
-        className={styles.rowHeader}
+        className={styles.historicalRunHeader}
         onClick={() => setExpanded((v) => !v)}
         {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
         <span className={styles.chevron}>{expanded ? '▼' : '▶'}</span>
-        <span className={styles.stageName}>{entry.stage}</span>
-        {entry.adapter && <span className={`${styles.adapterPill} ${adapterColor}`}>{entry.adapter}</span>}
-        <span className={styles.rowMeta}>{durationSec}</span>
-        <span className={styles.rowMeta}>{costStr}</span>
-        <span className={exitOk ? styles.exitOk : styles.exitFail}>{entry.exitCode !== null ? (exitOk ? '✓' : '✗') : '·'}</span>
+        <span className={styles.historicalRunLabel}>Run {index} — {stageCount} stage{stageCount !== 1 ? 's' : ''}</span>
+        <span className={styles.rowMeta}>{timeStr}</span>
+        <span className={styles.rowMeta}>${run.cost.toFixed(3)}</span>
       </button>
-
       {expanded && (
-        <div className={styles.detail}>
-          {entry.result != null ? (
-            <div className={styles.resultBox}>{entry.result}</div>
-          ) : (
-            <div className={styles.resultEmpty}>No result captured</div>
-          )}
-          {(entry.inputTokens != null) && (
-            <div className={styles.tokenRow}>
-              in {entry.inputTokens?.toLocaleString()} · out {entry.outputTokens?.toLocaleString()} · cache↑ {entry.cacheCreateTokens?.toLocaleString()} · cache↓ {entry.cacheReadTokens?.toLocaleString()}
-            </div>
-          )}
-          {entry.prompt != null && (
-            <>
-              <div className={styles.promptHeader}>
-                <button
-                  type="button"
-                  className={styles.promptToggle}
-                  onClick={() => setPromptOpen((v) => !v)}
-                  {...(promptOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-                >
-                  {promptOpen ? 'Hide prompt ▲' : 'Show prompt ▾'}
-                </button>
-                {promptOpen && (
-                  <div className={styles.viewBar} role="group" aria-label="Prompt view mode">
-                    <button
-                      type="button"
-                      className={promptView === 'raw' ? `${styles.viewBtn} ${styles.viewBtnActive}` : styles.viewBtn}
-                      onClick={() => setPromptView('raw')}
-                    >
-                      Raw
-                    </button>
-                    <button
-                      type="button"
-                      className={promptView === 'preview' ? `${styles.viewBtn} ${styles.viewBtnActive}` : styles.viewBtn}
-                      onClick={() => setPromptView('preview')}
-                    >
-                      Preview
-                    </button>
-                  </div>
-                )}
-              </div>
-              {promptOpen && promptView === 'raw' && (
-                <div className={styles.promptBox}>{entry.prompt}</div>
-              )}
-              {promptOpen && promptView === 'preview' && (
-                <div
-                  className={styles.promptPreview}
-                  dangerouslySetInnerHTML={{ __html: marked(entry.prompt) as string }}
-                />
-              )}
-            </>
-          )}
+        <div className={`${styles.historicalRunBody} ${viewMode === 'grid' ? styles.gridContainer : styles.listContainer}`}>
+          {run.stageLog.map((entry, i) => (
+            <StageCard key={`${entry.stage}-${i}`} entry={entry} viewMode={viewMode} onClick={() => onSelect(entry)} />
+          ))}
         </div>
       )}
     </div>
