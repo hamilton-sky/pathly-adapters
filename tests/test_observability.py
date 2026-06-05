@@ -42,9 +42,10 @@ def test_record_phase_start_valid(client):
     data = json.loads(r.data)
     assert data == {"status": "recorded"}
 
-    events_path = feature_dir / "EVENTS.jsonl"
-    assert events_path.exists()
-    line = json.loads(events_path.read_text(encoding="utf-8").strip())
+    from pathly_orchestrator import eventlog as _eventlog
+    events = _eventlog.read_events(str(feature_dir))
+    assert len(events) == 1
+    line = events[0]
     assert line["schema_version"] == 1
     assert line["type"] == "PHASE_START"
     assert line["phase"] == "implement"
@@ -75,8 +76,10 @@ def test_record_phase_done_all_optional_fields(client):
     })
     assert r.status_code == 200
 
-    events_path = feature_dir / "EVENTS.jsonl"
-    line = json.loads(events_path.read_text(encoding="utf-8").strip())
+    from pathly_orchestrator import eventlog as _eventlog
+    events = _eventlog.read_events(str(feature_dir))
+    assert len(events) == 1
+    line = events[0]
     assert line["type"] == "PHASE_DONE"
     assert line["conv"] == 2
     assert line["total_tokens"] == 1500
