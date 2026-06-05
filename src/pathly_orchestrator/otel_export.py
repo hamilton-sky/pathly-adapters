@@ -154,3 +154,52 @@ def export_span_async(event: dict) -> None:
         return
     t = threading.Thread(target=_do_export, args=(event, endpoint), daemon=True)
     t.start()
+
+
+def cli_main() -> None:
+    import argparse
+    import sys
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(prog="pathly-otel-export")
+    parser.add_argument("--feature", required=True, help="feature name")
+    parser.add_argument("--endpoint", required=True, help="OTLP endpoint base URL")
+    parser.add_argument("--project-root", default=None, help="path to project root")
+    parser.add_argument("--dry-run", action="store_true", help="print without sending HTTP requests")
+    args = parser.parse_args()
+
+    project_root = args.project_root if args.project_root is not None else os.getcwd()
+    db_path = Path(project_root) / "pathly" / "plans" / args.feature / "pathly.db"
+
+    if not db_path.exists():
+        print(f"error: DB not found: {db_path}", file=sys.stderr)
+        sys.exit(1)
+
+    from pathly_orchestrator import db as _db
+
+    conn = _db.get_db(db_path.parent)
+    events = _db.read_events(conn, args.feature)
+    agent_done_events = [e for e in events if e.get("type") == "AGENT_DONE"]
+
+    exported_count = 0
+    failures = 0
+
+    for event in agent_done_events:
+        agent = event.get("agent", "?")
+        seq = event.get("seq", "?")
+        print(f"exported span: invoke_agent {agent} (seq={seq})")
+        if args.dry_run:
+            exported_count += 1
+            continue
+        try:
+            _do_export(event, args.endpoint)
+            exported_count += 1
+        except Exception as exc:
+            logger.warning("export failed for seq=%s: %s", seq, exc)
+            failures += 1
+
+    print(f"done: {exported_count} spans exported")
+
+    if failures:
+        sys.exit(1)
+    sys.exit(0)

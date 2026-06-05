@@ -2,5 +2,12 @@
   "current": "BUILDING",
   "convs_total": 2,
   "convs_done": 0,
-  "conv_start_sha": "c46f6245c96bc0fca54366faf6e9058d4a2936ac"
+  "conv_start_sha": "f28baab1c2997a036e1473916895cdf4ee2b30cb",
+  "build_baseline": {
+    "started_at": "2026-06-05T10:33:42.033238+00:00",
+    "preexisting_dirty": [
+      "pathly/plans/otel-exporter/STATE.json",
+      "pathly/plans/otel-exporter/pathly.db-wal"
+    ]
+  }
 }

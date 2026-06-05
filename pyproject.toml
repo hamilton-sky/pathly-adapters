@@ -27,6 +27,7 @@ pathly-back = "pathly_orchestrator.back_cli:main"
 pathly-ff   = "pathly_orchestrator.ff_cli:main"
 pathly-studio = "pathly_studio_cli.install:main"
 pathly-design = "pathly_data.core.design.cli:main"
+pathly-otel-export = "pathly_orchestrator.otel_export:cli_main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
