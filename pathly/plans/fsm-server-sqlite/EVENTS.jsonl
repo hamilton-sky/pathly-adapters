@@ -1,0 +1,9 @@
+{"schema_version": 1, "type": "PHASE_START", "phase": "build", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:43:51Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:44:09Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:44:30Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:45:01Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:45:01Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "implement", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:45:09Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "implement", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:49:06Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:49:15Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "summary": "Migrated _append_agent_done_event and record_phase_endpoint in http_server.py to use eventlog.append_event; updated two tests to read via eventlog.read_events; 22 tests pass.", "total_tokens": 93713, "tool_uses": 15, "wall_seconds": 257, "cost_usd": 0.50605, "ts": "2026-06-05T06:49:28Z", "schema_version": 1}

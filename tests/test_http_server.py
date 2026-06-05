@@ -195,7 +195,10 @@ def test_record_activity_appends_complete_agent_done_event(client):
     )
 
     assert r.status_code == 200
-    event = json.loads((events_dir / "EVENTS.jsonl").read_text().strip())
+    from pathly_orchestrator import eventlog as _eventlog
+    events = _eventlog.read_events(str(events_dir))
+    assert len(events) == 1
+    event = events[0]
     assert event["schema_version"] == 1
     assert event["model"] == "gpt-5"
     assert event["conversation"] == 2
@@ -224,7 +227,10 @@ def test_record_activity_uses_total_tokens_when_split_is_missing(client):
     )
 
     assert r.status_code == 200
-    event = json.loads((events_dir / "EVENTS.jsonl").read_text().strip())
+    from pathly_orchestrator import eventlog as _eventlog
+    events = _eventlog.read_events(str(events_dir))
+    assert len(events) == 1
+    event = events[0]
     assert event["tokens_in"] == 15
     assert event["tokens_out"] == 0
     assert "cost_usd" in event

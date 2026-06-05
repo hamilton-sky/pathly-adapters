@@ -34,6 +34,7 @@ except ImportError:
     sys.exit(1)
 
 from pathly_orchestrator.config import Settings
+from pathly_orchestrator import eventlog
 from pathly_orchestrator.eventlog import read_state
 from pathly_orchestrator.feature_flags import flags
 from pathly_orchestrator.fsm_ops import build_menu_payload, next_action, complete_stage
@@ -662,8 +663,8 @@ def _append_agent_done_event(
 ) -> None:
     """Append an AGENT_DONE event to the feature's EVENTS.jsonl so SSE subscribers see it."""
     try:
-        events_path = Path(project_root) / "pathly" / "plans" / feature / "EVENTS.jsonl"
-        if not events_path.parent.exists():
+        feature_dir = Path(project_root) / "pathly" / "plans" / feature
+        if not feature_dir.exists():
             return
         event: dict[str, object] = {
             "schema_version": 1,
@@ -685,8 +686,7 @@ def _append_agent_done_event(
             event["trace_id"] = trace_id
         if span_id:
             event["span_id"] = span_id
-        with open(events_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event) + "\n")
+        eventlog.append_event(str(feature_dir), event)
     except Exception:
         logger.debug("_append_agent_done_event error", exc_info=True)
 
@@ -851,12 +851,12 @@ def record_phase_endpoint():
         feature = data["feature"]
         project_root = data.get("project_root") or os.environ.get("PATHLY_PROJECT_ROOT", "")
         if project_root:
-            events_path = Path(project_root) / "pathly" / "plans" / feature / "EVENTS.jsonl"
+            feature_dir = Path(project_root) / "pathly" / "plans" / feature
         else:
-            events_path = Path("pathly") / "plans" / feature / "EVENTS.jsonl"
+            feature_dir = Path("pathly") / "plans" / feature
 
-        if not events_path.parent.exists():
-            return jsonify({"error": f"Feature directory does not exist: {events_path.parent}"}), 400
+        if not feature_dir.exists():
+            return jsonify({"error": f"Feature directory does not exist: {feature_dir}"}), 400
 
         event: dict[str, object] = {
             "schema_version": 1,
@@ -875,8 +875,7 @@ def record_phase_endpoint():
             event["summary"] = data["summary"]
         event["ts"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        with open(events_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event) + "\n")
+        eventlog.append_event(str(feature_dir), event)
 
         return jsonify({"status": "recorded"}), 200
     except Exception as e:
