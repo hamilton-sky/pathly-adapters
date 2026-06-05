@@ -5,34 +5,5 @@
   "convs_total": 2,
   "convs_done": 1,
   "current_conversation": 0,
-  "updated_at": "2026-06-04T00:00:00Z",
-  "conv_start_sha": "7f935dd004ba5833ce333b1f7e51c8308600c5f3",
-  "build_baseline": {
-    "started_at": "2026-06-05T06:43:28.884273+00:00",
-    "preexisting_dirty": [
-      "pathly/plans/agent-done-early-advance/pathly.db",
-      "pathly/plans/brightsky-agent-upgrade/pathly.db",
-      "pathly/plans/brightsky-agent-upgrade/pathly.db-shm",
-      "pathly/plans/brightsky-agent-upgrade/pathly.db-wal",
-      "pathly/plans/chat-automate-toggle/pathly.db",
-      "pathly/plans/chat-stop-proxy/pathly.db",
-      "pathly/plans/codebase-architecture/pathly.db",
-      "pathly/plans/composition-blocks/pathly.db",
-      "pathly/plans/event-phase-summary/pathly.db",
-      "pathly/plans/fsm-server-sqlite/STATE.json",
-      "pathly/plans/fsm-server-sqlite/pathly.db",
-      "pathly/plans/fsm-sqlite/pathly.db",
-      "pathly/plans/gitnexus-integration/pathly.db",
-      "pathly/plans/multi-adapter-runner/pathly.db",
-      "pathly/plans/otel-exporter/pathly.db",
-      "pathly/plans/parallel-fleet-part-1/pathly.db",
-      "pathly/plans/parallel-fleet-part-2/pathly.db",
-      "pathly/plans/pathly-observability/pathly.db",
-      "pathly/plans/runner-pipeline-trace/pathly.db",
-      "pathly/plans/skill-fragment-composition/pathly.db",
-      "pathly/plans/skill-notebook-editor/pathly.db",
-      "pathly/plans/studio-sidebar-redesign/pathly.db",
-      "pathly/plans/visible-runner/pathly.db"
-    ]
-  }
+  "updated_at": "2026-06-04T00:00:00Z"
 }

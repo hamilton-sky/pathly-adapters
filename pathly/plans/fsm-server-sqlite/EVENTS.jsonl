@@ -7,3 +7,20 @@
 {"schema_version": 1, "type": "PHASE_DONE", "phase": "implement", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:49:06Z"}
 {"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:49:15Z"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 1, "result": "DONE", "summary": "Migrated _append_agent_done_event and record_phase_endpoint in http_server.py to use eventlog.append_event; updated two tests to read via eventlog.read_events; 22 tests pass.", "total_tokens": 93713, "tool_uses": 15, "wall_seconds": 257, "cost_usd": 0.50605, "ts": "2026-06-05T06:49:28Z", "schema_version": 1}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:50:01Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:50:06Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:50:59Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:50:59Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:51:55Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:51:56Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "review", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:53:47Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 1, "result": "PASS", "summary": "Conv 1 review passed \u2014 _append_agent_done_event and record_phase_endpoint correctly use eventlog.append_event; tests updated; no violations.", "total_tokens": 141233, "tool_uses": 40, "wall_seconds": 251, "cost_usd": 0.762658, "ts": "2026-06-05T06:54:13Z", "schema_version": 1}
+{"schema_version": 1, "type": "PHASE_START", "phase": "build", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:54:27Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:54:31Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:54:59Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:55:00Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:55:56Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "implement", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T06:55:56Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "implement", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:03:11Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:03:23Z"}
+{"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "summary": "Migrated _stage_brief, build_pipeline_history_block, on_state_counter, conv_done to use eventlog module; added 2 DB tests; 428 tests pass.", "total_tokens": 157135, "tool_uses": 31, "wall_seconds": 448, "cost_usd": 0.848529, "ts": "2026-06-05T07:03:34Z", "schema_version": 1}

@@ -185,8 +185,8 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     )
     from pathly_orchestrator.runner import build_pipeline_history_block
     import os
-    events_path = os.path.join(project_root, "pathly", "plans", feature, "EVENTS.jsonl")
-    history = build_pipeline_history_block(events_path)
+    feature_dir = os.path.join(project_root, "pathly", "plans", feature)
+    history = build_pipeline_history_block(feature_dir)
     return agent_text + context + history
 
 
@@ -266,19 +266,14 @@ def _stage_brief(state_info: dict, storage_path: Path) -> dict:
             age = (datetime.datetime.now().timestamp() - oldest_mtime) / 3600
             feedback_age_hours = round(age, 1)
 
-    # 1.1 — last 3 EVENTS.jsonl entries for agent context
+    # 1.1 — last 3 events for agent context
     recent_events: list[dict] = []
-    events_file = storage_path / "EVENTS.jsonl"
-    if events_file.exists():
-        try:
-            lines = [ln for ln in events_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
-            for line in lines[-3:]:
-                try:
-                    recent_events.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
-        except OSError:
-            pass
+    try:
+        from pathly_orchestrator import eventlog as _eventlog
+        all_events = _eventlog.read_events(str(storage_path))
+        recent_events = all_events[-3:] if len(all_events) >= 3 else list(all_events)
+    except Exception:
+        pass
 
     # 1.3 — most recent CONSULT_*.md for meet.md auto-injection
     recent_consult: str | None = None

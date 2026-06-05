@@ -1,2 +1,2 @@
 RESULT: PASS
-Verified: conversation 1 complete — migrated _append_agent_done_event and record_phase_endpoint in http_server.py to use eventlog.append_event instead of open(), and updated two tests to read events via eventlog.read_events; 22 tests pass.
+Verified: conversation 2 complete — migrated _stage_brief (fsm_ops.py), build_pipeline_history_block (runner.py), on_state_counter and conv_done (fsm.py) to use eventlog module; added 2 DB tests; 428 tests pass (2 pre-existing failures in test_observability.py unrelated to this feature).

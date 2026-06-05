@@ -174,14 +174,13 @@ def evaluate_transition_rules(
         op_fn = _ops.get(op)
         if op_fn is not None and field and compare_to and next_s:
             try:
-                state_file = storage_path / "STATE.json"
-                if state_file.exists():
-                    state_doc = json.loads(state_file.read_text(encoding="utf-8"))
-                    field_val = int(state_doc[field])
-                    compare_val = int(state_doc[compare_to])
-                    if op_fn(field_val, compare_val):
-                        return next_s
-            except (KeyError, ValueError, TypeError, json.JSONDecodeError, OSError):
+                from pathly_orchestrator import eventlog as _eventlog
+                state_doc = _eventlog.read_state(str(storage_path)) or {}
+                field_val = int(state_doc[field])
+                compare_val = int(state_doc[compare_to])
+                if op_fn(field_val, compare_val):
+                    return next_s
+            except (KeyError, ValueError, TypeError):
                 pass  # fall through gracefully
 
     # Level 3 — decide
@@ -373,16 +372,13 @@ def run_transition_actions(
                 content = progress_file.read_text(encoding="utf-8")
                 if mark == "conv_done":
                     content = content.replace(f"| {conv} |", f"| {conv} | DONE |", 1)
-                    state_file = storage_path / "STATE.json"
-                    if state_file.exists():
-                        try:
-                            state_doc = json.loads(state_file.read_text(encoding="utf-8"))
-                            state_doc["convs_done"] = int(state_doc.get("convs_done", 0)) + 1
-                            tmp = storage_path / "STATE.json.tmp"
-                            tmp.write_text(json.dumps(state_doc, indent=2) + "\n", encoding="utf-8")
-                            tmp.replace(state_file)
-                        except (json.JSONDecodeError, OSError, ValueError):
-                            pass
+                    try:
+                        from pathly_orchestrator import eventlog as _eventlog
+                        state_doc = _eventlog.read_state(str(storage_path)) or {}
+                        state_doc["convs_done"] = int(state_doc.get("convs_done", 0)) + 1
+                        _eventlog.write_state(str(storage_path), state_doc)
+                    except (ValueError, OSError):
+                        pass
                 elif mark == "all_phases_done":
                     content = re.sub(r"\|\s*\[ \]\s*\|", "| [x] |", content)
                 progress_file.write_text(content, encoding="utf-8")
