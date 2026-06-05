@@ -163,8 +163,16 @@ def record_activity(
     *,
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
+    trace_id: str = "",
+    span_id: str = "",
 ) -> dict:
     ensure_server_running(host=host, port=port)
+    if trace_id or span_id:
+        payload = dict(payload)
+        if trace_id:
+            payload["trace_id"] = trace_id
+        if span_id:
+            payload["span_id"] = span_id
     return _request_json("POST", _RECORD_ACTIVITY_PATH, payload, host=host, port=port)
 
 

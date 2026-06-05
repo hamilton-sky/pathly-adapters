@@ -657,6 +657,8 @@ def _append_agent_done_event(
     tool_uses: int,
     wall_seconds: int,
     cost_usd: float,
+    trace_id: str = "",
+    span_id: str = "",
 ) -> None:
     """Append an AGENT_DONE event to the feature's EVENTS.jsonl so SSE subscribers see it."""
     try:
@@ -679,6 +681,10 @@ def _append_agent_done_event(
         }
         if conversation is not None:
             event["conversation"] = conversation
+        if trace_id:
+            event["trace_id"] = trace_id
+        if span_id:
+            event["span_id"] = span_id
         with open(events_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(event) + "\n")
     except Exception:
@@ -782,6 +788,9 @@ def record_activity_endpoint():
                 total_tokens=int(data.get("total_tokens", 0)),
             )
 
+        trace_id = data.get("trace_id", "")
+        span_id = data.get("span_id", "")
+
         project_root = data.get("project_root", "")
         if project_root and data.get("feature"):
             total_tokens = int(data.get("total_tokens", 0))
@@ -802,6 +811,8 @@ def record_activity_endpoint():
                 tool_uses=int(data.get("tool_uses", 0)),
                 wall_seconds=wall_seconds,
                 cost_usd=float(cost_usd_val),
+                trace_id=str(trace_id) if trace_id else "",
+                span_id=str(span_id) if span_id else "",
             )
 
         return jsonify({"status": "recorded"}), 200

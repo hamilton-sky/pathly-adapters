@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import threading
 import time
 from dataclasses import dataclass, field
@@ -77,6 +78,10 @@ class RunnerState:
     _awaiting_agent_answer: bool = field(default=False, repr=False, compare=False)
     _agent_question_answer: Optional[str] = field(default=None, repr=False, compare=False)
     _agent_question_event: threading.Event = field(default_factory=threading.Event, repr=False, compare=False)
+
+    # OTel-compatible trace context — set at run start / per stage
+    trace_id: str = ""   # 32-char hex, set once at run start
+    span_id: str = ""    # 16-char hex, set per stage invocation
 
     # Active terminal tab id — set while a terminal-mode stage is in flight
     active_tab_id: str = ""
@@ -766,6 +771,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
 
             # ── Invoke agent ──────────────────────────────────────────────────
             run_id = f"{topic}-{state.iterations + 1}-{int(time.time() * 1000)}"
+            state.span_id = secrets.token_hex(8)
             try:
                 invoke_result = _run_stage_via_terminal(
                     state,
@@ -1146,6 +1152,7 @@ def start_run(
             _broadcast_fn=broadcast_fn,
             interactive=interactive,
         )
+        state.trace_id = secrets.token_hex(16)
         _registry[topic] = state
         state.status = "running"
         _write_mirror(state)

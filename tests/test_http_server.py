@@ -189,6 +189,8 @@ def test_record_activity_appends_complete_agent_done_event(client):
             "tool_uses": 3,
             "duration_ms": 2500,
             "cost_usd": 0.0123,
+            "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+            "span_id": "00f067aa0ba902b7",
         },
     )
 
@@ -200,6 +202,8 @@ def test_record_activity_appends_complete_agent_done_event(client):
     assert event["tokens_in"] == 10
     assert event["tokens_out"] == 5
     assert event["cost_usd"] == 0.0123
+    assert event["trace_id"] == "4bf92f3577b34da6a3ce929d0e0e4736"
+    assert event["span_id"] == "00f067aa0ba902b7"
 
 
 def test_record_activity_uses_total_tokens_when_split_is_missing(client):
