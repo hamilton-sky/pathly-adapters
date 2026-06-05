@@ -374,8 +374,14 @@ def run_transition_actions(
                     content = content.replace(f"| {conv} |", f"| {conv} | DONE |", 1)
                     try:
                         from pathly_orchestrator import eventlog as _eventlog
+                        from pathly_orchestrator.eventlog import VALID_STATES
                         state_doc = _eventlog.read_state(str(storage_path)) or {}
                         state_doc["convs_done"] = int(state_doc.get("convs_done", 0)) + 1
+                        # Guard: SQLite may have a stale/invalid 'current' from before a
+                        # STATE.json fix. Replace it with prev_state so write_state passes
+                        # validation.
+                        if state_doc.get("current") not in VALID_STATES:
+                            state_doc["current"] = prev_state
                         _eventlog.write_state(str(storage_path), state_doc)
                     except (ValueError, OSError):
                         pass

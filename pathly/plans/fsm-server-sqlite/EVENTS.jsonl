@@ -24,3 +24,11 @@
 {"schema_version": 1, "type": "PHASE_DONE", "phase": "implement", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:03:11Z"}
 {"schema_version": 1, "type": "PHASE_DONE", "phase": "build", "agent": "builder", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:03:23Z"}
 {"type": "AGENT_DONE", "agent": "builder", "model": "claude-sonnet-4-6", "conversation": 2, "result": "DONE", "summary": "Migrated _stage_brief, build_pipeline_history_block, on_state_counter, conv_done to use eventlog module; added 2 DB tests; 428 tests pass.", "total_tokens": 157135, "tool_uses": 31, "wall_seconds": 448, "cost_usd": 0.848529, "ts": "2026-06-05T07:03:34Z", "schema_version": 1}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:03:48Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "analyze", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:03:52Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "analyze", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:05:13Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "scout", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:05:14Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "scout", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:05:14Z"}
+{"schema_version": 1, "type": "PHASE_START", "phase": "review", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:05:15Z"}
+{"schema_version": 1, "type": "PHASE_DONE", "phase": "review", "agent": "reviewer", "feature": "fsm-server-sqlite", "ts": "2026-06-05T07:07:49Z"}
+{"type": "AGENT_DONE", "agent": "reviewer", "model": "claude-sonnet-4-6", "conversation": 2, "result": "PASS", "summary": "Conv 2 review passed \u2014 _stage_brief, build_pipeline_history_block, on_state_counter, conv_done all migrated correctly; flagged violations are pre-existing code not in Conv 2 scope.", "total_tokens": 129846, "tool_uses": 29, "wall_seconds": 259, "cost_usd": 0.701168, "ts": "2026-06-05T07:08:07Z", "schema_version": 1}
