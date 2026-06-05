@@ -1,5 +1,6 @@
 {
-  "current": "PLAN",
+  "current": "BUILDING",
   "convs_total": 2,
-  "convs_done": 0
+  "convs_done": 0,
+  "conv_start_sha": "c46f6245c96bc0fca54366faf6e9058d4a2936ac"
 }

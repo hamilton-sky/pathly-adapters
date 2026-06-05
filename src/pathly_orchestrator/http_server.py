@@ -814,6 +814,27 @@ def record_activity_endpoint():
                 trace_id=str(trace_id) if trace_id else "",
                 span_id=str(span_id) if span_id else "",
             )
+            # OTel export — fire-and-forget; no-op if PATHLY_OTEL_ENDPOINT is unset
+            try:
+                from pathly_orchestrator import otel_export as _otel
+                _otel.export_span_async({
+                    "type": "AGENT_DONE",
+                    "agent": str(data["agent"]),
+                    "feature": str(data["feature"]),
+                    "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "result": str(data.get("result", "DONE")),
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
+                    "cost_usd": float(cost_usd_val),
+                    "wall_seconds": wall_seconds,
+                    "model": str(data.get("model", "")),
+                    "conversation": data.get("conversation"),
+                    "summary": str(data.get("summary", "")),
+                    "trace_id": str(data.get("trace_id", "")),
+                    "span_id": str(data.get("span_id", "")),
+                })
+            except Exception:
+                logger.debug("otel_export hook error", exc_info=True)
 
         return jsonify({"status": "recorded"}), 200
     except Exception as e:

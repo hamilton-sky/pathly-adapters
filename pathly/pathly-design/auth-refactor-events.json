@@ -1,0 +1,246 @@
+[
+  {
+    "seq": 23,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:45:05Z",
+    "payload": {
+      "phase": "misc",
+      "n": 22
+    }
+  },
+  {
+    "seq": 22,
+    "type": "PHASE_START",
+    "ts": "2026-06-05T08:44:33Z",
+    "payload": {
+      "phase": "misc",
+      "n": 21
+    }
+  },
+  {
+    "seq": 21,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:43:33Z",
+    "payload": {
+      "phase": "misc",
+      "n": 20
+    }
+  },
+  {
+    "seq": 20,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:42:26Z",
+    "payload": {
+      "phase": "misc",
+      "n": 19
+    }
+  },
+  {
+    "seq": 19,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:41:06Z",
+    "payload": {
+      "phase": "misc",
+      "n": 18
+    }
+  },
+  {
+    "seq": 18,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:40:12Z",
+    "payload": {
+      "phase": "misc",
+      "n": 17
+    }
+  },
+  {
+    "seq": 17,
+    "type": "PHASE_START",
+    "ts": "2026-06-05T08:39:00Z",
+    "payload": {
+      "phase": "misc",
+      "n": 16
+    }
+  },
+  {
+    "seq": 16,
+    "type": "PHASE_START",
+    "ts": "2026-06-05T08:38:17Z",
+    "payload": {
+      "phase": "misc",
+      "n": 15
+    }
+  },
+  {
+    "seq": 15,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:37:07Z",
+    "payload": {
+      "phase": "misc",
+      "n": 14
+    }
+  },
+  {
+    "seq": 14,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:36:25Z",
+    "payload": {
+      "phase": "building",
+      "result": "pass"
+    }
+  },
+  {
+    "seq": 13,
+    "type": "AGENT_DONE",
+    "ts": "2026-06-05T08:36:19Z",
+    "payload": {
+      "agent": "builder",
+      "conversation": 1,
+      "model": "claude-sonnet-4",
+      "tokens_in": 26552,
+      "tokens_out": 6872,
+      "total_tokens": 33424,
+      "cost_usd": 0.28,
+      "wall_seconds": 70.4,
+      "tool_uses": 7,
+      "result": "pass",
+      "summary": "builder pass on conversation 1 for auth-refactor.",
+      "trace_id": "8be686abfc4ac1df",
+      "span_id": "80e742f8"
+    }
+  },
+  {
+    "seq": 12,
+    "type": "PHASE_START",
+    "ts": "2026-06-05T08:34:58Z",
+    "payload": {
+      "phase": "building",
+      "feature": "auth-refactor"
+    }
+  },
+  {
+    "seq": 11,
+    "type": "STATE_TRANSITION",
+    "ts": "2026-06-05T08:34:00Z",
+    "payload": {
+      "from": "REVIEWING",
+      "to": "BUILDING",
+      "reason": "gate passed"
+    }
+  },
+  {
+    "seq": 10,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:27:32Z",
+    "payload": {
+      "phase": "reviewing",
+      "result": "pass"
+    }
+  },
+  {
+    "seq": 9,
+    "type": "AGENT_DONE",
+    "ts": "2026-06-05T08:27:14Z",
+    "payload": {
+      "agent": "reviewer",
+      "conversation": 1,
+      "model": "claude-haiku-4",
+      "tokens_in": 34701,
+      "tokens_out": 6197,
+      "total_tokens": 40898,
+      "cost_usd": 0.41,
+      "wall_seconds": 84.9,
+      "tool_uses": 8,
+      "result": "pass",
+      "summary": "reviewer pass on conversation 1 for auth-refactor.",
+      "trace_id": "61bc17e652627f6c",
+      "span_id": "241ecbff"
+    }
+  },
+  {
+    "seq": 8,
+    "type": "PHASE_START",
+    "ts": "2026-06-05T08:25:23Z",
+    "payload": {
+      "phase": "reviewing",
+      "feature": "auth-refactor"
+    }
+  },
+  {
+    "seq": 7,
+    "type": "STATE_TRANSITION",
+    "ts": "2026-06-05T08:25:12Z",
+    "payload": {
+      "from": "BUILDING",
+      "to": "REVIEWING",
+      "reason": "gate passed"
+    }
+  },
+  {
+    "seq": 6,
+    "type": "PHASE_DONE",
+    "ts": "2026-06-05T08:19:34Z",
+    "payload": {
+      "phase": "building",
+      "result": "pass"
+    }
+  },
+  {
+    "seq": 5,
+    "type": "AGENT_DONE",
+    "ts": "2026-06-05T08:19:29Z",
+    "payload": {
+      "agent": "builder",
+      "conversation": 1,
+      "model": "claude-sonnet-4",
+      "tokens_in": 42975,
+      "tokens_out": 6462,
+      "total_tokens": 49437,
+      "cost_usd": 0.25,
+      "wall_seconds": 38.1,
+      "tool_uses": 10,
+      "result": "pass",
+      "summary": "builder pass on conversation 1 for auth-refactor.",
+      "trace_id": "f8244336a2ccf76f",
+      "span_id": "4bfa3516"
+    }
+  },
+  {
+    "seq": 4,
+    "type": "PHASE_START",
+    "ts": "2026-06-05T08:17:45Z",
+    "payload": {
+      "phase": "building",
+      "feature": "auth-refactor"
+    }
+  },
+  {
+    "seq": 3,
+    "type": "STATE_TRANSITION",
+    "ts": "2026-06-05T08:17:23Z",
+    "payload": {
+      "from": "PLANNING",
+      "to": "BUILDING",
+      "reason": "gate passed"
+    }
+  },
+  {
+    "seq": 2,
+    "type": "PHASE_START",
+    "ts": "2026-06-05T08:09:55Z",
+    "payload": {
+      "phase": "planning",
+      "feature": "auth-refactor"
+    }
+  },
+  {
+    "seq": 1,
+    "type": "STATE_TRANSITION",
+    "ts": "2026-06-05T08:09:40Z",
+    "payload": {
+      "from": null,
+      "to": "PLANNING",
+      "reason": "feature created"
+    }
+  }
+]
