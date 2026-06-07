@@ -40,6 +40,7 @@ from pathly_orchestrator.feature_flags import flags
 from pathly_orchestrator.fsm_ops import build_menu_payload, next_action, complete_stage
 from pathly_orchestrator.chat_agent import handle_chat
 from pathly_telemetry.storage import append_activity
+from pathly_orchestrator.api import api_bp
 
 _NO_FEATURE_MENU = {
     "state": "no-feature",
@@ -123,6 +124,7 @@ def _check_rate_limit(ip: str) -> bool:
 
 
 app = Flask(__name__)
+app.register_blueprint(api_bp)
 
 
 @app.before_request

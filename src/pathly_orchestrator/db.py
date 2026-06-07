@@ -174,12 +174,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_def_role_proj
 
 
 # ---------------------------------------------------------------------------
-# Seed stub (implemented in Conv 2)
+# Seed (implemented in seed.py)
 # ---------------------------------------------------------------------------
 
 def _seed_if_empty(conn: sqlite3.Connection) -> None:
-    """Populated in Conv 2. No-op stub."""
-    pass
+    from pathly_orchestrator.seed import seed_if_empty as _real_seed
+    _real_seed(conn)
 
 
 # ---------------------------------------------------------------------------
@@ -204,11 +204,12 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         _run_migrations(conn)
-        _seed_if_empty(conn)
         _conn_cache[db_path] = conn
         conn_id: int = id(conn)
         _write_locks[conn_id] = threading.Lock()
-        return conn
+
+    _seed_if_empty(conn)
+    return conn
 
 
 def _get_write_lock(conn: sqlite3.Connection) -> threading.Lock:

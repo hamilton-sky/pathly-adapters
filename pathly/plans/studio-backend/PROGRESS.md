@@ -10,9 +10,9 @@
 | Conv | Title | Stories | Status |
 |---|---|---|---|
 | Conv 1 | db.py rewrite | S1.1, S1.2 | DONE |
-| Conv 2 | Seed data + Caller updates | S1.3, S2.1 | TODO |
-| Conv 3 | Services layer | S3.1 | TODO |
-| Conv 4 | HTTP routes | S4.1, S4.2 | TODO |
+| Conv 2 | Seed data + Caller updates | S1.3, S2.1 | DONE |
+| Conv 3 | Services layer | S3.1 | DONE |
+| Conv 4 | HTTP routes | S4.1, S4.2 | DONE |
 
 ---
 
@@ -22,10 +22,10 @@
 |---|---|---|---|
 | Phase 0 | Pre-flight | Conv 1 | DONE |
 | Phase 1 | db.py rewrite | Conv 1 | DONE |
-| Phase 2 | Seed data | Conv 2 | TODO |
-| Phase 3 | Caller updates | Conv 2 | TODO |
-| Phase 4 | Services layer | Conv 3 | TODO |
-| Phase 5 | HTTP routes | Conv 4 | TODO |
+| Phase 2 | Seed data | Conv 2 | DONE |
+| Phase 3 | Caller updates | Conv 2 | DONE |
+| Phase 4 | Services layer | Conv 3 | DONE |
+| Phase 5 | HTTP routes | Conv 4 | DONE |
 
 ---
 

@@ -1,5 +1,5 @@
 RESULT: PASS
-db.py rewritten: 12 tables, WAL mode, 18 helpers importable; 446 tests pass (vs 445 baseline)
+Conv 4: HTTP routes via Blueprint: api/__init__.py (11 routes), http_server.py patched (1 line register_blueprint), test_api.py (15 pass); 473 passed total.
 
 ## Phase 0 Pre-flight Output
 
