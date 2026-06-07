@@ -9,12 +9,14 @@ import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
 import { HealthCheck } from './HealthCheck'
 import { OutputTab } from './OutputTab'
+import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
 import styles from './Monitor.module.css'
 
 export function Monitor(): JSX.Element {
   const { activeTopic, activeFlowSessions, activeMonitorTab, setActiveMonitorTab } = useStore()
   const { effectiveTopic, showTabBar } = useMonitorSession()
   const [viewTab, setViewTab] = useState<'events' | 'output'>('events')
+  const [configStage, setConfigStage] = useState<string | null>(null)
 
   if (!activeTopic) {
     return (
@@ -36,7 +38,7 @@ export function Monitor(): JSX.Element {
       <HeaderBar effectiveTopic={effectiveTopic} />
       <PlanProgressSection topic={effectiveTopic} />
       <HealthCheck />
-      <FsmView />
+      <FsmView onStageClick={(stage) => setConfigStage(stage)} />
       <MetricsStrip />
       {/* Sub-tab: Events | Output */}
       <div className={styles.viewTabBar}>
@@ -56,6 +58,9 @@ export function Monitor(): JSX.Element {
         </button>
       </div>
       {viewTab === 'events' ? <EventLog /> : <OutputTab />}
+      {configStage && (
+        <ConfigurePhaseModal stage={configStage} onClose={() => setConfigStage(null)} />
+      )}
     </div>
   )
 }
