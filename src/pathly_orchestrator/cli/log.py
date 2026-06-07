@@ -91,7 +91,6 @@ def _render_event(event: dict) -> str:
         agent = event.get("agent", "?")
         return f"  {time_str}  {etype:<22}  {fname}  agent: {agent}"
 
-    # Generic fallback
     extras = "  ".join(f"{k}: {v}" for k, v in event.items() if k not in skip_keys)
     return f"  {time_str}  {etype:<22}  {extras}"
 
