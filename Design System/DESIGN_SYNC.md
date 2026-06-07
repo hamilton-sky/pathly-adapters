@@ -29,34 +29,42 @@ Replaced hard-coded `px` font-sizes, border-radii, and transitions with token va
 - `components/Monitor/Monitor.module.css`
 - `components/Monitor/StageCard.module.css`
 - `components/Monitor/StageModal.module.css`
+- `components/Monitor/OutputTab.module.css`
 - `components/FlowEditor/shared/panel.module.css`
+- `components/FlowEditor/UnsavedChangesModal.module.css`
+- `components/FlowWizard/FlowWizard.module.css`
+- `components/FlowWizard/WizardFooter/WizardFooter.module.css`
+- `components/FlowWizard/StepIndicator/StepIndicator.module.css`
+- `components/FlowWizard/Step0Entry–Step7TransitionRules` (8 step files)
+- `components/FlowWizard/YamlPreview/YamlPreview.module.css`
+- `components/Settings/RadioCard.module.css`
+- `components/Settings/PaletteSwatch.module.css`
+- `components/SetupScreen/SetupScreen.module.css`
+
+### Shared components (DS → Studio)
+All ported as TypeScript + CSS modules under `components/ui/`:
+- **Badge** — `Badge/Badge.tsx` + `Badge.module.css`; 5 preset variants (`core/flow/integration/body/neutral`) + custom color via `--badge-color`; replaced old `useTheme()` version
+- **StatePill** — `StatePill/StatePill.tsx` + `StatePill.module.css`; FSM stage dot + label, tint + solid modes
+- **ProgressBar** — `ProgressBar/ProgressBar.tsx` + `ProgressBar.module.css`; dynamic width/color via CSS custom properties
+- **Spinner** — `Spinner/Spinner.tsx` + `Spinner.module.css`; size + color via CSS custom properties
+- **Tabs** — `Tabs/Tabs.tsx` + `Tabs.module.css`; underline (in-panel) and pill (view-switch) variants, count badges
+- **Card** — `Card/Card.tsx` + `Card.module.css`; optional title/actions header, interactive hover mode
+- **Input** — moved to `Input/Input.tsx`; added `label`, `icon`, `size` props matching DS spec
+- **Button** — added `icon` prop (leading icon slot)
 
 ---
 
 ## Left to do
 
 ### Token adoption — remaining CSS files
-Hard-coded pixel values still exist in these files (not yet swept):
-- `components/FlowWizard/**/*.module.css` (8 step files)
-- `components/Monitor/OutputTab.module.css`
-- `components/FlowEditor/VisualView/**/*.module.css` (StateNode, ExportControls, etc.)
-- `components/topbar/**` (no module.css found yet — verify)
-- `components/Settings/RadioCard.module.css`, `PaletteSwatch.module.css`
-- `components/HQ/**/*.module.css` (StepQueue, ThinkingBlock, FlowControlBar, etc.)
-- `components/Terminal/**`
-- `components/SetupScreen/SetupScreen.module.css`
+- `components/FlowEditor/VisualView/parts/ExportControls.module.css` — non-standard values (`border-radius: 7px`, `font-size: 12.5px`), skip or add custom tokens
+- `components/HQ/**/*.module.css` — not yet swept
+- `components/Terminal/**/*.module.css` — not yet swept
+- `components/topbar/**/*.module.css` — verify existence
 
-### Components — spec gaps still open
-| Component | Gap |
+### Components — open verification
+| Component | Status |
 |---|---|
-| **Input** | No `label` prop, no leading icon support (DS spec has both) |
-| **Button** | No `icon` prop (DS Button accepts an icon slot) |
-| **Badge** | Studio `Badge.tsx` exists but doesn't match DS spec variants (`core`, `flow`, `integration`) |
-| **StatePill** | Not ported as a standalone component — used ad-hoc in `Monitor` |
-| **ProgressBar** | DS component exists; Studio uses inline progress bars without a shared component |
-| **Spinner** | DS component exists; Studio has its own inline loader — no shared component |
-| **Tabs** | DS has underline + pill variants; Studio uses ad-hoc tab patterns |
-| **Card** | DS component exists; Studio has no shared Card component |
 | **Tooltip** | Studio `Tooltip.tsx` exists — verify it matches DS spec |
 | **ContextMenu** | Studio `ContextMenu.tsx` exists — verify it matches DS spec |
 
@@ -74,6 +82,7 @@ UI kit HTML files in `Design System/ui_kits/` and the root-level mocks:
 
 ---
 
-## Commit reference
-`feat: sync design system tokens + component token adoption`
-Branch merged into: `hamiton/backend-refactor`
+## Commit references
+- `feat: sync design system tokens + component token adoption` — tokens + Button/Input initial update
+- `feat: port DS components + complete token adoption sweep` — 6 new shared components, Input/Button updates, 19 CSS files swept
+Branch: `hamiton/backend-refactor`
