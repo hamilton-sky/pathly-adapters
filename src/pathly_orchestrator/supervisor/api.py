@@ -1,0 +1,154 @@
+"""Public API: start/pause/resume/abort/supply_decision/supply_agent_answer/reroute."""
+
+from __future__ import annotations
+
+import secrets
+import threading
+from typing import Callable, Optional
+
+from .state import RunnerState, logger
+from .registry import _lock, _registry, _write_mirror
+
+
+def start_run(
+    topic: str,
+    flow: str,
+    project_root: str,
+    model: str = "claude-sonnet-4-6",
+    timeout: int = 600,
+    max_iterations: int = 10,
+    max_cost_usd: float = 1.0,
+    autonomy: Optional[dict] = None,
+    broadcast_fn: Optional[Callable] = None,
+    interactive: bool = True,
+) -> RunnerState:
+    """Start a new supervised run for *topic*.  Raises ValueError if already active."""
+    import uuid as _uuid
+    with _lock:
+        existing = _registry.get(topic)
+        if existing and existing.status in {"running", "paused", "awaiting_decision"}:
+            raise ValueError(f"Run for topic {topic!r} is already active (status={existing.status})")
+
+        state = RunnerState(
+            topic=topic,
+            flow=flow,
+            project_root=project_root,
+            model=model,
+            timeout=timeout,
+            max_iterations=max_iterations,
+            max_cost_usd=max_cost_usd,
+            autonomy=autonomy or {},
+            run_id=str(_uuid.uuid4()),
+            _broadcast_fn=broadcast_fn,
+            interactive=interactive,
+        )
+        state.trace_id = secrets.token_hex(16)
+        _registry[topic] = state
+        state.status = "running"
+        _write_mirror(state)
+
+    if broadcast_fn:
+        try:
+            broadcast_fn(
+                topic,
+                {
+                    "type": "RUN_STARTED",
+                    "topic": topic,
+                    "run_id": state.run_id,
+                },
+            )
+        except Exception as exc:
+            logger.warning("broadcast_fn error: %s", exc)
+
+    from .orchestrator import _loop
+    t = threading.Thread(
+        target=_loop,
+        args=(state, broadcast_fn),
+        daemon=True,
+        name=f"supervisor-{topic}",
+    )
+    t.start()
+    return state
+
+
+def pause_run(topic: str) -> None:
+    with _lock:
+        state = _registry.get(topic)
+        if state is None:
+            raise KeyError(topic)
+        state._pause_flag = True
+
+
+def resume_run(topic: str) -> None:
+    with _lock:
+        state = _registry.get(topic)
+        if state is None:
+            raise KeyError(topic)
+        state._pause_flag = False
+
+
+def abort_run(topic: str) -> None:
+    """Hard-kill the in-flight subprocess (if any) and set status=aborted."""
+    with _lock:
+        state = _registry.get(topic)
+        if state is None:
+            raise KeyError(topic)
+        state._abort_flag = True
+        proc = state._proc
+        active_tab_id = state.active_tab_id
+        run_id = state.run_id
+        broadcast_fn = state._broadcast_fn
+
+    if proc is not None:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+    if active_tab_id and broadcast_fn:
+        try:
+            broadcast_fn(
+                topic,
+                {
+                    "type": "TERMINAL_SIGNAL",
+                    "topic": topic,
+                    "signal": "term",
+                    "tab_id": active_tab_id,
+                    "run_id": run_id,
+                },
+            )
+        except Exception as exc:
+            logger.warning("broadcast_fn error: %s", exc)
+
+
+def supply_decision(topic: str, decision: str) -> None:
+    """Supply a decision for an awaiting_decision run."""
+    with _lock:
+        state = _registry.get(topic)
+        if state is None:
+            raise KeyError(topic)
+        if state.status != "awaiting_decision":
+            raise ValueError(f"Topic {topic!r} is not awaiting a decision (status={state.status})")
+        state._decision = decision
+        state._decision_event.set()
+
+
+def supply_agent_answer(topic: str, answer: str) -> None:
+    """Supply a user answer for a stage that asked a question (denied AskUserQuestion)."""
+    with _lock:
+        state = _registry.get(topic)
+        if state is None:
+            raise KeyError(topic)
+        if not state._awaiting_agent_answer:
+            raise ValueError(f"Topic {topic!r} is not awaiting an agent answer")
+        state._agent_question_answer = answer
+        state._agent_question_event.set()
+
+
+def reroute_run(topic: str, adapter: str) -> None:
+    """Override the adapter for the next stage only."""
+    with _lock:
+        state = _registry.get(topic)
+        if state is None:
+            raise KeyError(topic)
+        state._reroute_adapter = adapter

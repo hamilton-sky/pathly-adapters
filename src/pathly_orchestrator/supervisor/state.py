@@ -1,0 +1,110 @@
+"""RunnerState dataclass and related constants."""
+
+from __future__ import annotations
+
+import logging
+import threading
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional
+
+logger = logging.getLogger("pathly.supervisor")
+
+VALID_STATUSES = frozenset(
+    {"idle", "running", "paused", "awaiting_decision", "aborted", "done", "error"}
+)
+
+MAX_FEEDBACK_ROUNDS = 3
+
+
+@dataclass
+class OpenSession:
+    adapter: str
+    session_id: Optional[str]
+    resumable: bool
+
+
+@dataclass
+class RunnerState:
+    topic: str
+    flow: str
+    project_root: str
+    model: str
+    timeout: int
+
+    run_id: str = ""
+    status: str = "idle"
+    current_state: str = ""
+    current_adapter: str = ""
+    iterations: int = 0
+    max_iterations: int = 10
+    cost_usd_so_far: float = 0.0
+    max_cost_usd: float = 1.0
+    # UI-configurable mode: True = visible PTY killed on AGENT_DONE; False = headless/reconciliation
+    interactive: bool = True
+    autonomy: dict = field(default_factory=dict)
+    pending_menu: Optional[dict] = None
+
+    # Internal control flags — written under the registry lock
+    _pause_flag: bool = field(default=False, repr=False, compare=False)
+    _abort_flag: bool = field(default=False, repr=False, compare=False)
+    _decision: Optional[str] = field(default=None, repr=False, compare=False)
+    _decision_event: threading.Event = field(
+        default_factory=threading.Event, repr=False, compare=False
+    )
+
+    # Session continuity
+    open_session: Optional[OpenSession] = field(default=None, repr=False, compare=False)
+
+    # Current subprocess handle — set only while a subprocess is active
+    _proc: Optional[Any] = field(default=None, repr=False, compare=False)
+
+    # Reroute override — set by /runner/reroute for the *next* stage only
+    _reroute_adapter: Optional[str] = field(default=None, repr=False, compare=False)
+
+    # Agent question — set while waiting for user to answer a denied AskUserQuestion
+    _awaiting_agent_answer: bool = field(default=False, repr=False, compare=False)
+    _agent_question_answer: Optional[str] = field(default=None, repr=False, compare=False)
+    _agent_question_event: threading.Event = field(default_factory=threading.Event, repr=False, compare=False)
+
+    # OTel-compatible trace context — set at run start / per stage
+    trace_id: str = ""   # 32-char hex, set once at run start
+    span_id: str = ""    # 16-char hex, set per stage invocation
+
+    # Active terminal tab id — set while a terminal-mode stage is in flight
+    active_tab_id: str = ""
+
+    # Broadcast callback — stored so abort_run() can send SSE without a broadcast_fn arg
+    _broadcast_fn: Optional[Callable] = field(default=None, repr=False, compare=False)
+
+    # Kind string for error state
+    error_kind: Optional[str] = None
+
+    def public_dict(self) -> dict:
+        """Return serialisable state for RUNNER_STATE.json and status API."""
+        return {
+            "topic": self.topic,
+            "flow": self.flow,
+            "project_root": self.project_root,
+            "model": self.model,
+            "timeout": self.timeout,
+            "run_id": self.run_id,
+            "status": self.status,
+            "current_state": self.current_state,
+            "current_adapter": self.current_adapter,
+            "iterations": self.iterations,
+            "max_iterations": self.max_iterations,
+            "cost_usd_so_far": self.cost_usd_so_far,
+            "max_cost_usd": self.max_cost_usd,
+            "autonomy": self.autonomy,
+            "pending_menu": self.pending_menu,
+            "error_kind": self.error_kind,
+            "open_session": (
+                {
+                    "adapter": self.open_session.adapter,
+                    "session_id": self.open_session.session_id,
+                    "resumable": self.open_session.resumable,
+                }
+                if self.open_session
+                else None
+            ),
+        }
