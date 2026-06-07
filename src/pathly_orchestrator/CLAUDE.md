@@ -78,18 +78,69 @@ Every `/next_action` response includes the following top-level fields:
 
 The `orchestrator` agent (haiku) can reconstruct state from the central DB event log if `STATE.json` is lost or corrupt. It is deterministic — same event log always produces the same state.
 
-## Visible runner (supervisor.py)
+## Package structure
 
-`supervisor.py` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.
+Each monolithic file has been decomposed into a sub-package:
+
+```
+pathly_orchestrator/
+  db/                      # SQLite connection, migrations, per-entity query helpers
+    connection.py          # get_db(), _get_write_lock(), connection cache
+    migrations.py          # _run_migrations(), CREATE TABLE SQL
+    queries/
+      fsm_events.py        # append_event, read_events, read_last_agent_done
+      fsm_state.py         # write_state, read_state
+      runner_state.py      # write_runner_state, read_runner_state, mark_stale_runners
+      flow_defs.py / skill_defs.py / agent_defs.py / invocations.py / overrides.py / feedback_items.py
+  runner/                  # CLI runner, agent invocation, argv, output parsing
+    argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
+    output.py              # parse_result, _extract_json_payload
+    events.py              # read_last_agent_done, _patch_last_agent_done, tail_agent_done
+    history.py             # build_pipeline_history_block
+    invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
+    cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
+  supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
+    state.py               # RunnerState, OpenSession dataclasses
+    registry.py            # _registry, _lock, get_state, recover_stale_mirrors
+    terminal.py            # _run_stage_via_terminal, _agent_done_watcher, _reconciliation_window
+    interactions.py        # _await_agent_question
+    orchestrator.py        # _loop, _resolve_stage_supervised
+    api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
+  http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
+    app.py                 # Flask app factory, blueprint registration, main()
+    middleware.py          # _log_request, _log_response, rate limiting, metrics
+    sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
+    pricing.py             # MODEL_PRICING, compute_cost_usd()
+    feedback.py            # _feedback_watcher, _process_feedback_file
+    blueprints/
+      health.py            # GET /health, GET /status, POST /shutdown
+      fsm.py               # POST /next_action, POST /complete_stage
+      runner.py            # all 12 /runner/* routes
+      telemetry.py         # POST /record_activity, POST /record_phase
+      skills.py            # /skills/catalog|parse|preview|export
+      menu.py              # GET /menu/<name>, GET /metrics
+      chat.py              # POST /chat
+      streams.py           # GET /events/menu|runner|history|stream
+```
+
+**Layer rules:**
+- `db/` — no imports from runner, supervisor, or http_server
+- `runner/` — may import db; no imports from supervisor or http_server
+- `supervisor/` — may import db and runner; no imports from http_server
+- `http_server/` — may import all; supervisor/db imports inside route handlers (lazy)
+- Each package's `__init__.py` re-exports all symbols for backward compatibility
+
+## Visible runner (supervisor/)
+
+`supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.
 
 **Stage flow:**
-1. `supervisor.py` calls `/next_action` → gets `agent_hint.instructions` (full prompt)
-2. Builds `argv = ['claude', '-p', '<instructions>', '--model', ..., '--print', '--output-format=json', '--dangerously-skip-permissions']`
-3. Emits `TERMINAL_SPAWN` SSE with `{ tab_id, run_id, argv, cwd, label, adapter }`
-4. Studio opens a PTY tab (`node-pty`) and spawns the process via the `argv`
-5. Studio POSTs `/runner/terminal/started` when PTY is up
-6. PTY exits → `terminal.ts` POSTs `/runner/terminal/result` with exit code and stdout tail
-7. `supervisor.py` receives the result, calls `/complete_stage`, advances to next stage
+1. `supervisor/orchestrator.py` calls `/next_action` → gets `agent_hint.instructions` (full prompt)
+2. `supervisor/terminal.py` builds `argv` and emits `TERMINAL_SPAWN` SSE with `{ tab_id, run_id, argv, cwd, label, adapter }`
+3. Studio opens a PTY tab (`node-pty`) and spawns the process via the `argv`
+4. Studio POSTs `/runner/terminal/started` when PTY is up
+5. PTY exits → `terminal.ts` POSTs `/runner/terminal/result` with exit code and stdout tail
+6. Supervisor receives the result, calls `/complete_stage`, advances to next stage
 
 Same-adapter consecutive stages share a `session_id`. Cross-adapter transitions start a new session.
 
