@@ -80,10 +80,16 @@ All ported as TypeScript + CSS modules under `components/ui/`:
 - DS uses `color-mix(in srgb, ...)` for derived tokens (accent tints, badge backgrounds)
 - Studio uses hard-coded `rgba(...)` equivalents — works in all modern browsers but diverges from the DS source; standardise when convenient
 
+### Monitor — Studio implementation
+- **FsmView** — 22px circle nodes (Check/CircleDot icons), agent labels below each stage, clickable → Configure modal
+- **ConfigurePhaseModal** — new portal component; CLI HOST / AGENT / SKILL radio chips + PROMPT PREVIEW pane; Cancel + Apply footer with "Open skill in Notebook"
+- **HeaderBar** — monospace feature title + `StatePill` for current FSM state
+- Commit: `feat(monitor): configure-phase modal + DS visual alignment`
+
 ### Design System kit updates (separate from Studio)
 UI kit HTML files in `Design System/ui_kits/` and the root-level mocks:
 - `ui_kits/db-explorer/` — updated (CSS extracted, pill position, search bar, Conversations tab)
-- `Monitor.html` — minor fixes pending (PASS/DONE badge chips, token format)
+- `Monitor.html` — matches Studio implementation ✓
 - `Canvas.html` — not yet reviewed
 - `Skill Notebook.html` — not yet reviewed
 - `Flow Builder.html` — not yet reviewed (maps to `FlowWizard`)
@@ -94,4 +100,5 @@ UI kit HTML files in `Design System/ui_kits/` and the root-level mocks:
 - `feat: sync design system tokens + component token adoption` — tokens + Button/Input initial update
 - `feat: port DS components + complete token adoption sweep` — 6 new shared components, Input/Button updates, 19 CSS files swept
 - `feat: token adoption sweep — HQ, Terminal, TopBar, Tooltip, ContextMenu` — 17 HQ + Terminal + TopBar files; Tooltip CSS module; ContextMenu cleanup
+- `feat(monitor): configure-phase modal + DS visual alignment` — FsmView upgrade, ConfigurePhaseModal, HeaderBar StatePill
 Branch: `hamiton/backend-refactor`
