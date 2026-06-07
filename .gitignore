@@ -18,6 +18,9 @@ build/bdist*/
 build/temp*/
 studio/tsconfig.web.tsbuildinfo
 studio/tsconfig.node.tsbuildinfo
-# SQLite WAL/SHM files — ephemeral DB state, never commit
+# SQLite — per-feature db files are legacy; central db is ~/.pathly/pathly.db
+pathly/plans/**/*.db
+pathly/plans/**/*.db-wal
+pathly/plans/**/*.db-shm
 *.db-wal
 *.db-shm
