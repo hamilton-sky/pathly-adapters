@@ -215,12 +215,41 @@ def route_feedback(flow: dict, storage_path: Path) -> dict | None:
     If file is HUMAN_QUESTIONS.md or BLOCKED_ON_HUMAN.md, also include
       "instructions": <file contents>.
     Return None if feedback/ is empty or does not exist.
+
+    Side-effect: syncs found/resolved files to the feedback_items DB table so
+    Studio can query live feedback status without scanning the filesystem.
     """
     feedback_dir = storage_path / "feedback"
     if not feedback_dir.exists():
         return None
 
     md_files = {f.name for f in feedback_dir.iterdir() if f.suffix == ".md"}
+
+    # Sync to DB: record new files, resolve files that have disappeared.
+    try:
+        from pathly_orchestrator.db import (
+            get_db,
+            read_feedback_items,
+            resolve_feedback_item,
+            write_feedback_item,
+        )
+        _conn = get_db()
+        # storage_path is always <project_root>/pathly/plans/<feature>
+        _feature = storage_path.name
+        _project_root = str(storage_path.parent.parent.parent)
+        for _fname in md_files:
+            _content: str | None = None
+            try:
+                _content = (feedback_dir / _fname).read_text(encoding="utf-8")
+            except OSError:
+                pass
+            write_feedback_item(_conn, _project_root, _feature, _fname, _content)
+        for _item in read_feedback_items(_conn, _project_root, _feature):
+            if _item["filename"] not in md_files:
+                resolve_feedback_item(_conn, _project_root, _feature, _item["filename"])
+    except Exception:
+        pass  # DB sync is best-effort; never block the routing decision
+
     if not md_files:
         return None
 

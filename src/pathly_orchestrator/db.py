@@ -155,6 +155,17 @@ CREATE TABLE IF NOT EXISTS agent_definitions (
 
 INSERT OR IGNORE INTO schema_version VALUES (1, datetime('now'));
 
+CREATE TABLE IF NOT EXISTS feedback_items (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_root TEXT NOT NULL,
+    feature      TEXT NOT NULL,
+    filename     TEXT NOT NULL,
+    content      TEXT,
+    created_at   TEXT NOT NULL,
+    resolved_at  TEXT,
+    UNIQUE(project_root, feature, filename)
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_def_name_global
     ON flow_definitions(name) WHERE project_root IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_def_name_proj
@@ -367,6 +378,59 @@ def mark_stale_runners(conn: sqlite3.Connection) -> int:
                 updated += 1
         conn.commit()
         return updated
+
+
+# ---------------------------------------------------------------------------
+# feedback_items helpers
+# ---------------------------------------------------------------------------
+
+def write_feedback_item(
+    conn: sqlite3.Connection,
+    project_root: str,
+    feature: str,
+    filename: str,
+    content: str | None,
+) -> None:
+    """Record an open feedback file. INSERT OR IGNORE — does not overwrite existing rows."""
+    with _get_write_lock(conn):
+        conn.execute(
+            "INSERT OR IGNORE INTO feedback_items "
+            "(project_root, feature, filename, content, created_at) "
+            "VALUES (?, ?, ?, ?, datetime('now'))",
+            (project_root, feature, filename, content),
+        )
+        conn.commit()
+
+
+def read_feedback_items(
+    conn: sqlite3.Connection,
+    project_root: str,
+    feature: str,
+) -> list[dict]:
+    """Return all unresolved feedback items for this feature, oldest first."""
+    rows = conn.execute(
+        "SELECT filename, content, created_at FROM feedback_items "
+        "WHERE project_root=? AND feature=? AND resolved_at IS NULL "
+        "ORDER BY created_at ASC",
+        (project_root, feature),
+    ).fetchall()
+    return [{"filename": r[0], "content": r[1], "created_at": r[2]} for r in rows]
+
+
+def resolve_feedback_item(
+    conn: sqlite3.Connection,
+    project_root: str,
+    feature: str,
+    filename: str,
+) -> None:
+    """Mark a feedback item as resolved (set resolved_at = now)."""
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE feedback_items SET resolved_at=datetime('now') "
+            "WHERE project_root=? AND feature=? AND filename=? AND resolved_at IS NULL",
+            (project_root, feature, filename),
+        )
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------

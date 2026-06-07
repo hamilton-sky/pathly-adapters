@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-import json
 import logging
 import re
 import subprocess
@@ -428,7 +427,12 @@ def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -
 
 
 def _count_planned_convs(storage_path: Path) -> int:
-    """Count unique conversation numbers in the # column of PROGRESS.md."""
+    """Return convs_total from DB state, falling back to PROGRESS.md on first run."""
+    from pathly_orchestrator import eventlog as _el
+    state = _el.read_state(str(storage_path))
+    if state and state.get("convs_total") is not None:
+        return int(state["convs_total"])
+    # First-run: DB has no convs_total yet — read from PROGRESS.md to bootstrap.
     progress_file = storage_path / "PROGRESS.md"
     if not progress_file.exists():
         return 0
@@ -488,13 +492,8 @@ def next_action(args: dict) -> dict:
             "storage_path": str(storage_path),
         }
 
-    state_file = storage_path / "STATE.json"
-    prior_state: dict = {}
-    if state_file.exists():
-        try:
-            prior_state = json.loads(state_file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            prior_state = {}
+    from pathly_orchestrator import eventlog as _eventlog
+    prior_state: dict = _eventlog.read_state(str(storage_path)) or {}
 
     stamped_state = dict(prior_state)
     needs_write = False
@@ -609,13 +608,8 @@ def complete_stage(args: dict) -> dict:
                     storage_path, {"type": "FEEDBACK_RESOLVED", "file": filename}
                 )
 
-    state_file = storage_path / "STATE.json"
-    state_before: dict | None = None
-    if state_file.exists():
-        try:
-            state_before = json.loads(state_file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            state_before = None
+    from pathly_orchestrator import eventlog as _eventlog
+    state_before: dict | None = _eventlog.read_state(str(storage_path))
 
     try:
         state_info = recover_state(storage_path, flow_config)
@@ -724,14 +718,6 @@ def complete_stage(args: dict) -> dict:
             except Exception:
                 result["instructions"] = None
         return result
-
-    if state_before is not None and state_file.exists():
-        try:
-            state_after = json.loads(state_file.read_text(encoding="utf-8"))
-            if state_after.get("current") != state_before.get("current"):
-                raise RuntimeError("STATE.json modified externally during transition")
-        except (json.JSONDecodeError, OSError):
-            pass
 
     run_transition_actions(
         flow_config,

@@ -14,9 +14,12 @@ from pathly_orchestrator.db import (
     get_db,
     mark_stale_runners,
     read_events,
+    read_feedback_items,
     read_last_agent_done,
     read_runner_state,
     read_state,
+    resolve_feedback_item,
+    write_feedback_item,
     write_runner_state,
     write_state,
 )
@@ -44,6 +47,7 @@ def test_get_db_creates_tables(tmp_path: Path) -> None:
     assert "flow_definitions" in tables
     assert "agent_definitions" in tables
     assert "skill_definitions" in tables
+    assert "feedback_items" in tables
 
 
 def test_get_db_cached(tmp_path: Path) -> None:
@@ -318,6 +322,46 @@ def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
     assert len(result) == 2
     assert result[0]["type"] == "STATE_TRANSITION"
     assert result[1]["type"] == "AGENT_DONE"
+
+
+# ---------------------------------------------------------------------------
+# feedback_items tests
+# ---------------------------------------------------------------------------
+
+def test_write_and_read_feedback_items(tmp_path: Path) -> None:
+    conn = get_db()
+    write_feedback_item(conn, _PROJECT_ROOT, "feat-fb", "REVIEW_FAILURES.md", "fix this")
+    write_feedback_item(conn, _PROJECT_ROOT, "feat-fb", "TEST_FAILURES.md", "test failed")
+
+    items = read_feedback_items(conn, _PROJECT_ROOT, "feat-fb")
+    assert len(items) == 2
+    filenames = {i["filename"] for i in items}
+    assert filenames == {"REVIEW_FAILURES.md", "TEST_FAILURES.md"}
+
+
+def test_write_feedback_item_idempotent(tmp_path: Path) -> None:
+    conn = get_db()
+    write_feedback_item(conn, _PROJECT_ROOT, "feat-fb2", "REVIEW_FAILURES.md", "v1")
+    write_feedback_item(conn, _PROJECT_ROOT, "feat-fb2", "REVIEW_FAILURES.md", "v2")
+
+    items = read_feedback_items(conn, _PROJECT_ROOT, "feat-fb2")
+    assert len(items) == 1
+    assert items[0]["content"] == "v1"  # INSERT OR IGNORE: original content preserved
+
+
+def test_resolve_feedback_item(tmp_path: Path) -> None:
+    conn = get_db()
+    write_feedback_item(conn, _PROJECT_ROOT, "feat-fb3", "REVIEW_FAILURES.md", "fix me")
+    resolve_feedback_item(conn, _PROJECT_ROOT, "feat-fb3", "REVIEW_FAILURES.md")
+
+    items = read_feedback_items(conn, _PROJECT_ROOT, "feat-fb3")
+    assert items == []
+
+
+def test_read_feedback_items_empty(tmp_path: Path) -> None:
+    conn = get_db()
+    items = read_feedback_items(conn, _PROJECT_ROOT, "feat-fb-missing")
+    assert items == []
 
 
 def test_recover_stale_mirrors_no_db(tmp_path: Path) -> None:
