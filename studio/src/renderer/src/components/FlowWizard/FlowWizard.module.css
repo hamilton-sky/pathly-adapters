@@ -13,7 +13,7 @@
   background: linear-gradient(180deg, var(--theme-bg-mantle) 0%, var(--theme-bg-base) 100%);
   border: 1px solid var(--theme-bg-surface0);
   border-radius: 14px;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+  box-shadow: var(--shadow-modal);
   display: flex;
   flex-direction: column;
 }
@@ -28,7 +28,7 @@
   height: 3px;
   background: var(--theme-bg-surface0);
   margin: 0 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -40,8 +40,8 @@
   appearance: none;
 }
 .progressWrap > progress::-webkit-progress-bar { background: transparent; }
-.progressWrap > progress::-webkit-progress-value { background: var(--theme-accent); border-radius: 999px; }
-.progressWrap > progress::-moz-progress-bar { background: var(--theme-accent); border-radius: 999px; }
+.progressWrap > progress::-webkit-progress-value { background: var(--theme-accent); border-radius: var(--radius-full); }
+.progressWrap > progress::-moz-progress-bar { background: var(--theme-accent); border-radius: var(--radius-full); }
 .content {
   flex: 1;
   overflow-y: auto;

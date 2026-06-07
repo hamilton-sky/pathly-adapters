@@ -1,7 +1,7 @@
 .root { display: block; }
 .title { font-size: var(--font-size-lg); font-weight: 600; color: var(--theme-text-primary); margin-bottom: 4px; }
 .sub { font-size: var(--font-size-sm); color: var(--theme-text-muted); margin-bottom: 20px; }
-.accordion { border: 1px solid var(--theme-bg-surface0); border-radius: 6px; margin-bottom: 12px; overflow: hidden; }
+.accordion { border: 1px solid var(--theme-bg-surface0); border-radius: var(--radius-md); margin-bottom: 12px; overflow: hidden; }
 .accordionBtn {
   width: 100%;
   background: none;
@@ -17,6 +17,6 @@
   text-align: left;
 }
 .accordionMeta { display: flex; align-items: center; gap: 8px; }
-.accordionCount { font-size: 11px; color: var(--theme-text-muted); }
+.accordionCount { font-size: var(--font-size-sm); color: var(--theme-text-muted); }
 .accordionChevron { color: var(--theme-text-muted); }
 .accordionPanel { padding: 0 14px 14px; }

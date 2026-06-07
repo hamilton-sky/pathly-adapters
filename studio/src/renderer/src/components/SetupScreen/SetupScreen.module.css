@@ -44,7 +44,7 @@
 
 .log {
   background-color: #181825;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 12px;
   height: 240px;
   overflow-y: auto;
@@ -55,7 +55,7 @@
 
 .logLine {
   font-family: monospace;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: #a6adc8;
   white-space: pre-wrap;
   word-break: break-all;
@@ -67,12 +67,12 @@
   gap: 10px;
   background-color: #2a1a1a;
   border: 1px solid #f38ba8;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 12px;
 }
 
 .errorText {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: #f38ba8;
   white-space: pre-wrap;
   word-break: break-all;
@@ -81,10 +81,10 @@
 .retryButton {
   align-self: flex-start;
   padding: 6px 16px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   background-color: #313244;
   color: #cdd6f4;
   border: 1px solid #45475a;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }

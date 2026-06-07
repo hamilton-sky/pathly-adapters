@@ -1,0 +1,28 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.track {
+  flex: 1;
+  height: var(--pb-height, 6px);
+  background: var(--bg-surface1);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.fill {
+  width: var(--pb-pct, 0%);
+  height: 100%;
+  background: var(--pb-color, var(--accent));
+  border-radius: var(--radius-full);
+  transition: width var(--transition-base);
+}
+
+.label {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}

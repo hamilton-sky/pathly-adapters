@@ -1,0 +1,49 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* tint variants (default) */
+.pill[data-state="PLANNING"]  { color: var(--state-planning);  background: color-mix(in srgb, var(--state-planning) 13%, transparent);  border-color: color-mix(in srgb, var(--state-planning) 38%, transparent); }
+.pill[data-state="BUILDING"]  { color: var(--state-building);  background: color-mix(in srgb, var(--state-building) 13%, transparent);  border-color: color-mix(in srgb, var(--state-building) 38%, transparent); }
+.pill[data-state="REVIEWING"] { color: var(--state-reviewing); background: color-mix(in srgb, var(--state-reviewing) 13%, transparent); border-color: color-mix(in srgb, var(--state-reviewing) 38%, transparent); }
+.pill[data-state="TESTING"]   { color: var(--state-testing);   background: color-mix(in srgb, var(--state-testing) 13%, transparent);   border-color: color-mix(in srgb, var(--state-testing) 38%, transparent); }
+.pill[data-state="RETRO"]     { color: var(--state-retro);     background: color-mix(in srgb, var(--state-retro) 13%, transparent);     border-color: color-mix(in srgb, var(--state-retro) 38%, transparent); }
+.pill[data-state="DONE"]      { color: var(--state-done);      background: color-mix(in srgb, var(--state-done) 13%, transparent);      border-color: color-mix(in srgb, var(--state-done) 38%, transparent); }
+.pill[data-state="ERROR"]     { color: var(--state-error);     background: color-mix(in srgb, var(--state-error) 13%, transparent);     border-color: color-mix(in srgb, var(--state-error) 38%, transparent); }
+.pill[data-state="IDLE"]      { color: var(--text-muted);      background: color-mix(in srgb, var(--text-muted) 10%, transparent);      border-color: color-mix(in srgb, var(--text-muted) 25%, transparent); }
+
+.pill[data-state="PLANNING"]  .dot { background: var(--state-planning); }
+.pill[data-state="BUILDING"]  .dot { background: var(--state-building); }
+.pill[data-state="REVIEWING"] .dot { background: var(--state-reviewing); }
+.pill[data-state="TESTING"]   .dot { background: var(--state-testing); }
+.pill[data-state="RETRO"]     .dot { background: var(--state-retro); }
+.pill[data-state="DONE"]      .dot { background: var(--state-done); }
+.pill[data-state="ERROR"]     .dot { background: var(--state-error); }
+.pill[data-state="IDLE"]      .dot { background: var(--text-muted); }
+
+/* solid variant */
+.solid { color: var(--bg-mantle); }
+.solid .dot { background: var(--bg-mantle); }
+.solid[data-state="PLANNING"]  { background: var(--state-planning);  border-color: var(--state-planning); }
+.solid[data-state="BUILDING"]  { background: var(--state-building);  border-color: var(--state-building); }
+.solid[data-state="REVIEWING"] { background: var(--state-reviewing); border-color: var(--state-reviewing); }
+.solid[data-state="TESTING"]   { background: var(--state-testing);   border-color: var(--state-testing); }
+.solid[data-state="RETRO"]     { background: var(--state-retro);     border-color: var(--state-retro); }
+.solid[data-state="DONE"]      { background: var(--state-done);      border-color: var(--state-done); }
+.solid[data-state="ERROR"]     { background: var(--state-error);     border-color: var(--state-error); }

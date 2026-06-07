@@ -20,7 +20,7 @@
   color: var(--theme-text-muted);
   flex-shrink: 0;
   cursor: default;
-  transition: transform 120ms ease;
+  transition: transform var(--transition-fast) ease;
 }
 .dotActive { background: var(--theme-accent); color: var(--theme-bg-base); }
 .dotDone { background: var(--theme-green); color: var(--theme-bg-base); cursor: pointer; }

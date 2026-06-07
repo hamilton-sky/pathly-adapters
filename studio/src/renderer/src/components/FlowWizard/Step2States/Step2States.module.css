@@ -7,20 +7,20 @@
   flex: 1;
   background: var(--theme-bg-base);
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-text-primary);
   font-size: var(--font-size-base);
   padding: 6px 10px;
   outline: none;
   font-family: monospace;
 }
-.tag { font-size: 11px; color: var(--theme-text-muted); flex-shrink: 0; }
+.tag { font-size: var(--font-size-sm); color: var(--theme-text-muted); flex-shrink: 0; }
 .remove {
   background: none;
   border: none;
   color: var(--theme-text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   padding: 0 4px;
   line-height: 1;
   flex-shrink: 0;
@@ -28,14 +28,14 @@
 .add {
   background: none;
   border: 1px dashed var(--theme-bg-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-blue);
   cursor: pointer;
   font-size: var(--font-size-sm);
   padding: 6px 12px;
   margin-top: 4px;
 }
-.previewLabel { margin-top: 18px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--theme-text-muted); margin-bottom: 8px; }
+.previewLabel { margin-top: 18px; font-size: var(--font-size-xs); font-weight: 700; letter-spacing: 0.08em; color: var(--theme-text-muted); margin-bottom: 8px; }
 .previewBox {
   display: flex;
   flex-wrap: wrap;
@@ -44,10 +44,10 @@
   padding: 10px 12px;
   background: var(--theme-bg-base);
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 .pill {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-family: monospace;
   background: rgba(137,180,250,0.12);
   border: 1px solid rgba(137,180,250,0.25);

@@ -4,12 +4,12 @@
 .choiceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
 .choiceCard {
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 14px;
   cursor: pointer;
   background: var(--theme-bg-base);
   text-align: left;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  transition: transform var(--transition-fast) ease, border-color var(--transition-fast) ease, box-shadow var(--transition-fast) ease, background-color var(--transition-fast) ease;
 }
 .choiceCard:hover {
   transform: translateY(-1px);
@@ -25,19 +25,19 @@
 .sectionLabel {
   margin-bottom: 8px;
   color: var(--theme-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 .templateList { display: grid; gap: 10px; }
 .templateCard {
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 14px;
   cursor: pointer;
   background: var(--theme-bg-base);
   text-align: left;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  transition: transform var(--transition-fast) ease, border-color var(--transition-fast) ease, box-shadow var(--transition-fast) ease, background-color var(--transition-fast) ease;
 }
 .templateCard:hover {
   transform: translateY(-1px);
@@ -54,12 +54,12 @@
   color: var(--theme-text-muted);
   margin-top: 6px;
   font-family: monospace;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 .resumeCard {
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 14px;
   margin-top: 16px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.18);
@@ -73,12 +73,12 @@
   gap: 6px;
   background: none;
   border: 1px dashed var(--theme-bg-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-blue);
   cursor: pointer;
   font-size: var(--font-size-sm);
   padding: 6px 12px;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  transition: transform var(--transition-fast) ease, border-color var(--transition-fast) ease, box-shadow var(--transition-fast) ease;
 }
 .addBtn:hover {
   transform: translateY(-1px);
