@@ -33,6 +33,14 @@ from pathly_orchestrator import db as _db
 
 CURRENT_SCHEMA_VERSION = 1
 
+_TOAST_EVENTS: dict[str, tuple[str, object]] = {
+    "STATE_TRANSITION": ("info",    lambda e: f"{e.get('from','?')} → {e.get('to','?')}"),
+    "AGENT_DONE":       ("success", lambda e: (e.get("summary") or e.get("result") or "Agent done")[:80]),
+    "GATE_FAILED":      ("warning", lambda e: f"Gate blocked: {(e.get('reason') or e.get('gate',''))[:60]}"),
+    "FEEDBACK_RESOLVED":("info",    lambda e: f"Feedback resolved: {e.get('file','')[:50]}"),
+    "RETRY":            ("info",    lambda e: f"Retrying stage: {e.get('stage','')}"),
+}
+
 
 def _db_only() -> bool:
     """DB-only mode is on by default. Set PATHLY_DB_ONLY=0 to re-enable file fallbacks."""
@@ -86,6 +94,20 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
     feature = feature_dir.name
     project_root = str(feature_dir.parent.parent.parent)
     _db.append_event(conn, project_root, feature, event)
+
+    event_type = event.get("type", "")
+    if event_type in _TOAST_EVENTS:
+        level, msg_fn = _TOAST_EVENTS[event_type]
+        try:
+            from pathly_orchestrator.http_server.sse import _broadcast_runner
+            _broadcast_runner(feature, {
+                "type": "TOAST",
+                "level": level,
+                "message": msg_fn(event),  # type: ignore[operator]
+                "feature": feature,
+            })
+        except Exception:
+            pass  # SSE is best-effort — never crash event logging
 
 
 def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:

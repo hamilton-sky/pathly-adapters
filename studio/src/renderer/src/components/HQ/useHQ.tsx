@@ -334,6 +334,10 @@ export function useHQ() {
               // → historical card appears (collapsed) in its place
               useRunnerStore.getState().snapshotRun()
               useRunnerStore.getState().setRunnerState({ status: (data.status as RunnerStatus) ?? 'idle' })
+            } else if (data.type === 'TOAST') {
+              const rawLevel = data.level as string | undefined
+              const variant = (rawLevel === 'success' || rawLevel === 'error') ? rawLevel : 'info'
+              useToastStore.getState().push((data.message as string) ?? '', variant)
             }
           } catch { /* ignore parse errors */ }
         }
