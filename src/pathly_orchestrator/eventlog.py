@@ -69,7 +69,7 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
                     f"Must be one of {sorted(states)}"
                 )
 
-    feature_dir = _resolve_path(storage_path)
+    feature_dir = _resolve_path(storage_path).resolve()
     event.setdefault("schema_version", CURRENT_SCHEMA_VERSION)
     if "ts" not in event:
         event["ts"] = _now()
@@ -83,6 +83,7 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
 
 def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:
     """Write state to SQLite (and STATE.json as a snapshot). Called by write_state() after validation."""
+    feature_dir = feature_dir.resolve()
     feature_dir.mkdir(parents=True, exist_ok=True)
     if "updated_at" not in state:
         state["updated_at"] = _now()
@@ -115,7 +116,7 @@ def write_state(storage_path: str, state: dict, flow: dict | None = None) -> Non
                 f"Invalid state: {new_current!r}. Must be one of {sorted(states)}"
             )
 
-    feature_dir = _resolve_path(storage_path)
+    feature_dir = _resolve_path(storage_path).resolve()
     if new_current is not None:
         existing = read_state(storage_path)
         if existing is not None:
@@ -139,7 +140,7 @@ write_state.__wrapped__ = _write_state_db  # type: ignore[attr-defined]
 
 
 def read_events(storage_path: str) -> list[dict]:
-    feature_dir = _resolve_path(storage_path)
+    feature_dir = _resolve_path(storage_path).resolve()
     project_root = str(feature_dir.parent.parent.parent)
     conn = _db.get_db()
     events = _db.read_events(conn, project_root, feature_dir.name)
@@ -174,7 +175,7 @@ def read_events(storage_path: str) -> list[dict]:
 
 
 def read_state(storage_path: str) -> dict | None:
-    feature_dir = _resolve_path(storage_path)
+    feature_dir = _resolve_path(storage_path).resolve()
     project_root = str(feature_dir.parent.parent.parent)
     conn = _db.get_db()
     result = _db.read_state(conn, project_root, feature_dir.name)

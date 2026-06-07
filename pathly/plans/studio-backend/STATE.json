@@ -1,5 +1,14 @@
 {
-  "convs_done": 1,
+  "feature": "studio-backend",
   "current": "BUILDING",
-  "updated_at": "2026-06-07T08:36:31Z"
+  "rigor": null,
+  "current_conversation": null,
+  "retry_count_by_key": null,
+  "iteration_by_stage": null,
+  "updated_at": "2026-06-07T08:36:31Z",
+  "conv_start_sha": null,
+  "convs_total": null,
+  "convs_done": 2,
+  "build_baseline": null,
+  "extra": null
 }

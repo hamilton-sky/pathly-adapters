@@ -113,6 +113,16 @@ def test_read_last_agent_done_none(tmp_path: Path) -> None:
     assert result is None
 
 
+def test_project_root_isolation_different_roots_same_feature():
+    from pathly_orchestrator.db import get_db, append_event, read_events
+    conn = get_db()
+    append_event(conn, '/project/alpha', 'feat-x', {'type': 'TEST', 'ts': '2026-01-01', 'payload': '{}'})
+    events_beta = read_events(conn, '/project/beta', 'feat-x')
+    assert events_beta == [], f'Cross-project bleed: {events_beta}'
+    events_alpha = read_events(conn, '/project/alpha', 'feat-x')
+    assert len(events_alpha) == 1
+
+
 # ---------------------------------------------------------------------------
 # fsm_state tests
 # ---------------------------------------------------------------------------
@@ -262,8 +272,8 @@ def test_legacy_read_state_from_json(tmp_path: Path) -> None:
     """eventlog.read_state falls back to STATE.json when no pathly.db exists."""
     import pathly_orchestrator.eventlog as eventlog
 
-    feature_dir = tmp_path / "my-feature"
-    feature_dir.mkdir()
+    feature_dir = tmp_path / "pathly" / "plans" / "my-feature"
+    feature_dir.mkdir(parents=True, exist_ok=True)
     state = {
         "current": "BUILD",
         "rigor": "standard",
@@ -285,8 +295,8 @@ def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
     """eventlog.read_events falls back to EVENTS.jsonl when no pathly.db exists."""
     import pathly_orchestrator.eventlog as eventlog
 
-    feature_dir = tmp_path / "my-feature"
-    feature_dir.mkdir()
+    feature_dir = tmp_path / "pathly" / "plans" / "my-feature"
+    feature_dir.mkdir(parents=True, exist_ok=True)
     lines = [
         json.dumps({"type": "STATE_TRANSITION", "ts": "2026-01-01T00:00:01Z", "to": "BUILD", "schema_version": 1}),
         "not valid json",
