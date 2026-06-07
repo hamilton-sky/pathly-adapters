@@ -1,10 +1,32 @@
 .canvas {
-  display: flex;
-  flex-direction: column;
   flex: 1;
   overflow-y: auto;
-  padding: 8px 0;
-  min-height: 0;
+  min-width: 0;
+  padding: 26px 0 60px;
+  background-color: var(--bg-base);
+  background-image: radial-gradient(rgba(136, 153, 176, 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.col {
+  width: 680px;
+  max-width: calc(100% - 56px);
+  margin: 0 auto;
+}
+
+.nbTitle {
+  font-family: var(--font-family-mono);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.nbMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  font-family: var(--font-family-mono);
 }
 
 .empty {

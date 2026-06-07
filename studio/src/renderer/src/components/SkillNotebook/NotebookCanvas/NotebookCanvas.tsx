@@ -15,6 +15,9 @@ export default function NotebookCanvas() {
   const [isDragging, setIsDragging] = useState(false)
   const [newCellId, setNewCellId] = useState<string | null>(null)
 
+  const pathParts = skillNotebookPath ? skillNotebookPath.replace(/\\/g, '/').split('/') : []
+  const skillName = pathParts[pathParts.length - 1]?.replace('.md', '') ?? ''
+
   useEffect(() => {
     if (skillNotebookPath) {
       loadSkill(skillNotebookPath)
@@ -63,42 +66,50 @@ export default function NotebookCanvas() {
       onDrop={handleCanvasDrop}
       onDragLeave={handleCanvasDragLeave}
     >
-      <InsertZone
-        afterCellId={null}
-        dragActive={activeZone === 'first'}
-        isDragging={isDragging}
-        onDragOver={() => setActiveZone('first')}
-        onDrop={(e) => handleInsertZoneDrop(null, e)}
-        onDragLeave={() => setActiveZone(null)}
-      />
-      {cells.map(cell => (
-        <React.Fragment key={cell.id}>
-          {cell.type === 'body' ? (
-            <BodyCell heading={cell.heading} content={cell.content} />
-          ) : (
-            <FragmentCell
-              id={cell.id}
-              fragmentName={cell.fragmentName}
-              category={cell.category}
-              description={cell.description}
-              isNew={cell.id === newCellId}
+      <div className={styles.col}>
+        {skillName && (
+          <>
+            <h2 className={styles.nbTitle}>{skillName}</h2>
+            <p className={styles.nbMeta}>{cells.length} cells · edited just now</p>
+          </>
+        )}
+        <InsertZone
+          afterCellId={null}
+          dragActive={activeZone === 'first'}
+          isDragging={isDragging}
+          onDragOver={() => setActiveZone('first')}
+          onDrop={(e) => handleInsertZoneDrop(null, e)}
+          onDragLeave={() => setActiveZone(null)}
+        />
+        {cells.map(cell => (
+          <React.Fragment key={cell.id}>
+            {cell.type === 'body' ? (
+              <BodyCell heading={cell.heading} content={cell.content} />
+            ) : (
+              <FragmentCell
+                id={cell.id}
+                fragmentName={cell.fragmentName}
+                category={cell.category}
+                description={cell.description}
+                isNew={cell.id === newCellId}
+              />
+            )}
+            <InsertZone
+              afterCellId={cell.id}
+              dragActive={activeZone === cell.id}
+              isDragging={isDragging}
+              onDragOver={() => setActiveZone(cell.id)}
+              onDrop={(e) => handleInsertZoneDrop(cell.id, e)}
+              onDragLeave={() => setActiveZone(null)}
             />
-          )}
-          <InsertZone
-            afterCellId={cell.id}
-            dragActive={activeZone === cell.id}
-            isDragging={isDragging}
-            onDragOver={() => setActiveZone(cell.id)}
-            onDrop={(e) => handleInsertZoneDrop(cell.id, e)}
-            onDragLeave={() => setActiveZone(null)}
-          />
-        </React.Fragment>
-      ))}
-      {cells.length === 0 && (
-        <div className={styles.empty}>
-          Load a skill file to start editing
-        </div>
-      )}
+          </React.Fragment>
+        ))}
+        {cells.length === 0 && (
+          <div className={styles.empty}>
+            Load a skill file to start editing
+          </div>
+        )}
+      </div>
     </div>
   )
 }

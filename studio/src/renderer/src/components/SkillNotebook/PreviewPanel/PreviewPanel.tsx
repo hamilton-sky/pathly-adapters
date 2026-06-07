@@ -4,8 +4,7 @@ import styles from './PreviewPanel.module.css'
 import PreviewSection from './PreviewSection/PreviewSection'
 
 export default function PreviewPanel() {
-  const { cells, featurePath, previewSections, previewTokens, previewLoading, setPreview, setPreviewLoading, setFeaturePath } = useSkillNotebookStore()
-  const [rawMode, setRawMode] = React.useState(false)
+  const { cells, featurePath, previewSections, previewTokens, previewLoading, setPreview, setPreviewLoading } = useSkillNotebookStore()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -30,39 +29,30 @@ export default function PreviewPanel() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [cells, featurePath])
 
-  const rawText = previewSections.map(s => `## ${s.heading}\n${s.content}`).join('\n\n')
+  const cellCount = previewSections.length
 
   return (
     <div className={styles.root}>
-      <div className={styles.toolbar}>
-        <input
-          className={styles.featureInput}
-          placeholder="Feature path…"
-          value={featurePath ?? ''}
-          onChange={e => setFeaturePath(e.target.value || null)}
-        />
-        <button
-          type="button"
-          className={styles.rawToggle}
-          onClick={() => setRawMode(r => !r)}
-        >
-          {rawMode ? 'Sections' : 'Raw'}
-        </button>
+      <div className={styles.pvHead}>
+        <span>Preview</span>
+        <div className={styles.pvHeadSpacer} />
+        <span className={styles.liveBadge}>
+          <span className={styles.liveDot} />
+          live
+        </span>
       </div>
-      <div className={`${styles.sections} ${previewLoading ? styles.loading : ''}`}>
-        {rawMode ? (
-          <pre className={styles.raw}>{rawText}</pre>
-        ) : (
-          previewSections.map((s, i) => (
-            <PreviewSection key={i} heading={s.heading} content={s.content} origin={s.origin} />
-          ))
-        )}
+
+      <div className={`${styles.pvBody} ${previewLoading ? styles.loading : ''}`}>
+        {previewSections.map((s, i) => (
+          <PreviewSection key={i} heading={s.heading} content={s.content} origin={s.origin} />
+        ))}
         {previewSections.length === 0 && !previewLoading && (
           <div className={styles.empty}>Add fragments to see preview</div>
         )}
       </div>
-      <div className={styles.tokenBar}>
-        ~{previewTokens} tokens estimated
+
+      <div className={styles.pvFoot}>
+        {cellCount} cells · ≈ {previewTokens} tokens · compiled clean
       </div>
     </div>
   )

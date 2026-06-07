@@ -1,27 +1,64 @@
 .zone {
-  height: 6px;
-  margin: 0 8px;
-  border-radius: 3px;
-  transition: height 150ms ease-out, background 150ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .zone {
-    transition: none;
-  }
-}
-
-.zone.active {
-  height: 32px;
-  background: var(--insert-zone-active);
+  height: 16px;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.label {
-  font-size: 10px;
+.zone::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.zone:hover::before {
+  opacity: 0.4;
+}
+
+.zone.dragActive::before {
+  opacity: 1;
+  height: 2px;
+}
+
+.plus {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-surface1);
+  border: var(--border);
   color: var(--accent);
-  font-weight: var(--font-weight-medium);
-  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s;
+  z-index: 1;
+  position: relative;
+}
+
+.zone:hover .plus {
+  opacity: 1;
+}
+
+.zone.dragActive {
+  height: 10px;
+}
+
+.zone.dragActive .plus {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zone::before,
+  .plus {
+    transition: none;
+  }
 }

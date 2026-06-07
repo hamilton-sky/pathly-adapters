@@ -1,56 +1,110 @@
 .cell {
   position: relative;
-  border-left: 3px solid var(--accent);
+  border: var(--border);
+  border-radius: var(--radius-lg);
   background: var(--bg-surface0);
-  border-radius: 0 4px 4px 0;
-  margin: 0 8px;
-  padding: 6px 8px 6px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  margin: 0 0 2px;
+  transition: box-shadow 0.12s, border-color 0.12s;
 }
 
-.header {
+.cell:hover {
+  border-color: var(--accent-border);
+}
+
+.cellHead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
+  gap: 9px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle-color);
+  background: var(--accent-bg);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
-.heading {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--accent);
+.title {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.lock {
-  color: var(--text-muted);
+.typeBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--accent);
+  background: var(--accent-bg);
   flex-shrink: 0;
 }
 
+.lock {
+  color: var(--text-muted);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+
+.cell:hover .actions {
+  opacity: 1;
+}
+
+.actionBtn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.actionBtn:hover {
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
+.cellBody {
+  padding: 11px 14px 13px;
+}
+
 .content {
-  font-size: 11px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
   color: var(--text-secondary);
   white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-  font-family: var(--font-family-base);
-  line-height: 1.5;
+  font-family: inherit;
 }
 
 .toggle {
   background: none;
   border: none;
-  padding: 0;
+  padding: 4px 0 0;
   font-size: 10px;
   color: var(--text-muted);
   cursor: pointer;
   align-self: flex-start;
   font-family: var(--font-family-base);
+  display: block;
 }
 
 .toggle:hover {

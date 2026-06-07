@@ -1,27 +1,37 @@
 import React, { useState } from 'react'
-import { Undo2, Redo2 } from 'lucide-react'
+import {
+  ArrowLeft, Undo2, Redo2, Database, Download,
+} from 'lucide-react'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './NotebookHeader.module.css'
 
-export default function NotebookHeader() {
+type ViewMode = 'cells' | 'preview'
+
+interface Props {
+  viewMode: ViewMode
+  onViewModeChange: (m: ViewMode) => void
+}
+
+export default function NotebookHeader({ viewMode, onViewModeChange }: Props) {
   const { undo, redo, cells, historyIndex, history } = useSkillNotebookStore()
   const skillNotebookPath = useUiStore(s => s.skillNotebookPath)
+  const setSkillNotebookPath = useUiStore(s => s.setSkillNotebookPath)
   const [exportState, setExportState] = useState<'idle' | 'success' | 'error'>('idle')
 
   const canUndo = historyIndex > 0
   const canRedo = historyIndex < history.length - 1
 
-  const pathParts = skillNotebookPath ? skillNotebookPath.split('/') : []
+  const pathParts = skillNotebookPath ? skillNotebookPath.replace(/\\/g, '/').split('/') : []
   const skillName = pathParts[pathParts.length - 1]?.replace('.md', '') ?? ''
-  const parentName = pathParts[pathParts.length - 2] ?? ''
+  const category = pathParts[pathParts.length - 2] ?? ''
 
   const handleExport = async () => {
     const fragmentOrder = cells
       .filter(c => c.type === 'fragment')
       .map(c => (c as any).fragmentName as string)
     const skillKey = skillNotebookPath
-      ? skillNotebookPath.replace(/^.*core\/skills\//, '').replace('.md', '')
+      ? skillNotebookPath.replace(/\\/g, '/').replace(/^.*core\/skills\//, '').replace('.md', '')
       : 'unknown'
     try {
       const res = await fetch('http://localhost:8765/skills/export', {
@@ -42,53 +52,81 @@ export default function NotebookHeader() {
     }
   }
 
-  const handleValidate = async () => {
+  const handleSave = async () => {
     try { await fetch('http://localhost:8765/health') } catch {}
   }
 
   return (
     <div className={styles.headerRoot}>
-      <div className={styles.headerTopRow}>
-        <div className={styles.breadcrumb}>
-          <span className={styles.breadcrumbMuted}>Skills › {parentName} › </span>
-          <span className={styles.skillName}>{skillName}</span>
-          <span className={styles.stageBadge}>NOTEBOOK</span>
-        </div>
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className="pathly-btn-b"
-            onClick={undo}
-            disabled={!canUndo}
-            title="Undo"
-            aria-label="Undo"
-          >
-            <Undo2 size={13} />
-          </button>
-          <button
-            type="button"
-            className="pathly-btn-b"
-            onClick={redo}
-            disabled={!canRedo}
-            title="Redo"
-            aria-label="Redo"
-          >
-            <Redo2 size={13} />
-          </button>
-          <div className={styles.divider} />
-          <button type="button" className="pathly-btn-b" onClick={handleValidate} title="Validate FSM connection">
-            Validate
-          </button>
-          <button
-            type="button"
-            className={`${styles.exportBtn} ${exportState === 'success' ? styles.exportSuccess : exportState === 'error' ? styles.exportError : ''}`}
-            onClick={handleExport}
-            disabled={exportState !== 'idle'}
-          >
-            {exportState === 'success' ? '✓ Exported' : exportState === 'error' ? 'Error' : 'Export Skill'}
-          </button>
-        </div>
+      <button
+        type="button"
+        className={styles.backBtn}
+        onClick={() => setSkillNotebookPath(null)}
+        aria-label="Back"
+      >
+        <ArrowLeft size={16} />
+      </button>
+
+      <div className={styles.breadcrumb}>
+        <span className={styles.breadcrumbText}>Skills › {category} › {skillName}</span>
       </div>
+
+      <span className={styles.badge}>NOTEBOOK</span>
+
+      <div className={styles.spacer} />
+
+      <button
+        type="button"
+        className={styles.iconBtn}
+        onClick={undo}
+        disabled={!canUndo}
+        title="Undo"
+        aria-label="Undo"
+      >
+        <Undo2 size={15} />
+      </button>
+      <button
+        type="button"
+        className={styles.iconBtn}
+        onClick={redo}
+        disabled={!canRedo}
+        title="Redo"
+        aria-label="Redo"
+      >
+        <Redo2 size={15} />
+      </button>
+
+      <div className={styles.viewToggle}>
+        <button
+          type="button"
+          className={`${styles.toggleBtn} ${viewMode === 'cells' ? styles.toggleActive : ''}`}
+          onClick={() => onViewModeChange('cells')}
+        >
+          Cells
+        </button>
+        <button
+          type="button"
+          className={`${styles.toggleBtn} ${viewMode === 'preview' ? styles.toggleActive : ''}`}
+          onClick={() => onViewModeChange('preview')}
+        >
+          Preview
+        </button>
+      </div>
+
+      <button type="button" className={styles.saveBtn} onClick={handleSave}>
+        <Database size={13} />
+        Save
+      </button>
+
+      <button
+        type="button"
+        className={`${styles.exportBtn} ${exportState === 'success' ? styles.exportSuccess : exportState === 'error' ? styles.exportError : ''}`}
+        onClick={handleExport}
+        disabled={exportState !== 'idle'}
+      >
+        <Download size={13} />
+        {exportState === 'success' ? 'Exported' : exportState === 'error' ? 'Error' : 'Export Skill'}
+      </button>
     </div>
   )
 }

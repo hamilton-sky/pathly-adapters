@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { ArrowLeft, FileText, BookOpen, Sparkles } from 'lucide-react'
 import { useUiStore } from '../../store/uiStore'
 import styles from './SkillNotebook.module.css'
 import NotebookHeader from './NotebookHeader/NotebookHeader'
 import NotebookCanvas from './NotebookCanvas/NotebookCanvas'
+import NotebookCatalog from './NotebookCatalog/NotebookCatalog'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
 
 const STEPS = [
@@ -12,9 +13,12 @@ const STEPS = [
   { icon: Sparkles, label: 'Edit in notebook mode', sub: 'Drag fragments, preview, export' },
 ]
 
+type ViewMode = 'cells' | 'preview'
+
 export default function SkillNotebookPanel() {
   const skillNotebookPath = useUiStore((s) => s.skillNotebookPath)
   const chatOpen = useUiStore((s) => s.chatOpen)
+  const [viewMode, setViewMode] = useState<ViewMode>('cells')
 
   if (!skillNotebookPath) {
     return (
@@ -42,8 +46,9 @@ export default function SkillNotebookPanel() {
 
   return (
     <div className={styles.root}>
-      <NotebookHeader />
+      <NotebookHeader viewMode={viewMode} onViewModeChange={setViewMode} />
       <div className={styles.body}>
+        <NotebookCatalog />
         <NotebookCanvas />
         {!chatOpen && (
           <>
