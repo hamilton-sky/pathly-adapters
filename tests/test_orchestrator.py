@@ -121,9 +121,15 @@ def test_write_state_rejects_invalid_state_name(tmp_path):
 
 def test_write_state_accepts_valid_state(tmp_path):
     _write_state_in_tmp(tmp_path, "feat", {"current": "BUILDING", "feature": "feat", "rigor": "lite"})
-    state_file = tmp_path / "plans" / "feat" / "STATE.json"
-    doc = json.loads(state_file.read_text())
-    assert doc["current"] == "BUILDING"
+    # Read back via public API — works in both normal and PATHLY_DB_ONLY=1 mode
+    original_plans = el._plans_dir
+    el._plans_dir = lambda: tmp_path / "plans"
+    try:
+        result = el.read_state("feat")
+    finally:
+        el._plans_dir = original_plans
+    assert result is not None
+    assert result["current"] == "BUILDING"
 
 
 def test_write_state_rejects_illegal_transition(tmp_path):

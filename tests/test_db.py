@@ -268,6 +268,10 @@ def test_concurrent_appends(tmp_path: Path) -> None:
 # Phase 8: Backward compat — legacy dirs (no pathly.db)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(
+    __import__("os").environ.get("PATHLY_DB_ONLY", "").strip().lower() not in ("", "0", "false", "no"),
+    reason="STATE.json fallback is disabled in PATHLY_DB_ONLY mode — legacy path intentionally skipped",
+)
 def test_legacy_read_state_from_json(tmp_path: Path) -> None:
     """eventlog.read_state falls back to STATE.json when no pathly.db exists."""
     import pathly_orchestrator.eventlog as eventlog
@@ -291,6 +295,10 @@ def test_legacy_read_state_from_json(tmp_path: Path) -> None:
     assert result["current_conversation"] == 1
 
 
+@pytest.mark.skipif(
+    __import__("os").environ.get("PATHLY_DB_ONLY", "").strip().lower() not in ("", "0", "false", "no"),
+    reason="EVENTS.jsonl fallback is disabled in PATHLY_DB_ONLY mode — legacy path intentionally skipped",
+)
 def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
     """eventlog.read_events falls back to EVENTS.jsonl when no pathly.db exists."""
     import pathly_orchestrator.eventlog as eventlog

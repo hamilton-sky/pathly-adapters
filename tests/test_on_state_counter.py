@@ -5,15 +5,14 @@ import json
 from pathlib import Path
 
 from pathly_orchestrator.fsm import evaluate_transition_rules
+from pathly_orchestrator import eventlog as el
 
 
 def _storage(tmp_path: Path, convs_done: int = 1, convs_total: int = 3) -> Path:
     storage = tmp_path / "pathly" / "plans" / "test"
     storage.mkdir(parents=True)
-    (storage / "STATE.json").write_text(
-        json.dumps({"current": "REVIEWING", "convs_done": convs_done, "convs_total": convs_total}),
-        encoding="utf-8",
-    )
+    # Write via eventlog so state goes to DB (works in both normal and PATHLY_DB_ONLY mode)
+    el.write_state(str(storage), {"current": "REVIEWING", "convs_done": convs_done, "convs_total": convs_total})
     return storage
 
 
@@ -52,10 +51,8 @@ def test_on_state_counter_missing_field(tmp_path):
     """STATE.json missing 'convs_done' → falls through without raising → default returned."""
     storage = tmp_path / "pathly" / "plans" / "test"
     storage.mkdir(parents=True)
-    (storage / "STATE.json").write_text(
-        json.dumps({"current": "REVIEWING", "convs_total": 3}),  # convs_done absent
-        encoding="utf-8",
-    )
+    # convs_done intentionally absent — condition must fall through gracefully
+    el.write_state(str(storage), {"current": "REVIEWING", "convs_total": 3})
     result = evaluate_transition_rules(_flow(), "REVIEWING", storage)
     assert result == "TESTING"
 

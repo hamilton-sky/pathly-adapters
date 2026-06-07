@@ -528,17 +528,16 @@ def test_build_prompt_includes_pipeline_history(tmp_path):
     feature = "test-feature"
     plan_dir = tmp_path / "pathly" / "plans" / feature
     plan_dir.mkdir(parents=True, exist_ok=True)
-    events_path = plan_dir / "EVENTS.jsonl"
-    events_path.write_text(
-        json.dumps({
-            "type": "AGENT_DONE",
-            "agent": "builder",
-            "conversation": 1,
-            "summary": "smoke test entry",
-            "ts": "2026-01-01T00:00:00Z",
-        }) + "\n",
-        encoding="utf-8",
-    )
+    # Write event via eventlog so it goes to DB (works in both normal and PATHLY_DB_ONLY mode)
+    from pathly_orchestrator.eventlog import append_event as _ae
+    _ae(str(plan_dir), {
+        "type": "AGENT_DONE",
+        "agent": "builder",
+        "conversation": 1,
+        "summary": "smoke test entry",
+        "ts": "2026-01-01T00:00:00Z",
+        "schema_version": 1,
+    })
 
     storage_path = plan_dir  # storage_path.name == feature, .parent.parent.parent == tmp_path
     flow_config = {
