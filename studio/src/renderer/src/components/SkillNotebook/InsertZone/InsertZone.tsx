@@ -1,4 +1,5 @@
 import React from 'react'
+import { Plus } from 'lucide-react'
 import styles from './InsertZone.module.css'
 
 interface Props {
@@ -10,10 +11,10 @@ interface Props {
   onDragLeave: () => void
 }
 
-export default function InsertZone({ afterCellId: _afterCellId, dragActive, isDragging = false, onDragOver, onDrop, onDragLeave }: Props) {
+export default function InsertZone({ afterCellId: _afterCellId, dragActive, isDragging: _isDragging = false, onDragOver, onDrop, onDragLeave }: Props) {
   return (
     <div
-      className={`${styles.zone} ${dragActive || isDragging ? styles.active : ''}`}
+      className={`${styles.zone} ${dragActive ? styles.dragActive : ''}`}
       onDragOver={e => {
         e.preventDefault()
         onDragOver()
@@ -24,7 +25,9 @@ export default function InsertZone({ afterCellId: _afterCellId, dragActive, isDr
       }}
       onDragLeave={onDragLeave}
     >
-      {dragActive && <span className={styles.label}>+ Drop here</span>}
+      <button type="button" className={styles.plus} aria-label="Insert cell">
+        <Plus size={12} />
+      </button>
     </div>
   )
 }

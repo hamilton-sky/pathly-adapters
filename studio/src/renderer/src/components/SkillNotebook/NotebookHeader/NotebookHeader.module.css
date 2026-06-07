@@ -1,25 +1,41 @@
 .headerRoot {
-  background: var(--bg-surface0);
-  border-bottom: 1px solid var(--bg-surface1);
-  padding: 8px 12px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 12px;
+  background: var(--bg-mantle);
+  border-bottom: var(--border);
   flex-shrink: 0;
 }
 
-.headerTopRow {
-  display: flex;
+.backBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.backBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--accent);
 }
 
 .breadcrumb {
   display: flex;
   align-items: center;
-  gap: 4px;
-  overflow: hidden;
   min-width: 0;
 }
 
-.breadcrumbMuted {
+.breadcrumbText {
   font-size: var(--font-size-sm);
   color: var(--text-muted);
   white-space: nowrap;
@@ -27,54 +43,115 @@
   text-overflow: ellipsis;
 }
 
-.skillName {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.stageBadge {
-  background: var(--accent-bg);
+.badge {
   color: var(--accent);
-  font-size: 10px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.06em;
-  padding: 1px 6px;
-  border-radius: 3px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.actions {
-  display: flex;
+.spacer {
+  flex: 1;
+}
+
+.iconBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--bg-surface0);
+  color: var(--accent);
+}
+
+.iconBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.viewToggle {
+  display: flex;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
   flex-shrink: 0;
 }
 
-.divider {
-  width: 1px;
-  height: 16px;
+.toggleBtn {
+  padding: 4px 10px;
+  font-size: var(--font-size-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.toggleBtn:hover:not(.toggleActive) {
+  color: var(--text-secondary);
+}
+
+.toggleActive {
   background: var(--bg-surface1);
-  margin: 0 2px;
+  color: var(--text-primary);
+}
+
+.saveBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.saveBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .exportBtn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 5px;
-  border: none;
+  gap: 5px;
+  padding: 7px 13px;
   background: var(--accent);
-  color: var(--bg-mantle);
+  border: none;
+  border-radius: var(--radius-md);
+  color: #fff;
   cursor: pointer;
   font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
-  font-weight: var(--font-weight-medium);
+  font-weight: 600;
   white-space: nowrap;
-  transition: opacity 120ms ease-out;
+  flex-shrink: 0;
+  transition: opacity var(--transition-fast);
 }
 
 .exportBtn:disabled {
@@ -84,10 +161,8 @@
 
 .exportSuccess {
   background: var(--green);
-  color: var(--bg-mantle);
 }
 
 .exportError {
   background: var(--red);
-  color: white;
 }

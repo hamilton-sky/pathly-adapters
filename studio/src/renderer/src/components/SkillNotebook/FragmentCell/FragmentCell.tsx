@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { GripVertical, X } from 'lucide-react'
+import {
+  GripVertical, ChevronUp, ChevronDown, Pencil, MoreHorizontal, X,
+} from 'lucide-react'
 import styles from './FragmentCell.module.css'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 
@@ -29,36 +31,44 @@ export default function FragmentCell({ id, fragmentName, category, description, 
 
   return (
     <div className={`${styles.cell} ${showNew ? styles.cellNew : ''}`}>
-      <div
-        className={styles.grip}
-        draggable
-        onDragStart={e => {
-          e.dataTransfer.setData('cell-id', id)
-          e.dataTransfer.effectAllowed = 'move'
-        }}
-      >
-        <GripVertical size={14} />
-      </div>
-      <div className={styles.body}>
-        <div className={styles.header}>
-          <span className={styles.name}>{fragmentName}</span>
+      <div className={styles.cellHead}>
+        <div
+          className={styles.grip}
+          draggable
+          onDragStart={e => {
+            e.dataTransfer.setData('cell-id', id)
+            e.dataTransfer.effectAllowed = 'move'
+          }}
+        >
+          <GripVertical size={13} />
+        </div>
+        <span className={styles.name}>{fragmentName}</span>
+        {category && (
           <span className={`${styles.badge} ${CATEGORY_CLASS[category] ?? ''}`}>
             {category.toUpperCase()}
           </span>
-        </div>
-        {description && (
-          <div className={styles.description}>{description}</div>
         )}
+        <div className={styles.actions}>
+          <button type="button" className={styles.actionBtn} aria-label="Move up"><ChevronUp size={13} /></button>
+          <button type="button" className={styles.actionBtn} aria-label="Move down"><ChevronDown size={13} /></button>
+          <button type="button" className={styles.actionBtn} aria-label="Edit"><Pencil size={13} /></button>
+          <button type="button" className={styles.actionBtn} aria-label="More"><MoreHorizontal size={13} /></button>
+          <button
+            type="button"
+            className={`${styles.actionBtn} ${styles.removeBtn}`}
+            onClick={() => removeCell(id)}
+            title="Remove fragment"
+            aria-label="Remove fragment"
+          >
+            <X size={13} />
+          </button>
+        </div>
       </div>
-      <button
-        type="button"
-        className={styles.remove}
-        onClick={() => removeCell(id)}
-        title="Remove fragment"
-        aria-label="Remove fragment"
-      >
-        <X size={12} />
-      </button>
+      {description && (
+        <div className={styles.cellBody}>
+          <div className={styles.description}>{description}</div>
+        </div>
+      )}
     </div>
   )
 }
