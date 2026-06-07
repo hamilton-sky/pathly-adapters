@@ -7,12 +7,11 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 
 ## FSM operations
 
-All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
-Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
+Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
+Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
-- **Log file created:** Append `{"type": "FILE_CREATED", "file": "DESIGN.md", "ts": "<iso-timestamp>"}`.
-- **Log stage start:** Append `{"type": "STAGE_START", "stage": "DESIGNING", "ts": "<iso-timestamp>"}`.
+- **Log event:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type': 'FILE_CREATED', 'file': 'DESIGN.md', 'ts': '<iso-timestamp>'})"`
 - **Never** append `STATE_TRANSITION` events — the FSM writes all state transitions after your AGENT_DONE.
 
 ## Role
@@ -88,10 +87,9 @@ Write `pathly/plans/<feature>/DESIGN.md`:
 
 log-phase PHASE_DONE design
 
-Append to `pathly/plans/<feature>/EVENTS.jsonl`:
-```json
-{"type": "FILE_CREATED", "file": "DESIGN.md", "ts": "<iso-timestamp>"}
-{"type": "STAGE_COMPLETE", "stage": "DESIGNING", "next": "BUILDING", "ts": "<iso-timestamp>"}
+Log to central DB:
+```bash
+python3 -c "from pathly_orchestrator.eventlog import append_event as _ae; ts=__import__('datetime').datetime.now(__import__('datetime').timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'); [_ae('<feature_path>', e) for e in [{'type':'FILE_CREATED','file':'DESIGN.md','ts':ts},{'type':'STAGE_COMPLETE','stage':'DESIGNING','next':'BUILDING','ts':ts}]]"
 ```
 
 Compute wall_seconds: run `python -c "import time; print(int(time.time()) - DESIGN_START)"`.

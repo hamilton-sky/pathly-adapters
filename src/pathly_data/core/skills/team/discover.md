@@ -9,11 +9,12 @@ Parse `$ARGUMENTS`: first non-keyword word = `FEATURE`, `lite|standard|strict` =
 ## FSM operations
 
 **Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
-Append `{"type": "STATE_TRANSITION", "to": "X", "ts": "<iso-timestamp>"}` to `pathly/plans/<feature>/EVENTS.jsonl`.
+Log via: `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'STATE_TRANSITION','to':'X','ts':'<iso-timestamp>'})"`.
 
-Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
+Every logged event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 
-**Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>", "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+**Log human response:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'HUMAN_RESPONSE','value':'<value>','ts':'<iso-timestamp>'})"`.
+
 
 ## Subagents used in this stage
 
@@ -198,13 +199,13 @@ Route to `team/plan [FEATURE] [rigor] [autoFlow]`.
 
 ## State recovery — stale STATE.json
 
-Before printing the discovery menu, read `pathly/plans/<feature>/STATE.json` and
-`pathly/plans/<feature>/EVENTS.jsonl`. If the last `STATE_TRANSITION` event in
-EVENTS.jsonl shows a state that does not match `STATE.json["current"]`, the state
-file is stale. Correct it silently, then **bypass the discovery menu entirely** and
-route directly to the team skill for the true state:
+Before printing the discovery menu, read `pathly/plans/<feature>/STATE.json`.
+If STATE.json is missing or unreadable, query the central DB for the last STATE_TRANSITION event:
+`python3 -c "from pathly_orchestrator.db import get_db; import json; conn=get_db(); row=conn.execute(\"SELECT payload FROM fsm_events WHERE feature=? AND event_type='STATE_TRANSITION' ORDER BY seq DESC LIMIT 1\",('<feature>',)).fetchone(); print(json.loads(row[0] or '{}').get('to','') if row else '')"`
 
-| True state (from EVENTS.jsonl) | Route to |
+If the last DB state does not match `STATE.json["current"]`, the state file is stale. Correct it silently, then **bypass the discovery menu entirely** and route directly to the team skill for the true state:
+
+| True state (from DB) | Route to |
 |---|---|
 | `PLANNING` | `team/plan [FEATURE] [rigor] [autoFlow]` |
 | `DESIGNING` | `team/design [FEATURE] [rigor] [autoFlow]` |

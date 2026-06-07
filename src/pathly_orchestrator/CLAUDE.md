@@ -6,7 +6,7 @@ Python package that implements the Pathly finite-state machine. Runs as both an 
 
 Features advance through: `STORM -> PLAN -> DESIGN -> BUILD -> REVIEW -> TEST -> RETRO -> DONE`
 
-Each transition is driven by events written to `pathly/plans/<feature>/EVENTS.jsonl`. The orchestrator reads `STATE.json` and `EVENTS.jsonl` to determine the next action.
+Each transition is driven by events written to the central SQLite DB (`~/.pathly/pathly.db`). The orchestrator reads `STATE.json` (filesystem snapshot) and queries the DB to determine the next action.
 
 ## HTTP endpoints
 
@@ -38,7 +38,7 @@ POST /runner/resume                  ← resume paused pipeline
 POST /runner/advance                 ← skip past current block
 POST /runner/retry                   ← retry blocked stage
 POST /runner/abort                   ← abort run completely
-POST /runner/terminal/result         ← PTY exit callback: { run_id, topic, exit_code, stdout_tail, wall_seconds, user_initiated } — enriched with AGENT_DONE.summary from EVENTS.jsonl; stdout used only for session_id + cost_usd
+POST /runner/terminal/result         ← PTY exit callback: { run_id, topic, exit_code, stdout_tail, wall_seconds, user_initiated } — enriched with AGENT_DONE.summary from central DB; stdout used only for session_id + cost_usd
 POST /runner/terminal/started        ← PTY started confirmation: { run_id, topic, tab_id }
 GET  /events/runner?topic=<topic>    ← SSE stream of runner events for Studio
 POST /shutdown                       ← graceful server shutdown (used by Electron on restart)
@@ -76,7 +76,7 @@ Every `/next_action` response includes the following top-level fields:
 
 ## FSM recovery
 
-The `orchestrator` agent (haiku) can reconstruct state from `EVENTS.jsonl` if `STATE.json` is lost or corrupt. It is deterministic - same event log always produces the same state.
+The `orchestrator` agent (haiku) can reconstruct state from the central DB event log if `STATE.json` is lost or corrupt. It is deterministic — same event log always produces the same state.
 
 ## Visible runner (supervisor.py)
 
@@ -110,8 +110,8 @@ When a PTY stage exits, the supervisor merges two sources:
 | Source | Used for |
 |---|---|
 | `--output-format=json` stdout | `session_id` (session continuity) + `cost_usd` (API-accurate billing) |
-| EVENTS.jsonl `AGENT_DONE.summary` | Semantic result text — what the agent did, outcome, key files |
+| Central DB `AGENT_DONE.summary` | Semantic result text — what the agent did, outcome, key files |
 
-The `summary` field is written by the agent via the `log-agent-done` skill during its run.
+The `summary` field is written by the agent via the `log-agent-done` skill to the central DB during its run.
 It is never subject to the PTY's 500-chunk rolling output buffer.
 If `summary` is absent (e.g. legacy agent), stdout `result` is used as a fallback.

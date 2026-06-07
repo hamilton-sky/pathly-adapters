@@ -43,9 +43,12 @@ If git exits with code 1 and the output contains "nothing to commit": exit clean
 
 ---
 
-## Step 4 — Append ACTION_DONE event
+## Step 4 — Record ACTION_DONE
 
-Append this JSON line to `<storage_path>/EVENTS.jsonl`:
-```json
-{"type": "ACTION_DONE", "action": "commit", "topic": "<topic>", "ts": "<iso-timestamp>"}
+```bash
+pathly-fsm-call record-activity \
+  --agent "builder" \
+  --feature "<topic>" \
+  --summary "committed: <message>" \
+  --project-root "$(pwd)"
 ```

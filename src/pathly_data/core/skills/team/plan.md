@@ -17,11 +17,12 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 ## FSM operations
 
 **Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
-Append `{"type": "STATE_TRANSITION", "to": "X", "ts": "<iso-timestamp>"}` to `pathly/plans/<feature>/EVENTS.jsonl`.
+Log via: `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'STATE_TRANSITION','to':'X','ts':'<iso-timestamp>'})"`.
 
-Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
+Every logged event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 
-**Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>", "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+**Log human response:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'HUMAN_RESPONSE','value':'<value>','ts':'<iso-timestamp>'})"`.
+
 
 ## Subagents
 

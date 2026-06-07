@@ -24,3 +24,5 @@ pathly/plans/**/*.db-wal
 pathly/plans/**/*.db-shm
 *.db-wal
 *.db-shm
+# EVENTS.jsonl — events go to central DB; per-feature files are transient fallbacks only
+pathly/plans/**/EVENTS.jsonl

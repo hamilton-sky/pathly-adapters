@@ -21,15 +21,14 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 
 ## FSM operations
 
-All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
-Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
+Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
+Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
-- **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
-- **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
-- **Log retry:** Append `{"type": "RETRY", "key": "conv-N:FILE.md", "ts": "<iso-timestamp>"}`.
-- **Check retry count:** Count RETRY events in EVENTS.jsonl where `key = "conv-N:FILE.md"`.
-- **Log human response:** Append `{"type": "HUMAN_RESPONSE", "value": "<value>", "ts": "<iso-timestamp>"}`.
+- **Log event:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type': 'FILE_CREATED', 'file': '<filename>', 'ts': '<iso-timestamp>'})"`
+- **Log retry:** Same pattern with `{'type': 'RETRY', 'key': 'conv-N:FILE.md', 'ts': '<iso-timestamp>'}`.
+- **Check retry count:** `python3 -c "from pathly_orchestrator.db import get_db; c=get_db(); print(c.execute(\"SELECT COUNT(*) FROM fsm_events WHERE feature=? AND event_type='RETRY' AND json_extract(payload,'$.key')=?\",('<feature>','conv-N:FILE.md')).fetchone()[0])"`
+- **Log human response:** Same pattern with `{'type': 'HUMAN_RESPONSE', 'value': '<value>', 'ts': '<iso-timestamp>'}`.
 - **Never** append `STATE_TRANSITION` events — the FSM writes all state transitions after your AGENT_DONE.
 
 ## Subagents (REVIEWING stage)
@@ -146,7 +145,7 @@ git diff HEAD -- . ":(exclude)pathly/plans/"
   Builder claimed to fix REVIEW_FAILURES.md but no code changed.
   Human decision required: accept as-is, override the rule, or rewrite the conversation scope.
   ```
-  Append `{"type": "NO_DIFF_DETECTED", "ts": "<iso-timestamp>"}` to EVENTS.jsonl.
+  Log `{"type": "NO_DIFF_DETECTED"}` via `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'NO_DIFF_DETECTED','ts':'<iso-timestamp>'})"`.
   Stop: "Zero-diff loop detected for Conv N. Escalated to HUMAN_QUESTIONS.md."
 - If output is **non-empty**: re-run from Phase 1 — Analyze above.
 

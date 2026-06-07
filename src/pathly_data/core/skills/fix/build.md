@@ -25,8 +25,8 @@ log-phase PHASE_DONE implement
 
 ## FSM operations
 
-All events appended to `<feature_path>/EVENTS.jsonl`.
+State transitions are written to the central DB via the FSM server.
 Every event must include `"ts": "<iso-timestamp>"` using current ISO-8601 UTC time.
 
 - **Transition state to X:** Write `<feature_path>/STATE.json` `{"current": "X"}`.
-  Append `{"type": "STATE_TRANSITION", "to": "X", "ts": "<iso-timestamp>"}`.
+  Call `pathly-fsm-call record-activity` to log the event to the central DB.

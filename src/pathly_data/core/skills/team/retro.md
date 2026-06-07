@@ -7,9 +7,9 @@ Parse `$ARGUMENTS`: `FEATURE`.
 ## FSM operations
 
 - **Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
-  Append `{"type": "STATE_TRANSITION", "to": "X", "ts": "<iso-timestamp>"}` to `pathly/plans/<feature>/EVENTS.jsonl`.
+  Log via: `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'STATE_TRANSITION','to':'X','ts':'<iso-timestamp>'})"`.
 
-Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
+Every logged event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 
 ## Subagents
 
@@ -41,8 +41,17 @@ Then invoke the `log-agent-done` skill with:
 ```
 
 **Generate pipeline-walkthrough files:**
-Read `pathly/plans/[feature]/EVENTS.jsonl`. Fill and write the three templates from
-`{{TEMPLATES_DIR}}/pipeline-walkthrough/` to `pathly/pipeline-walkthrough/[feature]/`:
+Query events from the central DB:
+```bash
+python3 -c "
+from pathly_orchestrator.db import get_db; import json
+conn = get_db()
+rows = conn.execute(\"SELECT event_type, payload FROM fsm_events WHERE feature=? ORDER BY seq\", ('<feature>',)).fetchall()
+for etype, p in rows:
+    print(json.dumps({'type': etype, **json.loads(p or '{}')}))
+"
+```
+Fill and write the three templates from `{{TEMPLATES_DIR}}/pipeline-walkthrough/` to `pathly/pipeline-walkthrough/[feature]/`:
 
 - `01-PIPELINE-FLOW.md` — FSM state sequence, conversation traces, feedback loops.
   Replace `{{FSM_STATES}}` with ordered STATE_TRANSITION `to` values;
@@ -56,7 +65,7 @@ Read `pathly/plans/[feature]/EVENTS.jsonl`. Fill and write the three templates f
 
 Use today's date for `{{DATE}}`, `git branch --show-current` for `{{BRANCH}}`,
 first HUMAN_RESPONSE value for `{{USER_INTENT}}` (or "not recorded").
-If EVENTS.jsonl does not exist, write all three files with placeholders → "not recorded".
+If no DB events exist for the feature, write all three files with placeholders → "not recorded".
 
 - Transition state → DONE.
 

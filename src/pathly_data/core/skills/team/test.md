@@ -19,8 +19,8 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 
 ## FSM operations
 
-All events are appended to `pathly/plans/<feature>/EVENTS.jsonl` as JSON lines.
-Every appended event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
+Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
+Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 State snapshots are written to `pathly/plans/<feature>/STATE.json`.
 
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
@@ -40,7 +40,7 @@ If any row status is not DONE: stop and report:
 Not all conversations are complete. Route to team <feature> build first. Incomplete: Conv N
 ```
 
-When all DONE: append `{"type": "IMPLEMENT_COMPLETE", "ts": "<iso-timestamp>"}` to EVENTS.jsonl. Confirm state is TESTING in STATE.json.
+When all DONE: log to central DB via `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'IMPLEMENT_COMPLETE','ts':'<iso-timestamp>'})"`. Confirm state is TESTING in STATE.json.
 
 ## Subagents (TESTING stage)
 

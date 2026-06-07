@@ -39,10 +39,10 @@ For each `.md` file found in `pathly/plans/$FEATURE/feedback/`:
 Read the YAML frontmatter block at the top of the file (between `---` markers).
 
 If frontmatter is present:
-- **Orphan check:** Read `pathly/plans/$FEATURE/EVENTS.jsonl`. If `created_by_event` is not
-  `"unknown"` and does not appear as any event's `timestamp` or `id` field in the log →
+- **Orphan check:** Query the central DB for events matching this feature (`pathly_orchestrator.db.get_db()`). If `created_by_event` is not
+  `"unknown"` and does not appear as any event's `id` field in the DB →
   flag as orphan from a previous run.
-  Report as: `[ORPHAN FEEDBACK] pathly/plans/$FEATURE/feedback/<file> — event <id> not in current EVENTS.jsonl`
+  Report as: `[ORPHAN FEEDBACK] pathly/plans/$FEATURE/feedback/<file> — event <id> not in current event log`
 - **TTL check:** Compute `created_at + ttl_hours`. If that time has elapsed (compare to
   current UTC time) →
   flag as stale.
@@ -99,7 +99,7 @@ Report as: `[DEAD REFERENCE] pathly/plans/$FEATURE — '<path>' mentioned in pla
 
 ---
 
-### Check D — FSM state file consistency (if STATE.json or EVENTS.jsonl exist)
+### Check D — FSM state file consistency (if STATE.json exists)
 
 If `pathly/plans/$FEATURE/STATE.json` exists:
 - Parse it as JSON. If unparseable: flag `[CORRUPT STATE] pathly/plans/$FEATURE/STATE.json — invalid JSON`
@@ -108,11 +108,9 @@ If `pathly/plans/$FEATURE/STATE.json` exists:
 - If not: flag `[INVALID STATE] pathly/plans/$FEATURE/STATE.json — unknown state: <value>`
 - Cross-check: if `state.current` is not `BLOCKED_ON_FEEDBACK` or `BLOCKED_ON_HUMAN`, but feedback files exist in `pathly/plans/$FEATURE/feedback/` → flag `[STATE DRIFT] STATE.json says <state> but feedback files are open: <files>`
 
-If `pathly/plans/$FEATURE/EVENTS.jsonl` exists:
-- Verify every line is valid JSON. If any line fails: flag `[CORRUPT EVENTS] pathly/plans/$FEATURE/EVENTS.jsonl — invalid JSONL at line N`
-- Check the last event's `toState` matches `STATE.json`'s `current` field (if both exist). If not: flag `[EVENTS DRIFT] EVENTS.jsonl last toState=<X> but STATE.json current=<Y>`
+Cross-check with central DB: query the last STATE_TRANSITION event for this feature and compare its `to` field with `STATE.json["current"]`. If they differ: flag `[STATE DRIFT] DB last STATE_TRANSITION to=<X> but STATE.json current=<Y>`
 
-If neither file exists and `rigor = strict`: flag `[MISSING FSM FILES] pathly/plans/$FEATURE — strict rigor requires STATE.json and EVENTS.jsonl`
+If STATE.json does not exist and `rigor = strict`: flag `[MISSING FSM FILE] pathly/plans/$FEATURE — strict rigor requires STATE.json`
 
 ---
 
@@ -127,14 +125,14 @@ Print a structured summary:
 ✓  No issues        ← if everything clean
 ⚠  N issue(s) found ← if problems detected
 
-[ORPHAN FEEDBACK]   pathly/plans/.../feedback/REVIEW_FAILURES.md — event 2026-04-28T10:00:00Z not in current EVENTS.jsonl → safe to delete
+[ORPHAN FEEDBACK]   pathly/plans/.../feedback/REVIEW_FAILURES.md — event 2026-04-28T10:00:00Z not in current event log → safe to delete
 [EXPIRED FEEDBACK]  pathly/plans/.../feedback/ARCH_FEEDBACK.md — TTL expired at 2026-04-29T10:00:00Z → safe to delete
 [STALE FEEDBACK]    pathly/plans/.../feedback/REVIEW_FAILURES.md — open since 2026-04-28, no commits since
 [PROGRESS DRIFT]    hotel-search — 3 conversations DONE but only 1 implementation commit found
 [DEAD REFERENCE]    nl-workflow-compiler — 'src/engine/pathly planner/nl_compiler.py' mentioned but not found
 [INVALID STATE]     hotel-search — STATE.json has unknown state: BLOCKED
 [STATE DRIFT]       hotel-search — STATE.json says BUILDING but REVIEW_FAILURES.md is open
-[CORRUPT EVENTS]    hotel-search — EVENTS.jsonl invalid JSONL at line 7
+[STATE DRIFT]       hotel-search — DB last STATE_TRANSITION to=REVIEWING but STATE.json current=BUILDING
 ```
 
 If all clear: `All checks passed. Pipeline state looks consistent.`

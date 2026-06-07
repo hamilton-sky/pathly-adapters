@@ -1,7 +1,7 @@
 ## Completion report (AGENT_DONE)
 
-After the stage agent completes, write an AGENT_DONE event **directly** to EVENTS.jsonl.
-This is **mandatory** — the supervisor reads this field as the authoritative result.
+After the stage agent completes, write an AGENT_DONE event to the **central DB** via eventlog.
+This is **mandatory** — the supervisor reads this event as the authoritative result.
 
 1. Compute wall_seconds: `python3 -c "import time; print(int(time.time()) - BUILD_START)"`
 2. Parse from the sub-agent's `<usage>` block: `total_tokens`, `tool_uses`, `duration_ms` (0 if absent).
@@ -21,7 +21,7 @@ This is **mandatory** — the supervisor reads this field as the authoritative r
    cost_usd = round((in_est / 1_000_000 * input_rate) + (out_est / 1_000_000 * output_rate), 6)
    ```
 
-4. Write the event directly — **do not invoke a skill**, run this command:
+4. Write the event to the central DB — **do not invoke a skill**, run this command:
 
 ```bash
 python3 -c "
@@ -41,10 +41,18 @@ event = {
   'ts': ts,
   'schema_version': 1,
 }
-path = '<feature_path>/EVENTS.jsonl'
-with open(path, 'a', encoding='utf-8') as f:
-    f.write(json.dumps(event) + chr(10))
-print('AGENT_DONE written')
+try:
+    from pathly_orchestrator.eventlog import append_event as _ae
+    _ae('<feature_path>', event)
+    print('AGENT_DONE written to DB')
+except Exception as _exc:
+    # Fallback: write to EVENTS.jsonl when eventlog unavailable (offline/codex mode)
+    import pathlib
+    path = pathlib.Path('<feature_path>/EVENTS.jsonl')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, 'a', encoding='utf-8') as _f:
+        _f.write(json.dumps(event) + chr(10))
+    print(f'AGENT_DONE written to EVENTS.jsonl (fallback: {_exc})')
 "
 ```
 

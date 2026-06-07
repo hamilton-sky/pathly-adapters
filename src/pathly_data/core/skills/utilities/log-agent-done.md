@@ -1,8 +1,8 @@
 # log-agent-done
 
-Internal utility — writes an AGENT_DONE event to EVENTS.jsonl and POSTs telemetry
-to the Pathly HTTP backend. Call this once per completed stage instead of manually
-appending AGENT_DONE and calling record-cost separately.
+Internal utility — writes an AGENT_DONE event to the central DB via eventlog and POSTs telemetry
+to the Pathly HTTP backend. Falls back to EVENTS.jsonl in offline/codex mode. Call this once per
+completed stage instead of manually recording AGENT_DONE and calling record-cost separately.
 
 Provider-agnostic: supports Claude, OpenAI, Google Gemini, and any other model.
 Pass `cost_usd` directly if the API response included it. Otherwise cost is computed

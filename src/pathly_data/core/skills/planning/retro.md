@@ -48,10 +48,18 @@ Ask these three questions, one at a time. Wait for an answer before asking the n
 
 ## Step 3: Write RETRO.md
 
-**Before writing — compute cost summary (if EVENTS.jsonl exists):**
+**Before writing — compute cost summary from central DB:**
 
-Read `pathly/plans/$ARGUMENTS/EVENTS.jsonl`. For every line where `type == "AGENT_DONE"`,
-collect `agent`, `model`, `tokens_in`, `tokens_out`, `cost_usd`.
+```bash
+python3 -c "
+from pathly_orchestrator.db import get_db; import json
+conn = get_db()
+rows = conn.execute(\"SELECT payload FROM fsm_events WHERE feature=? AND event_type='AGENT_DONE' ORDER BY seq\", ('$ARGUMENTS',)).fetchall()
+for (p,) in rows:
+    print(json.dumps(json.loads(p or '{}')))
+"
+```
+For every AGENT_DONE event, collect `agent`, `model`, `tokens_in`, `tokens_out`, `cost_usd`.
 
 Aggregate per agent:
 - Total `cost_usd` across all events (skip events where `cost_usd == 0.0`)
@@ -92,19 +100,19 @@ Total: $X.XX
 [2-3 sentence summary of the key learning from this retro]
 ```
 
-If `EVENTS.jsonl` doesn't exist or has no `cost_usd` data, omit the Cost Summary section entirely — do not show a table of zeros.
+If the DB has no AGENT_DONE events for this feature or all `cost_usd == 0.0`, omit the Cost Summary section entirely — do not show a table of zeros.
 
 ## Step 4: Generate pipeline-walkthrough files
 
-Using the EVENTS.jsonl data already read in Step 3, fill and write the three pipeline-walkthrough
+Using the DB event data already read in Step 3, fill and write the three pipeline-walkthrough
 documents to `pathly/pipeline-walkthrough/$ARGUMENTS/`. Create the directory if it does not exist.
 
 **Read context:**
 - Run `git branch --show-current` for `{{BRANCH}}`.
 - Use today's date for `{{DATE}}`.
-- From EVENTS.jsonl: first `HUMAN_RESPONSE` value → `{{USER_INTENT}}` (or "not recorded").
-- STATE_TRANSITION events → `{{FSM_STATES}}` (ordered `to` values, one per line).
-- AGENT_DONE events → per-agent token/cost rows. If all `cost_usd == 0.0`, replace cost
+- From central DB: first `HUMAN_RESPONSE` event `value` field → `{{USER_INTENT}}` (or "not recorded").
+- STATE_TRANSITION events from DB → `{{FSM_STATES}}` (ordered `to` values, one per line).
+- AGENT_DONE events from DB → per-agent token/cost rows. If all `cost_usd == 0.0`, replace cost
   columns with "not captured".
 - Files in `pathly/pipeline-walkthrough/$ARGUMENTS/artifacts/` → `{{FEEDBACK_FILE_ROWS}}`.
 - Run `git diff --name-only` against the main branch → `{{SOURCE_FILE_ROWS}}`.
@@ -138,7 +146,7 @@ Fill from `{{TEMPLATES_DIR}}/pipeline-walkthrough/03-ARTIFACT-MAP.md`.
 - `{{SOURCE_FILE_ROWS}}` — one row per changed file from git diff: `| path | [story ref] | [what changed] |`.
   Story ref: match file path against USER_STORIES.md content; if no match write "—".
 
-If EVENTS.jsonl does not exist, write all three files with every placeholder replaced by "not recorded".
+If no DB events exist for this feature, write all three files with every placeholder replaced by "not recorded".
 
 ## Step 5: Extract lessons
 

@@ -22,7 +22,8 @@ Before spawning the stage agent, scan `<feature_path>/feedback/`. If any file ex
 ### Guard — retry-count check
 
 Before routing any feedback file to its agent:
-1. Check the retry count for `conv-N:FILE.md` in EVENTS.jsonl.
+1. Check the retry count for `conv-N:FILE.md` from the central DB:
+   `python3 -c "from pathly_orchestrator.db import get_db; c=get_db(); print(c.execute(\"SELECT COUNT(*) FROM fsm_events WHERE feature=? AND event_type='RETRY' AND json_extract(payload,'$.key')=?\",('<feature>','conv-N:FILE.md')).fetchone()[0])"`
 2. If > 2: write `HUMAN_QUESTIONS.md` with an escalation message, log file created for
    `HUMAN_QUESTIONS.md`. Stop and report the retry limit exceeded.
 3. If ≤ 2: after routing the fix agent, log retry for `conv-N:FILE.md`.

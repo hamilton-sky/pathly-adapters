@@ -1,9 +1,0 @@
-{"type":"STATE_TRANSITION","to":"IDLE","timestamp":"2026-05-11T00:00:00Z"}
-{"type":"HUMAN_RESPONSE","value":"2","timestamp":"2026-05-11T00:00:01Z"}
-{"type":"STATE_TRANSITION","to":"PLANNING","timestamp":"2026-05-11T00:00:01Z"}
-{"type":"AGENT_SPAWNED","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"role":"Plan po-planner-separation","timestamp":"2026-05-11T00:00:02Z"}
-{"type":"AGENT_DONE","agent":"planner","model":"claude-sonnet-4-6","conversation":0,"result":"DONE","tokens_in":32042,"tokens_out":0,"tool_uses":18,"wall_seconds":191,"timestamp":"2026-05-11T00:00:03Z"}
-{"type":"HUMAN_RESPONSE","value":"stop","timestamp":"2026-05-11T00:00:04Z"}
-{"type":"STATE_TRANSITION","from":"PLANNING_PAUSED","to":"BUILDING","timestamp":"2026-05-12T15:41:23Z"}
-{"type":"AGENT_DONE","agent":"builder","feature":"po-planner-separation","summary":"Implemented PO/planner separation in core role and team-flow contracts.","timestamp":"2026-05-12T15:41:23Z"}
-{"type":"STATE_TRANSITION","from":"BUILDING","to":"DONE","timestamp":"2026-05-12T15:41:23Z"}

@@ -37,9 +37,12 @@ Copy it to `pathly/pipeline-walkthrough/<topic>/artifacts/<FILENAME>_conv<conv>_
 
 ---
 
-## Step 4 — Append ACTION_DONE event
+## Step 4 — Record ACTION_DONE
 
-Append this JSON line to `<storage_path>/EVENTS.jsonl`:
-```json
-{"type": "ACTION_DONE", "action": "archive-artifacts", "topic": "<topic>", "ts": "<iso-timestamp>"}
+```bash
+pathly-fsm-call record-activity \
+  --agent "orchestrator" \
+  --feature "<topic>" \
+  --summary "archived feedback artifacts for conv <conv>" \
+  --project-root "$(pwd)"
 ```

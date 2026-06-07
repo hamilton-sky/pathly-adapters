@@ -22,7 +22,6 @@ not update source code, and does not change workflow state on its own.
    - `pathly/plans/$FEATURE/PROGRESS.md`
    - `pathly/plans/$FEATURE/feedback/`
    - `pathly/plans/$FEATURE/STATE.json`
-   - `pathly/plans/$FEATURE/EVENTS.jsonl`
 4. Infer the current workflow state in plain language:
    - planning
    - building

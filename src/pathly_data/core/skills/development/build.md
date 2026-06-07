@@ -158,11 +158,6 @@ Write `pathly/plans/<feature>/STATE.json`:
 {"current": "REVIEWING", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
 ```
 
-Append to `pathly/plans/<feature>/EVENTS.jsonl`:
-```
-{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "<iso-timestamp>"}
-```
-
 Then run the Completion report with `agent: builder`, `result: DONE`, using `BUILD_START` from Step 4.5.
 
 **Auto-chain (fast/auto mode only):** If auto-flow mode is active and verification passed, after `log-agent-done` completes invoke the `review` skill with `<feature> <N>` (e.g. `pathly-observability 2`). If verification failed, do NOT chain — stop and report.

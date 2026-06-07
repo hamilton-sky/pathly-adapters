@@ -1,6 +1,6 @@
 # log-phase
 
-Internal utility — logs a phase boundary event to EVENTS.jsonl via the HTTP server.
+Internal utility — logs a phase boundary event to the central DB via the HTTP server.
 Call this at the entry and exit of each named phase within a skill workflow.
 
 Phase logging is best-effort. If the HTTP server is not running, the call fails silently
