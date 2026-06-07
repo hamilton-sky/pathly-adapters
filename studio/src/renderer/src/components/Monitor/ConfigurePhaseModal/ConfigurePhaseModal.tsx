@@ -1,12 +1,24 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Settings, BookOpen, Check } from 'lucide-react'
+import { useStore } from '../../../store'
+import { useUiStore } from '../../../store/uiStore'
 import { StatePill } from '../../ui/StatePill/StatePill'
 import styles from './ConfigurePhaseModal.module.css'
 
 const CLI_HOSTS = ['Claude Code', 'Codex', 'Copilot', 'Antigravity'] as const
 const AGENTS = ['planner', 'builder', 'reviewer', 'tester', 'retro'] as const
 const SKILLS = ['plan/storm', 'plan/scope', 'fix/build', 'team/build', 'review/quality', 'test/verify', 'retro/archive'] as const
+
+const SKILL_FILE_PATHS: Record<string, string> = {
+  'fix/build':      'fix/build',
+  'team/build':     'team/build',
+  'plan/storm':     'planning/storm',
+  'plan/scope':     'planning/plan',
+  'review/quality': 'development/review',
+  'test/verify':    'development/test',
+  'retro/archive':  'planning/retro',
+}
 
 const STAGE_DEFAULTS: Record<string, { agent: string; skill: string }> = {
   STORMING:  { agent: 'planner',  skill: 'plan/storm' },
@@ -38,11 +50,27 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   const [agent, setAgent] = useState<string>(defaults.agent)
   const [skill, setSkill] = useState<string>(defaults.skill)
 
+  const projectPath = useStore((s) => s.projectPath)
+  const setActivePanel = useStore((s) => s.setActivePanel)
+  const setSkillNotebookPath = useUiStore((s) => s.setSkillNotebookPath)
+
   function handleApply(): void {
     onClose()
   }
 
-  const preview = SKILL_PROMPTS[skill] ?? `# ${skill}\n\nNo preview available.`
+  function handleOpenInNotebook(): void {
+    const relPath = SKILL_FILE_PATHS[skill] ?? skill
+    const fullPath = `${projectPath}/src/pathly_data/core/skills/${relPath}.md`
+    setSkillNotebookPath(fullPath)
+    setActivePanel('skill-notebook')
+    onClose()
+  }
+
+  const basePreview = SKILL_PROMPTS[skill] ?? `# ${skill}\n\nNo preview available.`
+  const preview = basePreview.replace(
+    /^Host: [^\n]+/m,
+    `Host: ${host} · Agent: ${agent}`,
+  )
 
   return createPortal(
     <div
@@ -116,7 +144,7 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
         </div>
 
         <div className={styles.footer}>
-          <button type="button" className={styles.notebookBtn}>
+          <button type="button" className={styles.notebookBtn} onClick={handleOpenInNotebook}>
             <BookOpen size={14} />
             Open skill in Notebook
           </button>
