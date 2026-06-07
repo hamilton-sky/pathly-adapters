@@ -167,16 +167,12 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
           })
           .catch(() => { /* flow YAML missing — FsmView uses fallback */ })
 
-        readFile(`${base}/EVENTS.jsonl`).then((evContent) => {
-          if (!evContent) return
-          const parsed2: FsmEvent[] = []
-          for (const line of evContent.split('\n')) {
-            const trimmed = line.trim()
-            if (!trimmed) continue
-            try { parsed2.push(JSON.parse(trimmed) as FsmEvent) } catch { /* skip */ }
-          }
-          setEvents(parsed2)
-        }).catch(() => { /* file may not exist yet */ })
+        const port = 8765
+        const histParams = new URLSearchParams({ topic: effectiveTopic, project_root: projectPath })
+        fetch(`http://127.0.0.1:${port}/events/history?${histParams}`)
+          .then((r) => r.ok ? r.json() : [])
+          .then((data: FsmEvent[]) => { if (data.length > 0) setEvents(data) })
+          .catch(() => { /* server not yet running — SSE will stream events when it starts */ })
       } catch { /* ignore malformed */ }
     }).catch(() => { /* topic not found in any root */ })
 
@@ -199,14 +195,7 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
           }
         } catch { /* ignore */ }
       }
-      if (data.path.endsWith('EVENTS.jsonl') && monitorSourceRef.current === 'chokidar') {
-        const parsed: FsmEvent[] = []
-        for (const line of data.content.split('\n')) {
-          const trimmed = line.trim()
-          if (trimmed) try { parsed.push(JSON.parse(trimmed) as FsmEvent) } catch { /* skip */ }
-        }
-        setEvents(parsed)
-      }
+      // EVENTS.jsonl is no longer written — events come from SSE or /events/history
     })
 
     const port = 8765

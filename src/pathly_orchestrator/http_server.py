@@ -238,7 +238,6 @@ def _broadcast(key: tuple[str, str], line: str) -> None:
 
 def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
     topic, project_root = key
-    feature_dir = Path(project_root) / "pathly" / "plans" / topic
     from pathly_orchestrator import db as _db
     try:
         conn = _db.get_db()
@@ -256,23 +255,7 @@ def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
             stop.wait(0.1)
         return
     except Exception:
-        logger.debug("tail_events: cannot open SQLite DB, falling back to file", exc_info=True)
-
-    path = feature_dir / "EVENTS.jsonl"
-    pos = path.stat().st_size if path.exists() else 0
-    while not stop.is_set():
-        try:
-            if path.exists():
-                with open(path, "r", encoding="utf-8") as f:
-                    f.seek(pos)
-                    for raw in f:
-                        raw = raw.strip()
-                        if raw:
-                            _broadcast(key, raw)
-                    pos = f.tell()
-        except Exception:
-            logger.debug("tail_events error", exc_info=True)
-        stop.wait(0.1)
+        logger.warning("tail_events: cannot open central DB for %s/%s", topic, project_root, exc_info=True)
 
 
 @app.route("/shutdown", methods=["POST"])
@@ -1443,9 +1426,35 @@ def runner_events_endpoint():
     )
 
 
+@app.route("/events/history", methods=["GET"])
+def events_history():
+    """Return persisted event history for a feature from the central DB."""
+    from pathly_orchestrator import db as _db
+
+    topic = request.args.get("topic", "")
+    project_root = request.args.get("project_root", "")
+    if not topic or not project_root:
+        return jsonify({"error": "topic and project_root are required"}), 400
+
+    try:
+        limit = int(request.args.get("limit", "500"))
+    except ValueError:
+        limit = 500
+
+    try:
+        conn = _db.get_db()
+        events = _db.read_events(conn, project_root, topic, since_seq=0)
+        if limit > 0:
+            events = events[-limit:]
+        return jsonify(events)
+    except Exception as exc:
+        logger.warning("events_history: DB error for %s/%s: %s", project_root, topic, exc)
+        return jsonify([])
+
+
 @app.route("/events/stream", methods=["GET"])
 def events_stream():
-    """SSE endpoint: streams new EVENTS.jsonl lines to the Studio UI."""
+    """SSE endpoint: streams new events to the Studio UI."""
     from flask import Response, stream_with_context
 
     if not flags.sse_streaming:
