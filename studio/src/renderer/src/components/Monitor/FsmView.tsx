@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo } from 'react'
+import { Check, CircleDot } from 'lucide-react'
 import { useStore } from '../../store'
 import { Tooltip } from '../ui/Tooltip'
 import { useInjectCSS } from './utils'
@@ -39,14 +40,23 @@ const PULSE_CSS = `
 }
 `
 
+const STAGE_AGENTS: Record<string, string> = {
+  STORMING:  'planner',
+  PLANNING:  'planner',
+  BUILDING:  'builder',
+  REVIEWING: 'reviewer',
+  TESTING:   'tester',
+  DONE:      'retro',
+}
+
 type StepStatus = 'completed' | 'active' | 'active-retry' | 'pending'
 
 function dotClass(status: StepStatus): string {
   const map: Record<StepStatus, string> = {
-    completed:    styles.fsmDotCompleted,
-    active:       styles.fsmDotActive,
+    completed:      styles.fsmDotCompleted,
+    active:         styles.fsmDotActive,
     'active-retry': styles.fsmDotRetry,
-    pending:      styles.fsmDotPending,
+    pending:        styles.fsmDotPending,
   }
   return map[status]
 }
@@ -77,10 +87,19 @@ function TimelineDot({ status, currentState }: { status: StepStatus; currentStat
     }
   }, [currentState, status])
 
-  return <div ref={ref} className={`${styles.fsmDot} ${dotClass(status)}`} />
+  return (
+    <div ref={ref} className={`${styles.fsmDot} ${dotClass(status)}`}>
+      {status === 'completed' && <Check size={13} />}
+      {status === 'active' && <CircleDot size={13} />}
+    </div>
+  )
 }
 
-export function FsmView(): JSX.Element {
+interface FsmViewProps {
+  onStageClick: (stage: string, idx: number) => void
+}
+
+export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
   const fsmState = useStore((s) => s.fsmState)
   const pipelineStates = useStore((s) => s.pipelineStates)
   const events = useStore((s) => s.events)
@@ -88,7 +107,6 @@ export function FsmView(): JSX.Element {
 
   useInjectCSS(PULSE_CSS)
 
-  // Set aria-atomic imperatively to avoid JSX expression lint false-positive
   useEffect(() => {
     convLabelRef.current?.setAttribute('aria-atomic', 'true')
   }, [])
@@ -154,15 +172,21 @@ export function FsmView(): JSX.Element {
           return (
             <div key={state} className={isLast ? styles.fsmStepLast : styles.fsmStep}>
               <Tooltip label={tooltipLabel} placement="bottom" delay={200}>
-                <div aria-label={tooltipLabel} className={styles.fsmDotCol}>
+                <button
+                  type="button"
+                  aria-label={tooltipLabel}
+                  className={styles.fsmDotBtn}
+                  onClick={() => onStageClick(state, idx)}
+                >
                   <TimelineDot status={status} currentState={activeState ?? ''} />
                   <span className={`${styles.fsmStepLabel} ${labelClass(status)}`}>
                     {state.slice(0, 8)}
                   </span>
+                  <span className={styles.fsmStepAgent}>{STAGE_AGENTS[state] ?? ''}</span>
                   {status === 'active-retry' && retryCount > 0 && (
                     <span className={styles.fsmRetryBadge}>↩{retryCount}</span>
                   )}
-                </div>
+                </button>
               </Tooltip>
 
               {!isLast && (

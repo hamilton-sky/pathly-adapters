@@ -1,6 +1,7 @@
 import React from 'react'
 import { useStore } from '../../store'
 import { useInjectCSS, truncate } from './utils'
+import { StatePill } from '../ui/StatePill/StatePill'
 import styles from './Monitor.module.css'
 
 const LIVE_BADGE_CSS = `
@@ -21,6 +22,8 @@ interface Props {
 export function HeaderBar({ effectiveTopic }: Props): JSX.Element {
   const { fsmState, monitorSource } = useStore()
   useInjectCSS(LIVE_BADGE_CSS)
+
+  const currentState = fsmState?.current as string | undefined
 
   const flow = fsmState?.flow as string | undefined
   const topic = effectiveTopic
@@ -50,6 +53,9 @@ export function HeaderBar({ effectiveTopic }: Props): JSX.Element {
     <div className={styles.headerRoot}>
       <div className={styles.headerTopRow}>
         <span className={styles.headerTitle}>{topic}</span>
+        {currentState && currentState !== 'IDLE' && (
+          <StatePill state={currentState as Parameters<typeof StatePill>[0]['state']} className={styles.headerStatePill} />
+        )}
         <span
           role="status"
           aria-live="polite"
