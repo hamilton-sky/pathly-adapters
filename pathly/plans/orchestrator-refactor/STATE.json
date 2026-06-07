@@ -1,16 +1,6 @@
 {
   "convs_done": 5,
   "convs_total": 5,
-  "current": "BUILDING",
-  "updated_at": "2026-06-07T14:50:02Z",
-  "conv_start_sha": "97b5cd10fcbb194f0ca3dab2baadbcd00a7affc3",
-  "build_baseline": {
-    "started_at": "2026-06-07T14:50:26.826745+00:00",
-    "preexisting_dirty": [
-      "pathly/plans/orchestrator-refactor/EVENTS.jsonl",
-      "pathly/plans/orchestrator-refactor/STATE.json",
-      "pathly/plans/orchestrator-refactor/pathly.db",
-      "pathly/plans/studio-backend/pathly.db-wal"
-    ]
-  }
+  "current": "DONE",
+  "updated_at": "2026-06-07T14:50:02Z"
 }

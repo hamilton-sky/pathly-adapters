@@ -30,7 +30,7 @@ User → /pathly <cmd>           skills (installed at ~/.claude/skills/pathly-*)
      → pathly/plans/<feature>/ filesystem state
 
 Studio → Start button          FlowControlBar → POST /runner/start
-       → supervisor.py         drives FSM + spawns agents as visible terminals
+       → supervisor/            drives FSM + spawns agents as visible terminals
        → TERMINAL_SPAWN SSE    Studio opens a PTY tab (node-pty) per pipeline stage
        → terminal:spawn IPC    argv injected: ['claude', '-p', '<full prompt>', '--print', ...]
        → PTY exits             POST /runner/terminal/result → FSM continues
@@ -44,7 +44,7 @@ Studio → Start button          FlowControlBar → POST /runner/start
 | Mode | Trigger | How prompt reaches CLI | Skill files needed on disk? |
 |---|---|---|---|
 | **Interactive** | User types `/pathly build` | CLI reads `~/.claude/skills/pathly-build.md` | Yes — run `pathly-setup claude --apply` |
-| **Runner** | Studio Start button | `supervisor.py` injects full prompt via `-p` argv | No — prompt assembled in Python at runtime |
+| **Runner** | Studio Start button | `supervisor/` injects full prompt via `-p` argv | No — prompt assembled in Python at runtime |
 
 In runner mode Pathly is the single source of truth for skill content. The CLI receives the complete prompt as a command-line argument and exits when done — it never reads a skill file.
 
