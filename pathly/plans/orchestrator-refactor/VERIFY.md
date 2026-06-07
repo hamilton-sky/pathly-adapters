@@ -1,2 +1,2 @@
 RESULT: PASS
-Verified: conversation 1 complete — db.py decomposed into db/ package with 9 query files + connection/migrations modules; 471 tests pass at baseline, all callers unbroken via __init__.py re-exports.
+Verified: conversation 2 complete — runner.py decomposed into runner/ package (argv/output/events/history/invoke/cli); invoke_agent supervisor lazy-import removed; 20/20 runner tests pass, full suite at baseline.

@@ -9,7 +9,7 @@
 
 | Conv | Title | Stories | Status |
 |---|---|---|---|
-| Conv 1 | db/ package | S1.1–S1.4 | TODO |
+| Conv 1 | db/ package | S1.1–S1.4 | DONE |
 | Conv 2 | runner/ package | S2.1–S2.4 | TODO |
 | Conv 3 | supervisor/ package | S3.1–S3.6 | TODO |
 | Conv 4 | http_server/ package | S4.1–S4.6 | TODO |
@@ -21,7 +21,7 @@
 
 | Phase | Title | Conv | Status |
 |---|---|---|---|
-| Phase 1 | db/ decomposition | Conv 1 | TODO |
+| Phase 1 | db/ decomposition | Conv 1 | DONE |
 | Phase 2 | runner/ decomposition | Conv 2 | TODO |
 | Phase 3 | supervisor/ decomposition | Conv 3 | TODO |
 | Phase 4 | http_server/ decomposition | Conv 4 | TODO |
