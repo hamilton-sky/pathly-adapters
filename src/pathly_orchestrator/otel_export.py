@@ -187,12 +187,13 @@ def cli_main() -> None:
     for event in agent_done_events:
         agent = event.get("agent", "?")
         seq = event.get("seq", "?")
-        print(f"exported span: invoke_agent {agent} (seq={seq})")
         if args.dry_run:
+            print(f"dry-run: would export span: invoke_agent {agent} (seq={seq})")
             exported_count += 1
             continue
         try:
             _do_export(event, args.endpoint)
+            print(f"exported span: invoke_agent {agent} (seq={seq})")
             exported_count += 1
         except Exception as exc:
             logger.warning("export failed for seq=%s: %s", seq, exc)

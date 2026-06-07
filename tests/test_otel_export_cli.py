@@ -46,7 +46,7 @@ def test_cli_missing_db(tmp_path):
     assert exit_exc.code == 1
 
 
-def test_cli_dry_run(tmp_path, monkeypatch):
+def test_cli_dry_run(tmp_path, monkeypatch, capsys):
     _make_test_db(tmp_path, n_events=2)
     calls = []
     monkeypatch.setattr(
@@ -62,9 +62,12 @@ def test_cli_dry_run(tmp_path, monkeypatch):
     ])
     assert exit_exc.code == 0
     assert len(calls) == 0
+    captured = capsys.readouterr()
+    assert "dry-run" in captured.out
+    assert "exported span:" not in captured.out
 
 
-def test_cli_exports_spans(tmp_path, monkeypatch):
+def test_cli_exports_spans(tmp_path, monkeypatch, capsys):
     _make_test_db(tmp_path, n_events=2)
     calls = []
     monkeypatch.setattr(
@@ -79,6 +82,8 @@ def test_cli_exports_spans(tmp_path, monkeypatch):
     ])
     assert exit_exc.code == 0
     assert len(calls) == 2
+    captured = capsys.readouterr()
+    assert "exported span:" in captured.out
 
 
 def test_cli_zero_events(tmp_path, capsys):
