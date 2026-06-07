@@ -12,6 +12,7 @@ interface ButtonProps {
   loading?: boolean
   onClick?: () => void
   children: React.ReactNode
+  icon?: React.ReactNode
   style?: React.CSSProperties
   'data-testid'?: string
   'data-label'?: string
@@ -24,6 +25,7 @@ export function Button({
   loading = false,
   onClick,
   children,
+  icon,
   style,
   'data-testid': dataTestId,
   'data-label': dataLabel,
@@ -38,6 +40,7 @@ export function Button({
       data-testid={dataTestId}
       data-label={dataLabel}
     >
+      {!loading && icon != null && icon}
       {children}
     </button>
   )

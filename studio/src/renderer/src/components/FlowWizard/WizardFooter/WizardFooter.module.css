@@ -1,15 +1,15 @@
 .row { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-top: 1px solid var(--theme-bg-surface0); flex-shrink: 0; }
 .group { display: flex; gap: 8px; align-items: center; }
 .btn {
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-base);
   cursor: pointer;
   padding: 6px 14px;
   font-family: inherit;
-  transition: transform 120ms ease, border-color 120ms ease, background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  transition: transform var(--transition-fast) ease, border-color var(--transition-fast) ease, background-color var(--transition-fast) ease, color var(--transition-fast) ease, box-shadow var(--transition-fast) ease;
 }
 .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.18); }
 .cancel { background: none; border: none; color: var(--theme-text-muted); }
 .back { background: none; border: 1px solid var(--theme-bg-surface1); color: var(--theme-text-secondary); }
 .next { background: var(--theme-accent); border: none; color: var(--theme-bg-base); font-weight: 600; }
-.danger { background: none; border: none; color: var(--theme-yellow); font-size: 12px; }
+.danger { background: none; border: none; color: var(--theme-yellow); font-size: var(--font-size-sm); }

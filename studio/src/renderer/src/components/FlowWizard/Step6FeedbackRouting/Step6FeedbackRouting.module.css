@@ -4,7 +4,7 @@
 .input {
   background: var(--theme-bg-base);
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-text-primary);
   font-size: var(--font-size-sm);
   padding: 5px 8px;
@@ -18,7 +18,7 @@
   border: none;
   color: var(--theme-text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   padding: 0 4px;
   line-height: 1;
   flex-shrink: 0;
@@ -26,7 +26,7 @@
 .addBtn {
   background: none;
   border: 1px dashed var(--theme-bg-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-blue);
   cursor: pointer;
   font-size: var(--font-size-sm);
@@ -34,15 +34,15 @@
   margin-top: 4px;
 }
 .quickAdd { margin-top: 16px; }
-.quickAddLabel { font-size: 11px; color: var(--theme-text-muted); margin-bottom: 6px; }
+.quickAddLabel { font-size: var(--font-size-sm); color: var(--theme-text-muted); margin-bottom: 6px; }
 .tagList { display: flex; flex-wrap: wrap; gap: 6px; }
 .tagBtn {
   background: none;
   border: 1px dashed var(--theme-bg-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-blue);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   padding: 3px 8px;
   font-family: monospace;
 }

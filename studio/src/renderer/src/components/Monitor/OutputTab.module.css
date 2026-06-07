@@ -12,7 +12,7 @@
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   padding: 24px;
   text-align: center;
 }
@@ -29,7 +29,7 @@
 }
 
 .runTopic {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--text-secondary);
   font-family: var(--font-family-mono);
@@ -44,7 +44,7 @@
 }
 
 .runMeta {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   color: var(--text-muted);
   font-family: var(--font-family-mono);
 }
@@ -62,12 +62,12 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: none;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .toggleBtn:hover {
@@ -102,7 +102,7 @@
   flex-direction: column;
   gap: 0;
   border: 1px solid var(--bg-surface1);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -113,10 +113,10 @@
 /* ── Historical run section ───────────────────────── */
 .historicalRun {
   border: 1px solid var(--bg-surface1);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   opacity: 0.6;
-  transition: opacity 150ms;
+  transition: opacity var(--transition-base);
 }
 
 .historicalRun:hover {
@@ -134,7 +134,7 @@
   cursor: pointer;
   text-align: left;
   color: inherit;
-  transition: background 100ms;
+  transition: background var(--transition-fast);
 }
 
 .historicalRunHeader:hover {
@@ -142,7 +142,7 @@
 }
 
 .historicalRunLabel {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-family: var(--font-family-mono);
   color: var(--text-muted);
   flex: 1;
@@ -165,7 +165,7 @@
 }
 
 .rowMeta {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-family: var(--font-family-mono);
   color: var(--text-muted);
   flex-shrink: 0;

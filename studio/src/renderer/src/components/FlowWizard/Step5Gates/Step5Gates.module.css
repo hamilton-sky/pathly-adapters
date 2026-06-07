@@ -1,17 +1,17 @@
 .root { display: block; }
 .empty { color: var(--theme-text-muted); font-size: var(--font-size-sm); }
-.card { margin-bottom: 20px; padding: 12px; border: 1px solid var(--theme-bg-surface1); border-radius: 6px; }
+.card { margin-bottom: 20px; padding: 12px; border: 1px solid var(--theme-bg-surface1); border-radius: var(--radius-md); }
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .state { font-family: monospace; font-size: var(--font-size-sm); color: var(--theme-text-primary); }
-.gateCard { margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 4px; }
+.gateCard { margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); }
 .gateHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .gateHead .select { width: auto; flex: 1; margin-right: 8px; }
-.label { font-size: 11px; color: var(--theme-text-muted); }
+.label { font-size: var(--font-size-sm); color: var(--theme-text-muted); }
 .stack { display: flex; flex-direction: column; gap: 6px; }
 .input {
   background: var(--theme-bg-base);
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-text-primary);
   font-size: var(--font-size-sm);
   padding: 4px 8px;
@@ -23,7 +23,7 @@
 .select {
   background: var(--theme-bg-base);
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-text-primary);
   font-size: var(--font-size-sm);
   padding: 5px 8px;

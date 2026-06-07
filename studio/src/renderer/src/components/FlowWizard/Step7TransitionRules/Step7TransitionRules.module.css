@@ -1,23 +1,23 @@
 .root { display: block; }
 .desc { margin-bottom: 12px; font-size: var(--font-size-sm); color: var(--theme-text-muted); }
-.stateBlock { margin-bottom: 20px; padding: 12px; border: 1px solid var(--theme-bg-surface0); border-radius: 6px; }
+.stateBlock { margin-bottom: 20px; padding: 12px; border: 1px solid var(--theme-bg-surface0); border-radius: var(--radius-md); }
 .stateHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .stateName { font-family: monospace; font-size: var(--font-size-sm); color: var(--theme-text-primary); }
 .addBtn {
   background: none;
   border: 1px dashed var(--theme-bg-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-blue);
   cursor: pointer;
   font-size: var(--font-size-sm);
   padding: 6px 12px;
 }
 .conditionRow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.conditionLabel { font-size: 11px; color: var(--theme-text-muted); flex-shrink: 0; }
+.conditionLabel { font-size: var(--font-size-sm); color: var(--theme-text-muted); flex-shrink: 0; }
 .input {
   background: var(--theme-bg-base);
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-text-primary);
   font-size: var(--font-size-sm);
   padding: 4px 8px;
@@ -28,7 +28,7 @@
 .select {
   background: var(--theme-bg-base);
   border: 1px solid var(--theme-bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--theme-text-primary);
   font-size: var(--font-size-sm);
   padding: 5px 8px;
@@ -41,7 +41,7 @@
   border: none;
   color: var(--theme-text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   padding: 0 4px;
   line-height: 1;
   flex-shrink: 0;
