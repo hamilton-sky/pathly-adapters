@@ -94,8 +94,8 @@ export default function NotebookCanvas() {
                 isNew={cell.id === newCellId}
                 isFirst={idx === 0}
                 isLast={idx === cells.length - 1}
-                onMoveUp={() => moveCell(cell.id, idx <= 1 ? null : cells[idx - 2].id)}
-                onMoveDown={() => moveCell(cell.id, cells[idx + 1].id)}
+                onMoveUp={() => { if (idx > 0) moveCell(cell.id, idx <= 1 ? null : cells[idx - 2].id) }}
+                onMoveDown={() => { if (idx < cells.length - 1) moveCell(cell.id, cells[idx + 1].id) }}
               />
             )}
             <InsertZone
