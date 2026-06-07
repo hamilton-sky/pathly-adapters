@@ -1,7 +1,7 @@
 .automationCard {
   flex-shrink: 0;
   margin: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   background: var(--bg-surface0);
   color: var(--text-primary);
@@ -29,9 +29,9 @@
 .automationBtnRun {
   flex: 1;
   padding: 5px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: none;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   font-family: var(--font-family-base);
   background: var(--bg-surface1);
@@ -48,9 +48,9 @@
 .automationBtnStep {
   flex: 1;
   padding: 5px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   background: transparent;
   cursor: pointer;
   color: var(--text-primary);
@@ -59,9 +59,9 @@
 
 .automationBtnStop {
   padding: 3px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--red);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   background: transparent;
   cursor: pointer;
   color: var(--red);
@@ -70,9 +70,9 @@
 
 .automationBtnApprove {
   padding: 3px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: none;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
   background: var(--green);
@@ -82,9 +82,9 @@
 
 .automationBtnSkipStep {
   padding: 3px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   background: transparent;
   cursor: pointer;
   color: var(--text-secondary);
@@ -96,7 +96,7 @@
 .stepQueue {
   flex-shrink: 0;
   margin: 4px 12px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -147,9 +147,9 @@
 }
 
 .stepItem {
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
-  transition: background 150ms ease-out;
+  transition: var(--transition-base);
   background: var(--bg-surface0);
   color: var(--text-primary);
   border: 1px solid var(--border-subtle);
@@ -199,7 +199,7 @@
 }
 
 .stepAction {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
   font-family: var(--font-family-mono);
   margin-left: 28px;

@@ -27,7 +27,7 @@
 }
 
 .emptyText {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   max-width: 220px;
   line-height: 1.5;
 }
@@ -39,10 +39,10 @@
 }
 
 .badge {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   padding: 2px 7px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   align-self: flex-start;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -66,16 +66,16 @@
 }
 
 .ccTag {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-family: var(--font-family-mono);
   background: var(--bg-surface1);
   color: var(--text-muted);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   padding: 1px 4px;
 }
 
 .content {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
@@ -85,7 +85,7 @@
 
 /* Elapsed time during streaming */
 .timer {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
   margin-left: 6px;
   font-variant-numeric: tabular-nums;

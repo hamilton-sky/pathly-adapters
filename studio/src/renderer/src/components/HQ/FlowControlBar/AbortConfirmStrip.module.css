@@ -9,7 +9,7 @@
 }
 
 .label {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--text-primary);
   flex: 1;
 }
@@ -21,8 +21,8 @@
 
 .confirmBtn {
   padding: 3px 10px;
-  font-size: 12px;
-  border-radius: 4px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--red, #ef4444);
   background: transparent;
   color: var(--red, #ef4444);
@@ -36,8 +36,8 @@
 
 .cancelBtn {
   padding: 3px 10px;
-  font-size: 12px;
-  border-radius: 4px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-primary);

@@ -4,13 +4,13 @@
   left: var(--menu-left);
   background: var(--bg-surface0);
   border: 1px solid var(--bg-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   z-index: 9999;
-  font-family: monospace;
-  font-size: 12px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
   padding: 4px 0;
   min-width: 120px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-md);
 }
 
 .item {
@@ -22,8 +22,8 @@
   cursor: pointer;
   padding: 5px 14px;
   text-align: left;
-  font-size: 12px;
-  font-family: monospace;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-mono);
   box-sizing: border-box;
 }
 

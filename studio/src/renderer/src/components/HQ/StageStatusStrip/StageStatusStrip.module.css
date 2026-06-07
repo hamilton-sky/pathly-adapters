@@ -3,7 +3,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
   min-height: 26px;
@@ -69,17 +69,17 @@
 
 .adapterChip {
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: var(--chip-color, var(--text-muted));
   color: #fff;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   opacity: 0.85;
 }
 
 .adapterChipEmpty {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
 }
 
 .cost {
@@ -98,7 +98,7 @@
 
 .error {
   color: var(--red, #ef4444);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   width: 100%;
 }
 
@@ -107,13 +107,13 @@
   border: 1px solid var(--runner-border);
   color: var(--runtime);
   border-radius: 3px;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   padding: 1px 6px;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background 120ms ease-out, border-color 120ms ease-out;
+  transition: var(--transition-fast);
   animation: pillEnter 150ms ease-out both;
 }
 

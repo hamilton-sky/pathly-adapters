@@ -24,7 +24,7 @@
   cursor: col-resize;
   z-index: 10;
   background: transparent;
-  transition: background 150ms ease-out;
+  transition: var(--transition-base);
 }
 
 .resizeHandle:hover,
@@ -43,7 +43,7 @@
   border: 1px solid color-mix(in srgb, var(--accent, #22C55E) 24%, transparent);
   background: color-mix(in srgb, var(--accent, #22C55E) 10%, transparent);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-style: italic;
   line-height: 1.4;
 }
@@ -51,7 +51,7 @@
 .thinkingDot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--accent, #22C55E);
   flex-shrink: 0;
 }
@@ -66,14 +66,14 @@
   border: 1px solid color-mix(in srgb, var(--yellow, #fcd34d) 30%, transparent);
   background: color-mix(in srgb, var(--yellow, #fcd34d) 8%, transparent);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
 }
 
 .toolDot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--yellow, #fcd34d);
   flex-shrink: 0;
 }

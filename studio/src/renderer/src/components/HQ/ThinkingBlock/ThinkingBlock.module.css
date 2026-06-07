@@ -24,11 +24,11 @@
 }
 
 .label {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
-  font-family: monospace;
+  font-family: var(--font-family-mono);
   letter-spacing: 0.03em;
-  transition: color 120ms;
+  transition: var(--transition-fast);
 }
 
 .chevron {
@@ -55,10 +55,10 @@
 .body {
   overflow: hidden;
   padding: 0 8px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.55;
   color: var(--text-muted);
-  font-family: monospace;
+  font-family: var(--font-family-mono);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 220px;

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useTheme } from '../../useTheme'
+import clsx from 'clsx'
+import styles from './Tooltip.module.css'
 
 interface TooltipProps {
   label: string
@@ -26,7 +27,6 @@ export function Tooltip({
   const wrapRef = useRef<HTMLSpanElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const t = useTheme()
 
   function getAnchorEl(root: HTMLElement): HTMLElement {
     // display:contents spans have zero-size BCR; walk down until we find a real box
@@ -109,54 +109,19 @@ export function Tooltip({
         <div
           ref={tooltipRef}
           role="tooltip"
-          style={{
-            position: 'fixed',
-            top: pos.top,
-            left: pos.left,
-            transform,
-            zIndex: 99999,
-            pointerEvents: 'none',
-            display: 'inline-flex',
-            flexDirection: description ? 'column' : 'row',
-            alignItems: description ? 'flex-start' : 'center',
-            gap: description ? 3 : 7,
-            backgroundColor: t.bgSurface1,
-            color: t.textPrimary,
-            padding: '6px 10px',
-            borderRadius: 6,
-            fontSize: 12,
-            fontFamily: t.fontFamilyBase,
-            whiteSpace: description ? 'normal' : 'nowrap',
-            maxWidth: description ? 220 : undefined,
-            boxShadow: '0 4px 18px rgba(0,0,0,0.5)',
-            border: `1px solid rgba(255,255,255,0.07)`,
-            lineHeight: 1.4,
-          }}
+          className={clsx(styles.tooltip, description && styles.multiline)}
+          style={{ top: pos.top, left: pos.left, transform }}
         >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
+          <span className={styles.labelRow}>
             {label}
           {shortcut && (
-            <kbd
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                backgroundColor: t.bgBase,
-                color: t.textMuted,
-                border: `1px solid rgba(255,255,255,0.12)`,
-                borderRadius: 4,
-                padding: '1px 6px',
-                fontFamily: t.fontFamilyMono,
-                fontSize: 11,
-                lineHeight: 1.5,
-                letterSpacing: '0.03em',
-              }}
-            >
+            <kbd className={styles.kbd}>
               {shortcut}
             </kbd>
           )}
           </span>
           {description && (
-            <span style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.4 }}>
+            <span className={styles.desc}>
               {description}
             </span>
           )}
