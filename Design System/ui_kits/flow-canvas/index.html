@@ -1,0 +1,41 @@
+<!-- @startingPoint section="Screens" subtitle="Visual FSM flow editor — node graph + inspector" viewport="1280x760" -->
+<!-- @dsCard group="Flow Canvas" viewport="1280x760" name="Flow Canvas" subtitle="Visual FSM flow editor — node graph + inspector + YAML" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Pathly Studio — Flow Canvas</title>
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="../_shell/shell.css">
+<link rel="stylesheet" href="canvas.css">
+</head>
+<body>
+  <div class="app">
+    <div id="pathly-topbar"></div>
+    <div class="app-body">
+      <div id="pathly-sidebar"></div>
+      <main class="app-main cv-main">
+        <div class="cv-bar">
+          <span class="cv-flowname">team-build<span class="tag">flow.yaml</span></span>
+          <div class="seg-tabs" id="cv-views"></div>
+          <div class="cv-bar-actions">
+            <span class="valid-chip" id="cv-valid"></span>
+            <button class="btn-b" id="cv-layout">Auto-layout</button>
+            <button class="btn-cta" id="cv-export">Export ▾</button>
+            <div class="zoom"><button id="z-out">−</button><span class="pct">100%</span><button id="z-in">+</button></div>
+          </div>
+        </div>
+        <div class="cv-stage" id="cv-stage">
+          <div class="cv-canvas" id="cv-canvas">
+            <div class="cv-inner" id="cv-inner">
+              <svg class="cv-edges" id="cv-edges" viewBox="0 0 640 720"></svg>
+            </div>
+          </div>
+          <aside class="cv-inspect empty" id="cv-inspect">Select a state to edit its agent &amp; transitions</aside>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>window.PATHLY_SHELL = { project:'fsm-server-sqlite', activeNav:'flow', activeSide:'plan', sidebar:'rail' };</script>
+  <script src="../../assets/vendor/icons.js"></script>
+  <script src="../_shell/shell.js"></script>
+  <script src="canvas.js"></script>
+</body></html>

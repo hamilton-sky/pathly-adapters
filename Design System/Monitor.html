@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pathly · Monitor</title>
+<link rel="stylesheet" href="./styles.css" />
+<script src="./assets/vendor/icons.js"></script>
+<script src="./appbar-brands.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg-base); color: var(--text-primary); font-family: var(--font-family-base); font-size: var(--font-size-base); -webkit-font-smoothing: antialiased; }
+  .app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  [data-icon], [data-brand] { display: inline-flex; }
+  svg.lucide { display: block; }
+
+  /* ── global app header ── */
+  .appbar { height: 44px; flex-shrink: 0; display: flex; align-items: center; gap: 7px; padding: 0 8px 0 10px; position: relative; background: var(--bg-mantle); border-bottom: var(--border); }
+  .ab-ic { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: none; background: transparent; color: var(--text-secondary); cursor: pointer; flex-shrink: 0; }
+  .ab-ic:hover { background: var(--bg-surface1); color: var(--accent); }
+  .ab-ic.vscode:hover { background: var(--bg-surface1); }
+  .ab-projects { font-size: 12px; color: var(--text-secondary); background: transparent; border: var(--border); border-radius: var(--radius-md); padding: 5px 11px; cursor: pointer; flex-shrink: 0; }
+  .ab-proj { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); background: var(--bg-surface0); border: var(--border); border-radius: var(--radius-md); padding: 5px 11px; min-width: 178px; cursor: pointer; flex-shrink: 0; }
+  .ab-proj [data-icon] { margin-left: auto; color: var(--text-muted); }
+  .ab-nav { display: flex; gap: 3px; margin-left: 6px; }
+  .ab-tab { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: none; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; font-family: var(--font-family-base); }
+  .ab-tab:hover { background: var(--bg-surface0); color: var(--accent); }
+  .ab-tab.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .ab-publish { font-size: 12px; font-weight: 600; color: #fff; background: var(--accent); border: none; border-radius: var(--radius-md); padding: 6px 14px; cursor: pointer; flex-shrink: 0; }
+  .ab-win { display: flex; gap: 2px; margin-left: 6px; }
+  .ab-wb { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: var(--radius-md); }
+  .ab-wb:hover { background: var(--bg-surface0); color: var(--text-primary); }
+  .ab-wb.close:hover { background: var(--red); color: #fff; }
+  .ab-wb .wmin { width: 11px; height: 1.5px; background: currentColor; }
+  .ab-wb .wmax { width: 10px; height: 10px; border: 1.5px solid currentColor; border-radius: 2px; }
+  .sp { flex: 1; }
+
+  /* ── monitor body ── */
+  .mon { flex: 1; overflow-y: auto; }
+  .mhead { display: flex; align-items: center; gap: 12px; padding: 16px 24px 4px; }
+  .mhead .feat { font-family: var(--font-family-mono); font-size: 17px; font-weight: 600; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
+  .pill.building { color: var(--state-building); background: color-mix(in srgb, var(--state-building) 14%, transparent); }
+  .pill .d { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .sse { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--font-family-mono); color: var(--green); }
+  .sse .d { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .msub { padding: 0 24px; font-size: 12px; color: var(--text-muted); font-family: var(--font-family-mono); }
+
+  /* ── FSM stepper ── */
+  .stepper { display: flex; align-items: flex-start; padding: 22px 32px 10px; }
+  .step { flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+  .step-top { display: flex; align-items: center; width: 100%; }
+  .step-line { flex: 1; height: 2px; background: var(--bg-surface1); }
+  .step-line.on { background: var(--accent); }
+  .step-line.hide { visibility: hidden; }
+  .step-node { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--text-muted); background: var(--bg-base); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 0 6px; color: var(--text-muted); transition: box-shadow .15s; }
+  .step.done .step-node { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .step.active .step-node { border-color: var(--accent); color: var(--accent); }
+  .step-name { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; margin-top: 9px; color: var(--text-secondary); }
+  .step.active .step-name { color: var(--accent); }
+  .step.todo .step-name { color: var(--text-muted); }
+  .step-agent { font-size: 10px; color: var(--text-muted); font-family: var(--font-family-mono); margin-top: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .step.active .step-node { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); } }
+  }
+
+  /* ── metrics strip ── */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 16px 24px; }
+  .metric { background: var(--bg-surface0); border: var(--border); border-radius: var(--radius-lg); padding: 15px 17px; }
+  .metric .v { font-family: var(--font-family-mono); font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
+  .metric .v.g { color: var(--green); }
+  .metric .k { font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-muted); margin-top: 5px; }
+
+  /* ── tabs + event log ── */
+  .mtabs { display: flex; gap: 20px; padding: 4px 24px 0; border-bottom: var(--border); }
+  .mtab { font-size: 13px; color: var(--text-muted); padding: 8px 0; border-bottom: 2px solid transparent; cursor: pointer; }
+  .mtab.on { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: 600; }
+  .elog { margin: 16px 24px 24px; background: var(--bg-terminal); border: var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .elog-head { display: flex; align-items: center; padding: 9px 14px; border-bottom: var(--border); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+  .elog-head .ph { margin-left: auto; font-size: 10px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text-secondary); background: var(--bg-surface0); border: var(--border); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+  .elog-body { padding: 9px 14px; font-family: var(--font-family-mono); font-size: 12px; line-height: 1.75; }
+  .erow { display: flex; gap: 12px; }
+  .erow .t { color: var(--text-muted); flex-shrink: 0; }
+  .erow .ty { flex-shrink: 0; width: 124px; }
+  .erow .sm { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .erow .sm b { color: var(--text-primary); }
+  .ty.spawn { color: var(--blue); } .ty.file { color: var(--yellow); } .ty.done { color: var(--green); } .ty.trans { color: var(--accent); } .ty.gate { color: var(--red); } .ty.dim { color: var(--text-muted); }
+  .elog-foot { border-top: var(--border); padding: 8px 14px; font-family: var(--font-family-mono); font-size: 10px; color: var(--text-muted); display: flex; }
+  .elog-foot .r { margin-left: auto; }
+
+  /* ── configure-phase modal ── */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: none; align-items: flex-start; justify-content: center; z-index: 80; padding-top: 7vh; }
+  .modal-bg.show { display: flex; }
+  .modal { width: 640px; max-width: 92vw; background: var(--bg-mantle); border: var(--border); border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,0.55); overflow: hidden; max-height: 86vh; display: flex; flex-direction: column; }
+  .modal-head { display: flex; align-items: center; gap: 9px; padding: 14px 18px; border-bottom: var(--border); flex-shrink: 0; }
+  .modal-head .gear { color: var(--accent); display: inline-flex; }
+  .modal-head .mt { font-weight: 600; font-size: 14px; }
+  .modal-head .ms { color: var(--text-muted); font-size: 13px; }
+  .modal-head .x { margin-left: auto; color: var(--text-muted); cursor: pointer; display: inline-flex; }
+  .modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+  .cfg-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip2 { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: var(--border); background: var(--bg-surface0); color: var(--text-secondary); cursor: pointer; }
+  .chip2.on { border-color: var(--accent-border); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .chip2.mono { font-family: var(--font-family-mono); font-size: 12px; }
+  .chip2 [data-brand], .chip2 .ci { display: inline-flex; }
+  .prompt-prev { background: var(--bg-terminal); border: var(--border); border-radius: 9px; padding: 14px 15px; font-family: var(--font-family-mono); font-size: 12px; line-height: 1.7; }
+  .prompt-prev .h { color: var(--accent); }
+  .prompt-prev .m { color: var(--text-muted); }
+  .prompt-prev .b { color: var(--text-primary); font-weight: 600; }
+  .prompt-prev .x { color: var(--text-secondary); }
+  .modal-foot { display: flex; align-items: center; gap: 10px; padding: 13px 18px; border-top: var(--border); flex-shrink: 0; }
+  .modal-foot .nb { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-secondary); background: var(--bg-surface0); border: var(--border); border-radius: var(--radius-md); padding: 7px 11px; cursor: pointer; }
+  .modal-foot .spacer { flex: 1; }
+  .btn-ghost { font-size: 13px; color: var(--text-secondary); background: transparent; border: var(--border); border-radius: var(--radius-md); padding: 7px 14px; cursor: pointer; }
+  .btn-primary { font-size: 13px; font-weight: 600; color: #fff; background: var(--accent); border: none; border-radius: var(--radius-md); padding: 7px 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- GLOBAL APP HEADER -->
+  <div class="appbar">
+    <button class="ab-ic" title="Menu"><i data-icon="menu" data-size="16"></i></button>
+    <button class="ab-projects">Projects</button>
+    <button class="ab-proj">orchestrator-refactor<i data-icon="chevron-down" data-size="13"></i></button>
+    <div class="ab-split">
+      <button class="ab-ic vscode" title="Open in VS Code"><svg width="15" height="15" viewBox="0 0 24 24" fill="#007ACC" style="display:block"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 00-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 00-1.276.057L.327 7.261A1 1 0 00.326 8.74L3.9 12 .326 15.26a1 1 0 00.001 1.479L1.65 17.94a.999.999 0 001.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 001.704.29l4.942-2.377A1.5 1.5 0 0024 20.06V3.939a1.5 1.5 0 00-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg></button>
+      <span class="ab-split-div"></span>
+      <button class="ab-chev" title="Open project in…"><i data-icon="chevron-down" data-size="10"></i></button>
+      <div class="ab-menu">
+        <div class="ab-menu-label">Open project in…</div>
+        <button class="ab-menu-item"><span data-brand="vscode" data-bs="16"></span>VS Code</button>
+        <button class="ab-menu-item"><span data-brand="fileexplorer" data-bs="16"></span>File Explorer</button>
+        <button class="ab-menu-item"><span data-brand="winterminal" data-bs="16"></span>Terminal</button>
+        <button class="ab-menu-item"><span data-brand="gitbash" data-bs="16"></span>Git Bash</button>
+        <button class="ab-menu-item"><span data-brand="wsl" data-bs="16"></span>WSL</button>
+        <button class="ab-menu-item"><span data-brand="pycharm" data-bs="16"></span>PyCharm</button>
+      </div>
+    </div>
+    <button class="ab-ic" title="New window"><i data-icon="copy" data-size="15"></i></button>
+    <div class="ab-nav">
+      <button class="ab-tab"><i data-icon="layout-grid" data-size="14"></i>Canvas</button>
+      <button class="ab-tab"><i data-icon="book-open" data-size="14"></i>Notebook</button>
+      <button class="ab-tab on"><i data-icon="activity" data-size="14"></i>Monitor</button>
+    </div>
+    <span class="sp"></span>
+    <button class="ab-ic" title="Settings"><i data-icon="globe" data-size="15"></i></button>
+    <button class="ab-ic" title="Theme"><i data-icon="sun" data-size="15"></i></button>
+    <div class="ab-split">
+      <button class="ab-ic" title="Terminal"><i data-icon="square-terminal" data-size="15"></i></button>
+      <span class="ab-split-div"></span>
+      <button class="ab-chev" title="New terminal…"><i data-icon="chevron-down" data-size="10"></i></button>
+      <div class="ab-menu right">
+        <button class="ab-menu-item on"><span data-brand="shell" data-bs="16"></span>+ Shell</button>
+        <button class="ab-menu-item"><span data-brand="claude" data-bs="16"></span>Claude Code</button>
+        <button class="ab-menu-item"><span data-brand="codex" data-bs="16"></span>Codex</button>
+        <button class="ab-menu-item"><span data-brand="antigravity" data-bs="16"></span>Antigravity</button>
+      </div>
+    </div>
+    <button class="ab-publish">Publish</button>
+    <div class="ab-win">
+      <button class="ab-wb" title="Minimize"><span class="wmin"></span></button>
+      <button class="ab-wb" title="Maximize"><span class="wmax"></span></button>
+      <button class="ab-wb close" title="Close"><i data-icon="x" data-size="14"></i></button>
+    </div>
+  </div>
+
+  <!-- MONITOR -->
+  <div class="mon">
+    <div class="mhead">
+      <span class="feat">auth-refactor</span>
+      <span class="pill building"><span class="d"></span>Building</span>
+      <span class="sse"><span class="d"></span>SSE live</span>
+    </div>
+    <div class="msub">conv 2 · 2 done · 3 remaining</div>
+
+    <!-- FSM stepper -->
+    <div class="stepper" id="stepper">
+      <div class="step done" data-stage="STORMING"><div class="step-top"><span class="step-line hide"></span><span class="step-node"><i data-icon="check" data-size="14"></i></span><span class="step-line on"></span></div><div class="step-name">STORMING</div><div class="step-agent">planner</div></div>
+      <div class="step done" data-stage="PLANNING"><div class="step-top"><span class="step-line on"></span><span class="step-node"><i data-icon="check" data-size="14"></i></span><span class="step-line on"></span></div><div class="step-name">PLANNING</div><div class="step-agent">planner</div></div>
+      <div class="step active" data-stage="BUILDING"><div class="step-top"><span class="step-line on"></span><span class="step-node"><i data-icon="circle-dot" data-size="14"></i></span><span class="step-line"></span></div><div class="step-name">BUILDING</div><div class="step-agent">builder</div></div>
+      <div class="step todo" data-stage="REVIEWING"><div class="step-top"><span class="step-line"></span><span class="step-node"></span><span class="step-line"></span></div><div class="step-name">REVIEWING</div><div class="step-agent">reviewer</div></div>
+      <div class="step todo" data-stage="TESTING"><div class="step-top"><span class="step-line"></span><span class="step-node"></span><span class="step-line"></span></div><div class="step-name">TESTING</div><div class="step-agent">tester</div></div>
+      <div class="step todo" data-stage="DONE"><div class="step-top"><span class="step-line"></span><span class="step-node"></span><span class="step-line hide"></span></div><div class="step-name">DONE</div><div class="step-agent">retro</div></div>
+    </div>
+
+    <!-- metrics -->
+    <div class="metrics">
+      <div class="metric"><div class="v">142.3k</div><div class="k">Tokens</div></div>
+      <div class="metric"><div class="v">6m 44s</div><div class="k">Wall</div></div>
+      <div class="metric"><div class="v g">$1.97</div><div class="k">Cost</div></div>
+      <div class="metric"><div class="v">23</div><div class="k">Events</div></div>
+    </div>
+
+    <!-- tabs + event log -->
+    <div class="mtabs"><span class="mtab on">Events</span><span class="mtab">Output</span></div>
+    <div class="elog">
+      <div class="elog-head">Event log<span class="ph">all phases ▾</span></div>
+      <div class="elog-body">
+        <div class="erow"><span class="t">09:09:01</span><span class="ty spawn">AGENT_SPAWNED</span><span class="sm">builder #1</span></div>
+        <div class="erow"><span class="t">09:11:20</span><span class="ty file">FILE_CREATED</span><span class="sm">src/auth/session.ts</span></div>
+        <div class="erow"><span class="t">09:12:05</span><span class="ty dim">—</span><span class="sm">implement</span></div>
+        <div class="erow"><span class="t">09:18:30</span><span class="ty done">AGENT_DONE</span><span class="sm">builder #1 · <b>PASS</b> · 31 tools · 214s · 18.2k→6.4k · $0.71</span></div>
+        <div class="erow"><span class="t">09:21:06</span><span class="ty trans">TRANSITION</span><span class="sm">BUILDING → REVIEWING</span></div>
+        <div class="erow"><span class="t">09:24:18</span><span class="ty gate">GATE_FAILED</span><span class="sm">lint:strict → BUILDING</span></div>
+        <div class="erow"><span class="t">09:24:19</span><span class="ty trans">TRANSITION</span><span class="sm">↩ REVIEWING → BUILDING</span></div>
+        <div class="erow"><span class="t">09:24:40</span><span class="ty spawn">AGENT_SPAWNED</span><span class="sm">builder #2</span></div>
+        <div class="erow"><span class="t">09:27:11</span><span class="ty file">FILE_CREATED</span><span class="sm">src/auth/guards.ts</span></div>
+        <div class="erow"><span class="t">09:33:50</span><span class="ty done">AGENT_DONE</span><span class="sm">builder #2 · <b>DONE</b> · 22 tools · 168s · 14.8k→5.1k · $0.62</span></div>
+      </div>
+      <div class="elog-foot"><span>in/out 40.8k / 16.9k</span><span class="r">~64.5k combined</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIGURE PHASE MODAL -->
+<div class="modal-bg" id="cfg">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="gear"><i data-icon="settings" data-size="16"></i></span>
+      <span class="mt">Configure phase</span>
+      <span class="ms">— what runs when the pipeline enters this stage</span>
+      <span class="pill building" style="margin-left:8px"><span class="d"></span>Building</span>
+      <span class="x" id="cfg-x"><i data-icon="x" data-size="16"></i></span>
+    </div>
+    <div class="modal-body">
+      <div>
+        <div class="cfg-label">CLI host</div>
+        <div class="chips">
+          <span class="chip2 on"><span data-brand="claude" data-bs="16"></span>Claude Code</span>
+          <span class="chip2"><span data-brand="codex" data-bs="16"></span>Codex</span>
+          <span class="chip2"><span class="ci"><svg width="16" height="16" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="17" rx="6" fill="#24292F"/><ellipse cx="9" cy="12" rx="2" ry="2.6" fill="#fff"/><ellipse cx="15" cy="12" rx="2" ry="2.6" fill="#fff"/><circle cx="9" cy="12.4" r="0.85" fill="#24292F"/><circle cx="15" cy="12.4" r="0.85" fill="#24292F"/></svg></span>Copilot</span>
+          <span class="chip2"><span data-brand="antigravity" data-bs="16"></span>Antigravity</span>
+        </div>
+      </div>
+      <div>
+        <div class="cfg-label">Agent</div>
+        <div class="chips">
+          <span class="chip2 mono">planner</span>
+          <span class="chip2 mono on">builder</span>
+          <span class="chip2 mono">reviewer</span>
+          <span class="chip2 mono">tester</span>
+          <span class="chip2 mono">retro</span>
+        </div>
+      </div>
+      <div>
+        <div class="cfg-label">Skill</div>
+        <div class="chips">
+          <span class="chip2 mono">plan/storm</span>
+          <span class="chip2 mono">plan/scope</span>
+          <span class="chip2 mono on">fix/build</span>
+          <span class="chip2 mono">team/build</span>
+          <span class="chip2 mono">review/quality</span>
+          <span class="chip2 mono">test/verify</span>
+          <span class="chip2 mono">retro/archive</span>
+        </div>
+      </div>
+      <div>
+        <div class="cfg-label">Prompt preview</div>
+        <div class="prompt-prev">
+          <div class="h"># fix/build</div>
+          <div class="m">Host: Claude Code · Agent: builder · Conversation #2</div>
+          <div>&nbsp;</div>
+          <div class="x"><span class="b">Role:</span> Stage orchestrator — Quick Fix.</div>
+          <div class="x">Apply a single, well-scoped change. No multi-conversation</div>
+          <div class="x">planning, no PROGRESS.md churn.</div>
+          <div>&nbsp;</div>
+          <div class="x">· Read the issue description in plans/auth-refactor/</div>
+          <div class="x">· Locate the code</div>
+          <div class="x">· Apply the minimal change</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="nb"><i data-icon="book-open" data-size="14"></i>Open skill in Notebook</span>
+      <span class="spacer"></span>
+      <button class="btn-ghost" id="cfg-cancel">Cancel</button>
+      <button class="btn-primary"><i data-icon="check" data-size="14"></i>Apply</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  if (window.PathlyIcons && PathlyIcons.inject) PathlyIcons.inject(document);
+  (function () {
+    var cfg = document.getElementById('cfg');
+    function open() { cfg.classList.add('show'); }
+    function close() { cfg.classList.remove('show'); }
+    document.querySelectorAll('#stepper .step').forEach(function (s) { s.addEventListener('click', open); });
+    document.getElementById('cfg-x').addEventListener('click', close);
+    document.getElementById('cfg-cancel').addEventListener('click', close);
+    cfg.addEventListener('click', function (e) { if (e.target === cfg) close(); });
+    document.querySelectorAll('.chips').forEach(function (group) {
+      group.addEventListener('click', function (e) {
+        var chip = e.target.closest('.chip2'); if (!chip) return;
+        group.querySelectorAll('.chip2').forEach(function (c) { c.classList.remove('on'); });
+        chip.classList.add('on');
+      });
+    });
+  })();
+</script>
+</body>
+</html>

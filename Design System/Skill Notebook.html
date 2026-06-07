@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pathly · Skill Notebook</title>
+<link rel="stylesheet" href="./styles.css" />
+<script src="./assets/vendor/icons.js"></script>
+<script src="./appbar-brands.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg-base); color: var(--text-primary); font-family: var(--font-family-base);
+    font-size: var(--font-size-base); -webkit-font-smoothing: antialiased; }
+  .app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  /* ── global app header ── */
+  .appbar { height: 44px; flex-shrink: 0; display: flex; align-items: center; gap: 7px; padding: 0 8px 0 10px;
+    background: var(--bg-mantle); border-bottom: var(--border); }
+  .ab-ic { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md);
+    border: none; background: transparent; color: var(--text-secondary); cursor: pointer; flex-shrink: 0; }
+  .ab-ic:hover { background: var(--bg-surface1); color: var(--accent); }
+  .ab-ic.vscode:hover { background: var(--bg-surface1); }
+  .ab-projects { font-size: 12px; color: var(--text-secondary); background: transparent; border: var(--border);
+    border-radius: var(--radius-md); padding: 5px 11px; cursor: pointer; flex-shrink: 0; }
+  .ab-proj { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary);
+    background: var(--bg-surface0); border: var(--border); border-radius: var(--radius-md); padding: 5px 11px; min-width: 178px; cursor: pointer; flex-shrink: 0; }
+  .ab-proj [data-icon] { margin-left: auto; color: var(--text-muted); }
+  .ab-nav { display: flex; gap: 3px; margin-left: 6px; }
+  .ab-tab { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: none; border-radius: 6px;
+    background: transparent; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; font-family: var(--font-family-base); }
+  .ab-tab:hover { background: var(--bg-surface0); color: var(--accent); }
+  .ab-tab.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .ab-publish { font-size: 12px; font-weight: 600; color: #fff; background: var(--accent); border: none;
+    border-radius: var(--radius-md); padding: 6px 14px; cursor: pointer; flex-shrink: 0; }
+  .ab-win { display: flex; gap: 2px; margin-left: 6px; }
+  .ab-wb { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: none;
+    background: transparent; color: var(--text-muted); cursor: pointer; border-radius: var(--radius-md); }
+  .ab-wb:hover { background: var(--bg-surface0); color: var(--text-primary); }
+  .ab-wb.close:hover { background: var(--red); color: #fff; }
+  .ab-wb .wmin { width: 11px; height: 1.5px; background: currentColor; }
+  .ab-wb .wmax { width: 10px; height: 10px; border: 1.5px solid currentColor; border-radius: 2px; }
+  [data-icon] { display: inline-flex; }
+  svg.lucide { display: block; }
+
+  /* ── topbar ── */
+  .top { height: 48px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+    background: var(--bg-mantle); border-bottom: var(--border); }
+  .top .ibtn { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; border: none; background: transparent; }
+  .top .ibtn:hover { background: var(--bg-surface0); color: var(--accent); }
+  .crumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .crumbs .c { color: var(--text-muted); }
+  .crumbs .c.last { color: var(--text-primary); font-weight: 600; font-family: var(--font-family-mono); }
+  .crumbs .sep { color: var(--text-muted); opacity: 0.6; }
+  .nb-badge { font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 4px; padding: 3px 8px; }
+  .sp { flex: 1; }
+  .toggle { display: flex; border: var(--border); border-radius: var(--radius-md); overflow: hidden; }
+  .toggle button { border: none; background: transparent; color: var(--text-muted); font-size: 12px;
+    padding: 6px 12px; cursor: pointer; font-family: var(--font-family-base); }
+  .toggle button.on { background: var(--bg-surface1); color: var(--text-primary); font-weight: 600; }
+  .export { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #fff;
+    background: var(--accent); border: none; border-radius: var(--radius-md); padding: 7px 13px; cursor: pointer; }
+  .save2 { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    background: var(--bg-surface0); border: var(--border); border-radius: var(--radius-md); padding: 7px 12px; cursor: pointer; }
+  .save2:hover { color: var(--accent); border-color: var(--accent-border); }
+  .toast { position: fixed; right: 20px; bottom: 52px; z-index: 50; display: flex; align-items: center; gap: 11px;
+    background: var(--bg-surface1); border: 1px solid color-mix(in srgb, var(--green) 35%, transparent); border-radius: var(--radius-lg);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.5); padding: 12px 14px; min-width: 244px;
+    opacity: 0; transform: translateY(10px); pointer-events: none; transition: opacity 0.22s ease-out, transform 0.22s ease-out; }
+  .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .toast .tk { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
+  .toast .tt { flex: 1; min-width: 0; }
+  .toast .tt .t1 { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .toast .tt .t2 { font-size: 11px; color: var(--text-muted); font-family: var(--font-family-mono); margin-top: 2px; }
+  .toast .tx { color: var(--text-muted); display: inline-flex; cursor: pointer; }
+  .toast .tx:hover { color: var(--text-primary); }
+
+  .body { flex: 1; display: flex; min-height: 0; }
+
+  /* ── sidebar (catalog) ── */
+  .side { width: 250px; flex-shrink: 0; background: var(--bg-mantle); border-right: var(--border);
+    display: flex; flex-direction: column; min-height: 0; }
+  .side .sh { display: flex; align-items: center; gap: 7px; padding: 11px 12px 8px; font-size: 11px;
+    font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .side .sh .ac { color: var(--accent); display: inline-flex; }
+  .side .sh .sp2 { flex: 1; }
+  .search { padding: 0 10px 8px; }
+  .search .wrap { display: flex; align-items: center; gap: 7px; background: var(--bg-base); border: var(--border);
+    border-radius: var(--radius-md); padding: 6px 9px; }
+  .search .wrap [data-icon] { color: var(--text-muted); }
+  .search input { flex: 1; border: none; background: transparent; outline: none; color: var(--text-primary);
+    font-size: 12.5px; font-family: var(--font-family-base); }
+  .search input::placeholder { color: var(--text-muted); }
+  .cat { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+  .glabel { display: flex; align-items: center; gap: 6px; padding: 9px 12px 3px; }
+  .glabel .gl { font-size: 9px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-muted); }
+  .glabel.custom .gl { color: var(--accent); }
+  .glabel .ctag { font-size: 8px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 3px; padding: 1px 5px; }
+  .glabel .gsp { flex: 1; }
+  .glabel .gact { color: var(--text-muted); display: inline-flex; cursor: pointer; opacity: 0; }
+  .glabel:hover .gact { opacity: 0.75; }
+  .glabel .gact:hover { color: var(--accent); }
+  .citem { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 14px; cursor: grab;
+    font-size: 13px; color: var(--text-secondary); }
+  .citem:hover { background: var(--bg-surface0); color: var(--text-primary); }
+  .citem .grip { color: var(--text-muted); opacity: 0.35; display: inline-flex; margin-left: -4px; }
+  .citem:hover .grip { opacity: 0.8; }
+  .citem .ci { display: inline-flex; opacity: 0.85; }
+  .citem .cn { flex: 1; font-family: var(--font-family-mono); font-size: 12.5px; }
+  .citem .add { width: 18px; height: 18px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); opacity: 0; }
+  .citem:hover .add { opacity: 1; }
+  .newcat { margin: 10px 12px 6px; width: calc(100% - 24px); display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    color: var(--accent); font-size: 12px; font-weight: 600; border: 1.5px dashed var(--accent-border);
+    border-radius: var(--radius-md); padding: 8px; background: transparent; cursor: pointer; }
+
+  /* ── center (cells) ── */
+  .center { flex: 1; overflow-y: auto; min-width: 0; padding: 26px 0 60px;
+    background-color: var(--bg-base);
+    background-image: radial-gradient(color-mix(in srgb, var(--text-muted) 12%, transparent) 1px, transparent 1px);
+    background-size: 28px 28px; }
+  .col { width: 680px; max-width: calc(100% - 56px); margin: 0 auto; }
+  .nb-title { font-family: var(--font-family-mono); font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .nb-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; font-family: var(--font-family-mono); }
+
+  .insert { height: 16px; position: relative; display: flex; align-items: center; justify-content: center; }
+  .insert::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+    background: var(--accent); opacity: 0; transition: opacity 0.12s; }
+  .insert .plus { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-surface1); border: var(--border);
+    color: var(--accent); display: inline-flex; align-items: center; justify-content: center; opacity: 0; cursor: pointer;
+    transition: opacity 0.12s; z-index: 1; }
+  .insert:hover::before { opacity: 0.4; }
+  .insert:hover .plus { opacity: 1; }
+  .insert.drop { height: 10px; margin: 3px 0; }
+  .insert.drop::before { opacity: 1; height: 2px; background: var(--accent); }
+  .insert.drop .droplbl { position: absolute; left: 2px; top: -7px; font-size: 9.5px; font-weight: 700;
+    color: var(--accent); background: var(--bg-base); padding: 0 6px; font-family: var(--font-family-mono);
+    text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .cell { position: relative; display: block; border: var(--border);
+    border-radius: var(--radius-lg); background: var(--bg-surface0); transition: box-shadow 0.12s, border-color 0.12s; }
+  .cell[data-active] { border-color: var(--accent-border); box-shadow: 0 0 0 2px var(--accent-bg); }
+  .cell.dragging { opacity: 0.55; border-style: dashed; box-shadow: 0 16px 38px rgba(0,0,0,0.45); }
+  .cell-head { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-bottom: var(--border-subtle); }
+  .cell.body .cell-head { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .cell.fragment .cell-head { background: color-mix(in srgb, var(--green) 7%, transparent); }
+  /* tweak-driven cell indicator modes */
+  body.tw-ind-bar .cell.body .cell-head, body.tw-ind-none .cell .cell-head { background: transparent; }
+  body.tw-ind-bar .cell { border-left: 3px solid var(--accent); }
+  body.tw-ind-bar .cell.fragment { border-left-color: var(--green); }
+  body.tw-dense .cell-head { padding: 7px 12px; }
+  body.tw-dense .cell-body { padding: 8px 12px 10px; }
+  body.tw-dense .citem { padding-top: 4px; padding-bottom: 4px; }
+  body.tw-nopreview .preview { display: none; }
+  .cell-grip { color: var(--text-muted); opacity: 0.4; display: inline-flex; cursor: grab; }
+  .cell-title { font-family: var(--font-family-mono); font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .cell-badge { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; }
+  .cell-badge.body { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .cell-badge.frag { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+  .dragchip { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 700; color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 4px; padding: 2px 6px;
+    font-family: var(--font-family-mono); text-transform: uppercase; letter-spacing: 0.04em; }
+  .lock { color: var(--text-muted); opacity: 0.6; display: inline-flex; }
+  .cell-actions { margin-left: auto; display: flex; gap: 1px; opacity: 0; transition: opacity 0.12s; }
+  .cell:hover .cell-actions { opacity: 1; }
+  .cell-actions button { width: 24px; height: 24px; border: none; background: transparent; color: var(--text-muted);
+    border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .cell-actions button:hover { background: var(--bg-surface1); color: var(--text-primary); }
+  .cell-actions button.del:hover { color: var(--red); }
+  .cell-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+  .cell-actions button.more.on { background: var(--bg-surface1); color: var(--text-primary); }
+  .cell-body { padding: 11px 14px 13px; }
+  .cell-body p { margin: 0 0 7px; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+  .cell-body p:last-child { margin-bottom: 0; }
+  .var-pill { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent);
+    border-radius: 4px; padding: 0 5px; font-family: var(--font-family-mono); font-size: 0.9em; }
+  .hl { background: color-mix(in srgb, var(--accent) 26%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 2px; }
+  .show-full { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 11px; color: var(--text-muted); cursor: pointer; }
+  .show-full:hover { color: var(--accent); }
+
+  /* selection toolbar */
+  .sel-tb { position: absolute; top: 26px; right: 14px; z-index: 20; display: inline-flex; align-items: center; gap: 1px;
+    background: var(--bg-surface1); border: 1px solid rgba(255,255,255,0.1); border-radius: 9px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 4px; }
+  .sel-tb button { display: inline-flex; align-items: center; gap: 6px; border: none; background: transparent;
+    color: var(--text-secondary); font-size: 12px; font-family: var(--font-family-base); padding: 6px 9px; border-radius: 6px; cursor: pointer; }
+  .sel-tb button:hover { background: var(--bg-surface0); color: var(--text-primary); }
+  .sel-tb button.primary { color: var(--accent); font-weight: 600; }
+  .sel-tb button.primary [data-icon] { color: var(--accent); }
+  .sel-tb .div { width: 1px; height: 18px; background: rgba(255,255,255,0.1); margin: 0 3px; }
+  .sel-tb .caret { position: absolute; right: 34px; bottom: -6px; width: 12px; height: 12px; background: var(--bg-surface1);
+    border-right: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); transform: rotate(45deg); }
+
+  /* cell ⋯ menu */
+  .cmenu { position: absolute; top: 40px; right: 10px; z-index: 18; width: 196px; background: var(--bg-surface1);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 9px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 4px; }
+  .cmenu button { display: flex; align-items: center; gap: 9px; width: 100%; border: none; background: transparent;
+    color: var(--text-secondary); font-size: 12.5px; font-family: var(--font-family-base); padding: 7px 10px; border-radius: 6px; cursor: pointer; text-align: left; }
+  .cmenu button:hover { background: var(--bg-surface0); color: var(--text-primary); }
+  .cmenu button .ic { color: var(--text-muted); display: inline-flex; }
+  .cmenu button .kbd { margin-left: auto; font-family: var(--font-family-mono); font-size: 10px; color: var(--text-muted); }
+  .cmenu .sep { height: 1px; background: rgba(255,255,255,0.08); margin: 4px 2px; }
+  .cmenu button.del, .cmenu button.del .ic { color: var(--red); }
+
+  /* ── preview ── */
+  .preview { width: 344px; flex-shrink: 0; background: var(--bg-mantle); border-left: var(--border);
+    display: flex; flex-direction: column; min-height: 0; }
+  .pv-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: var(--border); }
+  .pv-head .pl { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); flex: 1; }
+  .pv-head .live { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--green); font-family: var(--font-family-mono); }
+  .pv-head .live .d { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .pv-body { flex: 1; overflow-y: auto; padding: 18px 20px; }
+  .pv-body h1 { font-size: 20px; font-weight: 700; margin: 0 0 12px; font-family: var(--font-family-mono); letter-spacing: -0.01em; }
+  .pv-body h2 { font-size: 14px; font-weight: 600; margin: 18px 0 7px; color: var(--text-primary); }
+  .pv-body p { font-size: 13px; line-height: 1.6; color: var(--text-secondary); margin: 0 0 9px; }
+  .pv-body ul { margin: 0 0 9px; padding-left: 18px; }
+  .pv-body li { font-size: 13px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 3px; }
+  .pv-body code { font-family: var(--font-family-mono); font-size: 12px; background: var(--bg-surface0);
+    border: var(--border-subtle); border-radius: 4px; padding: 1px 5px; color: var(--text-primary); }
+  .pv-foot { border-top: var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+    font-family: var(--font-family-mono); font-size: 11px; color: var(--text-muted); }
+  .pv-foot .g { color: var(--green); }
+
+  /* ── functionality legend ── */
+  .legend { flex-shrink: 0; height: 36px; display: flex; align-items: center; gap: 20px; padding: 0 16px;
+    background: var(--bg-mantle); border-top: var(--border); font-size: 11px; color: var(--text-muted); overflow-x: auto; }
+  .legend b { color: var(--text-secondary); font-weight: 600; }
+  .legend .k { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .legend [data-icon] { color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- GLOBAL APP HEADER -->
+  <div class="appbar">
+    <button class="ab-ic" title="Menu"><i data-icon="menu" data-size="16"></i></button>
+    <button class="ab-projects">Projects</button>
+    <button class="ab-proj">orchestrator-refactor<i data-icon="chevron-down" data-size="13"></i></button>
+    <div class="ab-split">
+      <button class="ab-ic vscode" title="Open in VS Code"><svg width="15" height="15" viewBox="0 0 24 24" fill="#007ACC" style="display:block"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 00-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 00-1.276.057L.327 7.261A1 1 0 00.326 8.74L3.9 12 .326 15.26a1 1 0 00.001 1.479L1.65 17.94a.999.999 0 001.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 001.704.29l4.942-2.377A1.5 1.5 0 0024 20.06V3.939a1.5 1.5 0 00-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg></button>
+      <span class="ab-split-div"></span>
+      <button class="ab-chev" title="Open project in…"><i data-icon="chevron-down" data-size="10"></i></button>
+      <div class="ab-menu">
+        <div class="ab-menu-label">Open project in…</div>
+        <button class="ab-menu-item"><span data-brand="vscode" data-bs="16"></span>VS Code</button>
+        <button class="ab-menu-item"><span data-brand="fileexplorer" data-bs="16"></span>File Explorer</button>
+        <button class="ab-menu-item"><span data-brand="winterminal" data-bs="16"></span>Terminal</button>
+        <button class="ab-menu-item"><span data-brand="gitbash" data-bs="16"></span>Git Bash</button>
+        <button class="ab-menu-item"><span data-brand="wsl" data-bs="16"></span>WSL</button>
+        <button class="ab-menu-item"><span data-brand="pycharm" data-bs="16"></span>PyCharm</button>
+      </div>
+    </div>
+    <button class="ab-ic" title="New window"><i data-icon="copy" data-size="15"></i></button>
+    <div class="ab-nav">
+      <button class="ab-tab"><i data-icon="layout-grid" data-size="14"></i>Canvas</button>
+      <button class="ab-tab on"><i data-icon="book-open" data-size="14"></i>Notebook</button>
+      <button class="ab-tab"><i data-icon="activity" data-size="14"></i>Monitor</button>
+    </div>
+    <span class="sp"></span>
+    <button class="ab-ic" title="Settings"><i data-icon="globe" data-size="15"></i></button>
+    <button class="ab-ic" title="Theme"><i data-icon="sun" data-size="15"></i></button>
+    <div class="ab-split">
+      <button class="ab-ic" title="Terminal"><i data-icon="square-terminal" data-size="15"></i></button>
+      <span class="ab-split-div"></span>
+      <button class="ab-chev" title="New terminal…"><i data-icon="chevron-down" data-size="10"></i></button>
+      <div class="ab-menu right">
+        <button class="ab-menu-item on"><span data-brand="shell" data-bs="16"></span>+ Shell</button>
+        <button class="ab-menu-item"><span data-brand="claude" data-bs="16"></span>Claude Code</button>
+        <button class="ab-menu-item"><span data-brand="codex" data-bs="16"></span>Codex</button>
+        <button class="ab-menu-item"><span data-brand="antigravity" data-bs="16"></span>Antigravity</button>
+      </div>
+    </div>
+    <button class="ab-publish">Publish</button>
+    <div class="ab-win">
+      <button class="ab-wb" title="Minimize"><span class="wmin"></span></button>
+      <button class="ab-wb" title="Maximize"><span class="wmax"></span></button>
+      <button class="ab-wb close" title="Close"><i data-icon="x" data-size="14"></i></button>
+    </div>
+  </div>
+
+  <!-- TOPBAR -->
+  <div class="top">
+    <button class="ibtn" title="Back"><i data-icon="arrow-left" data-size="16"></i></button>
+    <div class="crumbs"><span class="c">Skills</span><span class="sep">›</span><span class="c">fix</span><span class="sep">›</span><span class="c last">build</span></div>
+    <span class="nb-badge">Notebook</span>
+    <span class="sp"></span>
+    <button class="ibtn" title="Undo"><i data-icon="undo-2" data-size="15"></i></button>
+    <button class="ibtn" title="Redo"><i data-icon="redo-2" data-size="15"></i></button>
+    <div class="toggle"><button class="on">Cells</button><button>Preview</button></div>
+    <button class="save2" title="Save to database"><i data-icon="database" data-size="13"></i>Save</button>
+    <button class="export"><i data-icon="download" data-size="13"></i>Export Skill</button>
+  </div>
+
+  <div class="body">
+    <!-- SIDEBAR · CATALOG -->
+    <aside class="side">
+      <div class="sh"><span class="ac"><i data-icon="sparkles" data-size="13"></i></span><span class="sp2">Catalog</span><span class="gact" title="New category"><i data-icon="plus" data-size="13"></i></span></div>
+      <div class="search"><div class="wrap"><i data-icon="search" data-size="14"></i><input placeholder="Search the library…" /></div></div>
+      <div class="cat">
+        <div class="glabel"><span class="gl">Agents</span><span class="gsp"></span><span class="gact" title="Add agent"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="brain" data-size="13"></i></span><span class="cn">planner</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="brain" data-size="13"></i></span><span class="cn">builder</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="brain" data-size="13"></i></span><span class="cn">reviewer</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="brain" data-size="13"></i></span><span class="cn">tester</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+
+        <div class="glabel"><span class="gl">Fragments</span><span class="gsp"></span><span class="gact" title="Add fragment"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="diamond" data-size="13"></i></span><span class="cn">role</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="diamond" data-size="13"></i></span><span class="cn">procedure</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="diamond" data-size="13"></i></span><span class="cn">gate</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+
+        <div class="glabel"><span class="gl">Skills</span><span class="gsp"></span><span class="gact" title="Add skill"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="book-open" data-size="13"></i></span><span class="cn">build.md</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="book-open" data-size="13"></i></span><span class="cn">review.md</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+
+        <div class="glabel"><span class="gl">Templates</span><span class="gsp"></span><span class="gact" title="Add template"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="layout-grid" data-size="13"></i></span><span class="cn">fsm-base</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+
+        <div class="glabel custom"><span class="gl">Quick-fix kit</span><span class="ctag">custom</span><span class="gsp"></span><span class="gact" title="Rename / reorder / delete"><i data-icon="more-horizontal" data-size="13"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="star" data-size="13"></i></span><span class="cn">fix-role</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="star" data-size="13"></i></span><span class="cn">fix-gate</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+
+        <button class="newcat"><i data-icon="plus" data-size="13"></i>New category</button>
+      </div>
+    </aside>
+
+    <!-- CENTER · CELLS -->
+    <main class="center">
+      <div class="col">
+        <h1 class="nb-title">fix/build</h1>
+        <div class="nb-meta">3 cells · 1 body · 2 fragments · edited 2m ago</div>
+
+        <div class="insert"><span class="plus"><i data-icon="plus" data-size="13"></i></span></div>
+
+        <div class="cell body">
+          <div class="cell-head">
+            <span class="cell-title">fix/build</span>
+            <span class="cell-badge body">body</span>
+            <span class="lock" title="Body cells are the skill's own content"><i data-icon="lock" data-size="12"></i></span>
+            <div class="cell-actions">
+              <button title="Move up" disabled><i data-icon="chevron-up" data-size="14"></i></button>
+              <button title="Move down"><i data-icon="chevron-down" data-size="14"></i></button>
+              <button title="Edit"><i data-icon="pencil" data-size="14"></i></button>
+              <button title="More"><i data-icon="more-horizontal" data-size="14"></i></button>
+            </div>
+          </div>
+          <div class="cell-body">
+            <p>FIXING stage for the <span class="var-pill">quick-fix</span> flow. Fast, focused, <mark class="hl">minimal — one targeted change</mark>.</p>
+            <p>Invoked by the <span class="var-pill">team</span> orchestrator when the FSM state is <span class="var-pill">BUILDING</span>.</p>
+          </div>
+          <div class="sel-tb">
+            <button class="primary"><i data-icon="sparkles" data-size="13"></i>New cell from selection</button>
+            <span class="div"></span>
+            <button title="Make a fragment"><i data-icon="diamond" data-size="13"></i>Fragment</button>
+            <button title="Wrap as variable">{ }</button>
+            <button title="Bold" style="font-weight:700">B</button>
+            <button title="Italic" style="font-style:italic">i</button>
+            <span class="div"></span>
+            <button title="Comment"><i data-icon="message-square" data-size="13"></i></button>
+            <span class="caret"></span>
+          </div>
+        </div>
+
+        <div class="insert"><span class="plus"><i data-icon="plus" data-size="13"></i></span></div>
+
+        <div class="cell fragment" data-active>
+          <div class="cell-head">
+            <span class="cell-title">role</span>
+            <span class="cell-badge frag">fragment</span>
+            <div class="cell-actions" style="opacity:1">
+              <button title="Move up"><i data-icon="chevron-up" data-size="14"></i></button>
+              <button title="Move down"><i data-icon="chevron-down" data-size="14"></i></button>
+              <button title="Edit"><i data-icon="pencil" data-size="14"></i></button>
+              <button class="more on" title="More"><i data-icon="more-horizontal" data-size="14"></i></button>
+            </div>
+          </div>
+          <div class="cell-body">
+            <p>Stage orchestrator: <span class="var-pill">Quick Fix</span>.</p>
+            <p>Apply a <span class="var-pill">single</span>, well-scoped change. No multi-conversation planning, no PROGRESS.md churn.</p>
+            <span class="show-full"><i data-icon="chevron-down" data-size="12"></i>Show full fragment</span>
+          </div>
+          <div class="cmenu">
+            <button><span class="ic"><i data-icon="copy" data-size="13"></i></span>Duplicate<span class="kbd">⌘D</span></button>
+            <button><span class="ic"><i data-icon="chevron-up" data-size="13"></i></span>Move up<span class="kbd">⌘↑</span></button>
+            <button><span class="ic"><i data-icon="chevron-down" data-size="13"></i></span>Move down<span class="kbd">⌘↓</span></button>
+            <button><span class="ic"><i data-icon="diamond" data-size="13"></i></span>Convert to fragment</button>
+            <div class="sep"></div>
+            <button class="del"><span class="ic"><i data-icon="trash-2" data-size="13"></i></span>Delete<span class="kbd">⌫</span></button>
+          </div>
+        </div>
+
+        <div class="insert drop"><span class="droplbl">Drop to reorder</span></div>
+
+        <div class="cell fragment dragging">
+          <div class="cell-head">
+            <span class="cell-title">procedure</span>
+            <span class="cell-badge frag">fragment</span>
+            <span class="dragchip"><i data-icon="grip-vertical" data-size="11"></i>dragging</span>
+            <div class="cell-actions">
+              <button title="Move up"><i data-icon="chevron-up" data-size="14"></i></button>
+              <button title="Move down" disabled><i data-icon="chevron-down" data-size="14"></i></button>
+              <button title="Edit"><i data-icon="pencil" data-size="14"></i></button>
+              <button class="del" title="Remove"><i data-icon="trash-2" data-size="14"></i></button>
+            </div>
+          </div>
+          <div class="cell-body">
+            <p>Read the issue description · locate the code · apply the minimal change · verify it passes.</p>
+          </div>
+        </div>
+
+        <div class="insert"><span class="plus"><i data-icon="plus" data-size="13"></i></span></div>
+      </div>
+    </main>
+
+    <!-- PREVIEW -->
+    <aside class="preview">
+      <div class="pv-head"><span class="pl">Composed skill</span><span class="live"><span class="d"></span>live</span></div>
+      <div class="pv-body">
+        <h1>fix/build</h1>
+        <p>FIXING stage for the <code>quick-fix</code> flow. Fast, focused, minimal — one targeted change.</p>
+        <p>Invoked by the <code>team</code> orchestrator when the FSM state is <code>BUILDING</code>.</p>
+        <h2>Role</h2>
+        <p>Stage orchestrator: Quick Fix. Apply a single, well-scoped change.</p>
+        <ul><li>Read the issue description</li><li>Locate the code</li><li>Apply the minimal change</li><li>Verify it passes</li></ul>
+        <h2>Gate</h2>
+        <p><code>lint:strict</code>, <code>types:strict</code> must pass before <code>REVIEWING</code>.</p>
+      </div>
+      <div class="pv-foot"><span>3 cells</span><span>·</span><span class="g">≈ 1,240 tokens</span><span>·</span><span>compiled clean</span></div>
+    </aside>
+  </div>
+
+  <div class="toast" id="nb-toast">
+    <span class="tk"><i data-icon="circle-check" data-size="16"></i></span>
+    <div class="tt"><div class="t1">Saved to database</div><div class="t2">pathly.db · fix/build · 3 cells</div></div>
+    <span class="tx" title="Dismiss"><i data-icon="x" data-size="14"></i></span>
+  </div>
+
+  <!-- FUNCTIONALITY LEGEND -->
+  <div class="legend">
+    <span class="k"><i data-icon="chevrons-up" data-size="12"></i><b>Drag a cell or ⌘↑/↓</b> to move cells</span>
+    <span class="k"><i data-icon="plus" data-size="12"></i><b>Insert</b> a new cell, or drag from the catalog</span>
+    <span class="k"><i data-icon="copy" data-size="12"></i><b>⋯ menu</b> — duplicate · convert · delete</span>
+    <span class="k"><i data-icon="sparkles" data-size="12"></i><b>Select text</b> → new cell from selection</span>
+    <span class="k"><i data-icon="undo-2" data-size="12"></i><b>Undo / redo</b> — 50 steps</span>
+  </div>
+</div>
+
+<script>
+  if (window.PathlyIcons && PathlyIcons.inject) PathlyIcons.inject(document);
+  (function () {
+    var btn = document.querySelector('.save2'), toast = document.getElementById('nb-toast'), t;
+    function show() { toast.classList.add('show'); clearTimeout(t); t = setTimeout(function () { toast.classList.remove('show'); }, 2800); }
+    if (btn) btn.addEventListener('click', show);
+    var x = toast && toast.querySelector('.tx');
+    if (x) x.addEventListener('click', function () { toast.classList.remove('show'); clearTimeout(t); });
+  })();
+</script>
+<div id="tweaks-root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="./tweaks-panel.jsx"></script>
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#38BDF8",
+  "indicator": "tint",
+  "density": "regular",
+  "preview": true
+}/*EDITMODE-END*/;
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  React.useEffect(() => {
+    document.documentElement.style.setProperty('--accent', t.accent);
+    const b = document.body;
+    b.classList.toggle('tw-ind-bar', t.indicator === 'bar');
+    b.classList.toggle('tw-ind-none', t.indicator === 'none');
+    b.classList.toggle('tw-dense', t.density === 'compact');
+    b.classList.toggle('tw-nopreview', !t.preview);
+  }, [t.accent, t.indicator, t.density, t.preview]);
+  return (
+    <TweaksPanel title="Tweaks">
+      <TweakSection label="Theme" />
+      <TweakColor label="Accent" value={t.accent} options={['#38BDF8', '#A78BFA', '#34D399', '#c75c2a']} onChange={(v) => setTweak('accent', v)} />
+      <TweakSection label="Cells" />
+      <TweakRadio label="Type indicator" value={t.indicator} options={['tint', 'bar', 'none']} onChange={(v) => setTweak('indicator', v)} />
+      <TweakRadio label="Density" value={t.density} options={['compact', 'regular']} onChange={(v) => setTweak('density', v)} />
+      <TweakSection label="Layout" />
+      <TweakToggle label="Show preview" value={t.preview} onChange={(v) => setTweak('preview', v)} />
+    </TweaksPanel>
+  );
+}
+ReactDOM.createRoot(document.getElementById('tweaks-root')).render(<App />);
+</script>
+</body>
+</html>

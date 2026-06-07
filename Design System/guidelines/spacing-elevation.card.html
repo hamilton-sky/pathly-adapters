@@ -1,0 +1,21 @@
+<!-- @dsCard group="Spacing" viewport="700x180" name="Elevation" subtitle="Shadows reserved for floating surfaces only" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin:0; background:var(--bg-mantle); color:var(--text-primary);
+    font-family:var(--font-family-base); padding:30px 28px; }
+  .row { display:flex; gap:26px; align-items:center; }
+  .col { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .box { width:96px; height:60px; background:var(--bg-surface0);
+    border:1px solid var(--border-color); border-radius:var(--radius-lg); }
+  .lbl { font-size:11px; font-weight:600; }
+  .v { font-family:var(--font-family-mono); font-size:10px; color:var(--text-muted); }
+</style></head>
+<body>
+  <div class="row">
+    <div class="col"><div class="box" style="box-shadow:var(--shadow-sm)"></div><span class="lbl">sm</span><span class="v">rows, chips</span></div>
+    <div class="col"><div class="box" style="box-shadow:var(--shadow-md)"></div><span class="lbl">md</span><span class="v">dropdowns</span></div>
+    <div class="col"><div class="box" style="box-shadow:var(--shadow-lg)"></div><span class="lbl">lg</span><span class="v">popouts</span></div>
+    <div class="col"><div class="box" style="box-shadow:var(--shadow-modal)"></div><span class="lbl">modal</span><span class="v">dialogs</span></div>
+  </div>
+</body></html>

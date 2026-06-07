@@ -1,0 +1,113 @@
+<!-- @dsCard group="Slides" viewport="1280x720" name="Flow Builder slide" subtitle="Author your own FSM — states, prompts, agents, all configurable" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html, body { margin: 0; }
+  .slide {
+    width: 1280px; height: 720px; box-sizing: border-box;
+    background: var(--bg-base); color: var(--text-primary);
+    font-family: var(--font-family-base); padding: 60px 84px 56px;
+    display: flex; flex-direction: column;
+    background-image: radial-gradient(color-mix(in srgb, var(--text-muted) 14%, transparent) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+  .kicker { font-size: 16px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin: 0 0 12px; }
+  h2 { font-size: 46px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .sub { font-size: 21px; color: var(--text-secondary); margin: 0; max-width: 900px; }
+  .stage-area { flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: 28px; margin-top: 38px; min-height: 0; }
+
+  /* ── flow editor (left) ── */
+  .editor { border: var(--border); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg-mantle) 80%, transparent);
+    padding: 22px 24px; display: flex; flex-direction: column; }
+  .ed-head { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .ed-title { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .ed-title .nm { color: var(--text-primary); font-family: var(--font-family-mono); text-transform: none; letter-spacing: 0; margin-left: 6px; }
+  .ed-tools { margin-left: auto; display: flex; gap: 8px; }
+  .ed-tool { font-size: 13px; color: var(--text-secondary); border: var(--border); border-radius: var(--radius-md); padding: 5px 12px; display: inline-flex; align-items: center; gap: 7px; }
+  .ed-tool.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+
+  .graph { display: flex; flex-direction: column; gap: 0; align-items: flex-start; }
+  .node {
+    width: 100%; max-width: 420px; display: flex; align-items: center; gap: 14px;
+    border: var(--border); border-left: 4px solid var(--c); border-radius: var(--radius-md);
+    background: var(--bg-surface0); padding: 14px 16px;
+  }
+  .node.sel { border-color: var(--accent-border); border-left-color: var(--c); box-shadow: 0 0 0 3px var(--accent-bg); }
+  .node .pip { width: 11px; height: 11px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
+  .node .nname { font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
+  .node .nrole { font-family: var(--font-family-mono); font-size: 13px; color: var(--text-muted); margin-left: auto; }
+  .node .nskill { font-family: var(--font-family-mono); font-size: 12px; color: var(--accent); }
+  .connector { width: 2px; height: 24px; background: var(--border-color); margin-left: 28px; }
+  .connector.reroute { background: color-mix(in srgb, var(--orange) 60%, transparent); position: relative; }
+  .connector.reroute::after { content: '↩ reroute'; position: absolute; left: 12px; top: 4px; font-size: 11px; font-family: var(--font-family-mono); color: var(--orange); white-space: nowrap; }
+  .addnode { margin-left: 0; margin-top: 4px; display: inline-flex; align-items: center; gap: 8px; color: var(--accent);
+    font-size: 14px; font-weight: 600; border: 1.5px dashed var(--accent-border); border-radius: var(--radius-md); padding: 10px 16px; background: transparent; }
+
+  /* ── inspector (right) ── */
+  .inspector { border: var(--border); border-radius: var(--radius-lg); background: var(--bg-surface0); padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+  .ins-head { display: flex; align-items: center; gap: 9px; }
+  .ins-head .pip { width: 10px; height: 10px; border-radius: 50%; background: var(--state-building); }
+  .ins-head .t { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+  .control { background: var(--bg-base); border: var(--border); border-radius: var(--radius-md); padding: 9px 11px; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; }
+  .control.input { font-family: var(--font-family-mono); }
+  .control.select { justify-content: space-between; color: var(--text-secondary); }
+  .control.select .chev { color: var(--text-muted); }
+  .control.prompt { display: block; font-size: 13px; line-height: 1.5; color: var(--text-secondary); height: 64px; overflow: hidden; }
+  .control.prompt b { color: var(--text-primary); font-weight: 600; }
+  .seg { display: flex; gap: 0; border: var(--border); border-radius: var(--radius-md); overflow: hidden; }
+  .seg > span { flex: 1; text-align: center; font-size: 13px; padding: 8px 6px; color: var(--text-muted); border-right: var(--border); }
+  .seg > span:last-child { border-right: none; }
+  .seg > span.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .gate { display: flex; align-items: center; gap: 10px; }
+  .toggle { width: 34px; height: 20px; border-radius: 999px; background: var(--green); position: relative; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; right: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .gate .gtxt { font-family: var(--font-family-mono); font-size: 13px; color: var(--text-secondary); }
+</style></head>
+<body>
+  <div class="slide">
+    <p class="kicker">Make it yours</p>
+    <h2>Author your own flow.</h2>
+    <p class="sub">Define your states, wire the transitions, and assign a prompt, host, agent and skill to each one — every node is configurable.</p>
+
+    <div class="stage-area">
+      <!-- flow editor -->
+      <div class="editor">
+        <div class="ed-head">
+          <span class="ed-title">Flow<span class="nm">ship-fast.yaml</span></span>
+          <div class="ed-tools">
+            <span class="ed-tool">Auto-layout</span>
+            <span class="ed-tool primary">Save flow</span>
+          </div>
+        </div>
+        <div class="graph">
+          <div class="node" style="--c: var(--state-planning)">
+            <span class="pip"></span><span class="nname">DRAFT</span><span class="nskill">plan.md</span><span class="nrole">planner</span>
+          </div>
+          <div class="connector"></div>
+          <div class="node sel" style="--c: var(--state-building)">
+            <span class="pip"></span><span class="nname">BUILD</span><span class="nskill">build.md</span><span class="nrole">builder</span>
+          </div>
+          <div class="connector reroute"></div>
+          <div class="node" style="--c: var(--state-reviewing)">
+            <span class="pip"></span><span class="nname">SHIP</span><span class="nskill">review.md</span><span class="nrole">reviewer</span>
+          </div>
+          <div class="connector"></div>
+          <button class="addnode" type="button">＋ Add state</button>
+        </div>
+      </div>
+
+      <!-- inspector -->
+      <div class="inspector">
+        <div class="ins-head"><span class="pip"></span><span class="t">State · BUILD</span></div>
+        <div class="field"><label>State name</label><div class="control input">BUILD</div></div>
+        <div class="field"><label>Prompt</label><div class="control prompt"><b>BUILDING stage.</b> Implement the planned change. Keep the diff focused; run the gate before you hand off to review.</div></div>
+        <div class="field"><label>Host</label><div class="seg"><span class="on">Claude Code</span><span>Codex</span><span>Copilot</span></div></div>
+        <div class="field"><label>Agent</label><div class="control select">builder<span class="chev">▾</span></div></div>
+        <div class="field"><label>Skill</label><div class="control select">build.md<span class="chev">▾</span></div></div>
+        <div class="field"><label>Quality gate</label><div class="gate"><span class="toggle"></span><span class="gtxt">lint · type · test</span></div></div>
+      </div>
+    </div>
+  </div>
+</body></html>

@@ -1,0 +1,72 @@
+/* Pathly Studio — Flow Canvas kit styles */
+.cv-main { display:flex; flex-direction:column; overflow:hidden; }
+
+/* toolbar */
+.cv-bar { display:flex; align-items:center; gap:10px; padding:10px 18px; border-bottom:var(--border); flex-shrink:0; }
+.cv-flowname { font-family:var(--font-family-mono); font-size:var(--font-size-md); font-weight:600; }
+.cv-flowname .tag { color:var(--text-muted); font-weight:400; margin-left:8px; font-size:var(--font-size-sm); }
+.seg-tabs { display:flex; gap:3px; background:var(--bg-mantle); border:var(--border); border-radius:var(--radius-md); padding:2px; }
+.seg-tab { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border:none; border-radius:var(--radius-sm); background:transparent;
+  color:var(--text-muted); font:500 var(--font-size-sm)/1 var(--font-family-base); cursor:pointer; }
+.seg-tab[data-active] { background:var(--accent-bg); color:var(--accent); }
+.cv-bar-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.btn-b { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:var(--radius-md);
+  border:var(--border); background:var(--bg-mantle); color:var(--text-secondary);
+  font:500 var(--font-size-sm)/1 var(--font-family-base); cursor:pointer;
+  transition:background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast); }
+.btn-b:hover { background:var(--btn-b-hover-bg); border-color:var(--accent); color:var(--accent); }
+.btn-cta { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:var(--radius-md);
+  border:1px solid transparent; background:var(--accent); color:var(--bg-mantle); font:600 var(--font-size-sm)/1 var(--font-family-base); cursor:pointer; }
+.valid-chip { display:inline-flex; align-items:center; gap:6px; font-size:var(--font-size-sm); color:var(--green);
+  border:1px solid color-mix(in srgb,var(--green) 35%,transparent); background:color-mix(in srgb,var(--green) 12%,transparent);
+  border-radius:var(--radius-full); padding:4px 10px; }
+.zoom { display:flex; align-items:center; gap:2px; border:var(--border); border-radius:var(--radius-md); background:var(--bg-mantle); }
+.zoom button { width:26px; height:26px; border:none; background:transparent; color:var(--text-secondary); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+.zoom button:hover { color:var(--accent); }
+.zoom .pct { font-family:var(--font-family-mono); font-size:var(--font-size-sm); color:var(--text-muted); padding:0 6px; }
+
+/* canvas area */
+.cv-stage { flex:1; display:flex; min-height:0; }
+.cv-canvas { flex:1; position:relative; overflow:auto;
+  background-color:var(--bg-base);
+  background-image:radial-gradient(color-mix(in srgb,var(--text-muted) 22%,transparent) 1px, transparent 1px);
+  background-size:22px 22px; }
+.cv-inner { position:relative; width:640px; height:720px; margin:0; }
+.cv-edges { position:absolute; inset:0; pointer-events:none; }
+
+/* node */
+.node { position:absolute; width:160px; box-sizing:border-box; background:var(--bg-surface0);
+  border:1px solid var(--bg-surface1); border-left:3px solid var(--blue); border-radius:6px;
+  padding:9px 11px; cursor:pointer; transition:box-shadow var(--transition-fast), border-color var(--transition-fast); }
+.node:hover { box-shadow:0 0 0 1px var(--accent-border); }
+.node[data-active] { box-shadow:0 0 0 2px var(--accent); }
+.node .nstate { font-family:var(--font-family-mono); font-weight:700; font-size:12px; letter-spacing:0.03em; }
+.node .nagent { font-size:11px; color:var(--text-secondary); margin-top:3px; }
+.node .start { position:absolute; top:-8px; left:-8px; width:16px; height:16px; border-radius:50%; background:var(--accent);
+  color:#fff; font-size:8px; display:flex; align-items:center; justify-content:center; font-weight:700; }
+.node .handle { position:absolute; width:8px; height:8px; border-radius:50%; }
+.node .h-bot { background:var(--blue); bottom:-4px; left:50%; transform:translateX(-50%); }
+.node .h-top { background:var(--blue); top:-4px; left:50%; transform:translateX(-50%); }
+.node .h-right { background:var(--orange); right:-4px; top:50%; transform:translateY(-50%); }
+
+/* inspector */
+.cv-inspect { width:300px; flex-shrink:0; border-left:var(--border); background:var(--bg-mantle); padding:18px; overflow:auto; }
+.cv-inspect.empty { display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:var(--font-size-base); text-align:center; }
+.ins-title { font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); margin:0 0 6px; }
+.ins-state { font-family:var(--font-family-mono); font-size:var(--font-size-lg); font-weight:700; margin-bottom:18px; }
+.ins-field { margin-bottom:16px; }
+.ins-field .fl { font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px; }
+.ins-select { width:100%; appearance:none; background:var(--bg-surface0); border:var(--border); border-radius:var(--radius-md);
+  padding:8px 11px; color:var(--text-primary); font:var(--font-size-base)/1 var(--font-family-base); cursor:pointer; }
+.ins-trans { display:flex; flex-direction:column; gap:6px; }
+.ins-tran { display:flex; align-items:center; gap:8px; background:var(--bg-surface0); border:var(--border); border-radius:var(--radius-md);
+  padding:8px 11px; font-size:var(--font-size-base); }
+.ins-tran .arrow { color:var(--text-muted); }
+.ins-tran.back { border-color:color-mix(in srgb,var(--orange) 40%,transparent); }
+.ins-tran .to { font-family:var(--font-family-mono); color:var(--text-primary); }
+.ins-tran .cond { margin-left:auto; font-family:var(--font-family-mono); font-size:var(--font-size-sm); color:var(--text-muted); }
+
+/* YAML view */
+.cv-yaml { flex:1; overflow:auto; background:var(--bg-terminal); padding:20px 24px; }
+.cv-yaml pre { margin:0; font-family:var(--font-family-mono); font-size:var(--font-size-base); line-height:1.7; color:var(--text-secondary); }
+.cv-yaml .yk { color:var(--accent); } .cv-yaml .yv { color:var(--text-primary); } .cv-yaml .yc { color:var(--text-muted); } .cv-yaml .ys { color:var(--green); }

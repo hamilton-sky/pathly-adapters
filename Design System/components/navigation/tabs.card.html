@@ -1,0 +1,41 @@
+<!-- @dsCard group="Components" viewport="700x200" name="Tabs" subtitle="Underline (in-panel) & pill (view switch)" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="../../assets/vendor/react.production.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../assets/vendor/react-dom.production.min.js"></script>
+<style>
+  body { margin:0; background:var(--bg-base); color:var(--text-primary); font-family:var(--font-family-base); padding:24px 26px; }
+  .lbl { font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); margin:0 0 12px; }
+  .block { margin-bottom:26px; }
+</style></head>
+<body>
+  <div id="root"></div>
+  <script>
+    var h = React.createElement, ns = window.DesignSystem_ba588c, Tabs = ns.Tabs;
+    function App(){
+      var a = React.useState('timeline'), b = React.useState('monitor');
+      return h('div', null,
+        h('div',{className:'block'},
+          h('p',{className:'lbl'},'Underline — in-panel'),
+          h(Tabs,{activeId:a[0],onChange:a[1],tabs:[
+            {id:'timeline',label:'Timeline',count:9},
+            {id:'events',label:'Events',count:33},
+            {id:'agents',label:'Agents',count:8},
+            {id:'sql',label:'SQL'}
+          ]})
+        ),
+        h('div',{className:'block'},
+          h('p',{className:'lbl'},'Pill — view switch'),
+          h(Tabs,{variant:'pill',activeId:b[0],onChange:b[1],tabs:[
+            {id:'canvas',label:'Canvas'},
+            {id:'notebook',label:'Notebook'},
+            {id:'monitor',label:'Monitor'},
+            {id:'db',label:'DB Explorer'}
+          ]})
+        )
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+  </script>
+</body></html>

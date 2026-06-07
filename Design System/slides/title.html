@@ -1,0 +1,34 @@
+<!-- @dsCard group="Slides" viewport="1280x720" name="Title slide" subtitle="Brand mark + wordmark, grid field" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html,body { margin:0; }
+  .slide { width:1280px; height:720px; position:relative; overflow:hidden;
+    background:var(--bg-mantle); color:var(--text-primary); font-family:var(--font-family-base);
+    background-image:radial-gradient(color-mix(in srgb,var(--text-muted) 16%,transparent) 1px, transparent 1px);
+    background-size:34px 34px; display:flex; flex-direction:column; justify-content:center; padding:0 110px; }
+  .glow { position:absolute; width:680px; height:680px; right:-180px; top:-220px; border-radius:50%;
+    background:radial-gradient(circle, color-mix(in srgb,var(--accent) 22%,transparent), transparent 62%); filter:blur(20px); }
+  .lockup { display:flex; align-items:center; gap:22px; margin-bottom:44px; }
+  .lockup img { width:88px; height:88px; }
+  .lockup .wm { font-size:64px; font-weight:600; letter-spacing:-0.03em; }
+  h1 { font-size:78px; line-height:1.02; font-weight:700; letter-spacing:-0.03em; margin:0; max-width:920px; text-wrap:balance; }
+  h1 .acc { color:var(--accent); }
+  p { font-size:26px; color:var(--text-secondary); margin:28px 0 0; max-width:760px; line-height:1.4; }
+  .foot { position:absolute; bottom:54px; left:110px; right:110px; display:flex; align-items:center; justify-content:space-between;
+    font-family:var(--font-family-mono); font-size:18px; color:var(--text-muted); }
+  .hosts { display:flex; gap:10px; }
+  .hosts span { border:var(--border); border-radius:var(--radius-full); padding:5px 14px; color:var(--text-secondary); }
+</style></head>
+<body>
+  <div class="slide">
+    <div class="glow"></div>
+    <div class="lockup"><img src="../assets/logo-mark-sky.svg" alt="Pathly"><span class="wm">Pathly</span></div>
+    <h1>Drive every agent pipeline from <span class="acc">one cockpit.</span></h1>
+    <p>A local studio for orchestrating, observing and shipping AI agent workflows across Claude Code, Codex and Copilot.</p>
+    <div class="foot">
+      <span>pathly-studio · v2.11</span>
+      <span class="hosts"><span>Claude Code</span><span>Codex</span><span>Copilot</span></span>
+    </div>
+  </div>
+</body></html>
