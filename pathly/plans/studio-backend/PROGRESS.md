@@ -1,7 +1,7 @@
 # PROGRESS.md — studio-backend
 
 **Feature:** studio-backend
-**Status:** IN PROGRESS
+**Status:** DONE
 
 ---
 
