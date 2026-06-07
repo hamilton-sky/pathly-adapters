@@ -1,4 +1,4 @@
-"""Unit tests for pathly_orchestrator.db — all three tables."""
+"""Unit tests for pathly_orchestrator.db — all tables and helpers."""
 from __future__ import annotations
 
 import json
@@ -21,16 +21,9 @@ from pathly_orchestrator.db import (
     write_state,
 )
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _purge_cache(feature_dir: Path) -> None:
-    """Remove the cached connection for a tmp_path DB so tests are isolated."""
-    db_path = str(feature_dir.resolve() / "pathly.db")
-    with _cache_lock:
-        _conn_cache.pop(db_path, None)
+# Arbitrary project_root used across tests — isolation is handled by the
+# _isolate_db autouse fixture in conftest.py (Path.home() is redirected).
+_PROJECT_ROOT = "/project/alpha"
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +31,7 @@ def _purge_cache(feature_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_get_db_creates_tables(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
+    conn = get_db()
     tables = {
         row[0]
         for row in conn.execute(
@@ -48,14 +41,21 @@ def test_get_db_creates_tables(tmp_path: Path) -> None:
     assert "fsm_events" in tables
     assert "fsm_state" in tables
     assert "runner_state" in tables
-    _purge_cache(tmp_path)
+    assert "flow_definitions" in tables
+    assert "agent_definitions" in tables
+    assert "skill_definitions" in tables
 
 
 def test_get_db_cached(tmp_path: Path) -> None:
-    conn1 = get_db(tmp_path)
-    conn2 = get_db(tmp_path)
+    conn1 = get_db()
+    conn2 = get_db()
     assert conn1 is conn2
-    _purge_cache(tmp_path)
+
+
+def test_get_db_accepts_deprecated_path_arg(tmp_path: Path) -> None:
+    """get_db() must still accept a positional path arg without error."""
+    conn = get_db(tmp_path)
+    assert conn is not None
 
 
 # ---------------------------------------------------------------------------
@@ -63,58 +63,54 @@ def test_get_db_cached(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_append_and_read_events(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
+    conn = get_db()
     events = [
         {"type": "STATE_TRANSITION", "ts": "2026-01-01T00:00:01Z", "to": "PLAN"},
         {"type": "PHASE_START", "ts": "2026-01-01T00:00:02Z", "phase": "build"},
         {"type": "AGENT_DONE", "ts": "2026-01-01T00:00:03Z", "summary": "done"},
     ]
     for e in events:
-        append_event(conn, "feat-a", e)
+        append_event(conn, _PROJECT_ROOT, "feat-a", e)
 
-    result = read_events(conn, "feat-a")
+    result = read_events(conn, _PROJECT_ROOT, "feat-a")
     assert len(result) == 3
     assert result[0]["type"] == "STATE_TRANSITION"
     assert result[1]["type"] == "PHASE_START"
     assert result[2]["type"] == "AGENT_DONE"
     # seq must be present and ascending
     assert result[0]["seq"] < result[1]["seq"] < result[2]["seq"]
-    _purge_cache(tmp_path)
 
 
 def test_read_events_since_seq(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
+    conn = get_db()
     seqs = []
     for i in range(5):
-        seq = append_event(conn, "feat-b", {"type": "EV", "ts": f"t{i}", "i": i})
+        seq = append_event(conn, _PROJECT_ROOT, "feat-b", {"type": "EV", "ts": f"t{i}", "i": i})
         seqs.append(seq)
 
     # since_seq = seqs[2] means we want events after index 2 (i.e. indices 3 and 4)
-    result = read_events(conn, "feat-b", since_seq=seqs[2])
+    result = read_events(conn, _PROJECT_ROOT, "feat-b", since_seq=seqs[2])
     assert len(result) == 2
     assert result[0]["i"] == 3
     assert result[1]["i"] == 4
-    _purge_cache(tmp_path)
 
 
 def test_read_last_agent_done(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
-    append_event(conn, "feat-c", {"type": "STATE_TRANSITION", "ts": "t1"})
-    append_event(conn, "feat-c", {"type": "AGENT_DONE", "ts": "t2", "summary": "first"})
-    append_event(conn, "feat-c", {"type": "PHASE_START", "ts": "t3"})
-    append_event(conn, "feat-c", {"type": "AGENT_DONE", "ts": "t4", "summary": "second"})
+    conn = get_db()
+    append_event(conn, _PROJECT_ROOT, "feat-c", {"type": "STATE_TRANSITION", "ts": "t1"})
+    append_event(conn, _PROJECT_ROOT, "feat-c", {"type": "AGENT_DONE", "ts": "t2", "summary": "first"})
+    append_event(conn, _PROJECT_ROOT, "feat-c", {"type": "PHASE_START", "ts": "t3"})
+    append_event(conn, _PROJECT_ROOT, "feat-c", {"type": "AGENT_DONE", "ts": "t4", "summary": "second"})
 
-    result = read_last_agent_done(conn, "feat-c")
+    result = read_last_agent_done(conn, _PROJECT_ROOT, "feat-c")
     assert result is not None
     assert result["summary"] == "second"
-    _purge_cache(tmp_path)
 
 
 def test_read_last_agent_done_none(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
-    result = read_last_agent_done(conn, "feat-empty")
+    conn = get_db()
+    result = read_last_agent_done(conn, _PROJECT_ROOT, "feat-empty")
     assert result is None
-    _purge_cache(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +118,7 @@ def test_read_last_agent_done_none(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_write_and_read_state(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
+    conn = get_db()
     state = {
         "current": "BUILD",
         "rigor": "standard",
@@ -136,9 +132,9 @@ def test_write_and_read_state(tmp_path: Path) -> None:
         "build_baseline": {"tests": 413},
         "extra": {"some_future_field": True},
     }
-    write_state(conn, "feat-d", state)
+    write_state(conn, _PROJECT_ROOT, "feat-d", state)
 
-    result = read_state(conn, "feat-d")
+    result = read_state(conn, _PROJECT_ROOT, "feat-d")
     assert result is not None
     assert result["current"] == "BUILD"
     assert result["rigor"] == "standard"
@@ -150,14 +146,12 @@ def test_write_and_read_state(tmp_path: Path) -> None:
     assert result["convs_done"] == 1
     assert result["build_baseline"] == {"tests": 413}
     assert result["extra"] == {"some_future_field": True}
-    _purge_cache(tmp_path)
 
 
 def test_read_state_missing(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
-    result = read_state(conn, "nonexistent-feature")
+    conn = get_db()
+    result = read_state(conn, _PROJECT_ROOT, "nonexistent-feature")
     assert result is None
-    _purge_cache(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +159,7 @@ def test_read_state_missing(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_write_and_read_runner_state(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
+    conn = get_db()
     runner = {
         "topic": "my-feature",
         "flow": "standard",
@@ -186,9 +180,9 @@ def test_write_and_read_runner_state(tmp_path: Path) -> None:
         "open_session": {"id": "sess-1"},
         "updated_at": "2026-01-01T12:00:00Z",
     }
-    write_runner_state(conn, "feat-e", runner)
+    write_runner_state(conn, _PROJECT_ROOT, "feat-e", runner)
 
-    result = read_runner_state(conn, "feat-e")
+    result = read_runner_state(conn, _PROJECT_ROOT, "feat-e")
     assert result is not None
     assert result["topic"] == "my-feature"
     assert result["status"] == "running"
@@ -197,15 +191,14 @@ def test_write_and_read_runner_state(tmp_path: Path) -> None:
     assert result["cost_usd_so_far"] == pytest.approx(1.23)
     assert result["autonomy"] == {"gate": "auto"}
     assert result["open_session"] == {"id": "sess-1"}
-    _purge_cache(tmp_path)
 
 
 def test_mark_stale_runners(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
+    conn = get_db()
 
     # Two 'running' rows and one 'done' row
     for feat, status in [("r1", "running"), ("r2", "running"), ("r3", "done")]:
-        write_runner_state(conn, feat, {
+        write_runner_state(conn, _PROJECT_ROOT, feat, {
             "status": status,
             "updated_at": "2026-01-01T00:00:00Z",
         })
@@ -213,13 +206,12 @@ def test_mark_stale_runners(tmp_path: Path) -> None:
     count = mark_stale_runners(conn)
     assert count == 2
 
-    r1 = read_runner_state(conn, "r1")
-    r2 = read_runner_state(conn, "r2")
-    r3 = read_runner_state(conn, "r3")
+    r1 = read_runner_state(conn, _PROJECT_ROOT, "r1")
+    r2 = read_runner_state(conn, _PROJECT_ROOT, "r2")
+    r3 = read_runner_state(conn, _PROJECT_ROOT, "r3")
     assert r1 is not None and r1["status"] == "error"
     assert r2 is not None and r2["status"] == "error"
     assert r3 is not None and r3["status"] == "done"
-    _purge_cache(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +219,7 @@ def test_mark_stale_runners(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_concurrent_appends(tmp_path: Path) -> None:
-    conn = get_db(tmp_path)
+    conn = get_db()
     errors: list[Exception] = []
 
     def append_50(thread_id: int) -> None:
@@ -235,6 +227,7 @@ def test_concurrent_appends(tmp_path: Path) -> None:
             for i in range(50):
                 append_event(
                     conn,
+                    _PROJECT_ROOT,
                     "feat-concurrent",
                     {"type": "EV", "ts": f"t-{thread_id}-{i}", "thread": thread_id, "i": i},
                 )
@@ -251,14 +244,14 @@ def test_concurrent_appends(tmp_path: Path) -> None:
     assert not errors, f"Concurrent append raised: {errors}"
 
     rows = conn.execute(
-        "SELECT seq FROM fsm_events WHERE feature='feat-concurrent' ORDER BY seq ASC"
+        "SELECT seq FROM fsm_events WHERE project_root=? AND feature='feat-concurrent' ORDER BY seq ASC",
+        (_PROJECT_ROOT,),
     ).fetchall()
     assert len(rows) == 100
 
     # Verify no gaps in seq numbers for this feature
     seqs = [r[0] for r in rows]
     assert seqs == list(range(seqs[0], seqs[0] + 100))
-    _purge_cache(tmp_path)
 
 
 # ---------------------------------------------------------------------------

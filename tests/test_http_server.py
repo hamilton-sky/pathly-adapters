@@ -294,10 +294,11 @@ def test_events_stream_last_event_id_catchup(tmp_path, monkeypatch):
     feature_dir.mkdir(parents=True)
 
     # Write 3 events into SQLite: seq 1 (EV_A), seq 2 (EV_B), seq 3 (EV_C)
-    conn = _db.get_db(feature_dir)
-    _db.append_event(conn, topic, {"type": "EV_A", "msg": "first"})
-    _db.append_event(conn, topic, {"type": "EV_B", "msg": "second"})
-    _db.append_event(conn, topic, {"type": "EV_C", "msg": "third"})
+    conn = _db.get_db()
+    project_root = str(tmp_path)
+    _db.append_event(conn, project_root, topic, {"type": "EV_A", "msg": "first"})
+    _db.append_event(conn, project_root, topic, {"type": "EV_B", "msg": "second"})
+    _db.append_event(conn, project_root, topic, {"type": "EV_C", "msg": "third"})
 
     received: list[str] = []
     error_holder: list[Exception] = []

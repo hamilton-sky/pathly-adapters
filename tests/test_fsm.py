@@ -431,8 +431,9 @@ def test_append_event_creates_file(tmp_path):
     append_event(tmp_path, {"type": "A"})
     append_event(tmp_path, {"type": "B"})
     from pathly_orchestrator import db as _db
-    conn = _db.get_db(tmp_path)
-    events = _db.read_events(conn, tmp_path.name)
+    conn = _db.get_db()
+    project_root = str(tmp_path.parent.parent.parent)
+    events = _db.read_events(conn, project_root, tmp_path.name)
     assert len(events) == 2
     for e in events:
         assert isinstance(e, dict)
@@ -441,8 +442,9 @@ def test_append_event_creates_file(tmp_path):
 def test_append_event_ts_injected(tmp_path):
     append_event(tmp_path, {"type": "TEST"})
     from pathly_orchestrator import db as _db
-    conn = _db.get_db(tmp_path)
-    events = _db.read_events(conn, tmp_path.name)
+    conn = _db.get_db()
+    project_root = str(tmp_path.parent.parent.parent)
+    events = _db.read_events(conn, project_root, tmp_path.name)
     assert len(events) == 1
     assert "ts" in events[0]
 
@@ -450,8 +452,9 @@ def test_append_event_ts_injected(tmp_path):
 def test_append_event_preserves_other_fields(tmp_path):
     append_event(tmp_path, {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING"})
     from pathly_orchestrator import db as _db
-    conn = _db.get_db(tmp_path)
-    events = _db.read_events(conn, tmp_path.name)
+    conn = _db.get_db()
+    project_root = str(tmp_path.parent.parent.parent)
+    events = _db.read_events(conn, project_root, tmp_path.name)
     assert len(events) == 1
     event = events[0]
     assert event["type"] == "STATE_TRANSITION"

@@ -256,8 +256,8 @@ def test_complete_stage_with_valid_decision(tmp_path, monkeypatch):
 
     # Events now in SQLite, not EVENTS.jsonl
     from pathly_orchestrator import db as _db
-    _conn = _db.get_db(storage)
-    events = _db.read_events(_conn, "test-topic")
+    _conn = _db.get_db()
+    events = _db.read_events(_conn, str(tmp_path), "test-topic")
     event_types = [e["type"] for e in events]
     assert "DECIDE_ROUTING" in event_types
     assert "STATE_TRANSITION" in event_types
@@ -283,8 +283,8 @@ def test_complete_stage_with_invalid_decision(tmp_path, monkeypatch):
 
     # Events now in SQLite, not EVENTS.jsonl
     from pathly_orchestrator import db as _db
-    _conn = _db.get_db(storage)
-    events = _db.read_events(_conn, "test-topic")
+    _conn = _db.get_db()
+    events = _db.read_events(_conn, str(tmp_path), "test-topic")
     decide_events = [e for e in events if e.get("type") == "DECIDE_ROUTING"]
     assert len(decide_events) == 1
     # The implementation mutates decision to the default before logging, so decision_input is "a"

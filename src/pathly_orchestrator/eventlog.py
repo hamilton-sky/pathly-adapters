@@ -75,9 +75,10 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
         event["ts"] = _now()
 
     feature_dir.mkdir(parents=True, exist_ok=True)
-    conn = _db.get_db(feature_dir)
+    conn = _db.get_db()
     feature = feature_dir.name
-    _db.append_event(conn, feature, event)
+    project_root = str(feature_dir.parent.parent.parent)
+    _db.append_event(conn, project_root, feature, event)
 
 
 def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:
@@ -85,8 +86,9 @@ def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:
     feature_dir.mkdir(parents=True, exist_ok=True)
     if "updated_at" not in state:
         state["updated_at"] = _now()
-    conn = _db.get_db(feature_dir)
-    _db.write_state(conn, feature, state)
+    conn = _db.get_db()
+    project_root = str(feature_dir.parent.parent.parent)
+    _db.write_state(conn, project_root, feature, state)
     # Also write STATE.json as a human-readable snapshot (agents and tools read it directly)
     import os as _os
     path = feature_dir / "STATE.json"
@@ -138,22 +140,21 @@ write_state.__wrapped__ = _write_state_db  # type: ignore[attr-defined]
 
 def read_events(storage_path: str) -> list[dict]:
     feature_dir = _resolve_path(storage_path)
-    if (feature_dir / "pathly.db").exists():
-        conn = _db.get_db(feature_dir)
-        events = _db.read_events(conn, feature_dir.name)
-    else:
+    project_root = str(feature_dir.parent.parent.parent)
+    conn = _db.get_db()
+    events = _db.read_events(conn, project_root, feature_dir.name)
+    if not events:
+        # Fall back to EVENTS.jsonl for legacy feature dirs that predate SQLite
         path = _events_path(storage_path)
-        if not path.exists():
-            return []
-        events = []
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        events.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
+        if path.exists():
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            events.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            pass
     for event in events:
         schema_version = event.get("schema_version")
         if schema_version is None:
@@ -174,9 +175,12 @@ def read_events(storage_path: str) -> list[dict]:
 
 def read_state(storage_path: str) -> dict | None:
     feature_dir = _resolve_path(storage_path)
-    if (feature_dir / "pathly.db").exists():
-        conn = _db.get_db(feature_dir)
-        return _db.read_state(conn, feature_dir.name)
+    project_root = str(feature_dir.parent.parent.parent)
+    conn = _db.get_db()
+    result = _db.read_state(conn, project_root, feature_dir.name)
+    if result is not None:
+        return result
+    # Fall back to STATE.json for legacy feature dirs that predate SQLite
     path = _state_path(storage_path)
     if not path.exists():
         return None

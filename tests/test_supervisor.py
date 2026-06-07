@@ -93,12 +93,11 @@ def test_write_mirror_creates_file(tmp_path):
     )
     state.status = "running"
     _write_mirror(state)
-    feature_dir = tmp_path / "pathly" / "plans" / "mirror-topic"
-    conn = _db.get_db(feature_dir)
-    data = _db.read_runner_state(conn, "mirror-topic")
+    conn = _db.get_db()
+    data = _db.read_runner_state(conn, str(tmp_path), "mirror-topic")
     assert data is not None
     assert data["status"] == "running"
-    assert data["feature"] == "mirror-topic"
+    assert data["topic"] == "mirror-topic"
 
 
 def test_write_mirror_updates_on_status_change(tmp_path):
@@ -111,9 +110,8 @@ def test_write_mirror_updates_on_status_change(tmp_path):
     _write_mirror(state)
     state.status = "paused"
     _write_mirror(state)
-    feature_dir = tmp_path / "pathly" / "plans" / "mirror-topic2"
-    conn = _db.get_db(feature_dir)
-    data = _db.read_runner_state(conn, "mirror-topic2")
+    conn = _db.get_db()
+    data = _db.read_runner_state(conn, str(tmp_path), "mirror-topic2")
     assert data is not None
     assert data["status"] == "paused"
 
@@ -664,9 +662,8 @@ def test_mirror_written_on_completion(tmp_path):
             time.sleep(0.05)
 
     from pathly_orchestrator import db as _db
-    feature_dir = tmp_path / "pathly" / "plans" / topic
-    conn = _db.get_db(feature_dir)
-    data = _db.read_runner_state(conn, topic)
+    conn = _db.get_db()
+    data = _db.read_runner_state(conn, str(tmp_path), topic)
     assert data is not None
     assert data["status"] == "done"
     _fresh_registry(topic)
@@ -710,7 +707,8 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
 
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
-    conn = _db.get_db(plan_dir)
+    conn = _db.get_db()
+    project_root = str(tmp_path)
 
     advance_called = threading.Event()
     recon_started = threading.Event()
@@ -742,7 +740,7 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
             def _write_event():
                 import time as _time
                 _time.sleep(0.05)
-                _db.append_event(conn, topic, {
+                _db.append_event(conn, project_root, topic, {
                     "type": "AGENT_DONE",
                     "agent": "builder",
                     "conversation": 2,
@@ -768,7 +766,7 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     assert result.get("cost_usd") == 0.05
 
     # No RECONCILIATION_FAILURE in SQLite
-    written_events = _db.read_events(conn, topic)
+    written_events = _db.read_events(conn, project_root, topic)
     event_types = [e["type"] for e in written_events]
     assert "STAGE_RECONCILIATION_FAILURE" not in event_types
 
@@ -796,7 +794,8 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
     from pathly_orchestrator import db as _db
-    _db_conn = _db.get_db(plan_dir)
+    _db_conn = _db.get_db()
+    _project_root = str(tmp_path)
 
     recon_done = threading.Event()
 
@@ -814,7 +813,7 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
             def _write_event():
                 import time as _time
                 _time.sleep(0.05)
-                _db.append_event(_db_conn, topic, {
+                _db.append_event(_db_conn, _project_root, topic, {
                     "type": "AGENT_DONE",
                     "agent": "builder",
                     "conversation": 2,
@@ -837,7 +836,7 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
     recon_done.wait(timeout=3.0)
 
     # STAGE_RECONCILIATION_FAILURE must be written to SQLite
-    _written_events = _db.read_events(_db_conn, topic)
+    _written_events = _db.read_events(_db_conn, _project_root, topic)
     _event_types = [e["type"] for e in _written_events]
     assert "STAGE_RECONCILIATION_FAILURE" in _event_types
 
@@ -927,7 +926,8 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
     from pathly_orchestrator import db as _db
-    _db_conn = _db.get_db(plan_dir)
+    _db_conn = _db.get_db()
+    _project_root = str(tmp_path)
 
     broadcast_events: list[dict] = []
 
@@ -939,7 +939,7 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
             def _write_event():
                 import time as _time
                 _time.sleep(0.05)
-                _db.append_event(_db_conn, topic, {
+                _db.append_event(_db_conn, _project_root, topic, {
                     "type": "AGENT_DONE",
                     "agent": "builder",
                     "conversation": 4,
@@ -963,7 +963,7 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
     assert kill_events[0].get("tab_id") is not None
 
     # Events now written to SQLite, not EVENTS.jsonl
-    _written_events = _db.read_events(_db_conn, topic)
+    _written_events = _db.read_events(_db_conn, _project_root, topic)
     _event_types = [e["type"] for e in _written_events]
     assert "STAGE_INTERACTIVE_DONE" in _event_types
     assert "STAGE_RECONCILIATION_FAILURE" not in _event_types

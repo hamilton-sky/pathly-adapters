@@ -237,29 +237,24 @@ def _broadcast(key: tuple[str, str], line: str) -> None:
 def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
     topic, project_root = key
     feature_dir = Path(project_root) / "pathly" / "plans" / topic
-    db_path = feature_dir / "pathly.db"
-
-    if db_path.exists():
-        from pathly_orchestrator import db as _db
-        try:
-            conn = _db.get_db(feature_dir)
-        except Exception:
-            logger.debug("tail_events: cannot open SQLite DB, falling back to file", exc_info=True)
-            conn = None
-        if conn is not None:
-            last_seq = 0
-            while not stop.is_set():
-                try:
-                    events = _db.read_events(conn, topic, since_seq=last_seq)
-                    for event in events:
-                        seq = event.get("seq", 0)
-                        if seq > last_seq:
-                            last_seq = seq
-                        _broadcast(key, json.dumps(event))
-                except Exception:
-                    logger.debug("tail_events SQLite error", exc_info=True)
-                stop.wait(0.1)
-            return
+    from pathly_orchestrator import db as _db
+    try:
+        conn = _db.get_db()
+        last_seq = 0
+        while not stop.is_set():
+            try:
+                events = _db.read_events(conn, project_root, topic, since_seq=last_seq)
+                for event in events:
+                    seq = event.get("seq", 0)
+                    if seq > last_seq:
+                        last_seq = seq
+                    _broadcast(key, json.dumps(event))
+            except Exception:
+                logger.debug("tail_events SQLite error", exc_info=True)
+            stop.wait(0.1)
+        return
+    except Exception:
+        logger.debug("tail_events: cannot open SQLite DB, falling back to file", exc_info=True)
 
     path = feature_dir / "EVENTS.jsonl"
     pos = path.stat().st_size if path.exists() else 0
@@ -1485,17 +1480,11 @@ def events_stream():
             since_seq = 0
         if since_seq > 0:
             try:
-                feature_dir = resolved_root / "pathly" / "plans" / topic
-                db_path = feature_dir / "pathly.db"
-                if db_path.exists():
-                    from pathly_orchestrator import db as _db
-                    catch_conn = _db.get_db(feature_dir)
-                    try:
-                        for event in _db.read_events(catch_conn, topic, since_seq=since_seq):
-                            seq = event.get("seq", 0)
-                            yield f"id: {seq}\ndata: {json.dumps(event)}\n\n"
-                    finally:
-                        catch_conn.close()
+                from pathly_orchestrator import db as _db
+                catch_conn = _db.get_db()
+                for event in _db.read_events(catch_conn, str(resolved_root), topic, since_seq=since_seq):
+                    seq = event.get("seq", 0)
+                    yield f"id: {seq}\ndata: {json.dumps(event)}\n\n"
             except Exception:
                 logger.debug("SSE catch-up error for topic %s", topic, exc_info=True)
         yield 'data: {"type":"connected"}\n\n'

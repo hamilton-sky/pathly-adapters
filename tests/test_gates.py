@@ -21,8 +21,9 @@ def _storage(tmp_path: Path, topic: str = "test-feature") -> Path:
 def _read_events_from_db(storage: Path, topic: str = "test-feature") -> list[dict]:
     """Read events from SQLite (events now stored in pathly.db, not EVENTS.jsonl)."""
     from pathly_orchestrator import db as _db
-    conn = _db.get_db(storage)
-    return _db.read_events(conn, topic)
+    conn = _db.get_db()
+    project_root = str(storage.parent.parent.parent)
+    return _db.read_events(conn, project_root, topic)
 
 
 def _make_flow(gates: dict) -> dict:

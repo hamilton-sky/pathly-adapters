@@ -169,16 +169,16 @@ def cli_main() -> None:
     args = parser.parse_args()
 
     project_root = args.project_root if args.project_root is not None else os.getcwd()
-    db_path = Path(project_root) / "pathly" / "plans" / args.feature / "pathly.db"
+    feature_dir = Path(project_root) / "pathly" / "plans" / args.feature
 
-    if not db_path.exists():
-        print(f"error: DB not found: {db_path}", file=sys.stderr)
+    if not feature_dir.exists():
+        print(f"error: feature directory not found: {feature_dir}", file=sys.stderr)
         sys.exit(1)
 
     from pathly_orchestrator import db as _db
 
-    conn = _db.get_db(db_path.parent)
-    events = _db.read_events(conn, args.feature)
+    conn = _db.get_db()
+    events = _db.read_events(conn, project_root, args.feature)
     agent_done_events = [e for e in events if e.get("type") == "AGENT_DONE"]
 
     exported_count = 0

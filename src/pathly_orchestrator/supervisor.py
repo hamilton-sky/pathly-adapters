@@ -158,11 +158,12 @@ def _agent_done_watcher(
         stop_evt = _agent_done_stop_events.setdefault(run_id, threading.Event())
 
     try:
-        conn = _db.get_db(feature_dir)
+        conn = _db.get_db()
     except Exception as exc:
         logger.warning("_agent_done_watcher: cannot open DB for %s: %s", feature, exc)
         return
 
+    project_root = str(feature_dir.parent.parent.parent)
     _POLL = 0.15
     _TIMEOUT = _TERMINAL_RESULT_TIMEOUT
     elapsed = 0.0
@@ -172,7 +173,7 @@ def _agent_done_watcher(
         if stop_evt.is_set():
             return
         try:
-            rows = _db.read_events(conn, feature, since_seq=seq)
+            rows = _db.read_events(conn, project_root, feature, since_seq=seq)
         except Exception:
             rows = []
         for row in rows:
@@ -268,8 +269,8 @@ def _write_mirror(state: RunnerState) -> None:
         from pathly_orchestrator import db as _db
         feature_dir = Path(state.project_root) / "pathly" / "plans" / state.topic
         feature_dir.mkdir(parents=True, exist_ok=True)
-        conn = _db.get_db(feature_dir)
-        _db.write_runner_state(conn, state.topic, state.public_dict())
+        conn = _db.get_db()
+        _db.write_runner_state(conn, state.project_root, state.topic, state.public_dict())
     except Exception as exc:
         logger.warning("Failed to write runner_state SQLite for %s: %s", state.topic, exc)
 
@@ -277,8 +278,8 @@ def _write_mirror(state: RunnerState) -> None:
 def recover_stale_mirrors(project_root: str) -> None:
     """On server startup, mark any runner_state rows left as 'running' → 'error'.
 
-    Scans pathly/plans/*/pathly.db for SQLite DBs and calls mark_stale_runners().
-    Falls back to rewriting RUNNER_STATE.json for feature dirs that have no SQLite DB.
+    Uses the central ~/.pathly/pathly.db to call mark_stale_runners().
+    Falls back to rewriting RUNNER_STATE.json for feature dirs that have no SQLite entry.
     """
     from pathly_orchestrator import db as _db
 
@@ -287,16 +288,13 @@ def recover_stale_mirrors(project_root: str) -> None:
         return
 
     handled: set = set()
-    for db_path in plans_dir.glob("*/pathly.db"):
-        feature_dir = db_path.parent
-        try:
-            conn = _db.get_db(feature_dir)
-            count = _db.mark_stale_runners(conn)
-            if count:
-                logger.info("Marked %d stale runner(s) in %s → error", count, feature_dir.name)
-            handled.add(feature_dir)
-        except Exception as exc:
-            logger.warning("recover_stale_mirrors: SQLite mark failed for %s: %s", feature_dir.name, exc)
+    try:
+        conn = _db.get_db()
+        count = _db.mark_stale_runners(conn)
+        if count:
+            logger.info("Marked %d stale runner(s) in central DB → error", count)
+    except Exception as exc:
+        logger.warning("recover_stale_mirrors: SQLite mark failed: %s", exc)
 
     for mirror in plans_dir.glob("*/RUNNER_STATE.json"):
         if mirror.parent in handled:
@@ -400,9 +398,10 @@ def _run_stage_via_terminal(
             last_seq = 0
             try:
                 from pathly_orchestrator import db as _db
-                _db_conn = _db.get_db(feature_dir)
+                _db_conn = _db.get_db()
                 row = _db_conn.execute(
-                    "SELECT MAX(seq) FROM fsm_events WHERE feature=?", (feature,)
+                    "SELECT MAX(seq) FROM fsm_events WHERE project_root=? AND feature=?",
+                    (state.project_root, feature)
                 ).fetchone()
                 last_seq = row[0] or 0
             except Exception as exc:

@@ -8,9 +8,10 @@ def _make_test_db(tmp_path, n_events=2):
     feature = "test-feature"
     feature_dir = tmp_path / "pathly" / "plans" / feature
     feature_dir.mkdir(parents=True)
-    conn = _db.get_db(feature_dir)
+    conn = _db.get_db()
+    project_root = str(tmp_path)
     for i in range(n_events):
-        _db.append_event(conn, feature, {
+        _db.append_event(conn, project_root, feature, {
             "type": "AGENT_DONE",
             "agent": "builder",
             "feature": feature,
@@ -92,8 +93,8 @@ def test_cli_zero_events(tmp_path, capsys):
     feature = "test-feature"
     feature_dir = tmp_path / "pathly" / "plans" / feature
     feature_dir.mkdir(parents=True)
-    conn = _db.get_db(feature_dir)
-    _db.append_event(conn, feature, {
+    conn = _db.get_db()
+    _db.append_event(conn, str(tmp_path), feature, {
         "type": "PHASE_START",
         "feature": feature,
         "ts": "2026-01-01T00:00:00Z",
@@ -135,8 +136,9 @@ def test_cli_non_agent_done_events_skipped(tmp_path, monkeypatch):
     feature = "test-feature"
     feature_dir = tmp_path / "pathly" / "plans" / feature
     feature_dir.mkdir(parents=True)
-    conn = _db.get_db(feature_dir)
-    _db.append_event(conn, feature, {
+    conn = _db.get_db()
+    project_root = str(tmp_path)
+    _db.append_event(conn, project_root, feature, {
         "type": "AGENT_DONE",
         "agent": "builder",
         "feature": feature,
@@ -149,7 +151,7 @@ def test_cli_non_agent_done_events_skipped(tmp_path, monkeypatch):
         "model": "claude-sonnet-4-6",
         "conversation": 1,
     })
-    _db.append_event(conn, feature, {
+    _db.append_event(conn, project_root, feature, {
         "type": "PHASE_START",
         "feature": feature,
         "ts": "2026-01-01T00:00:01Z",
