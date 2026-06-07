@@ -75,6 +75,86 @@
   --badge-frag-bg: rgba(52, 211, 153, 0.15);
   --insert-zone-active: rgba(56, 189, 248, 0.4);
   --badge-body-bg: rgba(96, 165, 250, 0.15);
+
+  /* --- Signal hues ------------------------------------------------ */
+  --orange: #f97316;
+  --purple: #a78bfa;
+
+  /* --- Border color atoms ----------------------------------------- */
+  --border-color:        #283044;
+  --border-subtle-color: #1E2433;
+
+  /* --- Spacing scale ---------------------------------------------- */
+  --space-0:  0;
+  --space-1:  2px;
+  --space-2:  4px;
+  --space-3:  6px;
+  --space-4:  8px;
+  --space-5:  10px;
+  --space-6:  12px;
+  --space-7:  14px;
+  --space-8:  16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-16: 32px;
+  --space-20: 40px;
+  --space-24: 48px;
+
+  /* --- Radius scale ----------------------------------------------- */
+  --radius-xs:   3px;
+  --radius-sm:   4px;
+  --radius-md:   5px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-full: 999px;
+
+  /* --- Elevation shadows ------------------------------------------ */
+  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md:    0 4px 12px rgba(0, 0, 0, 0.30);
+  --shadow-lg:    0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  /* --- Layout rails ----------------------------------------------- */
+  --sidebar-width:   248px;
+  --topbar-height:   44px;
+  --terminal-height: 240px;
+
+  /* --- Motion (additional) ---------------------------------------- */
+  --transition-fast:   100ms ease-out;
+  --transition-snappy: 120ms ease-out;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* --- Typography (additional) ------------------------------------ */
+  --font-weight-bold: 700;
+  --font-size-xl:     22px;
+  --font-size-2xl:    32px;
+  --font-size-3xl:    44px;
+  --line-tight:  1.2;
+  --line-snug:   1.35;
+  --line-normal: 1.5;
+  --type-metric-family: var(--font-family-mono);
+
+  /* --- Pipeline state colors -------------------------------------- */
+  --state-planning:  var(--text-muted);
+  --state-building:  var(--blue);
+  --state-reviewing: var(--orange);
+  --state-testing:   var(--purple);
+  --state-retro:     var(--runtime);
+  --state-done:      var(--green);
+  --state-error:     var(--red);
+
+  /* --- Semantic surface / text aliases ---------------------------- */
+  --surface-app:    var(--bg-base);
+  --surface-chrome: var(--bg-mantle);
+  --surface-card:   var(--bg-surface0);
+  --surface-raised: var(--bg-surface1);
+  --surface-well:   var(--bg-terminal);
+  --text-body:      var(--text-primary);
+  --text-meta:      var(--text-secondary);
+  --text-faint:     var(--text-muted);
+
+  /* --- Brand gradient --------------------------------------------- */
+  --brand-gradient: linear-gradient(135deg, #60A5FA 0%, #818CF8 50%, #A78BFA 100%);
 }
 
 /* â”€â”€â”€ Pathly Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */

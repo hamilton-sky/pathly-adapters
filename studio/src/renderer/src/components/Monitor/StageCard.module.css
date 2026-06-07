@@ -1,11 +1,11 @@
 .card {
   background: var(--bg-surface0);
   border: 1px solid var(--bg-surface1);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-align: left;
   color: inherit;
-  transition: background 120ms, border-color 120ms;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .card:hover {
@@ -93,7 +93,7 @@
   font-size: 9px;
   font-family: var(--font-family-mono);
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: var(--bg-surface1);
   color: var(--text-muted);
   flex-shrink: 0;

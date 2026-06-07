@@ -40,11 +40,11 @@
 .expandBtn {
   background: none;
   border: 1px solid var(--bg-surface1);
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
   padding: 4px 7px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   transition: background 0.12s, color 0.12s;
 }
 .expandBtn:hover {
@@ -67,12 +67,12 @@
   box-sizing: border-box;
   background: var(--bg-base);
   border: 1px solid var(--bg-surface0);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   padding: 5px 9px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color var(--transition-base);
 }
 .filterInput::placeholder { color: var(--text-muted); }
 .filterInput:focus { border-color: var(--accent); }
@@ -94,7 +94,7 @@
 }
 .workspaceHeaderLabel {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text-muted);
@@ -125,7 +125,7 @@
   color: var(--text-muted);
   cursor: pointer;
   padding: 6px 4px 6px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-align: left;
@@ -152,7 +152,7 @@
   font-weight: 400;
   letter-spacing: 0;
   margin-left: 4px;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
 }
 
 .chevron {
@@ -284,9 +284,9 @@
   flex: 1;
   background: var(--bg-surface0);
   border: 1px solid var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
   padding: 2px 6px;
   outline: none;
@@ -474,7 +474,7 @@
   justify-content: center;
   background: none;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   color: var(--text-muted);
   cursor: pointer;
   padding: 2px 3px;
@@ -532,7 +532,7 @@
   flex: 1;
   background: var(--bg-surface1);
   border: 1px solid var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 13.5px;
   font-family: var(--font-family-base);
@@ -562,12 +562,12 @@
 }
 .modalTitle {
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-md);
   margin: 0 0 6px;
 }
 .modalSub {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   margin: 0 0 18px;
 }
 .modalActions {
@@ -578,10 +578,10 @@
 .modalCancel {
   background: var(--bg-surface0);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   padding: 5px 14px;
   transition: background 0.12s;
 }
@@ -589,10 +589,10 @@
 .modalDelete {
   background: rgba(239,68,68,0.15);
   border: 1px solid rgba(239,68,68,0.35);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--red);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   padding: 5px 14px;
   transition: background 0.12s;
@@ -639,9 +639,9 @@
   color: var(--text-muted);
   cursor: pointer;
   padding: 2px 4px;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   line-height: 1;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   transition: color 0.1s;
 }
 .filterClear:hover { color: var(--text-primary); }
@@ -654,7 +654,7 @@
   cursor: pointer;
   padding: 3px 4px;
   line-height: 1;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   transition: color 0.1s;
@@ -739,10 +739,10 @@
   flex-shrink: 0;
   background: none;
   border: 1px solid var(--bg-surface1);
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   padding: 3px 8px;
   transition: color 0.12s, border-color 0.12s;
   font-family: var(--font-family-base);

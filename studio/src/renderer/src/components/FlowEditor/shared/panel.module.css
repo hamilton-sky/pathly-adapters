@@ -63,7 +63,7 @@
 .input {
   background-color: var(--bg-surface0);
   border: var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
   padding: 4px 6px;
@@ -80,7 +80,7 @@
 .searchInput {
   background-color: var(--bg-surface0);
   border: var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
   padding: 4px 6px;
@@ -94,7 +94,7 @@
 .renameInput {
   background-color: var(--bg-surface0);
   border: var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
   padding: 4px 6px;
@@ -111,7 +111,7 @@
   padding: 5px 0;
   background: none;
   border: 1px solid var(--red);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--red);
   font-size: 12px;
   cursor: pointer;
@@ -123,7 +123,7 @@
 .addBtn {
   background: none;
   border: 1px dashed var(--bg-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--blue);
   cursor: pointer;
   font-size: var(--font-size-sm);
@@ -143,7 +143,7 @@
 .renameConfirmBtn {
   background: none;
   border: 1px dashed var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--accent);
   cursor: pointer;
   font-size: var(--font-size-sm);
@@ -237,7 +237,7 @@
   gap: 5px;
   background-color: var(--bg-surface0);
   border: 1px solid var(--bg-surface1);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   font-size: 12px;
   padding: 3px 10px;
   color: var(--text-primary);
@@ -266,7 +266,7 @@
   max-height: 180px;
   overflow-y: auto;
   border: 1px solid var(--bg-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background-color: var(--bg-surface0);
 }
 
@@ -387,13 +387,13 @@
   gap: 4px;
   font-size: 12px;
   background-color: var(--bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
 }
 
 .conditionBox {
   background-color: var(--bg-surface0);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 8px;
 }
 
@@ -413,7 +413,7 @@
   flex: 1;
   background-color: var(--bg-surface1);
   border: var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 12px;
   padding: 4px;
@@ -430,7 +430,7 @@
   gap: 4px;
   font-size: 12px;
   background-color: var(--bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
   flex-direction: column;
 }
@@ -442,7 +442,7 @@
   gap: 4px;
   font-size: 12px;
   background-color: var(--bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
   cursor: pointer;
   transition: background-color var(--transition-base);
@@ -456,7 +456,7 @@
   gap: 4px;
   font-size: 12px;
   background-color: var(--bg-surface0);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
   cursor: default;
 }
