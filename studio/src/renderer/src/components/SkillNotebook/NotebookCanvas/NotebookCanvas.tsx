@@ -70,7 +70,9 @@ export default function NotebookCanvas() {
         {skillName && (
           <>
             <h2 className={styles.nbTitle}>{skillName}</h2>
-            <p className={styles.nbMeta}>{cells.length} cells · edited just now</p>
+            <p className={styles.nbMeta}>
+              {cells.length} cells · {cells.filter(c => c.type === 'body').length} body · {cells.filter(c => c.type === 'fragment').length} fragments · edited just now
+            </p>
           </>
         )}
         <InsertZone

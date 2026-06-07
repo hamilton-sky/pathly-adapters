@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
   GripVertical, ChevronUp, ChevronDown, MoreHorizontal, X,
+  Copy, Diamond, Trash2,
 } from 'lucide-react'
 import styles from './FragmentCell.module.css'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
@@ -97,32 +98,21 @@ export default function FragmentCell({ id, fragmentName, category, description, 
             </button>
             {menuOpen && (
               <div className={styles.menu} role="menu">
-                <button
-                  type="button"
-                  className={styles.menuItem}
-                  role="menuitem"
-                  disabled={isFirst}
-                  onClick={() => { onMoveUp?.(); setMenuOpen(false) }}
-                >
-                  Move up
+                <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
+                  <Copy size={13} className={styles.menuIcon} />Copy<span className={styles.menuKbd}>⌘D</span>
                 </button>
-                <button
-                  type="button"
-                  className={styles.menuItem}
-                  role="menuitem"
-                  disabled={isLast}
-                  onClick={() => { onMoveDown?.(); setMenuOpen(false) }}
-                >
-                  Move down
+                <button type="button" className={styles.menuItem} role="menuitem" disabled={isFirst} onClick={() => { onMoveUp?.(); setMenuOpen(false) }}>
+                  <ChevronUp size={13} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>⌘↑</span>
+                </button>
+                <button type="button" className={styles.menuItem} role="menuitem" disabled={isLast} onClick={() => { onMoveDown?.(); setMenuOpen(false) }}>
+                  <ChevronDown size={13} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>⌘↓</span>
+                </button>
+                <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
+                  <Diamond size={13} className={styles.menuIcon} />Convert to fragment
                 </button>
                 <div className={styles.menuDivider} />
-                <button
-                  type="button"
-                  className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                  role="menuitem"
-                  onClick={() => { removeCell(id); setMenuOpen(false) }}
-                >
-                  Delete
+                <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} role="menuitem" onClick={() => { removeCell(id); setMenuOpen(false) }}>
+                  <Trash2 size={13} className={styles.menuIcon} />Delete<span className={styles.menuKbd}>⌫</span>
                 </button>
               </div>
             )}

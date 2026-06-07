@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowLeft, FileText, BookOpen, Sparkles } from 'lucide-react'
+import { ArrowLeft, FileText, BookOpen, Sparkles, ChevronsUp, Plus, Copy, Undo2 } from 'lucide-react'
 import { useUiStore } from '../../store/uiStore'
 import styles from './SkillNotebook.module.css'
 import NotebookHeader from './NotebookHeader/NotebookHeader'
@@ -54,6 +54,13 @@ export default function SkillNotebookPanel() {
         <div className={viewMode === 'preview' ? styles.previewWrapperFull : styles.previewWrapper}>
           <PreviewPanel />
         </div>
+      </div>
+      <div className={styles.legend}>
+        <span className={styles.legendItem}><ChevronsUp size={12} /><b>Drag a cell or ⌘↑/↓</b> to move cells</span>
+        <span className={styles.legendItem}><Plus size={12} /><b>Insert</b> a new cell, or drag from the catalog</span>
+        <span className={styles.legendItem}><Copy size={12} /><b>⋯ menu</b> — duplicate · convert · delete</span>
+        <span className={styles.legendItem}><Sparkles size={12} /><b>Select text</b> → new cell from selection</span>
+        <span className={styles.legendItem}><Undo2 size={12} /><b>Undo / redo</b> — 50 steps</span>
       </div>
     </div>
   )

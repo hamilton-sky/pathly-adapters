@@ -33,6 +33,33 @@
   overflow: hidden;
 }
 
+.legend {
+  flex-shrink: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 16px;
+  background: var(--bg-mantle);
+  border-top: var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.legendItem b {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 .empty {
   flex: 1;
   min-width: 0;
