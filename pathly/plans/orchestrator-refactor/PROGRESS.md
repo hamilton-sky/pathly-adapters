@@ -11,7 +11,7 @@
 |---|---|---|---|
 | Conv 1 | db/ package | S1.1–S1.4 | DONE |
 | Conv 2 | runner/ package | S2.1–S2.4 | DONE |
-| Conv 3 | supervisor/ package | S3.1–S3.6 | TODO |
+| Conv 3 | supervisor/ package | S3.1–S3.6 | DONE |
 | Conv 4 | http_server/ package | S4.1–S4.6 | TODO |
 | Conv 5 | Integration + cleanup | S5.1–S5.3 | TODO |
 
