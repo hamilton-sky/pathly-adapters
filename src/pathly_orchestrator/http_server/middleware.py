@@ -1,0 +1,129 @@
+"""Logging, rate limiting, and metrics middleware."""
+from __future__ import annotations
+
+import collections
+import json
+import logging
+import sys
+import threading
+import time
+import uuid
+
+from pathly_orchestrator.feature_flags import flags
+
+logger = logging.getLogger("pathly.http")
+
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_MAX = 120  # requests per window per IP
+_rate_counters: dict[str, collections.deque] = {}
+_rate_lock = threading.Lock()
+
+# Prometheus-format metrics
+_metrics: dict[str, int | float] = {
+    "pathly_requests_total": 0,
+    "pathly_requests_rate_limited_total": 0,
+    "pathly_request_errors_total": 0,
+    "pathly_sse_clients_active": 0,
+}
+_metrics_lock = threading.Lock()
+
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        log: dict = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%SZ"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            log["exc"] = self.formatException(record.exc_info)
+        extra = {
+            k: v
+            for k, v in record.__dict__.items()
+            if k not in logging.LogRecord.__dict__ and not k.startswith("_")
+        }
+        log.update(extra)
+        return json.dumps(log)
+
+
+def _setup_logging() -> None:
+    """Configure structured JSON logging."""
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(_JsonFormatter())
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+
+def _inc(key: str, amount: int | float = 1) -> None:
+    with _metrics_lock:
+        _metrics[key] = _metrics.get(key, 0) + amount
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """Return True if the request is allowed, False if rate limited."""
+    import sys
+    # Tests override _RATE_LIMIT_MAX on the package module (http_server.__init__);
+    # read the effective value from there if available, otherwise use this module's value.
+    _pkg = sys.modules.get("pathly_orchestrator.http_server")
+    max_val = getattr(_pkg, "_RATE_LIMIT_MAX", _RATE_LIMIT_MAX) if _pkg is not None else _RATE_LIMIT_MAX
+    now = time.time()
+    cutoff = now - _RATE_LIMIT_WINDOW
+    with _rate_lock:
+        dq = _rate_counters.setdefault(ip, collections.deque())
+        while dq and dq[0] < cutoff:
+            dq.popleft()
+        if len(dq) >= max_val:
+            return False
+        dq.append(now)
+        return True
+
+
+def _log_request():
+    from flask import request, jsonify
+    # Health endpoint bypasses all middleware — must respond before rate-limiting.
+    if request.path == "/health":
+        return None
+
+    # Handle CORS preflight (OPTIONS) before any routing or rate limiting.
+    # The browser sends this before every cross-origin POST with Content-Type: application/json.
+    if request.method == "OPTIONS":
+        from flask import Response as _Resp
+        resp = _Resp()
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        return resp
+
+    if flags.rate_limiting and not _check_rate_limit(request.remote_addr or "unknown"):
+        _inc("pathly_requests_rate_limited_total")
+        return jsonify({"error": "Rate limit exceeded"}), 429
+    _inc("pathly_requests_total")
+    request_id = str(uuid.uuid4())[:8]
+    request.environ["REQUEST_ID"] = request_id
+    logger.info(
+        "request",
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.path,
+            "remote": request.remote_addr,
+        },
+    )
+
+
+def _log_response(response):
+    from flask import request
+    request_id = request.environ.get("REQUEST_ID", "")
+    logger.info(
+        "response", extra={"request_id": request_id, "status": response.status_code}
+    )
+    if response.status_code >= 500:
+        _inc("pathly_request_errors_total")
+    # Allow renderer (Vite dev server at localhost:5173 or Electron) to call the API
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
