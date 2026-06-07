@@ -109,7 +109,7 @@
   background: transparent;
   cursor: pointer;
   flex-shrink: 0;
-  transition: color 120ms;
+  transition: color var(--transition-fast);
 }
 
 .tabNavBtn:not(:disabled):hover { color: var(--text-primary); }
@@ -142,7 +142,7 @@
   border-bottom: 2px solid transparent;
   background: transparent;
   cursor: pointer;
-  transition: color 120ms, border-color 120ms;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .viewTab:hover { color: var(--text-secondary); }
@@ -281,7 +281,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .convBadgeDone {
@@ -541,7 +541,7 @@
   flex: 1;
   overflow-y: auto;
   background: var(--bg-terminal);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--bg-surface0);
   padding: 8px;
 }
@@ -584,7 +584,7 @@
   background: #1E3A5F;
   color: #3B82F6;
   border: 1px solid #3B82F6;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   padding: 2px 10px;
   font-size: 11px;
   cursor: pointer;
@@ -630,11 +630,11 @@
   color: var(--text-muted);
   background: none;
   border: 1px solid var(--bg-surface1);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   padding: 1px 6px;
   cursor: pointer;
   letter-spacing: 0.03em;
-  transition: color 120ms, border-color 120ms;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
 }
 .evDenseToggle:hover         { color: var(--text-secondary); border-color: var(--text-muted); }
 .evDenseToggle:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }

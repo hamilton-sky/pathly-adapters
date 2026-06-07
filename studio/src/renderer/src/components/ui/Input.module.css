@@ -1,10 +1,10 @@
 .input {
-  background: var(--bg-base);
-  border: 1px solid var(--bg-surface1);
-  border-radius: 6px;
+  background: var(--bg-surface0);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   padding: 5px 9px;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-family: var(--font-family-mono);
   transition: border-color var(--transition-base);
   width: 100%;
@@ -14,6 +14,7 @@
 .input:focus {
   border-color: var(--accent);
   outline: none;
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 .input::placeholder {

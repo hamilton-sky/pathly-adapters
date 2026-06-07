@@ -1,6 +1,6 @@
 .btn {
   font-family: var(--font-family-base);
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition:
     background var(--transition-base),
@@ -32,6 +32,33 @@
   background: var(--red-bg-hover);
 }
 
+.secondary {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--btn-b-hover-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.secondary:active:not(:disabled) {
+  background: var(--btn-b-active-bg);
+}
+
+.cta {
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, var(--purple)) 100%);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+}
+.cta:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.cta:active:not(:disabled) {
+  filter: brightness(0.96);
+}
+
 .ghost {
   background: transparent;
   color: var(--text-secondary);
@@ -42,8 +69,8 @@
 }
 
 /* ─── Sizes ────────────────────────────────── */
-.sm { padding: 4px 10px;  font-size: 12px; }
-.md { padding: 6px 14px;  font-size: 13px; }
+.sm { padding: 4px 10px;  font-size: var(--font-size-sm); }
+.md { padding: 6px 14px;  font-size: var(--font-size-base); }
 
 /* ─── Loading ──────────────────────────────── */
 .loading {
