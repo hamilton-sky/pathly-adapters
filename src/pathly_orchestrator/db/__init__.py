@@ -9,6 +9,7 @@ from .queries.agent_defs import upsert_agent_definition, read_agent_definitions
 from .queries.invocations import write_agent_invocation, read_agent_invocations
 from .queries.overrides import write_skill_override, read_skill_override
 from .queries.feedback_items import write_feedback_item, read_feedback_items, resolve_feedback_item
+from .queries.stage_configs import upsert_stage_config, read_stage_config, delete_stage_config
 
 __all__ = [
     "get_db",
@@ -21,4 +22,5 @@ __all__ = [
     "write_agent_invocation", "read_agent_invocations",
     "write_skill_override", "read_skill_override",
     "write_feedback_item", "read_feedback_items", "resolve_feedback_item",
+    "upsert_stage_config", "read_stage_config", "delete_stage_config",
 ]

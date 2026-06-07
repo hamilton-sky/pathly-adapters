@@ -566,6 +566,23 @@ def next_action(args: dict) -> dict:
         write_state(storage_path, state_info["current_state"], stamped_state)
         prior_state = stamped_state
 
+    # Apply per-feature stage config override if present
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.stage_configs import read_stage_config as _read_stage_cfg
+        _cfg_conn = _get_db()
+        _stage_cfg = _read_stage_cfg(_cfg_conn, project_root, topic, state_info["current_state"])
+        if _stage_cfg:
+            if _stage_cfg.get("agent"):
+                flow_config = dict(flow_config)
+                flow_config["agent_map"] = dict(flow_config.get("agent_map", {}))
+                flow_config["agent_map"][state_info["current_state"]] = _stage_cfg["agent"]
+            if _stage_cfg.get("adapter"):
+                flow_config["adapter_map"] = dict(flow_config.get("adapter_map", {}))
+                flow_config["adapter_map"][state_info["current_state"]] = _stage_cfg["adapter"]
+    except Exception:
+        pass  # overrides are best-effort, never crash next_action
+
     feedback = route_feedback(flow_config, storage_path)
 
     if feedback is not None:

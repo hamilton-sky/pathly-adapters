@@ -1,43 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Settings, BookOpen, Check } from 'lucide-react'
 import { useStore } from '../../../store'
 import { useUiStore } from '../../../store/uiStore'
 import { StatePill } from '../../ui/StatePill/StatePill'
+import { PATHLY_API_BASE } from '../../../lib/config'
+import {
+  CLI_HOSTS, AGENTS, SKILLS,
+  HOST_TO_ADAPTER, ADAPTER_TO_HOST,
+  SKILL_FILE_PATHS, STAGE_DEFAULTS, SKILL_PROMPTS,
+} from './configurePhaseModalData'
 import styles from './ConfigurePhaseModal.module.css'
-
-const CLI_HOSTS = ['Claude Code', 'Codex', 'Copilot', 'Antigravity'] as const
-const AGENTS = ['planner', 'builder', 'reviewer', 'tester', 'retro'] as const
-const SKILLS = ['plan/storm', 'plan/scope', 'fix/build', 'team/build', 'review/quality', 'test/verify', 'retro/archive'] as const
-
-const SKILL_FILE_PATHS: Record<string, string> = {
-  'fix/build':      'fix/build',
-  'team/build':     'team/build',
-  'plan/storm':     'planning/storm',
-  'plan/scope':     'planning/plan',
-  'review/quality': 'development/review',
-  'test/verify':    'development/test',
-  'retro/archive':  'planning/retro',
-}
-
-const STAGE_DEFAULTS: Record<string, { agent: string; skill: string }> = {
-  STORMING:  { agent: 'planner',  skill: 'plan/storm' },
-  PLANNING:  { agent: 'planner',  skill: 'plan/scope' },
-  BUILDING:  { agent: 'builder',  skill: 'fix/build' },
-  REVIEWING: { agent: 'reviewer', skill: 'review/quality' },
-  TESTING:   { agent: 'tester',   skill: 'test/verify' },
-  DONE:      { agent: 'retro',    skill: 'retro/archive' },
-}
-
-const SKILL_PROMPTS: Record<string, string> = {
-  'plan/storm':     '# plan/storm\nHost: Claude Code · Agent: planner\n\nRole: Stage orchestrator — Brainstorm.\nExplore the problem space. Generate options. No code yet.',
-  'plan/scope':     '# plan/scope\nHost: Claude Code · Agent: planner\n\nRole: Stage orchestrator — Scope.\nDefine user stories, acceptance criteria, conversation breakdown.',
-  'fix/build':      '# fix/build\nHost: Claude Code · Agent: builder\n\nRole: Stage orchestrator — Quick Fix.\nApply a single, well-scoped change. No multi-conversation\nplanning, no PROGRESS.md churn.\n\n· Read the issue description in plans/<feature>/\n· Locate the code\n· Apply the minimal change',
-  'team/build':     '# team/build\nHost: Claude Code · Agent: builder\n\nRole: Stage orchestrator — Build.\nFollow the implementation plan. Write tests. Ship it.',
-  'review/quality': '# review/quality\nHost: Claude Code · Agent: reviewer\n\nRole: Stage orchestrator — Review.\nAdversarial code review. Find bugs, security issues, design gaps.\nWrite failures to REVIEW_FAILURES.md.',
-  'test/verify':    '# test/verify\nHost: Claude Code · Agent: tester\n\nRole: Stage orchestrator — Test.\nRun acceptance criteria against implementation.\nWrite gaps to TEST_FAILURES.md.',
-  'retro/archive':  '# retro/archive\nHost: Claude Code · Agent: retro\n\nRole: Stage orchestrator — Retro.\nSummarise what was built, cost, and lessons learned.',
-}
 
 interface Props {
   stage: string
@@ -46,46 +19,80 @@ interface Props {
 
 export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   const defaults = STAGE_DEFAULTS[stage] ?? { agent: 'builder', skill: 'fix/build' }
-  const [host, setHost]   = useState<string>('Claude Code')
-  const [agent, setAgent] = useState<string>(defaults.agent)
-  const [skill, setSkill] = useState<string>(defaults.skill)
+  const [host, setHost]     = useState<string>('Claude Code')
+  const [agent, setAgent]   = useState<string>(defaults.agent)
+  const [skill, setSkill]   = useState<string>(defaults.skill)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
 
   const projectPath = useStore((s) => s.projectPath)
+  const activeTopic = useStore((s) => s.activeTopic)
   const setActivePanel = useStore((s) => s.setActivePanel)
   const setSkillNotebookPath = useUiStore((s) => s.setSkillNotebookPath)
 
+  useEffect(() => {
+    if (!projectPath || !activeTopic) return
+    const params = new URLSearchParams({ project_root: projectPath, feature: activeTopic, stage })
+    fetch(`${PATHLY_API_BASE}/flows/stage-config?${params}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((cfg) => {
+        if (!cfg) return
+        if (cfg.agent) setAgent(cfg.agent)
+        if (cfg.adapter) setHost(ADAPTER_TO_HOST[cfg.adapter] ?? 'Claude Code')
+        if (cfg.skill) setSkill(cfg.skill)
+      })
+      .catch(() => undefined)
+  }, [projectPath, activeTopic, stage])
+
   function handleApply(): void {
-    onClose()
+    if (!projectPath || !activeTopic) { onClose(); return }
+    setSaving(true)
+    fetch(`${PATHLY_API_BASE}/flows/stage-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_root: projectPath,
+        feature: activeTopic,
+        stage,
+        agent,
+        adapter: HOST_TO_ADAPTER[host] ?? host,
+        skill,
+      }),
+    })
+      .then(() => { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000) })
+      .catch(() => setSaving(false))
+  }
+
+  function handleReset(): void {
+    if (!projectPath || !activeTopic) return
+    fetch(`${PATHLY_API_BASE}/flows/stage-config`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_root: projectPath, feature: activeTopic, stage }),
+    })
+      .then(() => { setHost('Claude Code'); setAgent(defaults.agent); setSkill(defaults.skill) })
+      .catch(() => undefined)
   }
 
   function handleOpenInNotebook(): void {
     const relPath = SKILL_FILE_PATHS[skill] ?? skill
-    const fullPath = `${projectPath}/src/pathly_data/core/skills/${relPath}.md`
-    setSkillNotebookPath(fullPath)
+    setSkillNotebookPath(`${projectPath}/src/pathly_data/core/skills/${relPath}.md`)
     setActivePanel('skill-notebook')
     onClose()
   }
 
   const basePreview = SKILL_PROMPTS[skill] ?? `# ${skill}\n\nNo preview available.`
-  const preview = basePreview.replace(
-    /^Host: [^\n]+/m,
-    `Host: ${host} · Agent: ${agent}`,
-  )
+  const preview = basePreview.replace(/^Host: [^\n]+/m, `Host: ${host} · Agent: ${agent}`)
 
   return createPortal(
-    <div
-      className={styles.backdrop}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
+    <div className={styles.backdrop} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className={styles.modal} role="dialog" aria-modal="true" aria-label={`Configure ${stage} phase`}>
         <div className={styles.header}>
           <Settings size={16} className={styles.gearIcon} />
           <span className={styles.title}>Configure phase</span>
           <span className={styles.subtitle}>— what runs when the pipeline enters this stage</span>
           <StatePill state={stage as Parameters<typeof StatePill>[0]['state']} className={styles.stagePill} />
-          <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
+          <button type="button" className={styles.close} onClick={onClose} aria-label="Close"><X size={16} /></button>
         </div>
 
         <div className={styles.body}>
@@ -93,50 +100,32 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
             <div className={styles.sectionLabel}>CLI Host</div>
             <div className={styles.chips}>
               {CLI_HOSTS.map((h) => (
-                <button
-                  key={h}
-                  type="button"
+                <button key={h} type="button"
                   className={`${styles.chip} ${host === h ? styles.chipActive : ''}`}
-                  onClick={() => setHost(h)}
-                >
-                  {h}
-                </button>
+                  onClick={() => setHost(h)}>{h}</button>
               ))}
             </div>
           </div>
-
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Agent</div>
             <div className={styles.chips}>
               {AGENTS.map((a) => (
-                <button
-                  key={a}
-                  type="button"
+                <button key={a} type="button"
                   className={`${styles.chip} ${styles.chipMono} ${agent === a ? styles.chipActive : ''}`}
-                  onClick={() => setAgent(a)}
-                >
-                  {a}
-                </button>
+                  onClick={() => setAgent(a)}>{a}</button>
               ))}
             </div>
           </div>
-
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Skill</div>
             <div className={styles.chips}>
               {SKILLS.map((sk) => (
-                <button
-                  key={sk}
-                  type="button"
+                <button key={sk} type="button"
                   className={`${styles.chip} ${styles.chipMono} ${skill === sk ? styles.chipActive : ''}`}
-                  onClick={() => setSkill(sk)}
-                >
-                  {sk}
-                </button>
+                  onClick={() => setSkill(sk)}>{sk}</button>
               ))}
             </div>
           </div>
-
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Prompt Preview</div>
             <pre className={styles.promptPre}>{preview}</pre>
@@ -145,14 +134,14 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
 
         <div className={styles.footer}>
           <button type="button" className={styles.notebookBtn} onClick={handleOpenInNotebook}>
-            <BookOpen size={14} />
-            Open skill in Notebook
+            <BookOpen size={14} />Open skill in Notebook
           </button>
           <span className={styles.footerSpacer} />
+          <button type="button" className={styles.resetBtn} onClick={handleReset}>Reset to default</button>
           <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-          <button type="button" className={styles.applyBtn} onClick={handleApply}>
+          <button type="button" className={styles.applyBtn} onClick={handleApply} disabled={saving}>
             <Check size={14} />
-            Apply
+            {saved ? <span className={styles.savedHint}>Saved</span> : 'Apply'}
           </button>
         </div>
       </div>

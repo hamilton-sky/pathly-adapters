@@ -170,4 +170,22 @@
   cursor: pointer;
 }
 .applyBtn:hover { filter: brightness(1.1); }
+.applyBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 .applyBtn:focus-visible { outline: var(--focus-ring); }
+
+.resetBtn {
+  font-size: var(--font-size-base);
+  color: var(--text-muted);
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.resetBtn:hover { color: var(--text-secondary); }
+.resetBtn:focus-visible { outline: var(--focus-ring); }
+
+.savedHint {
+  font-size: var(--font-size-sm);
+  color: #4ade80;
+}
