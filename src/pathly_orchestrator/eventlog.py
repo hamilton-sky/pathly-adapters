@@ -16,6 +16,7 @@ CLI usage (called by LLM via Bash or by the retro skill):
 from __future__ import annotations
 import json
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +32,16 @@ from pathly_orchestrator.state import (
 from pathly_orchestrator import db as _db
 
 CURRENT_SCHEMA_VERSION = 1
+
+
+def _db_only() -> bool:
+    """Return True when PATHLY_DB_ONLY env var is set to a truthy value.
+
+    Set PATHLY_DB_ONLY=1 to disable all file fallbacks (STATE.json, EVENTS.jsonl)
+    so you can verify the DB is the sole source of truth.
+    """
+    val = os.environ.get("PATHLY_DB_ONLY", "").strip().lower()
+    return val not in ("", "0", "false", "no")
 
 
 def _plans_dir() -> Path:
@@ -90,8 +101,9 @@ def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:
     conn = _db.get_db()
     project_root = str(feature_dir.parent.parent.parent)
     _db.write_state(conn, project_root, feature, state)
+    if _db_only():
+        return  # DB-only mode: skip STATE.json file write
     # Also write STATE.json as a human-readable snapshot (agents and tools read it directly)
-    import os as _os
     path = feature_dir / "STATE.json"
     tmp_path = path.with_suffix(".tmp")
     try:
@@ -99,7 +111,7 @@ def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:
             json.dump(state, f, indent=2)
             f.write("\n")
             f.flush()
-            _os.fsync(f.fileno())
+            os.fsync(f.fileno())
         tmp_path.replace(path)
     except Exception:
         tmp_path.unlink(missing_ok=True)
@@ -144,8 +156,9 @@ def read_events(storage_path: str) -> list[dict]:
     project_root = str(feature_dir.parent.parent.parent)
     conn = _db.get_db()
     events = _db.read_events(conn, project_root, feature_dir.name)
-    if not events:
-        # Fall back to EVENTS.jsonl for legacy feature dirs that predate SQLite
+    if not events and not _db_only():
+        # Fall back to EVENTS.jsonl for legacy feature dirs that predate SQLite.
+        # Disabled when PATHLY_DB_ONLY=1 so the DB-only path can be verified.
         path = _events_path(storage_path)
         if path.exists():
             with open(path, encoding="utf-8") as f:
@@ -181,6 +194,8 @@ def read_state(storage_path: str) -> dict | None:
     result = _db.read_state(conn, project_root, feature_dir.name)
     if result is not None:
         return result
+    if _db_only():
+        return None  # DB-only mode: skip STATE.json fallback
     # Fall back to STATE.json for legacy feature dirs that predate SQLite
     path = _state_path(storage_path)
     if not path.exists():

@@ -80,14 +80,46 @@ Set `tokens_in` and `tokens_out`:
 - If only `total_tokens`: `tokens_in = round(total_tokens * 0.80)`, `tokens_out = round(total_tokens * 0.20)`
 - Else: both 0
 
-## Step 3 — Write AGENT_DONE to EVENTS.jsonl
+## Step 3 — Write AGENT_DONE to DB (primary) with EVENTS.jsonl backup
 
-Append this JSON line to `pathly/plans/<feature>/EVENTS.jsonl`:
-```json
-{"type":"AGENT_DONE","agent":"<agent>","model":"<model>","conversation":<conversation>,"result":"<result>","summary":"<summary>","tokens_in":<tokens_in>,"tokens_out":<tokens_out>,"total_tokens":<total_tokens>,"cost_usd":<cost_usd>,"tool_uses":<tool_uses>,"wall_seconds":<wall_seconds>,"ts":"<iso-timestamp>","schema_version":1}
+**Primary path — via eventlog (writes to central SQLite DB):**
+
+```python
+python3 -c "
+import datetime, sys
+ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+event = {
+    'type': 'AGENT_DONE',
+    'agent': '<agent>',
+    'model': '<model>',
+    'conversation': <conversation>,
+    'result': '<result>',
+    'summary': '<summary>',
+    'tokens_in': <tokens_in>,
+    'tokens_out': <tokens_out>,
+    'total_tokens': <total_tokens>,
+    'cost_usd': <cost_usd>,
+    'tool_uses': <tool_uses>,
+    'wall_seconds': <wall_seconds>,
+    'ts': ts,
+    'schema_version': 1,
+}
+try:
+    from pathly_orchestrator.eventlog import append_event as _ae
+    _ae('pathly/plans/<feature>', event)
+    print('AGENT_DONE written to DB')
+except Exception as _exc:
+    # Fallback: write directly to EVENTS.jsonl when eventlog is unavailable (offline/codex mode)
+    import json, pathlib
+    path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, 'a', encoding='utf-8') as _f:
+        _f.write(json.dumps(event) + chr(10))
+    print(f'AGENT_DONE written to EVENTS.jsonl (fallback: {_exc})')
+"
 ```
 
-If the file does not exist, create it. If the directory does not exist, stop with an error.
+If the directory `pathly/plans/<feature>/` does not exist, stop with an error before running the above.
 
 ## Step 4 — POST telemetry to HTTP backend
 
