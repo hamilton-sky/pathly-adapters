@@ -81,7 +81,7 @@ export default function NotebookCanvas() {
           onDrop={(e) => handleInsertZoneDrop(null, e)}
           onDragLeave={() => setActiveZone(null)}
         />
-        {cells.map(cell => (
+        {cells.map((cell, idx) => (
           <React.Fragment key={cell.id}>
             {cell.type === 'body' ? (
               <BodyCell heading={cell.heading} content={cell.content} />
@@ -92,6 +92,10 @@ export default function NotebookCanvas() {
                 category={cell.category}
                 description={cell.description}
                 isNew={cell.id === newCellId}
+                isFirst={idx === 0}
+                isLast={idx === cells.length - 1}
+                onMoveUp={() => moveCell(cell.id, idx <= 1 ? null : cells[idx - 2].id)}
+                onMoveDown={() => moveCell(cell.id, cells[idx + 1].id)}
               />
             )}
             <InsertZone

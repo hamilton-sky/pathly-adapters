@@ -48,16 +48,12 @@ export default function SkillNotebookPanel() {
     <div className={styles.root}>
       <NotebookHeader viewMode={viewMode} onViewModeChange={setViewMode} />
       <div className={styles.body}>
-        <NotebookCatalog />
-        <NotebookCanvas />
-        {!chatOpen && (
-          <>
-            <div className={styles.resizeHandle} />
-            <div className={styles.previewWrapper}>
-              <PreviewPanel />
-            </div>
-          </>
-        )}
+        {viewMode === 'cells' && <NotebookCatalog />}
+        {viewMode === 'cells' && <NotebookCanvas />}
+        {viewMode === 'cells' && !chatOpen && <div className={styles.resizeHandle} />}
+        <div className={viewMode === 'preview' ? styles.previewWrapperFull : styles.previewWrapper}>
+          <PreviewPanel />
+        </div>
       </div>
     </div>
   )

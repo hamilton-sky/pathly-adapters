@@ -34,7 +34,7 @@ export default function PreviewPanel() {
   return (
     <div className={styles.root}>
       <div className={styles.pvHead}>
-        <span>Preview</span>
+        <span>Composed skill</span>
         <div className={styles.pvHeadSpacer} />
         <span className={styles.liveBadge}>
           <span className={styles.liveDot} />

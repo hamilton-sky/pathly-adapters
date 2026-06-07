@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
-  GripVertical, ChevronUp, ChevronDown, Pencil, MoreHorizontal, X,
+  GripVertical, ChevronUp, ChevronDown, MoreHorizontal, X,
 } from 'lucide-react'
 import styles from './FragmentCell.module.css'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
@@ -11,6 +11,10 @@ interface Props {
   category: string
   description: string
   isNew?: boolean
+  isFirst?: boolean
+  isLast?: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
 }
 
 const CATEGORY_CLASS: Record<string, string> = {
@@ -19,15 +23,28 @@ const CATEGORY_CLASS: Record<string, string> = {
   integration: styles.badgeIntegration,
 }
 
-export default function FragmentCell({ id, fragmentName, category, description, isNew = false }: Props) {
+export default function FragmentCell({ id, fragmentName, category, description, isNew = false, isFirst = false, isLast = false, onMoveUp, onMoveDown }: Props) {
   const removeCell = useSkillNotebookStore(s => s.removeCell)
   const [showNew, setShowNew] = useState(isNew)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!showNew) return
     const t = setTimeout(() => setShowNew(false), 150)
     return () => clearTimeout(t)
   }, [showNew])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
 
   return (
     <div className={`${styles.cell} ${showNew ? styles.cellNew : ''}`}>
@@ -49,10 +66,67 @@ export default function FragmentCell({ id, fragmentName, category, description, 
           </span>
         )}
         <div className={styles.actions}>
-          <button type="button" className={styles.actionBtn} aria-label="Move up"><ChevronUp size={13} /></button>
-          <button type="button" className={styles.actionBtn} aria-label="Move down"><ChevronDown size={13} /></button>
-          <button type="button" className={styles.actionBtn} aria-label="Edit"><Pencil size={13} /></button>
-          <button type="button" className={styles.actionBtn} aria-label="More"><MoreHorizontal size={13} /></button>
+          <button
+            type="button"
+            className={styles.actionBtn}
+            aria-label="Move up"
+            title="Move up"
+            disabled={isFirst}
+            onClick={onMoveUp}
+          >
+            <ChevronUp size={13} />
+          </button>
+          <button
+            type="button"
+            className={styles.actionBtn}
+            aria-label="Move down"
+            title="Move down"
+            disabled={isLast}
+            onClick={onMoveDown}
+          >
+            <ChevronDown size={13} />
+          </button>
+          <div className={styles.menuWrap} ref={menuRef}>
+            <button
+              type="button"
+              className={`${styles.actionBtn} ${menuOpen ? styles.actionBtnActive : ''}`}
+              aria-label="More options"
+              onClick={() => setMenuOpen(o => !o)}
+            >
+              <MoreHorizontal size={13} />
+            </button>
+            {menuOpen && (
+              <div className={styles.menu} role="menu">
+                <button
+                  type="button"
+                  className={styles.menuItem}
+                  role="menuitem"
+                  disabled={isFirst}
+                  onClick={() => { onMoveUp?.(); setMenuOpen(false) }}
+                >
+                  Move up
+                </button>
+                <button
+                  type="button"
+                  className={styles.menuItem}
+                  role="menuitem"
+                  disabled={isLast}
+                  onClick={() => { onMoveDown?.(); setMenuOpen(false) }}
+                >
+                  Move down
+                </button>
+                <div className={styles.menuDivider} />
+                <button
+                  type="button"
+                  className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                  role="menuitem"
+                  onClick={() => { removeCell(id); setMenuOpen(false) }}
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className={`${styles.actionBtn} ${styles.removeBtn}`}

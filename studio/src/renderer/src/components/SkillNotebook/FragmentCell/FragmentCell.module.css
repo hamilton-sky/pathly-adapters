@@ -124,6 +124,74 @@
   color: var(--red);
 }
 
+.actionBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.actionBtnActive {
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
+.menuWrap {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+  min-width: 140px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+}
+
+.menuItem:hover {
+  background: var(--bg-surface1);
+}
+
+.menuItem:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.menuItemDanger {
+  color: var(--red);
+}
+
+.menuItemDanger:hover {
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+
+.menuDivider {
+  height: 1px;
+  background: var(--border-subtle-color);
+  margin: 2px 4px;
+}
+
 .cellBody {
   padding: 8px 14px 10px;
   border-top: 1px solid var(--border-subtle-color);
