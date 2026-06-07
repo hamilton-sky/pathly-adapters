@@ -27,7 +27,7 @@
 }
 
 .title {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -38,10 +38,10 @@
 }
 
 .badge {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   padding: 1px 6px;
   border: 1px solid var(--bg-surface1);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   white-space: nowrap;
   flex-shrink: 0;
   color: var(--text-muted);
@@ -68,7 +68,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   transition: background 100ms ease, color 100ms ease;
   padding: 0;
@@ -143,7 +143,7 @@
 }
 
 .itemLabel {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -178,7 +178,7 @@
   width: 100%;
   text-align: left;
   padding: 6px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-mantle);
   color: var(--text-primary);

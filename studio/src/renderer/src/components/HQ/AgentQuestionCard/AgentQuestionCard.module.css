@@ -1,6 +1,6 @@
 .card {
   border: 1px solid var(--accent);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 10px 12px;
   margin: 6px 0;
   background: var(--bg-surface);
@@ -19,7 +19,7 @@
   border-radius: 50%;
   background: var(--accent);
   color: var(--bg-base);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -28,7 +28,7 @@
 }
 
 .title {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--accent);
   text-transform: uppercase;
@@ -36,7 +36,7 @@
 }
 
 .question {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-primary);
   margin: 0 0 8px;
   line-height: 1.5;
@@ -54,7 +54,7 @@
   align-items: flex-start;
   gap: 2px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-mantle);
   cursor: pointer;
@@ -68,12 +68,12 @@
 }
 
 .optLabel {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 500;
   color: var(--text-primary);
 }
 
 .optDesc {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
 }

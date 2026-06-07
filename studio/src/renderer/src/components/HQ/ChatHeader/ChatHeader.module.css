@@ -18,7 +18,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -37,12 +37,12 @@
   align-items: center;
   gap: 4px;
   padding: 3px 5px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg-surface1);
   color: var(--text-muted);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: border-color 150ms ease-out, background 150ms ease-out;
+  transition: var(--transition-base);
 }
 
 .targetBtn:hover,
@@ -78,8 +78,8 @@
   top: calc(100% + 6px);
   left: 0;
   min-width: 148px;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   z-index: 200;
   overflow: hidden;
   background: var(--bg-surface0);
@@ -98,9 +98,9 @@
   border: none;
   border-radius: 5px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--text-primary);
-  transition: background 120ms ease-out;
+  transition: var(--transition-fast);
 }
 
 .targetItem:hover {
@@ -130,7 +130,7 @@
   font-weight: 700;
   line-height: 1;
   padding: 1px 3px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: #000;
   pointer-events: none;
 }
@@ -151,8 +151,8 @@
   top: calc(100% + 6px);
   right: 0;
   width: 240px;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   z-index: 200;
   overflow: hidden;
   background: var(--bg-surface0);
@@ -161,7 +161,7 @@
 
 .sessionsHeader {
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -171,7 +171,7 @@
 
 .sessionsEmpty {
   padding: 16px 12px;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   text-align: center;
   line-height: 1.5;
   color: var(--text-muted);
@@ -179,7 +179,7 @@
 
 .sessionsEmptyHint {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 
 .sessionsList {
@@ -197,7 +197,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  transition: background 120ms ease-out;
+  transition: var(--transition-fast);
   color: var(--text-primary);
 }
 
@@ -206,7 +206,7 @@
 }
 
 .sessionTitle {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -214,6 +214,6 @@
 }
 
 .sessionMeta {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   color: var(--text-muted);
 }

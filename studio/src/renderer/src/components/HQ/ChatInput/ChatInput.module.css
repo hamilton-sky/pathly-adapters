@@ -63,9 +63,9 @@
 .textarea {
   width: 100%;
   resize: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   line-height: 1.5;
   outline: none;
   box-sizing: border-box;
@@ -94,7 +94,7 @@
 .modelPill {
   font-size: var(--font-size-xs);
   padding: 2px 7px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--bg-surface1);
   color: var(--text-muted);
 }
@@ -124,7 +124,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -146,12 +146,12 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  border-radius: 6px 0 0 6px;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
   border: none;
   background: transparent;
   cursor: pointer;
   color: var(--text-muted);
-  transition: background 120ms ease-out, color 120ms ease-out;
+  transition: var(--transition-fast);
   flex-shrink: 0;
 }
 
@@ -188,10 +188,10 @@
   background: transparent;
   cursor: pointer;
   color: var(--text-muted);
-  transition: background 120ms ease-out, color 120ms ease-out;
+  transition: var(--transition-fast);
   flex-shrink: 0;
   padding: 0;
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 
 .terminalChevron:hover {
@@ -203,11 +203,11 @@
   position: absolute;
   bottom: calc(100% + 6px);
   left: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   z-index: 200;
   min-width: 130px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-md);
   background: var(--bg-surface0);
   border: 1px solid var(--bg-surface1);
 }
@@ -218,7 +218,7 @@
   gap: 7px;
   width: 100%;
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   text-align: left;
   border: none;
   background: transparent;

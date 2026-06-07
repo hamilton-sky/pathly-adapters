@@ -99,7 +99,7 @@
   padding: 0 8px;
   height: 100%;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   border-right: 1px solid var(--t-surface1);
   -webkit-user-select: none;
   user-select: none;
@@ -132,7 +132,7 @@
   max-width: 0;
   opacity: 0;
   pointer-events: none;
-  transition: max-width 150ms ease-out, opacity 120ms ease-out;
+  transition: max-width var(--transition-base), opacity var(--transition-fast);
 }
 .tab:hover .tabActions,
 .tabActive .tabActions {
@@ -151,7 +151,7 @@
   color: var(--t-text-muted);
   background: transparent;
   opacity: 0.6;
-  transition: background 150ms ease-out, color 150ms ease-out, opacity 150ms ease-out;
+  transition: background var(--transition-base), color var(--transition-base), opacity var(--transition-base);
 }
 
 .tabInactive:hover {
@@ -175,7 +175,7 @@
   border: none;
   border-bottom: 1px solid var(--t-accent);
   color: var(--t-text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   outline: none;
   width: 80px;
   padding: 0 2px;
@@ -197,7 +197,7 @@
   flex-shrink: 0;
   opacity: 1;
   pointer-events: auto;
-  transition: border-color 120ms ease-out, color 120ms ease-out;
+  transition: var(--transition-fast);
 }
 
 .popoutBtn {
@@ -247,7 +247,7 @@
   height: 22px;
   flex-shrink: 0;
   border: 1px solid var(--t-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .splitLauncherMain {
@@ -299,8 +299,8 @@
 .launcherDropdown {
   background: var(--bg-surface0);
   border: 1px solid var(--bg-surface1);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
   min-width: 160px;
   padding: 4px 0;
   z-index: 9999;
@@ -318,7 +318,7 @@
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   text-align: left;
   white-space: nowrap;
   transition: background 0.1s;
@@ -341,7 +341,7 @@
   border: none;
   color: var(--t-text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   padding: 0 7px;
   height: 100%;
   line-height: 1;
@@ -364,7 +364,7 @@
 }
 
 .iconBtnClaude {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--t-accent);
   border-left: 2px solid var(--t-accent) !important;
@@ -377,7 +377,7 @@
 }
 
 .iconBtnCodex {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--t-blue);
   border-left: 2px solid var(--t-blue) !important;
@@ -390,7 +390,7 @@
 }
 
 .iconBtnAntigravity {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--t-green);
   border-left: 2px solid var(--t-green) !important;
@@ -412,7 +412,7 @@
   display: flex;
   align-items: center;
   color: var(--t-text-muted);
-  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+  transition: var(--transition-fast);
 }
 
 .splitIconBtn:hover {
@@ -499,7 +499,7 @@
   background: var(--t-surface0);
   flex-shrink: 0;
   position: relative;
-  transition: background 120ms ease-out;
+  transition: var(--transition-fast);
 }
 
 .splitDivider::after {
@@ -513,7 +513,7 @@
   border-radius: 1px;
   background: var(--t-text-muted);
   opacity: 0;
-  transition: opacity 120ms ease-out;
+  transition: var(--transition-fast);
 }
 
 .splitDivider:hover {
@@ -548,7 +548,7 @@
   justify-content: space-between;
   padding: 0 10px;
   color: var(--t-text-muted);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -614,7 +614,7 @@
   gap: 4px;
   min-height: 30px;
   padding: 3px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--t-text-muted);
 }
 
@@ -655,7 +655,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 
 .instanceActions {
@@ -700,8 +700,8 @@
 
 /* ── Numeric tab ID (#N) ── */
 .instanceNumericId {
-  font-size: 10px;
-  font-family: monospace;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
   color: var(--t-text-muted);
   flex-shrink: 0;
   opacity: 0.7;
@@ -724,7 +724,7 @@
   border-radius: 3px;
   color: var(--t-text-muted);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -738,7 +738,7 @@
 
 .treeGroupChevron {
   flex-shrink: 0;
-  transition: transform 150ms ease-out;
+  transition: var(--transition-base);
 }
 
 .treeGroupChevronCollapsed {
@@ -765,7 +765,7 @@
 .paneEmptyHint {
   display: block;
   padding-left: 16px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   opacity: 0.4;
   color: var(--t-text-muted);
 }
@@ -777,7 +777,7 @@
   align-items: center;
   justify-content: center;
   color: var(--t-text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-base);
 }
 
 .emptyRow {
@@ -792,24 +792,24 @@
 
 .emptyLabel {
   color: var(--t-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   margin-right: 4px;
 }
 
 .emptyBtn {
   background: none;
   border: 1px solid var(--t-surface1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--t-text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   padding: 3px 10px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   outline: none;
-  transition: border-color 120ms ease-out, color 120ms ease-out;
+  transition: var(--transition-fast);
 }
 
 .emptyBtn:hover {
@@ -821,7 +821,7 @@
 .emptyBtn:focus-visible {
   outline: 1px solid var(--t-accent);
   outline-offset: -2px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 /* ── xterm container ── */

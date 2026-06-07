@@ -4,7 +4,7 @@
   border-top: 1px solid var(--border);
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg-surface0);
   overflow: hidden;
   animation: cardEnter 180ms ease-out both;
@@ -47,7 +47,7 @@
   border: none;
   cursor: pointer;
   padding: 5px 6px 5px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   text-align: left;
   color: inherit;
 }
@@ -69,7 +69,7 @@
 .stageName {
   font-weight: 500;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -109,9 +109,9 @@
 /* ─── Chevron (inside headerToggle) ─────────────────────────── */
 .chevron {
   display: inline-block;
-  transition: transform 150ms ease-out;
+  transition: var(--transition-base);
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-md);
   flex-shrink: 0;
   line-height: 1;
 }
@@ -130,7 +130,7 @@
   border: 1px solid var(--runner-border);
   color: var(--runtime);
   border-radius: 3px;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   padding: 1px 7px;
   cursor: pointer;
@@ -153,7 +153,7 @@
   cursor: pointer;
   flex-shrink: 0;
   opacity: 0.5;
-  transition: opacity 120ms, color 120ms;
+  transition: var(--transition-fast);
 }
 
 .dismissBtn:hover {
@@ -176,7 +176,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -190,7 +190,7 @@
   text-align: left;
   color: var(--text-secondary);
   font-weight: 500;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   padding: 3px 6px;
   border-bottom: 1px solid var(--border);
 }
@@ -237,7 +237,7 @@
 .footer {
   padding: 4px 8px;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   border-top: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
 }
