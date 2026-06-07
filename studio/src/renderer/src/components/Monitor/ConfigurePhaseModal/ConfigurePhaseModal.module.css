@@ -1,18 +1,20 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(3, 5, 12, 0.65);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  z-index: 80;
+  z-index: 9000;
   padding-top: 7vh;
 }
 
 .modal {
-  width: 640px;
+  width: 760px;
   max-width: 92vw;
-  background: var(--bg-mantle);
+  background: var(--bg-base);
   border: var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-modal);

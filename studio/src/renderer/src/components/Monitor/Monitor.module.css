@@ -1,10 +1,11 @@
 /* ── Panel shell ──────────────────────────────────────────────── */
 .panel {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-base);
-  overflow: auto;
+  overflow: hidden;
 }
 
 .placeholder {
@@ -48,9 +49,15 @@
   gap: 3px;
 }
 
-.badgeLive    { color: #22C55E; }
-.badgeSyncing { color: #F59E0B; }
-.badgeOffline { color: #EF4444; }
+.badgeLive {
+  color: var(--runtime);
+  background: var(--runner-bg);
+  border: 1px solid var(--runner-border);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+}
+.badgeSyncing { color: var(--yellow); }
+.badgeOffline { color: var(--red); }
 
 .headerMeta {
   font-size: 11px;
@@ -299,40 +306,45 @@
 /* ── MetricsStrip ─────────────────────────────────────────────── */
 .metricsRoot {
   flex-shrink: 0;
-  border-bottom: 1px solid var(--bg-surface0);
+  border: var(--border);
+  border-left: none;
+  border-right: none;
+  background: var(--bg-surface0);
 }
 
-.metricsRow { display: flex; }
+.metricsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border-color);
+}
 
 .metricsTile {
-  flex: 1;
-  height: 44px;
+  background: var(--bg-surface0);
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-left: 1px solid var(--bg-surface0);
+  gap: 6px;
 }
 
-.metricsTile:first-child { border-left: none; }
-
 .metricsValue {
-  font-size: 16px;
+  font-size: 24px;
   font-family: var(--font-family-mono);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
 }
 
-.metricsValueEmpty { color: #374151; }
+.metricsValueEmpty { color: var(--text-disabled); }
 .metricsValueFull  { color: var(--text-primary); }
+.metricsValueCost  { color: var(--green); }
 
 .metricsLabel {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-top: 3px;
-  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  font-family: var(--font-family-base);
 }
 
 .metricsNoTelemetry {
@@ -474,11 +486,11 @@
 .fsmDotBtn:hover .fsmDot { border-color: var(--accent); }
 .fsmDotBtn:focus-visible { outline: var(--focus-ring); border-radius: var(--radius-sm); outline-offset: 2px; }
 
-.fsmDot          { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.fsmDotCompleted { background: var(--state-done); border: 2px solid var(--state-done); color: var(--bg-base); }
-.fsmDotActive    { background: var(--bg-base); border: 2px solid var(--accent); color: var(--accent); }
-.fsmDotRetry     { background: var(--bg-base); border: 2px dashed var(--orange); color: var(--orange); }
-.fsmDotPending   { background: var(--bg-base); border: 2px solid var(--text-muted); color: var(--text-muted); }
+.fsmDot          { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.fsmDotCompleted { background: var(--accent); border: 2px solid var(--accent); color: var(--bg-mantle); }
+.fsmDotActive    { background: transparent; border: 3px solid var(--runtime); color: var(--runtime); box-shadow: 0 0 0 4px var(--runner-bg-active); }
+.fsmDotRetry     { background: transparent; border: 2px dashed var(--orange); color: var(--orange); }
+.fsmDotPending   { background: transparent; border: 2px solid var(--border-color); color: var(--text-disabled); }
 
 .fsmStepLabel {
   font-size: var(--font-size-xs); margin-top: 0;
@@ -492,8 +504,8 @@
   font-family: var(--font-family-mono); line-height: 1;
 }
 
-.fsmStepLabelActive  { color: var(--text-primary); font-weight: 600; }
-.fsmStepLabelRetry   { color: #F59E0B; font-weight: 600; }
+.fsmStepLabelActive  { color: var(--runtime); font-weight: 600; }
+.fsmStepLabelRetry   { color: var(--orange); font-weight: 600; }
 .fsmStepLabelMuted   { color: var(--text-muted); }
 
 .fsmRetryBadge {
@@ -504,8 +516,8 @@
   line-height: 1;
 }
 
-.fsmConnector     { flex: 1; height: 2px; margin-top: 10px; min-width: 4px; background: var(--bg-surface1); }
-.fsmConnectorDone { background: var(--state-done); }
+.fsmConnector     { flex: 1; height: 2px; margin-top: 13px; min-width: 4px; background: var(--border-color); }
+.fsmConnectorDone { background: var(--accent); }
 
 /* ── EventLog ─────────────────────────────────────────────────── */
 .evContainer {

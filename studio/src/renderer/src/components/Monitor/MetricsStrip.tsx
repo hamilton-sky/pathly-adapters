@@ -13,10 +13,10 @@ export function MetricsStrip(): JSX.Element {
     ? 'Billing pending — BILLING_UPDATE will reconcile when agent session closes'
     : EMPTY_TOOLTIP
 
-  const tiles: { label: string; value: string; empty: boolean; tooltip?: string }[] = [
+  const tiles: { label: string; value: string; empty: boolean; tooltip?: string; highlight?: boolean }[] = [
     { label: 'TOKENS', value: fmtTokens(totalTokens), empty: totalTokens === 0, tooltip: EMPTY_TOOLTIP },
     { label: 'WALL',   value: fmtWall(lastWall),      empty: lastWall == null,  tooltip: EMPTY_TOOLTIP },
-    { label: 'COST',   value: costValue,               empty: costEmpty,         tooltip: costTooltip },
+    { label: 'COST',   value: costValue,               empty: costEmpty,         tooltip: costTooltip, highlight: true },
     { label: 'EVENTS', value: String(eventsCount),    empty: false },
   ]
 
@@ -31,7 +31,7 @@ export function MetricsStrip(): JSX.Element {
             delay={300}
           >
             <div className={styles.metricsTile}>
-              <span className={`${styles.metricsValue} ${tile.empty ? styles.metricsValueEmpty : styles.metricsValueFull}`}>
+              <span className={`${styles.metricsValue} ${tile.empty ? styles.metricsValueEmpty : tile.highlight ? styles.metricsValueCost : styles.metricsValueFull}`}>
                 {tile.value}
               </span>
               <span className={styles.metricsLabel}>{tile.label}</span>

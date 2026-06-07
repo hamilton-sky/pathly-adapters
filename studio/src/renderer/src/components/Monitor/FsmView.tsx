@@ -1,7 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { Check, CircleDot } from 'lucide-react'
 import { useStore } from '../../store'
-import { Tooltip } from '../ui/Tooltip'
 import { useInjectCSS } from './utils'
 import styles from './Monitor.module.css'
 
@@ -15,8 +14,8 @@ const PULSE_CSS = `
   50% { border-left-color: rgba(34,211,238,0.15); }
 }
 @keyframes pathly-dot-arrive-v2 {
-  0%, 100% { box-shadow: inset 0 0 0 3px #06B6D4; }
-  50%       { box-shadow: inset 0 0 0 3px rgba(6,182,212,0.25); }
+  0%, 100% { box-shadow: 0 0 0 4px rgba(45,212,191,0.20); }
+  50%       { box-shadow: 0 0 0 7px rgba(45,212,191,0.06); }
 }
 @keyframes pathly-retry-ring {
   0%, 100% { box-shadow: inset 0 0 0 3px #F59E0B; }
@@ -29,8 +28,8 @@ const PULSE_CSS = `
 @media (prefers-reduced-motion: no-preference) {
   .pathly-pulse { animation: pathly-pulse 600ms ease-in-out 2; }
   .pathly-pulse-border { animation: pathly-pulse-border 600ms ease-in-out 2; }
-  .pathly-stepper-active { animation: pathly-dot-arrive-v2 500ms ease-in-out 2; }
-  .pathly-stepper-retry { animation: pathly-retry-ring 700ms ease-in-out 3; }
+  .pathly-stepper-active { animation: pathly-dot-arrive-v2 1.4s ease-in-out infinite; }
+  .pathly-stepper-retry { animation: pathly-retry-ring 700ms ease-in-out infinite; }
 }
 @media (prefers-reduced-motion: reduce) {
   .pathly-pulse { animation: none; }
@@ -75,15 +74,11 @@ function TimelineDot({ status, currentState }: { status: StepStatus; currentStat
     if (!el) return
     if (status === 'active') {
       el.classList.add('pathly-stepper-active')
-      const onEnd = (): void => el.classList.remove('pathly-stepper-active')
-      el.addEventListener('animationend', onEnd, { once: true })
-      return () => el.removeEventListener('animationend', onEnd)
+      return () => el.classList.remove('pathly-stepper-active')
     }
     if (status === 'active-retry') {
       el.classList.add('pathly-stepper-retry')
-      const onEnd = (): void => el.classList.remove('pathly-stepper-retry')
-      el.addEventListener('animationend', onEnd, { once: true })
-      return () => el.removeEventListener('animationend', onEnd)
+      return () => el.classList.remove('pathly-stepper-retry')
     }
   }, [currentState, status])
 
@@ -171,23 +166,22 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
 
           return (
             <div key={state} className={isLast ? styles.fsmStepLast : styles.fsmStep}>
-              <Tooltip label={tooltipLabel} placement="bottom" delay={200}>
-                <button
-                  type="button"
-                  aria-label={tooltipLabel}
-                  className={styles.fsmDotBtn}
-                  onClick={() => onStageClick(state, idx)}
-                >
-                  <TimelineDot status={status} currentState={activeState ?? ''} />
-                  <span className={`${styles.fsmStepLabel} ${labelClass(status)}`}>
-                    {state.slice(0, 8)}
-                  </span>
-                  <span className={styles.fsmStepAgent}>{STAGE_AGENTS[state] ?? ''}</span>
-                  {status === 'active-retry' && retryCount > 0 && (
-                    <span className={styles.fsmRetryBadge}>↩{retryCount}</span>
-                  )}
-                </button>
-              </Tooltip>
+              <button
+                type="button"
+                title={tooltipLabel}
+                aria-label={tooltipLabel}
+                className={styles.fsmDotBtn}
+                onClick={() => onStageClick(state, idx)}
+              >
+                <TimelineDot status={status} currentState={activeState ?? ''} />
+                <span className={`${styles.fsmStepLabel} ${labelClass(status)}`}>
+                  {state.slice(0, 8)}
+                </span>
+                <span className={styles.fsmStepAgent}>{STAGE_AGENTS[state] ?? ''}</span>
+                {status === 'active-retry' && retryCount > 0 && (
+                  <span className={styles.fsmRetryBadge}>↩{retryCount}</span>
+                )}
+              </button>
 
               {!isLast && (
                 <div className={`${styles.fsmConnector} ${idx < activeIdx ? styles.fsmConnectorDone : ''}`} />
