@@ -35,13 +35,9 @@ CURRENT_SCHEMA_VERSION = 1
 
 
 def _db_only() -> bool:
-    """Return True when PATHLY_DB_ONLY env var is set to a truthy value.
-
-    Set PATHLY_DB_ONLY=1 to disable all file fallbacks (STATE.json, EVENTS.jsonl)
-    so you can verify the DB is the sole source of truth.
-    """
-    val = os.environ.get("PATHLY_DB_ONLY", "").strip().lower()
-    return val not in ("", "0", "false", "no")
+    """DB-only mode is on by default. Set PATHLY_DB_ONLY=0 to re-enable file fallbacks."""
+    val = os.environ.get("PATHLY_DB_ONLY", "1").strip().lower()
+    return val not in ("0", "false", "no")
 
 
 def _plans_dir() -> Path:

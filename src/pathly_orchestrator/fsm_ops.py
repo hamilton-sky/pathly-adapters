@@ -65,7 +65,18 @@ _SCHEMA_VERSION = "1"
 # ── Private helpers ───────────────────────────────────────────────────────────
 
 
-def _load_flow(flow_name: str) -> dict:
+def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
+    if project_root is not None:
+        try:
+            from pathly_orchestrator.db.connection import get_db
+            from pathly_orchestrator.db.queries.flow_defs import read_flow_definitions
+            conn = get_db(project_root)
+            for search_root in [project_root, None]:
+                for row in read_flow_definitions(conn, search_root):
+                    if row["name"] == flow_name:
+                        return yaml.safe_load(row["flow_yaml"])
+        except Exception:
+            pass
     text = (
         files("pathly_data")
         .joinpath(f"core/flows/{flow_name}.flow.yaml")
@@ -469,11 +480,14 @@ def next_action(args: dict) -> dict:
     topic = args["topic"]
     project_root = args["project_root"]
 
-    flow_config = _load_flow(flow_name)
+    flow_config = _load_flow(flow_name, project_root)
     storage_path = _resolve_storage_path(flow_config, project_root, topic)
 
+    from pathly_orchestrator import eventlog as _eventlog_pre
+    _db_state = _eventlog_pre.read_state(str(storage_path))
+
     try:
-        state_info = recover_state(storage_path, flow_config)
+        state_info = recover_state(storage_path, flow_config, state_doc=_db_state)
     except Exception as e:
         return {
             "schema_version": _SCHEMA_VERSION,
@@ -595,7 +609,7 @@ def complete_stage(args: dict) -> dict:
     decision: str | None = args.get("decision")
     resolved_files: list[str] | None = args.get("resolved_files")
 
-    flow_config = _load_flow(flow_name)
+    flow_config = _load_flow(flow_name, project_root)
     storage_path = _resolve_storage_path(flow_config, project_root, topic)
 
     if resolved_files:
@@ -612,7 +626,7 @@ def complete_stage(args: dict) -> dict:
     state_before: dict | None = _eventlog.read_state(str(storage_path))
 
     try:
-        state_info = recover_state(storage_path, flow_config)
+        state_info = recover_state(storage_path, flow_config, state_doc=state_before)
     except Exception as e:
         return {
             "schema_version": _SCHEMA_VERSION,

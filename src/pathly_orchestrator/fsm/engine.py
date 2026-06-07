@@ -23,7 +23,7 @@ _DEFAULT_LIMITS = {
 }
 
 
-def recover_state(storage_path: Path, flow: dict) -> dict:
+def recover_state(storage_path: Path, flow: dict, state_doc: dict | None = None) -> dict:
     """
     Read STATE.json and EVENTS.jsonl from storage_path.
     Return {"current_state": str, "conv": int, "open_feedback_files": list[str],
@@ -35,21 +35,25 @@ def recover_state(storage_path: Path, flow: dict) -> dict:
             {needs_context_per_stage: 3, feedback_rounds_per_stage: 2}.
     Per-state limits override top-level limits key by key (not wholesale replace).
     conv: read from STATE.json["current_conversation"], default 0.
+    state_doc: pre-loaded state dict (DB-primary). If provided, STATE.json is skipped.
     """
-    state_file = storage_path / "STATE.json"
-
     corrupted_state = False
-    if state_file.exists():
-        try:
-            state_doc = json.loads(state_file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            state_doc = {}
-            corrupted_state = True
+    if state_doc is not None:
         current_state = state_doc.get("current", flow["states"][0])
         conv = state_doc.get("current_conversation", 0)
     else:
-        current_state = flow["states"][0]
-        conv = 0
+        state_file = storage_path / "STATE.json"
+        if state_file.exists():
+            try:
+                loaded = json.loads(state_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                loaded = {}
+                corrupted_state = True
+            current_state = loaded.get("current", flow["states"][0])
+            conv = loaded.get("current_conversation", 0)
+        else:
+            current_state = flow["states"][0]
+            conv = 0
 
     feedback_dir = storage_path / "feedback"
     if feedback_dir.exists():

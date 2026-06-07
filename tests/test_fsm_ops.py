@@ -187,7 +187,7 @@ def _make_decide_agent_files(tmp_path: Path) -> None:
 
 
 def _patch_load_flow(monkeypatch, flow: dict) -> None:
-    monkeypatch.setattr(fsm_ops, "_load_flow", lambda _name: flow)
+    monkeypatch.setattr(fsm_ops, "_load_flow", lambda _name, _root=None: flow)
 
 
 def _patch_build_prompt(monkeypatch) -> None:

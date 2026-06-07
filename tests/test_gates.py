@@ -158,7 +158,7 @@ def test_complete_stage_gate_blocks(tmp_path, monkeypatch):
     import pathly_orchestrator.fsm_ops as fsm_ops
 
     flow = _make_team_like_flow()
-    monkeypatch.setattr(fsm_ops, "_load_flow", lambda _name: flow)
+    monkeypatch.setattr(fsm_ops, "_load_flow", lambda _name, _root=None: flow)
     monkeypatch.setattr(
         fsm_ops,
         "build_prompt",
@@ -189,7 +189,7 @@ def test_complete_stage_gate_then_advance(tmp_path, monkeypatch):
     import pathly_orchestrator.fsm_ops as fsm_ops
 
     flow = _make_team_like_flow()
-    monkeypatch.setattr(fsm_ops, "_load_flow", lambda _name: flow)
+    monkeypatch.setattr(fsm_ops, "_load_flow", lambda _name, _root=None: flow)
     monkeypatch.setattr(
         fsm_ops,
         "build_prompt",

@@ -1,14 +1,15 @@
 """
-Migrate existing pathly/plans/ feature directories from .json/.jsonl files to SQLite.
+Migrate existing pathly/plans/ feature directories from STATE.json to SQLite.
 
 CLI:
-    python scripts/migrate_to_sqlite.py [--plans-dir PATH] [--dry-run]
+    python scripts/migrate_to_sqlite.py [--plans-dir PATH] [--limit N] [--dry-run]
 
 Default --plans-dir: pathly/plans
+--limit N: only process the N most recently modified features (default: all)
+
 For each feature subdirectory (skips .archive and non-directories):
-  - Imports EVENTS.jsonl into fsm_events (idempotent within a run)
+  - Imports EVENTS.jsonl into fsm_events (if present, idempotent)
   - Imports STATE.json into fsm_state (if no row exists yet)
-  - Imports RUNNER_STATE.json into runner_state (if no row exists yet)
 
 Does NOT delete original files.
 """
@@ -20,16 +21,24 @@ import sys
 from pathlib import Path
 
 
-def migrate_feature(feature_dir: Path, dry_run: bool) -> None:
-    feature = feature_dir.name
+def _mtime(d: Path) -> float:
+    try:
+        return d.stat().st_mtime
+    except OSError:
+        return 0.0
 
+
+def migrate_feature(
+    feature_dir: Path,
+    project_root: str,
+    dry_run: bool,
+) -> None:
+    feature = feature_dir.name
     events_path = feature_dir / "EVENTS.jsonl"
     state_path = feature_dir / "STATE.json"
-    runner_path = feature_dir / "RUNNER_STATE.json"
 
     event_count = 0
     state_status = "missing"
-    runner_status = "missing"
 
     if dry_run:
         if events_path.exists():
@@ -46,24 +55,18 @@ def migrate_feature(feature_dir: Path, dry_run: bool) -> None:
                         print(f"  [WARN] {feature}/EVENTS.jsonl line {lineno}: malformed JSON, would skip")
             event_count = valid
 
-        if state_path.exists():
-            state_status = "ok"
-        if runner_path.exists():
-            runner_status = "ok"
-
-        print(f"[dry-run] [{feature}]: events={event_count} state={state_status} runner={runner_status}")
+        state_status = "ok" if state_path.exists() else "missing"
+        print(f"[dry-run] [{feature}]: events={event_count} state={state_status}")
         return
 
-    # Live run — import into SQLite
     from pathly_orchestrator import db as _db
 
-    conn = _db.get_db(feature_dir)
+    conn = _db.get_db()
 
     if events_path.exists():
-        existing_events = _db.read_events(conn, feature)
+        existing_events = _db.read_events(conn, project_root, feature)
         if existing_events:
-            event_count = len(existing_events)
-            print(f"  [{feature}]: events=skipped (already migrated, {event_count} rows present)")
+            print(f"  [{feature}]: events=skipped ({len(existing_events)} rows already present)")
         else:
             with open(events_path, encoding="utf-8") as f:
                 for lineno, line in enumerate(f, 1):
@@ -75,36 +78,19 @@ def migrate_feature(feature_dir: Path, dry_run: bool) -> None:
                     except json.JSONDecodeError:
                         print(f"  [WARN] {feature}/EVENTS.jsonl line {lineno}: malformed JSON, skipping")
                         continue
-                    _db.append_event(conn, feature, event)
+                    _db.append_event(conn, project_root, feature, event)
                     event_count += 1
 
     if state_path.exists():
-        existing = _db.read_state(conn, feature)
-        if existing is None:
-            try:
-                with open(state_path, encoding="utf-8") as f:
-                    state_dict = json.load(f)
-                _db.write_state(conn, feature, state_dict)
-                state_status = "ok"
-            except (json.JSONDecodeError, OSError) as exc:
-                print(f"  [WARN] {feature}/STATE.json: could not import — {exc}")
-        else:
+        try:
+            with open(state_path, encoding="utf-8") as f:
+                state_dict = json.load(f)
+            _db.write_state(conn, project_root, feature, state_dict)
             state_status = "ok"
+        except (json.JSONDecodeError, OSError) as exc:
+            state_status = f"error: {exc}"
 
-    if runner_path.exists():
-        existing_runner = _db.read_runner_state(conn, feature)
-        if existing_runner is None:
-            try:
-                with open(runner_path, encoding="utf-8") as f:
-                    runner_dict = json.load(f)
-                _db.write_runner_state(conn, feature, runner_dict)
-                runner_status = "ok"
-            except (json.JSONDecodeError, OSError) as exc:
-                print(f"  [WARN] {feature}/RUNNER_STATE.json: could not import — {exc}")
-        else:
-            runner_status = "ok"
-
-    print(f"[{feature}]: events={event_count} state={state_status} runner={runner_status}")
+    print(f"[{feature}]: events={event_count} state={state_status}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -117,23 +103,41 @@ def main(argv: list[str] | None = None) -> int:
         help="Root directory containing feature subdirs (default: pathly/plans)",
     )
     parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Only migrate the N most recently modified features",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print what would be imported without writing anything",
     )
     args = parser.parse_args(argv)
 
-    plans_dir = Path(args.plans_dir)
+    plans_dir = Path(args.plans_dir).resolve()
     if not plans_dir.is_dir():
         print(f"ERROR: plans-dir not found: {plans_dir}", file=sys.stderr)
         return 1
 
-    for entry in sorted(plans_dir.iterdir()):
-        if not entry.is_dir():
-            continue
-        if entry.name.startswith("."):
-            continue
-        migrate_feature(entry, dry_run=args.dry_run)
+    # project_root is two levels up from pathly/plans/
+    project_root = str(plans_dir.parent.parent)
+
+    entries = sorted(
+        (e for e in plans_dir.iterdir() if e.is_dir() and not e.name.startswith(".")),
+        key=_mtime,
+        reverse=True,
+    )
+
+    if args.limit is not None:
+        entries = entries[: args.limit]
+        print(f"Migrating {len(entries)} most recent feature(s) -> project_root={project_root}")
+    else:
+        print(f"Migrating {len(entries)} feature(s) -> project_root={project_root}")
+
+    for entry in entries:
+        migrate_feature(entry, project_root, dry_run=args.dry_run)
 
     return 0
 

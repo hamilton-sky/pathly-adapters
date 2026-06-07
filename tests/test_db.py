@@ -273,7 +273,7 @@ def test_concurrent_appends(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.skipif(
-    __import__("os").environ.get("PATHLY_DB_ONLY", "").strip().lower() not in ("", "0", "false", "no"),
+    __import__("os").environ.get("PATHLY_DB_ONLY", "1").strip().lower() not in ("0", "false", "no"),
     reason="STATE.json fallback is disabled in PATHLY_DB_ONLY mode — legacy path intentionally skipped",
 )
 def test_legacy_read_state_from_json(tmp_path: Path) -> None:
@@ -300,7 +300,7 @@ def test_legacy_read_state_from_json(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    __import__("os").environ.get("PATHLY_DB_ONLY", "").strip().lower() not in ("", "0", "false", "no"),
+    __import__("os").environ.get("PATHLY_DB_ONLY", "1").strip().lower() not in ("0", "false", "no"),
     reason="EVENTS.jsonl fallback is disabled in PATHLY_DB_ONLY mode — legacy path intentionally skipped",
 )
 def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
