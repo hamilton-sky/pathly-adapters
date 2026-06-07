@@ -54,19 +54,27 @@ All ported as TypeScript + CSS modules under `components/ui/`:
 
 ---
 
+- `components/HQ/**/*.module.css` — 17 files swept (all HQ subcomponents)
+- `components/Terminal/Terminal.module.css`
+- `components/topbar/TopBar.module.css`
+
+### Component refactors
+- **Tooltip** — visual styles migrated to `Tooltip.module.css`; `useTheme()` removed; only dynamic position values remain inline
+- **ContextMenu** — `font-family`, `font-size`, `border-radius`, `box-shadow` → token vars
+
+---
+
 ## Left to do
 
-### Token adoption — remaining CSS files
-- `components/FlowEditor/VisualView/parts/ExportControls.module.css` — non-standard values (`border-radius: 7px`, `font-size: 12.5px`), skip or add custom tokens
-- `components/HQ/**/*.module.css` — not yet swept
-- `components/Terminal/**/*.module.css` — not yet swept
-- `components/topbar/**/*.module.css` — verify existence
+### Token adoption — minor gaps
+- `components/FlowEditor/VisualView/parts/ExportControls.module.css` — non-standard values (`border-radius: 7px`, `font-size: 12.5px`); skip unless custom tokens are added
+- Hardcoded `rgba(...)` background tints in HQ components (ChatInput model icons `#38BDF8`/`#F59E0B`/`#86EFAC`, MiniTerminalCard status dots) — colour format standardisation is out of scope for now
 
 ### Components — open verification
 | Component | Status |
 |---|---|
-| **Tooltip** | Studio `Tooltip.tsx` exists — verify it matches DS spec |
-| **ContextMenu** | Studio `ContextMenu.tsx` exists — verify it matches DS spec |
+| **Tooltip** | Refactored ✓ — verify viewport-clamping still works visually |
+| **ContextMenu** | Tokens applied ✓ |
 
 ### Color format
 - DS uses `color-mix(in srgb, ...)` for derived tokens (accent tints, badge backgrounds)
@@ -85,4 +93,5 @@ UI kit HTML files in `Design System/ui_kits/` and the root-level mocks:
 ## Commit references
 - `feat: sync design system tokens + component token adoption` — tokens + Button/Input initial update
 - `feat: port DS components + complete token adoption sweep` — 6 new shared components, Input/Button updates, 19 CSS files swept
+- `feat: token adoption sweep — HQ, Terminal, TopBar, Tooltip, ContextMenu` — 17 HQ + Terminal + TopBar files; Tooltip CSS module; ContextMenu cleanup
 Branch: `hamiton/backend-refactor`
