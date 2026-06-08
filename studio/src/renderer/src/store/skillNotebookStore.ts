@@ -195,4 +195,20 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
     )
     get().pushCells(newCells)
   },
+  splitBodyCell: (cellId: string, newCells: Array<{ heading: string; content: string }>) => {
+    const state = get()
+    const idx = state.cells.findIndex(c => c.id === cellId)
+    if (idx === -1) return
+    const replacements: BodyCell[] = newCells.map(nc => ({
+      id: crypto.randomUUID(),
+      type: 'body',
+      heading: nc.heading,
+      content: nc.content,
+      isSystem: false,
+      originalContent: '',
+    }))
+    const next = [...state.cells]
+    next.splice(idx, 1, ...replacements)
+    get().pushCells(next)
+  },
 }))

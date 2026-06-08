@@ -11,7 +11,7 @@
 .modal {
   background: var(--bg-surface0);
   border-radius: 12px;
-  width: 780px;
+  width: 900px;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 80px);
   display: flex;
@@ -47,10 +47,11 @@
   min-height: 0;
 }
 
-.sourcePanel {
+/* ── LEFT: proposed cells list ── */
+.cellsPanel {
   width: 45%;
   flex-shrink: 0;
-  background: var(--bg-mantle);
+  background: var(--bg-surface0);
   border-right: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   flex-direction: column;
@@ -58,9 +59,10 @@
   padding: 14px 0 0;
 }
 
-.cellsPanel {
+/* ── RIGHT: live preview ── */
+.previewPanel {
   flex: 1;
-  background: var(--bg-surface0);
+  background: var(--bg-mantle);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -99,19 +101,7 @@
   padding: 2px 6px;
 }
 
-.sourceCode {
-  flex: 1;
-  overflow-y: auto;
-  margin: 0;
-  padding: 0 16px 16px;
-  font-family: var(--font-family-mono);
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
+/* ── Cell cards ── */
 .cellsList {
   flex: 1;
   overflow-y: auto;
@@ -123,7 +113,7 @@
 
 .cellCard {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   padding: 10px 12px;
   border-radius: 7px;
@@ -147,7 +137,7 @@
 
 .cellCheck {
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 0;
   accent-color: var(--accent);
   cursor: pointer;
 }
@@ -197,6 +187,72 @@
   white-space: nowrap;
 }
 
+/* ── Move buttons on each cell ── */
+.cellMoveButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.moveBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 18px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: background 80ms, color 80ms;
+}
+
+.moveBtn:hover:not(:disabled) {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.moveBtn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* ── Preview panel content ── */
+.previewBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.previewSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.previewSectionHeading {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.previewEmpty {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 32px 0;
+}
+
+/* ── Footer ── */
 .footer {
   display: flex;
   align-items: center;

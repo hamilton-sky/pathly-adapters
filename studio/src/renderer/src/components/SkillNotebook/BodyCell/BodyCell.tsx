@@ -1,9 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Pencil, Check, ChevronUp, ChevronDown, MoreHorizontal,
-  Copy, Diamond, Trash2, RotateCcw, Sparkles, Code, Bold, Italic, Columns,
+  Copy, Diamond, Trash2, RotateCcw, Sparkles, Code, Bold, Italic, Columns, Scissors,
 } from 'lucide-react'
 import MarkdownRenderer from '../../shared/MarkdownRenderer/MarkdownRenderer'
+import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 import styles from './BodyCell.module.css'
 
@@ -31,12 +32,15 @@ export default function BodyCell({
 }: Props) {
   const updateBodyCell = useSkillNotebookStore(s => s.updateBodyCell)
   const insertBodyCell = useSkillNotebookStore(s => s.insertBodyCell)
+  const splitBodyCell  = useSkillNotebookStore(s => s.splitBodyCell)
 
-  const [cellMode, setCellMode] = useState<CellMode>('view')
-  const [draft, setDraft]       = useState(content)
-  const [expanded, setExpanded] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [selBar, setSelBar]     = useState<SelBar | null>(null)
+  const [cellMode, setCellMode]         = useState<CellMode>('view')
+  const [draft, setDraft]               = useState(content)
+  const [headingDraft, setHeadingDraft] = useState(() => heading.replace(/^#{1,6}\s+/, ''))
+  const [expanded, setExpanded]       = useState(false)
+  const [menuOpen, setMenuOpen]       = useState(false)
+  const [showSplitModal, setShowSplitModal] = useState(false)
+  const [selBar, setSelBar]           = useState<SelBar | null>(null)
 
   const bodyRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -59,9 +63,9 @@ export default function BodyCell({
     return () => document.removeEventListener('mousedown', handler)
   }, [menuOpen])
 
-  function commitEdit() { updateBodyCell(id, draft); setCellMode('view') }
-  function handleEditClick() { setDraft(content); setCellMode('edit') }
-  function handleSplitClick() { setDraft(content); setCellMode(cellMode === 'split' ? 'view' : 'split') }
+  function commitEdit() { updateBodyCell(id, draft, headingDraft); setCellMode('view') }
+  function handleEditClick() { setDraft(content); setHeadingDraft(displayTitle); setCellMode('edit') }
+  function handleSplitClick() { setDraft(content); setHeadingDraft(displayTitle); setCellMode(cellMode === 'split' ? 'view' : 'split') }
 
   const handleMouseUp = useCallback(() => {
     if (cellMode !== 'view') return
@@ -83,7 +87,7 @@ export default function BodyCell({
 
   return (
     <div
-      className={`${styles.cell} ${isSystem ? styles.cellSystem : styles.cellBodyType}`}
+      className={`${styles.cell} ${isSystem ? styles.cellSystem : styles.cellBodyType}${menuOpen ? ` ${styles.cellMenuOpen}` : ''}`}
       tabIndex={-1}
     >
       {/* ── strip: badge + actions sit ON the top border line ── */}
@@ -143,6 +147,9 @@ export default function BodyCell({
               <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                 <Diamond size={13} className={styles.menuIcon} />Convert to fragment
               </button>
+              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => { setShowSplitModal(true); setMenuOpen(false) }}>
+                <Scissors size={13} className={styles.menuIcon} />Split into cells
+              </button>
               <div className={styles.menuDivider} />
               {isSystem ? (
                 <button type="button" className={styles.menuItem} role="menuitem" onClick={() => { onRevert?.(); setMenuOpen(false) }}>
@@ -159,7 +166,18 @@ export default function BodyCell({
       </div>
 
       {/* ── heading ── */}
-      <div className={styles.cellTitle}>{displayTitle}</div>
+      {isEditing ? (
+        <input
+          type="text"
+          className={styles.cellTitleInput}
+          value={headingDraft}
+          onChange={e => setHeadingDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commitEdit() }}
+          aria-label="Cell heading"
+        />
+      ) : (
+        <div className={styles.cellTitle}>{displayTitle}</div>
+      )}
 
       {/* ── body ── */}
       {cellMode === 'split' ? (
@@ -216,6 +234,18 @@ export default function BodyCell({
             </div>
           )}
         </div>
+      )}
+
+      {showSplitModal && (
+        <SkillSplitModal
+          rawContent={content}
+          onConfirm={(splitCells) => {
+            splitBodyCell(id, splitCells.map(c => ({ heading: c.heading, content: c.content })))
+            setShowSplitModal(false)
+          }}
+          onInsertOne={() => setShowSplitModal(false)}
+          onClose={() => setShowSplitModal(false)}
+        />
       )}
     </div>
   )
