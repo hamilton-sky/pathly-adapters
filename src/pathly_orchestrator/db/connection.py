@@ -29,6 +29,15 @@ def _refresh_catalog(conn: sqlite3.Connection) -> None:
         pass  # never block server start due to catalog failures
 
 
+def _refresh_flows(conn: sqlite3.Connection) -> None:
+    """Refresh flow_definitions from filesystem on every server start. Never raises."""
+    try:
+        from pathly_orchestrator.db.queries.flow_defs import _refresh_flows as _do_refresh
+        _do_refresh(conn)
+    except Exception:
+        pass  # never block server start
+
+
 def get_db(_deprecated_path=None) -> sqlite3.Connection:
     """Return a cached sqlite3.Connection for ~/.pathly/pathly.db.
 
@@ -53,6 +62,7 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
 
     _seed_if_empty(conn)
     _refresh_catalog(conn)
+    _refresh_flows(conn)
     return conn
 
 

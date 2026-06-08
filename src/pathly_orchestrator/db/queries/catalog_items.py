@@ -21,13 +21,14 @@ def upsert_catalog_item(
     category: str,
     description: str,
     tags: str = "",
+    content: str = "",
 ) -> int:
     """Upsert a catalog item. Returns the row id."""
     with _get_write_lock(conn):
         cur = conn.execute(
             "INSERT OR REPLACE INTO catalog_items "
-            "(item_type, name, rel_path, abs_path, category, description, tags, indexed_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "(item_type, name, rel_path, abs_path, category, description, tags, content, indexed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 item_type,
                 name,
@@ -36,6 +37,7 @@ def upsert_catalog_item(
                 category,
                 description,
                 tags,
+                content,
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
@@ -49,6 +51,16 @@ def read_all_catalog_items(conn: sqlite3.Connection) -> list[dict]:
         "SELECT * FROM catalog_items ORDER BY item_type, name"
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def read_catalog_item_by_path(conn: sqlite3.Connection, abs_path: str) -> dict | None:
+    """Return a catalog item by its absolute path, or None if not found."""
+    norm = abs_path.replace("\\", "/")
+    row = conn.execute(
+        "SELECT * FROM catalog_items WHERE abs_path=? OR abs_path=?",
+        (norm, norm.replace("/", "\\"))
+    ).fetchone()
+    return dict(row) if row else None
 
 
 # ── indexer ──────────────────────────────────────────────────────────────────
@@ -101,6 +113,7 @@ def _index_agents(conn: sqlite3.Connection, core: Path) -> None:
     for f in sorted(agents_dir.glob("*.md")):
         if "README" in f.name:
             continue
+        content = f.read_text(encoding="utf-8")
         upsert_catalog_item(
             conn,
             item_type="agent",
@@ -109,6 +122,7 @@ def _index_agents(conn: sqlite3.Connection, core: Path) -> None:
             abs_path=str(f).replace("\\", "/"),
             category="agents",
             description=_first_line(f),
+            content=content,
         )
 
 
@@ -117,9 +131,8 @@ def _index_fragments(conn: sqlite3.Connection, core: Path) -> None:
     if not fragments_dir.exists():
         return
     for f in sorted(fragments_dir.glob("*.md")):
-        name, description, category, _ = _parse_frontmatter(
-            f.read_text(encoding="utf-8"), f.stem
-        )
+        content = f.read_text(encoding="utf-8")
+        name, description, category, _ = _parse_frontmatter(content, f.stem)
         upsert_catalog_item(
             conn,
             item_type="fragment",
@@ -128,6 +141,7 @@ def _index_fragments(conn: sqlite3.Connection, core: Path) -> None:
             abs_path=str(f).replace("\\", "/"),
             category=category or "fragments",
             description=description,
+            content=content,
         )
 
 
@@ -143,6 +157,7 @@ def _index_skills(conn: sqlite3.Connection, core: Path, _data_root: Path) -> Non
         rel_to_skills = f.relative_to(skills_dir)
         skill_name = str(rel_to_skills.with_suffix("")).replace(os.sep, "/")
         category = parts[0] if len(parts) > 1 else ""
+        content = f.read_text(encoding="utf-8")
         upsert_catalog_item(
             conn,
             item_type="skill",
@@ -151,6 +166,7 @@ def _index_skills(conn: sqlite3.Connection, core: Path, _data_root: Path) -> Non
             abs_path=str(f).replace("\\", "/"),
             category=category,
             description=_first_line(f),
+            content=content,
         )
 
 
@@ -163,6 +179,7 @@ def _index_templates(conn: sqlite3.Connection, core: Path, _data_root: Path) -> 
         parts = rel_to_templates.parts
         tmpl_name = str(rel_to_templates.with_suffix("")).replace(os.sep, "/")
         category = parts[0] if len(parts) > 1 else ""
+        content = f.read_text(encoding="utf-8")
         upsert_catalog_item(
             conn,
             item_type="template",
@@ -171,6 +188,7 @@ def _index_templates(conn: sqlite3.Connection, core: Path, _data_root: Path) -> 
             abs_path=str(f).replace("\\", "/"),
             category=category,
             description=_first_line(f),
+            content=content,
         )
 
 

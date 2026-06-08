@@ -188,3 +188,17 @@ CREATE TABLE IF NOT EXISTS catalog_items (
 );
 """)
     conn.commit()
+    _add_additive_migrations(conn)
+
+
+def _add_additive_migrations(conn: sqlite3.Connection) -> None:
+    """ALTER TABLE migrations — safe to re-run; skips columns that already exist."""
+    for table, col, ctype in [
+        ("catalog_items",    "content",   "TEXT"),
+        ("flow_definitions", "file_path", "TEXT"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # column already exists

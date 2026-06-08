@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as jsYaml from 'js-yaml'
-import { readFile, writeFile } from '../../../services/pathlyApi'
+import { fetchFlow, saveFlow } from '../../../services/pathlyApi'
 import type { FlowYaml } from '../../../types'
 
 type TabMode = 'visual' | 'yaml'
@@ -25,6 +25,21 @@ interface UseFlowFileReturn {
   handleYamlSave: (content: string) => Promise<void>
 }
 
+function flowNameFromPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const filename = normalized.split('/').pop() ?? ''
+  return filename.replace(/\.flow\.yaml$/i, '')
+}
+
+function parseFirstDoc(content: string): FlowYaml | null {
+  try {
+    const docs = jsYaml.loadAll(content) as FlowYaml[]
+    return docs.find(d => d != null) ?? null
+  } catch {
+    return null
+  }
+}
+
 export function useFlowFile(
   selectedItem: SelectedItem | null | undefined,
   markDirty: (path: string) => void,
@@ -40,8 +55,6 @@ export function useFlowFile(
   const flowDataRef = useRef(flowData)
   useEffect(() => { flowDataRef.current = flowData }, [flowData])
 
-  // Preserved snapshot of the last successfully parsed flow so the visual graph
-  // stays intact while the user edits invalid YAML.
   const lastValidFlowDataRef = useRef<FlowYaml | null>(null)
 
   const rawYamlRef = useRef(rawYaml)
@@ -49,18 +62,26 @@ export function useFlowFile(
 
   useEffect(() => {
     if (!selectedItem) return
+    const name = flowNameFromPath(selectedItem.path)
+    if (!name) return
     setLoading(true)
     setSaveError(null)
     setYamlParseError(null)
     setYamlSyncContent(null)
     lastValidFlowDataRef.current = null
-    readFile(selectedItem.path)
-      .then((content) => {
-        setRawYaml(content ?? '')
+    fetchFlow(name)
+      .then((result) => {
+        const content = result?.flow_yaml ?? ''
+        setRawYaml(content)
         try {
-          const parsed = jsYaml.load(content ?? '') as FlowYaml
-          setFlowData(parsed)
-          lastValidFlowDataRef.current = parsed
+          const parsed = parseFirstDoc(content)
+          if (parsed) {
+            setFlowData(parsed)
+            lastValidFlowDataRef.current = parsed
+          } else {
+            setFlowData(null)
+            setYamlParseError('Empty or unreadable YAML document')
+          }
         } catch (error) {
           setFlowData(null)
           if (error instanceof jsYaml.YAMLException) {
@@ -87,15 +108,13 @@ export function useFlowFile(
       setRawYaml(serialized)
       setYamlSyncContent(serialized)
     } else if (next === 'visual' && currentRawYaml) {
-      try {
-        const parsed = jsYaml.load(currentRawYaml) as FlowYaml
+      const parsed = parseFirstDoc(currentRawYaml)
+      if (parsed) {
         setFlowData(parsed)
         lastValidFlowDataRef.current = parsed
         setYamlSyncContent(null)
         setYamlParseError(null)
-      } catch {
-        // YAML is invalid — fall back to the last valid snapshot if available
-        // so the visual graph is not destroyed. A warning is shown in the toolbar.
+      } else {
         const fallback = lastValidFlowDataRef.current
         if (fallback) {
           setFlowData(fallback)
@@ -131,10 +150,12 @@ export function useFlowFile(
 
   async function handleVisualSave(): Promise<void> {
     if (!selectedItem || !flowDataRef.current) return
+    const name = flowNameFromPath(selectedItem.path)
+    if (!name) return
     setSaveError(null)
     const content = jsYaml.dump(flowDataRef.current, { lineWidth: 120 })
     try {
-      await writeFile(selectedItem.path, content)
+      await saveFlow(name, content)
       clearDirty(selectedItem.path)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))
@@ -143,9 +164,11 @@ export function useFlowFile(
 
   async function handleYamlSave(content: string): Promise<void> {
     if (!selectedItem) return
+    const name = flowNameFromPath(selectedItem.path)
+    if (!name) return
     setSaveError(null)
     try {
-      await writeFile(selectedItem.path, content)
+      await saveFlow(name, content)
       setRawYaml(content)
       clearDirty(selectedItem.path)
     } catch (err) {
@@ -154,18 +177,8 @@ export function useFlowFile(
   }
 
   return {
-    flowData,
-    rawYaml,
-    loading,
-    saveError,
-    yamlParseError,
-    yamlSyncContent,
-    handleTabSwitch,
-    handleVisualChange,
-    handleYamlParsed,
-    handleYamlContentChange,
-    handleYamlParseError,
-    handleVisualSave,
-    handleYamlSave
+    flowData, rawYaml, loading, saveError, yamlParseError, yamlSyncContent,
+    handleTabSwitch, handleVisualChange, handleYamlParsed,
+    handleYamlContentChange, handleYamlParseError, handleVisualSave, handleYamlSave,
   }
 }
