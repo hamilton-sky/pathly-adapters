@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useLayoutEffect } from 'react'
 
 const CHAT_WIDTH_KEY = 'chat-panel-width'
 // Keep enough room for the Conductor header controls in compact mode.
@@ -21,7 +21,7 @@ export function useChatResize(): {
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (chatRef.current) {
       chatRef.current.style.setProperty('--chat-width', `${width}px`)
     }
@@ -36,6 +36,9 @@ export function useChatResize(): {
     startXRef.current = e.clientX
     startWidthRef.current = width
 
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+
     function onMouseMove(ev: MouseEvent): void {
       if (!isDraggingRef.current) return
       const delta = startXRef.current - ev.clientX   // inverted: left edge drag
@@ -45,6 +48,8 @@ export function useChatResize(): {
 
     function onMouseUp(): void {
       isDraggingRef.current = false
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
       setWidth((w) => { localStorage.setItem(CHAT_WIDTH_KEY, String(w)); return w })
