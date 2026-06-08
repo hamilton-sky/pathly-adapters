@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pathly · Canvas — Simplified Flow Creation (Preview)</title>
+<style>
+  /* ── Inline design tokens (self-contained, no external CSS needed) ── */
+  :root {
+    --bg-base:     #111827;
+    --bg-mantle:   #0B0F1A;
+    --bg-surface0: #1E2433;
+    --bg-surface1: #283044;
+    --bg-terminal: #0d1117;
+    --text-primary:   #E2E8F0;
+    --text-secondary: #A8BBCC;
+    --text-muted:     #8899B0;
+    --text-disabled:  #4A5568;
+    --accent:  #38BDF8;
+    --blue:    #60A5FA;
+    --green:   #34D399;
+    --red:     #f87171;
+    --yellow:  #FCD34D;
+    --runtime: #2DD4BF;
+    --orange:  #f97316;
+    --purple:  #a78bfa;
+    --border-color:        #283044;
+    --border-subtle-color: #1E2433;
+    --border:        1px solid var(--border-color);
+    --border-subtle: 1px solid var(--border-subtle-color);
+    --accent-bg:        color-mix(in srgb, var(--accent) 13%, transparent);
+    --accent-bg-hover:  color-mix(in srgb, var(--accent) 80%, transparent);
+    --accent-border:    color-mix(in srgb, var(--accent) 40%, transparent);
+    --red-bg:        color-mix(in srgb, var(--red) 13%, transparent);
+    --red-border:    color-mix(in srgb, var(--red) 40%, transparent);
+    --orange-bg:     color-mix(in srgb, var(--orange) 13%, transparent);
+    --orange-border: color-mix(in srgb, var(--orange) 40%, transparent);
+    --state-planning:  var(--text-muted);
+    --state-building:  var(--blue);
+    --state-reviewing: var(--orange);
+    --state-testing:   var(--purple);
+    --state-retro:     var(--runtime);
+    --state-done:      var(--green);
+    --state-error:     var(--red);
+    --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --font-size-xs:   10px;
+    --font-size-sm:   11px;
+    --font-size-base: 13px;
+    --font-size-md:   14px;
+    --font-size-lg:   16px;
+    --radius-xs:   3px;
+    --radius-sm:   4px;
+    --radius-md:   5px;
+    --radius-lg:   8px;
+    --radius-xl:   12px;
+    --radius-full: 999px;
+    --transition-fast: 0.12s ease;
+  }
+</style>
+<script src="./assets/vendor/icons.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: var(--bg-base); color: var(--text-primary);
+    font-family: var(--font-family-base); font-size: var(--font-size-base);
+    -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
+
+  /* ── Demo controller bar ─────────────────────────────────── */
+  .demo-bar { height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+    padding: 0 14px; background: color-mix(in srgb, var(--accent) 10%, var(--bg-mantle));
+    border-bottom: 1px solid var(--accent-border); }
+  .demo-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent); white-space: nowrap; padding: 3px 8px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border: 1px solid var(--accent-border); border-radius: 5px; }
+  .demo-steps { display: flex; gap: 3px; }
+  .step-btn { font-size: 11px; padding: 4px 11px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border-color); background: transparent; color: var(--text-muted);
+    font-family: var(--font-family-base); line-height: 1.4; transition: all 0.12s; }
+  .step-btn.on { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
+  .step-btn:not(.on):hover { background: var(--bg-surface1); color: var(--text-secondary); border-color: var(--accent-border); }
+  .sp { flex: 1; }
+  .demo-hint { font-size: 11px; color: var(--text-muted); font-style: italic; }
+
+  /* ── App shell ───────────────────────────────────────────── */
+  .app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+  /* appbar */
+  .appbar { height: 44px; flex-shrink: 0; display: flex; align-items: center; gap: 7px; padding: 0 8px 0 10px;
+    background: var(--bg-mantle); border-bottom: var(--border); }
+  .ab-ic { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-md); border: none; background: transparent; color: var(--text-secondary); cursor: pointer; }
+  .ab-ic:hover { background: var(--bg-surface1); color: var(--accent); }
+  .ab-proj { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary);
+    background: var(--bg-surface0); border: var(--border); border-radius: var(--radius-md); padding: 5px 11px; min-width: 170px; cursor: pointer; }
+  .ab-proj [data-icon] { margin-left: auto; color: var(--text-muted); }
+  .ab-nav { display: flex; gap: 3px; margin-left: 6px; }
+  .ab-tab { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: none;
+    border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; font-family: var(--font-family-base); }
+  .ab-tab.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .ab-publish { font-size: 12px; font-weight: 600; color: #fff; background: var(--accent); border: none;
+    border-radius: var(--radius-md); padding: 6px 14px; cursor: pointer; }
+
+  /* topbar */
+  .top { height: 48px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+    background: var(--bg-mantle); border-bottom: var(--border); }
+  .ibtn { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; border: none; background: transparent; }
+  .ibtn:hover { background: var(--bg-surface0); color: var(--accent); }
+  .crumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .crumbs .c { color: var(--text-muted); }
+  .crumbs .c.last { color: var(--text-primary); font-weight: 600; font-family: var(--font-family-mono); }
+  .crumbs .sep { color: var(--text-muted); opacity: 0.6; }
+  .nb-badge { font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 4px; padding: 3px 8px; }
+  .toggle { display: flex; border: var(--border); border-radius: var(--radius-md); overflow: hidden; }
+  .toggle button { border: none; background: transparent; color: var(--text-muted); font-size: 12px;
+    padding: 6px 12px; cursor: pointer; font-family: var(--font-family-base); }
+  .toggle button.on { background: var(--bg-surface1); color: var(--text-primary); font-weight: 600; }
+  .save2 { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    background: var(--bg-surface0); border: var(--border); border-radius: var(--radius-md); padding: 7px 12px; cursor: pointer; }
+  .save2:hover { color: var(--accent); border-color: var(--accent-border); }
+  .save2 [data-icon] { display: inline-flex; }
+  .publish { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #fff;
+    background: var(--accent); border: none; border-radius: var(--radius-md); padding: 7px 14px; cursor: pointer; }
+
+  /* body layout */
+  .body { flex: 1; display: flex; min-height: 0; position: relative; }
+
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  .side { width: 250px; flex-shrink: 0; background: var(--bg-mantle); border-right: var(--border);
+    display: flex; flex-direction: column; min-height: 0; }
+  .side .sh { display: flex; align-items: center; gap: 7px; padding: 11px 12px 8px; font-size: 11px;
+    font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .side .sh .ac { color: var(--accent); display: inline-flex; }
+  .side .sh .sp2 { flex: 1; }
+  .side .sh .gact { color: var(--text-muted); display: inline-flex; cursor: pointer; }
+  .search { padding: 0 10px 8px; }
+  .search .wrap { display: flex; align-items: center; gap: 7px; background: var(--bg-base); border: var(--border);
+    border-radius: var(--radius-md); padding: 6px 9px; }
+  .search input { flex: 1; border: none; background: transparent; outline: none; color: var(--text-primary);
+    font-size: 12.5px; font-family: var(--font-family-base); }
+  .search input::placeholder { color: var(--text-muted); }
+  .cat { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+  .glabel { display: flex; align-items: center; gap: 6px; padding: 9px 12px 3px; }
+  .glabel .gl { font-size: 9px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-muted); }
+  .glabel.custom .gl { color: var(--accent); }
+  .glabel .ctag { font-size: 8px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 3px; padding: 1px 5px; }
+  .glabel .gsp { flex: 1; }
+  .glabel .gact { color: var(--text-muted); display: inline-flex; cursor: pointer; opacity: 0; }
+  .glabel:hover .gact { opacity: 0.75; }
+  .citem { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 14px; cursor: grab;
+    font-size: 13px; color: var(--text-secondary); }
+  .citem:hover { background: var(--bg-surface0); color: var(--text-primary); }
+  .citem .grip { color: var(--text-muted); opacity: 0.35; display: inline-flex; margin-left: -4px; }
+  .citem:hover .grip { opacity: 0.8; }
+  .citem .ci { display: inline-flex; opacity: 0.85; }
+  .citem .cn { flex: 1; font-family: var(--font-family-mono); font-size: 12.5px; }
+  .citem .ct { font-family: var(--font-family-mono); font-size: 10px; color: var(--text-muted); }
+  .citem .add { width: 18px; height: 18px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); opacity: 0; }
+  .citem:hover .add { opacity: 1; }
+  .newcat { margin: 10px 12px 6px; width: calc(100% - 24px); display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    color: var(--accent); font-size: 12px; font-weight: 600; border: 1.5px dashed var(--accent-border);
+    border-radius: var(--radius-md); padding: 8px; background: transparent; cursor: pointer; }
+
+  /* ── Canvas center ───────────────────────────────────────── */
+  .center { flex: 1; overflow-y: auto; min-width: 0; padding: 30px 0 60px;
+    background-color: var(--bg-base);
+    background-image: radial-gradient(color-mix(in srgb, var(--text-muted) 16%, transparent) 1px, transparent 1px);
+    background-size: 26px 26px; display: flex; flex-direction: column; align-items: center; }
+
+  /* nodes */
+  .node { width: 320px; box-sizing: border-box; border: var(--border); border-left: 4px solid var(--c);
+    border-radius: var(--radius-md); background: var(--bg-surface0); padding: 11px 14px; cursor: pointer; position: relative;
+    transition: box-shadow 0.12s, border-color 0.12s; }
+  .node.sel { border-color: var(--accent-border); box-shadow: 0 0 0 2px var(--accent-bg); }
+  .node.editing { border-color: var(--accent-border); box-shadow: 0 0 0 2px var(--accent-bg); --c: var(--accent); }
+  .node .nrow { display: flex; align-items: center; gap: 10px; }
+  .node .pip { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
+  .node .nn { font-weight: 700; font-size: 15px; letter-spacing: 0.02em; flex: 1; }
+  .node .agent { font-family: var(--font-family-mono); font-size: 11px; color: var(--text-muted); }
+  .node .chips { display: flex; align-items: center; gap: 12px; margin-top: 7px; padding-left: 20px; }
+  .node .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); font-family: var(--font-family-mono); }
+  /* inline name editor */
+  .nn-input { font-weight: 700; font-size: 15px; letter-spacing: 0.02em; flex: 1; background: transparent;
+    border: none; border-bottom: 2px solid var(--accent); outline: none; color: var(--text-primary);
+    font-family: var(--font-family-base); padding: 0 0 2px; caret-color: var(--accent); }
+
+  /* connector line */
+  .conn { width: 2px; height: 22px; background: var(--border-color); }
+  .conn.re { position: relative; background: color-mix(in srgb, var(--orange) 55%, transparent); }
+  .conn.re::after { content: '↩ reroute'; position: absolute; left: 10px; top: 4px; font-size: 10px;
+    font-family: var(--font-family-mono); color: var(--orange); white-space: nowrap; }
+
+  /* add-state button */
+  .addn { width: 320px; box-sizing: border-box; margin-top: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    color: var(--accent); font-size: 13px; font-weight: 600; border: 1.5px dashed var(--accent-border);
+    border-radius: var(--radius-md); padding: 10px; background: transparent; cursor: pointer; }
+  .addn:hover { background: var(--accent-bg); }
+  .dropzone { width: 320px; margin-top: 6px; border: 1.5px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+    border-radius: var(--radius-md); padding: 9px; text-align: center; font-size: 11px; color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, transparent); font-style: italic; }
+
+  /* empty-canvas CTA */
+  .empty-cta { width: 320px; border: 1.5px dashed color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 14px; padding: 36px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px;
+    background: color-mix(in srgb, var(--accent) 4%, transparent); }
+  .empty-cta .eicon { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+  .empty-cta .et { font-size: 14px; font-weight: 700; color: var(--text-secondary); }
+  .empty-cta .ed { font-size: 12px; color: var(--text-muted); line-height: 1.6; max-width: 220px; }
+  .empty-cta .ea { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+    color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent-border);
+    border-radius: 8px; padding: 8px 16px; cursor: pointer; margin-top: 4px; }
+  .empty-cta .or { font-size: 11px; color: var(--text-muted); }
+
+  /* ── Inspector ───────────────────────────────────────────── */
+  .insp { width: 330px; flex-shrink: 0; border-left: var(--border); background: var(--bg-mantle);
+    padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  .ihead { display: flex; align-items: center; gap: 9px; }
+  .ihead .pip { width: 10px; height: 10px; border-radius: 50%; }
+  .ihead .it { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+  .new-badge { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--green) 35%, transparent); border-radius: 3px; padding: 2px 6px; margin-left: auto; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > label { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+  .ctrl { background: var(--bg-base); border: var(--border); border-radius: var(--radius-md); padding: 8px 10px;
+    font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+  .ctrl.mono { font-family: var(--font-family-mono); }
+  .ctrl.sel { justify-content: space-between; color: var(--text-secondary); cursor: pointer; }
+  .ctrl.sel .cv { color: var(--text-muted); display: inline-flex; }
+  .ctrl.unset { color: var(--text-muted) !important; border-color: var(--accent-border); background: color-mix(in srgb, var(--accent) 5%, var(--bg-base)); }
+  .prompt { background: var(--bg-base); border: var(--border); border-radius: var(--radius-md); padding: 9px 11px;
+    font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+  .prompt b { color: var(--text-primary); font-weight: 600; }
+  .gate { display: flex; align-items: center; gap: 10px; }
+  .toggle2 { width: 34px; height: 20px; border-radius: 999px; background: var(--green); position: relative; flex-shrink: 0; }
+  .toggle2::after { content: ''; position: absolute; right: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .gtxt { font-family: var(--font-family-mono); font-size: 12px; color: var(--text-secondary); }
+  .trans { display: flex; flex-direction: column; gap: 7px; }
+  .tr { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .tk { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); width: 52px; flex-shrink: 0; }
+  .tv { font-family: var(--font-family-mono); color: var(--text-primary); }
+  .tv.re { color: var(--orange); }
+  .tv.auto { color: var(--text-muted); font-style: italic; font-family: var(--font-family-base); font-size: 11px; }
+  .ilink { font-size: 12px; color: var(--accent); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  /* insp hint banner */
+  .insp-hint { background: color-mix(in srgb, var(--accent) 9%, transparent); border: 1px solid var(--accent-border);
+    border-radius: 8px; padding: 10px 12px; font-size: 11px; color: var(--accent); line-height: 1.6; }
+  .insp-hint b { font-weight: 700; }
+
+  /* insp empty placeholder */
+  .insp-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    opacity: 0.45; padding: 20px; text-align: center; }
+  .ie-t { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+  .ie-d { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+  /* auto-wire note */
+  .auto-note { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted);
+    padding: 8px 10px; background: color-mix(in srgb, var(--green) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--green) 25%, transparent); border-radius: 7px; }
+  .auto-note [data-icon] { color: var(--green); display: inline-flex; flex-shrink: 0; }
+
+  /* ── Dialog overlay ──────────────────────────────────────── */
+  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center;
+    z-index: 50; backdrop-filter: blur(3px); }
+  .dialog { width: 420px; background: var(--bg-surface0); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border-color));
+    border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.65); padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .dh { display: flex; align-items: flex-start; gap: 12px; }
+  .dicon { width: 40px; height: 40px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); flex-shrink: 0; }
+  .dt { font-size: 17px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+  .dd { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+  .dfield { display: flex; flex-direction: column; gap: 8px; }
+  .dfield label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+  .dinput { background: var(--bg-base); border: 1px solid var(--accent-border); border-radius: 9px; padding: 10px 13px;
+    font-size: 14px; font-family: var(--font-family-mono); color: var(--text-primary); outline: none; width: 100%;
+    box-shadow: 0 0 0 3px var(--accent-bg); }
+  .dinput::placeholder { color: var(--text-muted); }
+  .dtpl-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+  .dtpl { display: flex; gap: 8px; }
+  .tcard { flex: 1; border: 1.5px solid var(--border-color); border-radius: 9px; padding: 11px 13px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 4px; transition: border-color 0.12s, background 0.12s; }
+  .tcard.on { border-color: var(--accent); background: var(--accent-bg); }
+  .tct { font-size: 12px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+  .tcd { font-size: 11px; color: var(--text-muted); }
+  .dacts { display: flex; align-items: center; gap: 8px; }
+  .dcancel { flex: 1; font-size: 12px; padding: 9px; border-radius: 8px; border: var(--border);
+    background: transparent; color: var(--text-secondary); cursor: pointer; font-family: var(--font-family-base); text-align: center; }
+  .dcreate { font-size: 13px; font-weight: 600; padding: 9px 24px; border-radius: 8px; border: none;
+    background: var(--accent); color: #fff; cursor: pointer; font-family: var(--font-family-base);
+    display: inline-flex; align-items: center; gap: 7px; }
+
+  /* Comparison callout in dialog */
+  .compare { display: flex; gap: 0; border: var(--border); border-radius: 9px; overflow: hidden; margin-top: -4px; }
+  .compare .col { flex: 1; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .compare .col:first-child { border-right: var(--border); }
+  .compare .col .clabel { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  .compare .col.was .clabel { color: var(--red); }
+  .compare .col.now .clabel { color: var(--green); }
+  .compare .col .cval { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ── Legend ──────────────────────────────────────────────── */
+  .legend { flex-shrink: 0; height: 36px; display: flex; align-items: center; gap: 20px; padding: 0 16px;
+    background: var(--bg-mantle); border-top: var(--border); font-size: 11px; color: var(--text-muted); overflow-x: auto; }
+  .legend b { color: var(--text-secondary); font-weight: 600; }
+  .legend .k { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+  .toast { position: absolute; right: 20px; bottom: 48px; z-index: 60; display: flex; align-items: center; gap: 11px;
+    background: var(--bg-surface1); border: 1px solid color-mix(in srgb, var(--green) 35%, transparent); border-radius: 12px;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.5); padding: 12px 14px; min-width: 244px;
+    opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 0.25s ease-out, transform 0.25s ease-out; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .tk { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
+  .t1 { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .t2 { font-size: 11px; color: var(--text-muted); font-family: var(--font-family-mono); margin-top: 2px; }
+
+  /* ── Screen switching ────────────────────────────────────── */
+  .screen { display: none; flex: 1; flex-direction: row; min-height: 0; }
+  .screen.on { display: flex; }
+
+  /* blink caret animation */
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+  .caret { display: inline-block; width: 2px; height: 1em; background: var(--accent); vertical-align: middle;
+    margin-left: 2px; animation: blink 1s step-start infinite; }
+</style>
+</head>
+<body>
+
+<!-- ── DEMO CONTROLLER BAR ─────────────────────────────────── -->
+<div class="demo-bar">
+  <span class="demo-label">Preview</span>
+  <div class="demo-steps">
+    <button class="step-btn on" onclick="goto(1)">1 · New flow</button>
+    <button class="step-btn" onclick="goto(2)">2 · Empty canvas</button>
+    <button class="step-btn" onclick="goto(3)">3 · Building</button>
+    <button class="step-btn" onclick="goto(4)">4 · Done</button>
+  </div>
+  <span class="sp"></span>
+  <span class="demo-hint" id="hint">One input field replaces the 6-step wizard</span>
+</div>
+
+<!-- ── APP SHELL (shared chrome) ───────────────────────────── -->
+<div class="app">
+
+  <!-- appbar -->
+  <div class="appbar">
+    <button class="ab-ic"><i data-icon="menu" data-size="16"></i></button>
+    <button class="ab-proj" style="font-size:12px;color:var(--text-muted);min-width:auto;padding:5px 10px;">Projects</button>
+    <button class="ab-proj">orchestrator-refactor<i data-icon="chevron-down" data-size="13"></i></button>
+    <div class="ab-nav">
+      <button class="ab-tab on"><i data-icon="layout-grid" data-size="14"></i>Canvas</button>
+      <button class="ab-tab"><i data-icon="book-open" data-size="14"></i>Notebook</button>
+      <button class="ab-tab"><i data-icon="activity" data-size="14"></i>Monitor</button>
+    </div>
+    <span class="sp"></span>
+    <button class="ab-ic"><i data-icon="globe" data-size="15"></i></button>
+    <button class="ab-ic"><i data-icon="sun" data-size="15"></i></button>
+    <button class="ab-publish">Publish</button>
+  </div>
+
+  <!-- topbar -->
+  <div class="top">
+    <button class="ibtn"><i data-icon="arrow-left" data-size="16"></i></button>
+    <div class="crumbs">
+      <span class="c">Flows</span><span class="sep">›</span>
+      <span class="c last" id="flow-name-crumb">my-pipeline</span>
+    </div>
+    <span class="nb-badge">Canvas</span>
+    <span class="sp"></span>
+    <button class="ibtn"><i data-icon="undo-2" data-size="15"></i></button>
+    <button class="ibtn"><i data-icon="redo-2" data-size="15"></i></button>
+    <button class="ibtn"><i data-icon="layout-grid" data-size="15"></i></button>
+    <div class="toggle"><button class="on">Canvas</button><button>YAML</button></div>
+    <button class="save2" id="save-btn"><i data-icon="database" data-size="13"></i>Save</button>
+    <button class="publish"><i data-icon="git-branch" data-size="13"></i>Publish</button>
+  </div>
+
+  <!-- SHARED SIDEBAR (same across all screens) -->
+  <div class="body">
+    <aside class="side">
+      <div class="sh">
+        <span class="ac"><i data-icon="git-branch" data-size="13"></i></span>
+        <span class="sp2">Catalog</span>
+        <span class="gact"><i data-icon="plus" data-size="13"></i></span>
+      </div>
+      <div class="search"><div class="wrap"><i data-icon="search" data-size="14"></i><input placeholder="Search the library…" /></div></div>
+      <div class="cat">
+        <div class="glabel"><span class="gl">Flows</span><span class="gsp"></span><span class="gact"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="git-branch" data-size="13"></i></span><span class="cn">ship-fast</span><span class="ct">5</span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="git-branch" data-size="13"></i></span><span class="cn">quick-fix</span><span class="ct">3</span></div>
+
+        <div class="glabel"><span class="gl">Agents</span><span class="gsp"></span><span class="gact"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="brain" data-size="13"></i></span><span class="cn">architect</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="brain" data-size="13"></i></span><span class="cn">planner</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="brain" data-size="13"></i></span><span class="cn">builder</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="brain" data-size="13"></i></span><span class="cn">reviewer</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+
+        <div class="glabel"><span class="gl">Skills</span><span class="gsp"></span><span class="gact"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="book-open" data-size="13"></i></span><span class="cn">build.md</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="book-open" data-size="13"></i></span><span class="cn">review.md</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="book-open" data-size="13"></i></span><span class="cn">storm.md</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+
+        <div class="glabel"><span class="gl">Templates</span><span class="gsp"></span><span class="gact"><i data-icon="plus" data-size="12"></i></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="layout-grid" data-size="13"></i></span><span class="cn">fsm-base</span><span class="add"><i data-icon="plus" data-size="12"></i></span></div>
+
+        <div class="glabel custom"><span class="gl">My flows</span><span class="ctag">custom</span><span class="gsp"></span></div>
+        <div class="citem"><span class="grip"><i data-icon="grip-vertical" data-size="13"></i></span><span class="ci"><i data-icon="star" data-size="13"></i></span><span class="cn">my-pipeline</span><span class="ct">0</span></div>
+
+        <button class="newcat"><i data-icon="plus" data-size="13"></i>New category</button>
+      </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════════════
+         SCREEN 1 · NEW FLOW DIALOG
+         ═══════════════════════════════════════════════════════ -->
+    <div class="screen on" id="s1">
+
+      <!-- empty canvas behind the modal (dimmed) -->
+      <main class="center" style="opacity:0.35;pointer-events:none;padding-top:80px;">
+        <div class="empty-cta">
+          <div class="eicon"><i data-icon="git-branch" data-size="20"></i></div>
+          <div class="et">No states yet</div>
+          <div class="ed">Drag an agent from the catalog, or click Add state below</div>
+        </div>
+        <button class="addn" style="margin-top:16px;"><i data-icon="plus" data-size="14"></i>Add state</button>
+      </main>
+
+      <aside class="insp" style="opacity:0.35;">
+        <div class="insp-empty">
+          <i data-icon="mouse-pointer-click" data-size="28"></i>
+          <div class="ie-t">No state selected</div>
+          <div class="ie-d">Click a state on the canvas to configure it</div>
+        </div>
+      </aside>
+
+      <!-- The dialog -->
+      <div class="overlay">
+        <div class="dialog">
+          <div class="dh">
+            <div class="dicon"><i data-icon="plus" data-size="20"></i></div>
+            <div>
+              <div class="dt">New flow</div>
+              <div class="dd">Give it a name — you'll add states directly on the canvas.</div>
+            </div>
+          </div>
+
+          <div class="dfield">
+            <label>Flow name</label>
+            <input class="dinput" value="my-pipeline" placeholder="e.g. ship-fast" />
+          </div>
+
+          <div>
+            <div class="dtpl-label" style="margin-bottom:8px;">Start with</div>
+            <div class="dtpl">
+              <div class="tcard on">
+                <div class="tct"><i data-icon="layout-grid" data-size="13"></i>Blank canvas</div>
+                <div class="tcd">Add states by hand</div>
+              </div>
+              <div class="tcard">
+                <div class="tct"><i data-icon="copy" data-size="13"></i>From template</div>
+                <div class="tcd">Pick a preset flow</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="compare">
+            <div class="col was">
+              <div class="clabel">Before (wizard)</div>
+              <div class="cval">6 steps · states, transitions, agents, routing, gates, review</div>
+            </div>
+            <div class="col now">
+              <div class="clabel">Now (canvas-first)</div>
+              <div class="cval">1 field · build everything on the canvas, inspector handles the rest</div>
+            </div>
+          </div>
+
+          <div class="dacts">
+            <button class="dcancel">Cancel</button>
+            <button class="dcreate" onclick="goto(2)">Create flow <i data-icon="arrow-right" data-size="14"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         SCREEN 2 · EMPTY CANVAS
+         ═══════════════════════════════════════════════════════ -->
+    <div class="screen" id="s2">
+      <main class="center">
+        <div class="empty-cta">
+          <div class="eicon"><i data-icon="git-branch" data-size="22"></i></div>
+          <div class="et">Start building my-pipeline</div>
+          <div class="ed">Drag any agent or skill from the catalog onto the canvas, or click below to add your first state.</div>
+          <div class="ea" onclick="goto(3)"><i data-icon="plus" data-size="14"></i>Add first state</div>
+          <div class="or">or drag an agent from the left ←</div>
+        </div>
+        <button class="addn" style="margin-top:16px;" onclick="goto(3)"><i data-icon="plus" data-size="14"></i>Add state</button>
+      </main>
+      <aside class="insp">
+        <div class="insp-empty">
+          <i data-icon="mouse-pointer-click" data-size="28"></i>
+          <div class="ie-t">No state selected</div>
+          <div class="ie-d">Click a state on the canvas to configure it here</div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         SCREEN 3 · BUILDING (2 states done, 1 inline editing)
+         ═══════════════════════════════════════════════════════ -->
+    <div class="screen" id="s3">
+      <main class="center">
+        <!-- state 1: done -->
+        <div class="node" style="--c: var(--runtime)">
+          <div class="nrow"><span class="pip"></span><span class="nn">STORMING</span><span class="agent">architect</span></div>
+          <div class="chips">
+            <span class="chip"><span class="ic" data-brand="claude" data-bs="13"></span>Claude</span>
+            <span class="chip"><i data-icon="diamond" data-size="12"></i>storm.md</span>
+          </div>
+        </div>
+        <div class="conn"></div>
+        <!-- state 2: done -->
+        <div class="node" style="--c: var(--state-planning)">
+          <div class="nrow"><span class="pip"></span><span class="nn">PLANNING</span><span class="agent">planner</span></div>
+          <div class="chips">
+            <span class="chip"><span class="ic" data-brand="claude" data-bs="13"></span>Claude</span>
+            <span class="chip"><i data-icon="diamond" data-size="12"></i>plan.md</span>
+          </div>
+        </div>
+        <div class="conn"></div>
+        <!-- state 3: inline editing (new) -->
+        <div class="node editing" style="--c: var(--accent)">
+          <div class="nrow">
+            <span class="pip"></span>
+            <input class="nn-input" value="BUILDING" placeholder="State name…" />
+            <span class="caret"></span>
+          </div>
+        </div>
+        <!-- prompt to drop an agent -->
+        <div class="dropzone" style="margin-top:4px;">← Drag an agent here to assign it, or pick one in the Inspector →</div>
+        <button class="addn" style="margin-top:10px;"><i data-icon="plus" data-size="14"></i>Add state</button>
+      </main>
+
+      <!-- inspector: new state, incomplete -->
+      <aside class="insp">
+        <div class="ihead">
+          <span class="pip" style="background:var(--accent)"></span>
+          <span class="it">New state</span>
+          <span class="new-badge">unsaved</span>
+        </div>
+
+        <div class="insp-hint">
+          <b>Type a name</b> for this state, then assign an agent below or drag one from the catalog.<br>
+          Transitions are auto-wired — you can customize them any time.
+        </div>
+
+        <div class="field">
+          <label>State name</label>
+          <div class="ctrl mono">BUILDING<span class="caret" style="margin-left:1px;height:14px;"></span></div>
+        </div>
+
+        <div class="field">
+          <label>Agent</label>
+          <div class="ctrl sel unset">Choose an agent…<span class="cv"><i data-icon="chevron-down" data-size="14"></i></span></div>
+        </div>
+
+        <div class="field">
+          <label>CLI host</label>
+          <div class="ctrl sel"><span style="display:flex;align-items:center;gap:8px"><span class="ic" data-brand="claude" data-bs="16"></span>Claude Code</span><span class="cv"><i data-icon="chevron-down" data-size="14"></i></span></div>
+        </div>
+
+        <div class="auto-note">
+          <i data-icon="zap" data-size="14"></i>
+          Auto-wired: PLANNING → BUILDING → next state
+        </div>
+
+        <div class="field">
+          <label>Transitions</label>
+          <div class="trans">
+            <div class="tr"><span class="tk">On pass</span><span class="tv auto">auto → next state</span></div>
+            <div class="tr"><span class="tk">On fail</span><span class="tv auto">auto → self (retry)</span></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         SCREEN 4 · COMPLETE FLOW (matches Canvas.html)
+         ═══════════════════════════════════════════════════════ -->
+    <div class="screen" id="s4">
+      <main class="center">
+        <div class="node" style="--c: var(--runtime)">
+          <div class="nrow"><span class="pip"></span><span class="nn">STORMING</span><span class="agent">architect</span></div>
+          <div class="chips"><span class="chip"><span class="ic" data-brand="claude" data-bs="13"></span>Claude</span><span class="chip"><i data-icon="diamond" data-size="12"></i>storm.md</span></div>
+        </div>
+        <div class="conn"></div>
+        <div class="node" style="--c: var(--state-planning)">
+          <div class="nrow"><span class="pip"></span><span class="nn">PLANNING</span><span class="agent">planner</span></div>
+          <div class="chips"><span class="chip"><span class="ic" data-brand="claude" data-bs="13"></span>Claude</span><span class="chip"><i data-icon="diamond" data-size="12"></i>plan.md</span></div>
+        </div>
+        <div class="conn"></div>
+        <div class="node sel" style="--c: var(--state-building)">
+          <div class="nrow"><span class="pip"></span><span class="nn">BUILDING</span><span class="agent">builder</span></div>
+          <div class="chips"><span class="chip"><span class="ic" data-brand="claude" data-bs="13"></span>Claude</span><span class="chip"><i data-icon="diamond" data-size="12"></i>build.md</span></div>
+        </div>
+        <div class="conn re"></div>
+        <div class="node" style="--c: var(--state-reviewing)">
+          <div class="nrow"><span class="pip"></span><span class="nn">REVIEWING</span><span class="agent">reviewer</span></div>
+          <div class="chips"><span class="chip"><span class="ic" data-brand="codex" data-bs="13"></span>Codex</span><span class="chip"><i data-icon="diamond" data-size="12"></i>review.md</span></div>
+        </div>
+        <div class="conn"></div>
+        <div class="node" style="--c: var(--state-done)">
+          <div class="nrow"><span class="pip"></span><span class="nn">DONE</span><span class="agent">retro</span></div>
+        </div>
+        <div class="dropzone">Drag a skill, agent or template here to wire it into the selected node</div>
+        <button class="addn"><i data-icon="plus" data-size="14"></i>Add state</button>
+      </main>
+
+      <!-- inspector: BUILDING fully configured -->
+      <aside class="insp">
+        <div class="ihead"><span class="pip" style="background: var(--state-building)"></span><span class="it">State · BUILDING</span></div>
+        <div class="field"><label>State name</label><div class="ctrl mono">BUILDING</div></div>
+        <div class="field"><label>CLI host</label><div class="ctrl sel"><span style="display:flex;align-items:center;gap:8px"><span class="ic" data-brand="claude" data-bs="16"></span>Claude Code</span><span class="cv"><i data-icon="chevron-down" data-size="14"></i></span></div></div>
+        <div class="field"><label>Agent</label><div class="ctrl sel">builder<span class="cv"><i data-icon="chevron-down" data-size="14"></i></span></div></div>
+        <div class="field"><label>Skill</label><div class="ctrl sel">build.md<span class="cv"><i data-icon="chevron-down" data-size="14"></i></span></div></div>
+        <div class="field"><label>Prompt</label><div class="prompt"><b>BUILDING stage.</b> Implement the planned change. Keep the diff focused; run the gate before review.</div></div>
+        <div class="field"><label>Quality gate</label><div class="gate"><span class="toggle2"></span><span class="gtxt">lint · type · test</span></div></div>
+        <div class="field"><label>Transitions</label>
+          <div class="trans">
+            <div class="tr"><span class="tk">On pass</span><span class="tv">REVIEWING</span></div>
+            <div class="tr"><span class="tk">On fail</span><span class="tv re">↩ BUILDING</span></div>
+          </div>
+        </div>
+        <span class="ilink"><i data-icon="git-branch" data-size="13"></i>Edit routing rules</span>
+        <span class="ilink"><i data-icon="external-link" data-size="13"></i>Open build.md in Notebook</span>
+      </aside>
+
+      <!-- DB save toast (visible on screen 4) -->
+      <div class="toast show" id="toast-s4">
+        <span class="tk"><i data-icon="circle-check" data-size="16"></i></span>
+        <div><div class="t1">Saved to database</div><div class="t2">pathly.db · my-pipeline · 5 states</div></div>
+      </div>
+    </div>
+
+  </div><!-- /.body -->
+
+  <!-- ── Legend ── -->
+  <div class="legend">
+    <span class="k"><i data-icon="grip-vertical" data-size="12"></i><b>Drag from the catalog</b> onto a node, or to add a state</span>
+    <span class="k"><i data-icon="plus" data-size="12"></i><b>Add state</b> — type a name, assign agent in Inspector</span>
+    <span class="k"><i data-icon="zap" data-size="12"></i><b>Auto-wire</b> connects states in sequence by default</span>
+    <span class="k"><i data-icon="database" data-size="12"></i><b>Auto-save</b> to pathly.db on every change</span>
+  </div>
+
+</div><!-- /.app -->
+
+<script>
+var BRAND = {
+  claude: '<path fill="#D97757" d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/>',
+  codex: '<rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="#111827"/><g fill="none" stroke="#E5E7EB" stroke-width="1.8" stroke-linecap="round"><path d="M12 5.2c2.5 0 3.8 1.6 3.8 3.4 0 .9-.3 1.7-.9 2.4"/><path d="M18.1 8.8c1.2 2.1.4 4-1.2 4.9-.8.5-1.7.6-2.6.4"/><path d="M17.1 15.9c-1.2 2.1-3.3 2.4-4.9 1.5-.8-.4-1.4-1.1-1.7-2"/><path d="M12 18.8c-2.5 0-3.8-1.6-3.8-3.4 0-.9.3-1.7.9-2.4"/><path d="M5.9 15.2c-1.2-2.1-.4-4 1.2-4.9.8-.5 1.7-.6 2.6-.4"/><path d="M6.9 8.1c1.2-2.1 3.3-2.4 4.9-1.5.8.4 1.4 1.1 1.7 2"/></g><circle cx="12" cy="12" r="1.6" fill="#10B981"/>',
+};
+
+document.querySelectorAll('[data-brand]').forEach(function(el) {
+  var n = el.getAttribute('data-brand'), s = el.getAttribute('data-bs') || 14;
+  el.innerHTML = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" style="display:block">' + (BRAND[n] || '') + '</svg>';
+});
+if (window.PathlyIcons && PathlyIcons.inject) PathlyIcons.inject(document);
+
+var hints = [
+  'One input field replaces the 6-step wizard',
+  'After naming, the canvas opens immediately — no more steps',
+  'Click "Add state" and type the name inline — inspector opens instantly',
+  'All advanced config lives in the inspector — transitions, gates, routing'
+];
+
+function goto(n) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('on'); });
+  document.getElementById('s' + n).classList.add('on');
+  document.querySelectorAll('.step-btn').forEach(function(b, i) { b.classList.toggle('on', i === n - 1); });
+  document.getElementById('hint').textContent = hints[n - 1];
+}
+
+// Save button shows toast on screen 4
+document.getElementById('save-btn').addEventListener('click', function() {
+  var s4 = document.getElementById('s4');
+  if (s4.classList.contains('on')) {
+    var t = s4.querySelector('.toast');
+    t.classList.add('show');
+    setTimeout(function() { t.classList.remove('show'); }, 2800);
+  }
+});
+</script>
+</body>
+</html>

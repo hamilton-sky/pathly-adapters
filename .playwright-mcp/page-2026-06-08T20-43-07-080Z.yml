@@ -1,0 +1,174 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]: Preview
+    - generic [ref=e4]:
+      - button "1 · New flow" [ref=e5] [cursor=pointer]
+      - button "2 · Empty canvas" [active] [ref=e6] [cursor=pointer]
+      - button "3 · Building" [ref=e7] [cursor=pointer]
+      - button "4 · Done" [ref=e8] [cursor=pointer]
+    - generic [ref=e9]: After naming, the canvas opens immediately — no more steps
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - button [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+      - button "Projects" [ref=e14] [cursor=pointer]
+      - button "orchestrator-refactor" [ref=e15] [cursor=pointer]:
+        - text: orchestrator-refactor
+        - img [ref=e16]
+      - generic [ref=e18]:
+        - button "Canvas" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+          - text: Canvas
+        - button "Notebook" [ref=e25] [cursor=pointer]:
+          - img [ref=e26]
+          - text: Notebook
+        - button "Monitor" [ref=e28] [cursor=pointer]:
+          - img [ref=e29]
+          - text: Monitor
+      - button [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+      - button [ref=e35] [cursor=pointer]:
+        - img [ref=e36]
+      - button "Publish" [ref=e42] [cursor=pointer]
+    - generic [ref=e43]:
+      - button [ref=e44] [cursor=pointer]:
+        - img [ref=e45]
+      - generic [ref=e47]:
+        - generic [ref=e48]: Flows
+        - generic [ref=e49]: ›
+        - generic [ref=e50]: my-pipeline
+      - generic [ref=e51]: Canvas
+      - button [ref=e52] [cursor=pointer]:
+        - img [ref=e53]
+      - button [ref=e56] [cursor=pointer]:
+        - img [ref=e57]
+      - button [ref=e60] [cursor=pointer]:
+        - img [ref=e61]
+      - generic [ref=e66]:
+        - button "Canvas" [ref=e67] [cursor=pointer]
+        - button "YAML" [ref=e68] [cursor=pointer]
+      - button "Save" [ref=e69] [cursor=pointer]:
+        - img [ref=e70]
+        - text: Save
+      - button "Publish" [ref=e74] [cursor=pointer]:
+        - img [ref=e75]
+        - text: Publish
+    - generic [ref=e79]:
+      - complementary [ref=e80]:
+        - generic [ref=e81]:
+          - img [ref=e83]
+          - generic [ref=e87]: Catalog
+          - img [ref=e89] [cursor=pointer]
+        - generic [ref=e91]:
+          - img [ref=e92]
+          - textbox "Search the library…" [ref=e95]
+        - generic [ref=e96]:
+          - generic [ref=e97]:
+            - generic [ref=e98]: Flows
+            - img [ref=e100] [cursor=pointer]
+          - generic [ref=e101]:
+            - img [ref=e103]
+            - img [ref=e111]
+            - generic [ref=e115]: ship-fast
+            - generic [ref=e116]: "5"
+          - generic [ref=e117]:
+            - img [ref=e119]
+            - img [ref=e127]
+            - generic [ref=e131]: quick-fix
+            - generic [ref=e132]: "3"
+          - generic [ref=e133]:
+            - generic [ref=e134]: Agents
+            - img [ref=e136] [cursor=pointer]
+          - generic [ref=e137]:
+            - img [ref=e139]
+            - img [ref=e147]
+            - generic [ref=e155]: architect
+            - img [ref=e157]
+          - generic [ref=e158]:
+            - img [ref=e160]
+            - img [ref=e168]
+            - generic [ref=e176]: planner
+            - img [ref=e178]
+          - generic [ref=e179]:
+            - img [ref=e181]
+            - img [ref=e189]
+            - generic [ref=e197]: builder
+            - img [ref=e199]
+          - generic [ref=e200]:
+            - img [ref=e202]
+            - img [ref=e210]
+            - generic [ref=e218]: reviewer
+            - img [ref=e220]
+          - generic [ref=e221]:
+            - generic [ref=e222]: Skills
+            - img [ref=e224] [cursor=pointer]
+          - generic [ref=e225]:
+            - img [ref=e227]
+            - img [ref=e235]
+            - generic [ref=e237]: build.md
+            - img [ref=e239]
+          - generic [ref=e240]:
+            - img [ref=e242]
+            - img [ref=e250]
+            - generic [ref=e252]: review.md
+            - img [ref=e254]
+          - generic [ref=e255]:
+            - img [ref=e257]
+            - img [ref=e265]
+            - generic [ref=e267]: storm.md
+            - img [ref=e269]
+          - generic [ref=e270]:
+            - generic [ref=e271]: Templates
+            - img [ref=e273] [cursor=pointer]
+          - generic [ref=e274]:
+            - img [ref=e276]
+            - img [ref=e284]
+            - generic [ref=e289]: fsm-base
+            - img [ref=e291]
+          - generic [ref=e292]:
+            - generic [ref=e293]: My flows
+            - generic [ref=e294]: custom
+          - generic [ref=e295]:
+            - img [ref=e297]
+            - img [ref=e305]
+            - generic [ref=e307]: my-pipeline
+            - generic [ref=e308]: "0"
+          - button "New category" [ref=e309] [cursor=pointer]:
+            - img [ref=e310]
+            - text: New category
+      - generic [ref=e379]:
+        - main [ref=e380]:
+          - generic [ref=e381]:
+            - img [ref=e383]
+            - generic [ref=e387]: Start building my-pipeline
+            - generic [ref=e388]: Drag any agent or skill from the catalog onto the canvas, or click below to add your first state.
+            - generic [ref=e389] [cursor=pointer]:
+              - img [ref=e390]
+              - text: Add first state
+            - generic [ref=e391]: or drag an agent from the left ←
+          - button "Add state" [ref=e392] [cursor=pointer]:
+            - img [ref=e393]
+            - text: Add state
+        - complementary [ref=e394]:
+          - generic [ref=e395]:
+            - img [ref=e396]
+            - generic [ref=e397]: No state selected
+            - generic [ref=e398]: Click a state on the canvas to configure it here
+      - text: ↩ reroute
+    - generic [ref=e356]:
+      - generic [ref=e357]:
+        - img [ref=e358]
+        - generic [ref=e365]: Drag from the catalog
+        - text: onto a node, or to add a state
+      - generic [ref=e366]:
+        - img [ref=e367]
+        - generic [ref=e368]: Add state
+        - text: — type a name, assign agent in Inspector
+      - generic [ref=e369]:
+        - img [ref=e370]
+        - generic [ref=e372]: Auto-wire
+        - text: connects states in sequence by default
+      - generic [ref=e373]:
+        - img [ref=e374]
+        - generic [ref=e378]: Auto-save
+        - text: to pathly.db on every change
