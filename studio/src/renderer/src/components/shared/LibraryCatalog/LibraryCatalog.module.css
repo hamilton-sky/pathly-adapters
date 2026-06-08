@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 7px;
-  padding: 11px 12px 8px;
+  padding: 14px 12px 10px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -67,7 +67,7 @@
   background: var(--bg-base);
   border: var(--border);
   border-radius: var(--radius-md);
-  margin: 0 10px 4px;
+  margin: 0 10px 10px;
   padding: 0 10px;
   color: var(--text-muted);
 }
@@ -101,8 +101,8 @@
   text-align: left;
   background: none;
   border: none;
-  padding: 6px 8px 4px;
-  font-size: 10.5px;
+  padding: 8px 10px 7px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -206,7 +206,10 @@
   font-size: 10px;
   font-weight: 500;
   color: var(--text-muted);
-  opacity: 0.6;
+  opacity: 0.7;
+  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+  padding: 1px 5px;
+  border-radius: 10px;
 }
 
 /* ── CHEVRON ── */
@@ -222,8 +225,8 @@
 
 /* ── SUB-GROUP ── */
 .subGroup {
-  margin-left: 8px;
-  border-left: 1px solid color-mix(in srgb, var(--bg-surface1) 80%, transparent);
+  margin-left: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
 }
 
 .subGroupLabel {
@@ -234,8 +237,8 @@
   text-align: left;
   background: none;
   border: none;
-  padding: 4px 8px 3px 6px;
-  font-size: 10px;
+  padding: 6px 8px 6px 6px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -254,10 +257,13 @@
 }
 
 .subGroupCount {
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 500;
   color: var(--text-muted);
-  opacity: 0.5;
+  opacity: 0.6;
+  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+  padding: 1px 4px;
+  border-radius: 8px;
 }
 
 /* ── CURSOR VARIANTS (replace inline styles) ── */
@@ -268,6 +274,13 @@
 .groupHeader {
   display: flex;
   align-items: center;
+}
+
+/* hairline separator between adjacent top-level groups */
+.list > div + div > .groupHeader {
+  margin-top: 2px;
+  border-top: 1px solid color-mix(in srgb, var(--text-muted) 8%, transparent);
+  padding-top: 2px;
 }
 .groupLabel {
   flex: 1;
