@@ -21,15 +21,11 @@ def _patch_last_agent_done(
     wall_seconds: int,
     tool_uses: int = 0,
 ) -> None:
-    """Append a BILLING_UPDATE event with real cost/token data to DB (and EVENTS.jsonl backup).
+    """Append a BILLING_UPDATE event with real cost/token data to DB.
 
     The events table is append-only — we do not mutate the original AGENT_DONE row.
     Instead we emit BILLING_UPDATE which supersedes it for cost/token display.
-    EVENTS.jsonl is also patched for backward compat unless PATHLY_DB_ONLY=1.
     """
-    import os as _os
-    db_only = _os.environ.get("PATHLY_DB_ONLY", "").strip().lower() not in ("", "0", "false", "no")
-
     # --- find last AGENT_DONE for agent/conv identification ---
     patched_agent: str | None = None
     patched_conv: int | None = None
@@ -67,79 +63,21 @@ def _patch_last_agent_done(
     except Exception as exc:
         logger.warning("_patch_last_agent_done: DB write failed: %s", exc)
 
-    if db_only:
-        return  # DB-only mode: skip EVENTS.jsonl patch
-
-    # --- legacy: also patch EVENTS.jsonl in-place for backward compat ---
-    events_file = storage_path / "EVENTS.jsonl"
-    if not events_file.exists():
-        return
-    try:
-        lines = events_file.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return
-    patched = False
-    for i in range(len(lines) - 1, -1, -1):
-        try:
-            ev = json.loads(lines[i])
-        except json.JSONDecodeError:
-            continue
-        if ev.get("type") == "AGENT_DONE":
-            ev["cost_usd"] = cost_usd
-            ev["tokens_in"] = tokens_in
-            ev["tokens_out"] = tokens_out
-            ev["wall_seconds"] = wall_seconds
-            ev["tool_uses"] = tool_uses
-            lines[i] = json.dumps(ev)
-            patched = True
-            break
-    if patched:
-        events_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        with open(events_file, "a", encoding="utf-8") as _f:
-            _f.write(json.dumps(billing) + "\n")
-
 
 def read_last_agent_done(storage_path: Path) -> dict[str, Any] | None:
     """Return the last AGENT_DONE event for the feature, or None if absent.
 
-    Reads from the central SQLite DB; falls back to EVENTS.jsonl.
+    Reads exclusively from the central SQLite DB.
     """
-    import os as _os
-    db_only = _os.environ.get("PATHLY_DB_ONLY", "").strip().lower() not in ("", "0", "false", "no")
-
     try:
         from pathly_orchestrator.db import get_db as _get_db
         from pathly_orchestrator.db import read_last_agent_done as _db_read_last
         conn = _get_db()
         feature = storage_path.name
         project_root = str(storage_path.parent.parent.parent)
-        result = _db_read_last(conn, project_root, feature)
-        if result is not None:
-            return result
+        return _db_read_last(conn, project_root, feature)
     except Exception:
-        pass
-
-    if db_only:
-        return None  # DB-only mode: skip EVENTS.jsonl fallback
-
-    events_file = storage_path / "EVENTS.jsonl"
-    if not events_file.exists():
         return None
-    try:
-        lines = events_file.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return None
-    for line in reversed(lines):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            ev = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if ev.get("type") == "AGENT_DONE":
-            return ev
-    return None
 
 
 def tail_agent_done(

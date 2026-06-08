@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Skill Notebook Editor — Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-base:        #090D18;
+    --bg-mantle:      #0B0F1A;
+    --bg-surface0:    #1A2035;
+    --bg-surface1:    #242C44;
+    --bg-surface2:    #2E3A55;
+    --accent:         #38BDF8;
+    --accent-bg:      rgba(56,189,248,0.08);
+    --accent-border:  rgba(56,189,248,0.35);
+    --green:          #34D399;
+    --green-bg:       rgba(52,211,153,0.10);
+    --blue:           #60A5FA;
+    --blue-bg:        rgba(96,165,250,0.10);
+    --yellow:         #FCD34D;
+    --yellow-bg:      rgba(252,211,77,0.10);
+    --violet:         #A78BFA;
+    --violet-bg:      rgba(167,139,250,0.10);
+    --teal:           #2DD4BF;
+    --red:            #F87171;
+    --text-primary:   #E2EAF4;
+    --text-secondary: #8FA3BF;
+    --text-muted:     #4A6080;
+    --border:         rgba(255,255,255,0.07);
+    --font-ui:        'Space Grotesk', system-ui, sans-serif;
+    --font-mono:      'JetBrains Mono', 'Fira Code', monospace;
+    --radius:         6px;
+    --radius-lg:      10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-ui);
+    background: var(--bg-base);
+    color: var(--text-primary);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-size: 13px;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    height: 42px;
+    background: var(--bg-mantle);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .topbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .topbar-logo svg { width:16px; height:16px; }
+  .topbar-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .topbar-breadcrumb .current {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .topbar-sep { color: var(--text-muted); }
+  .topbar-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: var(--radius);
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; font-family: var(--font-ui);
+    transition: all 150ms;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: var(--border);
+  }
+  .btn-ghost:hover { background: var(--bg-surface0); color: var(--text-primary); }
+  .btn-primary {
+    background: var(--accent);
+    color: #001824;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+  .btn-primary:hover { background: #7DD3FC; }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); flex-shrink: 0;
+  }
+
+  /* ── THREE PANELS ── */
+  .workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── CATALOG PANEL ── */
+  .catalog {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--bg-mantle);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .search-input {
+    margin: 8px 10px;
+    padding: 6px 10px 6px 28px;
+    background: var(--bg-surface0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    outline: none;
+    width: calc(100% - 20px);
+    position: relative;
+  }
+  .search-wrap {
+    position: relative;
+    margin: 8px 10px;
+    flex-shrink: 0;
+  }
+  .search-wrap svg {
+    position: absolute;
+    left: 8px; top: 50%;
+    transform: translateY(-50%);
+    width: 12px; height: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+  .search-wrap input {
+    width: 100%;
+    padding: 6px 10px 6px 26px;
+    background: var(--bg-surface0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    outline: none;
+  }
+  .search-wrap input::placeholder { color: var(--text-muted); }
+  .search-wrap input:focus { border-color: var(--accent-border); }
+
+  .catalog-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-surface2) transparent;
+  }
+  .catalog-section-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 10px 12px 4px;
+  }
+  .fragment-card {
+    margin: 2px 8px;
+    padding: 8px 10px;
+    background: var(--bg-surface0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: grab;
+    transition: all 120ms;
+    position: relative;
+  }
+  .fragment-card:hover {
+    background: var(--bg-surface1);
+    border-color: var(--accent-border);
+    transform: translateX(1px);
+  }
+  .fragment-card.dragging {
+    opacity: 0.4;
+    transform: scale(0.97);
+  }
+  .fc-name { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+  .fc-desc { font-size: 10px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 5px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .fc-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .badge-core   { background: var(--green-bg);  color: var(--green);  }
+  .badge-flow   { background: var(--blue-bg);   color: var(--blue);   }
+  .badge-integ  { background: var(--yellow-bg); color: var(--yellow); }
+  .badge-violet { background: var(--violet-bg); color: var(--violet); }
+  .requires-tag {
+    font-size: 9px; color: var(--yellow);
+    display: flex; align-items: center; gap: 2px;
+  }
+
+  /* ── NOTEBOOK PANEL ── */
+  .notebook {
+    flex: 1;
+    min-width: 320px;
+    background: var(--bg-base);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .notebook-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-mantle);
+    flex-shrink: 0;
+  }
+  .skill-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--violet);
+  }
+  .notebook-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-surface2) transparent;
+  }
+
+  /* cells */
+  .cell {
+    border-radius: var(--radius);
+    margin-bottom: 4px;
+    position: relative;
+  }
+  .body-cell {
+    background: var(--bg-surface0);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 9px 12px;
+  }
+  .body-cell-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .body-cell-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    font-family: var(--font-mono);
+  }
+  .lock-icon { color: var(--text-muted); width: 12px; height: 12px; }
+  .body-cell-preview {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .expand-link {
+    font-size: 10px;
+    color: var(--accent);
+    cursor: pointer;
+    margin-top: 4px;
+    display: inline-block;
+    opacity: 0.7;
+  }
+
+  .fragment-cell-nb {
+    background: var(--bg-surface0);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    padding: 9px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .fragment-cell-nb.active {
+    background: var(--bg-surface1);
+    border-color: rgba(52,211,153,0.40);
+  }
+  .drag-handle {
+    color: var(--text-muted);
+    cursor: grab;
+    font-size: 14px;
+    line-height: 1;
+    padding-top: 1px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .drag-handle:hover { color: var(--text-secondary); }
+  .fcnb-body { flex: 1; min-width: 0; }
+  .fcnb-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+  }
+  .fcnb-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+  .fcnb-delete {
+    margin-left: auto;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 100ms;
+    flex-shrink: 0;
+  }
+  .fcnb-delete:hover { color: var(--red); background: rgba(248,113,113,0.10); }
+  .fcnb-desc { font-size: 10px; color: var(--text-secondary); line-height: 1.4; }
+
+  /* Insert zone */
+  .insert-zone {
+    height: 4px;
+    margin: 2px 0;
+    transition: height 120ms ease-out;
+  }
+  .insert-zone.active {
+    height: 30px;
+    background: var(--accent-bg);
+    border: 1px dashed var(--accent-border);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  /* Empty state */
+  .empty-zone {
+    border: 2px dashed var(--bg-surface2);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    text-align: center;
+    margin: 4px 0;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  /* ── PREVIEW PANEL ── */
+  .preview {
+    width: 320px;
+    flex-shrink: 0;
+    background: var(--bg-mantle);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .feature-var-row {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .feature-var-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .feature-var-input {
+    width: 100%;
+    padding: 5px 8px;
+    background: var(--bg-surface0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--teal);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    outline: none;
+  }
+  .feature-var-input:focus { border-color: var(--accent-border); }
+  .preview-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-surface2) transparent;
+  }
+  .preview-section {
+    margin-bottom: 14px;
+  }
+  .preview-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .preview-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    flex: 1;
+  }
+  .preview-section-title.body-origin { color: var(--accent); }
+  .preview-section-title.frag-origin { color: var(--green); }
+  .origin-badge {
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+  .origin-badge.body { background: var(--accent-bg); color: var(--accent); }
+  .origin-badge.frag { background: var(--green-bg);  color: var(--green);  }
+  .preview-section-body {
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    font-family: var(--font-mono);
+  }
+  .preview-section-body .var-highlight {
+    color: var(--teal);
+    background: rgba(45,212,191,0.10);
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  .preview-section-body.collapsed {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .preview-footer {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .token-estimate {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .preview-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .preview-actions .btn { flex: 1; justify-content: center; font-size: 10px; }
+
+  /* Resize handle */
+  .resize-handle {
+    width: 4px;
+    background: var(--border);
+    cursor: col-resize;
+    flex-shrink: 0;
+    transition: background 150ms;
+  }
+  .resize-handle:hover { background: var(--accent-border); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg-surface2); border-radius: 2px; }
+
+  /* Toggle animation for demo */
+  .demo-note {
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-surface0);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+    font-size: 10px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    pointer-events: none;
+    opacity: 0.8;
+  }
+  .cell-group { display: flex; flex-direction: column; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="1" y="2" width="14" height="12" rx="2"/>
+      <path d="M5 6l3 3-3 3M9 12h3"/>
+    </svg>
+    Pathly Studio
+  </div>
+  <div class="topbar-breadcrumb">
+    <span>Skills</span>
+    <span class="topbar-sep">›</span>
+    <span>team</span>
+    <span class="topbar-sep">›</span>
+    <span class="current">team/build</span>
+  </div>
+  <div class="topbar-actions">
+    <div class="status-dot"></div>
+    <span style="font-size:10px;color:var(--text-muted)">FSM running</span>
+    <button class="btn btn-ghost">Validate</button>
+    <button class="btn btn-primary">Export Skill</button>
+  </div>
+</div>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+  <!-- CATALOG PANEL -->
+  <div class="catalog">
+    <div class="panel-header">
+      <span class="panel-label">Fragment Catalog</span>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+        <circle cx="8" cy="8" r="1"/><circle cx="8" cy="4" r="1"/><circle cx="8" cy="12" r="1"/>
+      </svg>
+    </div>
+
+    <div class="search-wrap">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/>
+      </svg>
+      <input type="text" placeholder="Search fragments…" />
+    </div>
+
+    <div class="catalog-body">
+      <div class="catalog-section-label">Core</div>
+
+      <div class="fragment-card">
+        <div class="fc-name">completion-report</div>
+        <div class="fc-desc">Write AGENT_DONE event to EVENTS.jsonl after stage completes</div>
+        <div class="fc-meta">
+          <span class="badge badge-core">Core</span>
+        </div>
+      </div>
+
+      <div class="fragment-card">
+        <div class="fc-name">scout-choreography</div>
+        <div class="fc-desc">Parallel scouting — analyze codebase before touching any files</div>
+        <div class="fc-meta">
+          <span class="badge badge-core">Core</span>
+        </div>
+      </div>
+
+      <div class="fragment-card">
+        <div class="fc-name">feedback-protocol</div>
+        <div class="fc-desc">Handle REVIEW_FAILURES, TEST_FAILURES feedback loops before proceeding</div>
+        <div class="fc-meta">
+          <span class="badge badge-core">Core</span>
+        </div>
+      </div>
+
+      <div class="fragment-card">
+        <div class="fc-name">progress-logging</div>
+        <div class="fc-desc">Log PHASE_START / PHASE_DONE events to Studio monitor</div>
+        <div class="fc-meta">
+          <span class="badge badge-core">Core</span>
+        </div>
+      </div>
+
+      <div class="catalog-section-label">Flow</div>
+
+      <div class="fragment-card">
+        <div class="fc-name">conversation-tracking</div>
+        <div class="fc-desc">Read / write PROGRESS.md conversation table, track conv N of total</div>
+        <div class="fc-meta">
+          <span class="badge badge-flow">Flow</span>
+        </div>
+      </div>
+
+      <div class="catalog-section-label">Integration</div>
+
+      <div class="fragment-card">
+        <div class="fc-name">spawn-rules</div>
+        <div class="fc-desc">Sub-agent spawning protocol and model routing rules</div>
+        <div class="fc-meta">
+          <span class="badge badge-integ">Integration</span>
+          <span class="requires-tag">⚠ can_spawn</span>
+        </div>
+      </div>
+
+      <div class="fragment-card">
+        <div class="fc-name">mcp-github-pr</div>
+        <div class="fc-desc">Read PR diff, post inline comments, check CI status via MCP</div>
+        <div class="fc-meta">
+          <span class="badge badge-integ">Integration</span>
+          <span class="requires-tag">⚠ mcp_github</span>
+        </div>
+      </div>
+
+      <div class="fragment-card">
+        <div class="fc-name">http-notify-slack</div>
+        <div class="fc-desc">POST stage completion notification to configured Slack webhook</div>
+        <div class="fc-meta">
+          <span class="badge badge-integ">Integration</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESIZE HANDLE -->
+  <div class="resize-handle"></div>
+
+  <!-- NOTEBOOK PANEL -->
+  <div class="notebook">
+    <div class="notebook-header">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--violet)" stroke-width="1.5">
+        <path d="M2 3h12M2 8h12M2 13h8"/>
+      </svg>
+      <span class="skill-name">team / build</span>
+      <span style="font-size:10px;color:var(--text-muted);margin-left:4px;">BUILDING stage</span>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn btn-ghost" style="font-size:10px;padding:3px 8px;">↩ Undo</button>
+        <button class="btn btn-ghost" style="font-size:10px;padding:3px 8px;">↪ Redo</button>
+      </div>
+    </div>
+
+    <div class="notebook-body">
+
+      <!-- BODY CELL 1 -->
+      <div class="cell body-cell">
+        <div class="body-cell-header">
+          <span class="body-cell-title">## Role</span>
+          <svg class="lock-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="4" y="7" width="8" height="7" rx="1"/>
+            <path d="M6 7V5a2 2 0 014 0v2"/>
+          </svg>
+        </div>
+        <div class="body-cell-preview">Stage orchestrator: Building — coordinate subagents, handle feedback routing, and log every phase boundary. Logging is mandatory.</div>
+        <span class="expand-link">▼ Show full content</span>
+      </div>
+
+      <!-- INSERT ZONE (active state for demo) -->
+      <div class="insert-zone active">+ Drop here</div>
+
+      <!-- FRAGMENT CELL 1 -->
+      <div class="cell fragment-cell-nb active">
+        <span class="drag-handle">⠿</span>
+        <div class="fcnb-body">
+          <div class="fcnb-header">
+            <span class="fcnb-name">scout-choreography</span>
+            <span class="badge badge-core">Core</span>
+            <button class="fcnb-delete">✕</button>
+          </div>
+          <div class="fcnb-desc">Parallel scouting — analyze codebase before touching any files</div>
+        </div>
+      </div>
+
+      <div class="insert-zone"></div>
+
+      <!-- BODY CELL 2 -->
+      <div class="cell body-cell">
+        <div class="body-cell-header">
+          <span class="body-cell-title">## FSM Operations</span>
+          <svg class="lock-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="4" y="7" width="8" height="7" rx="1"/><path d="M6 7V5a2 2 0 014 0v2"/>
+          </svg>
+        </div>
+        <div class="body-cell-preview">Append events to EVENTS.jsonl. Transition state via STATE.json. Every event must include "ts" ISO-8601 timestamp.</div>
+        <span class="expand-link">▼ Show full content</span>
+      </div>
+
+      <div class="insert-zone"></div>
+
+      <!-- FRAGMENT CELL 2 -->
+      <div class="cell fragment-cell-nb">
+        <span class="drag-handle">⠿</span>
+        <div class="fcnb-body">
+          <div class="fcnb-header">
+            <span class="fcnb-name">conversation-tracking</span>
+            <span class="badge badge-flow">Flow</span>
+            <button class="fcnb-delete">✕</button>
+          </div>
+          <div class="fcnb-desc">Read / write PROGRESS.md conv table, determine conv N of total</div>
+        </div>
+      </div>
+
+      <div class="insert-zone"></div>
+
+      <!-- BODY CELL 3 -->
+      <div class="cell body-cell">
+        <div class="body-cell-header">
+          <span class="body-cell-title">## Implementation</span>
+          <svg class="lock-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="4" y="7" width="8" height="7" rx="1"/><path d="M6 7V5a2 2 0 014 0v2"/>
+          </svg>
+        </div>
+        <div class="body-cell-preview">Spawn the builder agent with conversation N prompt. Monitor for AGENT_DONE. Handle REVIEW_FAILURES feedback if written.</div>
+        <span class="expand-link">▼ Show full content</span>
+      </div>
+
+      <div class="insert-zone"></div>
+
+      <!-- FRAGMENT CELL 3 -->
+      <div class="cell fragment-cell-nb">
+        <span class="drag-handle">⠿</span>
+        <div class="fcnb-body">
+          <div class="fcnb-header">
+            <span class="fcnb-name">feedback-protocol</span>
+            <span class="badge badge-core">Core</span>
+            <button class="fcnb-delete">✕</button>
+          </div>
+          <div class="fcnb-desc">Handle REVIEW_FAILURES / TEST_FAILURES loops before advancing</div>
+        </div>
+      </div>
+
+      <div class="insert-zone"></div>
+
+      <!-- FRAGMENT CELL 4 -->
+      <div class="cell fragment-cell-nb">
+        <span class="drag-handle">⠿</span>
+        <div class="fcnb-body">
+          <div class="fcnb-header">
+            <span class="fcnb-name">completion-report</span>
+            <span class="badge badge-core">Core</span>
+            <button class="fcnb-delete">✕</button>
+          </div>
+          <div class="fcnb-desc">Write AGENT_DONE event to EVENTS.jsonl with timing and tokens</div>
+        </div>
+      </div>
+
+      <div class="insert-zone"></div>
+
+      <!-- FRAGMENT CELL 5 -->
+      <div class="cell fragment-cell-nb">
+        <span class="drag-handle">⠿</span>
+        <div class="fcnb-body">
+          <div class="fcnb-header">
+            <span class="fcnb-name">spawn-rules</span>
+            <span class="badge badge-integ">Integration</span>
+            <span class="requires-tag" style="font-size:9px;">⚠ can_spawn</span>
+            <button class="fcnb-delete">✕</button>
+          </div>
+          <div class="fcnb-desc">Sub-agent spawning protocol for builder / reviewer delegation</div>
+        </div>
+      </div>
+
+      <div class="insert-zone"></div>
+
+    </div>
+  </div>
+
+  <!-- RESIZE HANDLE -->
+  <div class="resize-handle"></div>
+
+  <!-- PREVIEW PANEL -->
+  <div class="preview">
+    <div class="preview-header">
+      <span class="panel-label">Preview</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="btn btn-ghost" style="font-size:9px;padding:2px 7px;">≡ Raw</button>
+        <button class="btn btn-ghost" style="font-size:9px;padding:2px 7px;">⟳</button>
+      </div>
+    </div>
+
+    <div class="feature-var-row">
+      <div class="feature-var-label">Feature path</div>
+      <input class="feature-var-input" value="pathly/plans/brightsky-agent-upgrade" />
+    </div>
+
+    <div class="preview-body">
+
+      <div class="preview-section">
+        <div class="preview-section-header">
+          <span class="preview-section-title body-origin">## Role</span>
+          <span class="origin-badge body">BODY</span>
+        </div>
+        <div class="preview-section-body collapsed">
+          Stage orchestrator: Building — coordinate subagents, handle feedback routing…
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <div class="preview-section-header">
+          <span class="preview-section-title frag-origin">## Scout Choreography</span>
+          <span class="origin-badge frag">FRAG</span>
+        </div>
+        <div class="preview-section-body collapsed">
+          Analyze → read relevant files → identify exact change locations before writing any code…
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <div class="preview-section-header">
+          <span class="preview-section-title body-origin">## FSM Operations</span>
+          <span class="origin-badge body">BODY</span>
+        </div>
+        <div class="preview-section-body collapsed">
+          Append events to <span class="var-highlight">pathly/plans/brightsky-agent-upgrade</span>/EVENTS.jsonl…
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <div class="preview-section-header">
+          <span class="preview-section-title frag-origin">## Conversation Tracking</span>
+          <span class="origin-badge frag">FRAG</span>
+        </div>
+        <div class="preview-section-body collapsed">
+          Read PROGRESS.md → find next TODO row → this is conv N of total…
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <div class="preview-section-header">
+          <span class="preview-section-title body-origin">## Implementation</span>
+          <span class="origin-badge body">BODY</span>
+        </div>
+        <div class="preview-section-body collapsed">
+          Spawn builder agent with conv N prompt from CONVERSATION_PROMPTS.md…
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <div class="preview-section-header">
+          <span class="preview-section-title frag-origin">## Feedback Protocol</span>
+          <span class="origin-badge frag">FRAG</span>
+        </div>
+        <div class="preview-section-body collapsed">
+          Scan <span class="var-highlight">pathly/plans/brightsky-agent-upgrade</span>/feedback/ before spawning agent…
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <div class="preview-section-header">
+          <span class="preview-section-title frag-origin">## Completion Report</span>
+          <span class="origin-badge frag">FRAG</span>
+        </div>
+        <div class="preview-section-body collapsed">
+          Write AGENT_DONE to <span class="var-highlight">pathly/plans/brightsky-agent-upgrade</span>/EVENTS.jsonl…
+        </div>
+      </div>
+
+    </div>
+
+    <div class="preview-footer">
+      <div class="token-estimate">~1,840 tokens estimated</div>
+      <div class="preview-actions">
+        <button class="btn btn-ghost">Copy</button>
+        <button class="btn btn-primary">Export</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="demo-note">Design Preview — Skill Notebook Editor</div>
+
+</body>
+</html>

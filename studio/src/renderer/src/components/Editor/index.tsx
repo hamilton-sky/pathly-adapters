@@ -81,17 +81,17 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   // Fall back to selectedItem for standalone Editor usage (FILES sidebar).
   const effectivePath = pathOverride ?? selectedItem?.path ?? null
 
-  const [config, setConfig] = useState<FrontmatterValues>({} as FrontmatterValues)
-  const [body, setBody]     = useState('')
-  const [tab, setTab]       = useState<TabMode>('edit')
-  const [loading, setLoading]     = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const isDirty = effectivePath ? dirtyItems.has(effectivePath) : false
   const derivedType = effectivePath && !selectedItem ? typeFromPath(effectivePath) : (selectedItem?.type ?? 'other')
   const isSkillOrAgent = derivedType === 'skill' || derivedType === 'agent'
   const isPreviewDefault = isSkillOrAgent || derivedType === 'template'
+
+  const [config, setConfig] = useState<FrontmatterValues>({} as FrontmatterValues)
+  const [body, setBody]     = useState('')
+  const [tab, setTab]       = useState<TabMode>(isPreviewDefault ? 'preview' : 'edit')
+  const [loading, setLoading]     = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const breadcrumb = selectedItem && !pathOverride
     ? `${selectedItem.type.charAt(0).toUpperCase() + selectedItem.type.slice(1)}s / ${selectedItem.name}`
     : effectivePath

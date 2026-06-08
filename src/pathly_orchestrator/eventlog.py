@@ -61,13 +61,6 @@ def _resolve_path(storage_path: str) -> Path:
     return Path(storage_path)
 
 
-def _events_path(storage_path: str) -> Path:
-    return _resolve_path(storage_path) / "EVENTS.jsonl"
-
-
-def _state_path(storage_path: str) -> Path:
-    return _resolve_path(storage_path) / "STATE.json"
-
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -174,19 +167,6 @@ def read_events(storage_path: str) -> list[dict]:
     project_root = str(feature_dir.parent.parent.parent)
     conn = _db.get_db()
     events = _db.read_events(conn, project_root, feature_dir.name)
-    if not events and not _db_only():
-        # Fall back to EVENTS.jsonl for legacy feature dirs that predate SQLite.
-        # Disabled when PATHLY_DB_ONLY=1 so the DB-only path can be verified.
-        path = _events_path(storage_path)
-        if path.exists():
-            with open(path, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        try:
-                            events.append(json.loads(line))
-                        except json.JSONDecodeError:
-                            pass
     for event in events:
         schema_version = event.get("schema_version")
         if schema_version is None:
@@ -209,17 +189,7 @@ def read_state(storage_path: str) -> dict | None:
     feature_dir = _resolve_path(storage_path).resolve()
     project_root = str(feature_dir.parent.parent.parent)
     conn = _db.get_db()
-    result = _db.read_state(conn, project_root, feature_dir.name)
-    if result is not None:
-        return result
-    if _db_only():
-        return None  # DB-only mode: skip STATE.json fallback
-    # Fall back to STATE.json for legacy feature dirs that predate SQLite
-    path = _state_path(storage_path)
-    if not path.exists():
-        return None
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    return _db.read_state(conn, project_root, feature_dir.name)
 
 
 def summary(storage_path: str) -> dict:

@@ -9,9 +9,11 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps): JSX.Element 
   const html = marked(content) as string
 
   return (
-    <div
-      className={styles.preview}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <div className={styles.previewWrapper}>
+      <div
+        className={styles.preview}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </div>
   )
 }

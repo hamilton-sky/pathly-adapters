@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>visible-runner — Feature Preview</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-base:       #1a1b26;
+    --bg-mantle:     #16171f;
+    --bg-surface0:   #1e2030;
+    --bg-surface1:   #252640;
+    --border:        rgba(255,255,255,0.08);
+    --border-subtle: rgba(255,255,255,0.05);
+    --text-primary:  #cdd6f4;
+    --text-secondary:#a6adc8;
+    --text-muted:    #585b70;
+    --runtime:       #2dd4bf;
+    --green:         #a6e3a1;
+    --red:           #f38ba8;
+    --yellow:        #f9e2af;
+    --accent:        #89b4fa;
+    --runner-bg:        rgba(45,212,191,0.08);
+    --runner-border:    rgba(45,212,191,0.30);
+    --runner-bg-hover:  rgba(45,212,191,0.14);
+    --runner-bg-active: rgba(45,212,191,0.20);
+    --font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-size: 12px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── top bar ─────────────────────────────────── */
+  .topbar {
+    height: 32px;
+    background: var(--bg-mantle);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .topbar-logo { color: var(--runtime); font-weight: 700; font-size: 11px; letter-spacing: 0.08em; }
+  .topbar-sep  { color: var(--text-muted); }
+  .topbar-sub  { color: var(--text-muted); font-size: 10px; }
+  .topbar-badge {
+    margin-left: auto;
+    font-size: 9px; font-weight: 600; letter-spacing: 0.06em;
+    background: var(--runner-bg); border: 1px solid var(--runner-border);
+    color: var(--runtime); padding: 2px 7px; border-radius: 3px;
+  }
+
+  /* ── main layout ─────────────────────────────── */
+  .layout {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── terminal pane ───────────────────────────── */
+  .terminal-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+  }
+
+  /* PaneTabBar */
+  .tab-bar {
+    height: 34px;
+    background: var(--bg-mantle);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: stretch;
+    gap: 1px;
+    padding: 0 6px;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 120ms, background 120ms;
+    position: relative;
+    user-select: none;
+  }
+  .tab:hover { color: var(--text-secondary); background: rgba(255,255,255,0.03); }
+  .tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
+
+  .tab.runner {
+    border-left: 2px solid var(--runtime);
+    background: var(--runner-bg);
+    color: var(--text-secondary);
+    padding-left: 8px;
+  }
+  .tab.runner:hover { background: var(--runner-bg-hover); }
+  .tab.runner.active { color: var(--text-primary); border-bottom-color: var(--runtime); }
+
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-idle    { background: var(--text-muted); }
+  .dot-running { background: var(--runtime); animation: pulse 1.4s ease-in-out infinite; }
+  .dot-done    { background: var(--green); }
+  .dot-error   { background: var(--red); }
+
+  @keyframes pulse {
+    0%,100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.35); opacity: 0.75; }
+  }
+
+  /* xterm viewport */
+  .xterm {
+    flex: 1;
+    background: #0f1117;
+    padding: 10px 14px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.5;
+    position: relative;
+  }
+  .xterm::-webkit-scrollbar { width: 4px; }
+  .xterm::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .xterm-line { white-space: pre; color: var(--text-secondary); }
+  .xterm-line.dim    { color: var(--text-muted); }
+  .xterm-line.green  { color: var(--green); font-weight: 700; }
+  .xterm-line.teal   { color: var(--runtime); }
+  .xterm-line.yellow { color: var(--yellow); }
+  .xterm-line.prompt { color: var(--accent); }
+
+  .xterm-cursor { display: inline-block; width: 7px; height: 13px; background: var(--runtime); opacity: 0.9; animation: blink 1.2s step-end infinite; vertical-align: text-bottom; }
+  @keyframes blink { 0%,100%{opacity:.9} 50%{opacity:0} }
+
+  /* autonomous warning overlay in terminal */
+  .xterm-warning {
+    font-weight: 600;
+    color: var(--yellow);
+    animation: fadeIn 300ms ease-out both;
+  }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  .banner-dim   { color: var(--text-muted); }
+  .banner-green { color: var(--green); font-weight: 700; }
+  .banner-red   { color: var(--red);   font-weight: 700; }
+
+  /* ── HQ panel ────────────────────────────────── */
+  .hq-panel {
+    width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-base);
+  }
+
+  .hq-header {
+    height: 34px;
+    background: var(--bg-mantle);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .hq-header-title { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+  .hq-header-topic { font-size: 10px; color: var(--runtime); margin-left: auto; }
+
+  /* StageStatusStrip */
+  .stage-strip {
+    padding: 6px 10px;
+    background: var(--bg-surface0);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .stage-strip .dot { width: 7px; height: 7px; }
+  .stage-name  { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+  .adapter-chip {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+    padding: 1px 5px; border-radius: 3px;
+    background: rgba(45,212,191,0.15); color: var(--runtime);
+  }
+  .cost-label { font-size: 10px; color: var(--text-muted); margin-left: auto; }
+
+  .live-btn {
+    background: var(--runner-bg);
+    border: 1px solid var(--runner-border);
+    color: var(--runtime);
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 120ms, border-color 120ms;
+    animation: pillEnter 150ms ease-out both;
+    font-family: var(--font);
+  }
+  .live-btn:hover { background: var(--runner-bg-hover); border-color: var(--runtime); }
+  .live-btn:active { background: var(--runner-bg-active); }
+  @keyframes pillEnter {
+    from { opacity: 0; transform: scale(0.85); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* message list */
+  .msg-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .msg-list::-webkit-scrollbar { width: 3px; }
+  .msg-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  .msg { padding: 6px 12px; font-size: 11px; line-height: 1.55; color: var(--text-secondary); }
+  .msg-system { color: var(--text-muted); font-size: 10px; padding: 4px 12px; }
+
+  /* ── RunnerLogCard ───────────────────────────── */
+  .runner-log-card {
+    margin: 4px 8px 6px;
+    border-radius: 6px;
+    background: var(--bg-surface0);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--runner-border);
+    overflow: hidden;
+    position: sticky;
+    bottom: 0;
+    transition: border-left-color 200ms ease-out;
+    animation: cardEnter 180ms ease-out both;
+  }
+  .runner-log-card.running { border-left-color: var(--runtime); }
+  @keyframes cardEnter {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    height: 32px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .card-header:hover { background: rgba(255,255,255,0.02); }
+
+  .card-summary { flex: 1; font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-summary strong { color: var(--text-primary); font-weight: 600; }
+
+  .toggle-btn {
+    width: 20px; height: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none;
+    color: var(--text-muted); cursor: pointer; flex-shrink: 0;
+    transition: transform 150ms ease-out;
+    font-family: var(--font); font-size: 10px;
+  }
+  .toggle-btn.open { transform: rotate(180deg); }
+
+  .jump-btn {
+    font-size: 10px; font-weight: 600;
+    padding: 1px 7px; border-radius: 3px;
+    background: transparent;
+    border: 1px solid var(--runner-border);
+    color: var(--runtime); cursor: pointer; flex-shrink: 0;
+    transition: background 120ms, border-color 120ms;
+    font-family: var(--font);
+  }
+  .jump-btn:hover { background: var(--runner-bg-hover); border-color: var(--runtime); }
+
+  /* expand/collapse body */
+  .card-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 200ms ease-out;
+    border-top: 0px solid var(--border-subtle);
+  }
+  .card-body.open {
+    max-height: 600px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .stage-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stage-table th {
+    padding: 3px 8px;
+    text-align: left;
+    font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--text-muted);
+    background: var(--bg-mantle);
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+  }
+  .stage-table td {
+    padding: 4px 8px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+    font-size: 10px;
+  }
+  .stage-table tr:last-child td { border-bottom: none; }
+  .td-stage { color: var(--text-primary) !important; font-weight: 500; }
+  .td-adapter { color: var(--runtime) !important; font-size: 9px !important; font-weight: 700; }
+  .td-dur { color: var(--text-muted) !important; font-size: 10px; }
+
+  .card-footer {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px;
+    font-size: 10px; color: var(--text-muted);
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-mantle);
+    flex-wrap: wrap;
+  }
+  .footer-cost { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+  /* ── chat input ──────────────────────────────── */
+  .chat-input {
+    padding: 8px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .input-box {
+    background: var(--bg-surface1);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    width: 100%;
+    font-family: var(--font);
+  }
+
+  /* ── flow diagram ────────────────────────────── */
+  .flow-section {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-mantle);
+    font-size: 10px;
+    display: none;
+  }
+
+  /* ── demo controls ───────────────────────────── */
+  .demo-bar {
+    position: fixed;
+    bottom: 12px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px;
+    background: rgba(22,23,31,0.95);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 8px;
+    backdrop-filter: blur(8px);
+    z-index: 100;
+  }
+  .demo-btn {
+    font-size: 10px; font-weight: 600;
+    padding: 3px 10px; border-radius: 4px;
+    background: var(--bg-surface1);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--font);
+    transition: all 100ms;
+  }
+  .demo-btn:hover { background: var(--bg-surface0); color: var(--text-primary); border-color: rgba(255,255,255,0.15); }
+  .demo-btn.primary {
+    background: var(--runner-bg);
+    border-color: var(--runner-border);
+    color: var(--runtime);
+  }
+  .demo-btn.primary:hover { background: var(--runner-bg-hover); border-color: var(--runtime); }
+  .demo-label { font-size: 10px; color: var(--text-muted); align-self: center; padding: 0 4px; }
+
+  /* ── toast ───────────────────────────────────── */
+  .toast-container { position: fixed; top: 44px; right: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 200; }
+  .toast {
+    background: var(--bg-surface1);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 7px 12px;
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--text-primary);
+    animation: toastIn 200ms ease-out both;
+    max-width: 260px;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .toast.out { animation: toastOut 200ms ease-in both; }
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(12px); }
+  }
+</style>
+</head>
+<body>
+
+<!-- top bar -->
+<div class="topbar">
+  <span class="topbar-logo">pathly</span>
+  <span class="topbar-sep">/</span>
+  <span class="topbar-sub">studio — visible-runner preview</span>
+  <span class="topbar-badge">RUNNING</span>
+</div>
+
+<!-- main layout -->
+<div class="layout">
+
+  <!-- ── left: terminal pane ── -->
+  <div class="terminal-pane">
+
+    <!-- PaneTabBar -->
+    <div class="tab-bar" id="tabBar">
+      <div class="tab active" onclick="switchTab('shell1',this)">
+        <span class="dot dot-idle"></span> shell
+      </div>
+      <div class="tab runner active-runner" id="runnerTab" onclick="switchTab('runner',this)">
+        <span class="dot dot-running" id="runnerDot"></span>
+        <span id="runnerTabLabel">claude — build</span>
+      </div>
+      <div class="tab" onclick="switchTab('shell2',this)">
+        <span class="dot dot-idle"></span> shell 2
+      </div>
+    </div>
+
+    <!-- xterm viewport -->
+    <div class="xterm" id="xtermView">
+      <div class="xterm-line dim">Pathly runner — autonomous mode</div>
+      <div class="xterm-line dim">────────────────────────────────────────</div>
+      <div class="xterm-line"> </div>
+    </div>
+
+  </div>
+
+  <!-- ── right: HQ panel ── -->
+  <div class="hq-panel">
+
+    <!-- header -->
+    <div class="hq-header">
+      <span class="hq-header-title">HQ</span>
+      <span class="hq-header-topic" id="hqTopic">feature/auth-refactor</span>
+    </div>
+
+    <!-- StageStatusStrip -->
+    <div class="stage-strip" id="stageStrip">
+      <span class="dot dot-running"></span>
+      <span class="stage-name" id="stageName">BUILD</span>
+      <span class="adapter-chip">claude</span>
+      <span class="cost-label" id="costLabel">$0.14</span>
+      <button class="live-btn" id="livePill" onclick="jumpToLive()">live ↗</button>
+    </div>
+
+    <!-- message list -->
+    <div class="msg-list" id="msgList">
+      <div class="msg-system">Pipeline started • auth-refactor</div>
+      <div class="msg">✓ STORM stage done in 42s</div>
+      <div class="msg">✓ PLAN stage done in 1m 18s</div>
+      <div class="msg-system">Runner advanced to BUILD</div>
+    </div>
+
+    <!-- RunnerLogCard injected here when run starts -->
+    <div id="logCardSlot"></div>
+
+    <!-- chat input -->
+    <div class="chat-input">
+      <div class="input-box">Ask HQ anything…</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- demo controls -->
+<div class="demo-bar">
+  <span class="demo-label">demo:</span>
+  <button class="demo-btn primary" onclick="startRun()">▶ start runner</button>
+  <button class="demo-btn" onclick="nextStage()">next stage →</button>
+  <button class="demo-btn" onclick="triggerDecision()">decision point</button>
+  <button class="demo-btn" onclick="finishStage()">finish stage ✓</button>
+  <button class="demo-btn" onclick="abortRun()">abort ✗</button>
+</div>
+
+<script>
+// ── state ───────────────────────────────────────────────────────────────────
+const STAGES = ['STORM','PLAN','BUILD','REVIEW','TEST','RETRO'];
+let currentStageIdx = 2; // BUILD
+let runActive = false;
+let logCardExpanded = false;
+let stageLog = [];
+let totalCost = 0.14;
+let runStartedAt = null;
+let typeInterval = null;
+
+const AGENT_OUTPUT = [
+  'claude --output-format=json --print ...',
+  '',
+  '\x1b[36mPathly — BUILD stage\x1b[0m',
+  'Reading IMPLEMENTATION_PLAN.md...',
+  'Reading src/pathly_orchestrator/runner.py...',
+  '',
+  'I\'ll start by extracting resolve_argv from invoke_agent...',
+  '',
+  '  \x1b[32m+\x1b[0m def resolve_argv(adapter, prompt, model, session=None, autonomy=None):',
+  '  \x1b[32m+\x1b[0m     return resolve_command(adapter, prompt, model,',
+  '  \x1b[32m+\x1b[0m         session=session, autonomy=autonomy)["argv"]',
+  '',
+  'Updating invoke_agent to call resolve_argv...',
+  '',
+  '  \x1b[33m~\x1b[0m     argv = resolve_command(adapter, prompt, model,...)',
+  '  \x1b[32m+\x1b[0m     argv = resolve_argv(adapter, prompt, model,...)',
+  '',
+  'Running tests...',
+  '  \x1b[32m✓\x1b[0m tests/test_runner.py::test_resolve_argv PASSED',
+  '  \x1b[32m✓\x1b[0m tests/test_runner.py::test_invoke_agent PASSED',
+  '  \x1b[32m✓\x1b[0m 12 passed in 2.4s',
+];
+
+// ── helpers ─────────────────────────────────────────────────────────────────
+function el(id) { return document.getElementById(id); }
+
+function appendTerminal(html, cls='') {
+  const div = document.createElement('div');
+  div.className = 'xterm-line' + (cls ? ' '+cls : '');
+  div.innerHTML = html;
+  el('xtermView').appendChild(div);
+  el('xtermView').scrollTop = el('xtermView').scrollHeight;
+  return div;
+}
+
+function toast(msg, variant='info') {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.borderLeftColor = variant==='info' ? 'var(--accent)' : variant==='success' ? 'var(--green)' : 'var(--red)';
+  t.textContent = msg;
+  el('toastContainer').appendChild(t);
+  setTimeout(() => {
+    t.classList.add('out');
+    setTimeout(() => t.remove(), 200);
+  }, 4000);
+}
+
+function fmtDur(ms) {
+  if (ms < 60000) return (ms/1000).toFixed(0)+'s';
+  return Math.floor(ms/60000)+'m '+(Math.floor(ms/1000)%60)+'s';
+}
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// ── log card ─────────────────────────────────────────────────────────────────
+function renderLogCard() {
+  const slot = el('logCardSlot');
+  if (!stageLog.length) { slot.innerHTML=''; return; }
+  const done = stageLog.filter(s=>s.endedAt).length;
+  const current = stageLog[stageLog.length-1];
+  const summary = `${done} stage${done!==1?'s':''} done — <strong>${current.stage}</strong>`;
+
+  const rows = stageLog.map((s,i) => {
+    const dur = s.endedAt ? fmtDur(s.endedAt-s.startedAt) : '…';
+    const dotCls = s.endedAt ? (s.exitCode===0?'dot-done':'dot-error') : 'dot-running';
+    return `<tr>
+      <td class="td-stage">${s.stage}</td>
+      <td class="td-adapter">${s.adapter}</td>
+      <td>${fmtTime(s.startedAt)}</td>
+      <td class="td-dur">${dur}</td>
+      <td><span class="dot ${dotCls}" style="display:inline-block"></span></td>
+    </tr>`;
+  }).join('');
+
+  slot.innerHTML = `
+    <div class="runner-log-card ${runActive?'running':''}" id="runnerLogCard">
+      <div class="card-header" onclick="toggleCard()">
+        <span class="dot ${runActive?'dot-running':'dot-done'}"></span>
+        <span class="card-summary">${summary}</span>
+        <button class="toggle-btn ${logCardExpanded?'open':''}" type="button" id="toggleBtn">▾</button>
+        <button class="jump-btn" type="button" onclick="event.stopPropagation();jumpToLive()">Jump ↗</button>
+      </div>
+      <div class="card-body ${logCardExpanded?'open':''}" id="cardBody">
+        <table class="stage-table">
+          <thead><tr>
+            <th>Stage</th><th>Adapter</th><th>Started</th><th>Dur</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="card-footer">
+          <span>Run started ${fmtTime(runStartedAt)}</span>
+          <span>•</span>
+          <span>${stageLog.length} stage${stageLog.length!==1?'s':''}</span>
+          <span class="footer-cost">$${totalCost.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleCard() {
+  logCardExpanded = !logCardExpanded;
+  renderLogCard();
+}
+
+// ── tab switching ─────────────────────────────────────────────────────────────
+function switchTab(id, tabEl) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  tabEl.classList.add('active');
+  if (id==='runner') {
+    showRunnerTerminal();
+  }
+}
+
+function showRunnerTerminal() {
+  // already shown in xtermView
+}
+
+function jumpToLive() {
+  // activate runner tab
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el('runnerTab').classList.add('active');
+  el('xtermView').scrollTop = el('xtermView').scrollHeight;
+  toast('Jumped to live terminal', 'info');
+}
+
+// ── demo actions ─────────────────────────────────────────────────────────────
+function startRun() {
+  if (runActive) return;
+  runActive = true;
+  runStartedAt = Date.now();
+  stageLog = [];
+  totalCost = 0;
+  currentStageIdx = 0;
+
+  // clear xterm
+  el('xtermView').innerHTML = '';
+  appendTerminal('<span class="banner-dim">──</span> <span style="color:var(--runtime);font-weight:700">Pathly Runner — autonomous mode</span> <span class="banner-dim">──────────────────────────</span>');
+  appendTerminal('');
+
+  // add msg
+  el('msgList').innerHTML = `
+    <div class="msg-system">Pipeline started • auth-refactor</div>
+  `;
+
+  startStage(STAGES[0]);
+}
+
+function startStage(stage) {
+  const entry = { stage, adapter:'claude', tabId:`runner-${Math.random().toString(36).slice(2,10)}`, startedAt:Date.now(), endedAt:null, exitCode:null, mode:'terminal' };
+  stageLog.push(entry);
+  runStartedAt = runStartedAt || Date.now();
+  currentStageIdx = STAGES.indexOf(stage);
+
+  // update strip
+  el('stageName').textContent = stage;
+  el('livePill').style.display='';
+  el('runnerTabLabel').textContent = `claude — ${stage.toLowerCase()}`;
+  el('runnerDot').className = 'dot dot-running';
+
+  // SSE TERMINAL_SPAWN → open tab, write to xterm
+  appendTerminal('');
+  appendTerminal(`<span class="teal">▸ TERMINAL_SPAWN</span> <span class="dim">run_id=r-${entry.tabId.slice(7,15)} stage=${stage}</span>`);
+  appendTerminal('');
+
+  // type agent output
+  let lineIdx=0;
+  if (typeInterval) clearInterval(typeInterval);
+  typeInterval = setInterval(() => {
+    if (lineIdx >= AGENT_OUTPUT.length) {
+      clearInterval(typeInterval);
+      // cursor
+      const cur = document.createElement('span');
+      cur.className='xterm-cursor';
+      el('xtermView').appendChild(cur);
+      el('xtermView').scrollTop=el('xtermView').scrollHeight;
+      return;
+    }
+    const raw = AGENT_OUTPUT[lineIdx++];
+    appendTerminal(raw.replace(/\x1b\[(\d+)m/g,'').replace(/\x1b\[0m/g,''));
+  }, 90);
+
+  // update cost
+  totalCost += 0.04;
+  el('costLabel').textContent = '$'+totalCost.toFixed(2);
+
+  renderLogCard();
+  toast(`TERMINAL_SPAWN → ${stage} tab opened`, 'info');
+}
+
+function nextStage() {
+  if (!runActive) { toast('Start the runner first','info'); return; }
+  finishCurrentStage(0);
+  setTimeout(()=>{
+    currentStageIdx++;
+    if (currentStageIdx >= STAGES.length) { endRun(); return; }
+    startStage(STAGES[currentStageIdx]);
+  }, 600);
+}
+
+function finishCurrentStage(exitCode) {
+  if (!stageLog.length) return;
+  const last = stageLog[stageLog.length-1];
+  last.endedAt = Date.now();
+  last.exitCode = exitCode;
+
+  // write completion banner to xterm
+  const dur = fmtDur(last.endedAt-last.startedAt);
+  if (exitCode===0) {
+    appendTerminal('');
+    appendTerminal(`<span class="banner-dim">──</span> <span class="banner-green">${last.stage} DONE</span>  <span class="dim">${dur}</span> <span class="banner-dim">──────────────────────────────────────────</span>`);
+  } else {
+    appendTerminal('');
+    appendTerminal(`<span class="banner-dim">──</span> <span class="banner-red">${last.stage} ABORTED</span> <span class="banner-dim">──────────────────────────────────────────</span>`);
+  }
+  appendTerminal('');
+
+  el('runnerDot').className = exitCode===0 ? 'dot dot-done' : 'dot dot-error';
+  totalCost += 0.06;
+  el('costLabel').textContent = '$'+totalCost.toFixed(2);
+
+  el('msgList').insertAdjacentHTML('beforeend', `<div class="msg">✓ ${last.stage} done in ${dur}</div>`);
+  renderLogCard();
+}
+
+function finishStage() {
+  if (!runActive) { toast('Start the runner first','info'); return; }
+  finishCurrentStage(0);
+}
+
+function triggerDecision() {
+  if (!runActive) { toast('Start the runner first','info'); return; }
+  logCardExpanded = true;
+  renderLogCard();
+  toast('Runner is waiting for your decision', 'info');
+  appendTerminal('');
+  appendTerminal('<span class="teal">▸ DECISION_MENU</span> <span class="dim">awaiting human input…</span>');
+  el('stageName').textContent = 'DECISION';
+}
+
+function abortRun() {
+  if (!runActive) { toast('No active run','info'); return; }
+  if (typeInterval) clearInterval(typeInterval);
+  finishCurrentStage(1);
+  endRun(true);
+}
+
+function endRun(aborted=false) {
+  runActive = false;
+  if (typeInterval) clearInterval(typeInterval);
+  el('livePill').style.display='none';
+  el('runnerDot').className = aborted ? 'dot dot-error' : 'dot dot-done';
+  el('stageName').textContent = aborted ? 'ABORTED' : 'DONE';
+  renderLogCard();
+  toast(aborted ? 'Runner aborted' : 'Pipeline complete ✓', aborted ? 'error' : 'success');
+}
+
+// ── autonomous warning ───────────────────────────────────────────────────────
+el('xtermView').addEventListener('click', () => {
+  if (!runActive) return;
+  // show ANSI warning once
+  if (!el('xtermView').dataset.warned) {
+    el('xtermView').dataset.warned='1';
+    const w = appendTerminal('[!] Autonomous mode active — input will be forwarded to the agent');
+    w.style.color='var(--yellow)';
+    w.style.fontWeight='600';
+  }
+});
+
+// ── init ─────────────────────────────────────────────────────────────────────
+// show placeholder state
+appendTerminal('Click <span style="color:var(--runtime)">▶ start runner</span> below to see the feature in action.');
+appendTerminal('');
+appendTerminal('<span class="dim">The runner will:</span>');
+appendTerminal('<span class="dim">  1. broadcast TERMINAL_SPAWN via SSE</span>');
+appendTerminal('<span class="dim">  2. open this xterm tab with teal left border</span>');
+appendTerminal('<span class="dim">  3. stream agent output live</span>');
+appendTerminal('<span class="dim">  4. show RunnerLogCard in HQ panel →</span>');
+appendTerminal('<span class="dim">  5. show [live ↗] pill in StageStatusStrip</span>');
+appendTerminal('');
+
+// hide live pill initially
+el('livePill').style.display='none';
+el('logCardSlot').innerHTML='';
+el('stageName').textContent='—';
+</script>
+</body>
+</html>

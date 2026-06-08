@@ -80,9 +80,9 @@ Set `tokens_in` and `tokens_out`:
 - If only `total_tokens`: `tokens_in = round(total_tokens * 0.80)`, `tokens_out = round(total_tokens * 0.20)`
 - Else: both 0
 
-## Step 3 — Write AGENT_DONE to DB (primary) with EVENTS.jsonl backup
+## Step 3 — Write AGENT_DONE via HTTP endpoint (primary) with DB/EVENTS.jsonl fallback
 
-**Primary path — via eventlog (writes to central SQLite DB):**
+Build the event dict first:
 
 ```python
 python3 -c "
@@ -104,18 +104,55 @@ event = {
     'ts': ts,
     'schema_version': 1,
 }
+import json, pathlib
+
+_written = False
+
+# Primary path: POST to HTTP endpoint
 try:
-    from pathly_orchestrator.eventlog import append_event as _ae
-    _ae('pathly/plans/<feature>', event)
-    print('AGENT_DONE written to DB')
-except Exception as _exc:
-    # Fallback: write directly to EVENTS.jsonl when eventlog is unavailable (offline/codex mode)
-    import json, pathlib
-    path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'a', encoding='utf-8') as _f:
-        _f.write(json.dumps(event) + chr(10))
-    print(f'AGENT_DONE written to EVENTS.jsonl (fallback: {_exc})')
+    import urllib.request
+    body = json.dumps({
+        'type': event['type'],
+        'feature': '<feature>',
+        'project_root': str(pathlib.Path.cwd()),
+        'payload': event,
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        'http://127.0.0.1:8765/runner/event',
+        data=body,
+        headers={'Content-Type': 'application/json'},
+        method='POST',
+    )
+    import urllib.error
+    try:
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            if resp.status == 200:
+                print('AGENT_DONE written via HTTP /runner/event')
+                _written = True
+    except urllib.error.URLError:
+        pass  # server unreachable — fall through to local fallback
+except Exception:
+    pass
+
+# Fallback: write via eventlog (DB-primary, EVENTS.jsonl secondary)
+if not _written:
+    try:
+        from pathly_orchestrator.eventlog import append_event as _ae
+        _ae('pathly/plans/<feature>', event)
+        print('AGENT_DONE written to DB (fallback)')
+    except Exception as _exc:
+        # Last resort: write directly to EVENTS.jsonl
+        path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a', encoding='utf-8') as _f:
+            _f.write(json.dumps(event) + chr(10))
+        print(f'AGENT_DONE written to EVENTS.jsonl (last resort: {_exc})')
+
+# AC2.5 dual-write: always append to EVENTS.jsonl as backup
+path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+path.parent.mkdir(parents=True, exist_ok=True)
+with open(path, 'a', encoding='utf-8') as _f:
+    _f.write(json.dumps(event) + chr(10))
 "
 ```
 

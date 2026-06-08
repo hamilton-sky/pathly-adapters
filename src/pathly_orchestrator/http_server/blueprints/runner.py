@@ -421,6 +421,45 @@ def runner_abort():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/runner/event", methods=["POST"])
+def runner_event():
+    """Accept an event from an agent and persist it via eventlog.
+
+    Required body fields: type, feature, project_root, payload (dict).
+    Returns {"ok": true} on success.
+    """
+    try:
+        from pathlib import Path
+        from pathly_orchestrator import eventlog as _evtlog
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        required = {"type", "feature", "project_root", "payload"}
+        missing = required - set(data.keys())
+        if missing:
+            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+
+        feature = data["feature"]
+        project_root = data["project_root"]
+        payload = data["payload"]
+
+        if not isinstance(feature, str) or not feature.strip():
+            return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
+        if not isinstance(project_root, str) or not project_root.strip():
+            return jsonify({"error": "Field 'project_root' must be a non-empty string"}), 400
+        if not isinstance(payload, dict):
+            return jsonify({"error": "Field 'payload' must be a JSON object"}), 400
+
+        storage_path = str(Path(project_root) / "pathly" / "plans" / feature)
+        _evtlog.append_event(storage_path, payload)
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("runner_event error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/runner/status", methods=["GET"])
 def runner_status():
     """Return the current RunnerState for a topic.
