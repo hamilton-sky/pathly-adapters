@@ -1,23 +1,17 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .modal {
+  position: fixed;
+  left: var(--modal-x, 40%);
+  top: var(--modal-y, 40%);
+  z-index: 500;
   background: var(--bg-mantle);
   border: 1px solid var(--bg-surface0);
   border-radius: 10px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  padding: 20px;
-  width: 380px;
+  padding: 16px;
+  width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .header {
@@ -27,7 +21,7 @@
 }
 
 .title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -51,7 +45,7 @@
   background: var(--bg-base);
   border-left: 2px solid var(--accent);
   border-radius: 0 4px 4px 0;
-  padding: 5px 10px;
+  padding: 4px 8px;
   font-style: italic;
   overflow: hidden;
   display: -webkit-box;
@@ -66,7 +60,7 @@
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 13px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   line-height: 1.5;
   font-family: inherit;
   width: 100%;
@@ -89,7 +83,7 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  padding: 6px 14px;
+  padding: 5px 12px;
   transition: border-color 0.12s, color 0.12s;
 }
 .sendBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
@@ -103,7 +97,7 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
-  padding: 6px 16px;
+  padding: 5px 14px;
   transition: opacity 0.12s;
 }
 .addBtn:hover:not(:disabled) { opacity: 0.85; }
