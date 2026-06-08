@@ -86,7 +86,7 @@ export default function NotebookCanvas() {
         {cells.map((cell, idx) => (
           <React.Fragment key={cell.id}>
             {cell.type === 'body' ? (
-              <BodyCell heading={cell.heading} content={cell.content} />
+              <BodyCell id={cell.id} heading={cell.heading} content={cell.content} />
             ) : (
               <FragmentCell
                 id={cell.id}

@@ -44,7 +44,7 @@ export default function PreviewPanel() {
 
       <div className={`${styles.pvBody} ${previewLoading ? styles.loading : ''}`}>
         {previewSections.map((s, i) => (
-          <PreviewSection key={i} heading={s.heading} content={s.content} origin={s.origin} />
+          <PreviewSection key={i} heading={s.heading} content={s.content} />
         ))}
         {previewSections.length === 0 && !previewLoading && (
           <div className={styles.empty}>Add fragments to see preview</div>

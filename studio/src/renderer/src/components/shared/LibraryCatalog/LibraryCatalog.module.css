@@ -1,0 +1,205 @@
+.catalog {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-mantle);
+  border-right: var(--border);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 12px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.headerIcon {
+  color: var(--accent);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg-base);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  margin: 0 10px 4px;
+  padding: 0 10px;
+  color: var(--text-muted);
+}
+
+.searchInput {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 6px 0;
+  font-family: var(--font-family-base);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.groupLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 14px;
+  cursor: grab;
+  height: 32px;
+  position: relative;
+}
+
+.item:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.itemGrip {
+  color: var(--text-muted);
+  opacity: 0.35;
+  flex-shrink: 0;
+  margin-left: -4px;
+}
+
+.item:hover .itemGrip {
+  opacity: 0.8;
+}
+
+.itemIcon {
+  display: inline-flex;
+  opacity: 0.85;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.itemName {
+  flex: 1;
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item:hover .itemName {
+  color: var(--text-primary);
+}
+
+.addBtn {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  opacity: 0;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.item:hover .addBtn {
+  opacity: 1;
+}
+
+.popoverWrap {
+  position: relative;
+}
+
+.popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 300;
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  width: 176px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.popoverItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  text-align: left;
+}
+
+.popoverItem:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.popoverIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.empty {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.newCat {
+  margin: 10px 12px 6px;
+  width: calc(100% - 24px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px dashed var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  background: transparent;
+  cursor: pointer;
+}

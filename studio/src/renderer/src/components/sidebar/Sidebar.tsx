@@ -7,9 +7,9 @@ import { PATHLY_DRAG_MIME } from '../../types'
 import { listDir, listDirs } from '../../services/pathlyApi'
 import { useProjectFiles } from '../../hooks/useProjectFiles'
 import { usePlanFiles } from '../../hooks/usePlanFiles'
-import { LibraryPanel } from './panels/LibraryPanel'
 import { WorkspacePanel } from './panels/WorkspacePanel'
-import CatalogPanel from './panels/CatalogPanel/CatalogPanel'
+import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
+import { useSkillNotebookStore } from '../../store/skillNotebookStore'
 import { useSidebarResize } from './shell/useSidebarResize'
 import { TabBar } from './shell/TabBar'
 import { FilterRow } from './shell/FilterRow'
@@ -60,6 +60,8 @@ export function Sidebar(): JSX.Element | null {
     activePanel,
     setLastUsedFlowPath,
   } = useStore()
+
+  const insertFragment = useSkillNotebookStore((s) => s.insertFragment)
 
   const { sections, setSections, loadItems, customWorkspaceSections } = useProjectFiles()
   const { planFolders, setPlanFolders, loadPlanFiles } = usePlanFiles()
@@ -112,7 +114,6 @@ export function Sidebar(): JSX.Element | null {
     try { return localStorage.getItem('pathly:sidebarTab') !== 'workspace' }
     catch { return true }
   })
-  const [catalogTab, setCatalogTab] = useState<'catalog' | 'files'>('catalog')
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
@@ -154,7 +155,7 @@ export function Sidebar(): JSX.Element | null {
     if (item.type === 'flow') {
       setActivePanel('flow')
       setLastUsedFlowPath(item.path)
-    } else if (item.type === 'skill' && item.path.endsWith('.md')) {
+    } else if (item.path.endsWith('.md')) {
       setActivePanel('skill-notebook')
       setSkillNotebookPath(item.path)
     } else {
@@ -471,89 +472,29 @@ export function Sidebar(): JSX.Element | null {
 
   return (
     <div ref={sidebarRef} className={styles.sidebar}>
-      {activePanelUi === 'skill-notebook' ? (
-        <div className={styles.tabBar} role="tablist" aria-label="Skill notebook view">
-          <button
-            type="button"
-            role="tab"
-            {...(catalogTab === 'catalog' ? { 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
-            className={`${styles.tab} ${catalogTab === 'catalog' ? styles.tabActive : ''}`}
-            onClick={() => setCatalogTab('catalog')}
-          >
-            CATALOG
-          </button>
-          <button
-            type="button"
-            role="tab"
-            {...(catalogTab === 'files' ? { 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
-            className={`${styles.tab} ${catalogTab === 'files' ? styles.tabActive : ''}`}
-            onClick={() => setCatalogTab('files')}
-          >
-            FILES
-          </button>
-        </div>
-      ) : (
-        <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
+      <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
+
+      {!libraryOpen && (
+        <FilterRow
+          libraryOpen={libraryOpen}
+          filter={filter}
+          onChange={setFilter}
+          onClear={() => setFilter('')}
+          onCollapseAll={handleCollapseAll}
+        />
       )}
 
-      <FilterRow
-        libraryOpen={libraryOpen}
-        filter={filter}
-        onChange={setFilter}
-        onClear={() => setFilter('')}
-        onCollapseAll={handleCollapseAll}
-      />
-
       <div className={styles.treeContainer}>
-        {activePanelUi === 'skill-notebook' && catalogTab === 'catalog' && (
-          <CatalogPanel />
-        )}
-
-        {activePanelUi !== 'skill-notebook' && libraryOpen && (
-          <LibraryPanel
-            sections={sections}
-            selectedItem={selectedItem}
-            filter={filter}
-            lowerFilter={lowerFilter}
-            renamingPath={renamingPath}
-            renameValue={renameValue}
-            onSelect={handleItemClick}
-            onToggleSection={toggleSection}
-            onToggleSubdir={toggleSubdir}
-            onNewUserLibraryItem={handleNewUserLibraryItem}
-            dragFromGripRef={dragFromGripRef}
-            onDragStart={handleItemDragStart}
-            onStartRename={startRename}
-            onStartDelete={setConfirmDelete}
-            onRenameChange={setRenameValue}
-            onRenameCommit={(item, itemDir) => { void commitRename(item, itemDir) }}
-            onRenameCancel={() => setRenamingPath(null)}
+        {libraryOpen && (
+          <LibraryCatalog
+            context={activePanelUi === 'skill-notebook' ? 'notebook' : 'canvas'}
+            pathlyRoot={pathlyRoot}
+            onOpenSkill={(path) => { setSkillNotebookPath(path); setActivePanel('skill-notebook') }}
+            onInsertCell={(item) => { insertFragment(item.name, null) }}
           />
         )}
 
-        {activePanelUi === 'skill-notebook' && catalogTab === 'files' && (
-          <LibraryPanel
-            sections={sections}
-            selectedItem={selectedItem}
-            filter={filter}
-            lowerFilter={lowerFilter}
-            renamingPath={renamingPath}
-            renameValue={renameValue}
-            onSelect={handleItemClick}
-            onToggleSection={toggleSection}
-            onToggleSubdir={toggleSubdir}
-            onNewUserLibraryItem={handleNewUserLibraryItem}
-            dragFromGripRef={dragFromGripRef}
-            onDragStart={handleItemDragStart}
-            onStartRename={startRename}
-            onStartDelete={setConfirmDelete}
-            onRenameChange={setRenameValue}
-            onRenameCommit={(item, itemDir) => { void commitRename(item, itemDir) }}
-            onRenameCancel={() => setRenamingPath(null)}
-          />
-        )}
-
-        {activePanelUi !== 'skill-notebook' && !libraryOpen && projectPath && (
+        {!libraryOpen && projectPath && (
           <WorkspacePanel
             sections={sections}
             projectPath={projectPath}

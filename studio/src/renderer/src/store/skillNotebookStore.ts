@@ -35,6 +35,7 @@ interface SkillNotebookState {
   insertFragment: (fragmentName: string, afterCellId: string | null) => string
   removeCell: (cellId: string) => void
   moveCell: (cellId: string, afterCellId: string | null) => void
+  updateBodyCell: (cellId: string, content: string) => void
 }
 
 export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
@@ -138,6 +139,13 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
       next.splice(idx + 1, 0, cell)
       newCells = next
     }
+    get().pushCells(newCells)
+  },
+  updateBodyCell: (cellId: string, content: string) => {
+    const state = get()
+    const newCells = state.cells.map(c =>
+      c.id === cellId && c.type === 'body' ? { ...c, content } : c
+    )
     get().pushCells(newCells)
   },
 }))

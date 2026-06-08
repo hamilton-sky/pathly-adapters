@@ -4,12 +4,12 @@ import { useUiStore } from '../../store/uiStore'
 import styles from './SkillNotebook.module.css'
 import NotebookHeader from './NotebookHeader/NotebookHeader'
 import NotebookCanvas from './NotebookCanvas/NotebookCanvas'
-import NotebookCatalog from './NotebookCatalog/NotebookCatalog'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
+import FilePreview from './FilePreview/FilePreview'
 
 const STEPS = [
   { icon: ArrowLeft, label: 'Go to FILES in the sidebar', sub: 'Switch to the FILES tab on the left' },
-  { icon: FileText, label: 'Click a skill .md file', sub: 'Any skill in your project' },
+  { icon: FileText, label: 'Click any .md file', sub: 'Skills, agents, templates, plan files…' },
   { icon: Sparkles, label: 'Edit in notebook mode', sub: 'Drag fragments, preview, export' },
 ]
 
@@ -48,12 +48,18 @@ export default function SkillNotebookPanel() {
     <div className={styles.root}>
       <NotebookHeader viewMode={viewMode} onViewModeChange={setViewMode} />
       <div className={styles.body}>
-        {viewMode === 'cells' && <NotebookCatalog />}
         {viewMode === 'cells' && <NotebookCanvas />}
         {viewMode === 'cells' && !chatOpen && <div className={styles.resizeHandle} />}
-        <div className={viewMode === 'preview' ? styles.previewWrapperFull : styles.previewWrapper}>
-          <PreviewPanel />
-        </div>
+        {viewMode === 'cells' && (
+          <div className={styles.previewWrapper}>
+            <PreviewPanel />
+          </div>
+        )}
+        {viewMode === 'preview' && (
+          <div className={styles.previewWrapperFull}>
+            <FilePreview />
+          </div>
+        )}
       </div>
       <div className={styles.legend}>
         <span className={styles.legendItem}><ChevronsUp size={12} /><b>Drag a cell or ⌘↑/↓</b> to move cells</span>
