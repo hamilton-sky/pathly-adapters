@@ -11,7 +11,7 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 12px;
   padding: 10px 12px 8px;
   flex-shrink: 0;
 }

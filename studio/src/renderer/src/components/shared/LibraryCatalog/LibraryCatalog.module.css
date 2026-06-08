@@ -50,6 +50,12 @@
 }
 .menuItem:hover { background: var(--bg-surface0); color: var(--text-primary); }
 
+.menuItemDanger { color: var(--red) !important; }
+.menuItemDanger:hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent) !important;
+  color: var(--red) !important;
+}
+
 .headerIcon {
   color: var(--accent);
 }
@@ -194,22 +200,6 @@
   color: var(--text-muted);
 }
 
-.newCat {
-  margin: 10px 12px 6px;
-  width: calc(100% - 24px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-  border: 1.5px dashed var(--accent-border);
-  border-radius: var(--radius-md);
-  padding: 8px;
-  background: transparent;
-  cursor: pointer;
-}
 
 .groupCount {
   margin-left: auto;
@@ -274,7 +264,7 @@
 .itemClickable { cursor: pointer; }
 .itemGrabbable { cursor: grab; }
 
-/* ── GROUP HEADER with + button ── */
+/* ── GROUP HEADER with ··· menu ── */
 .groupHeader {
   display: flex;
   align-items: center;
@@ -282,7 +272,7 @@
 .groupLabel {
   flex: 1;
 }
-.groupAddBtn {
+.groupMenuBtn {
   width: 24px;
   height: 24px;
   display: inline-flex;
@@ -298,10 +288,10 @@
   flex-shrink: 0;
   margin-right: 4px;
 }
-.groupHeader:hover .groupAddBtn {
+.groupHeader:hover .groupMenuBtn {
   opacity: 0.7;
 }
-.groupAddBtn:hover {
+.groupMenuBtn:hover {
   opacity: 1 !important;
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
@@ -452,3 +442,63 @@
   border-radius: var(--radius-sm);
 }
 .newCatCancelBtn:hover { color: var(--text-primary); }
+
+/* ── TYPE SELECTOR in new-category form ── */
+.newCatSelect {
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 11px;
+  padding: 4px 6px;
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── NEW CATEGORY button (bottom of list) ── */
+.newCat {
+  margin: 10px 12px 6px;
+  width: calc(100% - 24px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px dashed var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-family-base);
+}
+.newCat:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* ── SUB-GROUP HEADER ··· menu btn ── */
+.subGroupMenuBtn {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0;
+  border-radius: var(--radius-sm);
+  transition: opacity 80ms, background 80ms;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.subGroupHeader:hover .subGroupMenuBtn {
+  opacity: 0.6;
+}
+.subGroupMenuBtn:hover {
+  opacity: 1 !important;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}

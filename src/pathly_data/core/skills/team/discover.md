@@ -1,3 +1,6 @@
+---
+
+---
 # team/discover
 
 Stage 0 — Discovery Path. Invoked by the `team` orchestrator when FSM state is

@@ -110,9 +110,11 @@ def _index_agents(conn: sqlite3.Connection, core: Path) -> None:
     agents_dir = core / "agents"
     if not agents_dir.exists():
         return
-    for f in sorted(agents_dir.glob("*.md")):
+    for f in sorted(agents_dir.rglob("*.md")):
         if "README" in f.name:
             continue
+        parts = f.relative_to(agents_dir).parts
+        category = parts[0] if len(parts) > 1 else ""
         content = f.read_text(encoding="utf-8")
         upsert_catalog_item(
             conn,
@@ -120,7 +122,7 @@ def _index_agents(conn: sqlite3.Connection, core: Path) -> None:
             name=f.stem,
             rel_path=_rel(f, core.parent.parent),
             abs_path=str(f).replace("\\", "/"),
-            category="agents",
+            category=category,
             description=_first_line(f),
             content=content,
         )

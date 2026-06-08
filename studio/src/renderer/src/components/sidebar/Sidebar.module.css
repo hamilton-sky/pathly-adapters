@@ -393,7 +393,7 @@
 .tabBar {
   display: flex;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--bg-surface0);
+  border-bottom: var(--border);
 }
 .tab {
   flex: 1;
