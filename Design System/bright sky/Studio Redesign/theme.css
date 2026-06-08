@@ -1,0 +1,79 @@
+/* theme.css — real Pathly palettes mapped onto the existing token names so
+   every component (styles.css + studio.css + redesign.css) themes for free.
+   Values lifted from studio/src/renderer/src/theme.ts. Default = Pathly Dark
+   (sky-blue accent — "bright sky"). [data-theme] wrappers switch palette. */
+
+:root {
+  --ui:  'Geist', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/* ===================== Pathly Dark (default) ===================== */
+:root,
+[data-theme="dark"] {
+  --crust:#070B14; --mantle:#0B0F1A; --base:#111827;
+  --surface0:#1E2433; --surface1:#283044; --surface2:#3A4357;
+  --overlay0:#5A6B82; --overlay1:#7A8AA0; --overlay2:#94A3B8;
+  --subtext0:#94A3B8; --subtext1:#B6C2D4; --text:#E2E8F0;
+
+  --bg-crust:#070B14; --bg-mantle:#0B0F1A; --bg-base:#111827; --bg-elevated:#1A2233;
+  --border:#222B3C; --border-strong:#313C52;
+  --text-primary:#E2E8F0; --text-secondary:#B6C2D4; --text-muted:#7A8AA0; --text-faint:#5A6B82;
+
+  --accent:#38BDF8; --accent-rgb:56 189 248;
+  --accent-soft:color-mix(in srgb, var(--accent) 16%, transparent);
+
+  --blue:#60A5FA; --sapphire:#38BDF8; --sky:#7DD3FC; --lavender:#A5B4FC;
+  --teal:#2DD4BF; --green:#34D399; --yellow:#FCD34D; --peach:#FB923C;
+  --maroon:#FB7185; --red:#F87171; --mauve:#A78BFA; --pink:#F0ABFC;
+
+  --action:#38BDF8; --action-soft:color-mix(in srgb, var(--action) 18%, transparent);
+  --warn:var(--peach);
+}
+
+/* ===================== Pathly Light ===================== */
+[data-theme="light"] {
+  --crust:#E8EEF4; --mantle:#F0F6FC; --base:#FFFFFF;
+  --surface0:#EAF0F6; --surface1:#D6DEE8; --surface2:#B8C4D2;
+  --overlay0:#94A3B8; --overlay1:#64748B; --overlay2:#475569;
+  --subtext0:#475569; --subtext1:#334155; --text:#0F172A;
+
+  --bg-crust:#E3EAF1; --bg-mantle:#F0F6FC; --bg-base:#FFFFFF; --bg-elevated:#FFFFFF;
+  --border:#E2E8F0; --border-strong:#CBD5E1;
+  --text-primary:#0F172A; --text-secondary:#334155; --text-muted:#64748B; --text-faint:#94A3B8;
+
+  --accent:#0369A1; --accent-rgb:3 105 161;
+  --accent-soft:color-mix(in srgb, var(--accent) 12%, transparent);
+
+  --blue:#1D4ED8; --sapphire:#0369A1; --sky:#0EA5E9; --lavender:#6366F1;
+  --teal:#0F766E; --green:#047857; --yellow:#B45309; --peach:#C2410C;
+  --maroon:#BE123C; --red:#DC2626; --mauve:#7C3AED; --pink:#C026D3;
+
+  --action:#0369A1; --action-soft:color-mix(in srgb, var(--action) 12%, transparent);
+  --warn:var(--peach);
+
+  --shadow-card: 0 1px 0 0 rgba(255,255,255,.6) inset, 0 6px 18px -12px rgba(15,23,42,.25);
+  --shadow-modal: 0 24px 60px -12px rgba(15,23,42,.28), 0 0 0 1px var(--border-strong);
+}
+
+/* ===================== Catppuccin Mocha (optional palette) ===================== */
+[data-theme="mocha"] {
+  --crust:#11111b; --mantle:#181825; --base:#1e1e2e;
+  --surface0:#313244; --surface1:#45475a; --surface2:#585b70;
+  --overlay0:#6c7086; --overlay1:#7f849c; --overlay2:#9399b2;
+  --subtext0:#a6adc8; --subtext1:#bac2de; --text:#cdd6f4;
+
+  --bg-crust:#11111b; --bg-mantle:#181825; --bg-base:#1e1e2e; --bg-elevated:#232336;
+  --border:#2a2a3c; --border-strong:#383850;
+  --text-primary:#cdd6f4; --text-secondary:#bac2de; --text-muted:#7f849c; --text-faint:#6c7086;
+
+  --accent:#cba6f7; --accent-rgb:203 166 247;
+  --accent-soft:color-mix(in srgb, var(--accent) 16%, transparent);
+
+  --blue:#89b4fa; --sapphire:#74c7ec; --sky:#89dceb; --lavender:#b4befe;
+  --teal:#94e2d5; --green:#a6e3a1; --yellow:#f9e2af; --peach:#fab387;
+  --maroon:#eba0ac; --red:#f38ba8; --mauve:#cba6f7; --pink:#f5c2e7;
+
+  --action:#fab387; --action-soft:color-mix(in srgb, var(--action) 18%, transparent);
+  --warn:var(--peach);
+}
