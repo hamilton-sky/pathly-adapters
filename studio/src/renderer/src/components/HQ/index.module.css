@@ -30,10 +30,19 @@
   cursor: col-resize;
   z-index: 10;
   background: transparent;
+}
+.resizeHandle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: transparent;
   transition: background 0.15s;
 }
-
-.resizeHandle:hover { background: var(--accent); opacity: 0.4; }
+.resizeHandle:hover::before { background: var(--accent); opacity: 0.4; }
 
 .thinkingBar {
   display: flex;
