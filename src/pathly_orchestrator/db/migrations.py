@@ -5,7 +5,7 @@ import sqlite3
 
 
 def _run_migrations(conn: sqlite3.Connection) -> None:
-    """Idempotent schema creation for all 12 tables + schema_version."""
+    """Idempotent schema creation for all 14 tables + schema_version."""
     conn.executescript("""
 CREATE TABLE IF NOT EXISTS schema_version (
     version     INTEGER PRIMARY KEY,
@@ -185,6 +185,27 @@ CREATE TABLE IF NOT EXISTS catalog_items (
     tags         TEXT,
     indexed_at   TEXT NOT NULL,
     UNIQUE(item_type, name)
+);
+
+CREATE TABLE IF NOT EXISTS run_history (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_root TEXT NOT NULL,
+    feature      TEXT NOT NULL,
+    run_id       TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    started_at   TEXT,
+    finished_at  TEXT,
+    stage_count  INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    cost_usd     REAL DEFAULT 0.0,
+    adapter      TEXT,
+    UNIQUE(run_id)
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 """)
     conn.commit()

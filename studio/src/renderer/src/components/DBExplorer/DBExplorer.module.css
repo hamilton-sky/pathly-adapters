@@ -91,3 +91,10 @@
   background: var(--accent-bg);
   color: var(--accent);
 }
+
+.loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}

@@ -75,6 +75,22 @@ def runner_start():
             broadcast_fn=_broadcast_runner,
             interactive=interactive,
         )
+        try:
+            import time as _time
+            from pathly_orchestrator.db.connection import get_db as _get_db
+            from pathly_orchestrator.db.queries.run_history import upsert_run as _upsert_run
+            _now = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
+            _upsert_run(
+                _get_db(),
+                project_root=data["project_root"],
+                feature=topic,
+                run_id=state.run_id,
+                status="running",
+                started_at=_now,
+                adapter=data.get("flow"),
+            )
+        except Exception:
+            logging.debug("run_history upsert (start) error", exc_info=True)
         return jsonify({"status": "started", "topic": topic, "run_id": state.run_id}), 200
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409

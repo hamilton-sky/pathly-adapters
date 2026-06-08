@@ -1,0 +1,77 @@
+.item {
+  background: var(--bg-surface0);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.resolved { opacity: 0.4; }
+
+.anchor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.lineNum {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: 'Fira Mono', 'Cascadia Code', monospace;
+  flex-shrink: 0;
+}
+
+.lineText {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'Fira Mono', 'Cascadia Code', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.body {
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.45;
+  margin: 0;
+  word-break: break-word;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.resolveBtn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 7px;
+  transition: color 0.12s, border-color 0.12s;
+}
+.resolveBtn:hover { color: var(--green); border-color: var(--green); }
+
+.removeBtn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.12s;
+}
+.removeBtn:hover { color: var(--red); }

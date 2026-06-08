@@ -9,6 +9,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from pathly_orchestrator import eventlog
+from pathly_orchestrator.db.connection import get_db as _get_db
 from pathly_orchestrator.feature_flags import flags
 from pathly_telemetry.storage import append_activity
 from ..pricing import MODEL_PRICING
@@ -207,6 +208,35 @@ def record_activity_endpoint():
                 })
             except Exception:
                 logger.debug("otel_export hook error", exc_info=True)
+            # Write span to local otel_spans table for Studio DB Explorer
+            try:
+                import json as _json
+                _now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                _attrs = _json.dumps({
+                    "gen_ai.agent.name": str(data["agent"]),
+                    "gen_ai.usage.input_tokens": tokens_in,
+                    "gen_ai.usage.output_tokens": tokens_out,
+                    "gen_ai.request.model": str(data.get("model", "")),
+                    "pathly.cost_usd": float(cost_usd_val),
+                    "pathly.wall_seconds": wall_seconds,
+                    "pathly.result": str(data.get("result", "DONE")),
+                })
+                _conn = _get_db()
+                _conn.execute(
+                    "INSERT INTO otel_spans "
+                    "(project_root, feature, trace_id, span_id, parent_span_id, "
+                    " name, start_time, end_time, attributes) "
+                    "VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)",
+                    (
+                        str(project_root), str(data["feature"]),
+                        str(trace_id) if trace_id else None,
+                        str(span_id) if span_id else None,
+                        f"agent.{data['agent']}", _now, _now, _attrs,
+                    ),
+                )
+                _conn.commit()
+            except Exception:
+                logger.debug("otel_spans local write error", exc_info=True)
 
         return jsonify({"status": "recorded"}), 200
     except Exception as e:

@@ -1,6 +1,69 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 // Mirrored in studio/src/renderer/src/types/global.d.ts — keep in sync
+interface DbStats {
+  features: number
+  events: number
+  invocations: number
+  total_tokens: number
+  total_cost_usd: number
+}
+
+interface DbFeature {
+  project_root: string
+  feature: string
+  state: string
+  events: number
+  invocations: number
+  total_tokens: number
+  cost_usd: number
+  updated_at: string
+}
+
+interface DbEvent {
+  seq: number
+  ts: string
+  event_type: string
+  payload: Record<string, unknown>
+}
+
+interface DbAgent {
+  id: number
+  run_id: string | null
+  stage: string | null
+  agent_role: string | null
+  started_at: string | null
+  finished_at: string | null
+  tokens_in: number | null
+  tokens_out: number | null
+  cost_usd: number | null
+  session_id: string | null
+  summary: string | null
+}
+
+interface DbOtelSpan {
+  id: number
+  trace_id: string | null
+  span_id: string | null
+  parent_span_id: string | null
+  name: string
+  start_time: string
+  end_time: string
+  attributes: Record<string, unknown>
+}
+
+interface DbRun {
+  id: number
+  run_id: string
+  status: string
+  started_at: string | null
+  finished_at: string | null
+  stage_count: number
+  total_tokens: number
+  cost_usd: number
+  adapter: string | null
+}
+
 interface BrightskyTokenPayload {
   access_token: string
   refresh_token: string
@@ -166,5 +229,22 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on('brightsky:token', listener)
       return () => ipcRenderer.removeListener('brightsky:token', listener)
     },
+  },
+  db: {
+    stats: (): Promise<DbStats | null> => ipcRenderer.invoke('db:stats'),
+    features: (): Promise<DbFeature[]> => ipcRenderer.invoke('db:features'),
+    events: (feature: string, projectRoot?: string): Promise<DbEvent[]> =>
+      ipcRenderer.invoke('db:events', feature, projectRoot),
+    agents: (feature: string, projectRoot?: string): Promise<DbAgent[]> =>
+      ipcRenderer.invoke('db:agents', feature, projectRoot),
+    otel: (feature: string, projectRoot?: string): Promise<DbOtelSpan[]> =>
+      ipcRenderer.invoke('db:otel', feature, projectRoot),
+    runs: (feature: string, projectRoot?: string): Promise<DbRun[]> =>
+      ipcRenderer.invoke('db:runs', feature, projectRoot),
+    query: (sql: string): Promise<{ rows: Record<string, unknown>[]; error?: string }> =>
+      ipcRenderer.invoke('db:query', sql),
+    settings: (): Promise<Record<string, string>> => ipcRenderer.invoke('db:settings'),
+    setSetting: (key: string, value: string): Promise<void> =>
+      ipcRenderer.invoke('db:setSetting', key, value),
   },
 })

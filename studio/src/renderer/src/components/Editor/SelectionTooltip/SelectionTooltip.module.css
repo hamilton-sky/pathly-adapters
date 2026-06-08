@@ -1,0 +1,30 @@
+.tooltip {
+  position: fixed;
+  left: var(--tip-x, 0px);
+  top: var(--tip-y, 0px);
+  transform: translateX(-50%) translateY(calc(-100% - 8px));
+  z-index: 1000;
+  background: var(--bg-surface1);
+  border: 1px solid var(--bg-surface0);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  padding: 2px;
+  pointer-events: all;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s;
+}
+.btn:hover { background: var(--bg-surface0); color: var(--accent); }

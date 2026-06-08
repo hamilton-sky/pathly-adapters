@@ -1,48 +1,39 @@
-import { FEATURES } from './dbExplorerData'
+import type { FeatureData } from './dbExplorerData'
 import styles from './StatsStrip.module.css'
 
-function totalEvents(): number {
-  return FEATURES.reduce((sum, f) => sum + f.events, 0)
+interface StatsStripProps {
+  stats: DbStats | null
+  features: FeatureData[]
 }
 
-function totalInvocations(): number {
-  return FEATURES.reduce((sum, f) => sum + f.inv, 0)
-}
+export function StatsStrip({ stats, features }: StatsStripProps): JSX.Element {
+  const featureCount = stats?.features ?? features.length
+  const eventCount = stats?.events ?? features.reduce((s, f) => s + f.events, 0)
+  const invCount = stats?.invocations ?? features.reduce((s, f) => s + f.inv, 0)
+  const tokenCount = stats?.total_tokens ?? features.reduce((s, f) => s + parseInt(f.tokens.replace(/,/g, ''), 10), 0)
+  const costVal = stats?.total_cost_usd ?? features.reduce((s, f) => s + parseFloat(f.cost.replace('$', '')), 0)
 
-function totalCost(): string {
-  const val = FEATURES.reduce((sum, f) => sum + parseFloat(f.cost.replace('$', '')), 0)
-  return `$${val.toFixed(2)}`
-}
-
-function totalTokens(): string {
-  const val = FEATURES.reduce((sum, f) => {
-    return sum + parseInt(f.tokens.replace(/,/g, ''), 10)
-  }, 0)
-  return val.toLocaleString()
-}
-
-export function StatsStrip(): JSX.Element {
   return (
     <div className={styles.stats}>
       <div className={styles.stat}>
         <div className={styles.k}>Features</div>
-        <div className={styles.v}>{FEATURES.length}</div>
+        <div className={styles.v}>{featureCount}</div>
       </div>
       <div className={styles.stat}>
         <div className={styles.k}>Events</div>
-        <div className={styles.v}>{totalEvents()}</div>
+        <div className={styles.v}>{eventCount}</div>
       </div>
       <div className={styles.stat}>
         <div className={styles.k}>Invocations</div>
-        <div className={styles.v}>{totalInvocations()}</div>
+        <div className={styles.v}>{invCount}</div>
       </div>
       <div className={styles.stat}>
         <div className={styles.k}>Tokens</div>
-        <div className={styles.v}>{totalTokens()}</div>
+        <div className={styles.v}>{tokenCount.toLocaleString()}</div>
       </div>
       <div className={styles.stat}>
         <div className={styles.k}>Cost</div>
-        <div className={`${styles.v} ${styles.cost}`}>{totalCost()}</div>
+        <div className={`${styles.v} ${styles.cost}`}>${costVal.toFixed(2)}</div>
       </div>
     </div>
   )

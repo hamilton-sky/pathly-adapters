@@ -116,3 +116,10 @@
   padding: 18px;
   overflow: auto;
 }
+
+.mLoading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}

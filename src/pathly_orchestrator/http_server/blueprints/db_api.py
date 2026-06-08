@@ -1,0 +1,344 @@
+"""DB Explorer REST endpoints — /db/*."""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sqlite3
+from pathlib import Path
+
+from flask import Blueprint, jsonify, request
+
+logger = logging.getLogger("pathly.http")
+bp = Blueprint("db_api", __name__)
+
+_ALLOWED_KEYWORDS = {"select", "with", "from", "where", "join", "group", "order",
+                     "limit", "having", "union", "intersect", "except", "explain"}
+_FORBIDDEN_KEYWORDS = {"insert", "update", "delete", "drop", "create", "alter",
+                       "attach", "detach", "pragma", "vacuum", "reindex"}
+
+
+def _get_db():
+    from pathly_orchestrator.db.connection import get_db
+    return get_db()
+
+
+def _project_root_param() -> str:
+    return (
+        request.args.get("project_root", "")
+        or os.environ.get("PATHLY_PROJECT_ROOT", "")
+    )
+
+
+def _parse_json_file(path: Path) -> dict:
+    """Read a JSON file that may have YAML frontmatter (--- ... --- {json})."""
+    raw = path.read_text(encoding="utf-8").strip()
+    if raw.startswith("---"):
+        parts = [p.strip() for p in raw.split("---") if p.strip()]
+        raw = parts[-1] if parts else "{}"
+    return json.loads(raw)
+
+
+def _scan_filesystem_features(project_root: str) -> list[dict]:
+    """Scan pathly/plans/*/STATE.json for features not yet in the DB."""
+    results = []
+    plans_dir = Path(project_root) / "pathly" / "plans"
+    if not plans_dir.is_dir():
+        return results
+
+    for state_file in sorted(plans_dir.glob("*/STATE.json")):
+        feature_name = state_file.parent.name
+        try:
+            state = _parse_json_file(state_file)
+        except Exception:
+            continue
+
+        current = state.get("current", "UNKNOWN").upper()
+        updated_at = state.get("updated_at", "")
+        convs_done = int(state.get("convs_done", 0))
+        convs_total = int(state.get("convs_total", 0))
+
+        cost_usd = 0.0
+        runner_file = state_file.parent / "RUNNER_STATE.json"
+        if runner_file.exists():
+            try:
+                runner = _parse_json_file(runner_file)
+                cost_usd = float(runner.get("cost_usd_so_far", 0.0))
+            except Exception:
+                pass
+
+        results.append({
+            "project_root": project_root,
+            "feature": feature_name,
+            "state": current,
+            "events": 0,
+            "invocations": 0,
+            "total_tokens": 0,
+            "cost_usd": cost_usd,
+            "updated_at": updated_at,
+            "convs_done": convs_done,
+            "convs_total": convs_total,
+            "source": "filesystem",
+        })
+    return results
+
+
+@bp.route("/db/stats", methods=["GET"])
+def db_stats():
+    """Aggregate counts — DB + filesystem feature count."""
+    try:
+        project_root = _project_root_param()
+        conn = _get_db()
+
+        db_features_count = conn.execute("SELECT COUNT(DISTINCT feature) FROM fsm_state").fetchone()[0]
+        events = conn.execute("SELECT COUNT(*) FROM fsm_events").fetchone()[0]
+        invocations = conn.execute("SELECT COUNT(*) FROM agent_invocations").fetchone()[0]
+        row = conn.execute(
+            "SELECT COALESCE(SUM(tokens_in+tokens_out),0), COALESCE(SUM(cost_usd),0) "
+            "FROM agent_invocations"
+        ).fetchone()
+        total_tokens = int(row[0])
+        total_cost = float(row[1])
+
+        # Supplement feature count from filesystem if DB is empty
+        if db_features_count == 0 and project_root:
+            fs_features = _scan_filesystem_features(project_root)
+            db_features_count = len(fs_features)
+            total_cost += sum(f["cost_usd"] for f in fs_features)
+
+        return jsonify({
+            "features": db_features_count,
+            "events": events,
+            "invocations": invocations,
+            "total_tokens": total_tokens,
+            "total_cost_usd": round(total_cost, 4),
+        })
+    except Exception as e:
+        logger.exception("db_stats error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/features", methods=["GET"])
+def db_features():
+    """List all features — DB rows first, filesystem fallback for older features."""
+    try:
+        project_root = _project_root_param()
+        conn = _get_db()
+
+        # DB-backed features — skip rows with corrupt state_json
+        states: dict[tuple[str, str], dict] = {}
+        for r in conn.execute("SELECT project_root, feature, state_json FROM fsm_state").fetchall():
+            try:
+                states[(r["project_root"], r["feature"])] = json.loads(r["state_json"])
+            except (json.JSONDecodeError, TypeError):
+                states[(r["project_root"], r["feature"])] = {}
+        event_counts = {
+            (r["project_root"], r["feature"]): r["cnt"]
+            for r in conn.execute(
+                "SELECT project_root, feature, COUNT(*) as cnt FROM fsm_events GROUP BY project_root, feature"
+            ).fetchall()
+        }
+        inv_rows = conn.execute(
+            "SELECT project_root, feature, "
+            "COUNT(*) as inv, "
+            "COALESCE(SUM(tokens_in+tokens_out),0) as total_tokens, "
+            "COALESCE(SUM(cost_usd),0) as total_cost "
+            "FROM agent_invocations GROUP BY project_root, feature"
+        ).fetchall()
+        inv_stats = {(r["project_root"], r["feature"]): dict(r) for r in inv_rows}
+
+        # Only show features that have a real FSM-state entry — drop event-only phantoms
+        all_keys = set(states)
+        results = []
+        for (pr, feat) in sorted(all_keys, key=lambda x: x[1]):
+            state_obj = states.get((pr, feat), {})
+            inv = inv_stats.get((pr, feat), {})
+            # DB state_json stores current_state; filesystem uses current
+            state_val = state_obj.get("current_state") or state_obj.get("current", "UNKNOWN")
+            results.append({
+                "project_root": pr,
+                "feature": feat,
+                "state": state_val.upper(),
+                "events": event_counts.get((pr, feat), 0),
+                "invocations": inv.get("inv", 0),
+                "total_tokens": int(inv.get("total_tokens", 0)),
+                "cost_usd": round(float(inv.get("total_cost", 0.0)), 4),
+                "updated_at": state_obj.get("updated_at", ""),
+                "convs_done": state_obj.get("convs_done", 0),
+                "convs_total": state_obj.get("convs_total", 0),
+                "source": "db",
+            })
+
+        # Filesystem fallback — add any features not already in DB results
+        db_feature_names = {r["feature"] for r in results}
+        if project_root:
+            for fs_feat in _scan_filesystem_features(project_root):
+                if fs_feat["feature"] not in db_feature_names:
+                    results.append(fs_feat)
+
+        return jsonify(sorted(results, key=lambda x: x["feature"]))
+    except Exception as e:
+        logger.exception("db_features error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/features/<feature>/events", methods=["GET"])
+def db_feature_events(feature: str):
+    """Events for a specific feature."""
+    try:
+        conn = _get_db()
+        pr = _project_root_param()
+        query = "SELECT seq, ts, event_type, payload FROM fsm_events WHERE feature=?"
+        params: list = [feature]
+        if pr:
+            query += " AND project_root=?"
+            params.append(pr)
+        query += " ORDER BY seq DESC LIMIT 200"
+        rows = conn.execute(query, params).fetchall()
+        results = []
+        for r in rows:
+            try:
+                payload = json.loads(r["payload"])
+            except (json.JSONDecodeError, TypeError):
+                payload = {}
+            results.append({
+                "seq": r["seq"],
+                "ts": r["ts"],
+                "event_type": r["event_type"],
+                "payload": payload,
+            })
+        return jsonify(results)
+    except Exception as e:
+        logger.exception("db_feature_events error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/features/<feature>/agents", methods=["GET"])
+def db_feature_agents(feature: str):
+    """Agent invocations for a specific feature."""
+    try:
+        conn = _get_db()
+        pr = _project_root_param()
+        query = (
+            "SELECT id, run_id, stage, agent_role, started_at, finished_at, "
+            "tokens_in, tokens_out, cost_usd, session_id, summary "
+            "FROM agent_invocations WHERE feature=?"
+        )
+        params: list = [feature]
+        if pr:
+            query += " AND project_root=?"
+            params.append(pr)
+        query += " ORDER BY id DESC"
+        rows = conn.execute(query, params).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        logger.exception("db_feature_agents error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/features/<feature>/otel", methods=["GET"])
+def db_feature_otel(feature: str):
+    """OTel spans for a specific feature."""
+    try:
+        conn = _get_db()
+        pr = _project_root_param()
+        query = (
+            "SELECT id, trace_id, span_id, parent_span_id, name, "
+            "start_time, end_time, attributes "
+            "FROM otel_spans WHERE feature=?"
+        )
+        params: list = [feature]
+        if pr:
+            query += " AND project_root=?"
+            params.append(pr)
+        query += " ORDER BY id DESC LIMIT 200"
+        rows = conn.execute(query, params).fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["attributes"] = json.loads(d["attributes"] or "{}")
+            except (json.JSONDecodeError, TypeError):
+                d["attributes"] = {}
+            results.append(d)
+        return jsonify(results)
+    except Exception as e:
+        logger.exception("db_feature_otel error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/features/<feature>/runs", methods=["GET"])
+def db_feature_runs(feature: str):
+    """Run history for a specific feature."""
+    try:
+        conn = _get_db()
+        pr = _project_root_param()
+        query = (
+            "SELECT id, run_id, status, started_at, finished_at, "
+            "stage_count, total_tokens, cost_usd, adapter "
+            "FROM run_history WHERE feature=?"
+        )
+        params: list = [feature]
+        if pr:
+            query += " AND project_root=?"
+            params.append(pr)
+        query += " ORDER BY id DESC"
+        rows = conn.execute(query, params).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        logger.exception("db_feature_runs error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/query", methods=["POST"])
+def db_query():
+    """Sandboxed SELECT-only SQL query."""
+    try:
+        data = request.get_json() or {}
+        sql = str(data.get("sql", "")).strip()
+        if not sql:
+            return jsonify({"error": "Missing 'sql' field"}), 400
+        first_word = sql.lower().split()[0] if sql.split() else ""
+        if first_word in _FORBIDDEN_KEYWORDS or first_word not in _ALLOWED_KEYWORDS:
+            return jsonify({"error": "Only SELECT queries are allowed"}), 400
+        conn = _get_db()
+        rows = conn.execute(sql).fetchmany(500)
+        return jsonify({"rows": [dict(r) for r in rows]})
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.exception("db_query error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/settings", methods=["GET"])
+def db_get_settings():
+    """Return all app_settings."""
+    try:
+        conn = _get_db()
+        rows = conn.execute("SELECT key, value FROM app_settings").fetchall()
+        return jsonify({r["key"]: r["value"] for r in rows})
+    except Exception as e:
+        logger.exception("db_get_settings error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/settings/<key>", methods=["PUT"])
+def db_set_setting(key: str):
+    """Set an app_setting."""
+    try:
+        data = request.get_json() or {}
+        value = data.get("value")
+        if value is None:
+            return jsonify({"error": "Missing 'value' field"}), 400
+        conn = _get_db()
+        conn.execute(
+            "INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, datetime('now')) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+            (key, str(value)),
+        )
+        conn.commit()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        logger.exception("db_set_setting error")
+        return jsonify({"error": str(e)}), 500

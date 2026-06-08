@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { FeatureData } from './dbExplorerData'
-import { FEATURES } from './dbExplorerData'
 import { StatsStrip } from './StatsStrip'
 import { FeatureGrid } from './FeatureGrid'
 import { FeatureStack } from './FeatureStack'
@@ -9,17 +8,68 @@ import styles from './DBExplorer.module.css'
 
 type ViewMode = 'grid' | 'stack'
 
+function dbFeatureToFeatureData(f: DbFeature): FeatureData {
+  const state = mapState(f.state)
+  return {
+    name: f.feature,
+    state,
+    events: f.events,
+    inv: f.invocations,
+    tokens: f.total_tokens.toLocaleString(),
+    cost: `$${f.cost_usd.toFixed(2)}`,
+    ts: f.updated_at ? f.updated_at.slice(11, 19) : '',
+    done: f.convs_done ?? 0,
+    total: f.convs_total ?? 0,
+    pcol: `var(--state-${state.toLowerCase()})`,
+    dots: [{ state }],
+  }
+}
+
+function mapState(s: string): FeatureData['state'] {
+  const upper = s.toUpperCase()
+  if (upper === 'DONE') return 'DONE'
+  if (upper === 'RETRO') return 'RETRO'
+  if (['TESTING', 'TEST'].includes(upper)) return 'TESTING'
+  if (['REVIEWING', 'REVIEW'].includes(upper)) return 'REVIEWING'
+  if (['BUILDING', 'BUILD', 'DESIGN', 'DESIGNING'].includes(upper)) return 'BUILDING'
+  // STORM, PLAN, PLANNING, UNKNOWN and anything else → PLANNING
+  return 'PLANNING'
+}
+
 export function DBExplorer(): JSX.Element {
+  const [features, setFeatures] = useState<FeatureData[]>([])
+  const [stats, setStats] = useState<DbStats | null>(null)
   const [modalFeature, setModalFeature] = useState<FeatureData | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [rawFeatures, rawStats] = await Promise.all([
+        window.pathly.db.features(),
+        window.pathly.db.stats(),
+      ])
+      setFeatures(rawFeatures.map(dbFeatureToFeatureData))
+      setStats(rawStats)
+    } catch {
+      // FSM may not be running yet — stay with empty list
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
 
   return (
     <div className={styles.panel}>
-      <DBExplorerHeader viewMode={viewMode} onViewMode={setViewMode} />
-      <StatsStrip />
-      {viewMode === 'grid'
-        ? <FeatureGrid features={FEATURES} onCardClick={setModalFeature} />
-        : <FeatureStack features={FEATURES} onRowClick={setModalFeature} />
+      <DBExplorerHeader viewMode={viewMode} onViewMode={setViewMode} onRefresh={load} />
+      <StatsStrip stats={stats} features={features} />
+      {loading
+        ? <div className={styles.loading}>Loading…</div>
+        : viewMode === 'grid'
+          ? <FeatureGrid features={features} onCardClick={setModalFeature} />
+          : <FeatureStack features={features} onRowClick={setModalFeature} />
       }
       <FeatureModal feature={modalFeature} onClose={() => setModalFeature(null)} />
     </div>
@@ -29,9 +79,10 @@ export function DBExplorer(): JSX.Element {
 interface HeaderProps {
   viewMode: ViewMode
   onViewMode: (m: ViewMode) => void
+  onRefresh: () => void
 }
 
-function DBExplorerHeader({ viewMode, onViewMode }: HeaderProps): JSX.Element {
+function DBExplorerHeader({ viewMode, onViewMode, onRefresh }: HeaderProps): JSX.Element {
   return (
     <div className={styles.header}>
       <div className={styles.titleGroup}>
@@ -59,8 +110,7 @@ function DBExplorerHeader({ viewMode, onViewMode }: HeaderProps): JSX.Element {
             ☰
           </button>
         </div>
-        <button type="button" className={styles.btnB}>↻ Refresh</button>
-        <button type="button" className={styles.btnB}>⊞ Run Migration</button>
+        <button type="button" className={styles.btnB} onClick={onRefresh}>↻ Refresh</button>
         <button type="button" className={styles.btnB}>↓ Export JSON</button>
       </div>
     </div>

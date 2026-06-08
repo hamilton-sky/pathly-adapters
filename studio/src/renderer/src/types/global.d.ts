@@ -1,6 +1,72 @@
 export {}
 
 declare global {
+  interface DbStats {
+    features: number
+    events: number
+    invocations: number
+    total_tokens: number
+    total_cost_usd: number
+  }
+
+  interface DbFeature {
+    project_root: string
+    feature: string
+    state: string
+    events: number
+    invocations: number
+    total_tokens: number
+    cost_usd: number
+    updated_at: string
+    convs_done?: number
+    convs_total?: number
+    source?: string
+  }
+
+  interface DbEvent {
+    seq: number
+    ts: string
+    event_type: string
+    payload: Record<string, unknown>
+  }
+
+  interface DbAgent {
+    id: number
+    run_id: string | null
+    stage: string | null
+    agent_role: string | null
+    started_at: string | null
+    finished_at: string | null
+    tokens_in: number | null
+    tokens_out: number | null
+    cost_usd: number | null
+    session_id: string | null
+    summary: string | null
+  }
+
+  interface DbOtelSpan {
+    id: number
+    trace_id: string | null
+    span_id: string | null
+    parent_span_id: string | null
+    name: string
+    start_time: string
+    end_time: string
+    attributes: Record<string, unknown>
+  }
+
+  interface DbRun {
+    id: number
+    run_id: string
+    status: string
+    started_at: string | null
+    finished_at: string | null
+    stage_count: number
+    total_tokens: number
+    cost_usd: number
+    adapter: string | null
+  }
+
   interface BrightskyTokenPayload {
     access_token: string
     refresh_token: string
@@ -93,6 +159,17 @@ declare global {
       brightsky: {
         login: (baseUrl: string) => Promise<void>
         onToken: (cb: (payload: BrightskyTokenPayload | BrightskyAuthError) => void) => () => void
+      }
+      db: {
+        stats: () => Promise<DbStats | null>
+        features: () => Promise<DbFeature[]>
+        events: (feature: string, projectRoot?: string) => Promise<DbEvent[]>
+        agents: (feature: string, projectRoot?: string) => Promise<DbAgent[]>
+        otel: (feature: string, projectRoot?: string) => Promise<DbOtelSpan[]>
+        runs: (feature: string, projectRoot?: string) => Promise<DbRun[]>
+        query: (sql: string) => Promise<{ rows: Record<string, unknown>[]; error?: string }>
+        settings: () => Promise<Record<string, string>>
+        setSetting: (key: string, value: string) => Promise<void>
       }
     }
   }

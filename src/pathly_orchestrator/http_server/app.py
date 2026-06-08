@@ -24,6 +24,7 @@ from .blueprints.menu import bp as menu_bp
 from .blueprints.chat import bp as chat_bp
 from .blueprints.streams import bp as streams_bp
 from .blueprints import flows as _flows_bp
+from .blueprints.db_api import bp as db_api_bp
 
 app = Flask(__name__)
 
@@ -40,6 +41,7 @@ app.register_blueprint(menu_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(streams_bp)
 app.register_blueprint(_flows_bp.bp)
+app.register_blueprint(db_api_bp)
 
 # Register request/response hooks
 app.before_request(_log_request)

@@ -87,6 +87,25 @@ def _set_status(state: RunnerState, status: str, broadcast_fn: Optional[Callable
             )
         except Exception as exc:
             logger.warning("broadcast_fn error: %s", exc)
+    if status in {"done", "aborted", "error"}:
+        try:
+            import time as _time
+            from pathly_orchestrator.db.connection import get_db as _get_db
+            from pathly_orchestrator.db.queries.run_history import upsert_run as _upsert_run
+            _now = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
+            _upsert_run(
+                _get_db(),
+                project_root=state.project_root,
+                feature=state.topic,
+                run_id=state.run_id,
+                status=status,
+                finished_at=_now,
+                stage_count=state.iterations,
+                total_tokens=0,
+                cost_usd=state.cost_usd_so_far,
+            )
+        except Exception:
+            logger.debug("run_history upsert (finish) error", exc_info=True)
 
 
 def _cleanup_run_id(run_id: str) -> None:

@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store'
+import { useTerminalStore } from '../../store/terminalStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
 import type { FrontmatterValues } from '../../types'
 import { Tooltip } from '../ui'
 import { ConfigForm } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
+import { CommentsPanel } from './CommentsPanel/CommentsPanel'
+import { CommentablePreview } from './CommentablePreview/CommentablePreview'
+import { CommentModal } from './CommentModal/CommentModal'
+import { useComments } from './useComments'
+import { deriveLineNumber, buildSendPrompt, getSpawnCwd } from './commentUtils'
 import styles from './index.module.css'
 
 type TabMode = 'edit' | 'preview' | 'split'
@@ -86,9 +92,14 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   const isSkillOrAgent = derivedType === 'skill' || derivedType === 'agent'
   const isPreviewDefault = isSkillOrAgent || derivedType === 'template'
 
+  const { comments, add: addComment, resolve: resolveComment, remove: removeComment } = useComments(effectivePath)
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
+  const addTab = useTerminalStore((s) => s.addTab)
+  const openTab = useTerminalStore((s) => s.openTab)
+
   const [config, setConfig] = useState<FrontmatterValues>({} as FrontmatterValues)
   const [body, setBody]     = useState('')
-  const [tab, setTab]       = useState<TabMode>(isPreviewDefault ? 'preview' : 'edit')
+  const [tab, setTab]       = useState<TabMode>('preview')
   const [loading, setLoading]     = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -100,8 +111,8 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
 
   useEffect(() => {
     if (!effectivePath) return
-    const defaultTab = isPreviewDefault ? 'preview' : 'edit'
-    setTab(defaultTab)
+    setTab('preview')
+    setPendingAnchor(null)
     setLoading(true)
     setSaveError(null)
     readFile(effectivePath)
@@ -147,11 +158,35 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     autoSaveRef.current = setTimeout(() => void performSave(v, config), 2000)
   }
 
+  function handleModalAdd(commentBody: string): void {
+    if (!pendingAnchor || !effectivePath) return
+    addComment(deriveLineNumber(body, pendingAnchor), pendingAnchor, commentBody)
+    setPendingAnchor(null)
+  }
+
+  async function handleModalSendNow(commentBody: string): Promise<void> {
+    if (!pendingAnchor || !effectivePath) return
+    const lineNumber = deriveLineNumber(body, pendingAnchor)
+    addComment(lineNumber, pendingAnchor, commentBody)
+    setPendingAnchor(null)
+    const newItem = { id: 'send-now', lineNumber, lineText: pendingAnchor.slice(0, 120), body: commentBody, resolved: false, createdAt: '' }
+    const allUnresolved = [...comments.filter((c) => !c.resolved), newItem]
+    const norm = effectivePath.replace(/\\/g, '/')
+    const fileName = norm.split('/').pop() ?? 'file'
+    const prompt = buildSendPrompt(effectivePath, body, allUnresolved)
+    const tabId = `review-${Date.now().toString(36)}`
+    addTab(tabId, `Review · ${fileName}`)
+    openTab(tabId)
+    await window.pathly.terminal.spawn(tabId, getSpawnCwd(effectivePath), undefined, [
+      'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
+    ])
+  }
+
   if (loading) {
     return <div className={styles.panel}><div className={styles.message}>Loading…</div></div>
   }
 
-  const tabs: TabMode[] = ['edit', 'preview', 'split']
+  const tabs: TabMode[] = ['preview', 'edit', 'split']
 
   return (
     <div className={styles.panel}>
@@ -180,7 +215,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
         <span className={styles.breadcrumb}>{breadcrumb}</span>
         <div className={styles.actions}>
           {saveError && <span className={styles.error}>{saveError}</span>}
-          {isPreviewDefault && tab === 'preview' && (
+          {tab === 'preview' && (
             <Tooltip label="Edit raw source" placement="bottom">
               <button className={styles.tab} onClick={() => setTab('edit')}>
                 Edit source
@@ -215,8 +250,22 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
           </div>
         )}
         {tab === 'preview' && (
-          <div className={styles.full}>
-            <MarkdownPreview content={body} />
+          <div className={styles.previewWithComments}>
+            <div className={styles.previewContent}>
+              <CommentablePreview
+                content={body}
+                onSelectionComment={(anchor) => setPendingAnchor(anchor)}
+              />
+            </div>
+            {effectivePath && (
+              <CommentsPanel
+                filePath={effectivePath}
+                body={body}
+                comments={comments}
+                onResolve={resolveComment}
+                onRemove={removeComment}
+              />
+            )}
           </div>
         )}
         {tab === 'split' && (
@@ -231,6 +280,15 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
           </div>
         )}
       </div>
+
+      {pendingAnchor && (
+        <CommentModal
+          anchorText={pendingAnchor}
+          onAdd={handleModalAdd}
+          onSendNow={(b) => void handleModalSendNow(b)}
+          onClose={() => setPendingAnchor(null)}
+        />
+      )}
     </div>
   )
 }
