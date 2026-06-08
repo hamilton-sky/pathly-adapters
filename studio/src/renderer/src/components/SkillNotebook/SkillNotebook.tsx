@@ -16,7 +16,6 @@ const STEPS = [
 
 export default function SkillNotebookPanel() {
   const skillNotebookPath = useUiStore((s) => s.skillNotebookPath)
-  const chatOpen = useUiStore((s) => s.chatOpen)
   const [viewMode, setViewMode] = useState<NotebookViewMode>('cells')
   const preview = usePreviewResize()
 
@@ -61,7 +60,7 @@ export default function SkillNotebookPanel() {
         <>
           <div className={styles.body}>
             <NotebookCanvas />
-            {!chatOpen && <div className={styles.resizeHandle} onMouseDown={preview.onDragStart} />}
+            <div className={styles.resizeHandle} onMouseDown={preview.onDragStart} />
             <div ref={preview.previewRef} className={styles.previewWrapper}>
               <PreviewPanel />
             </div>
