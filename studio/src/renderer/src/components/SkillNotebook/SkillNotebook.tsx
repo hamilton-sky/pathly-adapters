@@ -54,7 +54,7 @@ export default function SkillNotebookPanel() {
       {viewMode === 'editor' ? (
         /* Full editor — raw source view with its own edit/preview/split toggle */
         <div className={styles.editorWrapper}>
-          <Editor />
+          <Editor path={skillNotebookPath} />
         </div>
       ) : (
         /* Notebook cells + live preview panel */

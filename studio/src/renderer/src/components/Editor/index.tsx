@@ -66,8 +66,20 @@ function serializeFrontmatter(config: FrontmatterValues): string {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function Editor(): JSX.Element {
+function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
+  const norm = p.replace(/\\/g, '/')
+  if (norm.includes('/agents/')) return 'agent'
+  if (norm.includes('/templates/')) return 'template'
+  if (norm.includes('/skills/')) return 'skill'
+  return 'other'
+}
+
+export function Editor({ path: pathOverride }: { path?: string | null } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
+
+  // When rendered from SkillNotebook, pathOverride carries skillNotebookPath.
+  // Fall back to selectedItem for standalone Editor usage (FILES sidebar).
+  const effectivePath = pathOverride ?? selectedItem?.path ?? null
 
   const [config, setConfig] = useState<FrontmatterValues>({} as FrontmatterValues)
   const [body, setBody]     = useState('')
@@ -76,21 +88,23 @@ export function Editor(): JSX.Element {
   const [saveError, setSaveError] = useState<string | null>(null)
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const isDirty = selectedItem ? dirtyItems.has(selectedItem.path) : false
-  const isSkillOrAgent = selectedItem?.type === 'skill' || selectedItem?.type === 'agent'
-  const isPreviewDefault = isSkillOrAgent || selectedItem?.type === 'template'
-  const breadcrumb = selectedItem
+  const isDirty = effectivePath ? dirtyItems.has(effectivePath) : false
+  const derivedType = effectivePath && !selectedItem ? typeFromPath(effectivePath) : (selectedItem?.type ?? 'other')
+  const isSkillOrAgent = derivedType === 'skill' || derivedType === 'agent'
+  const isPreviewDefault = isSkillOrAgent || derivedType === 'template'
+  const breadcrumb = selectedItem && !pathOverride
     ? `${selectedItem.type.charAt(0).toUpperCase() + selectedItem.type.slice(1)}s / ${selectedItem.name}`
-    : ''
+    : effectivePath
+      ? effectivePath.replace(/\\/g, '/').split('/').slice(-2).join(' › ').replace('.md', '')
+      : ''
 
   useEffect(() => {
-    if (!selectedItem) return
-    const type = selectedItem.type
-    const defaultTab = (type === 'skill' || type === 'agent' || type === 'template') ? 'preview' : 'edit'
+    if (!effectivePath) return
+    const defaultTab = isPreviewDefault ? 'preview' : 'edit'
     setTab(defaultTab)
     setLoading(true)
     setSaveError(null)
-    readFile(selectedItem.path)
+    readFile(effectivePath)
       .then((content) => {
         const parsed = parseFrontmatter(content ?? '')
         setConfig(parsed.config)
@@ -98,7 +112,7 @@ export function Editor(): JSX.Element {
       })
       .catch(() => { setConfig({} as FrontmatterValues); setBody('') })
       .finally(() => setLoading(false))
-  }, [selectedItem?.path])
+  }, [effectivePath])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -109,12 +123,12 @@ export function Editor(): JSX.Element {
   })
 
   async function performSave(currentBody: string, currentConfig: FrontmatterValues): Promise<void> {
-    if (!selectedItem) return
+    if (!effectivePath) return
     setSaveError(null)
     const merged = `---\n${serializeFrontmatter(currentConfig)}\n---\n${currentBody}`
     try {
-      await writeFile(selectedItem.path, merged)
-      clearDirty(selectedItem.path)
+      await writeFile(effectivePath, merged)
+      clearDirty(effectivePath)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))
     }
@@ -122,12 +136,12 @@ export function Editor(): JSX.Element {
 
   function handleConfigChange(v: FrontmatterValues): void {
     setConfig(v)
-    if (selectedItem) markDirty(selectedItem.path)
+    if (effectivePath) markDirty(effectivePath)
   }
 
   function handleBodyChange(v: string): void {
     setBody(v)
-    if (selectedItem) markDirty(selectedItem.path)
+    if (effectivePath) markDirty(effectivePath)
     if (tab === 'preview') return
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
     autoSaveRef.current = setTimeout(() => void performSave(v, config), 2000)
