@@ -4,9 +4,10 @@ import styles from './StageDots.module.css'
 
 interface StageDotsProps {
   dots: DotSegment[]
+  compact?: boolean
 }
 
-export function StageDots({ dots }: StageDotsProps): JSX.Element {
+export function StageDots({ dots, compact }: StageDotsProps): JSX.Element {
   const refs = useRef<(HTMLSpanElement | null)[]>([])
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export function StageDots({ dots }: StageDotsProps): JSX.Element {
   }, [dots])
 
   return (
-    <div className={styles.dots}>
+    <div className={`${styles.dots} ${compact ? styles.compact : ''}`}>
       {dots.map((dot, i) => (
         <span
           key={i}

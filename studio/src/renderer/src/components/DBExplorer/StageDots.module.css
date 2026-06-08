@@ -4,6 +4,15 @@
   margin: 14px 0;
 }
 
+.compact {
+  margin: 0;
+  height: 5px;
+}
+
+.compact .segment {
+  height: 5px;
+}
+
 .segment {
   flex: var(--seg-flex, 1);
   height: 7px;

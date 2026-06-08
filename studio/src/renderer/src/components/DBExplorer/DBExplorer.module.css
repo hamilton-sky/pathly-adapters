@@ -55,3 +55,39 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+.viewToggle {
+  display: flex;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  background: var(--bg-mantle);
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.toggleBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.toggleBtnActive {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.toggleBtnActive:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+}

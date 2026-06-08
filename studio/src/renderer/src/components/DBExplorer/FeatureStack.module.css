@@ -1,0 +1,124 @@
+.stack {
+  padding: 0 28px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 160px 1fr 72px 96px 96px 72px 110px 120px;
+  gap: 12px;
+  padding: 0 14px 8px;
+  border-bottom: var(--border);
+}
+
+.hName,
+.hDots,
+.hNum,
+.hProgress,
+.hState {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hNum,
+.hProgress {
+  text-align: right;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 160px 1fr 72px 96px 96px 72px 110px 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: var(--border-subtle);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+  width: 100%;
+}
+
+.row:hover {
+  background: var(--bg-surface0);
+}
+
+.row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.name {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+}
+
+.num {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.cost {
+  color: var(--green);
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.progressEl {
+  width: 56px;
+  height: 5px;
+  appearance: none;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface1);
+  overflow: hidden;
+}
+
+.progressEl::-webkit-progress-bar {
+  background: var(--bg-surface1);
+  border-radius: var(--radius-full);
+}
+
+.progressEl::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: var(--radius-full);
+}
+
+.progressEl::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: var(--radius-full);
+}
+
+.frac {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.state {
+  display: flex;
+  justify-content: flex-end;
+}
