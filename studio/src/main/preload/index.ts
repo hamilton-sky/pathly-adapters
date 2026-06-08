@@ -35,7 +35,9 @@ contextBridge.exposeInMainWorld('pathly', {
       const listener = (_e: Electron.IpcRendererEvent, line: string): void => cb(line)
       ipcRenderer.on('shell:output', listener)
       return () => ipcRenderer.removeListener('shell:output', listener)
-    }
+    },
+    openSlide: (filePath: string): Promise<void> => ipcRenderer.invoke('shell:openSlide', filePath),
+    dsPort: (): Promise<number> => ipcRenderer.invoke('shell:dsPort'),
   },
   fsm: {
     ping: (): Promise<boolean> => ipcRenderer.invoke('fsm:ping'),

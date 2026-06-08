@@ -42,10 +42,6 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
     <div className={s.panelScrollable}>
       <PanelHeader title={stateId} onClose={onClose} />
 
-      <button onClick={onRemove} className={s.dangerBtn}>
-        Remove from canvas
-      </button>
-
       <div>
         <label htmlFor={renameInputId} className={s.label}>State ID</label>
         {renaming ? (
@@ -62,7 +58,7 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
               }}
               className={s.renameInput}
             />
-            <button onMouseDown={(e) => { e.preventDefault(); commitRename() }} className={s.renameConfirmBtn}>
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); commitRename() }} className={s.renameConfirmBtn}>
               ✓
             </button>
           </div>
@@ -88,6 +84,7 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
               {currentAgent}
             </span>
             <button
+              type="button"
               onClick={() => onAgentChange(stateId, '')}
               title="Clear assignment"
               className={s.agentClearBtn}
@@ -179,6 +176,10 @@ export function NodePanel({ stateId, data, onAgentChange, onRename, onClose, onR
           ))}
         </div>
       )}
+
+      <button type="button" onClick={onRemove} className={s.dangerBtn}>
+        Remove from canvas
+      </button>
     </div>
   )
 }

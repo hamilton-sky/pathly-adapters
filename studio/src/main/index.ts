@@ -1,5 +1,8 @@
-import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu, globalShortcut } from 'electron'
-import { join } from 'path'
+import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu, globalShortcut, protocol, net as electronNet } from 'electron'
+import { join, extname } from 'path'
+import { pathToFileURL } from 'url'
+import { createServer } from 'http'
+import { createReadStream, statSync } from 'fs'
 import { registerFsHandlers } from './ipc/fs'
 import { registerWatcherHandlers } from './ipc/watcher'
 import { registerFsmHandlers } from './ipc/fsm'
@@ -15,6 +18,51 @@ import { registerBrightskyHandlers } from './ipc/brightsky'
 import { autoUpdater } from 'electron-updater'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
+
+const DS_MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.json': 'application/json; charset=utf-8',
+}
+
+let dsServerPort = 0
+
+function startDsFileServer(dsRoot: string): Promise<number> {
+  return new Promise((resolve) => {
+    const server = createServer((req, res) => {
+      const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0])
+      const filePath = join(dsRoot, 'Design System', urlPath)
+      try {
+        statSync(filePath)
+      } catch {
+        res.writeHead(404); res.end(); return
+      }
+      const mime = DS_MIME[extname(filePath).toLowerCase()] ?? 'application/octet-stream'
+      res.writeHead(200, {
+        'Content-Type': mime,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache',
+      })
+      createReadStream(filePath).pipe(res)
+    })
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number }
+      dsServerPort = addr.port
+      resolve(addr.port)
+    })
+  })
+}
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'ds', privileges: { standard: true, secure: true, corsEnabled: true, supportFetchAPI: true } },
+])
 
 let fsmServer: ChildProcess | null = null
 
@@ -81,7 +129,8 @@ function createWindow(projectPath?: string): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      experimentalFeatures: true
+      experimentalFeatures: true,
+      webSecurity: false,
     }
   })
   Menu.setApplicationMenu(null)
@@ -105,6 +154,20 @@ function createWindow(projectPath?: string): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
+  protocol.handle('ds', (request) => {
+    const urlPath = decodeURIComponent(new URL(request.url).pathname)
+    const root = app.isPackaged
+      ? join(process.resourcesPath, 'pathly-library')
+      : join(app.getAppPath(), '..')
+    const filePath = join(root, 'Design System', urlPath)
+    return electronNet.fetch(pathToFileURL(filePath).href)
+  })
+
+  const dsLibRoot = app.isPackaged
+    ? join(process.resourcesPath, 'pathly-library')
+    : join(app.getAppPath(), '..')
+  await startDsFileServer(dsLibRoot)
+
   const alreadyRunning = await isFsmRunning()
   if (alreadyRunning) {
     console.log('[FSM] server already running — shutting down stale instance')
@@ -164,6 +227,22 @@ function registerIpcHandlers(win: BrowserWindow): void {
 
   ipcMain.handle('shell:openWindow', async (_event, projectPath: string) => {
     createWindow(projectPath)
+  })
+
+  ipcMain.handle('shell:dsPort', () => dsServerPort)
+
+  ipcMain.handle('shell:openSlide', async (_event, url: string) => {
+    const isLocal = url.startsWith('http://127.0.0.1:') || url.startsWith('http://localhost:')
+    if (!isLocal || !url.endsWith('.html')) return
+    const slideWin = new BrowserWindow({
+      width: 1280,
+      height: 740,
+      title: 'Pathly Studio',
+      autoHideMenuBar: true,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    })
+    slideWin.setMenu(null)
+    await slideWin.loadURL(url)
   })
 
   ipcMain.handle('window:setTitleBarOverlay', (_e, opts: { color: string; symbolColor: string }) => {

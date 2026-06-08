@@ -7,6 +7,8 @@ export const pickFolder      = (): Promise<string | null>                       
 export const publish         = (cwd: string): Promise<number | null>                                         => window.pathly.shell.publish(cwd)
 export const onPublishOutput = (cb: (line: string) => void): (() => void)                                    => window.pathly.shell.onOutput(cb)
 export const openWindow      = (path: string): Promise<void>                                                  => window.pathly.shell.openWindow(path)
+export const openSlide       = (filePath: string): Promise<void>                                             => window.pathly.shell.openSlide(filePath)
+export const getDsPort       = (): Promise<number>                                                           => window.pathly.shell.dsPort()
 export const fsmPing         = (): Promise<boolean>                                                           => window.pathly.fsm.ping()
 export const watchStart      = (projectPath: string, topic: string): Promise<void>                           => window.pathly.watch.start(projectPath, topic)
 export const onWatchEvent    = (cb: (data: { path: string; content: string }) => void): (() => void)         => window.pathly.watch.onEvent(cb)
