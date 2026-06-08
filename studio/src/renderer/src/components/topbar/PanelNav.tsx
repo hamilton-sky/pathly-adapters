@@ -1,5 +1,5 @@
 import React from 'react'
-import { LayoutGrid, Activity, BookOpen } from 'lucide-react'
+import { LayoutGrid, Activity, BookOpen, Database } from 'lucide-react'
 import { useStore } from '../../store'
 import { Tooltip } from '../ui'
 import { readFile } from '../../services/pathlyApi'
@@ -53,6 +53,17 @@ export function PanelNav(): JSX.Element {
         >
           <Activity size={13} />
           Monitor
+        </button>
+      </Tooltip>
+      <Tooltip label="Pipeline database explorer" shortcut="Ctrl+4" placement="bottom">
+        <button
+          type="button"
+          data-testid="topbar-panel-db-explorer"
+          className={`${styles.navBtn} ${activePanel === 'db-explorer' ? styles.navBtnActive : ''}`}
+          onClick={() => setActivePanel('db-explorer')}
+        >
+          <Database size={13} />
+          DB Explorer
         </button>
       </Tooltip>
     </div>

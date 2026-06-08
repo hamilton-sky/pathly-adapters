@@ -1,0 +1,57 @@
+.panel {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px 28px 18px;
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btnB {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: var(--radius-md);
+  border: var(--border);
+  background: var(--bg-mantle);
+  color: var(--text-secondary);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-base);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btnB:hover {
+  background: var(--btn-b-hover-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}

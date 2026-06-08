@@ -1,0 +1,54 @@
+.sublabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.eventList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eventRow {
+  display: grid;
+  grid-template-columns: 20px 80px 1fr 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.dotWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--dot-color, var(--text-muted));
+}
+
+.time {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.type {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.detail {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}

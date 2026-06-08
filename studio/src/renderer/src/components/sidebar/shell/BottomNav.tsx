@@ -4,9 +4,10 @@ interface BottomNavProps {
   activePanel: string
   onMonitor: () => void
   onSettings: () => void
+  onDbExplorer: () => void
 }
 
-export function BottomNav({ activePanel, onMonitor, onSettings }: BottomNavProps): JSX.Element {
+export function BottomNav({ activePanel, onMonitor, onSettings, onDbExplorer }: BottomNavProps): JSX.Element {
   return (
     <>
       <div className={styles.divider} />
@@ -18,6 +19,15 @@ export function BottomNav({ activePanel, onMonitor, onSettings }: BottomNavProps
         onClick={onMonitor}
       >
         <span className={styles.monitorDot}>●</span> Monitor
+      </button>
+
+      <button
+        type="button"
+        data-testid="sidebar-nav-db-explorer"
+        className={`${styles.bottomRow} ${activePanel === 'db-explorer' ? styles.bottomRowActive : ''}`}
+        onClick={onDbExplorer}
+      >
+        ⊞ DB Explorer
       </button>
 
       <button

@@ -25,7 +25,7 @@ function loadLastUsedFlowPath(): string | null {
 
 export interface UiState {
   sidebarCollapsed: boolean
-  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook'
+  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer'
   dirtyItems: Set<string>
   theme: ThemeName
   preferredDark: ThemeName
@@ -43,7 +43,7 @@ export interface UiState {
   setSidebarCollapsed: (v: boolean) => void
   setSkillNotebookViewMode: (mode: 'cells' | 'editor') => void
   toggleNotebookPreview: () => void
-  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook') => void
+  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer') => void
   setSkillNotebookPath: (path: string | null) => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void

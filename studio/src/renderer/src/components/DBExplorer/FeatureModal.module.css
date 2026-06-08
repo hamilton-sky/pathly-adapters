@@ -1,0 +1,118 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 5, 12, 0.6);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 64px 24px;
+  z-index: 100;
+}
+
+.overlay[data-open] {
+  display: flex;
+}
+
+.modal {
+  width: 860px;
+  max-width: 100%;
+  max-height: calc(100vh - 128px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  border: var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+.mHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-bottom: var(--border-subtle);
+}
+
+.mName {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mMeta {
+  font-size: var(--font-size-base);
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.mMeta b {
+  font-family: var(--font-family-mono);
+  color: var(--green);
+  font-weight: var(--font-weight-medium);
+}
+
+.closeBtn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface1);
+}
+
+.mTabs {
+  display: flex;
+  gap: 20px;
+  padding: 0 18px;
+  border-bottom: var(--border);
+}
+
+.mTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 10px;
+  margin-bottom: -1px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: var(--font-weight-medium) var(--font-size-base) / 1 var(--font-family-base);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color var(--transition-fast);
+}
+
+.mTab[data-active] {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  border-bottom-color: var(--accent);
+}
+
+.ct {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+}
+
+.mTab[data-active] .ct {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.mBody {
+  padding: 18px;
+  overflow: auto;
+}

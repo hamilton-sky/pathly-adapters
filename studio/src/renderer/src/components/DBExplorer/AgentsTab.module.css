@@ -1,0 +1,44 @@
+.sublabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.agents {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.arow {
+  display: grid;
+  grid-template-columns: 150px 1fr 56px;
+  align-items: center;
+  gap: 14px;
+}
+
+.aname {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+}
+
+.conv {
+  color: var(--text-muted);
+}
+
+.abar {
+  height: 22px;
+  border-radius: var(--radius-sm);
+  width: var(--bar-w, 0%);
+  background: var(--bar-color, var(--accent));
+}
+
+.acost {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  color: var(--green);
+  text-align: right;
+}

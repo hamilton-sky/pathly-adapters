@@ -1,0 +1,29 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  border: 1px solid;
+  color: var(--state-color, var(--text-muted));
+  background: color-mix(in srgb, var(--state-color, var(--text-muted)) 13%, transparent);
+  border-color: color-mix(in srgb, var(--state-color, var(--text-muted)) 38%, transparent);
+}
+
+.pill[data-state='PLANNING'] { --state-color: var(--state-planning); }
+.pill[data-state='BUILDING'] { --state-color: var(--state-building); }
+.pill[data-state='REVIEWING'] { --state-color: var(--state-reviewing); }
+.pill[data-state='TESTING'] { --state-color: var(--state-testing); }
+.pill[data-state='RETRO'] { --state-color: var(--state-retro); }
+.pill[data-state='DONE'] { --state-color: var(--state-done); }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--state-color, var(--text-muted));
+}

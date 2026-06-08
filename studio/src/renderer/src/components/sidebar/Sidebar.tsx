@@ -601,6 +601,7 @@ export function Sidebar(): JSX.Element | null {
         <BottomNav
           activePanel={activePanel}
           onMonitor={() => setActivePanel('monitor')}
+          onDbExplorer={() => setActivePanel('db-explorer')}
           onSettings={() => setActivePanel('settings')}
         />
       </div>

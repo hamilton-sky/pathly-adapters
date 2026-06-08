@@ -1,0 +1,82 @@
+.sublabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.timeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 14px;
+}
+
+.stepGroup {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.tstep {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 96px;
+}
+
+.tstamp {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.tdur {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+.tarrow {
+  color: var(--text-disabled);
+  align-self: center;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: var(--border-subtle);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.legendDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--state-color, var(--text-muted));
+}
+
+.legendDot[data-state='PLANNING'] { --state-color: var(--state-planning); }
+.legendDot[data-state='BUILDING'] { --state-color: var(--state-building); }
+.legendDot[data-state='REVIEWING'] { --state-color: var(--state-reviewing); }
+.legendDot[data-state='TESTING'] { --state-color: var(--state-testing); }
+.legendDot[data-state='RETRO'] { --state-color: var(--state-retro); }
+.legendDot[data-state='DONE'] { --state-color: var(--state-done); }
