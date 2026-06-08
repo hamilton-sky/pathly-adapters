@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { listDir, listDirs } from '../../../services/pathlyApi'
 
 export interface CatalogItemData {
   name: string
@@ -15,73 +14,54 @@ export interface CatalogGroup {
   items: CatalogItemData[]
 }
 
-interface Fragment {
+interface ApiItem {
   name: string
   description: string
   category: string
+  path: string
 }
 
-function isMdOrYaml(name: string): boolean {
-  return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')
+interface CatalogAllResponse {
+  agents:    ApiItem[]
+  fragments: ApiItem[]
+  skills:    ApiItem[]
+  templates: ApiItem[]
 }
 
-async function listFilesDeep(dir: string, prefix = ''): Promise<CatalogItemData[]> {
-  const [files, subdirs] = await Promise.all([
-    listDir(dir).catch(() => [] as string[]),
-    listDirs(dir).catch(() => [] as string[]),
-  ])
-  const direct: CatalogItemData[] = files
-    .filter(isMdOrYaml)
-    .map(f => ({ name: prefix ? `${prefix}/${f}` : f, path: `${dir}/${f}` }))
-
-  const nested = await Promise.all(
-    subdirs.map(sd => listFilesDeep(`${dir}/${sd}`, prefix ? `${prefix}/${sd}` : sd))
-  )
-  return [...direct, ...nested.flat()]
+function toItem(r: ApiItem): CatalogItemData {
+  return {
+    name:        r.name,
+    path:        r.path || undefined,
+    description: r.description || undefined,
+    category:    r.category || undefined,
+  }
 }
 
-export function useCatalogData(pathlyRoot?: string | null): CatalogGroup[] {
-  const [fragments, setFragments] = useState<CatalogItemData[]>([])
-  const [agents, setAgents] = useState<CatalogItemData[]>([])
-  const [skills, setSkills] = useState<CatalogItemData[]>([])
-  const [templates, setTemplates] = useState<CatalogItemData[]>([])
+/**
+ * Fetch the full catalog from the FSM server in one round-trip.
+ * _pathlyRoot is kept for API compatibility but is no longer used —
+ * the server knows where pathly_data lives.
+ */
+export function useCatalogData(_pathlyRoot?: string | null): CatalogGroup[] {
+  const [groups, setGroups] = useState<CatalogGroup[]>([])
 
   useEffect(() => {
-    fetch('http://localhost:8765/skills/catalog')
-      .then(r => r.json() as Promise<Fragment[]>)
-      .then(data => setFragments(
-        data.map(f => ({ name: f.name, description: f.description, category: f.category }))
-      ))
+    fetch('http://localhost:8765/catalog/all')
+      .then(r => r.json() as Promise<CatalogAllResponse>)
+      .then(data => {
+        const next: CatalogGroup[] = []
+        if (data.agents?.length)
+          next.push({ label: 'Agents',    type: 'agent',    icon: 'brain',       items: data.agents.map(toItem) })
+        if (data.fragments?.length)
+          next.push({ label: 'Fragments', type: 'fragment', icon: 'diamond',     items: data.fragments.map(toItem) })
+        if (data.skills?.length)
+          next.push({ label: 'Skills',    type: 'skill',    icon: 'book-open',   items: data.skills.map(toItem) })
+        if (data.templates?.length)
+          next.push({ label: 'Templates', type: 'template', icon: 'layout-grid', items: data.templates.map(toItem) })
+        setGroups(next)
+      })
       .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    if (!pathlyRoot) return
-
-    const agentsDir   = `${pathlyRoot}/src/pathly_data/core/agents`
-    const skillsDir   = `${pathlyRoot}/src/pathly_data/core/skills`
-    const templatesDir = `${pathlyRoot}/src/pathly_data/core/templates`
-
-    listDir(agentsDir)
-      .then(files => setAgents(
-        files.filter(isMdOrYaml).map(f => ({ name: f, path: `${agentsDir}/${f}` }))
-      ))
-      .catch(() => {})
-
-    listFilesDeep(skillsDir)
-      .then(setSkills)
-      .catch(() => {})
-
-    listFilesDeep(templatesDir)
-      .then(setTemplates)
-      .catch(() => {})
-  }, [pathlyRoot])
-
-  const groups: CatalogGroup[] = []
-  if (agents.length > 0)    groups.push({ label: 'Agents',    type: 'agent',    icon: 'brain',        items: agents })
-  if (fragments.length > 0) groups.push({ label: 'Fragments', type: 'fragment', icon: 'diamond',      items: fragments })
-  if (skills.length > 0)    groups.push({ label: 'Skills',    type: 'skill',    icon: 'book-open',    items: skills })
-  if (templates.length > 0) groups.push({ label: 'Templates', type: 'template', icon: 'layout-grid',  items: templates })
+  }, [])  // fetch once on mount — server rebuilds the index on every start
 
   return groups
 }

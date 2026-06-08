@@ -62,6 +62,7 @@ export function Sidebar(): JSX.Element | null {
   } = useStore()
 
   const insertFragment = useSkillNotebookStore((s) => s.insertFragment)
+  const notebookCells  = useSkillNotebookStore((s) => s.cells)
 
   const { sections, setSections, loadItems, customWorkspaceSections } = useProjectFiles()
   const { planFolders, setPlanFolders, loadPlanFiles } = usePlanFiles()
@@ -490,7 +491,17 @@ export function Sidebar(): JSX.Element | null {
             context={activePanelUi === 'skill-notebook' ? 'notebook' : 'canvas'}
             pathlyRoot={pathlyRoot}
             onOpenSkill={(path) => { setSkillNotebookPath(path); setActivePanel('skill-notebook') }}
-            onInsertCell={(item) => { insertFragment(item.name, null) }}
+            onInsertCell={(item) => {
+              if (item.path) {
+                // Skill/agent/template — open it in the notebook
+                setSkillNotebookPath(item.path)
+                setActivePanel('skill-notebook')
+              } else {
+                // Fragment — insert after the last cell
+                const lastCell = notebookCells[notebookCells.length - 1]
+                insertFragment(item.name, lastCell?.id ?? null)
+              }
+            }}
           />
         )}
 

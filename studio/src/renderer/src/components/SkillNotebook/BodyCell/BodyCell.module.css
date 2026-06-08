@@ -1,65 +1,118 @@
+/* ── CELL ── */
 .cell {
   position: relative;
-  border: var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg-surface0);
   margin: 0 0 2px;
-  transition: box-shadow 0.12s, border-color 0.12s;
+  padding: 22px 14px 14px;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
 
-.cell:hover {
-  border-color: var(--accent-border);
+/* type variants — dim border at rest */
+.cellSystem {
+  border: 1.5px solid color-mix(in srgb, var(--accent) 22%, var(--bg-surface1));
 }
 
-.cellHead {
+.cellBodyType {
+  border: 1.5px solid color-mix(in srgb, var(--green) 22%, var(--bg-surface1));
+}
+
+/* selected — border brightens + full glow */
+.cellSystem:focus-within {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px  color-mix(in srgb, var(--accent) 22%, transparent),
+    0 0 18px 0 color-mix(in srgb, var(--accent) 28%, transparent),
+    0 -5px 18px -4px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.cellBodyType:focus-within {
+  border-color: var(--green);
+  box-shadow:
+    0 0 0 1px  color-mix(in srgb, var(--green) 22%, transparent),
+    0 0 18px 0 color-mix(in srgb, var(--green) 28%, transparent),
+    0 -5px 18px -4px color-mix(in srgb, var(--green) 50%, transparent);
+}
+
+/* ── STRIP — badge + icons sit ON the top border ── */
+.strip {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  z-index: 10;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border-subtle-color);
-  background: var(--accent-bg);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  gap: 1px;
+  background: var(--bg-surface0);
+  padding: 2px 5px;
+  border-radius: 7px;
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
 
-.title {
-  font-family: var(--font-family-mono);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.cellSystem .strip {
+  border: 1.5px solid color-mix(in srgb, var(--accent) 22%, var(--bg-surface1));
 }
 
+.cellBodyType .strip {
+  border: 1.5px solid color-mix(in srgb, var(--green) 22%, var(--bg-surface1));
+}
+
+/* strip glows in sync with cell */
+.cellSystem:focus-within .strip {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 8px 0 color-mix(in srgb, var(--accent) 40%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.cellBodyType:focus-within .strip {
+  border-color: var(--green);
+  box-shadow:
+    0 0 8px 0 color-mix(in srgb, var(--green) 40%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--green) 20%, transparent);
+}
+
+/* type badge */
 .typeBadge {
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 2px 7px;
   border-radius: 4px;
-  color: var(--accent);
-  background: var(--accent-bg);
+  margin-right: 4px;
   flex-shrink: 0;
+  line-height: 1.4;
 }
 
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  opacity: 0.45;
-  transition: opacity 0.12s;
+.cellSystem .typeBadge {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-.cell:hover .actions {
-  opacity: 1;
+.cellBodyType .typeBadge {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
 }
 
+/* strip divider */
+.stripDiv {
+  width: 1px;
+  height: 14px;
+  background: var(--bg-surface1);
+  margin: 0 3px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* action buttons */
 .actionBtn {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -68,6 +121,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
+  flex-shrink: 0;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
@@ -91,7 +145,90 @@
   pointer-events: none;
 }
 
-/* ── ⋯ menu ── */
+/* ── CELL TITLE ── */
+.cellTitle {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 9px;
+  line-height: 1.3;
+}
+
+/* ── CELL BODY ── */
+.cellBody {
+  position: relative;
+}
+
+.editor {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px 10px;
+  resize: vertical;
+  outline: none;
+  min-height: 80px;
+}
+
+.toggle {
+  background: none;
+  border: none;
+  padding: 4px 0 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  align-self: flex-start;
+  font-family: var(--font-family-base);
+  display: block;
+}
+
+.toggle:hover {
+  color: var(--text-secondary);
+}
+
+/* ── SPLIT VIEW ── */
+.splitBody {
+  display: flex;
+  flex-direction: row;
+  min-height: 180px;
+  margin: 0 -14px -14px;
+}
+
+.splitEdit {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.splitEdit .editor {
+  flex: 1;
+  resize: none;
+  min-height: 160px;
+  width: 100%;
+}
+
+.splitDivider {
+  width: 1px;
+  background: var(--border-subtle-color);
+  flex-shrink: 0;
+}
+
+.splitPreview {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  overflow-y: auto;
+  max-height: 480px;
+}
+
+/* ── ⋯ MENU ── */
 .menuWrap {
   position: relative;
 }
@@ -140,22 +277,11 @@
   color: var(--text-muted);
 }
 
-.menuItem:hover {
-  background: var(--bg-surface0);
-}
+.menuItem:hover { background: var(--bg-surface0); }
+.menuItem:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.menuItem:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.menuItemDanger {
-  color: var(--red);
-}
-
-.menuItemDanger:hover {
-  background: color-mix(in srgb, var(--red) 10%, transparent);
-}
+.menuItemDanger { color: var(--red); }
+.menuItemDanger:hover { background: color-mix(in srgb, var(--red) 10%, transparent); }
 
 .menuDivider {
   height: 1px;
@@ -163,44 +289,7 @@
   margin: 2px 4px;
 }
 
-/* ── cell body ── */
-.cellBody {
-  padding: 11px 14px 13px;
-  position: relative;
-}
-
-.editor {
-  width: 100%;
-  background: var(--bg-base);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  line-height: 1.6;
-  padding: 8px 10px;
-  resize: vertical;
-  outline: none;
-  min-height: 80px;
-}
-
-.toggle {
-  background: none;
-  border: none;
-  padding: 4px 0 0;
-  font-size: 10px;
-  color: var(--text-muted);
-  cursor: pointer;
-  align-self: flex-start;
-  font-family: var(--font-family-base);
-  display: block;
-}
-
-.toggle:hover {
-  color: var(--text-secondary);
-}
-
-/* ── selection toolbar ── */
+/* ── SELECTION TOOLBAR ── */
 .selBar {
   position: absolute;
   left: var(--sel-x);

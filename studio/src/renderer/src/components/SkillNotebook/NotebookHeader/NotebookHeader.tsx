@@ -1,19 +1,19 @@
 import React, { useState } from 'react'
 import {
-  ArrowLeft, Undo2, Redo2, Database, Download,
+  ArrowLeft, Undo2, Redo2, Database, Download, FileCode,
 } from 'lucide-react'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './NotebookHeader.module.css'
 
-type ViewMode = 'cells' | 'preview'
+export type NotebookViewMode = 'cells' | 'editor'
 
 interface Props {
-  viewMode: ViewMode
-  onViewModeChange: (m: ViewMode) => void
+  viewMode: NotebookViewMode
+  onToggleViewMode: () => void
 }
 
-export default function NotebookHeader({ viewMode, onViewModeChange }: Props) {
+export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const { undo, redo, cells, historyIndex, history } = useSkillNotebookStore()
   const skillNotebookPath = useUiStore(s => s.skillNotebookPath)
   const setSkillNotebookPath = useUiStore(s => s.setSkillNotebookPath)
@@ -75,57 +75,55 @@ export default function NotebookHeader({ viewMode, onViewModeChange }: Props) {
 
       <div className={styles.spacer} />
 
+      {/* Only show undo/redo and save/export in cells mode */}
+      {viewMode === 'cells' && (
+        <>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo"
+            aria-label="Undo"
+          >
+            <Undo2 size={15} />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo"
+            aria-label="Redo"
+          >
+            <Redo2 size={15} />
+          </button>
+          <button type="button" className={styles.saveBtn} onClick={handleSave}>
+            <Database size={13} />
+            Save
+          </button>
+          <button
+            type="button"
+            className={`${styles.exportBtn} ${exportState === 'success' ? styles.exportSuccess : exportState === 'error' ? styles.exportError : ''}`}
+            onClick={handleExport}
+            disabled={exportState !== 'idle'}
+          >
+            <Download size={13} />
+            {exportState === 'success' ? 'Exported' : exportState === 'error' ? 'Error' : 'Export Skill'}
+          </button>
+        </>
+      )}
+
+      {/* Mode toggle — cells ↔ raw editor */}
       <button
         type="button"
-        className={styles.iconBtn}
-        onClick={undo}
-        disabled={!canUndo}
-        title="Undo"
-        aria-label="Undo"
+        className={`${styles.modeToggleBtn} ${viewMode === 'editor' ? styles.modeToggleActive : ''}`}
+        title={viewMode === 'editor' ? 'Back to notebook view' : 'View as editor (raw source)'}
+        aria-label={viewMode === 'editor' ? 'Notebook view' : 'Editor view'}
+        onClick={onToggleViewMode}
       >
-        <Undo2 size={15} />
-      </button>
-      <button
-        type="button"
-        className={styles.iconBtn}
-        onClick={redo}
-        disabled={!canRedo}
-        title="Redo"
-        aria-label="Redo"
-      >
-        <Redo2 size={15} />
-      </button>
-
-      <div className={styles.viewToggle}>
-        <button
-          type="button"
-          className={`${styles.toggleBtn} ${viewMode === 'cells' ? styles.toggleActive : ''}`}
-          onClick={() => onViewModeChange('cells')}
-        >
-          Cells
-        </button>
-        <button
-          type="button"
-          className={`${styles.toggleBtn} ${viewMode === 'preview' ? styles.toggleActive : ''}`}
-          onClick={() => onViewModeChange('preview')}
-        >
-          Preview
-        </button>
-      </div>
-
-      <button type="button" className={styles.saveBtn} onClick={handleSave}>
-        <Database size={13} />
-        Save
-      </button>
-
-      <button
-        type="button"
-        className={`${styles.exportBtn} ${exportState === 'success' ? styles.exportSuccess : exportState === 'error' ? styles.exportError : ''}`}
-        onClick={handleExport}
-        disabled={exportState !== 'idle'}
-      >
-        <Download size={13} />
-        {exportState === 'success' ? 'Exported' : exportState === 'error' ? 'Error' : 'Export Skill'}
+        <FileCode size={15} />
+        <span>{viewMode === 'editor' ? 'Notebook' : 'Editor'}</span>
       </button>
     </div>
   )

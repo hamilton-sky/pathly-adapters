@@ -24,6 +24,48 @@ def skills_catalog():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+@bp.route("/catalog/all", methods=["GET"])
+def catalog_all():
+    """Return all catalog items grouped by type.
+
+    Response:
+      {
+        "agents":    [{"name", "description", "category", "path"}],
+        "fragments": [...],
+        "skills":    [...],
+        "templates": [...]
+      }
+    """
+    try:
+        from pathly_orchestrator.db import get_db
+        from pathly_orchestrator.db.queries.catalog_items import read_all_catalog_items
+
+        conn = get_db()
+        items = read_all_catalog_items(conn)
+
+        result: dict = {"agents": [], "fragments": [], "skills": [], "templates": []}
+        type_to_key = {
+            "agent": "agents",
+            "fragment": "fragments",
+            "skill": "skills",
+            "template": "templates",
+        }
+        for item in items:
+            group = type_to_key.get(item.get("item_type", ""))
+            if group:
+                result[group].append({
+                    "name":        item["name"],
+                    "description": item.get("description") or "",
+                    "category":    item.get("category") or "",
+                    "path":        (item.get("abs_path") or "").replace("\\", "/"),
+                })
+
+        return jsonify(result), 200
+    except Exception as e:
+        logging.exception("catalog_all error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
 @bp.route("/skills/parse", methods=["POST"])
 def skills_parse():
     """Parse a skill .md file into body cells and fragment cells.

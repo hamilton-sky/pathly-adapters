@@ -1,5 +1,5 @@
 import React from 'react'
-import { renderMarkdown } from '../../../utils/renderMarkdown'
+import { marked } from 'marked'
 import styles from './MarkdownRenderer.module.css'
 
 interface Props {
@@ -11,7 +11,7 @@ export default function MarkdownRenderer({ content, className }: Props) {
   return (
     <div
       className={`${styles.md} ${className ?? ''}`}
-      dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+      dangerouslySetInnerHTML={{ __html: marked(content) as string }}
     />
   )
 }

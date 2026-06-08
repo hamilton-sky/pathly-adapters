@@ -1,14 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react'
-import {
-  Sparkles, Search, Brain, Diamond, BookOpen, LayoutGrid,
-  GripVertical, Plus, Pencil, PlusSquare,
-} from 'lucide-react'
+import React, { useState } from 'react'
+import { Sparkles, Search, Brain, Diamond, BookOpen, LayoutGrid, GripVertical, Plus } from 'lucide-react'
 import { useCatalogData, CatalogItemData, CatalogGroup } from './useCatalogData'
 import styles from './LibraryCatalog.module.css'
 
 interface Props {
   context: 'notebook' | 'canvas'
-  pathlyRoot?: string
+  pathlyRoot?: string | null
   onOpenSkill?: (path: string) => void
   onInsertCell?: (item: CatalogItemData) => void
 }
@@ -22,30 +19,29 @@ function GroupIcon({ icon }: { icon: CatalogGroup['icon'] }) {
 
 interface ItemRowProps {
   item: CatalogItemData
+  type: CatalogGroup['type']
   groupIcon: CatalogGroup['icon']
   context: 'notebook' | 'canvas'
   onOpenSkill?: (path: string) => void
   onInsertCell?: (item: CatalogItemData) => void
 }
 
-function ItemRow({ item, groupIcon, context, onOpenSkill, onInsertCell }: ItemRowProps) {
-  const [popoverOpen, setPopoverOpen] = useState(false)
-  const popoverRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!popoverOpen) return
-    function handleOutside(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setPopoverOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
-  }, [popoverOpen])
+function ItemRow({ item, type, groupIcon, context, onOpenSkill, onInsertCell }: ItemRowProps) {
+  const isFragment = type === 'fragment'
+  const hasPath = !!item.path
 
   function handleDragStart(e: React.DragEvent) {
     e.dataTransfer.setData('fragment-name', item.name)
     e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  function handleRowClick() {
+    if (context !== 'notebook') return
+    if (isFragment) {
+      onInsertCell?.(item)
+    } else if (hasPath) {
+      onOpenSkill?.(item.path!)
+    }
   }
 
   return (
@@ -53,43 +49,40 @@ function ItemRow({ item, groupIcon, context, onOpenSkill, onInsertCell }: ItemRo
       className={styles.item}
       draggable
       onDragStart={handleDragStart}
+      onClick={handleRowClick}
+      title={item.description ?? item.name}
+      style={{ cursor: context === 'notebook' ? 'pointer' : 'grab' }}
     >
       <GripVertical size={13} className={styles.itemGrip} />
       <span className={styles.itemIcon}>
         <GroupIcon icon={groupIcon} />
       </span>
       <span className={styles.itemName}>{item.name}</span>
+
       {context === 'notebook' && (
-        <div className={styles.popoverWrap} ref={popoverRef}>
+        <div className={styles.itemActions}>
+          {/* "Add as cell" — insert fragment or open non-fragment */}
           <button
             type="button"
-            className={styles.addBtn}
-            aria-label={`Add ${item.name}`}
-            onClick={() => setPopoverOpen(v => !v)}
+            className={styles.actionBtn}
+            title={isFragment ? 'Insert as cell' : 'Add to notebook'}
+            aria-label={isFragment ? 'Insert as cell' : 'Add to notebook'}
+            onClick={e => { e.stopPropagation(); onInsertCell?.(item) }}
           >
             <Plus size={11} />
           </button>
-          {popoverOpen && (
-            <div className={styles.popover} role="menu">
-              <button
-                type="button"
-                className={styles.popoverItem}
-                role="menuitem"
-                onClick={() => { setPopoverOpen(false); onOpenSkill?.(item.path ?? '') }}
-              >
-                <Pencil size={13} className={styles.popoverIcon} />
-                Open to edit
-              </button>
-              <button
-                type="button"
-                className={styles.popoverItem}
-                role="menuitem"
-                onClick={() => { setPopoverOpen(false); onInsertCell?.(item) }}
-              >
-                <PlusSquare size={13} className={styles.popoverIcon} />
-                Insert as cell
-              </button>
-            </div>
+
+          {/* "Open to edit" — only for items with a path */}
+          {hasPath && (
+            <button
+              type="button"
+              className={styles.actionBtn}
+              title="Open to edit"
+              aria-label="Open to edit"
+              onClick={e => { e.stopPropagation(); onOpenSkill?.(item.path!) }}
+            >
+              <BookOpen size={11} />
+            </button>
           )}
         </div>
       )}
@@ -141,6 +134,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onIns
               <ItemRow
                 key={item.name}
                 item={item}
+                type={group.type}
                 groupIcon={group.icon}
                 context={context}
                 onOpenSkill={onOpenSkill}

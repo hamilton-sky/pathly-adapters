@@ -173,5 +173,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_def_role_global
     ON agent_definitions(role) WHERE project_root IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_def_role_proj
     ON agent_definitions(role, project_root) WHERE project_root IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS catalog_items (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_type    TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    rel_path     TEXT,
+    abs_path     TEXT,
+    category     TEXT,
+    description  TEXT,
+    tags         TEXT,
+    indexed_at   TEXT NOT NULL,
+    UNIQUE(item_type, name)
+);
 """)
     conn.commit()

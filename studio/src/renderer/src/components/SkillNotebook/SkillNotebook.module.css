@@ -27,12 +27,14 @@
   overflow: hidden;
 }
 
-.previewWrapperFull {
+
+/* Editor mode — full-height wrapper so <Editor> fills the panel */
+.editorWrapper {
   flex: 1;
-  min-width: 0;
-  overflow: hidden;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .legend {

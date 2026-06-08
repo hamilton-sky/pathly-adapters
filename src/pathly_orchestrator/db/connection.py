@@ -20,6 +20,15 @@ def _seed_if_empty(conn: sqlite3.Connection) -> None:
     _real_seed(conn)
 
 
+def _refresh_catalog(conn: sqlite3.Connection) -> None:
+    """Rebuild the catalog_items index on every server start. Never raises."""
+    try:
+        from pathly_orchestrator.db.queries.catalog_items import rebuild_catalog
+        rebuild_catalog(conn)
+    except Exception:
+        pass  # never block server start due to catalog failures
+
+
 def get_db(_deprecated_path=None) -> sqlite3.Connection:
     """Return a cached sqlite3.Connection for ~/.pathly/pathly.db.
 
@@ -43,6 +52,7 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
         _write_locks[conn_id] = threading.Lock()
 
     _seed_if_empty(conn)
+    _refresh_catalog(conn)
     return conn
 
 

@@ -86,32 +86,37 @@
   cursor: not-allowed;
 }
 
-.viewToggle {
-  display: flex;
+
+.modeToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  background: transparent;
   border: var(--border);
   border-radius: var(--radius-md);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.toggleBtn {
-  padding: 4px 10px;
-  font-size: var(--font-size-sm);
-  background: transparent;
-  border: none;
   color: var(--text-muted);
   cursor: pointer;
+  font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
-  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
 
-.toggleBtn:hover:not(.toggleActive) {
-  color: var(--text-secondary);
-}
-
-.toggleActive {
-  background: var(--bg-surface1);
+.modeToggleBtn:hover {
   color: var(--text-primary);
+  border-color: var(--accent-border);
+}
+
+.modeToggleActive {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.modeToggleActive:hover {
+  color: var(--accent);
 }
 
 .saveBtn {
