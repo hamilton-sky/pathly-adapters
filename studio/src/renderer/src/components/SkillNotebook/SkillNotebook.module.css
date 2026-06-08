@@ -19,10 +19,14 @@
   background: var(--bg-surface1);
   flex-shrink: 0;
   cursor: col-resize;
+  transition: background 0.15s;
 }
 
+.resizeHandle:hover { background: var(--accent); opacity: 0.4; }
+
 .previewWrapper {
-  width: 344px;
+  --preview-width: 344px;
+  width: var(--preview-width);
   flex-shrink: 0;
   overflow: hidden;
 }

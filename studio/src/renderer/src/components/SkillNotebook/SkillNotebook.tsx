@@ -6,6 +6,7 @@ import NotebookHeader, { NotebookViewMode } from './NotebookHeader/NotebookHeade
 import NotebookCanvas from './NotebookCanvas/NotebookCanvas'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
 import { Editor } from '../Editor'
+import { usePreviewResize } from './usePreviewResize'
 
 const STEPS = [
   { icon: ArrowLeft, label: 'Go to FILES in the sidebar', sub: 'Switch to the FILES tab on the left' },
@@ -17,6 +18,7 @@ export default function SkillNotebookPanel() {
   const skillNotebookPath = useUiStore((s) => s.skillNotebookPath)
   const chatOpen = useUiStore((s) => s.chatOpen)
   const [viewMode, setViewMode] = useState<NotebookViewMode>('cells')
+  const preview = usePreviewResize()
 
   if (!skillNotebookPath) {
     return (
@@ -59,8 +61,8 @@ export default function SkillNotebookPanel() {
         <>
           <div className={styles.body}>
             <NotebookCanvas />
-            {!chatOpen && <div className={styles.resizeHandle} />}
-            <div className={styles.previewWrapper}>
+            {!chatOpen && <div className={styles.resizeHandle} onMouseDown={preview.onDragStart} />}
+            <div ref={preview.previewRef} className={styles.previewWrapper}>
               <PreviewPanel />
             </div>
           </div>

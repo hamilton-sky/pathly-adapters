@@ -1,6 +1,5 @@
 .root {
-  width: 344px;
-  flex-shrink: 0;
+  width: 100%;
   background: var(--bg-mantle);
   border-left: var(--border);
   display: flex;
