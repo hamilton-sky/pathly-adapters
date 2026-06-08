@@ -1,0 +1,62 @@
+- generic [active] [ref=e1]:
+  - paragraph [ref=e2]: Click any cell to select it — click again to deselect
+  - generic [ref=e3]:
+    - generic [ref=e4] [cursor=pointer]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: System
+        - button "Move up" [ref=e7]:
+          - img [ref=e8]
+        - button "Move down" [ref=e10]:
+          - img [ref=e11]
+        - button "Edit" [ref=e14]:
+          - img [ref=e15]
+        - button "More" [ref=e17]:
+          - img [ref=e18]
+      - generic [ref=e22]: back
+      - generic [ref=e23]: Roll back the FSM one state with confirmation. Does not undo git commits.
+    - generic [ref=e24] [cursor=pointer]:
+      - generic [ref=e25]:
+        - generic [ref=e26]: System
+        - button [ref=e27]:
+          - img [ref=e28]
+        - button [ref=e30]:
+          - img [ref=e31]
+        - button [ref=e34]:
+          - img [ref=e35]
+        - button [ref=e37]:
+          - img [ref=e38]
+      - generic [ref=e42]: "## Runtime"
+      - generic [ref=e43]:
+        - text: "Run: pathly-back $ARGUMENTS"
+        - text: Print the output exactly as returned.
+        - text: "If command not found: print \"Run pathly-setup first to install Pathly CLI tools.\""
+    - generic [ref=e44] [cursor=pointer]:
+      - generic [ref=e45]:
+        - generic [ref=e46]: Body
+        - button [ref=e47]:
+          - img [ref=e48]
+        - button [ref=e50]:
+          - img [ref=e51]
+        - button [ref=e54]:
+          - img [ref=e55]
+        - button [ref=e57]:
+          - img [ref=e58]
+      - generic [ref=e62]: "## Responsibilities"
+      - generic [ref=e63]:
+        - text: 1. Accept free-form user requests.
+        - text: 2. Inspect current project state before routing.
+        - text: "3. Classify the request:"
+        - text: – new feature · resume existing work · tiny direct change
+    - generic [ref=e64] [cursor=pointer]:
+      - generic [ref=e65]:
+        - generic [ref=e66]: Body
+        - button [ref=e67]:
+          - img [ref=e68]
+        - button [ref=e70]:
+          - img [ref=e71]
+        - button [ref=e74]:
+          - img [ref=e75]
+        - button [ref=e77]:
+          - img [ref=e78]
+      - generic [ref=e82]: New section
+      - generic [ref=e83]: Empty cell

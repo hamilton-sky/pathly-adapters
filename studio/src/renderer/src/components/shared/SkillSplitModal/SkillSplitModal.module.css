@@ -101,123 +101,140 @@
   padding: 2px 6px;
 }
 
-/* ── Cell cards ── */
+/* ── Cell cards — notebook style ── */
 .cellsList {
   flex: 1;
   overflow-y: auto;
-  padding: 0 12px 16px;
+  padding: 14px 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 16px;
 }
 
 .cellCard {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 7px;
-  background: var(--bg-surface1);
-  border-left: 3px solid var(--accent);
+  position: relative;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface0);
+  padding: 22px 14px 12px;
   cursor: pointer;
-  transition: background 80ms;
+  transition: opacity 0.15s;
 }
 
-.cellCard:hover {
-  background: color-mix(in srgb, var(--bg-surface1) 80%, var(--bg-mantle));
+.cellCardHeading {
+  border: 1.5px solid color-mix(in srgb, var(--accent) 22%, var(--bg-surface1));
+}
+
+.cellCardBody {
+  border: 1.5px solid color-mix(in srgb, var(--green) 22%, var(--bg-surface1));
 }
 
 .cellCardUnchecked {
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
-.cellCardMarkdown {
-  border-left-color: #d97706;
+/* strip sits ON the top border, mirrors BodyCell */
+.strip {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  background: var(--bg-surface0);
+  padding: 2px 5px;
+  border-radius: 7px;
+}
+
+.cellCardHeading .strip {
+  border: 1.5px solid color-mix(in srgb, var(--accent) 22%, var(--bg-surface1));
+}
+
+.cellCardBody .strip {
+  border: 1.5px solid color-mix(in srgb, var(--green) 22%, var(--bg-surface1));
 }
 
 .cellCheck {
   flex-shrink: 0;
-  margin-top: 0;
   accent-color: var(--accent);
   cursor: pointer;
-}
-
-.cellBody {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  margin-right: 2px;
 }
 
 .typeBadge {
-  display: inline-block;
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.07em;
-  border-radius: 3px;
-  padding: 1px 5px;
-  width: fit-content;
-}
-
-.typeBadgeHeading {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
-
-.typeBadgeMarkdown {
-  color: #d97706;
-  background: color-mix(in srgb, #d97706 15%, transparent);
-}
-
-.cellHeading {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cellPreview {
-  font-size: 11px;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ── Move buttons on each cell ── */
-.cellMoveButtons {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
   flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.cellCardHeading .typeBadge {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.cellCardBody .typeBadge {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
+}
+
+.stripDiv {
+  width: 1px;
+  height: 14px;
+  background: var(--bg-surface1);
+  margin: 0 3px;
+  flex-shrink: 0;
+  display: inline-block;
 }
 
 .moveBtn {
-  display: flex;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 18px;
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
-  padding: 0;
+  flex-shrink: 0;
   transition: background 80ms, color 80ms;
 }
 
 .moveBtn:hover:not(:disabled) {
-  background: var(--bg-surface0);
+  background: var(--bg-surface1);
   color: var(--text-primary);
 }
 
 .moveBtn:disabled {
-  opacity: 0.25;
+  opacity: 0.3;
   cursor: not-allowed;
+  pointer-events: none;
+}
+
+.cellTitle {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+  line-height: 1.3;
+}
+
+.cellPreview {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
 }
 
 /* ── Preview panel content ── */

@@ -69,8 +69,7 @@ function ItemRow({ item, type, groupIcon, context, displayName, onOpenSkill, onO
   function handleRowClick() {
     if (isFlow) { onOpenFlow?.(item.path || item.name); return }
     if (context !== 'notebook') return
-    if (isFragment) { onInsertCell?.(item) }
-    else if (hasPath) { onOpenSkill?.(item.path!) }
+    if (hasPath) { onOpenSkill?.(item.path!) }
   }
 
   type MenuItem = { label: string; danger?: boolean; onClick: () => void }
@@ -79,13 +78,9 @@ function ItemRow({ item, type, groupIcon, context, displayName, onOpenSkill, onO
   if (isFlow) {
     if (hasPath) menuItems.push({ label: 'Open on canvas', onClick: () => { setMenuOpen(false); onOpenFlow?.(item.path || item.name) } })
   } else if (context === 'notebook') {
-    if (isFragment) {
-      menuItems.push({ label: 'Insert as cell', onClick: () => { setMenuOpen(false); onInsertCell?.(item) } })
-    } else {
-      menuItems.push({ label: 'Add to notebook', onClick: () => { setMenuOpen(false); onAddCells?.(item) } })
-      if (hasPath) menuItems.push({ label: 'Open to edit', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
-      if (!isFragment && hasPath) menuItems.push({ label: 'Split into cells', onClick: () => { setMenuOpen(false); onAddCells?.(item) } })
-    }
+    menuItems.push({ label: 'Insert as cell', onClick: () => { setMenuOpen(false); onInsertCell?.(item) } })
+    if (hasPath) menuItems.push({ label: 'Open to edit', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
+    if (hasPath) menuItems.push({ label: 'Split into cells', onClick: () => { setMenuOpen(false); onAddCells?.(item) } })
   }
   if (onDeleteItem) menuItems.push({ label: 'Delete', danger: true, onClick: () => { setMenuOpen(false); onDeleteItem(item, type) } })
 

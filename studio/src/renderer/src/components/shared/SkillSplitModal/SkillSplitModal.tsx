@@ -127,32 +127,27 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
               {cells.map((cell, idx) => (
                 <div
                   key={cell.id}
-                  className={`${styles.cellCard} ${!cell.checked ? styles.cellCardUnchecked : ''} ${cell.type === 'heading' ? styles.cellCardHeading : styles.cellCardMarkdown}`}
+                  className={`${styles.cellCard} ${cell.type === 'heading' ? styles.cellCardHeading : styles.cellCardBody}${!cell.checked ? ` ${styles.cellCardUnchecked}` : ''}`}
                   onClick={() => toggleCell(cell.id)}
                 >
-                  <input
-                    type="checkbox"
-                    className={styles.cellCheck}
-                    checked={cell.checked}
-                    onChange={() => toggleCell(cell.id)}
-                    onClick={e => e.stopPropagation()}
-                  />
-                  <div className={styles.cellBody}>
-                    <span className={`${styles.typeBadge} ${cell.type === 'heading' ? styles.typeBadgeHeading : styles.typeBadgeMarkdown}`}>
-                      {cell.type === 'heading' ? 'HEADING' : 'MARKDOWN'}
+                  <div className={styles.strip}>
+                    <input
+                      type="checkbox"
+                      className={styles.cellCheck}
+                      checked={cell.checked}
+                      onChange={() => toggleCell(cell.id)}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <span className={styles.typeBadge}>
+                      {cell.type === 'heading' ? 'HEADING' : 'BODY'}
                     </span>
-                    <div className={styles.cellHeading}>{cell.heading}</div>
-                    {cell.content && (
-                      <div className={styles.cellPreview}>{cell.content.split('\n')[0]}</div>
-                    )}
-                  </div>
-                  <div className={styles.cellMoveButtons} onClick={e => e.stopPropagation()}>
+                    <span className={styles.stripDiv} />
                     <button
                       type="button"
                       className={styles.moveBtn}
                       title="Move up"
                       disabled={idx === 0}
-                      onClick={() => moveUp(cell.id)}
+                      onClick={e => { e.stopPropagation(); moveUp(cell.id) }}
                     >
                       <ChevronUp size={12} />
                     </button>
@@ -161,11 +156,15 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
                       className={styles.moveBtn}
                       title="Move down"
                       disabled={idx === cells.length - 1}
-                      onClick={() => moveDown(cell.id)}
+                      onClick={e => { e.stopPropagation(); moveDown(cell.id) }}
                     >
                       <ChevronDown size={12} />
                     </button>
                   </div>
+                  {cell.heading && <div className={styles.cellTitle}>{cell.heading}</div>}
+                  {cell.content && (
+                    <div className={styles.cellPreview}>{cell.content.split('\n')[0]}</div>
+                  )}
                 </div>
               ))}
             </div>

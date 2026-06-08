@@ -5,6 +5,7 @@ export interface CatalogItemData {
   path?: string
   description?: string
   category?: string
+  itemType?: 'agent' | 'fragment' | 'skill' | 'template' | 'flow'
 }
 
 export interface CatalogGroup {
@@ -34,12 +35,13 @@ interface FlowListItem {
   updated_at: string
 }
 
-function toItem(r: ApiItem): CatalogItemData {
+function toItem(r: ApiItem, itemType: CatalogItemData['itemType']): CatalogItemData {
   return {
     name:        r.name,
     path:        r.path || undefined,
     description: r.description || undefined,
     category:    r.category || undefined,
+    itemType,
   }
 }
 
@@ -71,13 +73,13 @@ export function useCatalogData(_pathlyRoot?: string | null, refreshKey?: number)
       if (flows?.length)
         next.push({ label: 'Flows',     type: 'flow',     icon: 'git-branch',  items: flows.map(flowToItem) })
       if (data.agents?.length)
-        next.push({ label: 'Agents',    type: 'agent',    icon: 'brain',       items: data.agents.map(toItem) })
+        next.push({ label: 'Agents',    type: 'agent',    icon: 'brain',       items: data.agents.map(r => toItem(r, 'agent')) })
       if (data.fragments?.length)
-        next.push({ label: 'Fragments', type: 'fragment', icon: 'diamond',     items: data.fragments.map(toItem) })
+        next.push({ label: 'Fragments', type: 'fragment', icon: 'diamond',     items: data.fragments.map(r => toItem(r, 'fragment')) })
       if (data.skills?.length)
-        next.push({ label: 'Skills',    type: 'skill',    icon: 'book-open',   items: data.skills.map(toItem) })
+        next.push({ label: 'Skills',    type: 'skill',    icon: 'book-open',   items: data.skills.map(r => toItem(r, 'skill')) })
       if (data.templates?.length)
-        next.push({ label: 'Templates', type: 'template', icon: 'layout-grid', items: data.templates.map(toItem) })
+        next.push({ label: 'Templates', type: 'template', icon: 'layout-grid', items: data.templates.map(r => toItem(r, 'template')) })
       setGroups(next)
     }).catch(() => {})
   }, [refreshKey])

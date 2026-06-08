@@ -11,6 +11,7 @@ export default function NotebookCanvas() {
   const { cells, insertFragment, insertBodyCell, moveCell, removeCell, revertBodyCell, undo, redo } = useSkillNotebookStore()
   const skillNotebookPath = useUiStore(s => s.skillNotebookPath)
   const setSkillNotebookPath = useUiStore(s => s.setSkillNotebookPath)
+  const setSkillNotebookViewMode = useUiStore(s => s.setSkillNotebookViewMode)
   const loadSkill = useSkillNotebookStore(s => s.loadSkill)
 
   const [activeZone, setActiveZone] = useState<string | null>(null)
@@ -34,11 +35,18 @@ export default function NotebookCanvas() {
   }, [undo, redo])
 
   const handleOpenFragment = useCallback(async (path: string | undefined, name: string) => {
-    if (path) { setSkillNotebookPath(path); return }
+    if (path) {
+      setSkillNotebookPath(path)
+      setSkillNotebookViewMode('editor')
+      return
+    }
     const res = await fetch('http://localhost:8765/catalog/all').then(r => r.json()).catch(() => null)
     const found = res?.fragments?.find((f: { name: string; path: string }) => f.name === name)
-    if (found?.path) setSkillNotebookPath(found.path)
-  }, [setSkillNotebookPath])
+    if (found?.path) {
+      setSkillNotebookPath(found.path)
+      setSkillNotebookViewMode('editor')
+    }
+  }, [setSkillNotebookPath, setSkillNotebookViewMode])
 
   function handleInsertZoneDrop(afterCellId: string | null, e: React.DragEvent) {
     const fragmentName = e.dataTransfer.getData('fragment-name')
@@ -124,7 +132,6 @@ export default function NotebookCanvas() {
                 isLast={idx === cells.length - 1}
                 onMoveUp={() => { if (idx > 0) moveCell(cell.id, idx <= 1 ? null : cells[idx - 2].id) }}
                 onMoveDown={() => { if (idx < cells.length - 1) moveCell(cell.id, cells[idx + 1].id) }}
-                onOpenFragment={p => void handleOpenFragment(p, cell.fragmentName)}
               />
             )}
             <InsertZone

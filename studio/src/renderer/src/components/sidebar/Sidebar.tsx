@@ -521,11 +521,13 @@ export function Sidebar(): JSX.Element | null {
               setLastUsedFlowPath(pathOrName)
             }}
             onInsertCell={(item) => {
-              if (item.path) {
-                setSplitModalItem(item)
-              } else {
-                const lastCell = notebookCells[notebookCells.length - 1]
+              const lastCell = notebookCells[notebookCells.length - 1]
+              if (item.itemType === 'fragment') {
                 insertFragment(item.name, lastCell?.id ?? null)
+              } else if (item.path) {
+                void window.pathly.fs.read(item.path).then(raw => {
+                  insertBodyCell(item.name, raw, lastCell?.id ?? null)
+                })
               }
             }}
             onAddCells={(item) => setSplitModalItem(item)}

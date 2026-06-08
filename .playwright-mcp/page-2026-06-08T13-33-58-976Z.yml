@@ -1,0 +1,65 @@
+- generic [active] [ref=e1]:
+  - paragraph [ref=e2]: Click cell to select · Click ✎ pencil to edit
+  - generic [ref=e3]:
+    - generic [ref=e4] [cursor=pointer]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: System
+        - button "Move up" [ref=e7]:
+          - img [ref=e8]
+        - button "Move down" [ref=e10]:
+          - img [ref=e11]
+        - button "Edit" [ref=e14]:
+          - img [ref=e15]
+        - button "More" [ref=e18]:
+          - img [ref=e19]
+      - generic [ref=e23]: back
+      - paragraph [ref=e25]: Roll back the FSM one state with confirmation. Does not undo git commits.
+    - generic [ref=e26] [cursor=pointer]:
+      - generic [ref=e27]:
+        - generic [ref=e28]: System
+        - button [ref=e29]:
+          - img [ref=e30]
+        - button [ref=e32]:
+          - img [ref=e33]
+        - button [ref=e36]:
+          - img [ref=e37]
+        - button [ref=e40]:
+          - img [ref=e41]
+      - generic [ref=e45]: Runtime
+      - generic [ref=e46]:
+        - paragraph [ref=e47]:
+          - text: "Run:"
+          - code [ref=e48]: pathly-back $ARGUMENTS
+        - paragraph [ref=e49]: Print the output exactly as returned.
+        - paragraph [ref=e50]: "If command not found: print \"Run pathly-setup first to install Pathly CLI tools.\""
+    - generic [ref=e51] [cursor=pointer]:
+      - generic [ref=e52]:
+        - generic [ref=e53]: Body
+        - button [ref=e54]:
+          - img [ref=e55]
+        - button [ref=e57]:
+          - img [ref=e58]
+        - button [ref=e61]:
+          - img [ref=e62]
+        - button [ref=e65]:
+          - img [ref=e66]
+      - generic [ref=e70]: Responsibilities
+      - generic [ref=e71]:
+        - list [ref=e72]:
+          - listitem [ref=e73]: Accept free-form user requests.
+          - listitem [ref=e74]: Inspect current project state before routing.
+          - listitem [ref=e75]: "Classify the request:"
+        - list [ref=e76]:
+          - listitem [ref=e77]: new feature · resume existing work · tiny direct change
+    - generic [ref=e78] [cursor=pointer]:
+      - generic [ref=e79]:
+        - generic [ref=e80]: Body
+        - button [ref=e81]:
+          - img [ref=e82]
+        - button [ref=e84]:
+          - img [ref=e85]
+        - button [ref=e88]:
+          - img [ref=e89]
+        - button [ref=e92]:
+          - img [ref=e93]
+      - generic [ref=e97]: New section
