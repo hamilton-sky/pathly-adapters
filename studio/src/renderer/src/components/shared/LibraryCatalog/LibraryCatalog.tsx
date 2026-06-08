@@ -62,6 +62,7 @@ function ItemRow({ item, type, groupIcon, context, displayName, onOpenSkill, onO
 
   function handleDragStart(e: React.DragEvent) {
     e.dataTransfer.setData('fragment-name', item.name)
+    if (item.path) e.dataTransfer.setData('fragment-path', item.path)
     e.dataTransfer.effectAllowed = 'copy'
   }
 

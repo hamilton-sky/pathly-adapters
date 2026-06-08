@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { ChevronUp, ChevronDown, MoreHorizontal, Copy, Diamond, Trash2 } from 'lucide-react'
+import { ChevronUp, ChevronDown, MoreHorizontal, Copy, Diamond, Trash2, Pencil } from 'lucide-react'
 import styles from './FragmentCell.module.css'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 
@@ -8,11 +8,13 @@ interface Props {
   fragmentName: string
   category: string
   description: string
+  path?: string
   isNew?: boolean
   isFirst?: boolean
   isLast?: boolean
   onMoveUp?: () => void
   onMoveDown?: () => void
+  onOpenFragment?: (path: string | undefined) => void
 }
 
 const CATEGORY_CLASS: Record<string, string> = {
@@ -22,9 +24,9 @@ const CATEGORY_CLASS: Record<string, string> = {
 }
 
 export default function FragmentCell({
-  id, fragmentName, category, description,
+  id, fragmentName, category, description, path,
   isNew = false, isFirst = false, isLast = false,
-  onMoveUp, onMoveDown,
+  onMoveUp, onMoveDown, onOpenFragment,
 }: Props) {
   const removeCell = useSkillNotebookStore(s => s.removeCell)
   const [showNew, setShowNew]   = useState(isNew)
@@ -87,6 +89,11 @@ export default function FragmentCell({
                 <button type="button" className={styles.menuItem} role="menuitem" disabled={isLast} onClick={() => { onMoveDown?.(); setMenuOpen(false) }}>
                   <ChevronDown size={13} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>⌘↓</span>
                 </button>
+                {onOpenFragment && (
+                  <button type="button" className={styles.menuItem} role="menuitem" onClick={() => { setMenuOpen(false); onOpenFragment(path) }}>
+                    <Pencil size={13} className={styles.menuIcon} />Open to edit
+                  </button>
+                )}
                 <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                   <Diamond size={13} className={styles.menuIcon} />Convert to body
                 </button>

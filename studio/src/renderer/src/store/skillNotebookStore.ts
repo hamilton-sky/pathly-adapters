@@ -17,6 +17,7 @@ export interface FragmentCell {
   fragmentName: string
   category: string
   description: string
+  path?: string
 }
 
 export type NotebookCell = BodyCell | FragmentCell
@@ -37,12 +38,13 @@ interface SkillNotebookState {
   setPreview: (sections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>, tokens: number) => void
   setPreviewLoading: (loading: boolean) => void
   loadSkill: (skillPath: string) => Promise<void>
-  insertFragment: (fragmentName: string, afterCellId: string | null) => string
+  insertFragment: (fragmentName: string, afterCellId: string | null, path?: string) => string
   insertBodyCell: (heading: string, content: string, afterCellId: string | null) => string
   removeCell: (cellId: string) => void
   moveCell: (cellId: string, afterCellId: string | null) => void
-  updateBodyCell: (cellId: string, content: string) => void
+  updateBodyCell: (cellId: string, content: string, heading?: string) => void
   revertBodyCell: (cellId: string) => void
+  splitBodyCell: (cellId: string, newCells: Array<{ heading: string; content: string }>) => void
 }
 
 export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
@@ -130,7 +132,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
     get().pushCells(newCells)
     return newCell.id
   },
-  insertFragment: (fragmentName: string, afterCellId: string | null) => {
+  insertFragment: (fragmentName: string, afterCellId: string | null, path?: string) => {
     const state = get()
     const newCell: FragmentCell = {
       id: crypto.randomUUID(),
@@ -138,6 +140,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
       fragmentName,
       category: '',
       description: '',
+      path,
     }
     const newCells = afterCellId === null
       ? [newCell, ...state.cells]
@@ -174,10 +177,12 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
     }
     get().pushCells(newCells)
   },
-  updateBodyCell: (cellId: string, content: string) => {
+  updateBodyCell: (cellId: string, content: string, heading?: string) => {
     const state = get()
     const newCells = state.cells.map(c =>
-      c.id === cellId && c.type === 'body' ? { ...c, content } : c
+      c.id === cellId && c.type === 'body'
+        ? { ...c, content, ...(heading !== undefined ? { heading } : {}) }
+        : c
     )
     get().pushCells(newCells)
   },
