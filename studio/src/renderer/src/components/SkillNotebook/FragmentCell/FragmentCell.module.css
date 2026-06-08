@@ -92,7 +92,7 @@
   display: flex;
   align-items: center;
   gap: 1px;
-  opacity: 0;
+  opacity: 0.45;
   transition: opacity 0.12s;
   flex-shrink: 0;
 }

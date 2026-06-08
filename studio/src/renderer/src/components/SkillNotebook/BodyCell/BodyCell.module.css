@@ -47,8 +47,14 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   margin-left: auto;
+  opacity: 0.45;
+  transition: opacity 0.12s;
+}
+
+.cell:hover .actions {
+  opacity: 1;
 }
 
 .actionBtn {
@@ -113,4 +119,71 @@
 
 .toggle:hover {
   color: var(--text-secondary);
+}
+
+/* ── selection toolbar ── */
+.cellBody {
+  position: relative;
+}
+
+.selBar {
+  position: absolute;
+  left: var(--sel-x);
+  top: var(--sel-y);
+  transform: translate(-50%, -100%);
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  padding: 3px 5px;
+  white-space: nowrap;
+  pointer-events: all;
+}
+
+.selBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--font-family-base);
+}
+
+.selBtn:hover {
+  background: var(--accent-bg);
+}
+
+.selDivider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255,255,255,0.1);
+  margin: 0 2px;
+}
+
+.selBtnIcon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.selBtnIcon:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
 }

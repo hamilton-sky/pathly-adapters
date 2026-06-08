@@ -33,6 +33,7 @@ interface SkillNotebookState {
   setPreviewLoading: (loading: boolean) => void
   loadSkill: (skillPath: string) => Promise<void>
   insertFragment: (fragmentName: string, afterCellId: string | null) => string
+  insertBodyCell: (heading: string, content: string, afterCellId: string | null) => string
   removeCell: (cellId: string) => void
   moveCell: (cellId: string, afterCellId: string | null) => void
   updateBodyCell: (cellId: string, content: string) => void
@@ -97,6 +98,25 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
     } catch {
       get().setPreviewLoading(false)
     }
+  },
+  insertBodyCell: (heading: string, content: string, afterCellId: string | null) => {
+    const state = get()
+    const newCell: BodyCell = {
+      id: crypto.randomUUID(),
+      type: 'body',
+      heading,
+      content,
+    }
+    const newCells = afterCellId === null
+      ? [newCell, ...state.cells]
+      : (() => {
+          const idx = state.cells.findIndex(c => c.id === afterCellId)
+          const next = [...state.cells]
+          next.splice(idx + 1, 0, newCell)
+          return next
+        })()
+    get().pushCells(newCells)
+    return newCell.id
   },
   insertFragment: (fragmentName: string, afterCellId: string | null) => {
     const state = get()
