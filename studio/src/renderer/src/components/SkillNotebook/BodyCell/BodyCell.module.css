@@ -80,14 +80,93 @@
   color: var(--green);
 }
 
-.lock {
+.actionBtnActive {
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
+.actionBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── ⋯ menu ── */
+.menuWrap {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 9px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  width: 196px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+}
+
+.menuIcon {
   color: var(--text-muted);
-  opacity: 0.4;
   flex-shrink: 0;
 }
 
+.menuKbd {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.menuItem:hover {
+  background: var(--bg-surface0);
+}
+
+.menuItem:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.menuItemDanger {
+  color: var(--red);
+}
+
+.menuItemDanger:hover {
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+
+.menuDivider {
+  height: 1px;
+  background: var(--border-subtle-color);
+  margin: 2px 4px;
+}
+
+/* ── cell body ── */
 .cellBody {
   padding: 11px 14px 13px;
+  position: relative;
 }
 
 .editor {
@@ -122,10 +201,6 @@
 }
 
 /* ── selection toolbar ── */
-.cellBody {
-  position: relative;
-}
-
 .selBar {
   position: absolute;
   left: var(--sel-x);
@@ -159,9 +234,7 @@
   font-family: var(--font-family-base);
 }
 
-.selBtn:hover {
-  background: var(--accent-bg);
-}
+.selBtn:hover { background: var(--accent-bg); }
 
 .selDivider {
   width: 1px;

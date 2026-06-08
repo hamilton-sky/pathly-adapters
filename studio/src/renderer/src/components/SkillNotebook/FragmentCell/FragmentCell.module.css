@@ -33,24 +33,6 @@
   border-radius: var(--radius-lg);
 }
 
-.grip {
-  color: var(--text-muted);
-  cursor: grab;
-  opacity: 0.35;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  transition: opacity var(--transition-fast);
-}
-
-.cell:hover .grip {
-  opacity: 0.8;
-}
-
-.grip:active {
-  cursor: grabbing;
-}
-
 .name {
   font-family: var(--font-family-mono);
   font-size: 13px;
@@ -120,10 +102,6 @@
   color: var(--text-primary);
 }
 
-.removeBtn:hover {
-  color: var(--red);
-}
-
 .actionBtn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
@@ -135,6 +113,7 @@
   color: var(--text-primary);
 }
 
+/* ── ⋯ menu ── */
 .menuWrap {
   position: relative;
 }
@@ -184,7 +163,7 @@
 }
 
 .menuItem:hover {
-  background: var(--bg-surface1);
+  background: var(--bg-surface0);
 }
 
 .menuItem:disabled {
@@ -206,6 +185,7 @@
   margin: 2px 4px;
 }
 
+/* ── cell body ── */
 .cellBody {
   padding: 8px 14px 10px;
   border-top: 1px solid var(--border-subtle-color);
@@ -215,6 +195,21 @@
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.45;
+}
+
+.toggle {
+  background: none;
+  border: none;
+  padding: 4px 0 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  display: block;
+}
+
+.toggle:hover {
+  color: var(--text-secondary);
 }
 
 @media (prefers-reduced-motion: reduce) {

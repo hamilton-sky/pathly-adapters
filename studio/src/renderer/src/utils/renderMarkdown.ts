@@ -3,15 +3,18 @@ function escapeHtml(str: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 function applyInline(text: string): string {
-  return text
+  // Escape HTML first so any raw tags in the source show as text, not rendered elements.
+  // After escaping: < → &lt;  > → &gt;  & → &amp;
+  const safe = escapeHtml(text)
+  return safe
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
-    .replace(/<([^>]+)>/g, '<span class="var-hl">$1</span>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Pathly template vars like <FEATURE_NAME> — matched via escaped brackets after escapeHtml
+    .replace(/&lt;([A-Za-z][A-Za-z0-9_./]*)&gt;/g, '<span class="var-hl">$1</span>')
 }
 
 export function renderMarkdown(md: string): string {

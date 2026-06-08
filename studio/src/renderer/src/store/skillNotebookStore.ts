@@ -5,6 +5,10 @@ export interface BodyCell {
   type: 'body'
   heading: string
   content: string
+  /** true = loaded from the original skill file; cannot be deleted, only reverted */
+  isSystem?: boolean
+  /** snapshot of content at load time — used by revertBodyCell */
+  originalContent?: string
 }
 
 export interface FragmentCell {
@@ -37,6 +41,7 @@ interface SkillNotebookState {
   removeCell: (cellId: string) => void
   moveCell: (cellId: string, afterCellId: string | null) => void
   updateBodyCell: (cellId: string, content: string) => void
+  revertBodyCell: (cellId: string) => void
 }
 
 export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
@@ -86,6 +91,8 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
         type: 'body',
         heading: bc.heading,
         content: bc.content,
+        isSystem: true,
+        originalContent: bc.content,
       }))
       const fragmentCells: FragmentCell[] = (data.fragment_cells ?? []).map(fc => ({
         id: fc.id,
@@ -106,6 +113,8 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
       type: 'body',
       heading,
       content,
+      isSystem: false,
+      originalContent: '',
     }
     const newCells = afterCellId === null
       ? [newCell, ...state.cells]
@@ -141,7 +150,8 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
   removeCell: (cellId: string) => {
     const state = get()
     const cell = state.cells.find(c => c.id === cellId)
-    if (!cell || cell.type === 'body') return
+    // System body cells cannot be deleted — only reverted (use revertBodyCell)
+    if (!cell || (cell.type === 'body' && cell.isSystem === true)) return
     const newCells = state.cells.filter(c => c.id !== cellId)
     get().pushCells(newCells)
   },
@@ -165,6 +175,15 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
     const state = get()
     const newCells = state.cells.map(c =>
       c.id === cellId && c.type === 'body' ? { ...c, content } : c
+    )
+    get().pushCells(newCells)
+  },
+  revertBodyCell: (cellId: string) => {
+    const state = get()
+    const newCells = state.cells.map(c =>
+      c.id === cellId && c.type === 'body' && c.isSystem
+        ? { ...c, content: c.originalContent ?? c.content }
+        : c
     )
     get().pushCells(newCells)
   },

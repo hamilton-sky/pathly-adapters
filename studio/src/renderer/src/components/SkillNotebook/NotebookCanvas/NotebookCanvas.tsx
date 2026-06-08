@@ -8,7 +8,7 @@ import FragmentCell from '../FragmentCell/FragmentCell'
 import InsertZone from '../InsertZone/InsertZone'
 
 export default function NotebookCanvas() {
-  const { cells, insertFragment, insertBodyCell, moveCell, undo, redo } = useSkillNotebookStore()
+  const { cells, insertFragment, insertBodyCell, moveCell, removeCell, revertBodyCell, undo, redo } = useSkillNotebookStore()
   const skillNotebookPath = useUiStore(s => s.skillNotebookPath)
   const loadSkill = useSkillNotebookStore(s => s.loadSkill)
 
@@ -64,7 +64,7 @@ export default function NotebookCanvas() {
             <button
               type="button"
               className={styles.addCellBtn}
-              title="Add empty cell"
+              title="Add empty cell at bottom"
               onClick={() => handleInsert(cells.length > 0 ? cells[cells.length - 1].id : null)}
             >
               <Plus size={13} />
@@ -95,10 +95,13 @@ export default function NotebookCanvas() {
                 id={cell.id}
                 heading={cell.heading}
                 content={cell.content}
+                isSystem={cell.isSystem === true}
                 isFirst={idx === 0}
                 isLast={idx === cells.length - 1}
                 onMoveUp={() => { if (idx > 0) moveCell(cell.id, idx <= 1 ? null : cells[idx - 2].id) }}
                 onMoveDown={() => { if (idx < cells.length - 1) moveCell(cell.id, cells[idx + 1].id) }}
+                onRemove={() => removeCell(cell.id)}
+                onRevert={() => revertBodyCell(cell.id)}
               />
             ) : (
               <FragmentCell
