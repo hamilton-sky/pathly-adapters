@@ -23,6 +23,14 @@
   flex-shrink: 0;
 }
 
+.pvTitle {
+  font-family: var(--font-family-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
 .pvHeadSpacer {
   flex: 1;
 }

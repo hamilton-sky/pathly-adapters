@@ -26,6 +26,7 @@ interface SkillNotebookState {
   history: NotebookCell[][]
   historyIndex: number
   featurePath: string | null
+  compositionKey: string
   previewSections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>
   previewTokens: number
   previewLoading: boolean
@@ -49,6 +50,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
   history: [],
   historyIndex: -1,
   featurePath: null,
+  compositionKey: '',
   previewSections: [],
   previewTokens: 0,
   previewLoading: false,
@@ -101,6 +103,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
         category: fc.category,
         description: fc.description,
       }))
+      set({ compositionKey: data.composition_key ?? '' })
       get().pushCells([...bodyCells, ...fragmentCells])
     } catch {
       get().setPreviewLoading(false)

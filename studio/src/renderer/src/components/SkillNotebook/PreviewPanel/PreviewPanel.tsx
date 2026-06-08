@@ -4,37 +4,53 @@ import styles from './PreviewPanel.module.css'
 import PreviewSection from './PreviewSection/PreviewSection'
 
 export default function PreviewPanel() {
-  const { cells, featurePath, previewSections, previewTokens, previewLoading, setPreview, setPreviewLoading } = useSkillNotebookStore()
+  const {
+    cells, compositionKey, featurePath,
+    previewSections, previewTokens, previewLoading,
+    setPreview, setPreviewLoading,
+  } = useSkillNotebookStore()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    // Don't call the API if no skill is open
+    if (!compositionKey && cells.length === 0) return
+
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      const fragmentCells = cells.filter(c => c.type === 'fragment')
-      if (fragmentCells.length === 0 && cells.length === 0) return
       setPreviewLoading(true)
+
+      const bodyCells = cells
+        .filter(c => c.type === 'body')
+        .map(c => ({ heading: (c as any).heading ?? '', content: (c as any).content ?? '' }))
+
+      const fragmentCells = cells
+        .filter(c => c.type === 'fragment')
+        .map(c => ({ type: 'fragment', fragmentName: (c as any).fragmentName }))
+
       fetch('http://localhost:8765/skills/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          skill: 'team/build',
-          cells: fragmentCells.map(c => ({ type: 'fragment', fragmentName: (c as any).fragmentName })),
-          feature_path: featurePath ?? 'pathly/plans/example',
+          skill: compositionKey,
+          cells: fragmentCells,
+          body_cells: bodyCells,
+          feature_path: featurePath ?? '',
         }),
       })
         .then(r => r.json())
         .then(data => setPreview(data.sections ?? [], data.tokens ?? 0))
         .catch(() => setPreviewLoading(false))
-    }, 250)
+    }, 350)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [cells, featurePath])
+  }, [cells, compositionKey, featurePath])
 
+  const skillLabel = compositionKey || '—'
   const cellCount = previewSections.length
 
   return (
     <div className={styles.root}>
       <div className={styles.pvHead}>
-        <span>Composed skill</span>
+        <span title={skillLabel} className={styles.pvTitle}>{skillLabel}</span>
         <div className={styles.pvHeadSpacer} />
         <span className={styles.liveBadge}>
           <span className={styles.liveDot} />
@@ -47,7 +63,9 @@ export default function PreviewPanel() {
           <PreviewSection key={i} heading={s.heading} content={s.content} />
         ))}
         {previewSections.length === 0 && !previewLoading && (
-          <div className={styles.empty}>Add fragments to see preview</div>
+          <div className={styles.empty}>
+            {compositionKey ? 'No content yet — add body or fragment cells' : 'Open a skill to see the live preview'}
+          </div>
         )}
       </div>
 

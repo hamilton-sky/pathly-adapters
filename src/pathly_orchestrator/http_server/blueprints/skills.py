@@ -110,7 +110,12 @@ def skills_parse():
 def skills_preview():
     """Preview an assembled skill with live fragment substitution.
 
-    Body: {"skill": "team/build", "cells": [...], "feature_path": "pathly/plans/foo"}
+    Body: {
+        "skill": "team/build",        # skill key for disk lookup (optional if body_cells given)
+        "cells": [...],               # fragment cells [{type:"fragment", fragmentName:...}]
+        "body_cells": [...],          # live body cells [{heading, content}] from the notebook editor
+        "feature_path": "pathly/plans/foo"
+    }
     Returns: {"sections": [{heading, content, origin}], "tokens": int}
     """
     try:
@@ -121,12 +126,28 @@ def skills_preview():
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
-        skill = data.get("skill", "")
+        skill = (data.get("skill") or "").strip()
         cells = data.get("cells", [])
+        body_cells_raw = data.get("body_cells", [])
         feature_path = data.get("feature_path", "")
 
-        if not isinstance(skill, str) or not skill.strip():
-            return jsonify({"error": "Field 'skill' must be a non-empty string"}), 400
+        # Build skill body text from live editor body cells (preferred over disk read)
+        body_cells_text = ""
+        if body_cells_raw:
+            parts_bc = []
+            for bc in body_cells_raw:
+                if not isinstance(bc, dict):
+                    continue
+                heading = (bc.get("heading") or "").strip()
+                content = (bc.get("content") or "").strip()
+                if heading:
+                    parts_bc.append(f"## {heading}\n\n{content}" if content else f"## {heading}")
+                elif content:
+                    parts_bc.append(content)
+            body_cells_text = "\n\n".join(parts_bc)
+
+        if not skill and not body_cells_text:
+            return jsonify({"error": "Provide 'skill' key or 'body_cells'"}), 400
 
         # Collect fragment names from cells where type == "fragment"
         fragment_names = [
@@ -135,26 +156,31 @@ def skills_preview():
             if isinstance(c, dict) and c.get("type") == "fragment" and c.get("fragmentName")
         ]
 
-        # Build adapter_caps: use fragment_names directly if provided via cells,
-        # otherwise fall back to compose_skill which reads composition.yaml
-        if fragment_names:
-            from pathly_orchestrator.compose import _read_skill_body
+        # Build assembled text: body (live cells or disk) + fragment bodies
+        if fragment_names or body_cells_text:
             from pathly_orchestrator.compose import load_manifest, _read_fragment
 
             manifest = load_manifest()
             fragments_dir = manifest.get("fragments_dir", "fragments")
-            try:
-                skill_body = _read_skill_body(skill)
-            except Exception:
-                skill_body = ""
+
+            # Prefer live body cells; fall back to reading skill from disk
+            if body_cells_text:
+                skill_body = body_cells_text
+            else:
+                try:
+                    from pathly_orchestrator.compose import _read_skill_body
+                    skill_body = _read_skill_body(skill)
+                except Exception:
+                    skill_body = ""
+
             fragment_bodies = []
             for fname in fragment_names:
                 try:
                     fragment_bodies.append(_read_fragment(fragments_dir, fname).rstrip("\n"))
                 except Exception:
                     pass
-            parts = [skill_body.rstrip("\n")] + fragment_bodies
-            assembled = "\n\n".join(parts) + "\n"
+            raw_parts = [skill_body.rstrip("\n")] + fragment_bodies
+            assembled = "\n\n".join(p for p in raw_parts if p) + "\n"
         else:
             assembled = compose_skill(skill, adapter_caps={"can_spawn": True})
 
