@@ -128,7 +128,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
   moveCell: (cellId: string, afterCellId: string | null) => {
     const state = get()
     const cell = state.cells.find(c => c.id === cellId)
-    if (!cell || cell.type === 'body') return
+    if (!cell) return
     const without = state.cells.filter(c => c.id !== cellId)
     let newCells: NotebookCell[]
     if (afterCellId === null) {
