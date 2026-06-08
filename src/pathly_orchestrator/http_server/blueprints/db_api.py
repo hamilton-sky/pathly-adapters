@@ -91,11 +91,15 @@ def db_stats():
         conn = _get_db()
 
         db_features_count = conn.execute("SELECT COUNT(DISTINCT feature) FROM fsm_state").fetchone()[0]
-        events = conn.execute("SELECT COUNT(*) FROM fsm_events").fetchone()[0]
-        invocations = conn.execute("SELECT COUNT(*) FROM agent_invocations").fetchone()[0]
+        events = conn.execute("SELECT COUNT(*) FROM fsm_events WHERE event_type NOT IN ('BILLING_UPDATE')").fetchone()[0]
+        invocations = conn.execute("SELECT COUNT(*) FROM fsm_events WHERE event_type='AGENT_DONE'").fetchone()[0]
+        # Tokens from AGENT_DONE only; cost from both AGENT_DONE + BILLING_UPDATE.
         row = conn.execute(
-            "SELECT COALESCE(SUM(tokens_in+tokens_out),0), COALESCE(SUM(cost_usd),0) "
-            "FROM agent_invocations"
+            "SELECT "
+            "  COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
+            "    THEN CAST(json_extract(payload,'$.total_tokens') AS INT) ELSE 0 END),0), "
+            "  COALESCE(SUM(CAST(json_extract(payload,'$.cost_usd') AS REAL)),0) "
+            "FROM fsm_events WHERE event_type IN ('AGENT_DONE','BILLING_UPDATE')"
         ).fetchone()
         total_tokens = int(row[0])
         total_cost = float(row[1])
@@ -138,12 +142,16 @@ def db_features():
                 "SELECT project_root, feature, COUNT(*) as cnt FROM fsm_events GROUP BY project_root, feature"
             ).fetchall()
         }
+        # Tokens from AGENT_DONE only; cost from AGENT_DONE (where >0) + BILLING_UPDATE.
+        # BILLING_UPDATE supersedes zero-cost AGENT_DONE rows — no double-counting.
         inv_rows = conn.execute(
             "SELECT project_root, feature, "
-            "COUNT(*) as inv, "
-            "COALESCE(SUM(tokens_in+tokens_out),0) as total_tokens, "
-            "COALESCE(SUM(cost_usd),0) as total_cost "
-            "FROM agent_invocations GROUP BY project_root, feature"
+            "COUNT(CASE WHEN event_type='AGENT_DONE' THEN 1 END) as inv, "
+            "COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
+            "  THEN CAST(json_extract(payload,'$.total_tokens') AS INT) ELSE 0 END),0) as total_tokens, "
+            "COALESCE(SUM(CAST(json_extract(payload,'$.cost_usd') AS REAL)),0) as total_cost "
+            "FROM fsm_events WHERE event_type IN ('AGENT_DONE','BILLING_UPDATE') "
+            "GROUP BY project_root, feature"
         ).fetchall()
         inv_stats = {(r["project_root"], r["feature"]): dict(r) for r in inv_rows}
 
