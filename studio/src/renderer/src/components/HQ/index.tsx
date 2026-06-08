@@ -27,8 +27,9 @@ export function HQ(): JSX.Element {
       ref={chat.chatRef}
       className={styles.panel}
     >
-      {/* Left-edge drag handle — drag to resize */}
+      {/* Left-edge drag handle — lives outside panelInner so overflow:hidden doesn't clip it */}
       <div className={styles.resizeHandle} onMouseDown={chat.onDragStart} />
+      <div className={styles.panelInner}>
       <ChatHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} hasAntigravityTab={chat.hasAntigravityTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={chat.handleClearAll} sessions={chat.brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
       <FlowControlBar />
       <StageStatusStrip />
@@ -106,6 +107,7 @@ export function HQ(): JSX.Element {
         miniTerminalActive={chat.miniTerminalVisible}
         miniTerminalKind={chat.hasActiveTerminal ? chat.targetKind : undefined}
       />
+      </div>
     </div>
   )
 }

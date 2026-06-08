@@ -4,34 +4,36 @@
   min-width: 260px;
   max-width: 720px;
   flex-shrink: 0;
+  height: 100%;
+  position: relative;
+  /* No overflow:hidden here — would clip the resize handle at left:-3px */
+}
+
+/* Inner wrapper carries overflow constraint + layout; handle lives outside it */
+.panelInner {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  position: relative;
   background: var(--bg-base);
   border-left: var(--border);
   font-family: var(--font-family-base);
 }
 
-/* Drag handle — left edge of the panel */
+/* Drag handle — centered on the left border, matching sidebar handle style */
 .resizeHandle {
   position: absolute;
-  left: 0;
   top: 0;
-  bottom: 0;
-  width: 4px;
+  left: -3px;
+  width: 6px;
+  height: 100%;
   cursor: col-resize;
   z-index: 10;
   background: transparent;
-  transition: var(--transition-base);
+  transition: background 0.15s;
 }
 
-.resizeHandle:hover,
-.resizeHandle:active {
-  background: var(--accent, #22C55E);
-  opacity: 0.5;
-}
+.resizeHandle:hover { background: var(--accent); opacity: 0.4; }
 
 .thinkingBar {
   display: flex;

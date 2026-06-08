@@ -9,6 +9,8 @@ import { useProjectFiles } from '../../hooks/useProjectFiles'
 import { usePlanFiles } from '../../hooks/usePlanFiles'
 import { WorkspacePanel } from './panels/WorkspacePanel'
 import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
+import SkillSplitModal from '../shared/SkillSplitModal/SkillSplitModal'
+import type { CatalogGroup, CatalogItemData } from '../shared/LibraryCatalog/useCatalogData'
 import { useSkillNotebookStore } from '../../store/skillNotebookStore'
 import { useSidebarResize } from './shell/useSidebarResize'
 import { TabBar } from './shell/TabBar'
@@ -62,6 +64,7 @@ export function Sidebar(): JSX.Element | null {
   } = useStore()
 
   const insertFragment = useSkillNotebookStore((s) => s.insertFragment)
+  const insertBodyCell = useSkillNotebookStore((s) => s.insertBodyCell)
   const notebookCells  = useSkillNotebookStore((s) => s.cells)
 
   const { sections, setSections, loadItems, customWorkspaceSections } = useProjectFiles()
@@ -124,6 +127,7 @@ export function Sidebar(): JSX.Element | null {
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<{ dir: string; name: string } | null>(null)
   const [dragOverPath, setDragOverPath] = useState<string | null>(null)
+  const [splitModalItem, setSplitModalItem] = useState<CatalogItemData | null>(null)
   const [inlineCreate, setInlineCreate] = useState<{
     target: string   // 'workspace-root' | 'plan-folder' | 'plan-file' | section label
     parentDir: string
@@ -471,6 +475,24 @@ export function Sidebar(): JSX.Element | null {
     })
   }
 
+  async function deleteItemViaAPI(item: CatalogItemData, type: CatalogGroup['type']): Promise<void> {
+    if (type === 'flow') {
+      await fetch(`http://localhost:8765/flows/${encodeURIComponent(item.name)}`, { method: 'DELETE' })
+    } else {
+      await fetch(`http://localhost:8765/catalog/item?type=${type}&name=${encodeURIComponent(item.name)}`, { method: 'DELETE' })
+    }
+  }
+
+  async function createNewCatalogItem(type: CatalogGroup['type'], category?: string): Promise<void> {
+    const name = window.prompt(`New ${type} name:`)
+    if (!name?.trim()) return
+    await fetch('http://localhost:8765/catalog/item/new', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, name: name.trim(), category: category || '' }),
+    })
+  }
+
   return (
     <div ref={sidebarRef} className={styles.sidebar}>
       <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
@@ -491,16 +513,39 @@ export function Sidebar(): JSX.Element | null {
             context={activePanelUi === 'skill-notebook' ? 'notebook' : 'canvas'}
             pathlyRoot={pathlyRoot}
             onOpenSkill={(path) => { setSkillNotebookPath(path); setActivePanel('skill-notebook') }}
+            onOpenFlow={(pathOrName) => {
+              const filename = pathOrName.replace(/\\/g, '/').split('/').pop() ?? pathOrName
+              const name = filename.replace(/\.flow\.yaml$/i, '')
+              setSelectedItem({ name, path: pathOrName, type: 'flow' })
+              setActivePanel('flow')
+              setLastUsedFlowPath(pathOrName)
+            }}
             onInsertCell={(item) => {
               if (item.path) {
-                // Skill/agent/template — open it in the notebook
-                setSkillNotebookPath(item.path)
-                setActivePanel('skill-notebook')
+                setSplitModalItem(item)
               } else {
-                // Fragment — insert after the last cell
                 const lastCell = notebookCells[notebookCells.length - 1]
                 insertFragment(item.name, lastCell?.id ?? null)
               }
+            }}
+            onAddCells={(item) => setSplitModalItem(item)}
+            onNewItem={(type, category) => {
+              if (type === 'flow') {
+                setShowFlowWizard(true)
+              } else {
+                void createNewCatalogItem(type, category)
+              }
+            }}
+            onDeleteItem={(item, type) => deleteItemViaAPI(item, type)}
+            onNewCategory={async (type, name) => {
+              await fetch('http://localhost:8765/catalog/category/new', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, name }),
+              })
+            }}
+            onDeleteCategory={async (type, category) => {
+              await fetch(`http://localhost:8765/catalog/category?type=${type}&name=${encodeURIComponent(category)}`, { method: 'DELETE' })
             }}
           />
         )}
@@ -595,6 +640,26 @@ export function Sidebar(): JSX.Element | null {
         onConfirmDeleteSectionCancel={() => setConfirmDeleteSection(null)}
         onConfirmDeleteSectionConfirm={(dir) => void doDeleteCustomSection(dir)}
       />
+
+      {splitModalItem?.path && (
+        <SkillSplitModal
+          filePath={splitModalItem.path}
+          fileName={splitModalItem.name}
+          onClose={() => setSplitModalItem(null)}
+          onInsertOne={(raw) => {
+            setSplitModalItem(null)
+            const lastCell = notebookCells[notebookCells.length - 1]
+            insertBodyCell(splitModalItem.name, raw, lastCell?.id ?? null)
+          }}
+          onConfirm={(cells) => {
+            setSplitModalItem(null)
+            let lastId = notebookCells[notebookCells.length - 1]?.id ?? null
+            for (const cell of cells) {
+              lastId = insertBodyCell(cell.heading, cell.content, lastId)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

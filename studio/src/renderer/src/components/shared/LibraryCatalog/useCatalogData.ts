@@ -9,8 +9,8 @@ export interface CatalogItemData {
 
 export interface CatalogGroup {
   label: string
-  type: 'agent' | 'fragment' | 'skill' | 'template'
-  icon: 'brain' | 'diamond' | 'book-open' | 'layout-grid'
+  type: 'agent' | 'fragment' | 'skill' | 'template' | 'flow'
+  icon: 'brain' | 'diamond' | 'book-open' | 'layout-grid' | 'git-branch'
   items: CatalogItemData[]
 }
 
@@ -28,6 +28,12 @@ interface CatalogAllResponse {
   templates: ApiItem[]
 }
 
+interface FlowListItem {
+  name: string
+  file_path: string
+  updated_at: string
+}
+
 function toItem(r: ApiItem): CatalogItemData {
   return {
     name:        r.name,
@@ -37,31 +43,44 @@ function toItem(r: ApiItem): CatalogItemData {
   }
 }
 
+function flowToItem(f: FlowListItem): CatalogItemData {
+  return {
+    name:     f.name,
+    path:     f.file_path || undefined,
+    category: 'flows',
+  }
+}
+
+const FSM = 'http://localhost:8765'
+
 /**
  * Fetch the full catalog from the FSM server in one round-trip.
  * _pathlyRoot is kept for API compatibility but is no longer used —
  * the server knows where pathly_data lives.
+ * refreshKey can be incremented by the caller to trigger a re-fetch.
  */
-export function useCatalogData(_pathlyRoot?: string | null): CatalogGroup[] {
+export function useCatalogData(_pathlyRoot?: string | null, refreshKey?: number): CatalogGroup[] {
   const [groups, setGroups] = useState<CatalogGroup[]>([])
 
   useEffect(() => {
-    fetch('http://localhost:8765/catalog/all')
-      .then(r => r.json() as Promise<CatalogAllResponse>)
-      .then(data => {
-        const next: CatalogGroup[] = []
-        if (data.agents?.length)
-          next.push({ label: 'Agents',    type: 'agent',    icon: 'brain',       items: data.agents.map(toItem) })
-        if (data.fragments?.length)
-          next.push({ label: 'Fragments', type: 'fragment', icon: 'diamond',     items: data.fragments.map(toItem) })
-        if (data.skills?.length)
-          next.push({ label: 'Skills',    type: 'skill',    icon: 'book-open',   items: data.skills.map(toItem) })
-        if (data.templates?.length)
-          next.push({ label: 'Templates', type: 'template', icon: 'layout-grid', items: data.templates.map(toItem) })
-        setGroups(next)
-      })
-      .catch(() => {})
-  }, [])  // fetch once on mount — server rebuilds the index on every start
+    Promise.all([
+      fetch(`${FSM}/catalog/all`).then(r => r.json() as Promise<CatalogAllResponse>),
+      fetch(`${FSM}/flows`).then(r => r.json() as Promise<FlowListItem[]>).catch(() => [] as FlowListItem[]),
+    ]).then(([data, flows]) => {
+      const next: CatalogGroup[] = []
+      if (flows?.length)
+        next.push({ label: 'Flows',     type: 'flow',     icon: 'git-branch',  items: flows.map(flowToItem) })
+      if (data.agents?.length)
+        next.push({ label: 'Agents',    type: 'agent',    icon: 'brain',       items: data.agents.map(toItem) })
+      if (data.fragments?.length)
+        next.push({ label: 'Fragments', type: 'fragment', icon: 'diamond',     items: data.fragments.map(toItem) })
+      if (data.skills?.length)
+        next.push({ label: 'Skills',    type: 'skill',    icon: 'book-open',   items: data.skills.map(toItem) })
+      if (data.templates?.length)
+        next.push({ label: 'Templates', type: 'template', icon: 'layout-grid', items: data.templates.map(toItem) })
+      setGroups(next)
+    }).catch(() => {})
+  }, [refreshKey])
 
   return groups
 }
