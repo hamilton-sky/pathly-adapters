@@ -74,6 +74,24 @@
   text-align: center;
 }
 
+.pvCloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.pvCloseBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface1);
+}
+
 .pvFoot {
   border-top: var(--border);
   padding: 10px 16px;

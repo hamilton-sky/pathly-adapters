@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react'
+import { PanelRightClose } from 'lucide-react'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
+import { useUiStore } from '../../../store/uiStore'
 import styles from './PreviewPanel.module.css'
 import PreviewSection from './PreviewSection/PreviewSection'
 
@@ -9,6 +11,7 @@ export default function PreviewPanel() {
     previewSections, previewTokens, previewLoading,
     setPreview, setPreviewLoading,
   } = useSkillNotebookStore()
+  const togglePreview = useUiStore((s) => s.toggleNotebookPreview)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -56,6 +59,14 @@ export default function PreviewPanel() {
           <span className={styles.liveDot} />
           live
         </span>
+        <button
+          type="button"
+          className={styles.pvCloseBtn}
+          onClick={togglePreview}
+          aria-label="Close preview"
+        >
+          <PanelRightClose size={14} />
+        </button>
       </div>
 
       <div className={`${styles.pvBody} ${previewLoading ? styles.loading : ''}`}>

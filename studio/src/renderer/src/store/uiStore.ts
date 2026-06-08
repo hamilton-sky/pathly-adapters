@@ -38,7 +38,11 @@ export interface UiState {
   chatOpen: boolean
   skillsPanelOpen: boolean
   skillNotebookPath: string | null
+  skillNotebookViewMode: 'cells' | 'editor'
+  notebookPreviewOpen: boolean
   setSidebarCollapsed: (v: boolean) => void
+  setSkillNotebookViewMode: (mode: 'cells' | 'editor') => void
+  toggleNotebookPreview: () => void
   setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook') => void
   setSkillNotebookPath: (path: string | null) => void
   markDirty: (path: string) => void
@@ -72,9 +76,13 @@ export const useUiStore = create<UiState>()(
       chatOpen: false,
       skillsPanelOpen: true,
       skillNotebookPath: null,
+      skillNotebookViewMode: 'cells',
+      notebookPreviewOpen: true,
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+      toggleNotebookPreview: () => set((s) => ({ notebookPreviewOpen: !s.notebookPreviewOpen })),
       setActivePanel: (p) => set({ activePanel: p }),
       setSkillNotebookPath: (path) => set({ skillNotebookPath: path }),
+      setSkillNotebookViewMode: (mode) => set({ skillNotebookViewMode: mode }),
       markDirty: (path) => set((s) => ({ dirtyItems: new Set([...s.dirtyItems, path]) })),
       clearDirty: (path) =>
         set((s) => {
@@ -119,7 +127,7 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'pathly-studio-ui',
-      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme, preferredDark: s.preferredDark, preferredLight: s.preferredLight }),
+      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme, preferredDark: s.preferredDark, preferredLight: s.preferredLight, notebookPreviewOpen: s.notebookPreviewOpen }),
     }
   )
 )
