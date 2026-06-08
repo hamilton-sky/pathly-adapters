@@ -5,7 +5,7 @@
   min-height: 0;
 }
 
-/* Pending anchor — not yet submitted, interactive (clickable to re-open modal) */
+/* Pending — drafting a comment (accent/blue, interactive) */
 .pendingMark {
   background: color-mix(in srgb, var(--accent) 28%, transparent);
   color: inherit;
@@ -19,11 +19,11 @@
   background: color-mix(in srgb, var(--accent) 44%, transparent);
 }
 
-/* Submitted anchor — comment exists in the panel, visual only */
+/* Submitted — comment exists in the panel (yellow/amber, visual only) */
 .submittedMark {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  background: color-mix(in srgb, var(--yellow) 22%, transparent);
   color: inherit;
   border-radius: 2px;
   padding: 0 2px;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--yellow) 60%, transparent);
 }

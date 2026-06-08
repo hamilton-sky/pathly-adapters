@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
@@ -92,10 +92,15 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   const isSkillOrAgent = derivedType === 'skill' || derivedType === 'agent'
   const isPreviewDefault = isSkillOrAgent || derivedType === 'template'
 
-  const { comments, add: addComment, resolve: resolveComment, remove: removeComment } = useComments(effectivePath)
+  const { comments, add: addComment, edit: editComment, resolve: resolveComment, remove: removeComment } = useComments(effectivePath)
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
   const [anchorPos, setAnchorPos]         = useState<{ x: number; y: number } | null>(null)
   const [modalOpen, setModalOpen]         = useState(false)
+  const [showHighlights, setShowHighlights] = useState(true)
+  const submittedAnchors = useMemo(
+    () => comments.filter((c) => !c.resolved).map((c) => c.lineText),
+    [comments]
+  )
   const addTab = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
 
@@ -264,7 +269,8 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
                 content={body}
                 pendingAnchor={pendingAnchor}
                 modalOpen={modalOpen}
-                submittedAnchors={comments.filter((c) => !c.resolved).map((c) => c.lineText)}
+                submittedAnchors={submittedAnchors}
+                showHighlights={showHighlights}
                 onSelectionComment={(text, x, y) => { setPendingAnchor(text); setAnchorPos({ x, y }); setModalOpen(true) }}
                 onResume={(x, y) => { setAnchorPos({ x, y }); setModalOpen(true) }}
               />
@@ -274,8 +280,11 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
                 filePath={effectivePath}
                 body={body}
                 comments={comments}
+                showHighlights={showHighlights}
+                onToggleHighlights={() => setShowHighlights((v) => !v)}
                 onResolve={resolveComment}
                 onRemove={removeComment}
+                onEdit={editComment}
               />
             )}
           </div>

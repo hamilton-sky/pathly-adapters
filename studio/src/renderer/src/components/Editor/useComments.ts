@@ -53,6 +53,14 @@ export function useComments(filePath: string | null) {
     })
   }, [persist])
 
+  const edit = useCallback((id: string, body: string) => {
+    setComments((prev) => {
+      const next = prev.map((c) => c.id === id ? { ...c, body } : c)
+      persist(next)
+      return next
+    })
+  }, [persist])
+
   const resolve = useCallback((id: string) => {
     setComments((prev) => {
       const next = prev.map((c) => c.id === id ? { ...c, resolved: true } : c)
@@ -69,5 +77,5 @@ export function useComments(filePath: string | null) {
     })
   }, [persist])
 
-  return { comments, add, resolve, remove }
+  return { comments, add, edit, resolve, remove }
 }

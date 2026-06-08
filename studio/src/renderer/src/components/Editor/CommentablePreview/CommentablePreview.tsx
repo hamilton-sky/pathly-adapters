@@ -10,42 +10,72 @@ interface Props {
   pendingAnchor: string | null
   modalOpen: boolean
   submittedAnchors: string[]
+  showHighlights: boolean
   onSelectionComment: (text: string, x: number, y: number) => void
   onResume: (x: number, y: number) => void
 }
 
-function removeAllMarks(container: HTMLElement): void {
+export function removeAllMarks(container: HTMLElement): void {
   container.querySelectorAll('[data-comment-mark]').forEach((el) => {
-    const text = document.createTextNode(el.textContent ?? '')
-    el.parentNode?.replaceChild(text, el)
+    el.parentNode?.replaceChild(document.createTextNode(el.textContent ?? ''), el)
   })
 }
 
-function injectMark(container: HTMLElement, anchor: string, className: string): HTMLElement | null {
-  const searchText = anchor.split('\n')[0].trim().slice(0, 80)
-  if (!searchText) return null
+function injectMarkForText(container: HTMLElement, searchTerm: string, className: string): HTMLElement | null {
+  if (!searchTerm) return null
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null)
   while (walker.nextNode()) {
     const node = walker.currentNode as Text
     const nodeText = node.textContent ?? ''
-    const idx = nodeText.indexOf(searchText)
-    if (idx === -1) continue
+    let start = nodeText.indexOf(searchTerm)
+    let len = searchTerm.length
+
+    if (start === -1) {
+      // Whitespace-normalised match (browser adds \n at visual wraps)
+      const normNode = nodeText.replace(/\s+/g, ' ')
+      const normIdx = normNode.indexOf(searchTerm)
+      if (normIdx === -1) continue
+      // Map normIdx → original start
+      let s = 0, n = 0
+      while (s < nodeText.length && n < normIdx) {
+        if (/\s/.test(nodeText[s])) { while (s < nodeText.length && /\s/.test(nodeText[s])) s++; n++ }
+        else { s++; n++ }
+      }
+      start = s
+      while (s < nodeText.length && n < normIdx + searchTerm.length) {
+        if (/\s/.test(nodeText[s])) { while (s < nodeText.length && /\s/.test(nodeText[s])) s++; n++ }
+        else { s++; n++ }
+      }
+      len = s - start
+    }
+
     const mark = document.createElement('mark')
     mark.className = className
     mark.dataset.commentMark = 'true'
-    mark.textContent = nodeText.slice(idx, idx + searchText.length)
+    mark.textContent = nodeText.slice(start, start + len)
     const parent = node.parentNode!
-    parent.insertBefore(document.createTextNode(nodeText.slice(0, idx)), node)
+    parent.insertBefore(document.createTextNode(nodeText.slice(0, start)), node)
     parent.insertBefore(mark, node)
-    parent.insertBefore(document.createTextNode(nodeText.slice(idx + searchText.length)), node)
+    parent.insertBefore(document.createTextNode(nodeText.slice(start + len)), node)
     parent.removeChild(node)
     return mark
   }
   return null
 }
 
+function injectMark(container: HTMLElement, anchor: string, className: string): HTMLElement | null {
+  const norm = anchor.replace(/\s+/g, ' ').trim()
+  if (!norm) return null
+  // Try full normalised anchor, then progressively shorter prefixes for cross-node selections
+  return (
+    injectMarkForText(container, norm, className) ??
+    (norm.length > 60 ? injectMarkForText(container, norm.slice(0, 60), className) : null) ??
+    (norm.length > 30 ? injectMarkForText(container, norm.slice(0, 30), className) : null)
+  )
+}
+
 export function CommentablePreview({
-  content, pendingAnchor, modalOpen, submittedAnchors, onSelectionComment, onResume,
+  content, pendingAnchor, modalOpen, submittedAnchors, showHighlights, onSelectionComment, onResume,
 }: Props): JSX.Element {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -73,20 +103,18 @@ export function CommentablePreview({
     setTooltip(null)
   }
 
-  // Re-inject all marks whenever anchors or content change
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     removeAllMarks(container)
+    if (!showHighlights) return
 
-    // Submitted comment highlights (persistent, non-interactive)
     for (const anchor of submittedAnchors) {
       if (anchor !== pendingAnchor) {
         injectMark(container, anchor, styles.submittedMark)
       }
     }
 
-    // Pending anchor (interactive — clickable to re-open modal)
     if (pendingAnchor && !modalOpen) {
       const mark = injectMark(container, pendingAnchor, styles.pendingMark)
       if (mark) {
@@ -99,7 +127,7 @@ export function CommentablePreview({
         })
       }
     }
-  }, [pendingAnchor, modalOpen, content, submittedAnchors, onResume])
+  }, [pendingAnchor, modalOpen, content, submittedAnchors, showHighlights, onResume])
 
   return (
     <div ref={containerRef} className={styles.root} onMouseUp={handleMouseUp}>

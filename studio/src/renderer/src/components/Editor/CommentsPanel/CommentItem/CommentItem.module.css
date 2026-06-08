@@ -40,6 +40,56 @@
   word-break: break-word;
 }
 
+.editArea {
+  resize: none;
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 6px 8px;
+  line-height: 1.45;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.editArea:focus { outline: none; }
+
+.editActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.saveBtn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  transition: opacity 0.12s;
+}
+.saveBtn:hover:not(:disabled) { opacity: 0.85; }
+.saveBtn:disabled { opacity: 0.35; cursor: default; }
+
+.cancelEditBtn {
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 3px 8px;
+  transition: color 0.12s;
+}
+.cancelEditBtn:hover { color: var(--text-primary); }
+
 .actions {
   display: flex;
   align-items: center;
@@ -61,6 +111,19 @@
   transition: color 0.12s, border-color 0.12s;
 }
 .resolveBtn:hover { color: var(--green); border-color: var(--green); }
+
+.editBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.12s;
+}
+.editBtn:hover { color: var(--accent); }
 
 .removeBtn {
   margin-left: auto;
