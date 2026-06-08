@@ -94,6 +94,8 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
 
   const { comments, add: addComment, resolve: resolveComment, remove: removeComment } = useComments(effectivePath)
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
+  const [anchorPos, setAnchorPos]         = useState<{ x: number; y: number } | null>(null)
+  const [modalOpen, setModalOpen]         = useState(false)
   const addTab = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
 
@@ -113,6 +115,8 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     if (!effectivePath) return
     setTab('preview')
     setPendingAnchor(null)
+    setAnchorPos(null)
+    setModalOpen(false)
     setLoading(true)
     setSaveError(null)
     readFile(effectivePath)
@@ -162,6 +166,8 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     if (!pendingAnchor || !effectivePath) return
     addComment(deriveLineNumber(body, pendingAnchor), pendingAnchor, commentBody)
     setPendingAnchor(null)
+    setAnchorPos(null)
+    setModalOpen(false)
   }
 
   async function handleModalSendNow(commentBody: string): Promise<void> {
@@ -169,6 +175,8 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     const lineNumber = deriveLineNumber(body, pendingAnchor)
     addComment(lineNumber, pendingAnchor, commentBody)
     setPendingAnchor(null)
+    setAnchorPos(null)
+    setModalOpen(false)
     const newItem = { id: 'send-now', lineNumber, lineText: pendingAnchor.slice(0, 120), body: commentBody, resolved: false, createdAt: '' }
     const allUnresolved = [...comments.filter((c) => !c.resolved), newItem]
     const norm = effectivePath.replace(/\\/g, '/')
@@ -254,7 +262,11 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
             <div className={styles.previewContent}>
               <CommentablePreview
                 content={body}
-                onSelectionComment={(anchor) => setPendingAnchor(anchor)}
+                pendingAnchor={pendingAnchor}
+                modalOpen={modalOpen}
+                submittedAnchors={comments.filter((c) => !c.resolved).map((c) => c.lineText)}
+                onSelectionComment={(text, x, y) => { setPendingAnchor(text); setAnchorPos({ x, y }); setModalOpen(true) }}
+                onResume={(x, y) => { setAnchorPos({ x, y }); setModalOpen(true) }}
               />
             </div>
             {effectivePath && (
@@ -281,12 +293,14 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
         )}
       </div>
 
-      {pendingAnchor && (
+      {modalOpen && pendingAnchor && anchorPos && (
         <CommentModal
           anchorText={pendingAnchor}
+          x={anchorPos.x}
+          y={anchorPos.y}
           onAdd={handleModalAdd}
           onSendNow={(b) => void handleModalSendNow(b)}
-          onClose={() => setPendingAnchor(null)}
+          onClose={() => setModalOpen(false)}
         />
       )}
     </div>

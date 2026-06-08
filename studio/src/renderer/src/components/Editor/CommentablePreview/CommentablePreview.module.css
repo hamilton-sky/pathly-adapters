@@ -4,3 +4,26 @@
   position: relative;
   min-height: 0;
 }
+
+/* Pending anchor — not yet submitted, interactive (clickable to re-open modal) */
+.pendingMark {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 2px;
+  cursor: pointer;
+  outline: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  transition: background 0.15s;
+}
+.pendingMark:hover {
+  background: color-mix(in srgb, var(--accent) 44%, transparent);
+}
+
+/* Submitted anchor — comment exists in the panel, visual only */
+.submittedMark {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 2px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
