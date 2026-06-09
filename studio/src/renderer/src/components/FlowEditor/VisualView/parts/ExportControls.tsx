@@ -1,8 +1,6 @@
-import type { Theme } from '../../../../theme'
 import type { FlowExportTarget } from '../../../../types'
 import { EXPORT_TARGET_LABELS } from '../constants'
 import { Tooltip } from '../../../ui'
-import { makeVisualViewStyles } from '../VisualView.styles'
 import styles from './ExportControls.module.css'
 
 interface Props {
@@ -10,11 +8,9 @@ interface Props {
   onTargetChange: (target: FlowExportTarget) => void
   hasErrors: boolean
   onPublish: () => void
-  t: Theme
 }
 
-export function ExportControls({ exportTarget, onTargetChange, hasErrors, onPublish, t }: Props): JSX.Element {
-  const s = makeVisualViewStyles(t)
+export function ExportControls({ exportTarget, onTargetChange, hasErrors, onPublish }: Props): JSX.Element {
   return (
     <>
       <div className={styles.selectWrap}>
@@ -34,7 +30,8 @@ export function ExportControls({ exportTarget, onTargetChange, hasErrors, onPubl
         placement="bottom"
       >
         <button
-          style={hasErrors ? s.publishBtnDisabled : s.publishBtn}
+          type="button"
+          className={hasErrors ? styles.publishBtnDisabled : styles.publishBtn}
           onClick={onPublish}
           disabled={hasErrors}
         >

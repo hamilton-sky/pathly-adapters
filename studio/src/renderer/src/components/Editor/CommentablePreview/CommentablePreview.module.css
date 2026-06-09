@@ -5,25 +5,42 @@
   min-height: 0;
 }
 
-/* Pending — drafting a comment (accent/blue, interactive) */
-.pendingMark {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
+/*
+ * CSS Custom Highlight API — these style the highlights registered via CSS.highlights.set().
+ * Works across inline elements (<code>, <strong>, etc.) with zero DOM mutation.
+ * Supported properties: background-color, color, text-decoration, text-shadow.
+ */
+
+/* Pending draft comment — accent blue, click anywhere in it to resume */
+:global(::highlight(pathly-pending)) {
+  background-color: color-mix(in srgb, var(--accent) 28%, transparent);
   color: inherit;
-  border-radius: 2px;
-  padding: 0 2px;
-  cursor: pointer;
-  outline: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  transition: background 0.15s;
-}
-.pendingMark:hover {
-  background: color-mix(in srgb, var(--accent) 44%, transparent);
 }
 
-/* Submitted — comment exists in the panel (yellow/amber, visual only) */
-.submittedMark {
-  background: color-mix(in srgb, var(--yellow) 22%, transparent);
+/* Submitted comment — amber underline tint */
+:global(::highlight(pathly-submitted)) {
+  background-color: color-mix(in srgb, var(--yellow) 22%, transparent);
   color: inherit;
-  border-radius: 2px;
-  padding: 0 2px;
-  border-bottom: 1px solid color-mix(in srgb, var(--yellow) 60%, transparent);
+}
+
+/* Per-color comment highlights */
+:global(::highlight(pathly-comment-yellow)) { background-color: var(--comment-yellow-tint); color: inherit; }
+:global(::highlight(pathly-comment-green))  { background-color: var(--comment-green-tint);  color: inherit; }
+:global(::highlight(pathly-comment-blue))   { background-color: var(--comment-blue-tint);   color: inherit; }
+:global(::highlight(pathly-comment-purple)) { background-color: var(--comment-purple-tint); color: inherit; }
+:global(::highlight(pathly-comment-orange)) { background-color: var(--comment-orange-tint); color: inherit; }
+:global(::highlight(pathly-comment-pulse))  {
+  background-color: var(--pulse-start, rgba(252, 211, 77, 0.65));
+  animation: commentPulse 300ms ease-out forwards;
+}
+
+@keyframes commentPulse {
+  0%, 40% { background-color: var(--pulse-start, rgba(252, 211, 77, 0.65)); }
+  100%     { background-color: var(--pulse-end,   rgba(252, 211, 77, 0.24)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes commentPulse {
+    0%, 100% { background-color: var(--pulse-start, rgba(252, 211, 77, 0.65)); }
+  }
 }

@@ -34,16 +34,29 @@
   color: var(--accent);
 }
 
+/* 22×22 icon button — matches Canvas.html .ab-ic pattern */
 .closeBtn {
-  background: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
   border: none;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: var(--font-size-base);
-  padding: 0 4px;
-  transition: color var(--transition-base);
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-fast);
 }
-.closeBtn:hover { color: var(--text-primary); }
+.closeBtn:hover  { background-color: var(--bg-surface1); color: var(--text-primary); }
+.closeBtn:active { transform: scale(0.88); }
+.closeBtn:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 
 /* ─── Typography helpers ────────────────────────────────────── */
 .label {
@@ -67,13 +80,17 @@
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
-  padding: 4px 6px;
+  font-family: var(--font-family-base);
+  padding: 5px 7px;
   outline: none;
   width: 100%;
   box-sizing: border-box;
-  transition: border-color var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
 }
-.input:focus { border-color: var(--accent); }
+.input:hover { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
 
 .mb4 { margin-bottom: 4px; }
 .mb6 { margin-bottom: 6px; }
@@ -84,13 +101,17 @@
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
-  padding: 4px 6px;
+  font-family: var(--font-family-base);
+  padding: 5px 7px;
   outline: none;
   width: 100%;
   box-sizing: border-box;
-  transition: border-color var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
 }
-.searchInput:focus { border-color: var(--accent); }
+.searchInput:hover { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.searchInput:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
 
 .renameInput {
   background-color: var(--bg-surface0);
@@ -98,102 +119,184 @@
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
-  padding: 4px 6px;
+  font-family: var(--font-family-mono);
+  padding: 5px 7px;
   outline: none;
   flex: 1;
-  font-family: var(--font-family-mono);
-  transition: border-color var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
 }
-.renameInput:focus { border-color: var(--accent); }
+.renameInput:hover { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.renameInput:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
 
 /* ─── Buttons ───────────────────────────────────────────────── */
+
+/* Full-width destructive action */
 .dangerBtn {
   width: 100%;
-  padding: 5px 0;
-  background: none;
+  padding: 7px 0;
+  background: transparent;
   border: 1px solid var(--red);
   border-radius: var(--radius-sm);
   color: var(--red);
   font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-family-base);
+  letter-spacing: 0.01em;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background-color var(--transition-base);
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-fast);
 }
-.dangerBtn:hover { background-color: var(--red-bg); }
+.dangerBtn:hover  { background-color: var(--red-bg); }
+.dangerBtn:active { background-color: color-mix(in srgb, var(--red) 20%, transparent); transform: scale(0.99); }
+.dangerBtn:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
+/* Dashed add / insert trigger */
 .addBtn {
-  background: none;
-  border: 1px dashed var(--bg-surface1);
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--blue) 40%, var(--bg-surface1));
   border-radius: var(--radius-sm);
   color: var(--blue);
   cursor: pointer;
   font-size: var(--font-size-sm);
-  padding: 4px 8px;
+  font-family: var(--font-family-base);
+  padding: 5px 10px;
   margin-top: 4px;
-  transition: border-color var(--transition-base);
+  letter-spacing: 0.01em;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-fast);
 }
-.addBtn:hover { border-color: var(--blue); }
+.addBtn:hover  { border-color: var(--blue); background-color: color-mix(in srgb, var(--blue) 8%, transparent); }
+.addBtn:active { transform: scale(0.98); }
+.addBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .addBtnFlush { margin-top: 0; }
 
 .addBtnAccent {
   color: var(--accent);
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--bg-surface1));
 }
+.addBtnAccent:hover { border-color: var(--accent); background-color: var(--accent-bg); color: var(--accent); }
 
+/* Confirm rename (✓) */
 .renameConfirmBtn {
-  background: none;
-  border: 1px dashed var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: var(--radius-sm);
   color: var(--accent);
   cursor: pointer;
   font-size: var(--font-size-sm);
-  padding: 3px 8px;
+  font-family: var(--font-family-base);
+  padding: 4px 10px;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    transform var(--transition-fast);
 }
+.renameConfirmBtn:hover  { background-color: var(--accent-bg); border-color: var(--accent); }
+.renameConfirmBtn:active { transform: scale(0.94); }
+.renameConfirmBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
+/* Inline × delete — always reads as destructive on hover */
 .removeBtn {
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
   border: none;
+  border-radius: var(--radius-xs);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
-  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
   flex-shrink: 0;
-  transition: color var(--transition-base);
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-fast);
 }
-.removeBtn:hover { color: var(--text-primary); }
+.removeBtn:hover  { color: var(--red); background-color: var(--red-bg); }
+.removeBtn:active { transform: scale(0.82); }
+.removeBtn:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
 
+/* Cancel / Save buttons inside edit rows */
 .cancelEditBtn {
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
   border: none;
+  border-radius: var(--radius-xs);
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
-  padding: 0 2px;
+  font-family: var(--font-family-base);
+  padding: 3px 8px;
   flex-shrink: 0;
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-fast);
 }
+.cancelEditBtn:hover  { background-color: var(--bg-surface1); color: var(--text-primary); }
+.cancelEditBtn:active { transform: scale(0.95); }
+.cancelEditBtn:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 
 .saveEditBtn {
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
   border: none;
+  border-radius: var(--radius-xs);
   color: var(--accent);
   cursor: pointer;
   font-size: 12px;
-  padding: 0 2px;
+  font-family: var(--font-family-base);
+  padding: 3px 8px;
   flex-shrink: 0;
+  transition:
+    background-color var(--transition-base),
+    transform var(--transition-fast);
 }
+.saveEditBtn:hover  { background-color: var(--accent-bg); }
+.saveEditBtn:active { background-color: color-mix(in srgb, var(--accent) 18%, transparent); transform: scale(0.95); }
+.saveEditBtn:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 
+/* Agent clear × — semantically closer to reset than delete */
 .agentClearBtn {
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
   border: none;
+  border-radius: var(--radius-xs);
   color: color-mix(in srgb, var(--accent) 50%, transparent);
   cursor: pointer;
   font-size: 15px;
   line-height: 1;
-  padding: 0 2px;
-  transition: color var(--transition-base);
+  transition:
+    color var(--transition-base),
+    background-color var(--transition-base),
+    transform var(--transition-fast);
 }
-.agentClearBtn:hover { color: var(--red); }
+.agentClearBtn:hover  { color: var(--red); background-color: var(--red-bg); }
+.agentClearBtn:active { transform: scale(0.82); }
+.agentClearBtn:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
 
 /* ─── State ID row ──────────────────────────────────────────── */
 .stateIdDisplay {
@@ -205,11 +308,10 @@
   border: var(--border);
   border-radius: var(--radius-md);
   padding: 7px 10px;
+  transition: border-color var(--transition-base);
 }
 
-.stateIdDisplayEditable {
-  cursor: text;
-}
+.stateIdDisplayEditable { cursor: text; }
 .stateIdDisplayEditable:hover {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
@@ -457,6 +559,7 @@
 
 .conditionBox {
   background-color: var(--bg-surface0);
+  border: var(--border);
   border-radius: var(--radius-md);
   padding: 8px;
 }
@@ -480,13 +583,20 @@
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 12px;
-  padding: 4px;
+  font-family: var(--font-family-base);
+  padding: 5px 7px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-base);
 }
+.condSelectStyle:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.condSelectStyle:focus { border-color: var(--accent); }
 
 .condTarget   { color: var(--blue); }
 .condArtifact { color: var(--green); }
 .condText     { color: var(--text-secondary); font-size: 11px; }
 
+/* Action edit row — inline form */
 .actionEditRow {
   display: flex;
   align-items: flex-start;
@@ -494,11 +604,13 @@
   gap: 4px;
   font-size: 12px;
   background-color: var(--bg-surface0);
+  border: var(--border);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   flex-direction: column;
 }
 
+/* Action display row — clickable to edit */
 .actionDisplayRow {
   display: flex;
   align-items: flex-start;
@@ -506,12 +618,19 @@
   gap: 4px;
   font-size: 12px;
   background-color: var(--bg-surface0);
+  border: var(--border);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   cursor: pointer;
-  transition: background-color var(--transition-base);
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base);
 }
-.actionDisplayRow:hover { background-color: var(--bg-surface1); }
+.actionDisplayRow:hover {
+  background-color: var(--bg-surface1);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.actionDisplayRow:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 
 .actionDisplayRowReadOnly {
   display: flex;
@@ -520,6 +639,7 @@
   gap: 4px;
   font-size: 12px;
   background-color: var(--bg-surface0);
+  border: var(--border);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   cursor: default;
@@ -541,3 +661,232 @@
 .actionSkillActive { color: var(--green); font-size: 11px; }
 .actionSkillEmpty  { color: var(--text-muted); font-size: 11px; }
 .actionMsg         { color: var(--text-secondary); font-size: 11px; }
+
+/* ─── Inspector header (Canvas.html .ihead) ─────────────────── */
+.inspHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 2px;
+}
+.inspPip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--pip-color, var(--blue));
+}
+.inspTitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+/* ─── ctrl containers (Canvas.html .ctrl) ───────────────────── */
+.ctrl {
+  background: var(--bg-base);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base);
+}
+.ctrlText { flex: 1; }
+.ctrlMono { font-family: var(--font-family-mono); }
+
+/* Clickable ctrl — state name rename trigger */
+.ctrlClickable {
+  cursor: pointer;
+  justify-content: space-between;
+}
+.ctrlClickable:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background-color: var(--bg-surface0);
+}
+.ctrlClickable:active { background-color: var(--bg-surface1); }
+.ctrlClickable:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+
+.ctrlEditHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: color var(--transition-base);
+}
+.ctrlClickable:hover .ctrlEditHint { color: var(--accent); }
+
+/* ─── Select dropdowns ───────────────────────────────────────── */
+.ctrlSelectWrapper { position: relative; }
+
+.ctrlSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: var(--bg-base);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 32px 8px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  outline: none;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+.ctrlSelect:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background-color: var(--bg-surface0);
+}
+.ctrlSelect:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+/* Chevron animates when select has focus */
+.ctrlSelectChevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  transition: color var(--transition-base);
+}
+.ctrlSelectWrapper:focus-within .ctrlSelectChevron { color: var(--accent); }
+
+/* ─── Transitions table ──────────────────────────────────────── */
+.transSection { display: flex; flex-direction: column; gap: 5px; }
+
+/* Transition row — button that opens edge panel */
+.transRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 10px;
+  background: var(--bg-base);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    transform var(--transition-fast);
+}
+.transRow:hover {
+  background: var(--bg-surface0);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.transRow:active { transform: scale(0.99); background: var(--bg-surface1); }
+.transRow:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+
+.transKey {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  width: 52px;
+  flex-shrink: 0;
+}
+.transVal {
+  font-family: var(--font-family-mono);
+  color: var(--text-primary);
+  flex: 1;
+  font-size: 11.5px;
+}
+/* Uses token instead of hardcoded hex */
+.transValReturn { color: var(--orange); }
+
+.transCondTag {
+  font-size: 9px;
+  font-family: var(--font-family-mono);
+  color: var(--text-muted);
+  background: var(--bg-surface1);
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── ilink ──────────────────────────────────────────────────── */
+.ilink {
+  font-size: 12px;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font-family: var(--font-family-base);
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-fast);
+}
+.ilink:hover  { opacity: 0.8; }
+.ilink:active { transform: translateX(2px); }
+.ilink:focus-visible { outline: var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
+
+/* ─── Edge panel header ──────────────────────────────────────── */
+.edgeHeaderArrow { color: var(--blue); font-size: 14px; }
+.edgeHeaderTitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: 1;
+  font-family: var(--font-family-mono);
+}
+
+/* ─── Condition pill in edge panel ──────────────────────────── */
+.condPill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-base);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  transition: border-color var(--transition-base);
+}
+.condPill:has(.removeBtn:hover) {
+  border-color: color-mix(in srgb, var(--red) 35%, transparent);
+}
+.condPillKey {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-width: 52px;
+}
+.condPillVal {
+  flex: 1;
+  color: var(--text-secondary);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+.condPillArtifact { color: var(--green); }
+.condPillTarget   { color: var(--blue); }

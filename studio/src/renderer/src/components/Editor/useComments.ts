@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { readFile, writeFile } from '../../services/pathlyApi'
 
+export const COMMENT_COLORS = ['yellow', 'green', 'blue', 'purple', 'orange'] as const
+export type CommentColor = typeof COMMENT_COLORS[number]
+
 export interface Comment {
   id: string
   lineNumber: number
@@ -8,6 +11,7 @@ export interface Comment {
   body: string
   resolved: boolean
   createdAt: string
+  color: CommentColor
 }
 
 function sidecarPath(filePath: string): string {
@@ -23,8 +27,12 @@ export function useComments(filePath: string | null) {
     readFile(sidecarPath(filePath))
       .then((raw) => {
         if (!raw) { setComments([]); return }
-        const data = JSON.parse(raw) as { comments: Comment[] }
-        setComments(data.comments ?? [])
+        const data = JSON.parse(raw) as { comments: Array<Comment & { color?: string }> }
+        const loaded = (data.comments ?? []).map((c) => ({
+          ...c,
+          color: (c.color ?? 'yellow') as CommentColor,
+        }))
+        setComments(loaded)
       })
       .catch(() => setComments([]))
   }, [filePath])
@@ -37,7 +45,7 @@ export function useComments(filePath: string | null) {
     }, 400)
   }, [filePath])
 
-  const add = useCallback((lineNumber: number, lineText: string, body: string) => {
+  const add = useCallback((lineNumber: number, lineText: string, body: string, color: CommentColor = 'yellow'): string => {
     const comment: Comment = {
       id: `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       lineNumber,
@@ -45,12 +53,14 @@ export function useComments(filePath: string | null) {
       body,
       resolved: false,
       createdAt: new Date().toISOString(),
+      color,
     }
     setComments((prev) => {
       const next = [...prev, comment].sort((a, b) => a.lineNumber - b.lineNumber)
       persist(next)
       return next
     })
+    return comment.id
   }, [persist])
 
   const edit = useCallback((id: string, body: string) => {
@@ -69,6 +79,14 @@ export function useComments(filePath: string | null) {
     })
   }, [persist])
 
+  const reopen = useCallback((id: string) => {
+    setComments((prev) => {
+      const next = prev.map((c) => c.id === id ? { ...c, resolved: false } : c)
+      persist(next)
+      return next
+    })
+  }, [persist])
+
   const remove = useCallback((id: string) => {
     setComments((prev) => {
       const next = prev.filter((c) => c.id !== id)
@@ -77,5 +95,5 @@ export function useComments(filePath: string | null) {
     })
   }, [persist])
 
-  return { comments, add, edit, resolve, remove }
+  return { comments, add, edit, resolve, reopen, remove }
 }

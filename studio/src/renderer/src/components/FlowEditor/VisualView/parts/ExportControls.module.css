@@ -47,3 +47,33 @@
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* ── Publish button ── */
+.publishBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--bg-base);
+  cursor: pointer;
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family-base);
+  transition: var(--transition-fast);
+}
+.publishBtn:hover { filter: brightness(1.12); }
+.publishBtn:active { transform: scale(0.97); }
+.publishBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.publishBtnDisabled {
+  background: var(--bg-surface1);
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: not-allowed;
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family-base);
+  opacity: 0.6;
+}

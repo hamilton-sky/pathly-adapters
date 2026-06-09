@@ -1,9 +1,6 @@
----
-
----
 version: 1
 flow: team
-storage_path: "pathly/plans/{topic}/"
+storage_path: pathly/plans/{topic}/
 states:
   - STORMING
   - PLANNING
@@ -49,14 +46,6 @@ role_map:
   REVIEWING: reviewer
   TESTING: tester
   RETRO: retro
-# adapter_map (optional): route pipeline stages to different CLI adapters.
-# 'default' is required; every value must be in {claude, codex, copilot}.
-# Every non-default key must be a declared state in 'states'.
-# Omitting this block is fully backward-compatible (preferred_adapter returns "").
-# adapter_map:
-#   default: claude          # used for any stage not listed below
-#   BUILDING: codex          # optional per-state override
-#   REVIEWING: claude
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
@@ -70,13 +59,13 @@ transition_rules:
   PLANNING:
     on_content:
       - file: IMPLEMENTATION_PLAN.md
-        contains: "## Conversation"
+        contains: '## Conversation'
         next: DESIGNING
     default: PLANNING
   DESIGNING:
     on_content:
       - file: DESIGN.md
-        contains: "## Design System Output"
+        contains: '## Design System Output'
         next: BUILDING
     default: DESIGNING
   BUILDING:
@@ -84,7 +73,7 @@ transition_rules:
   REVIEWING:
     on_artifact:
       REVIEW_FAILURES.md: BUILDING
-      MORE_CONVS_NEEDED.md: BUILDING   # backwards-compat fallback — one release window
+      MORE_CONVS_NEEDED.md: BUILDING
     on_state_counter:
       field: convs_done
       op: lt
@@ -109,7 +98,7 @@ gates:
   BUILDING->REVIEWING:
     - type: verify_gate
       artifact: VERIFY.md
-      pass_marker: "RESULT: PASS"
+      pass_marker: 'RESULT: PASS'
       on_fail: VERIFY_FAILURES.md
     - type: scope_gate
       scope_file: CONVERSATION_PROMPTS.md
@@ -118,3 +107,4 @@ gates:
     - type: require_artifact
       artifact: REVIEW.md
       on_fail: HUMAN_QUESTIONS.md
+_comments: []

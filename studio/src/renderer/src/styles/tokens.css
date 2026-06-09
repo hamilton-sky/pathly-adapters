@@ -155,6 +155,13 @@
 
   /* --- Brand gradient --------------------------------------------- */
   --brand-gradient: linear-gradient(135deg, #60A5FA 0%, #818CF8 50%, #A78BFA 100%);
+
+  /* --- Comment color tokens (5 presets) --------------------------- */
+  --comment-yellow-swatch: #FCD34D;  --comment-yellow-tint: rgba(252, 211, 77, 0.24);  --comment-yellow-border: rgba(252, 211, 77, 0.55);
+  --comment-green-swatch:  #34D399;  --comment-green-tint:  rgba(52, 211, 153, 0.22);  --comment-green-border:  rgba(52, 211, 153, 0.50);
+  --comment-blue-swatch:   #60A5FA;  --comment-blue-tint:   rgba(96, 165, 250, 0.22);  --comment-blue-border:   rgba(96, 165, 250, 0.50);
+  --comment-purple-swatch: #A78BFA;  --comment-purple-tint: rgba(167, 139, 250, 0.22); --comment-purple-border: rgba(167, 139, 250, 0.50);
+  --comment-orange-swatch: #F97316;  --comment-orange-tint: rgba(249, 115, 22, 0.22);  --comment-orange-border: rgba(249, 115, 22, 0.50);
 }
 
 /* â”€â”€â”€ Pathly Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -193,6 +200,13 @@
   --runner-bg-active: rgba(15, 118, 110, 0.20);
 
   --text-disabled: #94A3B8;
+
+  /* --- Comment color swatch overrides for light theme ------------- */
+  --comment-yellow-swatch: #D97706;
+  --comment-green-swatch:  #047857;
+  --comment-blue-swatch:   #1D4ED8;
+  --comment-purple-swatch: #7C3AED;
+  --comment-orange-swatch: #C2410C;
 }
 
 /* â”€â”€â”€ Nord â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */

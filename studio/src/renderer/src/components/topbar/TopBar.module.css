@@ -36,6 +36,7 @@
   transition: background 0.12s, color 0.12s;
 }
 .backBtn:hover { background: var(--btn-b-hover-bg); border-color: var(--btn-b-hover-border); color: var(--btn-b-hover-color); }
+.backBtn:active { transform: scale(0.95); }
 .backBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 
@@ -143,6 +144,7 @@
   transition: background 0.12s, color 0.12s;
 }
 .terminalBtn:hover { background: var(--btn-b-hover-bg); border-color: var(--btn-b-hover-border); color: var(--btn-b-hover-color); }
+.terminalBtn:active { transform: scale(0.95); }
 .terminalBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .publishBtn {
@@ -158,6 +160,7 @@
   transition: opacity 0.12s;
 }
 .publishBtn:hover { filter: brightness(1.1); }
+.publishBtn:active { transform: scale(0.97); filter: brightness(0.95); }
 .publishBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 .publishBtn:disabled { opacity: 0.5; cursor: default; }
 
@@ -444,6 +447,7 @@
   background: var(--btn-b-hover-bg);
   color: var(--btn-b-hover-color);
 }
+.navBtn:active { transform: scale(0.94); }
 
 .navBtnActive {
   background: var(--accent);

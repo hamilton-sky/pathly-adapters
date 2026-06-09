@@ -1,0 +1,56 @@
+/* Gutter container — no layout of its own, badges are position:fixed */
+.gutter {
+  pointer-events: none;
+}
+
+/* Each badge is fixed to the viewport so overflow:hidden parents can't clip it */
+.badge {
+  position: fixed;
+  top: var(--badge-top, -100px);
+  left: var(--badge-left, -100px);
+  transform: translateY(-50%);
+
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--badge-color, var(--comment-yellow-swatch));
+  border: 2px solid color-mix(in srgb, var(--badge-color, var(--comment-yellow-swatch)) 60%, #000);
+  color: #0a0f1a;
+
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  pointer-events: all;
+  z-index: 20;
+
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.badge:hover {
+  transform: translateY(-50%) scale(1.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.badge:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Pinned badge — text is off-screen above/below; indicate with reduced size */
+.badge[data-pinned="true"] {
+  opacity: 0.55;
+  transform: translateY(-50%) scale(0.82);
+}
+.badge[data-pinned="true"]:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}

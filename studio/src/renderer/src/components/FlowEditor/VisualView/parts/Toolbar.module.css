@@ -1,0 +1,115 @@
+/* Toolbar.module.css — canvas flow editor toolbar */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--bg-surface0);
+  flex-shrink: 0;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--bg-surface1);
+  margin: 0 6px;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ── View tabs (Visual / YAML) ── */
+.tab {
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: var(--font-family-base);
+  transition: var(--transition-fast);
+}
+.tab:hover {
+  background: var(--bg-surface0);
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+.tab:active { transform: scale(0.95); }
+.tab:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.tabActive {
+  background: var(--bg-surface0);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: var(--font-family-base);
+  font-weight: 600;
+  transition: var(--transition-fast);
+}
+.tabActive:hover { opacity: 0.82; }
+.tabActive:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+/* ── Save button ── */
+.saveBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--bg-base);
+  cursor: pointer;
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family-base);
+  transition: var(--transition-fast);
+}
+.saveBtn:hover { filter: brightness(1.12); }
+.saveBtn:active { transform: scale(0.97); }
+.saveBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+/* ── Ghost action buttons (Add state, Auto-layout) ── */
+.ghostBtn {
+  background: transparent;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family-base);
+  transition: var(--transition-fast);
+}
+.ghostBtn:hover {
+  background: var(--btn-b-hover-bg);
+  border-color: var(--btn-b-hover-border);
+  color: var(--btn-b-hover-color);
+}
+.ghostBtn:active { transform: scale(0.97); }
+.ghostBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+/* ── Note/annotation buttons (sticky, bubble) ── */
+.noteBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.noteBtn:hover { background: var(--btn-b-hover-bg); border-color: var(--btn-b-hover-border); color: var(--btn-b-hover-color); }
+.noteBtn:active { transform: scale(0.94); }
+.noteBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }

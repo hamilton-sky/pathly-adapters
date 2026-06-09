@@ -10,12 +10,15 @@ interface Props {
   detail: PanelDetail
   data: FlowYaml
   onAgentChange: (stateId: string, value: string) => void
+  onAdapterChange: (stateId: string, value: string) => void
+  onSkillChange: (stateId: string, value: string) => void
   onRename: (oldId: string, newId: string) => void
   onClose: () => void
   onRemoveNode: (stateId: string) => void
   onRemoveEdge: (source: string, target: string) => void
   onAddAction: (source: string, target: string) => void
   onDataChange: (updated: FlowYaml) => void
+  onSelectEdge?: (source: string, target: string) => void
   validationIssues: FlowValidationIssue[]
   t: Theme
 }
@@ -24,12 +27,15 @@ export function InspectorPane({
   detail,
   data,
   onAgentChange,
+  onAdapterChange,
+  onSkillChange,
   onRename,
   onClose,
   onRemoveNode,
   onRemoveEdge,
   onAddAction,
   onDataChange,
+  onSelectEdge,
   validationIssues,
   t,
 }: Props): JSX.Element | null {
@@ -43,9 +49,12 @@ export function InspectorPane({
           stateId={detail.stateId}
           data={data}
           onAgentChange={onAgentChange}
+          onAdapterChange={onAdapterChange}
+          onSkillChange={onSkillChange}
           onRename={onRename}
           onClose={onClose}
           onRemove={() => { onRemoveNode(detail.stateId); onClose() }}
+          onSelectEdge={onSelectEdge}
           issues={validationIssues}
         />
       )}

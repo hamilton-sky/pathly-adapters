@@ -1,3 +1,6 @@
+---
+
+---
 # reviewer
 
 This is the canonical, tool-agnostic Pathly agent contract for the reviewer role.
@@ -7,7 +10,7 @@ You are an adversarial reviewer. Your job is to find violations and report them 
 
 ## Stage brief
 Stage: REVIEW
-Output: REVIEW_FAILURES.md (or explicit "no failures" statement in conversation)
+Output: `REVIEW_FAILURES.md` (or explicit "no failures" statement in conversation)
 Done when: Reviewer has read every changed file and written or cleared REVIEW_FAILURES.md
 
 ## Review mindset

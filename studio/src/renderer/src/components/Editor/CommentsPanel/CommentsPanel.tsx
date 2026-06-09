@@ -1,5 +1,5 @@
 import React from 'react'
-import { SendHorizonal, Eye, EyeOff } from 'lucide-react'
+import { SendHorizonal, Eye, EyeOff, ChevronRight } from 'lucide-react'
 import { useTerminalStore } from '../../../store/terminalStore'
 import type { Comment } from '../useComments'
 import { buildSendPrompt, getSpawnCwd } from '../commentUtils'
@@ -11,14 +11,18 @@ interface Props {
   body: string
   comments: Comment[]
   showHighlights: boolean
+  orphanedIds: Set<string>
   onToggleHighlights: () => void
+  onCollapse: () => void
   onResolve: (id: string) => void
+  onReopen: (id: string) => void
   onRemove: (id: string) => void
   onEdit: (id: string, body: string) => void
+  onScrollTo: (id: string) => void
 }
 
 export function CommentsPanel({
-  filePath, body, comments, showHighlights, onToggleHighlights, onResolve, onRemove, onEdit,
+  filePath, body, comments, showHighlights, orphanedIds, onToggleHighlights, onCollapse, onResolve, onReopen, onRemove, onEdit, onScrollTo,
 }: Props): JSX.Element {
   const addTab = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
@@ -47,29 +51,59 @@ export function CommentsPanel({
           Comments
           {unresolved.length > 0 && <span className={styles.badge}>{unresolved.length}</span>}
         </span>
-        <button
-          type="button"
-          className={styles.toggleBtn}
-          onClick={onToggleHighlights}
-          title={showHighlights ? 'Hide highlights in preview' : 'Show highlights in preview'}
-          aria-label={showHighlights ? 'Hide highlights' : 'Show highlights'}
-        >
-          {showHighlights ? <Eye size={13} /> : <EyeOff size={13} />}
-        </button>
+        <div className={styles.headerBtns}>
+          <button
+            type="button"
+            className={styles.toggleBtn}
+            onClick={onToggleHighlights}
+            title={showHighlights ? 'Hide highlights in preview' : 'Show highlights in preview'}
+            aria-label={showHighlights ? 'Hide highlights' : 'Show highlights'}
+          >
+            {showHighlights ? <Eye size={13} /> : <EyeOff size={13} />}
+          </button>
+          <button
+            type="button"
+            className={styles.toggleBtn}
+            onClick={onCollapse}
+            aria-label="Hide comments panel"
+          >
+            <ChevronRight size={13} />
+          </button>
+        </div>
       </div>
 
       <div className={styles.list}>
         {comments.length === 0 && (
           <p className={styles.empty}>Select text in the preview to add a comment</p>
         )}
-        {unresolved.map((c) => (
-          <CommentItem key={c.id} comment={c} onResolve={onResolve} onRemove={onRemove} onEdit={onEdit} />
+        {unresolved.map((c, idx) => (
+          <CommentItem
+            key={c.id}
+            comment={c}
+            index={idx + 1}
+            isOrphaned={orphanedIds.has(c.id)}
+            onResolve={onResolve}
+            onReopen={onReopen}
+            onRemove={onRemove}
+            onEdit={onEdit}
+            onScrollTo={onScrollTo}
+          />
         ))}
         {resolved.length > 0 && (
           <>
             <p className={styles.resolvedLabel}>Resolved</p>
-            {resolved.map((c) => (
-              <CommentItem key={c.id} comment={c} onResolve={onResolve} onRemove={onRemove} onEdit={onEdit} />
+            {resolved.map((c, idx) => (
+              <CommentItem
+                key={c.id}
+                comment={c}
+                index={idx + 1}
+                isOrphaned={false}
+                onResolve={onResolve}
+                onReopen={onReopen}
+                onRemove={onRemove}
+                onEdit={onEdit}
+                onScrollTo={onScrollTo}
+              />
             ))}
           </>
         )}

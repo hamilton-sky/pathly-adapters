@@ -1,0 +1,88 @@
+/* ── Collapsed rail — permanent thin strip on the right ─────────── */
+.rail {
+  width: 36px;
+  align-self: stretch;        /* fills the full height of the flex row */
+  flex-shrink: 0;
+  border: none;
+  border-left: 1px solid var(--bg-surface0);
+  background: var(--bg-mantle);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0 10px;
+  gap: 0;
+  color: var(--text-muted);
+  transition:
+    background var(--transition-fast),
+    border-left-color var(--transition-fast);
+}
+.rail:hover {
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-mantle));
+  border-left-color: var(--accent);
+}
+.rail:hover .label { color: var(--accent); }
+.rail:hover .count { transform: scale(1.1); }
+.rail:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
+
+/* ── Count badge ──────────────────────────────────────────────────── */
+.count {
+  min-width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  /* Subtle glow matching the cell pattern */
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
+  transition: transform var(--transition-fast);
+  margin-bottom: 10px;
+}
+
+/* ── Color dots — one per open comment ────────────────────────────── */
+.dots {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface1);   /* safe fallback */
+  flex-shrink: 0;
+}
+.dot[data-color="yellow"] { background: var(--comment-yellow-swatch); }
+.dot[data-color="green"]  { background: var(--comment-green-swatch); }
+.dot[data-color="blue"]   { background: var(--comment-blue-swatch); }
+.dot[data-color="purple"] { background: var(--comment-purple-swatch); }
+.dot[data-color="orange"] { background: var(--comment-orange-swatch); }
+
+.dotMore {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ── Vertical "Comments" label — sits at the bottom ──────────────── */
+.label {
+  margin-top: auto;
+  padding-bottom: 2px;
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  transition: color var(--transition-fast);
+}

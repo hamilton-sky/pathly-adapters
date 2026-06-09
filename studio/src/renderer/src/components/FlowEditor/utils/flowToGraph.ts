@@ -7,6 +7,8 @@ import type { FlowValidationIssue } from './validateFlow'
 export interface StateNodeData {
   state: string
   agent: string
+  adapter?: string  // e.g. 'claude' | 'codex' | 'antigravity'
+  skill?: string    // e.g. 'build.md'
   isStart?: boolean
   issues?: FlowValidationIssue[]
   outgoingStates?: string[]
@@ -141,6 +143,8 @@ export function flowToGraph(data: FlowYaml, t: Theme): { nodes: Node<StateNodeDa
       data: {
         state,
         agent: data.agent_map?.[state] ?? '',
+        adapter: data.adapter_map?.[state],
+        skill: data.skill_map?.[state],
         outgoingStates,
         incomingStates,
         feedbackArrivals: feedbackArrivalsMap.get(state),

@@ -1,131 +1,124 @@
 import { Handle, Position, type NodeProps } from 'reactflow'
-import { useTheme } from '../../../useTheme'
 import type { StateNodeData } from '../utils/flowToGraph'
+import { ClaudeIcon, CodexIcon, AntigravityIcon } from '../../Terminal/BrandIcons'
+import styles from './StateNode.module.css'
 
 export type { StateNodeData }
 
-// Left accent bar color by agent type keyword
-function accentColor(agent: string, blue: string, purple: string, green: string, amber: string, muted: string): string {
-  if (!agent) return muted
-  const a = agent.toLowerCase()
-  if (a.includes('review') || a.includes('reviewer')) return purple
-  if (a.includes('test') || a.includes('tester')) return amber
-  if (a.includes('retro') || a.includes('done')) return green
-  return blue
+function agentAccent(agent: string): string {
+  const a = (agent ?? '').toLowerCase()
+  if (a.includes('review')) return '#A78BFA'
+  if (a.includes('test')) return 'var(--yellow)'
+  if (a.includes('retro') || a.includes('done')) return 'var(--green)'
+  return 'var(--blue)'
 }
 
-const HANDLE_STYLE = { width: 8, height: 8, border: 'none' }
+const ADAPTER_LABELS: Record<string, string> = {
+  claude: 'Claude',
+  codex: 'Codex',
+  copilot: 'Copilot',
+  antigravity: 'Antigravity',
+}
+
+function AdapterChipIcon({ adapter }: { adapter: string }): JSX.Element | null {
+  if (adapter === 'claude') return <ClaudeIcon size={13} />
+  if (adapter === 'codex') return <CodexIcon size={13} />
+  if (adapter === 'antigravity') return <AntigravityIcon size={13} />
+  return null
+}
+
+function DiamondIcon(): JSX.Element {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path d="M12 2L22 7L12 12L2 7L12 2Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none" />
+    </svg>
+  )
+}
+
+const HANDLE_STYLE: React.CSSProperties = { width: 8, height: 8, border: 'none' }
 
 export function StateNode({ data }: NodeProps<StateNodeData>): JSX.Element {
-  const t = useTheme()
   const hasError = data.issues?.some((i) => i.level === 'error')
   const hasWarning = data.issues && data.issues.length > 0
+  const accent = agentAccent(data.agent)
 
-  const borderColor = hasError ? t.red : hasWarning ? t.yellow : t.bgSurface1
-  const accent = accentColor(data.agent, t.blue, t.purple ?? '#A78BFA', t.green, t.yellow, t.bgSurface1)
+  const nodeClass = [
+    styles.node,
+    hasError ? styles.nodeError : hasWarning ? styles.nodeWarning : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div
-      style={{
-        backgroundColor: t.bgSurface0,
-        borderTop: `1px solid ${borderColor}`,
-        borderRight: `1px solid ${borderColor}`,
-        borderBottom: `1px solid ${borderColor}`,
-        borderLeft: `3px solid ${accent}`,
-        borderRadius: '6px',
-        color: t.textPrimary,
-        width: 160,
-        padding: '8px 10px 8px 10px',
-        position: 'relative',
-        boxSizing: 'border-box',
-      }}
+      className={nodeClass}
+      style={{ '--node-accent': accent } as React.CSSProperties}
     >
-      {/* Top handles — forward in/out for TB layout */}
+      {/* Top handles — forward flow */}
       <Handle type="target" position={Position.Top} id="top-tgt"
-        style={{ ...HANDLE_STYLE, background: t.blue, left: '50%' }} />
+        style={{ ...HANDLE_STYLE, background: 'var(--blue)', left: '50%' }} />
       <Handle type="source" position={Position.Top} id="top-src"
-        style={{ ...HANDLE_STYLE, background: t.blue, left: '35%' }} />
+        style={{ ...HANDLE_STYLE, background: 'var(--blue)', left: '35%' }} />
 
       {/* Bottom handles — main forward flow */}
       <Handle type="source" position={Position.Bottom} id="bot-src"
-        style={{ ...HANDLE_STYLE, background: t.blue, left: '50%' }} />
+        style={{ ...HANDLE_STYLE, background: 'var(--blue)', left: '50%' }} />
       <Handle type="target" position={Position.Bottom} id="bot-tgt"
-        style={{ ...HANDLE_STYLE, background: t.blue, left: '35%' }} />
+        style={{ ...HANDLE_STYLE, background: 'var(--blue)', left: '35%' }} />
 
-      {/* Left handles — backward loop entry/exit (left side) */}
+      {/* Left handles — backward loop */}
       <Handle type="target" position={Position.Left} id="left-tgt"
         style={{ ...HANDLE_STYLE, background: '#F59E0B', top: '35%' }} />
       <Handle type="source" position={Position.Left} id="left-src"
         style={{ ...HANDLE_STYLE, background: '#F59E0B', top: '65%' }} />
 
-      {/* Right handles — backward loop entry/exit (right side) */}
+      {/* Right handles — backward loop */}
       <Handle type="target" position={Position.Right} id="right-tgt"
         style={{ ...HANDLE_STYLE, background: '#F59E0B', top: '35%' }} />
       <Handle type="source" position={Position.Right} id="right-src"
         style={{ ...HANDLE_STYLE, background: '#F59E0B', top: '65%' }} />
 
-      {/* Start indicator */}
       {data.isStart && (
-        <div
-          title="Start state"
-          style={{
-            position: 'absolute',
-            top: -8, left: -8,
-            width: 16, height: 16,
-            borderRadius: '50%',
-            backgroundColor: t.accent,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '9px', color: '#fff', fontWeight: 700,
-          }}
-        >
-          ▶
-        </div>
+        <div className={styles.startBadge} title="Start state">▶</div>
       )}
 
-      {/* Validation badge */}
       {hasWarning && (
         <div
+          className={`${styles.validBadge}${hasError ? ` ${styles.validBadgeError}` : ''}`}
           title={data.issues?.map((i) => i.message).join('\n')}
           aria-label={`${data.issues?.length} validation issue(s)`}
-          style={{
-            position: 'absolute',
-            top: -6, right: -6,
-            width: 16, height: 16,
-            borderRadius: '50%',
-            backgroundColor: hasError ? t.red : t.yellow,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '10px', color: t.bgBase, fontWeight: 700, cursor: 'default',
-          }}
         >
           !
         </div>
       )}
 
-      {/* State name */}
-      <div style={{ fontWeight: 700, fontSize: '12px', letterSpacing: '0.03em', fontFamily: 'monospace' }}>
-        {data.state}
+      <div className={styles.header}>
+        <span className={styles.pip} aria-hidden="true" />
+        <span className={styles.name}>{data.state}</span>
+        {data.agent && <span className={styles.agentLabel}>{data.agent}</span>}
       </div>
 
-      {/* Agent name */}
-      {data.agent && (
-        <div style={{ fontSize: '11px', color: t.textSecondary, marginTop: '3px', fontFamily: 'inherit' }}>
-          {data.agent}
+      {(data.adapter || data.skill) && (
+        <div className={styles.chips}>
+          {data.adapter && (
+            <span className={styles.chip}>
+              <AdapterChipIcon adapter={data.adapter} />
+              {ADAPTER_LABELS[data.adapter] ?? data.adapter}
+            </span>
+          )}
+          {data.skill && (
+            <span className={styles.chip}>
+              <DiamondIcon />
+              {data.skill}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Feedback routing arrivals — artifacts that escalate back to this state */}
       {data.feedbackArrivals && data.feedbackArrivals.length > 0 && (
         <div
+          className={styles.feedbackArrivals}
           title={`feedback_routing: ${data.feedbackArrivals.join(', ')}`}
-          style={{
-            marginTop: '5px',
-            paddingTop: '4px',
-            borderTop: '1px solid #8B5CF622',
-            fontSize: '9px',
-            color: '#8B5CF6',
-            fontFamily: 'monospace',
-            lineHeight: 1.4,
-          }}
         >
           ↩ {data.feedbackArrivals.join(', ')}
         </div>

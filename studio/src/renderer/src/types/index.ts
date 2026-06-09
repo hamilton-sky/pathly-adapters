@@ -44,6 +44,19 @@ export type PathlyDragItem = PathlyCanvasDragItem | PathlyReorgDragItem | Pathly
 // MIME key used for both drag types — differentiated by dragType field in payload
 export const PATHLY_DRAG_MIME = 'application/pathly-drag-item'
 
+export type CommentColor = 'yellow' | 'teal' | 'red' | 'purple' | 'grey'
+export type CommentShape = 'sticky' | 'bubble'
+
+export interface CommentEntry {
+  id: string
+  text: string
+  color: CommentColor
+  shape: CommentShape
+  x: number
+  y: number
+  attachedTo?: string
+}
+
 export interface TemplateSubdir {
   name: string
   open: boolean
@@ -84,11 +97,14 @@ export interface FlowYaml {
   states: string[]
   transitions: Record<string, string[]>
   agent_map: Record<string, string>
+  adapter_map?: Record<string, string>   // CLI adapter per state: 'claude' | 'codex' | 'antigravity'
+  skill_map?: Record<string, string>     // skill filename per state, e.g. 'build.md'
   transition_rules?: Record<string, unknown>
   transition_actions?: Record<string, unknown>
   storage_path?: string
   feedback_routing?: Record<string, unknown>
   role_map?: Record<string, string>
+  _comments?: CommentEntry[]
 }
 
 export interface FsmState {

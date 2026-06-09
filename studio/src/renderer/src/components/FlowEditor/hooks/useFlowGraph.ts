@@ -23,6 +23,8 @@ interface UseFlowGraphReturn {
   onNodeClick: NodeMouseHandler
   onEdgeClick: EdgeMouseHandler
   handleAgentChange: (stateId: string, value: string) => void
+  handleAdapterChange: (stateId: string, value: string) => void
+  handleSkillChange: (stateId: string, value: string) => void
   handleAddTransitionRule: (source: string) => void
   handleAddTransitionAction: (source: string, target: string) => void
   dataRef: React.MutableRefObject<FlowYaml>
@@ -142,6 +144,24 @@ export function useFlowGraph(
     onChange(updated)
   }
 
+  function handleAdapterChange(stateId: string, value: string): void {
+    const d = dataRef.current
+    const updated: FlowYaml = {
+      ...d,
+      adapter_map: { ...(d.adapter_map ?? {}), [stateId]: value }
+    }
+    onChange(updated)
+  }
+
+  function handleSkillChange(stateId: string, value: string): void {
+    const d = dataRef.current
+    const updated: FlowYaml = {
+      ...d,
+      skill_map: { ...(d.skill_map ?? {}), [stateId]: value }
+    }
+    onChange(updated)
+  }
+
   function handleAddTransitionRule(source: string): void {
     const d = dataRef.current
     const rules = (d.transition_rules as Record<string, Record<string, unknown>> | undefined) ?? {}
@@ -174,6 +194,8 @@ export function useFlowGraph(
     onNodeClick: handleNodeClick,
     onEdgeClick: handleEdgeClick,
     handleAgentChange,
+    handleAdapterChange,
+    handleSkillChange,
     handleAddTransitionRule,
     handleAddTransitionAction,
     dataRef,

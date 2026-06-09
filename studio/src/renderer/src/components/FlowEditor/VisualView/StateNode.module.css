@@ -1,0 +1,127 @@
+.node {
+  width: 230px;
+  background: var(--bg-surface0);
+  border-top: 1px solid var(--bg-surface1);
+  border-right: 1px solid var(--bg-surface1);
+  border-bottom: 1px solid var(--bg-surface1);
+  border-left: 4px solid var(--node-accent, var(--blue));
+  border-radius: 4px;
+  padding: 10px 12px;
+  position: relative;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: box-shadow 0.12s, border-color 0.12s;
+}
+
+.nodeError {
+  border-top-color: var(--red);
+  border-right-color: var(--red);
+  border-bottom-color: var(--red);
+}
+
+.nodeWarning {
+  border-top-color: var(--yellow);
+  border-right-color: var(--yellow);
+  border-bottom-color: var(--yellow);
+}
+
+.startBadge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #fff;
+  font-weight: 700;
+}
+
+.validBadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--yellow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--bg-base);
+  font-weight: 700;
+  cursor: default;
+}
+
+.validBadgeError {
+  background: var(--red);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--node-accent, var(--blue));
+  flex-shrink: 0;
+}
+
+.name {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  flex: 1;
+  font-family: var(--font-family-mono);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentLabel {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  padding-left: 18px;
+  overflow: hidden;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-family-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 90px;
+}
+
+.feedbackArrivals {
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(139, 92, 246, 0.13);
+  font-size: 9px;
+  color: #8B5CF6;
+  font-family: var(--font-family-mono);
+  line-height: 1.4;
+}

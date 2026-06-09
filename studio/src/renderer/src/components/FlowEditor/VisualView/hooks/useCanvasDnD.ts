@@ -4,8 +4,8 @@ import { PATHLY_DRAG_MIME } from '../../../../types'
 import { generateUniqueStateId } from '../utils/generateUniqueStateId'
 
 // Approximate half-dimensions of a StateNode — used to center it on the drop point.
-const NODE_HALF_W = 90
-const NODE_HALF_H = 40
+const NODE_HALF_W = 115
+const NODE_HALF_H = 35
 
 interface UseCanvasDnDArgs {
   dataRef: React.MutableRefObject<FlowYaml>

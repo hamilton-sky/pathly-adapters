@@ -1,6 +1,6 @@
 import { useRef } from 'react'
-import ReactFlow, { Background, Controls } from 'reactflow'
-import type { Node, Edge, Connection, NodeMouseHandler, EdgeMouseHandler } from 'reactflow'
+import ReactFlow, { Background, BackgroundVariant, Controls } from 'reactflow'
+import type { Node, Edge, Connection, NodeMouseHandler, EdgeMouseHandler, NodeDragHandler } from 'reactflow'
 import 'reactflow/dist/style.css'
 import type { Theme } from '../../../../theme'
 import { makeVisualViewStyles } from '../VisualView.styles'
@@ -24,6 +24,7 @@ interface Props {
   onEdgeUpdateEnd: (e: MouseEvent | TouchEvent, edge: Edge) => void
   onDragOver: (e: React.DragEvent<HTMLDivElement>) => void
   onDrop: (e: React.DragEvent<HTMLDivElement>) => void
+  onNodeDragStop?: NodeDragHandler
   canvasRef: React.RefObject<HTMLDivElement>
   t: Theme
 }
@@ -45,6 +46,7 @@ export function FlowCanvas({
   onEdgeUpdateEnd,
   onDragOver,
   onDrop,
+  onNodeDragStop,
   canvasRef,
   t,
 }: Props): JSX.Element {
@@ -68,11 +70,12 @@ export function FlowCanvas({
         onEdgeUpdateStart={onEdgeUpdateStart}
         onEdgeUpdate={onEdgeUpdate}
         onEdgeUpdateEnd={onEdgeUpdateEnd}
+        onNodeDragStop={onNodeDragStop}
         edgeUpdaterRadius={20}
         deleteKeyCode={['Delete', 'Backspace']}
         fitView
       >
-        <Background color={t.bgSurface0} />
+        <Background variant={BackgroundVariant.Dots} color="rgba(136,153,176,0.22)" gap={26} size={1.2} />
         <Controls />
       </ReactFlow>
     </div>

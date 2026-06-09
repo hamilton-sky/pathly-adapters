@@ -1,7 +1,8 @@
 import type { FlowExportTarget } from '../../../types'
 import { StateNode } from './StateNode'
+import { CommentNode } from './CommentNode'
 
-export const nodeTypes = { stateNode: StateNode }
+export const nodeTypes = { stateNode: StateNode, commentNode: CommentNode }
 
 export const EXPORT_TARGET_LABELS: Record<FlowExportTarget, string> = {
   'pathly-package': 'FSM Runtime',

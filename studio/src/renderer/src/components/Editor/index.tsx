@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
@@ -8,9 +8,12 @@ import { ConfigForm } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
 import { CommentsPanel } from './CommentsPanel/CommentsPanel'
+import { CommentsPanelRail } from './CommentsPanel/CommentsPanelRail/CommentsPanelRail'
 import { CommentablePreview } from './CommentablePreview/CommentablePreview'
+import type { CommentablePreviewHandle } from './CommentablePreview/CommentablePreview'
 import { CommentModal } from './CommentModal/CommentModal'
 import { useComments } from './useComments'
+import type { CommentColor } from './useComments'
 import { deriveLineNumber, buildSendPrompt, getSpawnCwd } from './commentUtils'
 import styles from './index.module.css'
 
@@ -83,8 +86,6 @@ function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
 export function Editor({ path: pathOverride }: { path?: string | null } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
 
-  // When rendered from SkillNotebook, pathOverride carries skillNotebookPath.
-  // Fall back to selectedItem for standalone Editor usage (FILES sidebar).
   const effectivePath = pathOverride ?? selectedItem?.path ?? null
 
   const isDirty = effectivePath ? dirtyItems.has(effectivePath) : false
@@ -92,16 +93,24 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   const isSkillOrAgent = derivedType === 'skill' || derivedType === 'agent'
   const isPreviewDefault = isSkillOrAgent || derivedType === 'template'
 
-  const { comments, add: addComment, edit: editComment, resolve: resolveComment, remove: removeComment } = useComments(effectivePath)
+  const { comments, add: addComment, edit: editComment, resolve: resolveComment, reopen: reopenComment, remove: removeComment } = useComments(effectivePath)
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
   const [anchorPos, setAnchorPos]         = useState<{ x: number; y: number } | null>(null)
   const [modalOpen, setModalOpen]         = useState(false)
   const [pendingBody, setPendingBody]     = useState('')
   const [showHighlights, setShowHighlights] = useState(true)
-  const submittedAnchors = useMemo(
-    () => comments.filter((c) => !c.resolved).map((c) => c.lineText),
-    [comments]
-  )
+  const [showPanel, setShowPanel] = useState(true)
+
+  const previewRef = useRef<CommentablePreviewHandle>(null)
+  const [orphanedIds, setOrphanedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setOrphanedIds(previewRef.current?.getOrphanedIds() ?? new Set())
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [comments])
+
   const addTab = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
 
@@ -169,24 +178,29 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     autoSaveRef.current = setTimeout(() => void performSave(v, config), 2000)
   }
 
-  function handleModalAdd(commentBody: string): void {
+  function handleModalAdd(commentBody: string, color: CommentColor): void {
     if (!pendingAnchor || !effectivePath) return
-    addComment(deriveLineNumber(body, pendingAnchor), pendingAnchor, commentBody)
+    const newId = addComment(deriveLineNumber(body, pendingAnchor), pendingAnchor, commentBody, color)
+    previewRef.current?.captureRange(newId)   // pin the live Range so submitted highlight = draft highlight
     setPendingAnchor(null)
     setAnchorPos(null)
     setModalOpen(false)
     setPendingBody('')
   }
 
-  async function handleModalSendNow(commentBody: string): Promise<void> {
+  async function handleModalSendNow(commentBody: string, color: CommentColor): Promise<void> {
     if (!pendingAnchor || !effectivePath) return
     const lineNumber = deriveLineNumber(body, pendingAnchor)
-    addComment(lineNumber, pendingAnchor, commentBody)
+    const newId = addComment(lineNumber, pendingAnchor, commentBody, color)
+    previewRef.current?.captureRange(newId)   // same fix for Send-to-Agent path
     setPendingAnchor(null)
     setAnchorPos(null)
     setModalOpen(false)
     setPendingBody('')
-    const newItem = { id: 'send-now', lineNumber, lineText: pendingAnchor.slice(0, 120), body: commentBody, resolved: false, createdAt: '' }
+    const newItem = {
+      id: 'send-now', lineNumber, lineText: pendingAnchor.slice(0, 120),
+      body: commentBody, resolved: false, createdAt: '', color,
+    }
     const allUnresolved = [...comments.filter((c) => !c.resolved), newItem]
     const norm = effectivePath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'file'
@@ -199,13 +213,11 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     ])
   }
 
-  // Stable callbacks — avoids re-running CommentablePreview's mark-injection
-  // effect on every parent render (unstable inline arrows were the culprit)
   const handleSelectionComment = useCallback((text: string, x: number, y: number) => {
     setPendingAnchor(text)
     setAnchorPos({ x, y })
     setModalOpen(true)
-    setPendingBody('')  // clear any draft from a previous selection
+    setPendingBody('')
   }, [])
 
   const handleResume = useCallback((x: number, y: number) => {
@@ -221,7 +233,6 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
 
   return (
     <div className={styles.panel}>
-      {/* Toolbar — always at top, matches UX diagram */}
       <div className={styles.toolbar}>
         <div className={styles.tabs}>
           {tabs.map((t_) => {
@@ -264,7 +275,6 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
         </div>
       </div>
 
-      {/* Configuration card — only for skills/agents/templates, compact in preview/split */}
       {isPreviewDefault && (
         <ConfigForm
           values={config}
@@ -273,7 +283,6 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
         />
       )}
 
-      {/* Content area */}
       <div className={styles.editorArea}>
         {tab === 'edit' && (
           <div className={styles.full}>
@@ -284,26 +293,41 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
           <div className={styles.previewWithComments}>
             <div className={styles.previewContent}>
               <CommentablePreview
+                ref={previewRef}
                 content={body}
                 pendingAnchor={pendingAnchor}
                 modalOpen={modalOpen}
-                submittedAnchors={submittedAnchors}
+                comments={comments}
                 showHighlights={showHighlights}
                 onSelectionComment={handleSelectionComment}
                 onResume={handleResume}
               />
             </div>
             {effectivePath && (
-              <CommentsPanel
-                filePath={effectivePath}
-                body={body}
-                comments={comments}
-                showHighlights={showHighlights}
-                onToggleHighlights={() => setShowHighlights((v) => !v)}
-                onResolve={resolveComment}
-                onRemove={removeComment}
-                onEdit={editComment}
-              />
+              <>
+                {!showPanel && (
+                  <CommentsPanelRail
+                    comments={comments}
+                    onExpand={() => setShowPanel(true)}
+                  />
+                )}
+                {showPanel && (
+                  <CommentsPanel
+                    filePath={effectivePath}
+                    body={body}
+                    comments={comments}
+                    showHighlights={showHighlights}
+                    orphanedIds={orphanedIds}
+                    onToggleHighlights={() => setShowHighlights((v) => !v)}
+                    onCollapse={() => setShowPanel(false)}
+                    onResolve={resolveComment}
+                    onReopen={reopenComment}
+                    onRemove={removeComment}
+                    onEdit={editComment}
+                    onScrollTo={(id) => previewRef.current?.scrollToComment(id)}
+                  />
+                )}
+              </>
             )}
           </div>
         )}
@@ -327,7 +351,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
           y={anchorPos.y}
           initialBody={pendingBody}
           onAdd={handleModalAdd}
-          onSendNow={(b) => void handleModalSendNow(b)}
+          onSendNow={(b, color) => void handleModalSendNow(b, color)}
           onDraftChange={setPendingBody}
           onClose={() => setModalOpen(false)}
           onCancel={() => { setModalOpen(false); setPendingAnchor(null); setAnchorPos(null); setPendingBody('') }}

@@ -1,8 +1,8 @@
-import type { FlowExportTarget } from '../../../../types'
-import type { Theme } from '../../../../theme'
+import type { FlowExportTarget, CommentShape } from '../../../../types'
 import { Tooltip } from '../../../ui'
-import { makeVisualViewStyles } from '../VisualView.styles'
+import { StickyNote, MessageSquare } from 'lucide-react'
 import { ExportControls } from './ExportControls'
+import styles from './Toolbar.module.css'
 
 interface Props {
   tab: 'visual' | 'yaml'
@@ -10,11 +10,11 @@ interface Props {
   onSave: () => void
   onAddState: () => void
   onAutoLayout: () => void
+  onAddNote: (shape: CommentShape) => void
   exportTarget: FlowExportTarget
   onTargetChange: (target: FlowExportTarget) => void
   hasErrors: boolean
   onPublish: () => void
-  t: Theme
 }
 
 export function Toolbar({
@@ -23,42 +23,52 @@ export function Toolbar({
   onSave,
   onAddState,
   onAutoLayout,
+  onAddNote,
   exportTarget,
   onTargetChange,
   hasErrors,
   onPublish,
-  t,
 }: Props): JSX.Element {
-  const s = makeVisualViewStyles(t)
   return (
-    <div style={s.toolbar}>
+    <div className={styles.toolbar}>
       <Tooltip label="Visual canvas editor" placement="bottom">
-        <button style={tab === 'visual' ? s.tabActive : s.tab} onClick={() => onTabClick('visual')}>Visual</button>
+        <button type="button" className={tab === 'visual' ? styles.tabActive : styles.tab} onClick={() => onTabClick('visual')}>Visual</button>
       </Tooltip>
       <Tooltip label="YAML source editor" placement="bottom">
-        <button style={tab === 'yaml' ? s.tabActive : s.tab} onClick={() => onTabClick('yaml')}>YAML</button>
+        <button type="button" className={tab === 'yaml' ? styles.tabActive : styles.tab} onClick={() => onTabClick('yaml')}>YAML</button>
       </Tooltip>
 
-      <div style={s.toolbarDivider} />
+      <div className={styles.divider} />
 
       <Tooltip label="Save flow YAML" shortcut="Ctrl+S" placement="bottom">
-        <button style={s.saveBtn} onClick={onSave}>Save</button>
+        <button type="button" className={styles.saveBtn} onClick={onSave}>Save</button>
       </Tooltip>
       <Tooltip label="Add a new state node" placement="bottom">
-        <button style={s.ghostBtn} onClick={onAddState}>+ Add state</button>
+        <button type="button" className={styles.ghostBtn} onClick={onAddState}>+ Add state</button>
       </Tooltip>
       <Tooltip label="Auto-arrange nodes top-to-bottom" placement="bottom">
-        <button style={s.ghostBtn} onClick={onAutoLayout}>Auto-layout</button>
+        <button type="button" className={styles.ghostBtn} onClick={onAutoLayout}>Auto-layout</button>
       </Tooltip>
 
-      <div style={s.toolbarSpacer} />
+      <div className={styles.divider} />
+      <Tooltip label="Add sticky note to canvas" placement="bottom">
+        <button type="button" className={styles.noteBtn} onClick={() => onAddNote('sticky')} aria-label="Add sticky note">
+          <StickyNote size={13} />
+        </button>
+      </Tooltip>
+      <Tooltip label="Add speech bubble to canvas" placement="bottom">
+        <button type="button" className={styles.noteBtn} onClick={() => onAddNote('bubble')} aria-label="Add speech bubble">
+          <MessageSquare size={13} />
+        </button>
+      </Tooltip>
+
+      <div className={styles.spacer} />
 
       <ExportControls
         exportTarget={exportTarget}
         onTargetChange={onTargetChange}
         hasErrors={hasErrors}
         onPublish={onPublish}
-        t={t}
       />
     </div>
   )

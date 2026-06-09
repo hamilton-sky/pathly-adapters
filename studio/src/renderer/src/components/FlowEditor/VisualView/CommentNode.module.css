@@ -1,0 +1,168 @@
+.node {
+  width: 200px;
+  min-height: 90px;
+  background: var(--cbg, #FEFCE8);
+  border: 1.5px solid var(--cborder, #FDE047);
+  border-radius: 10px;
+  padding: 0;
+  position: relative;
+  box-sizing: border-box;
+  cursor: default;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+/* Speech bubble triangle — ::before for border, ::after for fill */
+.bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -14px;
+  left: 20px;
+  border-top: 14px solid var(--cborder, #FDE047);
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+}
+.bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -11px;
+  left: 21px;
+  border-top: 12px solid var(--cbg, #FEFCE8);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px 4px;
+  border-bottom: 1px solid var(--cborder, #FDE047);
+}
+
+.shapeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--ctext, #422006);
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 0;
+  flex-shrink: 0;
+  transition: opacity 0.1s, background 0.1s;
+}
+.shapeBtn:hover { opacity: 1; background: rgba(0,0,0,0.08); }
+.shapeBtn:focus-visible { outline: 2px solid var(--cborder, #FDE047); outline-offset: 1px; }
+
+.swatches {
+  display: flex;
+  gap: 3px;
+  flex: 1;
+  justify-content: center;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--swatch-color);
+  border: 1.5px solid rgba(0,0,0,0.15);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s;
+}
+.swatch:hover { transform: scale(1.25); }
+.swatchActive { border-color: rgba(0,0,0,0.5); transform: scale(1.15); box-shadow: 0 0 0 1.5px rgba(0,0,0,0.3); }
+.swatch:focus-visible { outline: 2px solid var(--cborder, #FDE047); outline-offset: 1px; }
+
+.deleteBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--ctext, #422006);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.5;
+  padding: 0;
+  flex-shrink: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+.deleteBtn:hover { opacity: 1; background: rgba(220,38,38,0.1); color: #DC2626; }
+.deleteBtn:focus-visible { outline: 2px solid #DC2626; outline-offset: 1px; }
+
+.textDisplay {
+  padding: 8px 10px;
+  min-height: 55px;
+  font-size: 12px;
+  color: var(--ctext, #422006);
+  font-family: var(--font-family-base);
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+  line-height: 1.5;
+  user-select: none;
+}
+.textDisplay:focus-visible { outline: 2px solid var(--cborder, #FDE047); border-radius: 4px; }
+
+.placeholder {
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.textarea {
+  display: block;
+  width: 100%;
+  min-height: 55px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-size: 12px;
+  color: var(--ctext, #422006);
+  font-family: var(--font-family-base);
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+/* Source handle for attachment edge (right side, subtle) */
+.attachHandle {
+  width: 7px !important;
+  height: 7px !important;
+  background: rgba(160,160,170,0.5) !important;
+  border: 1.5px solid rgba(160,160,170,0.7) !important;
+  right: -4px !important;
+}
+
+/* Attachment state picker */
+.attachSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(0,0,0,0.07);
+  border: 1px solid rgba(0,0,0,0.18);
+  border-radius: 3px;
+  color: var(--ctext, #422006);
+  font-size: 9px;
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  padding: 1px 3px;
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.attachSelect:focus-visible {
+  outline: 2px solid var(--cborder, #FDE047);
+  outline-offset: 1px;
+}

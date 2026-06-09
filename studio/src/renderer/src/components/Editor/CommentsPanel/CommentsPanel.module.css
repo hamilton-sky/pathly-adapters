@@ -1,5 +1,5 @@
 .panel {
-  width: 260px;
+  width: 290px;
   flex-shrink: 0;
   border-left: 1px solid var(--bg-surface0);
   background: var(--bg-mantle);
@@ -39,6 +39,12 @@
   letter-spacing: 0;
 }
 
+.headerBtns {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .toggleBtn {
   background: none;
   border: none;
@@ -51,6 +57,7 @@
   transition: color 0.12s, background 0.12s;
 }
 .toggleBtn:hover { color: var(--accent); background: var(--bg-surface0); }
+.toggleBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .list {
   flex: 1;
