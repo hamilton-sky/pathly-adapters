@@ -92,12 +92,7 @@ Log to central DB:
 python3 -c "from pathly_orchestrator.eventlog import append_event as _ae; ts=__import__('datetime').datetime.now(__import__('datetime').timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'); [_ae('<feature_path>', e) for e in [{'type':'FILE_CREATED','file':'DESIGN.md','ts':ts},{'type':'STAGE_COMPLETE','stage':'DESIGNING','next':'BUILDING','ts':ts}]]"
 ```
 
-Compute wall_seconds: run `python -c "import time; print(int(time.time()) - DESIGN_START)"`.
-
-Then invoke the `log-agent-done` skill with:
-```json
-{"agent":"designer","feature":"<FEATURE>","conversation":0,"result":"DONE","total_tokens":0,"tool_uses":0,"duration_ms":0,"wall_seconds":<computed>}
-```
+Run the Completion report with `agent: designer`, `result: DONE`, `conversation: 0`, using `DESIGN_START`.
 
 Write `pathly/plans/<feature>/STATE.json`:
 ```json

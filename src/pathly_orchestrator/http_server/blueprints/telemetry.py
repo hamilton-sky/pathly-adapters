@@ -1,4 +1,4 @@
-"""Telemetry endpoints: /record_activity, /record_phase."""
+"""Telemetry endpoints: /record_activity, /record_phase, /record_phase_summary."""
 from __future__ import annotations
 
 import logging
@@ -9,6 +9,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from pathly_orchestrator import eventlog
+from pathly_orchestrator.db import append_event as _db_append_event
 from pathly_orchestrator.db.connection import get_db as _get_db
 from pathly_orchestrator.feature_flags import flags
 from pathly_telemetry.storage import append_activity
@@ -320,4 +321,57 @@ def record_phase_endpoint():
         return jsonify({"status": "recorded"}), 200
     except Exception as e:
         logging.exception("record_phase error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
+@bp.route("/record_phase_summary", methods=["POST"])
+def record_phase_summary_endpoint():
+    """Store a PHASE_SUMMARY event in SQLite for the given feature."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        for field in ("feature", "agent", "text"):
+            if field not in data or not isinstance(data[field], str) or not data[field].strip():
+                return jsonify({"error": f"Missing required field: '{field}'"}), 400
+
+        text = data["text"]
+        if len(text) > 2000:
+            return jsonify({"error": "Field 'text' must not exceed 2000 characters"}), 400
+
+        feature = data["feature"]
+        agent = data["agent"]
+        project_root = data.get("project_root") or os.environ.get("PATHLY_PROJECT_ROOT", "")
+        feature_dir = Path(project_root) / "pathly" / "plans" / feature
+
+        if not feature_dir.exists():
+            return jsonify({"error": f"Feature directory does not exist: {feature_dir}"}), 400
+
+        event: dict[str, object] = {
+            "schema_version": 1,
+            "type": "PHASE_SUMMARY",
+            "feature": feature,
+            "agent": agent,
+            "text": text,
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+
+        phase = data.get("phase")
+        if phase and isinstance(phase, str) and phase.strip():
+            event["phase"] = phase
+
+        conv = data.get("conv")
+        if conv is not None:
+            try:
+                event["conv"] = int(conv)
+            except (TypeError, ValueError):
+                pass
+
+        conn = _get_db()
+        seq = _db_append_event(conn, str(project_root), feature, event)
+
+        return jsonify({"status": "recorded", "seq": seq}), 200
+    except Exception as e:
+        logging.exception("record_phase_summary error")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500

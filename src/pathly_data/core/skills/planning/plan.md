@@ -53,6 +53,8 @@ If `rigor = strict`, do not skip risk questions. Explicitly ask about security, 
 
 ## Step 3: Gather Codebase Context
 
+Capture start time: `python3 -c "import time; print(int(time.time()))"` → `PLAN_START`
+
 **Phase 1 — Analyze:**
 log-phase PHASE_START analyze
 
@@ -80,6 +82,8 @@ Spawn `planner` with `phase: plan`. Inject:
 Plus all existing context: rigor level, `STORM_SEED` contents if it existed, `PO_NOTES` contents if it exists.
 
 log-phase PHASE_DONE plan
+
+Run the Completion report with `agent: planner`, `result: DONE`, `conversation: 0`, using `PLAN_START` from the start of this step. Set `summary` to: `"planner created <N> files for <FEATURE> (<rigor> rigor)"` where N is the count of files written in Step 4.
 
 ## Template Path Resolution
 

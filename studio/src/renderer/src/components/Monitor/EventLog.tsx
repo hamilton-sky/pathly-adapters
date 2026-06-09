@@ -42,6 +42,7 @@ function eventColorClass(ev: FsmEvent, retrograde?: boolean): string {
     case 'STAGE_COMPLETE':
     case 'IMPLEMENT_COMPLETE': return styles.evColorStage
     case 'WARNING':        return styles.evColorYellow
+    case 'PHASE_SUMMARY':  return styles.evColorSummary
     default:               return styles.evColorMuted
   }
 }
@@ -129,6 +130,11 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
       return `${ts}  ${pad('GATE_SKIPPED', 14)}  ${ev.key ?? ev.detail ?? ''}${ev.reason ? `  reason: ${ev.reason}` : ''}`
     case 'STAGE_COMPLETE':
       return `${ts}  ${pad('STAGE_COMPLETE', 14)}  ${ev.stage ?? ev.from ?? '?'} → ${ev.next ?? ev.to ?? '?'}`
+    case 'PHASE_SUMMARY': {
+      const agent = (ev as Record<string, unknown>).agent as string | undefined ?? '?'
+      const text = (ev as Record<string, unknown>).text as string | undefined ?? '(no text)'
+      return `${ts}  ${pad('SUMMARY', 14)}  ${agent}  ${text}`
+    }
     default: {
       const {
         type,

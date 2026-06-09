@@ -21,11 +21,11 @@ This is **mandatory** — the supervisor reads this event as the authoritative r
    cost_usd = round((in_est / 1_000_000 * input_rate) + (out_est / 1_000_000 * output_rate), 6)
    ```
 
-4. Write the event to the central DB — **do not invoke a skill**, run this command:
+4. Write the event — **do not invoke a skill**, run this command:
 
 ```bash
 python3 -c "
-import json, datetime
+import json, datetime, pathlib
 ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 event = {
   'type': 'AGENT_DONE',
@@ -41,18 +41,49 @@ event = {
   'ts': ts,
   'schema_version': 1,
 }
+
+_written = False
+
+# Primary path: POST to HTTP endpoint
 try:
-    from pathly_orchestrator.eventlog import append_event as _ae
-    _ae('<feature_path>', event)
-    print('AGENT_DONE written to DB')
-except Exception as _exc:
-    # Fallback: write to EVENTS.jsonl when eventlog unavailable (offline/codex mode)
-    import pathlib
-    path = pathlib.Path('<feature_path>/EVENTS.jsonl')
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'a', encoding='utf-8') as _f:
-        _f.write(json.dumps(event) + chr(10))
-    print(f'AGENT_DONE written to EVENTS.jsonl (fallback: {_exc})')
+    import urllib.request, urllib.error
+    body = json.dumps({
+        'type': event['type'],
+        'feature': '<feature>',
+        'project_root': str(pathlib.Path.cwd()),
+        'payload': event,
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        'http://127.0.0.1:8765/runner/event',
+        data=body,
+        headers={'Content-Type': 'application/json'},
+        method='POST',
+    )
+    with urllib.request.urlopen(req, timeout=3) as resp:
+        if resp.status == 200:
+            print('AGENT_DONE written via HTTP /runner/event')
+            _written = True
+except Exception:
+    pass  # server unreachable — fall through to local fallback
+
+# Fallback: write via eventlog (DB-primary, EVENTS.jsonl secondary)
+if not _written:
+    try:
+        from pathly_orchestrator.eventlog import append_event as _ae
+        _ae('pathly/plans/<feature>', event)
+        print('AGENT_DONE written to DB (fallback)')
+    except Exception as _exc:
+        path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a', encoding='utf-8') as _f:
+            _f.write(json.dumps(event) + chr(10))
+        print(f'AGENT_DONE written to EVENTS.jsonl (last resort: {_exc})')
+
+# Always dual-write to EVENTS.jsonl as backup
+path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+path.parent.mkdir(parents=True, exist_ok=True)
+with open(path, 'a', encoding='utf-8') as _f:
+    _f.write(json.dumps(event) + chr(10))
 "
 ```
 
@@ -72,9 +103,9 @@ pathly-fsm-call record-activity \
 ```
 
 Replace the UPPER_CASE placeholders with actual values:
-- `AGENT_ROLE` — e.g. `builder`, `reviewer`, `tester`
+- `AGENT_ROLE` — e.g. `builder`, `reviewer`, `tester`, `planner`
 - `MODEL_ID` — model used in this stage (e.g. `claude-sonnet-4-6`)
-- `CONV_N` — integer conversation number (0 for non-build stages)
+- `CONV_N` — integer conversation number (0 for non-build stages like plan/review/test)
 - `SUMMARY_SENTENCE` — one sentence: what was done and the outcome
 - `TOTAL_TOKENS`, `TOOL_USES`, `WALL_SECONDS` — from `<usage>` block or wall_seconds computation
 - `COST_USD` — computed in step 3

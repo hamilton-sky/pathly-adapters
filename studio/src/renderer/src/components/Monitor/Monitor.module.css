@@ -585,6 +585,7 @@
 .evColorSpawned    { color: #06B6D4; }
 .evColorStage      { color: #34D399; }
 .evColorRetrograde { color: #F97316; }
+.evColorSummary    { color: #F59E0B; }
 
 .evNewPill {
   position: absolute;

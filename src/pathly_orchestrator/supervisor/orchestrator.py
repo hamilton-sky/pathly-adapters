@@ -9,6 +9,7 @@ from typing import Callable, Optional
 from .state import RunnerState, OpenSession, MAX_FEEDBACK_ROUNDS, logger
 from .registry import _lock, _write_mirror, _set_status
 from .interactions import _await_agent_question
+from .terminal import _write_supervisor_phase_summary
 
 
 def _resolve_stage_supervised(
@@ -507,6 +508,14 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     }
                 )
                 return
+
+            _write_supervisor_phase_summary(
+                project_root=project_root,
+                topic=topic,
+                stage=state.current_state or "",
+                agent="supervisor",
+                text=f"{(state.current_state or 'stage').lower()} complete — {preferred_adapter} finished",
+            )
 
             # next_state — continue loop
             if result.get("next_state"):

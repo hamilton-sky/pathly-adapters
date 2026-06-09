@@ -222,13 +222,7 @@ If autoFlow: log human response "auto-advance".
 
 Transition state → BUILDING.
 
-Compute wall_seconds fallback: run `python -c "import time; print(int(time.time()) - PLAN_START)"` using `PLAN_START` from Stage 2.
-
-Then invoke the `log-agent-done` skill with:
-```json
-{"agent":"planner","feature":"<FEATURE>","conversation":0,"result":"DONE","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>,"wall_seconds":<computed>}
-```
-(wall_seconds is the fallback computed from PLAN_START; log-agent-done prefers duration_ms if > 0)
+Run the Completion report with `agent: planner`, `result: DONE`, `conversation: 0`, using `PLAN_START` from Stage 2. Set `summary` to: `"planner created <N> files for <FEATURE> (<rigor> rigor)"` where N is the count of files written.
 
 Route back to `team [FEATURE] [rigor] [autoFlow]`.
 

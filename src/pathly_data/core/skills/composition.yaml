@@ -90,3 +90,15 @@ skills:
     fragments:
       - completion-report
       - scout-choreography
+
+  planning/plan:
+    fragments:
+      - completion-report
+
+  team/plan:
+    fragments:
+      - completion-report
+
+  team/design:
+    fragments:
+      - completion-report

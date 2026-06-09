@@ -19,6 +19,40 @@ from .registry import (
 )
 
 
+def _write_supervisor_phase_summary(
+    *,
+    project_root: str,
+    topic: str,
+    stage: str,
+    agent: str,
+    text: str,
+) -> None:
+    """Write a PHASE_SUMMARY event to the feature's SQLite DB. Silent on failure."""
+    import time as _time
+    if not project_root or not topic:
+        return
+    try:
+        from pathly_orchestrator import db as _db
+        feature_dir = Path(project_root) / "pathly" / "plans" / topic
+        if not feature_dir.exists():
+            return
+        conn = _db.get_db()
+        phase = stage.lower().replace("-", "_") if stage else ""
+        event: dict = {
+            "schema_version": 1,
+            "type": "PHASE_SUMMARY",
+            "feature": topic,
+            "agent": agent,
+            "text": text,
+            "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        }
+        if phase:
+            event["phase"] = phase
+        _db.append_event(conn, project_root, topic, event)
+    except Exception:
+        logger.debug("_write_supervisor_phase_summary failed", exc_info=True)
+
+
 def _agent_done_watcher(
     run: TerminalRun,
     feature_dir: Path,
@@ -171,6 +205,14 @@ def _run_stage_via_terminal(
         }
         if broadcast_fn:
             broadcast_fn(state.topic, payload)
+
+        _write_supervisor_phase_summary(
+            project_root=state.project_root,
+            topic=state.topic,
+            stage=state.current_state or "",
+            agent="supervisor",
+            text=f"Starting {(state.current_state or 'stage').lower()} — {adapter} agent spawned",
+        )
 
         if not run.wait_started(timeout=30):
             drop_run(run_id)

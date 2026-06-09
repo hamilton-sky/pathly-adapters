@@ -15,7 +15,7 @@ from .registry import (
     _set_status,
     _cleanup_run_id,
 )
-from .terminal import _run_stage_via_terminal, _agent_done_watcher, _reconciliation_window
+from .terminal import _run_stage_via_terminal, _agent_done_watcher, _reconciliation_window, _write_supervisor_phase_summary
 from .interactions import _await_agent_question
 from .orchestrator import _loop, _resolve_stage_supervised
 from .api import start_run, pause_run, resume_run, abort_run, supply_decision, supply_agent_answer, reroute_run
@@ -41,6 +41,7 @@ __all__ = [
     "_run_stage_via_terminal",
     "_agent_done_watcher",
     "_reconciliation_window",
+    "_write_supervisor_phase_summary",
     "_await_agent_question",
     "_loop",
     "_resolve_stage_supervised",
