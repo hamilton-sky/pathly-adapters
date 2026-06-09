@@ -141,7 +141,7 @@
 .editArea {
   resize: none;
   background: var(--bg-base);
-  border: 1px solid var(--accent);
+  border: 1px solid color-mix(in srgb, var(--comment-item-color, var(--accent)) 70%, var(--bg-base));
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: var(--font-size-sm);

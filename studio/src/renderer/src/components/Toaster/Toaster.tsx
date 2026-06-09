@@ -1,9 +1,9 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { useToastStore } from '../store/toastStore'
-import { useNotificationStore } from '../store/notificationStore'
-import type { ToastPosition, ToastStyle } from '../store/notificationStore'
+import { useToastStore } from '../../store/toastStore'
+import { useNotificationStore } from '../../store/notificationStore'
+import type { ToastPosition, ToastStyle } from '../../store/notificationStore'
 import styles from './Toaster.module.css'
 
 const POS_CLASS: Record<ToastPosition, string> = {

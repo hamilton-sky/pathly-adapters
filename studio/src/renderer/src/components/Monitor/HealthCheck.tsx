@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
 import { fsmPing, readFile, listDir } from '../../services/pathlyApi'
-import { Tooltip } from '../ui/Tooltip'
+import { Tooltip } from '../ui/Tooltip/Tooltip'
 import styles from './Monitor.module.css'
 
 type CheckStatus = 'pass' | 'warn' | 'fail' | 'loading'

@@ -72,6 +72,11 @@
   flex-wrap: wrap;
 }
 
+/* Per-adapter brand colours — active state only */
+.chip[data-adapter='claude'][data-active='true']  { --chip-color: #E07535; --chip-bg: rgba(224,117,53,0.12);  --chip-border: rgba(224,117,53,0.5);  --chip-dot-color: #E07535; }
+.chip[data-adapter='codex'][data-active='true']   { --chip-color: #0EA5E9; --chip-bg: rgba(14,165,233,0.12);  --chip-border: rgba(14,165,233,0.5);  --chip-dot-color: #0EA5E9; }
+.chip[data-adapter='copilot'][data-active='true'] { --chip-color: #8888AA; --chip-bg: rgba(136,136,170,0.12); --chip-border: rgba(136,136,170,0.5); --chip-dot-color: #8888AA; }
+
 /* Same CSS-var trick as ConfigForm */
 .chip {
   /* button UA reset */

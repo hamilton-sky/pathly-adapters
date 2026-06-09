@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PathlyItem } from '../types'
-import { writeFile } from '../services/pathlyApi'
-import { useFocusTrap } from '../hooks/useFocusTrap'
+import type { PathlyItem } from '../../types'
+import { writeFile } from '../../services/pathlyApi'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import styles from './NewItemDialog.module.css'
 
 interface Props {
@@ -12,19 +12,6 @@ interface Props {
 }
 
 const ADAPTER_OPTIONS = ['claude', 'codex', 'copilot']
-
-// Brand colours — intentionally static, not theme-derived
-const ADAPTER_COLORS: Record<string, { color: string; bg: string; border: string }> = {
-  claude:  { color: '#E07535', bg: 'rgba(224,117,53,0.12)',  border: 'rgba(224,117,53,0.5)'  },
-  codex:   { color: '#0EA5E9', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.5)'  },
-  copilot: { color: '#8888AA', bg: 'rgba(136,136,170,0.12)', border: 'rgba(136,136,170,0.5)' },
-}
-
-function chipVars(active: boolean, meta: typeof ADAPTER_COLORS['claude']): React.CSSProperties {
-  return active
-    ? { '--chip-color': meta.color, '--chip-bg': meta.bg, '--chip-border': meta.border, '--chip-dot-color': meta.color } as React.CSSProperties
-    : {}
-}
 
 function buildSkillFrontmatter(name: string, description: string, adapters: string[], tools: string[]): string {
   const lines = [
@@ -153,15 +140,14 @@ export function NewItemDialog({ type, dir, onClose, onCreated }: Props): JSX.Ele
                 <div className={styles.chips}>
                   {ADAPTER_OPTIONS.map((adapter) => {
                     const active = adapters.includes(adapter)
-                    const meta   = ADAPTER_COLORS[adapter]
                     return (
                       <button
                         key={adapter}
                         type="button"
-                        role="switch"
-                        aria-checked={active ? 'true' : 'false'}
+                        {...(active ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
                         className={styles.chip}
-                        style={chipVars(active, meta)}
+                        data-adapter={adapter}
+                        data-active={active ? 'true' : 'false'}
                         onClick={() => toggleAdapter(adapter)}
                         title={active ? `Remove ${adapter}` : `Add ${adapter}`}
                       >

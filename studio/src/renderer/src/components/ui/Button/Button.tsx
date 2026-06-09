@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import styles from './Button.module.css'
-import uiStyles from './ui.module.css'
+import uiStyles from '../ui.module.css'
 
 type Variant = 'primary' | 'cta' | 'secondary' | 'ghost' | 'destructive'
 type Size = 'sm' | 'md'

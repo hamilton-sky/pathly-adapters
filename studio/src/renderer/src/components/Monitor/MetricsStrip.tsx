@@ -1,5 +1,5 @@
 import React from 'react'
-import { Tooltip } from '../ui/Tooltip'
+import { Tooltip } from '../ui/Tooltip/Tooltip'
 import { useAgentTelemetry, fmtTokens, fmtWall, fmtCost, EMPTY_TOOLTIP } from './utils'
 import styles from './Monitor.module.css'
 
