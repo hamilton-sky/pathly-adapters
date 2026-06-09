@@ -63,11 +63,53 @@
   border: 1px solid color-mix(in srgb, #a78bfa 28%, transparent);
 }
 
+/* Skill / Agent toggle */
+.viewToggle {
+  display: flex;
+  align-items: center;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  gap: 2px;
+}
+
+.viewBtn {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+  font-weight: 600;
+  padding: 2px 12px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  letter-spacing: 0.03em;
+}
+.viewBtn:hover:not(:disabled) { color: var(--text-secondary); }
+.viewBtn:focus-visible         { outline: var(--focus-ring); }
+.viewBtn:disabled              { opacity: 0.3; cursor: default; }
+
+.viewBtnActive {
+  background: var(--bg-surface1);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.viewBtnActive:hover { color: var(--accent); }
+
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   flex-shrink: 0;
+  margin-left: auto;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .iconBtn {
@@ -102,8 +144,8 @@
   border-top: none;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
   padding: 16px 18px;
+  height: 260px;
   overflow-y: auto;
-  max-height: 360px;
   color: var(--text-secondary);
   font-size: var(--font-size-base);
   line-height: 1.7;
@@ -212,9 +254,9 @@
   font-size: var(--font-size-sm);
   line-height: 1.75;
   color: var(--text-primary);
-  resize: vertical;
-  min-height: 200px;
-  max-height: 420px;
+  resize: none;
+  height: 260px;
+  overflow-y: auto;
   outline: none;
   box-sizing: border-box;
   transition: box-shadow var(--transition-fast);

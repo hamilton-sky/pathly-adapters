@@ -8,7 +8,7 @@ import { PATHLY_API_BASE } from '../../../lib/config'
 import {
   CLI_HOSTS, AGENTS, SKILLS,
   HOST_TO_ADAPTER, ADAPTER_TO_HOST,
-  SKILL_FILE_PATHS, STAGE_DEFAULTS, SKILL_PROMPTS,
+  SKILL_FILE_PATHS, AGENT_FILE_PATHS, STAGE_DEFAULTS, SKILL_PROMPTS,
 } from './configurePhaseModalData'
 import { AssemblyFlowBar } from './AssemblyFlowBar'
 import { PromptPreview } from './PromptPreview'
@@ -83,7 +83,30 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
     onClose()
   }
 
-  const basePreview = SKILL_PROMPTS[skill] ?? `# ${skill}\n\nNo preview available.`
+  const [loadedSkillText, setLoadedSkillText] = useState<string | null>(null)
+  useEffect(() => {
+    setLoadedSkillText(null)
+    if (!projectPath) return
+    const relPath = SKILL_FILE_PATHS[skill] ?? skill
+    const fullPath = `${projectPath}/src/pathly_data/core/skills/${relPath}.md`
+    window.pathly.fs.read(fullPath)
+      .then((text) => setLoadedSkillText(text ?? null))
+      .catch(() => setLoadedSkillText(null))
+  }, [skill, projectPath])
+
+  const [loadedAgentText, setLoadedAgentText] = useState<string | null>(null)
+  useEffect(() => {
+    setLoadedAgentText(null)
+    if (!projectPath) return
+    const relPath = AGENT_FILE_PATHS[agent]
+    if (!relPath) return
+    const fullPath = `${projectPath}/src/pathly_data/core/agents/${relPath}.md`
+    window.pathly.fs.read(fullPath)
+      .then((text) => setLoadedAgentText(text ?? null))
+      .catch(() => setLoadedAgentText(null))
+  }, [agent, projectPath])
+
+  const basePreview = loadedSkillText ?? SKILL_PROMPTS[skill] ?? `# ${skill}\n\nNo preview available.`
   const preview     = basePreview.replace(/^Host: [^\n]+/m, `Host: ${host} · Agent: ${agent}`)
   const isModified  = host !== 'Claude Code' || agent !== defaults.agent || skill !== defaults.skill
 
@@ -139,6 +162,7 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
             <div className={styles.sectionLabel}>Prompt Preview</div>
             <PromptPreview
               prompt={preview}
+              agentPrompt={loadedAgentText ?? undefined}
               isModified={isModified}
               label={`${skill} · ${agent} · ${host}`}
             />

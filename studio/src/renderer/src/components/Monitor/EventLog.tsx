@@ -80,11 +80,7 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
       } else if (total > 0) {
         tokStr = `  ${(total / 1000).toFixed(1)}k`
       }
-      let costStr = ''
-      if (ev.cost_usd != null) {
-        costStr = ev.cost_usd > 0 ? `  $${ev.cost_usd.toFixed(4)}` : '  $…'
-      }
-      return `${ts}  ${pad('AGENT_DONE', 14)}  ${ev.agent ?? '?'}${conv}  ${result}${tools}${secs}${tokStr}${costStr}`
+      return `${ts}  ${pad('AGENT_DONE', 14)}  ${ev.agent ?? '?'}${conv}  ${result}${tools}${secs}${tokStr}`
     }
     case 'PHASE_START': {
       const phase = (ev as Record<string, unknown>).phase as string | undefined ?? '?'
@@ -246,10 +242,29 @@ export function EventLog(): JSX.Element {
   const displayEvents = useMemo(() => {
     if (phaseFilter === 'all') return visibleEvents
     const targetSet = phaseFilter === 'build' ? BUILD_PHASES : REVIEW_PHASES
+    const BUILD_ACTORS  = new Set(['builder', 'planner', 'designer'])
+    const REVIEW_ACTORS = new Set(['reviewer', 'tester', 'retro'])
+    const targetActors  = phaseFilter === 'build' ? BUILD_ACTORS : REVIEW_ACTORS
+
+    // Primary: track phase via STATE_TRANSITION events
     let phase: string | null = null
+    let hasTransitions = false
+    const stateFiltered: typeof visibleEvents = []
+    for (const ev of visibleEvents) {
+      if (ev.type === 'STATE_TRANSITION' && ev.to) { phase = String(ev.to); hasTransitions = true }
+      if (phase != null && targetSet.has(phase)) stateFiltered.push(ev)
+    }
+    if (hasTransitions) return stateFiltered
+
+    // Fallback: infer stream from most-recently-seen agent actor
+    let currentActor: string | null = null
     return visibleEvents.filter((ev) => {
-      if (ev.type === 'STATE_TRANSITION' && ev.to) phase = String(ev.to)
-      return phase != null && targetSet.has(phase)
+      const actor = getEventActor(ev)
+      if (actor) {
+        const base = actor.split(' ')[0]
+        if (BUILD_ACTORS.has(base) || REVIEW_ACTORS.has(base)) currentActor = base
+      }
+      return currentActor != null && targetActors.has(currentActor)
     })
   }, [phaseFilter, visibleEvents])
 
@@ -348,12 +363,19 @@ export function EventLog(): JSX.Element {
       </div>
       <div className={styles.evTotalsBar}>
         <div className={styles.evTotalsRow}>
-          <span className={styles.evTotalsLabel}>in/out</span>
-          <span className={styles.evTotalsValue}>
-            {totalIn > 0 ? `${(totalIn / 1000).toFixed(1)}k` : '—'}↑
-            &nbsp;&nbsp;
-            {totalOut > 0 ? `${(totalOut / 1000).toFixed(1)}k` : '—'}↓
-          </span>
+          {(totalIn > 0 || totalOut > 0) ? (
+            <span className={styles.evTotalsValue}>
+              {`${(totalIn / 1000).toFixed(1)}k in`}
+              <span className={styles.evTotalsDot}> · </span>
+              {`${(totalOut / 1000).toFixed(1)}k out`}
+            </span>
+          ) : totalTokens > 0 ? (
+            <span className={styles.evTotalsValue}>
+              {`${(totalTokens / 1000).toFixed(1)}k tokens`}
+            </span>
+          ) : (
+            <span className={styles.evTotalsLabel}>no token data yet</span>
+          )}
           {totalTokens > 0 && (
             <span className={`${styles.evTotalsLabel} ${styles.evTotalsSummary}`}>
               = {totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens} combined

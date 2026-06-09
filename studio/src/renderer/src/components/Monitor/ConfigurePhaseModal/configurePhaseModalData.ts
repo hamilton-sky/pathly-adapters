@@ -13,6 +13,14 @@ export const ADAPTER_TO_HOST: Record<string, string> = Object.fromEntries(
   Object.entries(HOST_TO_ADAPTER).map(([h, a]) => [a, h])
 )
 
+export const AGENT_FILE_PATHS: Record<string, string> = {
+  'planner':  'planning/planner',
+  'builder':  'building/builder',
+  'reviewer': 'quality/reviewer',
+  'tester':   'quality/tester',
+  'designer': 'building/designer',
+}
+
 export const SKILL_FILE_PATHS: Record<string, string> = {
   'fix/build':      'fix/build',
   'team/build':     'team/build',

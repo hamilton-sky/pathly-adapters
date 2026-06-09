@@ -625,6 +625,7 @@
 
 .evTotalsLabel   { font-size: 12px; font-family: 'Fira Mono', 'Cascadia Code', 'Consolas', monospace; color: var(--text-muted); }
 .evTotalsValue   { font-size: 12px; font-family: 'Fira Mono', 'Cascadia Code', 'Consolas', monospace; color: var(--text-secondary); }
+.evTotalsDot     { color: var(--text-muted); }
 .evTotalsSummary { margin-left: auto; opacity: 0.5; font-style: italic; }
 .evTotalsMissing { margin-left: auto; opacity: 0.5; }
 .evTotalsPending { margin-left: auto; color: var(--text-muted); font-style: italic; opacity: 0.7; }
