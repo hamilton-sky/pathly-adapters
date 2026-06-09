@@ -1,5 +1,9 @@
 {
-  "convs_done": 3,
-  "current": "REVIEWING",
-  "updated_at": "2026-06-09T20:44:44Z"
+  "current": "DONE",
+  "feature": "event-phase-summary",
+  "rigor": "standard",
+  "convs_total": 4,
+  "convs_done": 4,
+  "current_conversation": 4,
+  "updated_at": "2026-06-09T21:49:54Z"
 }

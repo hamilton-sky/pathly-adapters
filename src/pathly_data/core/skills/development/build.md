@@ -163,8 +163,10 @@ During long-running work, POST progress notes to the FSM so the user can see act
 ```bash
 curl -s -X POST http://127.0.0.1:8765/record_phase_summary \
   -H "Content-Type: application/json" \
-  -d "{\"feature\": \"<feature>\", \"agent\": \"builder\", \"text\": \"<short note>\"}"
+  -d "{\"feature\": \"<feature>\", \"agent\": \"builder\", \"text\": \"<short note>\", \"conv\": <N>}"
 ```
+
+Replace `<N>` with the current conversation number (e.g. `2`). Omit `conv` if the conversation number is unknown.
 
 Call this at:
 - After completing each conversation's implementation

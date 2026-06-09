@@ -1,3 +1,8 @@
+---
+
+---
+
+
 # build
 
 This is the canonical, tool-agnostic Pathly behavior for the build workflow.
@@ -151,16 +156,30 @@ After successful verification, report:
 
 Do NOT update PROGRESS.md. Do NOT commit. The orchestrator (`/pathly team`) handles both after the reviewer passes.
 
+## Emitting progress notes
+
+During long-running work, POST progress notes to the FSM so the user can see activity in the Studio Monitor:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/record_phase_summary \
+  -H "Content-Type: application/json" \
+  -d "{\"feature\": \"<feature>\", \"agent\": \"builder\", \"text\": \"<short note>\", \"conv\": <N>}"
+```
+
+Replace `<N>` with the current conversation number (e.g. `2`). Omit `conv` if the conversation number is unknown.
+
+Call this at:
+- After completing each conversation's implementation
+- After tests pass
+- Before starting a large multi-file refactor
+
+If `PATHLY_PROJECT_ROOT` is set in the environment, omit `project_root` from the body — the server reads it from the env var. If the endpoint is unreachable or returns non-200, log a one-line warning and continue. Never abort work because a progress note failed.
+
 ## Exit contract
 
 Write `pathly/plans/<feature>/STATE.json`:
 ```json
 {"current": "REVIEWING", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
-```
-
-Append to `pathly/plans/<feature>/EVENTS.jsonl`:
-```
-{"type": "STATE_TRANSITION", "to": "REVIEWING", "ts": "<iso-timestamp>"}
 ```
 
 Then run the Completion report with `agent: builder`, `result: DONE`, using `BUILD_START` from Step 4.5.
@@ -215,11 +234,11 @@ FSM server is not automatically managed by the host environment.
 
 ## Completion report (AGENT_DONE)
 
-After the stage agent completes, write an AGENT_DONE event **directly** to EVENTS.jsonl.
-This is **mandatory** — the supervisor reads this field as the authoritative result.
+After the stage agent completes, write an AGENT_DONE event to the **central DB** via eventlog.
+This is **mandatory** — the supervisor reads this event as the authoritative result.
 
 1. Compute wall_seconds: `python3 -c "import time; print(int(time.time()) - BUILD_START)"`
-2. Parse from the sub-agent's `<usage>` block: `total_tokens`, `tool_uses`, `duration_ms` (0 if absent).
+2. Sum `total_tokens` and `tool_uses` across **ALL** subagents spawned during this stage (analyze, scouts, implement/review, and every fix/retry iteration). Parse each subagent's `<usage>` block (look for `subagent_tokens:` and `tool_uses:` lines in the tool result) and add to running totals. `duration_ms = 0` if absent.
 3. Compute `cost_usd` from `total_tokens` and `model` using an 80/20 input/output token split:
 
    | Model prefix | Input $/MTok | Output $/MTok |
@@ -236,11 +255,11 @@ This is **mandatory** — the supervisor reads this field as the authoritative r
    cost_usd = round((in_est / 1_000_000 * input_rate) + (out_est / 1_000_000 * output_rate), 6)
    ```
 
-4. Write the event directly — **do not invoke a skill**, run this command:
+4. Write the event — **do not invoke a skill**, run this command:
 
 ```bash
 python3 -c "
-import json, datetime
+import json, datetime, pathlib
 ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 event = {
   'type': 'AGENT_DONE',
@@ -256,10 +275,49 @@ event = {
   'ts': ts,
   'schema_version': 1,
 }
-path = '<feature_path>/EVENTS.jsonl'
-with open(path, 'a', encoding='utf-8') as f:
-    f.write(json.dumps(event) + chr(10))
-print('AGENT_DONE written')
+
+_written = False
+
+# Primary path: POST to HTTP endpoint
+try:
+    import urllib.request, urllib.error
+    body = json.dumps({
+        'type': event['type'],
+        'feature': '<feature>',
+        'project_root': str(pathlib.Path.cwd()),
+        'payload': event,
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        'http://127.0.0.1:8765/runner/event',
+        data=body,
+        headers={'Content-Type': 'application/json'},
+        method='POST',
+    )
+    with urllib.request.urlopen(req, timeout=3) as resp:
+        if resp.status == 200:
+            print('AGENT_DONE written via HTTP /runner/event')
+            _written = True
+except Exception:
+    pass  # server unreachable — fall through to local fallback
+
+# Fallback: write via eventlog (DB-primary, EVENTS.jsonl secondary)
+if not _written:
+    try:
+        from pathly_orchestrator.eventlog import append_event as _ae
+        _ae('pathly/plans/<feature>', event)
+        print('AGENT_DONE written to DB (fallback)')
+    except Exception as _exc:
+        path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a', encoding='utf-8') as _f:
+            _f.write(json.dumps(event) + chr(10))
+        print(f'AGENT_DONE written to EVENTS.jsonl (last resort: {_exc})')
+
+# Always dual-write to EVENTS.jsonl as backup
+path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+path.parent.mkdir(parents=True, exist_ok=True)
+with open(path, 'a', encoding='utf-8') as _f:
+    _f.write(json.dumps(event) + chr(10))
 "
 ```
 
@@ -279,9 +337,9 @@ pathly-fsm-call record-activity \
 ```
 
 Replace the UPPER_CASE placeholders with actual values:
-- `AGENT_ROLE` — e.g. `builder`, `reviewer`, `tester`
+- `AGENT_ROLE` — e.g. `builder`, `reviewer`, `tester`, `planner`
 - `MODEL_ID` — model used in this stage (e.g. `claude-sonnet-4-6`)
-- `CONV_N` — integer conversation number (0 for non-build stages)
+- `CONV_N` — integer conversation number (0 for non-build stages like plan/review/test)
 - `SUMMARY_SENTENCE` — one sentence: what was done and the outcome
 - `TOTAL_TOKENS`, `TOOL_USES`, `WALL_SECONDS` — from `<usage>` block or wall_seconds computation
 - `COST_USD` — computed in step 3
@@ -314,6 +372,27 @@ default scout entry, where one is defined).
 Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
 - `type: quick` → spawn `quick` with `ROLE: <stage agent>` + the question
 - `type: scout` → spawn `scout` with `ROLE: <stage agent>` + scope + question
+
+After each scout/quick returns, parse its `<usage>` block (`subagent_tokens`, `tool_uses`) and
+record it immediately — non-blocking, skip if server unavailable:
+
+```bash
+# For each scout that returned — replace placeholders with actual values from <usage> block
+# model is claude-haiku-4-5-20251001 for scout/quick agents
+pathly-fsm-call record-activity \
+  --agent "scout" \
+  --feature "<feature>" \
+  --summary "<question truncated to 80 chars>" \
+  --conversation N \
+  --model "claude-haiku-4-5-20251001" \
+  --total-tokens SCOUT_TOKENS \
+  --tool-uses SCOUT_TOOL_USES \
+  --wall-seconds 0 \
+  --cost-usd SCOUT_COST_USD
+```
+
+Compute `SCOUT_COST_USD` using haiku rates (input $0.80/MTok, output $4.00/MTok) with 80/20 split.
+Add each scout's `SCOUT_TOKENS` to the stage running total for the final AGENT_DONE.
 
 Compress all returned findings into a short summary and inject it into the Phase 3 work prompt
 as the stage's findings section.

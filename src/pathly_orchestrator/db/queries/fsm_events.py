@@ -7,6 +7,11 @@ import sqlite3
 from ..connection import _get_write_lock
 
 
+def _norm(project_root: str) -> str:
+    """Normalize path separators so Windows backslash and forward-slash paths hit the same row."""
+    return project_root.replace("\\", "/")
+
+
 def append_event(
     conn: sqlite3.Connection, project_root: str, feature: str, event_dict: dict
 ) -> int:
@@ -18,7 +23,7 @@ def append_event(
         cur = conn.execute(
             "INSERT INTO fsm_events (project_root, feature, ts, event_type, payload) "
             "VALUES (?, ?, ?, ?, ?)",
-            (project_root, feature, ts, event_type, payload),
+            (_norm(project_root), feature, ts, event_type, payload),
         )
         conn.commit()
         return cur.lastrowid or 0
@@ -31,7 +36,7 @@ def read_events(
     rows = conn.execute(
         "SELECT seq, payload FROM fsm_events "
         "WHERE project_root=? AND feature=? AND seq>? ORDER BY seq ASC",
-        (project_root, feature, since_seq),
+        (_norm(project_root), feature, since_seq),
     ).fetchall()
     result = []
     for row in rows:
@@ -49,7 +54,7 @@ def read_last_agent_done(
         "SELECT payload FROM fsm_events "
         "WHERE project_root=? AND feature=? AND event_type='AGENT_DONE' "
         "ORDER BY seq DESC LIMIT 1",
-        (project_root, feature),
+        (_norm(project_root), feature),
     ).fetchone()
     if row is None:
         return None

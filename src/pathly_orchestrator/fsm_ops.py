@@ -18,7 +18,6 @@ from pathly_orchestrator.fsm import (
     route_feedback,
     run_gates,
     run_transition_actions,
-    write_state,
 )
 
 _AGENT_GROUPS = {
@@ -563,7 +562,8 @@ def next_action(args: dict) -> dict:
             )
 
     if needs_write:
-        write_state(storage_path, state_info["current_state"], stamped_state)
+        from pathly_orchestrator import eventlog as _elog_ws
+        _elog_ws.write_state(str(storage_path), {**stamped_state, "current": state_info["current_state"]}, flow_config)
         prior_state = stamped_state
 
     # Apply per-feature stage config override if present
@@ -763,7 +763,8 @@ def complete_stage(args: dict) -> dict:
     # Clear per-conversation baselines so the next conversation gets fresh snapshots.
     prior_state.pop("conv_start_sha", None)
     prior_state.pop("build_baseline", None)
-    write_state(storage_path, next_state, prior_state)
+    from pathly_orchestrator import eventlog as _elog_ws
+    _elog_ws.write_state(str(storage_path), {**prior_state, "current": next_state}, flow_config)
 
     append_event(
         storage_path,

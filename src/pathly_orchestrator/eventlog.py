@@ -42,10 +42,9 @@ _TOAST_EVENTS: dict[str, tuple[str, object]] = {
 }
 
 
-def _db_only() -> bool:
-    """DB-only mode is on by default. Set PATHLY_DB_ONLY=0 to re-enable file fallbacks."""
-    val = os.environ.get("PATHLY_DB_ONLY", "1").strip().lower()
-    return val not in ("0", "false", "no")
+def _norm_root(path: "str | Path") -> str:
+    """Normalize project_root to forward slashes so Windows and HTTP paths match in SQLite."""
+    return str(path).replace("\\", "/")
 
 
 def _plans_dir() -> Path:
@@ -85,7 +84,7 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
     feature_dir.mkdir(parents=True, exist_ok=True)
     conn = _db.get_db()
     feature = feature_dir.name
-    project_root = str(feature_dir.parent.parent.parent)
+    project_root = _norm_root(feature_dir.parent.parent.parent)
     _db.append_event(conn, project_root, feature, event)
 
     try:
@@ -117,11 +116,9 @@ def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:
     if "updated_at" not in state:
         state["updated_at"] = _now()
     conn = _db.get_db()
-    project_root = str(feature_dir.parent.parent.parent)
+    project_root = _norm_root(feature_dir.parent.parent.parent)
     _db.write_state(conn, project_root, feature, state)
-    if _db_only():
-        return  # DB-only mode: skip STATE.json file write
-    # Also write STATE.json as a human-readable snapshot (agents and tools read it directly)
+    # Always write STATE.json — agents and the scope gate read it directly.
     path = feature_dir / "STATE.json"
     tmp_path = path.with_suffix(".tmp")
     try:
@@ -171,7 +168,7 @@ write_state.__wrapped__ = _write_state_db  # type: ignore[attr-defined]
 
 def read_events(storage_path: str) -> list[dict]:
     feature_dir = _resolve_path(storage_path).resolve()
-    project_root = str(feature_dir.parent.parent.parent)
+    project_root = _norm_root(feature_dir.parent.parent.parent)
     conn = _db.get_db()
     events = _db.read_events(conn, project_root, feature_dir.name)
     for event in events:
@@ -194,7 +191,7 @@ def read_events(storage_path: str) -> list[dict]:
 
 def read_state(storage_path: str) -> dict | None:
     feature_dir = _resolve_path(storage_path).resolve()
-    project_root = str(feature_dir.parent.parent.parent)
+    project_root = _norm_root(feature_dir.parent.parent.parent)
     conn = _db.get_db()
     return _db.read_state(conn, project_root, feature_dir.name)
 
