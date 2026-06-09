@@ -52,6 +52,7 @@ feedback_routing:
   ARCH_FEEDBACK: architect
   DESIGN_QUESTIONS: architect
   IMPL_QUESTIONS: planner
+  REFLECT_CRITIQUE: builder
   REVIEW_FAILURES: builder
   SCOPE_VIOLATION: builder
   TEST_FAILURES: builder
