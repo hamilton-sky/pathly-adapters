@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useStore } from '../../../store'
 import { usePlanFiles } from '../../../hooks/usePlanFiles'
 import { watchStart, readFile, onWatchEvent } from '../../../services/pathlyApi'
 import { getFlowYamlName, extractTopic, mergeBillingUpdate } from '../utils'
 import type { FsmEvent } from '../../../types/index'
 
-export function useMonitorSession(): { effectiveTopic: string | null; showTabBar: boolean } {
+export function useMonitorSession(): { effectiveTopic: string | null; showTabBar: boolean; refresh: () => void } {
   const {
     projectPath,
     activeTopic,
@@ -228,5 +228,35 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
     }
   }, [effectiveTopic, projectPath, setMonitorSource, setFsmState, setEvents, setPipelineStates, setActiveFlowSessions, activeTopic, setActiveMonitorTab])
 
-  return { effectiveTopic, showTabBar }
+  const effectiveTopicRef = useRef(effectiveTopic)
+  effectiveTopicRef.current = effectiveTopic
+  const projectPathRef = useRef(projectPath)
+  projectPathRef.current = projectPath
+
+  const refresh = useCallback(() => {
+    const topic = effectiveTopicRef.current
+    const path = projectPathRef.current
+    if (!topic || !path) return
+
+    const roots = [
+      `${path}/pathly/plans/${topic}`,
+      `${path}/pathly/debugs/${topic}`,
+      `${path}/pathly/explorations/${topic}`,
+    ]
+    Promise.any(roots.map((r) => readFile(`${r}/STATE.json`).then((c) => ({ content: c }))))
+      .then(({ content }) => {
+        if (!content) return
+        try { setFsmState(JSON.parse(content)) } catch { /* ignore */ }
+      })
+      .catch(() => { /* topic not found */ })
+
+    const port = 8765
+    const histParams = new URLSearchParams({ topic, project_root: path })
+    fetch(`http://127.0.0.1:${port}/events/history?${histParams}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: FsmEvent[]) => { if (data.length > 0) setEvents(data) })
+      .catch(() => { /* server not running */ })
+  }, [setFsmState, setEvents])
+
+  return { effectiveTopic, showTabBar, refresh }
 }

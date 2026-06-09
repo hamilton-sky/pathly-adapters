@@ -59,6 +59,20 @@
 .badgeSyncing { color: var(--yellow); }
 .badgeOffline { color: var(--red); }
 
+.refreshBtn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 6px;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.refreshBtn:hover { color: var(--text-primary); border-color: var(--accent-border); }
+
 .headerMeta {
   font-size: 11px;
   font-family: system-ui, -apple-system, sans-serif;

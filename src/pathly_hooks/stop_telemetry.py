@@ -19,6 +19,10 @@ import time
 from pathlib import Path
 
 
+def _norm(p: str) -> str:
+    return p.replace("\\", "/")
+
+
 def _find_active_feature_dir_db(project_root: str) -> Path | None:
     """Find the feature dir with the most recent event in the SQLite DB."""
     try:
@@ -26,7 +30,7 @@ def _find_active_feature_dir_db(project_root: str) -> Path | None:
         conn = _get_db()
         row = conn.execute(
             "SELECT feature FROM fsm_events WHERE project_root=? ORDER BY seq DESC LIMIT 1",
-            (project_root,),
+            (_norm(project_root),),
         ).fetchone()
         if row:
             feature = row["feature"] if hasattr(row, "keys") else row[0]
@@ -111,7 +115,7 @@ def _write_billing_update_db(
     try:
         from pathly_orchestrator.db import get_db as _get_db, append_event as _db_ae
         conn = _get_db()
-        project_root = str(feature_dir.parent.parent.parent)
+        project_root = _norm(str(feature_dir.parent.parent.parent))
         feature = feature_dir.name
         # Find last AGENT_DONE for agent/conv labelling
         last = conn.execute(
@@ -168,7 +172,7 @@ def main() -> None:
     if tokens_in == 0 and cost_usd == 0.0:
         sys.exit(0)
 
-    project_root = os.environ.get("PATHLY_PROJECT_ROOT", "")
+    project_root = _norm(os.environ.get("PATHLY_PROJECT_ROOT", ""))
     if not project_root:
         sys.exit(0)
 

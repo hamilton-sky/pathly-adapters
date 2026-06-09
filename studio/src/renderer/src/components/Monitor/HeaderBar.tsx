@@ -17,9 +17,10 @@ const LIVE_BADGE_CSS = `
 
 interface Props {
   effectiveTopic: string | null
+  onRefresh: () => void
 }
 
-export function HeaderBar({ effectiveTopic }: Props): JSX.Element {
+export function HeaderBar({ effectiveTopic, onRefresh }: Props): JSX.Element {
   const { fsmState, monitorSource } = useStore()
   useInjectCSS(LIVE_BADGE_CSS)
 
@@ -66,6 +67,14 @@ export function HeaderBar({ effectiveTopic }: Props): JSX.Element {
           <span className={badgeDotClass} aria-hidden="true">{badgeDot}</span>
           <span aria-hidden="true">{badgeLabel}</span>
         </span>
+        <button
+          type="button"
+          className={styles.refreshBtn}
+          onClick={onRefresh}
+          aria-label="Refresh monitor state"
+        >
+          ↻
+        </button>
       </div>
     </div>
   )

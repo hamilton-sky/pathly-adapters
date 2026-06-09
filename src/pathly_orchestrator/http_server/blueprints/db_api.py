@@ -24,10 +24,11 @@ def _get_db():
 
 
 def _project_root_param() -> str:
-    return (
+    raw = (
         request.args.get("project_root", "")
         or os.environ.get("PATHLY_PROJECT_ROOT", "")
     )
+    return raw.replace("\\", "/")
 
 
 def _parse_json_file(path: Path) -> dict:

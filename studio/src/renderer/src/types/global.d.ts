@@ -170,8 +170,8 @@ declare global {
         onToken: (cb: (payload: BrightskyTokenPayload | BrightskyAuthError) => void) => () => void
       }
       db: {
-        stats: () => Promise<DbStats | null>
-        features: () => Promise<DbFeature[]>
+        stats: (projectRoot?: string) => Promise<DbStats | null>
+        features: (projectRoot?: string) => Promise<DbFeature[]>
         events: (feature: string, projectRoot?: string) => Promise<DbEvent[]>
         agents: (feature: string, projectRoot?: string) => Promise<DbAgent[]>
         otel: (feature: string, projectRoot?: string) => Promise<DbOtelSpan[]>

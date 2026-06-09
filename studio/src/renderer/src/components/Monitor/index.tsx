@@ -14,7 +14,7 @@ import styles from './Monitor.module.css'
 
 export function Monitor(): JSX.Element {
   const { activeTopic, activeFlowSessions, activeMonitorTab, setActiveMonitorTab } = useStore()
-  const { effectiveTopic, showTabBar } = useMonitorSession()
+  const { effectiveTopic, showTabBar, refresh } = useMonitorSession()
   const [viewTab, setViewTab] = useState<'events' | 'output'>('events')
   const [configStage, setConfigStage] = useState<string | null>(null)
 
@@ -35,7 +35,7 @@ export function Monitor(): JSX.Element {
           onTabSelect={setActiveMonitorTab}
         />
       )}
-      <HeaderBar effectiveTopic={effectiveTopic} />
+      <HeaderBar effectiveTopic={effectiveTopic} onRefresh={refresh} />
       <PlanProgressSection topic={effectiveTopic} />
       <HealthCheck />
       <FsmView onStageClick={(stage) => setConfigStage(stage)} />

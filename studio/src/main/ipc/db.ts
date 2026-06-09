@@ -33,12 +33,14 @@ async function fsmPut(path: string, body: unknown): Promise<unknown> {
 }
 
 export function registerDbHandlers(): void {
-  ipcMain.handle('db:stats', async () => {
-    try { return await fsmGet(`/db/stats?project_root=${_PR}`) } catch { return null }
+  ipcMain.handle('db:stats', async (_e, projectRoot?: string) => {
+    const pr = projectRoot ? encodeURIComponent(projectRoot) : _PR
+    try { return await fsmGet(`/db/stats?project_root=${pr}`) } catch { return null }
   })
 
-  ipcMain.handle('db:features', async () => {
-    try { return await fsmGet(`/db/features?project_root=${_PR}`) } catch { return [] }
+  ipcMain.handle('db:features', async (_e, projectRoot?: string) => {
+    const pr = projectRoot ? encodeURIComponent(projectRoot) : _PR
+    try { return await fsmGet(`/db/features?project_root=${pr}`) } catch { return [] }
   })
 
   ipcMain.handle('db:events', async (_e, feature: string, projectRoot?: string) => {

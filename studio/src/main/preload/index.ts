@@ -241,8 +241,8 @@ contextBridge.exposeInMainWorld('pathly', {
     },
   },
   db: {
-    stats: (): Promise<DbStats | null> => ipcRenderer.invoke('db:stats'),
-    features: (): Promise<DbFeature[]> => ipcRenderer.invoke('db:features'),
+    stats: (projectRoot?: string): Promise<DbStats | null> => ipcRenderer.invoke('db:stats', projectRoot),
+    features: (projectRoot?: string): Promise<DbFeature[]> => ipcRenderer.invoke('db:features', projectRoot),
     events: (feature: string, projectRoot?: string): Promise<DbEvent[]> =>
       ipcRenderer.invoke('db:events', feature, projectRoot),
     agents: (feature: string, projectRoot?: string): Promise<DbAgent[]> =>

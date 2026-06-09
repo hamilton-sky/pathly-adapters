@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useProjectStore } from '../../store/projectStore'
 import type { FeatureData } from './dbExplorerData'
 import { StatsStrip } from './StatsStrip'
 import { FeatureGrid } from './FeatureGrid'
@@ -38,6 +39,7 @@ function mapState(s: string): FeatureData['state'] {
 }
 
 export function DBExplorer(): JSX.Element {
+  const projectPath = useProjectStore((s) => s.projectPath)
   const [features, setFeatures] = useState<FeatureData[]>([])
   const [stats, setStats] = useState<DbStats | null>(null)
   const [modalFeature, setModalFeature] = useState<FeatureData | null>(null)
@@ -48,8 +50,8 @@ export function DBExplorer(): JSX.Element {
     setLoading(true)
     try {
       const [rawFeatures, rawStats] = await Promise.all([
-        window.pathly.db.features(),
-        window.pathly.db.stats(),
+        window.pathly.db.features(projectPath || undefined),
+        window.pathly.db.stats(projectPath || undefined),
       ])
       setFeatures(rawFeatures.map(dbFeatureToFeatureData))
       setStats(rawStats)
@@ -58,7 +60,7 @@ export function DBExplorer(): JSX.Element {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [projectPath])
 
   useEffect(() => { load() }, [load])
 
