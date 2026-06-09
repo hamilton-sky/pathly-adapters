@@ -138,7 +138,7 @@ export function VisualViewInner({ data, onChange, onSave, tab, onTabClick }: Pro
         source: `__comment__${c.id}`,
         sourceHandle: 'attach-src',
         target: c.attachedTo as string,
-        targetHandle: null,
+        targetHandle: 'top-tgt',
         type: 'straight',
         style: { stroke: 'rgba(150,150,160,0.4)', strokeDasharray: '5 4', strokeWidth: 1.5 },
         markerEnd: undefined,

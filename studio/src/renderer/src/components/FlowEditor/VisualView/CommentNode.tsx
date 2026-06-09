@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { NodeProps } from 'reactflow'
 import { Handle, Position } from 'reactflow'
-import { StickyNote, MessageSquare } from 'lucide-react'
+import { FileText, MessageCircle, Trash2 } from 'lucide-react'
 import type { CommentEntry, CommentColor, CommentShape } from '../../../types'
+import { Tooltip } from '../../ui'
 import styles from './CommentNode.module.css'
 
 interface CommentNodeData extends CommentEntry {
@@ -48,26 +49,29 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
       style={{ '--cbg': COLOR_BG[data.color], '--cborder': COLOR_BORDER[data.color], '--ctext': COLOR_TEXT[data.color] } as React.CSSProperties}
     >
       <div className={styles.toolbar}>
-        <button
-          type="button"
-          className={styles.shapeBtn}
-          onClick={toggleShape}
-          aria-label={data.shape === 'sticky' ? 'Switch to speech bubble' : 'Switch to sticky note'}
-        >
-          {data.shape === 'sticky' ? <StickyNote size={12} /> : <MessageSquare size={12} />}
-        </button>
+        <Tooltip label={data.shape === 'sticky' ? 'Switch to speech bubble' : 'Switch to sticky note'} placement="top">
+          <button
+            type="button"
+            className={styles.shapeBtn}
+            onClick={toggleShape}
+            aria-label={data.shape === 'sticky' ? 'Switch to speech bubble' : 'Switch to sticky note'}
+          >
+            {data.shape === 'sticky' ? <FileText size={13} /> : <MessageCircle size={13} />}
+          </button>
+        </Tooltip>
 
         <div className={styles.swatches}>
           {ALL_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={[styles.swatch, data.color === c ? styles.swatchActive : ''].filter(Boolean).join(' ')}
-              style={{ '--swatch-color': SWATCH_COLORS[c] } as React.CSSProperties}
-              onClick={() => data.onUpdate(data.id, { color: c })}
-              aria-label={`Set color ${c}`}
-              aria-pressed={data.color === c}
-            />
+            <Tooltip key={c} label={c} placement="top">
+              <button
+                type="button"
+                className={[styles.swatch, data.color === c ? styles.swatchActive : ''].filter(Boolean).join(' ')}
+                style={{ '--swatch-color': SWATCH_COLORS[c] } as React.CSSProperties}
+                onClick={() => data.onUpdate(data.id, { color: c })}
+                aria-label={`Set color ${c}`}
+                aria-pressed={data.color === c}
+              />
+            </Tooltip>
           ))}
         </div>
 
@@ -77,7 +81,7 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
             value={data.attachedTo ?? ''}
             onChange={(e) => data.onUpdate(data.id, { attachedTo: e.target.value || undefined })}
             aria-label="Link to state"
-            title="Attach to state"
+            title="Attach to state node"
           >
             <option value="">— link —</option>
             {(data.states ?? []).map((s) => (
@@ -86,14 +90,16 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
           </select>
         )}
 
-        <button
-          type="button"
-          className={styles.deleteBtn}
-          onClick={() => data.onDelete(data.id)}
-          aria-label="Delete comment"
-        >
-          ×
-        </button>
+        <Tooltip label="Delete note" placement="top">
+          <button
+            type="button"
+            className={styles.deleteBtn}
+            onClick={() => data.onDelete(data.id)}
+            aria-label="Delete comment"
+          >
+            <Trash2 size={12} />
+          </button>
+        </Tooltip>
       </div>
 
       {editing ? (

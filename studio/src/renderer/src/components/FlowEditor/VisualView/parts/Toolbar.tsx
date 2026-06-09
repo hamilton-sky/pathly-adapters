@@ -1,6 +1,6 @@
 import type { FlowExportTarget, CommentShape } from '../../../../types'
 import { Tooltip } from '../../../ui'
-import { StickyNote, MessageSquare } from 'lucide-react'
+import { FileText, MessageCircle } from 'lucide-react'
 import { ExportControls } from './ExportControls'
 import styles from './Toolbar.module.css'
 
@@ -51,14 +51,14 @@ export function Toolbar({
       </Tooltip>
 
       <div className={styles.divider} />
-      <Tooltip label="Add sticky note to canvas" placement="bottom">
-        <button type="button" className={styles.noteBtn} onClick={() => onAddNote('sticky')} aria-label="Add sticky note">
-          <StickyNote size={13} />
+      <Tooltip label="Add text note to canvas" placement="bottom">
+        <button type="button" className={styles.noteBtn} onClick={() => onAddNote('sticky')} aria-label="Add text note">
+          <FileText size={13} />
         </button>
       </Tooltip>
       <Tooltip label="Add speech bubble to canvas" placement="bottom">
         <button type="button" className={styles.noteBtn} onClick={() => onAddNote('bubble')} aria-label="Add speech bubble">
-          <MessageSquare size={13} />
+          <MessageCircle size={13} />
         </button>
       </Tooltip>
 
