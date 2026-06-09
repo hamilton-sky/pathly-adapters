@@ -130,29 +130,54 @@ def db_features():
         conn = _get_db()
 
         # DB-backed features — skip rows with corrupt state_json
+        pr_filter = project_root  # None → all projects; set → scoped to one project
         states: dict[tuple[str, str], dict] = {}
-        for r in conn.execute("SELECT project_root, feature, state_json FROM fsm_state").fetchall():
+        if pr_filter:
+            state_rows = conn.execute(
+                "SELECT project_root, feature, state_json FROM fsm_state WHERE project_root=?",
+                [pr_filter],
+            ).fetchall()
+        else:
+            state_rows = conn.execute("SELECT project_root, feature, state_json FROM fsm_state").fetchall()
+        for r in state_rows:
             try:
                 states[(r["project_root"], r["feature"])] = json.loads(r["state_json"])
             except (json.JSONDecodeError, TypeError):
                 states[(r["project_root"], r["feature"])] = {}
-        event_counts = {
-            (r["project_root"], r["feature"]): r["cnt"]
-            for r in conn.execute(
+        if pr_filter:
+            event_count_rows = conn.execute(
+                "SELECT project_root, feature, COUNT(*) as cnt FROM fsm_events"
+                " WHERE project_root=? GROUP BY project_root, feature",
+                [pr_filter],
+            ).fetchall()
+        else:
+            event_count_rows = conn.execute(
                 "SELECT project_root, feature, COUNT(*) as cnt FROM fsm_events GROUP BY project_root, feature"
             ).fetchall()
-        }
+        event_counts = {(r["project_root"], r["feature"]): r["cnt"] for r in event_count_rows}
         # Tokens from AGENT_DONE only; cost from AGENT_DONE (where >0) + BILLING_UPDATE.
         # BILLING_UPDATE supersedes zero-cost AGENT_DONE rows — no double-counting.
-        inv_rows = conn.execute(
-            "SELECT project_root, feature, "
-            "COUNT(CASE WHEN event_type='AGENT_DONE' THEN 1 END) as inv, "
-            "COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
-            "  THEN CAST(json_extract(payload,'$.total_tokens') AS INT) ELSE 0 END),0) as total_tokens, "
-            "COALESCE(SUM(CAST(json_extract(payload,'$.cost_usd') AS REAL)),0) as total_cost "
-            "FROM fsm_events WHERE event_type IN ('AGENT_DONE','BILLING_UPDATE') "
-            "GROUP BY project_root, feature"
-        ).fetchall()
+        if pr_filter:
+            inv_rows = conn.execute(
+                "SELECT project_root, feature, "
+                "COUNT(CASE WHEN event_type='AGENT_DONE' THEN 1 END) as inv, "
+                "COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
+                "  THEN CAST(json_extract(payload,'$.total_tokens') AS INT) ELSE 0 END),0) as total_tokens, "
+                "COALESCE(SUM(CAST(json_extract(payload,'$.cost_usd') AS REAL)),0) as total_cost "
+                "FROM fsm_events WHERE event_type IN ('AGENT_DONE','BILLING_UPDATE') AND project_root=? "
+                "GROUP BY project_root, feature",
+                [pr_filter],
+            ).fetchall()
+        else:
+            inv_rows = conn.execute(
+                "SELECT project_root, feature, "
+                "COUNT(CASE WHEN event_type='AGENT_DONE' THEN 1 END) as inv, "
+                "COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
+                "  THEN CAST(json_extract(payload,'$.total_tokens') AS INT) ELSE 0 END),0) as total_tokens, "
+                "COALESCE(SUM(CAST(json_extract(payload,'$.cost_usd') AS REAL)),0) as total_cost "
+                "FROM fsm_events WHERE event_type IN ('AGENT_DONE','BILLING_UPDATE') "
+                "GROUP BY project_root, feature"
+            ).fetchall()
         inv_stats = {(r["project_root"], r["feature"]): dict(r) for r in inv_rows}
 
         # Only show features that have a real FSM-state entry — drop event-only phantoms
