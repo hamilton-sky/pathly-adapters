@@ -95,5 +95,10 @@ export function useComments(filePath: string | null) {
     })
   }, [persist])
 
-  return { comments, add, edit, resolve, reopen, remove }
+  const clearAll = useCallback(() => {
+    setComments([])
+    persist([])
+  }, [persist])
+
+  return { comments, add, edit, resolve, reopen, remove, clearAll }
 }

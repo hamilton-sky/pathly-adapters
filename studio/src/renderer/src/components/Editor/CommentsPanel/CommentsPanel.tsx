@@ -1,5 +1,6 @@
 import React from 'react'
-import { SendHorizonal, Eye, EyeOff, ChevronRight } from 'lucide-react'
+import { SendHorizonal, Eye, EyeOff, ChevronRight, Trash2 } from 'lucide-react'
+import { Tooltip } from '../../ui'
 import { useTerminalStore } from '../../../store/terminalStore'
 import type { Comment } from '../useComments'
 import { buildSendPrompt, getSpawnCwd } from '../commentUtils'
@@ -14,6 +15,7 @@ interface Props {
   orphanedIds: Set<string>
   onToggleHighlights: () => void
   onCollapse: () => void
+  onClearAll: () => void
   onResolve: (id: string) => void
   onReopen: (id: string) => void
   onRemove: (id: string) => void
@@ -22,7 +24,7 @@ interface Props {
 }
 
 export function CommentsPanel({
-  filePath, body, comments, showHighlights, orphanedIds, onToggleHighlights, onCollapse, onResolve, onReopen, onRemove, onEdit, onScrollTo,
+  filePath, body, comments, showHighlights, orphanedIds, onToggleHighlights, onCollapse, onClearAll, onResolve, onReopen, onRemove, onEdit, onScrollTo,
 }: Props): JSX.Element {
   const addTab = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
@@ -52,23 +54,37 @@ export function CommentsPanel({
           {unresolved.length > 0 && <span className={styles.badge}>{unresolved.length}</span>}
         </span>
         <div className={styles.headerBtns}>
-          <button
-            type="button"
-            className={styles.toggleBtn}
-            onClick={onToggleHighlights}
-            title={showHighlights ? 'Hide highlights in preview' : 'Show highlights in preview'}
-            aria-label={showHighlights ? 'Hide highlights' : 'Show highlights'}
-          >
-            {showHighlights ? <Eye size={13} /> : <EyeOff size={13} />}
-          </button>
-          <button
-            type="button"
-            className={styles.toggleBtn}
-            onClick={onCollapse}
-            aria-label="Hide comments panel"
-          >
-            <ChevronRight size={13} />
-          </button>
+          <Tooltip label={showHighlights ? 'Hide highlights' : 'Show highlights'} placement="bottom">
+            <button
+              type="button"
+              className={styles.toggleBtn}
+              onClick={onToggleHighlights}
+              aria-label={showHighlights ? 'Hide highlights in preview' : 'Show highlights in preview'}
+            >
+              {showHighlights ? <Eye size={13} /> : <EyeOff size={13} />}
+            </button>
+          </Tooltip>
+          <Tooltip label="Clear all comments" placement="bottom">
+            <button
+              type="button"
+              className={`${styles.toggleBtn} ${styles.clearBtn}`}
+              onClick={onClearAll}
+              disabled={comments.length === 0}
+              aria-label="Clear all comments"
+            >
+              <Trash2 size={13} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Collapse panel" placement="bottom">
+            <button
+              type="button"
+              className={styles.toggleBtn}
+              onClick={onCollapse}
+              aria-label="Hide comments panel"
+            >
+              <ChevronRight size={13} />
+            </button>
+          </Tooltip>
         </div>
       </div>
 

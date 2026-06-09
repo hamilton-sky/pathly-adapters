@@ -93,7 +93,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   const isSkillOrAgent = derivedType === 'skill' || derivedType === 'agent'
   const isPreviewDefault = isSkillOrAgent || derivedType === 'template'
 
-  const { comments, add: addComment, edit: editComment, resolve: resolveComment, reopen: reopenComment, remove: removeComment } = useComments(effectivePath)
+  const { comments, add: addComment, edit: editComment, resolve: resolveComment, reopen: reopenComment, remove: removeComment, clearAll: clearAllComments } = useComments(effectivePath)
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
   const [anchorPos, setAnchorPos]         = useState<{ x: number; y: number } | null>(null)
   const [modalOpen, setModalOpen]         = useState(false)
@@ -320,6 +320,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
                     orphanedIds={orphanedIds}
                     onToggleHighlights={() => setShowHighlights((v) => !v)}
                     onCollapse={() => setShowPanel(false)}
+                    onClearAll={clearAllComments}
                     onResolve={resolveComment}
                     onReopen={reopenComment}
                     onRemove={removeComment}

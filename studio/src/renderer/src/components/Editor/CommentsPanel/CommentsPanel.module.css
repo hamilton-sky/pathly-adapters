@@ -58,6 +58,12 @@
 }
 .toggleBtn:hover { color: var(--accent); background: var(--bg-surface0); }
 .toggleBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.toggleBtn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+
+.clearBtn:hover {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, var(--bg-surface0));
+}
 
 .list {
   flex: 1;
