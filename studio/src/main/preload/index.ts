@@ -161,6 +161,8 @@ contextBridge.exposeInMainWorld('pathly', {
   },
   setup: {
     isNeeded: (): Promise<boolean> => ipcRenderer.invoke('setup:isNeeded'),
+    info: (): Promise<{ isNeeded: boolean; isUpgrade: boolean; fromVersion: string | null; toVersion: string }> =>
+      ipcRenderer.invoke('setup:info'),
     run: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('setup:run'),
     onProgress: (cb: (msg: string) => void): (() => void) => {
       const listener = (_e: Electron.IpcRendererEvent, msg: string): void => cb(msg)

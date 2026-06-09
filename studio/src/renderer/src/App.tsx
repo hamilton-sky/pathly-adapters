@@ -106,15 +106,21 @@ function MainApp(): JSX.Element | null {
   const chatOpen = useUiStore((s) => s.chatOpen)
 
   const [setupDone, setSetupDone] = useState<boolean | null>(null)
+  const [setupIsUpgrade, setSetupIsUpgrade] = useState(false)
+  const [setupFromVersion, setSetupFromVersion] = useState<string | null>(null)
+  const [setupToVersion, setSetupToVersion] = useState<string>('')
 
   useEffect(() => {
     const setupApi = window.pathly?.setup
-    if (!setupApi?.isNeeded) {
+    if (!setupApi?.info) {
       setSetupDone(true)
       return
     }
-    setupApi.isNeeded().then((needed: boolean) => {
-      setSetupDone(!needed)
+    setupApi.info().then((info) => {
+      setSetupDone(!info.isNeeded)
+      setSetupIsUpgrade(info.isUpgrade)
+      setSetupFromVersion(info.fromVersion)
+      setSetupToVersion(info.toVersion)
     }).catch(() => setSetupDone(true))
   }, [])
 
@@ -218,7 +224,14 @@ function MainApp(): JSX.Element | null {
   if (setupDone === null) return null
 
   if (!setupDone) {
-    return <SetupScreen onComplete={() => setSetupDone(true)} />
+    return (
+      <SetupScreen
+        onComplete={() => setSetupDone(true)}
+        isUpgrade={setupIsUpgrade}
+        fromVersion={setupFromVersion}
+        toVersion={setupToVersion}
+      />
+    )
   }
 
   if (projectPath === '') {

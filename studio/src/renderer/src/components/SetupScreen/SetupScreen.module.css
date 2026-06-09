@@ -21,6 +21,12 @@
 
 .header {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.headerRow {
+  display: flex;
   align-items: center;
   gap: 12px;
 }
@@ -30,6 +36,12 @@
   font-size: 20px;
   font-weight: 600;
   color: #cdd6f4;
+}
+
+.subheading {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: #6c7086;
 }
 
 .spinner {

@@ -124,6 +124,7 @@ declare global {
       }
       setup: {
         isNeeded: () => Promise<boolean>
+        info: () => Promise<{ isNeeded: boolean; isUpgrade: boolean; fromVersion: string | null; toVersion: string }>
         run: () => Promise<{ ok: boolean; error?: string }>
         onProgress: (cb: (msg: string) => void) => () => void
       }

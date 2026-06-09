@@ -3,9 +3,12 @@ import s from './SetupScreen.module.css'
 
 interface Props {
   onComplete: () => void
+  isUpgrade?: boolean
+  fromVersion?: string | null
+  toVersion?: string
 }
 
-export function SetupScreen({ onComplete }: Props): JSX.Element {
+export function SetupScreen({ onComplete, isUpgrade, fromVersion, toVersion }: Props): JSX.Element {
   const [lines, setLines] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
@@ -43,8 +46,15 @@ export function SetupScreen({ onComplete }: Props): JSX.Element {
     <div className={s.root}>
       <div className={s.card}>
         <div className={s.header}>
-          {!error && <div className={s.spinner} />}
-          <h1 className={s.heading}>Setting up Pathly</h1>
+          <div className={s.headerRow}>
+            {!error && <div className={s.spinner} />}
+            <h1 className={s.heading}>
+              {isUpgrade ? `Updating Pathly to v${toVersion}` : 'Setting up Pathly'}
+            </h1>
+          </div>
+          {isUpgrade && fromVersion && (
+            <p className={s.subheading}>Refreshing your agents and skills from v{fromVersion}.</p>
+          )}
         </div>
 
         <div ref={logRef} className={s.log}>
