@@ -310,6 +310,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
           onAdd={handleModalAdd}
           onSendNow={(b) => void handleModalSendNow(b)}
           onClose={() => setModalOpen(false)}
+          onCancel={() => { setModalOpen(false); setPendingAnchor(null); setAnchorPos(null) }}
         />
       )}
     </div>

@@ -8,10 +8,11 @@ interface Props {
   y: number
   onAdd: (body: string) => void
   onSendNow: (body: string) => void
-  onClose: () => void
+  onClose: () => void   // click outside — keeps anchor/highlight
+  onCancel: () => void  // X button — clears anchor, no highlight
 }
 
-export function CommentModal({ anchorText, x, y, onAdd, onSendNow, onClose }: Props): JSX.Element {
+export function CommentModal({ anchorText, x, y, onAdd, onSendNow, onClose, onCancel }: Props): JSX.Element {
   const [body, setBody] = useState('')
   const canSubmit = body.trim().length > 0
   const ref = useRef<HTMLDivElement>(null)
@@ -43,7 +44,7 @@ export function CommentModal({ anchorText, x, y, onAdd, onSendNow, onClose }: Pr
     <div ref={ref} className={styles.modal} onMouseDown={(e) => e.stopPropagation()}>
       <div className={styles.header}>
         <span className={styles.title}>Comment</span>
-        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
+        <button type="button" className={styles.closeBtn} onClick={onCancel} aria-label="Close">
           <X size={14} />
         </button>
       </div>

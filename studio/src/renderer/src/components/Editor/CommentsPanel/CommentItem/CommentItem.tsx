@@ -62,24 +62,28 @@ export function CommentItem({ comment, onResolve, onRemove, onEdit }: Props): JS
         <p className={styles.body}>{comment.body}</p>
       )}
 
-      {!comment.resolved && !editing && (
+      {!editing && (
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.resolveBtn}
-            onClick={() => onResolve(comment.id)}
-            aria-label="Resolve comment"
-          >
-            <Check size={11} /> Resolve
-          </button>
-          <button
-            type="button"
-            className={styles.editBtn}
-            onClick={() => { setDraft(comment.body); setEditing(true) }}
-            aria-label="Edit comment"
-          >
-            <Pencil size={11} />
-          </button>
+          {!comment.resolved && (
+            <>
+              <button
+                type="button"
+                className={styles.resolveBtn}
+                onClick={() => onResolve(comment.id)}
+                aria-label="Resolve comment"
+              >
+                <Check size={11} /> Resolve
+              </button>
+              <button
+                type="button"
+                className={styles.editBtn}
+                onClick={() => { setDraft(comment.body); setEditing(true) }}
+                aria-label="Edit comment"
+              >
+                <Pencil size={11} />
+              </button>
+            </>
+          )}
           <button
             type="button"
             className={styles.removeBtn}
