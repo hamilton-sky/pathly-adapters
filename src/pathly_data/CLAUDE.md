@@ -100,10 +100,19 @@ adapter_map:
 The right way to do this:
 
 ```bash
-# After editing any core file:
+# After editing any core file for the FIRST TIME (new installs):
 pathly-setup claude --apply    # syncs to ~/.claude/ and regenerates claude adapter
-python -m build                # rebuilds the package (all adapters)
+
+# After editing a core file that is ALREADY INSTALLED (updates fragments, skill bodies, agents):
+pathly-setup claude --apply --repair   # --repair overwrites existing Pathly-owned files
+
+# Rebuild all adapters (codex, copilot) from core:
+python -m build
 ```
+
+> **Why `--repair`?** `--apply` alone skips files already tracked in the manifest. Use `--repair`
+> every time you update an existing core agent, skill, or fragment — otherwise installed files
+> stay stale and the changes never reach the running agent.
 
 If you manually edit `_meta/` files in one adapter, you **must** make the same change in the other two, or run the build step above. Never patch one adapter and leave the others stale.
 

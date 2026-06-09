@@ -79,3 +79,20 @@
   word-break: break-word;
   line-height: 1.5;
 }
+
+/* ── Diff tab ────────────────────────────────────────────────── */
+.diffSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diffHeading {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-transform: uppercase;
+}

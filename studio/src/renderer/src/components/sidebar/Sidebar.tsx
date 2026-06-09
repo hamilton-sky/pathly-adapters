@@ -493,6 +493,42 @@ export function Sidebar(): JSX.Element | null {
     })
   }
 
+  async function moveCatalogItem(item: CatalogItemData, type: CatalogGroup['type'], newCategory: string): Promise<void> {
+    const res = await fetch('http://localhost:8765/catalog/item/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, name: item.name, newCategory }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string }
+      throw new Error(body.error ?? `Move failed (${res.status})`)
+    }
+  }
+
+  async function renameCatalogItem(item: CatalogItemData, type: CatalogGroup['type'], newStem: string): Promise<void> {
+    const res = await fetch('http://localhost:8765/catalog/item/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, name: item.name, newStem }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string }
+      throw new Error(body.error ?? `Rename failed (${res.status})`)
+    }
+  }
+
+  async function renameCatalogCategory(type: CatalogGroup['type'], oldName: string, newName: string): Promise<void> {
+    const res = await fetch('http://localhost:8765/catalog/category/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, oldName, newName }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string }
+      throw new Error(body.error ?? `Rename failed (${res.status})`)
+    }
+  }
+
   return (
     <div ref={sidebarRef} className={styles.sidebar}>
       <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
@@ -531,14 +567,17 @@ export function Sidebar(): JSX.Element | null {
               }
             }}
             onAddCells={(item) => setSplitModalItem(item)}
-            onNewItem={(type, category) => {
+            onNewItem={async (type, category) => {
               if (type === 'flow') {
                 setShowFlowWizard(true)
               } else {
-                void createNewCatalogItem(type, category)
+                await createNewCatalogItem(type, category)
               }
             }}
             onDeleteItem={(item, type) => deleteItemViaAPI(item, type)}
+            onMoveItem={(item, type, cat) => moveCatalogItem(item, type, cat)}
+            onRenameItem={(item, type, stem) => renameCatalogItem(item, type, stem)}
+            onRenameCategory={(type, old, n) => renameCatalogCategory(type, old, n)}
             onNewCategory={async (type, name) => {
               await fetch('http://localhost:8765/catalog/category/new', {
                 method: 'POST',

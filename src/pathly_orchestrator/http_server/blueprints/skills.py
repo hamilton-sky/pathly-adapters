@@ -232,10 +232,11 @@ def create_catalog_item():
             return jsonify({"error": "Cannot locate pathly_data"}), 500
 
         core = data_root / "core"
+        fragment_dir = (core / "skills" / "fragments" / category) if category else (core / "skills" / "fragments")
         type_to_dir = {
-            "skill": core / "skills" / (category or "custom"),
-            "agent": core / "agents",
-            "fragment": core / "skills" / "fragments",
+            "skill":    core / "skills" / (category or "custom"),
+            "agent":    core / "agents",
+            "fragment": fragment_dir,
             "template": core / "templates" / (category or "custom"),
         }
         target_dir = type_to_dir[item_type]
@@ -249,7 +250,7 @@ def create_catalog_item():
         abs_path = str(file_path).replace("\\", "/")
         rel_path = _rel(file_path, data_root.parent)
 
-        if item_type in ("skill", "template"):
+        if item_type in ("skill", "template", "fragment"):
             item_name = f"{category}/{safe_name}" if category else safe_name
         else:
             item_name = safe_name
@@ -314,6 +315,100 @@ def delete_catalog_item():
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/catalog/item/move", methods=["POST"])
+def move_catalog_item_route():
+    """Move a catalog item to a different category.
+    Body: {"type": "skill", "name": "development/my-skill", "newCategory": "planning"}
+    Returns updated fields: {name, category, abs_path, rel_path}
+    """
+    try:
+        from pathly_orchestrator.db import get_db
+        from pathly_orchestrator.db.queries.catalog_items import move_catalog_item
+
+        data = request.get_json() or {}
+        item_type = data.get("type", "")
+        name = (data.get("name") or "").strip()
+        new_category = (data.get("newCategory") or "").strip()
+
+        if item_type not in ("skill", "agent", "fragment", "template"):
+            return jsonify({"error": "type must be skill|agent|fragment|template"}), 400
+        if not name:
+            return jsonify({"error": "Field 'name' is required"}), 400
+
+        conn = get_db()
+        result = move_catalog_item(conn, item_type, name, new_category)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except FileExistsError as e:
+        return jsonify({"error": str(e)}), 409
+    except Exception as e:
+        logging.exception("move_catalog_item error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/catalog/item/rename", methods=["POST"])
+def rename_catalog_item_route():
+    """Rename a catalog item (same directory, new filename stem).
+    Body: {"type": "skill", "name": "development/my-skill", "newName": "better-name"}
+    Returns updated fields: {name, abs_path, rel_path}
+    """
+    try:
+        from pathly_orchestrator.db import get_db
+        from pathly_orchestrator.db.queries.catalog_items import rename_catalog_item
+
+        data = request.get_json() or {}
+        item_type = data.get("type", "")
+        name = (data.get("name") or "").strip()
+        new_name = (data.get("newName") or "").strip()
+
+        if item_type not in ("skill", "agent", "fragment", "template"):
+            return jsonify({"error": "type must be skill|agent|fragment|template"}), 400
+        if not name or not new_name:
+            return jsonify({"error": "Fields 'name' and 'newName' are required"}), 400
+
+        conn = get_db()
+        result = rename_catalog_item(conn, item_type, name, new_name)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except FileExistsError as e:
+        return jsonify({"error": str(e)}), 409
+    except Exception as e:
+        logging.exception("rename_catalog_item error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/catalog/category/rename", methods=["POST"])
+def rename_catalog_category_route():
+    """Rename a catalog category directory.
+    Body: {"type": "skill", "oldName": "dev", "newName": "development"}
+    Returns: {oldName, newName, updatedItems}
+    """
+    try:
+        from pathly_orchestrator.db import get_db
+        from pathly_orchestrator.db.queries.catalog_items import rename_catalog_category
+
+        data = request.get_json() or {}
+        item_type = data.get("type", "skill")
+        old_name = (data.get("oldName") or "").strip()
+        new_name = (data.get("newName") or "").strip()
+
+        if not old_name or not new_name:
+            return jsonify({"error": "Fields 'oldName' and 'newName' are required"}), 400
+
+        conn = get_db()
+        result = rename_catalog_category(conn, item_type, old_name, new_name)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except FileExistsError as e:
+        return jsonify({"error": str(e)}), 409
+    except Exception as e:
+        logging.exception("rename_catalog_category error")
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/catalog/category/new", methods=["POST"])
 def create_category():
     """Create a new category (subdirectory under skills or templates).
@@ -338,7 +433,12 @@ def create_category():
         if not data_root:
             return jsonify({"error": "Cannot locate pathly_data"}), 500
 
-        base = data_root / "core" / ("skills" if item_type in ("skill", "fragment") else "templates")
+        if item_type == "fragment":
+            base = data_root / "core" / "skills" / "fragments"
+        elif item_type in ("skill",):
+            base = data_root / "core" / "skills"
+        else:
+            base = data_root / "core" / "templates"
         new_dir = base / safe
         if new_dir.exists():
             return jsonify({"error": f"Category '{safe}' already exists"}), 409

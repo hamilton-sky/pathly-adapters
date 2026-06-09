@@ -639,20 +639,28 @@
 
 .evTitleRow .evTitle { margin-bottom: 0; }
 
-/* Dense-phase toggle button */
+/* Dense/verbose toggle — icon button matching app design */
 .evDenseToggle {
-  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
   font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 500;
   color: var(--text-muted);
-  background: none;
-  border: 1px solid var(--bg-surface1);
-  border-radius: var(--radius-xs);
-  padding: 1px 6px;
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
   cursor: pointer;
-  letter-spacing: 0.03em;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  letter-spacing: 0.02em;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
 }
-.evDenseToggle:hover         { color: var(--text-secondary); border-color: var(--text-muted); }
+.evDenseToggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface0);
+  border-color: rgba(255, 255, 255, 0.16);
+}
 .evDenseToggle:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 /* ── Event line — flex row with actor chip ───────────────────── */
@@ -677,14 +685,22 @@
 .evActorChip {
   flex-shrink: 0;
   font-size: 9px;
+  font-weight: 600;
   font-family: var(--font-family-mono);
-  color: #a78bfa;
-  background: color-mix(in srgb, #a78bfa 12%, transparent);
   border-radius: 3px;
   padding: 1px 5px;
   line-height: 1.6;
   align-self: center;
 }
+
+/* Per-role actor chip colors */
+.evActorChipBuilder  { color: #06B6D4; background: color-mix(in srgb, #06B6D4 12%, transparent); }
+.evActorChipReviewer { color: #a78bfa; background: color-mix(in srgb, #a78bfa 12%, transparent); }
+.evActorChipPlanner  { color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, transparent); }
+.evActorChipTester   { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+.evActorChipDesigner { color: var(--orange); background: color-mix(in srgb, var(--orange) 12%, transparent); }
+.evActorChipRetro    { color: var(--yellow); background: color-mix(in srgb, var(--yellow) 12%, transparent); }
+.evActorChipDefault  { color: var(--text-muted); background: color-mix(in srgb, var(--text-muted) 10%, transparent); }
 
 .evCostChip {
   flex-shrink: 0;
@@ -731,33 +747,41 @@
 .evTokBarOut { color: var(--green); }
 
 /* ── Phase filter pills ──────────────────────────────────────── */
-.viewTabSpacer { flex: 1; }
-
 .phaseFilter {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  gap: 5px;
 }
 
 .phaseFilterPill {
-  font-size: 9px;
+  font-size: 11px;
   font-family: system-ui, -apple-system, sans-serif;
   color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--bg-surface1);
   border-radius: var(--radius-xl);
-  padding: 1px 8px;
+  padding: 3px 12px;
   cursor: pointer;
   transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
 }
 .phaseFilterPill:hover         { color: var(--text-secondary); border-color: var(--text-muted); }
 .phaseFilterPill:focus-visible { outline: var(--focus-ring); }
 
-.phaseFilterPillActive {
+/* Per-phase active colors */
+.phaseFilterPillActiveAll {
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   border-color: var(--accent);
+}
+.phaseFilterPillActiveBuild {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border-color: var(--green);
+}
+.phaseFilterPillActiveReview {
+  color: #a78bfa;
+  background: color-mix(in srgb, #a78bfa 12%, transparent);
+  border-color: #a78bfa;
 }
 
 /* ── MetricsStrip sub-label ──────────────────────────────────── */

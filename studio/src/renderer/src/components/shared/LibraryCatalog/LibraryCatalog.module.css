@@ -515,3 +515,44 @@
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
 }
+
+/* ── INLINE RENAME INPUT ── */
+.renameInput {
+  flex: 1;
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  padding: 1px 5px;
+  outline: none;
+  min-width: 0;
+}
+
+/* ── MOVE-TO-CATEGORY picker ── */
+.menuItemBack {
+  composes: menuItem;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 3px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding-bottom: 7px;
+}
+
+.menuItemDisabled {
+  composes: menuItem;
+  color: var(--text-muted);
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+@keyframes moveFlash {
+  0%   { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  60%  { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  100% { background: transparent; }
+}
+.itemMoveFlash {
+  animation: moveFlash 500ms ease-out forwards;
+}

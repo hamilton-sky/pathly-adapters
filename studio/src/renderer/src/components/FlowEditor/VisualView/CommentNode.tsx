@@ -83,7 +83,7 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
             aria-label="Link to state"
             title="Attach to state node"
           >
-            <option value=””>&mdash; link &mdash;</option>
+            <option value="">— link —</option>
             {(data.states ?? []).map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}

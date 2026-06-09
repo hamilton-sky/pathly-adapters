@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useStore } from '../../store'
 import type { FsmEvent } from '../../types/index'
 import { useInjectCSS, useAgentTelemetry } from './utils'
@@ -173,12 +174,22 @@ function getEventCost(ev: FsmEvent): string | null {
   return ev.cost_usd > 0 ? `$${ev.cost_usd.toFixed(4)}` : '$…'
 }
 
+function getActorChipClass(actor: string): string {
+  if (actor.startsWith('builder'))  return styles.evActorChipBuilder
+  if (actor.startsWith('reviewer')) return styles.evActorChipReviewer
+  if (actor.startsWith('planner'))  return styles.evActorChipPlanner
+  if (actor.startsWith('tester'))   return styles.evActorChipTester
+  if (actor.startsWith('designer')) return styles.evActorChipDesigner
+  if (actor.startsWith('retro'))    return styles.evActorChipRetro
+  return styles.evActorChipDefault
+}
+
 function RawEventLine({ ev, isNew, retrograde }: { ev: FsmEvent; isNew: boolean; retrograde?: boolean }): JSX.Element {
   const actor = getEventActor(ev)
   const cost  = getEventCost(ev)
   return (
     <div className={`${styles.evLineRow} ${isNew ? 'pathly-new-row' : ''}`}>
-      {actor && <span className={styles.evActorChip}>{actor}</span>}
+      {actor && <span className={`${styles.evActorChip} ${getActorChipClass(actor)}`}>{actor}</span>}
       <span className={`${styles.evLineText} ${eventColorClass(ev, retrograde)}`}>
         {formatEvent(ev, retrograde)}
       </span>
@@ -199,16 +210,20 @@ function computeRetrograde(events: FsmEvent[]): boolean[] {
   })
 }
 
-interface EventLogProps {
-  filter?: PhaseFilter
-}
-
-export function EventLog({ filter = 'all' }: EventLogProps): JSX.Element {
+export function EventLog(): JSX.Element {
   const events = useStore((s) => s.events)
   const { totalIn, totalOut, totalTokens, agentDone } = useAgentTelemetry()
   const billingPending = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd === 0)
   const missingCostData = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd == null)
   const [densePhases, setDensePhases] = useState(true)
+  const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>('all')
+
+  function pillActive(f: PhaseFilter): string {
+    if (phaseFilter !== f) return ''
+    if (f === 'all')    return styles.phaseFilterPillActiveAll
+    if (f === 'build')  return styles.phaseFilterPillActiveBuild
+    return styles.phaseFilterPillActiveReview
+  }
 
   useInjectCSS(FLASH_CSS)
 
@@ -229,14 +244,14 @@ export function EventLog({ filter = 'all' }: EventLogProps): JSX.Element {
     : events
 
   const displayEvents = useMemo(() => {
-    if (filter === 'all') return visibleEvents
-    const targetSet = filter === 'build' ? BUILD_PHASES : REVIEW_PHASES
+    if (phaseFilter === 'all') return visibleEvents
+    const targetSet = phaseFilter === 'build' ? BUILD_PHASES : REVIEW_PHASES
     let phase: string | null = null
     return visibleEvents.filter((ev) => {
       if (ev.type === 'STATE_TRANSITION' && ev.to) phase = String(ev.to)
       return phase != null && targetSet.has(phase)
     })
-  }, [filter, visibleEvents])
+  }, [phaseFilter, visibleEvents])
 
   useEffect(() => {
     const added = displayEvents.length - prevLengthRef.current
@@ -287,14 +302,33 @@ export function EventLog({ filter = 'all' }: EventLogProps): JSX.Element {
     <div className={styles.evContainer}>
       <div className={styles.evTitleRow}>
         <span className={styles.evTitle}>Event Log</span>
-        <button type="button" className={styles.evDenseToggle} onClick={() => setDensePhases((v) => !v)}>
-          {densePhases ? 'all phases' : 'compact'}
+        <div className={styles.phaseFilter}>
+          {(['all', 'build', 'review'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={`${styles.phaseFilterPill} ${pillActive(f)}`}
+              onClick={() => setPhaseFilter(f)}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={styles.evDenseToggle}
+          onClick={() => setDensePhases((v) => !v)}
+          aria-label={densePhases ? 'Show verbose events' : 'Show dense events'}
+          title={densePhases ? 'verbose' : 'dense'}
+        >
+          {densePhases ? <Eye size={14} /> : <EyeOff size={14} />}
+          <span>{densePhases ? 'verbose' : 'dense'}</span>
         </button>
       </div>
       <div className={styles.evLogWrapper}>
         <div ref={logRef} className={styles.evLog} onScroll={handleScroll}>
           {displayEvents.length === 0 ? (
-            <div className={styles.evEmpty}>{filter !== 'all' ? `No ${filter} events` : 'No events yet'}</div>
+            <div className={styles.evEmpty}>{phaseFilter !== 'all' ? `No ${phaseFilter} events` : 'No events yet'}</div>
           ) : (
             displayEvents.map((ev, i) => (
               <RawEventLine

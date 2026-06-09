@@ -103,7 +103,8 @@ python -m build                     # rebuilds all adapters from core
 python3 scripts/check_version_sync.py
 
 # Install / propagate agent+skill changes to ~/.claude
-pathly-setup claude --apply
+pathly-setup claude --apply           # first install
+pathly-setup claude --apply --repair  # update already-installed files (fragments, skills, agents)
 ```
 
 ---

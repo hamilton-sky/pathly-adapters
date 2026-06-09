@@ -1,6 +1,8 @@
-﻿import React, { useState, useEffect, useRef } from 'react'
-import { Sparkles, Search, Brain, Diamond, BookOpen, LayoutGrid, GitBranch, GripVertical, Plus, ChevronRight, ChevronsUp, MoreHorizontal, Trash2 } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Sparkles, Search, Brain, Diamond, BookOpen, LayoutGrid, GitBranch, GripVertical, Plus, ChevronLeft, ChevronRight, ChevronsUp, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useCatalogData, CatalogItemData, CatalogGroup } from './useCatalogData'
+import { PATHLY_DRAG_MIME } from '../../../types'
+import type { PathlyCanvasDragItem, PathlySection } from '../../../types'
 import styles from './LibraryCatalog.module.css'
 
 interface Props {
@@ -10,10 +12,13 @@ interface Props {
   onOpenFlow?: (pathOrName: string) => void
   onInsertCell?: (item: CatalogItemData) => void
   onAddCells?: (item: CatalogItemData) => void
-  onNewItem?: (type: CatalogGroup['type'], category?: string) => void
+  onNewItem?: (type: CatalogGroup['type'], category?: string) => Promise<void>
   onDeleteItem?: (item: CatalogItemData, type: CatalogGroup['type']) => Promise<void>
   onDeleteCategory?: (type: CatalogGroup['type'], category: string) => Promise<void>
   onNewCategory?: (type: CatalogGroup['type'], name: string) => Promise<void>
+  onMoveItem?: (item: CatalogItemData, type: CatalogGroup['type'], newCategory: string) => Promise<void>
+  onRenameItem?: (item: CatalogItemData, type: CatalogGroup['type'], newStem: string) => Promise<void>
+  onRenameCategory?: (type: CatalogGroup['type'], oldName: string, newName: string) => Promise<void>
 }
 
 function GroupIcon({ icon }: { icon: CatalogGroup['icon'] }) {
@@ -29,48 +34,103 @@ function leafName(item: CatalogItemData): string {
   return slash >= 0 ? item.name.slice(slash + 1) : item.name
 }
 
+const SECTION_MAP: Record<string, PathlySection> = {
+  skill: 'skills', agent: 'agents', template: 'templates', fragment: 'skills',
+}
+
+// ── ItemRow ───────────────────────────────────────────────────────────────────
+
 interface ItemRowProps {
   item: CatalogItemData
   type: CatalogGroup['type']
   groupIcon: CatalogGroup['icon']
   context: 'notebook' | 'canvas'
   displayName?: string
+  categories?: string[]
   onOpenSkill?: (path: string) => void
   onOpenFlow?: (pathOrName: string) => void
   onInsertCell?: (item: CatalogItemData) => void
   onAddCells?: (item: CatalogItemData) => void
   onDeleteItem?: (item: CatalogItemData, type: CatalogGroup['type']) => void
+  onMoveItem?: (item: CatalogItemData, type: CatalogGroup['type'], newCategory: string) => Promise<void>
+  onRenameItem?: (item: CatalogItemData, type: CatalogGroup['type'], newStem: string) => Promise<void>
 }
 
-function ItemRow({ item, type, groupIcon, context, displayName, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onDeleteItem }: ItemRowProps) {
-  const isFragment = type === 'fragment'
+function ItemRow({ item, type, groupIcon, context, displayName, categories, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onDeleteItem, onMoveItem, onRenameItem }: ItemRowProps) {
   const isFlow = type === 'flow'
   const hasPath = !!item.path
   const label = displayName ?? item.name
 
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuOpen, setMenuOpen]     = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [renaming, setRenaming]     = useState(false)
+  const [renameVal, setRenameVal]   = useState('')
+
+  const menuRef     = useRef<HTMLDivElement>(null)
+  const rowRef      = useRef<HTMLDivElement>(null)
+  const renameRef   = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!menuOpen) return
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+        setPickerOpen(false)
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [menuOpen])
 
+  useEffect(() => {
+    if (renaming) setTimeout(() => renameRef.current?.select(), 30)
+  }, [renaming])
+
   function handleDragStart(e: React.DragEvent) {
-    e.dataTransfer.setData('fragment-name', item.name)
-    if (item.path) e.dataTransfer.setData('fragment-path', item.path)
+    const payload: PathlyCanvasDragItem = {
+      dragType: 'canvas',
+      name: item.name,
+      section: SECTION_MAP[type] ?? 'skills',
+      path: item.path ? [item.path] : [],
+    }
+    e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify(payload))
     e.dataTransfer.effectAllowed = 'copy'
   }
 
   function handleRowClick() {
+    if (renaming) return
     if (isFlow) { onOpenFlow?.(item.path || item.name); return }
     if (context !== 'notebook') return
     if (hasPath) { onOpenSkill?.(item.path!) }
   }
+
+  async function handleMoveToCategory(newCategory: string) {
+    setPickerOpen(false)
+    setMenuOpen(false)
+    await onMoveItem?.(item, type, newCategory)
+    if (rowRef.current) {
+      rowRef.current.classList.add(styles.itemMoveFlash)
+      setTimeout(() => rowRef.current?.classList.remove(styles.itemMoveFlash), 500)
+    }
+  }
+
+  async function handleRenameCommit() {
+    const trimmed = renameVal.trim()
+    if (!trimmed) { setRenaming(false); return }
+    try {
+      await onRenameItem?.(item, type, trimmed)
+    } finally {
+      setRenaming(false)
+    }
+  }
+
+  // Current category: empty string = uncategorized
+  const currentCategory = (item.category && item.category !== type && item.category !== 'fragments')
+    ? item.category : ''
+
+  const hasMoveTargets = !!onMoveItem && !isFlow && (
+    (categories && categories.length > 0) || currentCategory !== ''
+  )
 
   type MenuItem = { label: string; danger?: boolean; onClick: () => void }
   const menuItems: MenuItem[] = []
@@ -82,21 +142,48 @@ function ItemRow({ item, type, groupIcon, context, displayName, onOpenSkill, onO
     if (hasPath) menuItems.push({ label: 'Open to edit', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
     if (hasPath) menuItems.push({ label: 'Split into cells', onClick: () => { setMenuOpen(false); onAddCells?.(item) } })
   }
+  if (onRenameItem && !isFlow) {
+    menuItems.push({ label: 'Rename', onClick: () => {
+      setMenuOpen(false)
+      setRenameVal(leafName(item).replace(/\.[^.]+$/, ''))
+      setRenaming(true)
+    }})
+  }
+  if (hasMoveTargets) {
+    menuItems.push({ label: 'Move to category…', onClick: () => { setPickerOpen(true) } })
+  }
   if (onDeleteItem) menuItems.push({ label: 'Delete', danger: true, onClick: () => { setMenuOpen(false); onDeleteItem(item, type) } })
 
   return (
     <div
+      ref={rowRef}
       className={`${styles.item} ${context === 'notebook' ? styles.itemClickable : styles.itemGrabbable}`}
-      draggable={context === 'canvas'}
-      onDragStart={context === 'canvas' ? handleDragStart : undefined}
+      draggable={context === 'canvas' && !isFlow && !renaming}
+      onDragStart={context === 'canvas' && !isFlow && !renaming ? handleDragStart : undefined}
       onClick={handleRowClick}
-      title={item.description ?? item.name}
+      title={renaming ? undefined : (item.description ?? item.name)}
     >
       {context === 'canvas' && !isFlow && <GripVertical size={15} className={styles.itemGrip} />}
       <span className={styles.itemIcon}><GroupIcon icon={groupIcon} /></span>
-      <span className={styles.itemName}>{label}</span>
 
-      {menuItems.length > 0 && (
+      {renaming ? (
+        <input
+          ref={renameRef}
+          className={styles.renameInput}
+          value={renameVal}
+          onChange={e => setRenameVal(e.target.value)}
+          onClick={e => e.stopPropagation()}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { e.preventDefault(); void handleRenameCommit() }
+            if (e.key === 'Escape') { setRenaming(false) }
+          }}
+          onBlur={() => { if (renameVal.trim()) void handleRenameCommit(); else setRenaming(false) }}
+        />
+      ) : (
+        <span className={styles.itemName}>{label}</span>
+      )}
+
+      {!renaming && menuItems.length > 0 && (
         <div className={styles.itemActions}>
           <div className={styles.menuWrap} ref={menuRef}>
             <button
@@ -104,11 +191,12 @@ function ItemRow({ item, type, groupIcon, context, displayName, onOpenSkill, onO
               className={styles.actionBtn}
               title="More options"
               aria-label="More options"
-              onClick={e => { e.stopPropagation(); setMenuOpen(o => !o) }}
+              onClick={e => { e.stopPropagation(); setMenuOpen(o => !o); setPickerOpen(false) }}
             >
               <MoreHorizontal size={11} />
             </button>
-            {menuOpen && (
+
+            {menuOpen && !pickerOpen && (
               <div className={styles.menu}>
                 {menuItems.map(mi => (
                   <button
@@ -122,12 +210,46 @@ function ItemRow({ item, type, groupIcon, context, displayName, onOpenSkill, onO
                 ))}
               </div>
             )}
+
+            {menuOpen && pickerOpen && (
+              <div className={styles.menu}>
+                <button
+                  type="button"
+                  className={styles.menuItemBack}
+                  onClick={e => { e.stopPropagation(); setPickerOpen(false) }}
+                >
+                  <ChevronLeft size={10} />
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className={currentCategory === '' ? styles.menuItemDisabled : styles.menuItem}
+                  {...(currentCategory === '' ? { disabled: true } : {})}
+                  onClick={e => { e.stopPropagation(); if (currentCategory !== '') void handleMoveToCategory('') }}
+                >
+                  {`Uncategorized${currentCategory === '' ? ' ✓' : ''}`}
+                </button>
+                {(categories ?? []).filter(c => c !== '_other').map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={currentCategory === cat ? styles.menuItemDisabled : styles.menuItem}
+                    {...(currentCategory === cat ? { disabled: true } : {})}
+                    onClick={e => { e.stopPropagation(); if (currentCategory !== cat) void handleMoveToCategory(cat) }}
+                  >
+                    {`${cat}${currentCategory === cat ? ' ✓' : ''}`}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   )
 }
+
+// ── SubGroup ──────────────────────────────────────────────────────────────────
 
 interface SubGroupProps {
   label: string
@@ -138,6 +260,7 @@ interface SubGroupProps {
   groupIcon: CatalogGroup['icon']
   context: 'notebook' | 'canvas'
   collapseKey: number
+  categories?: string[]
   onOpenSkill?: (path: string) => void
   onOpenFlow?: (pathOrName: string) => void
   onInsertCell?: (item: CatalogItemData) => void
@@ -145,14 +268,23 @@ interface SubGroupProps {
   onDeleteItem?: (item: CatalogItemData, type: CatalogGroup['type']) => void
   onRequestDeleteCategory?: (type: CatalogGroup['type'], label: string) => void
   onNewSubcategory?: (type: CatalogGroup['type'], fullPath: string) => Promise<void>
+  onMoveItem?: (item: CatalogItemData, type: CatalogGroup['type'], newCategory: string) => Promise<void>
+  onRenameItem?: (item: CatalogItemData, type: CatalogGroup['type'], newStem: string) => Promise<void>
+  onRenameCategory?: (type: CatalogGroup['type'], categoryName: string, newName: string) => Promise<void>
 }
 
-function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon, context, collapseKey, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onDeleteItem, onRequestDeleteCategory, onNewSubcategory }: SubGroupProps) {
-  const [open, setOpen] = useState(false)
+function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon, context, collapseKey, categories, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onDeleteItem, onRequestDeleteCategory, onNewSubcategory, onMoveItem, onRenameItem, onRenameCategory }: SubGroupProps) {
+  const [open, setOpen]               = useState(false)
   const [subMenuOpen, setSubMenuOpen] = useState(false)
   const [showSubCatForm, setShowSubCatForm] = useState(false)
-  const [subCatName, setSubCatName] = useState('')
-  const subMenuRef = useRef<HTMLDivElement>(null)
+  const [subCatName, setSubCatName]   = useState('')
+  const [renaming, setRenaming]       = useState(false)
+  const [renameVal, setRenameVal]     = useState('')
+
+  const subMenuRef  = useRef<HTMLDivElement>(null)
+  const renameRef   = useRef<HTMLInputElement>(null)
+
+  const isOtherBucket = parentCategory === '_other'
 
   useEffect(() => { setOpen(false) }, [collapseKey])
 
@@ -165,6 +297,10 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
     return () => document.removeEventListener('mousedown', handler)
   }, [subMenuOpen])
 
+  useEffect(() => {
+    if (renaming) setTimeout(() => renameRef.current?.select(), 30)
+  }, [renaming])
+
   async function handleCreateSubcategory() {
     const trimmed = subCatName.trim()
     if (!trimmed) return
@@ -173,8 +309,18 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
     setSubCatName('')
   }
 
+  async function handleRenameCommit() {
+    const trimmed = renameVal.trim()
+    if (!trimmed) { setRenaming(false); return }
+    try {
+      await onRenameCategory?.(type, parentCategory, trimmed)
+    } finally {
+      setRenaming(false)
+    }
+  }
+
   const totalCount = items.length + Object.values(subCategories ?? {}).reduce((s, a) => s + a.length, 0)
-  const hasActions = !!(onNewSubcategory || onRequestDeleteCategory)
+  const hasActions = !!(onNewSubcategory || onRequestDeleteCategory || (!isOtherBucket && onRenameCategory))
 
   return (
     <div className={styles.subGroup}>
@@ -182,14 +328,32 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
         <button
           type="button"
           className={styles.subGroupLabel}
-          onClick={() => setOpen(o => !o)}
+          onClick={() => { if (!renaming) setOpen(o => !o) }}
           {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
         >
           <ChevronRight size={10} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} />
-          <span className={styles.subGroupName}>{label}</span>
-          <span className={styles.subGroupCount}>{totalCount}</span>
+          {renaming ? (
+            <input
+              ref={renameRef}
+              className={styles.renameInput}
+              value={renameVal}
+              onChange={e => setRenameVal(e.target.value)}
+              onClick={e => e.stopPropagation()}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); void handleRenameCommit() }
+                if (e.key === 'Escape') { setRenaming(false) }
+              }}
+              onBlur={() => { if (renameVal.trim()) void handleRenameCommit(); else setRenaming(false) }}
+            />
+          ) : (
+            <>
+              <span className={styles.subGroupName}>{label}</span>
+              <span className={styles.subGroupCount}>{totalCount}</span>
+            </>
+          )}
         </button>
-        {hasActions && (
+
+        {hasActions && !renaming && (
           <div className={styles.menuWrap} ref={subMenuRef}>
             <button
               type="button"
@@ -202,6 +366,15 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
             </button>
             {subMenuOpen && (
               <div className={styles.menu}>
+                {!isOtherBucket && onRenameCategory && (
+                  <button
+                    type="button"
+                    className={styles.menuItem}
+                    onClick={() => { setSubMenuOpen(false); setOpen(true); setRenameVal(label); setRenaming(true) }}
+                  >
+                    Rename
+                  </button>
+                )}
                 {onNewSubcategory && (
                   <button
                     type="button"
@@ -234,7 +407,7 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
             className={styles.newCatInput}
             value={subCatName}
             onChange={e => setSubCatName(e.target.value)}
-            placeholder="Subcategory nameâ€¦"
+            placeholder="Subcategory name…"
             autoFocus
             onKeyDown={e => {
               if (e.key === 'Enter') void handleCreateSubcategory()
@@ -242,7 +415,7 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
             }}
           />
           <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateSubcategory()}>Create</button>
-          <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowSubCatForm(false); setSubCatName('') }}>âœ•</button>
+          <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowSubCatForm(false); setSubCatName('') }}>{'✕'}</button>
         </div>
       )}
 
@@ -256,11 +429,14 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
               groupIcon={groupIcon}
               context={context}
               displayName={leafName(item)}
+              categories={categories}
               onOpenSkill={onOpenSkill}
               onOpenFlow={onOpenFlow}
               onInsertCell={onInsertCell}
               onAddCells={onAddCells}
               onDeleteItem={onDeleteItem}
+              onMoveItem={onMoveItem}
+              onRenameItem={onRenameItem}
             />
           ))}
           {subCategories && Object.keys(subCategories).sort().map(subName => (
@@ -273,12 +449,16 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
               groupIcon={groupIcon}
               context={context}
               collapseKey={collapseKey}
+              categories={categories}
               onOpenSkill={onOpenSkill}
               onOpenFlow={onOpenFlow}
               onInsertCell={onInsertCell}
               onAddCells={onAddCells}
               onDeleteItem={onDeleteItem}
               onRequestDeleteCategory={onRequestDeleteCategory}
+              onMoveItem={onMoveItem}
+              onRenameItem={onRenameItem}
+              onRenameCategory={onRenameCategory}
             />
           ))}
         </>
@@ -286,6 +466,8 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
     </div>
   )
 }
+
+// ── buildCategoryTree ─────────────────────────────────────────────────────────
 
 interface CatNode {
   items: CatalogItemData[]
@@ -312,6 +494,8 @@ function buildCategoryTree(groupItems: CatalogItemData[], groupType: string): Re
   return tree
 }
 
+// ── GroupSection ──────────────────────────────────────────────────────────────
+
 interface GroupSectionProps {
   group: CatalogGroup
   context: 'notebook' | 'canvas'
@@ -320,18 +504,21 @@ interface GroupSectionProps {
   onOpenFlow?: (pathOrName: string) => void
   onInsertCell?: (item: CatalogItemData) => void
   onAddCells?: (item: CatalogItemData) => void
-  onNewItem?: (type: CatalogGroup['type'], category?: string) => void
+  onNewItem?: (type: CatalogGroup['type'], category?: string) => Promise<void>
   onDeleteItem?: (item: CatalogItemData, type: CatalogGroup['type']) => void
   onDeleteCategory?: (type: CatalogGroup['type'], category: string) => void
   onRequestDeleteCategory?: (type: CatalogGroup['type'], category: string) => void
   onNewCategory?: (type: CatalogGroup['type'], name: string) => Promise<void>
+  onMoveItem?: (item: CatalogItemData, type: CatalogGroup['type'], newCategory: string) => Promise<void>
+  onRenameItem?: (item: CatalogItemData, type: CatalogGroup['type'], newStem: string) => Promise<void>
+  onRenameCategory?: (type: CatalogGroup['type'], oldName: string, newName: string) => Promise<void>
 }
 
-function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onNewItem, onDeleteItem, onDeleteCategory, onRequestDeleteCategory, onNewCategory }: GroupSectionProps) {
-  const [open, setOpen] = useState(false)
+function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onNewItem, onDeleteItem, onDeleteCategory, onRequestDeleteCategory, onNewCategory, onMoveItem, onRenameItem, onRenameCategory }: GroupSectionProps) {
+  const [open, setOpen]               = useState(false)
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
   const [showCatForm, setShowCatForm] = useState(false)
-  const [catName, setCatName] = useState('')
+  const [catName, setCatName]         = useState('')
   const groupMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setOpen(false) }, [collapseKey])
@@ -345,7 +532,8 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
     return () => document.removeEventListener('mousedown', handler)
   }, [groupMenuOpen])
 
-  const supportsCategories = group.type === 'skill' || group.type === 'agent' || group.type === 'template'
+  const supportsCategories = group.type === 'skill' || group.type === 'agent'
+    || group.type === 'template' || group.type === 'fragment'
 
   const useSubcategories = supportsCategories &&
     group.items.some(i => i.category && i.category !== group.type)
@@ -359,6 +547,10 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
   }
 
   const singularLabel = group.label.toLowerCase().replace(/s$/, '')
+
+  const categoryNames = supportsCategories
+    ? Object.keys(buildCategoryTree(group.items, group.type)).filter(k => k !== '_other').sort()
+    : []
 
   const groupLabelButton = (
     <button
@@ -392,7 +584,7 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
             <button
               type="button"
               className={styles.menuItem}
-              onClick={() => { setGroupMenuOpen(false); onNewItem?.(group.type) }}
+              onClick={() => { setGroupMenuOpen(false); void onNewItem?.(group.type) }}
             >
               <Plus size={11} />
               New {singularLabel}
@@ -419,7 +611,7 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
         className={styles.newCatInput}
         value={catName}
         onChange={e => setCatName(e.target.value)}
-        placeholder={`${singularLabel} categoryâ€¦`}
+        placeholder={`${singularLabel} category…`}
         autoFocus
         onKeyDown={e => {
           if (e.key === 'Enter') void handleCreateCategory()
@@ -427,19 +619,19 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
         }}
       />
       <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateCategory()}>Create</button>
-      <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowCatForm(false); setCatName('') }}>âœ•</button>
+      <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowCatForm(false); setCatName('') }}>{'✕'}</button>
     </div>
   )
 
   if (useSubcategories) {
     const tree = buildCategoryTree(group.items, group.type)
-    const categories = Object.keys(tree).sort()
+    const treeCategories = Object.keys(tree).sort()
 
     return (
       <div>
         {groupHeader}
         {catForm}
-        {open && categories.map(cat => (
+        {open && treeCategories.map(cat => (
           <SubGroup
             key={cat}
             label={cat === '_other' ? 'other' : cat}
@@ -450,6 +642,7 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
             groupIcon={group.icon}
             context={context}
             collapseKey={collapseKey}
+            categories={categoryNames}
             onOpenSkill={onOpenSkill}
             onOpenFlow={onOpenFlow}
             onInsertCell={onInsertCell}
@@ -457,6 +650,9 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
             onDeleteItem={onDeleteItem}
             onRequestDeleteCategory={onDeleteCategory ? onRequestDeleteCategory : undefined}
             onNewSubcategory={onNewCategory}
+            onMoveItem={onMoveItem}
+            onRenameItem={onRenameItem}
+            onRenameCategory={onRenameCategory}
           />
         ))}
       </div>
@@ -474,30 +670,37 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
           type={group.type}
           groupIcon={group.icon}
           context={context}
+          categories={categoryNames}
           onOpenSkill={onOpenSkill}
           onOpenFlow={onOpenFlow}
           onInsertCell={onInsertCell}
           onAddCells={onAddCells}
           onDeleteItem={onDeleteItem}
+          onMoveItem={onMoveItem}
+          onRenameItem={onRenameItem}
         />
       ))}
     </div>
   )
 }
 
+// ── LibraryCatalog (root) ─────────────────────────────────────────────────────
+
 const CAT_TYPES: { value: CatalogGroup['type']; label: string }[] = [
   { value: 'skill',    label: 'Skills' },
   { value: 'agent',    label: 'Agents' },
   { value: 'template', label: 'Templates' },
+  { value: 'fragment', label: 'Fragments' },
 ]
 
-export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onNewItem, onDeleteItem, onDeleteCategory, onNewCategory }: Props) {
+export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onNewItem, onDeleteItem, onDeleteCategory, onNewCategory, onMoveItem, onRenameItem, onRenameCategory }: Props) {
   const [refreshKey, setRefreshKey] = useState(0)
   const allGroups = useCatalogData(pathlyRoot, refreshKey)
-  const [query, setQuery] = useState('')
+  const [query, setQuery]           = useState('')
   const [collapseKey, setCollapseKey] = useState(0)
+  const [operationError, setOperationError] = useState<string | null>(null)
 
-  const [pendingDelete, setPendingDelete] = useState<{ item: CatalogItemData; type: CatalogGroup['type'] } | null>(null)
+  const [pendingDelete, setPendingDelete]     = useState<{ item: CatalogItemData; type: CatalogGroup['type'] } | null>(null)
   const [pendingDeleteCat, setPendingDeleteCat] = useState<{ type: CatalogGroup['type']; category: string } | null>(null)
 
   const [newCatType, setNewCatType] = useState<CatalogGroup['type'] | null>(null)
@@ -518,6 +721,17 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
     setNewCatType(null)
     setNewCatName('')
     setRefreshKey(k => k + 1)
+  }
+
+  function withRefresh<T extends unknown[]>(fn: (...args: T) => Promise<void>) {
+    return async (...args: T) => {
+      try {
+        await fn(...args)
+        setRefreshKey(k => k + 1)
+      } catch (e: unknown) {
+        setOperationError(e instanceof Error ? e.message : 'Operation failed')
+      }
+    }
   }
 
   const filtered = query.trim()
@@ -554,7 +768,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
         <Search size={15} />
         <input
           className={styles.searchInput}
-          placeholder="Search the libraryâ€¦"
+          placeholder="Search the library…"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
@@ -571,14 +785,24 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
             onOpenFlow={onOpenFlow}
             onInsertCell={onInsertCell}
             onAddCells={onAddCells}
-            onNewItem={onNewItem}
+            onNewItem={onNewItem ? withRefresh(async (type, category) => {
+              await onNewItem(type, category)
+            }) : undefined}
             onDeleteItem={onDeleteItem ? requestDelete : undefined}
             onDeleteCategory={onDeleteCategory}
             onRequestDeleteCategory={onDeleteCategory ? requestDeleteCategory : undefined}
-            onNewCategory={async (type, name) => {
-              await onNewCategory?.(type, name)
-              setRefreshKey(k => k + 1)
-            }}
+            onNewCategory={onNewCategory ? withRefresh(async (type, name) => {
+              await onNewCategory(type, name)
+            }) : undefined}
+            onMoveItem={onMoveItem ? withRefresh(async (item, type, cat) => {
+              await onMoveItem(item, type, cat)
+            }) : undefined}
+            onRenameItem={onRenameItem ? withRefresh(async (item, type, stem) => {
+              await onRenameItem(item, type, stem)
+            }) : undefined}
+            onRenameCategory={onRenameCategory ? withRefresh(async (type, old, n) => {
+              await onRenameCategory(type, old, n)
+            }) : undefined}
           />
         ))}
         {filtered.length === 0 && query.trim() && (
@@ -598,7 +822,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
               className={styles.newCatInput}
               value={newCatName}
               onChange={e => setNewCatName(e.target.value)}
-              placeholder="Category nameâ€¦"
+              placeholder="Category name…"
               autoFocus
               onKeyDown={e => {
                 if (e.key === 'Enter') void handleCreateCategory()
@@ -606,7 +830,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
               }}
             />
             <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateCategory()}>Create</button>
-            <button type="button" className={styles.newCatCancelBtn} onClick={() => { setNewCatType(null); setNewCatName('') }}>âœ•</button>
+            <button type="button" className={styles.newCatCancelBtn} onClick={() => { setNewCatType(null); setNewCatName('') }}>{'✕'}</button>
           </div>
         ) : (
           <button type="button" className={styles.newCat} onClick={() => setNewCatType('skill')}>
@@ -616,6 +840,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
         )}
       </div>
 
+      {/* ── Delete item confirm ── */}
       {pendingDelete && (
         <div className={styles.confirmOverlay}>
           <div className={styles.confirmCard}>
@@ -639,6 +864,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
         </div>
       )}
 
+      {/* ── Delete category confirm ── */}
       {pendingDeleteCat && (
         <div className={styles.confirmOverlay}>
           <div className={styles.confirmCard}>
@@ -657,6 +883,19 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Operation error modal ── */}
+      {operationError && (
+        <div className={styles.confirmOverlay}>
+          <div className={styles.confirmCard}>
+            <div className={styles.confirmTitle}>Error</div>
+            <div className={styles.confirmBody}>{operationError}</div>
+            <div className={styles.confirmActions}>
+              <button type="button" className={styles.confirmCancel} onClick={() => setOperationError(null)}>OK</button>
             </div>
           </div>
         </div>

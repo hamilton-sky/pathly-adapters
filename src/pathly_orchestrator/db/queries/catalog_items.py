@@ -65,6 +65,197 @@ def read_catalog_item_by_path(conn: sqlite3.Connection, abs_path: str) -> dict |
 
 # ── indexer ──────────────────────────────────────────────────────────────────
 
+def move_catalog_item(
+    conn: sqlite3.Connection,
+    item_type: str,
+    name: str,
+    new_category: str,
+) -> dict:
+    """Move a catalog item to a different category directory.
+
+    Returns a dict with updated name/category/abs_path/rel_path fields.
+    """
+    import shutil as _shutil
+
+    row = conn.execute(
+        "SELECT * FROM catalog_items WHERE item_type=? AND name=?", (item_type, name)
+    ).fetchone()
+    if not row:
+        raise ValueError(f"Item '{name}' of type '{item_type}' not found")
+    row = dict(row)
+
+    old_abs_path = Path(row["abs_path"].replace("/", os.sep))
+    data_root = _find_data_root()
+    if not data_root:
+        raise RuntimeError("Cannot locate pathly_data")
+
+    core = data_root / "core"
+    type_to_base: dict[str, Path] = {
+        "skill":    core / "skills",
+        "agent":    core / "agents",
+        "fragment": core / "skills" / "fragments",
+        "template": core / "templates",
+    }
+    base = type_to_base.get(item_type, core / "skills")
+    new_dir = base / new_category if new_category else base
+    new_dir.mkdir(parents=True, exist_ok=True)
+
+    new_abs_path = new_dir / old_abs_path.name
+    if old_abs_path.resolve() == new_abs_path.resolve():
+        return row  # already in target category
+
+    if new_abs_path.exists():
+        raise FileExistsError(
+            f"An item named '{old_abs_path.name}' already exists in "
+            f"'{new_category or 'Uncategorized'}'"
+        )
+
+    _shutil.move(str(old_abs_path), str(new_abs_path))
+
+    stem = old_abs_path.stem
+    if item_type in ("skill", "template", "fragment"):
+        new_name = f"{new_category}/{stem}" if new_category else stem
+    else:
+        new_name = stem
+
+    new_abs_str = str(new_abs_path).replace("\\", "/")
+    new_rel = _rel(new_abs_path, data_root.parent)
+
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE catalog_items SET name=?, category=?, abs_path=?, rel_path=? "
+            "WHERE item_type=? AND name=?",
+            (new_name, new_category, new_abs_str, new_rel, item_type, name),
+        )
+        conn.commit()
+
+    return {"name": new_name, "category": new_category, "abs_path": new_abs_str, "rel_path": new_rel}
+
+
+def rename_catalog_item(
+    conn: sqlite3.Connection,
+    item_type: str,
+    name: str,
+    new_stem: str,
+) -> dict:
+    """Rename a catalog item file (same directory, new filename stem).
+
+    Returns updated fields: {name, abs_path, rel_path}
+    """
+    import re as _re
+
+    row = conn.execute(
+        "SELECT * FROM catalog_items WHERE item_type=? AND name=?", (item_type, name)
+    ).fetchone()
+    if not row:
+        raise ValueError(f"Item '{name}' of type '{item_type}' not found")
+    row = dict(row)
+
+    safe_stem = _re.sub(r"[^a-z0-9\-_]", "-", new_stem.lower()).strip("-")
+    if not safe_stem:
+        raise ValueError("Invalid name")
+
+    old_abs = Path(row["abs_path"].replace("/", os.sep))
+    new_abs = old_abs.parent / f"{safe_stem}{old_abs.suffix}"
+
+    if old_abs.resolve() == new_abs.resolve():
+        return row
+    if new_abs.exists():
+        raise FileExistsError(f"'{safe_stem}' already exists in this category")
+
+    old_abs.rename(new_abs)
+
+    data_root = _find_data_root()
+    category = row.get("category", "")
+    if item_type in ("skill", "template", "fragment"):
+        new_name = f"{category}/{safe_stem}" if category and category not in (item_type, "fragments") else safe_stem
+    else:
+        new_name = safe_stem
+
+    new_abs_str = str(new_abs).replace("\\", "/")
+    new_rel = _rel(new_abs, data_root.parent) if data_root else new_abs_str
+
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE catalog_items SET name=?, abs_path=?, rel_path=? WHERE item_type=? AND name=?",
+            (new_name, new_abs_str, new_rel, item_type, name),
+        )
+        conn.commit()
+
+    return {"name": new_name, "abs_path": new_abs_str, "rel_path": new_rel}
+
+
+def rename_catalog_category(
+    conn: sqlite3.Connection,
+    item_type: str,
+    old_name: str,
+    new_name: str,
+) -> dict:
+    """Rename a catalog category directory and update all items in it.
+
+    Returns {oldName, newName, updatedItems}
+    """
+    import re as _re
+    import shutil as _shutil
+
+    safe_new = _re.sub(r"[^a-z0-9\-_]", "-", new_name.lower()).strip("-")
+    if not safe_new:
+        raise ValueError("Invalid category name")
+
+    data_root = _find_data_root()
+    if not data_root:
+        raise RuntimeError("Cannot locate pathly_data")
+
+    core = data_root / "core"
+    type_to_base: dict[str, Path] = {
+        "skill":    core / "skills",
+        "agent":    core / "agents",
+        "fragment": core / "skills" / "fragments",
+        "template": core / "templates",
+    }
+    base = type_to_base.get(item_type, core / "skills")
+    old_dir = base / old_name
+    new_dir = base / safe_new
+
+    if not old_dir.exists():
+        raise ValueError(f"Category '{old_name}' not found on disk")
+    if new_dir.exists():
+        raise FileExistsError(f"Category '{safe_new}' already exists")
+
+    _shutil.move(str(old_dir), str(new_dir))
+
+    rows = conn.execute(
+        "SELECT name, abs_path FROM catalog_items WHERE item_type=? AND category=?",
+        (item_type, old_name),
+    ).fetchall()
+
+    with _get_write_lock(conn):
+        for r in rows:
+            r = dict(r)
+            old_item_abs = Path(r["abs_path"].replace("/", os.sep))
+            new_item_abs = new_dir / old_item_abs.name
+            stem = old_item_abs.stem
+            if item_type in ("skill", "template", "fragment"):
+                new_item_name = f"{safe_new}/{stem}"
+            else:
+                new_item_name = stem
+            conn.execute(
+                "UPDATE catalog_items SET name=?, category=?, abs_path=?, rel_path=? "
+                "WHERE item_type=? AND name=?",
+                (
+                    new_item_name,
+                    safe_new,
+                    str(new_item_abs).replace("\\", "/"),
+                    _rel(new_item_abs, data_root.parent),
+                    item_type,
+                    r["name"],
+                ),
+            )
+        conn.commit()
+
+    return {"oldName": old_name, "newName": safe_new, "updatedItems": len(rows)}
+
+
 def rebuild_catalog(conn: sqlite3.Connection) -> None:
     """Walk pathly_data/core and (re)index agents, fragments, skills, templates.
 
@@ -132,16 +323,19 @@ def _index_fragments(conn: sqlite3.Connection, core: Path) -> None:
     fragments_dir = core / "skills" / "fragments"
     if not fragments_dir.exists():
         return
-    for f in sorted(fragments_dir.glob("*.md")):
+    for f in sorted(fragments_dir.rglob("*.md")):
+        parts = f.relative_to(fragments_dir).parts
+        subdir_category = parts[0] if len(parts) > 1 else ""
         content = f.read_text(encoding="utf-8")
-        name, description, category, _ = _parse_frontmatter(content, f.stem)
+        name, description, _, _ = _parse_frontmatter(content, f.stem)
+        item_name = f"{subdir_category}/{f.stem}" if subdir_category else name
         upsert_catalog_item(
             conn,
             item_type="fragment",
-            name=name,
+            name=item_name,
             rel_path=_rel(f, core.parent.parent),
             abs_path=str(f).replace("\\", "/"),
-            category=category or "fragments",
+            category=subdir_category or "fragments",
             description=description,
             content=content,
         )
