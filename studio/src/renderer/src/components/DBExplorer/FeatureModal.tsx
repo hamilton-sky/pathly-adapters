@@ -5,9 +5,10 @@ import { TimelineTab } from './TimelineTab'
 import { AgentsTab } from './AgentsTab'
 import { EventsTab } from './EventsTab'
 import { InspectTab } from './InspectTab'
+import { TracesTab } from './TracesTab'
 import styles from './FeatureModal.module.css'
 
-type TabId = 'timeline' | 'events' | 'agents' | 'inspect'
+type TabId = 'timeline' | 'events' | 'agents' | 'inspect' | 'traces'
 
 interface FeatureModalProps {
   feature: FeatureData | null
@@ -17,9 +18,10 @@ interface FeatureModalProps {
 interface ModalData {
   transitions: TransitionData[]
   rawEvents: DbEvent[]
+  otelSpans: DbOtelSpan[]
 }
 
-const EMPTY: ModalData = { transitions: [], rawEvents: [] }
+const EMPTY: ModalData = { transitions: [], rawEvents: [], otelSpans: [] }
 
 function calcDuration(from: string, to: string): string {
   const diff = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 1000)
@@ -62,9 +64,12 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
   useEffect(() => {
     if (!feature) { setData(EMPTY); return }
     setLoading(true)
-    window.pathly.db.events(feature.name)
-      .then((rawEvents) => {
-        setData({ transitions: eventsToTransitions(rawEvents), rawEvents })
+    Promise.all([
+      window.pathly.db.events(feature.name),
+      window.pathly.db.otel(feature.name).catch(() => [] as DbOtelSpan[]),
+    ])
+      .then(([rawEvents, otelSpans]) => {
+        setData({ transitions: eventsToTransitions(rawEvents), rawEvents, otelSpans })
       })
       .catch(() => setData(EMPTY))
       .finally(() => setLoading(false))
@@ -76,6 +81,7 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
     { id: 'timeline', label: 'Timeline', count: data.transitions.length || undefined },
     { id: 'events',   label: 'Events',   count: data.rawEvents.length || undefined },
     { id: 'agents',   label: 'Agents',   count: agentCount || undefined },
+    { id: 'traces',   label: 'Traces',   count: data.otelSpans.length || undefined },
     { id: 'inspect',  label: 'Inspect' },
   ]
 
@@ -108,6 +114,7 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
                   {activeTab === 'timeline' && <TimelineTab transitions={data.transitions} />}
                   {activeTab === 'events'   && <EventsTab events={data.rawEvents} />}
                   {activeTab === 'agents'   && <AgentsTab events={data.rawEvents} />}
+                  {activeTab === 'traces'   && <TracesTab spans={data.otelSpans} />}
                   {activeTab === 'inspect'  && <InspectTab events={data.rawEvents} />}
                 </>
             }

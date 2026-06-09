@@ -80,23 +80,73 @@ def get_named_menu(name: str):
 
 @bp.route("/metrics", methods=["GET"])
 def metrics_endpoint():
-    """Prometheus text-format metrics endpoint."""
+    """Prometheus text-format metrics endpoint (HTTP + pipeline counters)."""
     from flask import Response
+    from pathly_orchestrator.metrics import _collector
 
     with _metrics_lock:
-        snapshot = dict(_metrics)
+        http_snap = dict(_metrics)
+    pipe = _collector.snapshot()
+
     lines = [
         "# HELP pathly_requests_total Total HTTP requests received",
         "# TYPE pathly_requests_total counter",
-        f"pathly_requests_total {snapshot.get('pathly_requests_total', 0)}",
+        f"pathly_requests_total {http_snap.get('pathly_requests_total', 0)}",
         "# HELP pathly_requests_rate_limited_total Requests rejected by rate limiter",
         "# TYPE pathly_requests_rate_limited_total counter",
-        f"pathly_requests_rate_limited_total {snapshot.get('pathly_requests_rate_limited_total', 0)}",
+        f"pathly_requests_rate_limited_total {http_snap.get('pathly_requests_rate_limited_total', 0)}",
         "# HELP pathly_request_errors_total HTTP 5xx responses",
         "# TYPE pathly_request_errors_total counter",
-        f"pathly_request_errors_total {snapshot.get('pathly_request_errors_total', 0)}",
+        f"pathly_request_errors_total {http_snap.get('pathly_request_errors_total', 0)}",
         "# HELP pathly_sse_clients_active Currently connected SSE clients",
         "# TYPE pathly_sse_clients_active gauge",
-        f"pathly_sse_clients_active {snapshot.get('pathly_sse_clients_active', 0)}",
+        f"pathly_sse_clients_active {http_snap.get('pathly_sse_clients_active', 0)}",
+        # Pipeline counters
+        "# HELP pathly_cost_usd_total Agent cost since server start (USD)",
+        "# TYPE pathly_cost_usd_total counter",
+        f"pathly_cost_usd_total {pipe['cost_usd']}",
+        "# HELP pathly_tokens_total Input + output tokens since server start",
+        "# TYPE pathly_tokens_total counter",
+        f"pathly_tokens_total {pipe['tokens_in'] + pipe['tokens_out']}",
+        "# HELP pathly_pipelines_started_total Pipeline runs initiated",
+        "# TYPE pathly_pipelines_started_total counter",
+        f"pathly_pipelines_started_total {pipe['pipelines_started']}",
+        "# HELP pathly_pipelines_done_total Pipelines that reached DONE",
+        "# TYPE pathly_pipelines_done_total counter",
+        f"pathly_pipelines_done_total {pipe['pipelines_done']}",
+        "# HELP pathly_feedback_loops_total Rework transitions (e.g. REVIEWING→BUILDING)",
+        "# TYPE pathly_feedback_loops_total counter",
+        f"pathly_feedback_loops_total {pipe['feedback_loops']}",
+        "# HELP pathly_gate_failures_total Gate blocks that halted a stage",
+        "# TYPE pathly_gate_failures_total counter",
+        f"pathly_gate_failures_total {pipe['gate_failures']}",
     ]
+    # Per-stage visit counts (labelled)
+    if pipe["stage_visits"]:
+        lines += [
+            "# HELP pathly_stage_visits_total Entries into each FSM state",
+            "# TYPE pathly_stage_visits_total counter",
+        ]
+        for state, count in sorted(pipe["stage_visits"].items()):
+            lines.append(f'pathly_stage_visits_total{{state="{state}"}} {count}')
+    # Per-agent invocation counts (labelled)
+    if pipe["agent_invocations"]:
+        lines += [
+            "# HELP pathly_agent_invocations_total Agent invocations by role",
+            "# TYPE pathly_agent_invocations_total counter",
+        ]
+        for agent, count in sorted(pipe["agent_invocations"].items()):
+            lines.append(f'pathly_agent_invocations_total{{agent="{agent}"}} {count}')
+
     return Response("\n".join(lines) + "\n", mimetype="text/plain; version=0.0.4")
+
+
+@bp.route("/metrics/json", methods=["GET"])
+def metrics_json():
+    """JSON metrics — pipeline counters for Studio and dashboards."""
+    from pathly_orchestrator.metrics import _collector
+
+    with _metrics_lock:
+        http_snap = dict(_metrics)
+    pipe = _collector.snapshot()
+    return jsonify({**http_snap, **pipe}), 200

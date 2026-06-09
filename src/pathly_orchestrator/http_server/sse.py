@@ -90,6 +90,15 @@ def _broadcast(key: tuple[str, str], line: str) -> None:
 def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
     topic, project_root = key
     from pathly_orchestrator import db as _db
+    from pathly_orchestrator.event_bus import _bus
+
+    wake = threading.Event()
+    bus_key = f"FSM_EVENT:{project_root}:{topic}"
+
+    def _on_new_event(_data: dict) -> None:
+        wake.set()
+
+    _bus.subscribe(bus_key, _on_new_event)
     try:
         conn = _db.get_db()
         last_seq = 0
@@ -103,10 +112,12 @@ def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
                     _broadcast(key, json.dumps(event))
             except Exception:
                 _logger.debug("tail_events SQLite error", exc_info=True)
-            stop.wait(0.1)
-        return
+            wake.clear()
+            wake.wait(timeout=5.0)  # woken immediately by _on_new_event, or falls back to 5s
     except Exception:
         _logger.warning("tail_events: cannot open central DB for %s/%s", topic, project_root, exc_info=True)
+    finally:
+        _bus.unsubscribe(bus_key, _on_new_event)
 
 
 def _broadcast_runner(topic: str, payload: dict) -> None:

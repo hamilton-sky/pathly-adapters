@@ -76,6 +76,10 @@ def main() -> None:
     logger.info("  GET  %s:%s/health", host, port)
     logger.info("  GET  %s:%s/events/stream?topic=TOPIC&project_root=PATH", host, port)
 
+    # Instantiate pipeline-level subscribers (EventBus side-effects on import).
+    import pathly_orchestrator.metrics   # noqa: F401
+    import pathly_orchestrator.webhook   # noqa: F401
+
     project_root = settings.project_root
     _watcher_stop = threading.Event()
     if project_root and flags.feedback_watcher:

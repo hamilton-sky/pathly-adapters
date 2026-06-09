@@ -109,11 +109,10 @@ def runner_terminal_started():
         run_id = data.get("run_id", "")
         if not topic or not isinstance(run_id, str) or not run_id:
             return jsonify({"error": "unknown run_id"}), 404
-        with _sup._lock:
-            evt = _sup._terminal_started_events.get(run_id)
-            if evt is None:
-                return jsonify({"error": "unknown run_id"}), 404
-            evt.set()
+        run = _sup.get_run(run_id)
+        if run is None:
+            return jsonify({"error": "unknown run_id"}), 404
+        run.mark_started()
         return jsonify({"ok": True}), 200
     except Exception as exc:
         logging.exception("runner_terminal_started error")
@@ -132,10 +131,10 @@ def runner_terminal_result():
         if not topic or not isinstance(run_id, str) or not run_id:
             return jsonify({"error": "unknown run_id"}), 404
 
+        run = _sup.get_run(run_id)
+        if run is None:
+            return jsonify({"error": "unknown run_id"}), 404
         with _sup._lock:
-            evt = _sup._terminal_result_events.get(run_id)
-            if evt is None:
-                return jsonify({"error": "unknown run_id"}), 404
             runner_state = _sup._registry.get(topic)
             if runner_state is not None:
                 adapter = runner_state.current_adapter or "claude"
@@ -181,14 +180,12 @@ def runner_terminal_result():
                 "usage": parsed.get("usage", {}),
             })
 
-        with _sup._lock:
-            _sup._terminal_result_data[run_id] = {
-                "result": parsed,
-                "exit_code": data.get("exit_code"),
-                "wall_seconds": data.get("wall_seconds"),
-                "user_initiated": data.get("user_initiated"),
-            }
-            evt.set()
+        run.mark_pty_result({
+            "result": parsed,
+            "exit_code": data.get("exit_code"),
+            "wall_seconds": data.get("wall_seconds"),
+            "user_initiated": data.get("user_initiated"),
+        })
         return jsonify({"ok": True}), 200
     except Exception as exc:
         logging.exception("runner_terminal_result error")

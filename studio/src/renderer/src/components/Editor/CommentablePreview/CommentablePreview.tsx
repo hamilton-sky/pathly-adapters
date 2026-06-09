@@ -67,11 +67,41 @@ function injectMark(container: HTMLElement, anchor: string, className: string): 
   const norm = anchor.replace(/\s+/g, ' ').trim()
   if (!norm) return null
   // Try full normalised anchor, then progressively shorter prefixes for cross-node selections
-  return (
+  const found = (
     injectMarkForText(container, norm, className) ??
     (norm.length > 60 ? injectMarkForText(container, norm.slice(0, 60), className) : null) ??
     (norm.length > 30 ? injectMarkForText(container, norm.slice(0, 30), className) : null)
   )
+  if (found) return found
+  const words = norm.split(/\s+/)
+  // Fallback A: › -separated chips (priority order list with multiple adjacent <code> elements)
+  const chips = norm.split(/\s*›\s*/)
+  if (chips.length > 1) {
+    for (const chip of chips) {
+      const s = chip.trim()
+      if (s.length >= 4) {
+        const r = injectMarkForText(container, s, className)
+        if (r) return r
+      }
+    }
+  }
+  // Fallback B: selection STARTS inside a <code> element — strip words from the front
+  for (let skip = 1; skip < Math.min(words.length, 8); skip++) {
+    const suffix = words.slice(skip).join(' ')
+    if (suffix.length >= 8) {
+      const r = injectMarkForText(container, suffix, className)
+      if (r) return r
+    }
+  }
+  // Fallback C: selection ENDS inside a <code> element — strip words from the end
+  for (let take = words.length - 1; take >= Math.max(1, words.length - 8); take--) {
+    const prefix = words.slice(0, take).join(' ')
+    if (prefix.length >= 8) {
+      const r = injectMarkForText(container, prefix, className)
+      if (r) return r
+    }
+  }
+  return null
 }
 
 export function CommentablePreview({

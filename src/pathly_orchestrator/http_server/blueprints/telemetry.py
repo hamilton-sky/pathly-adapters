@@ -19,6 +19,23 @@ bp = Blueprint("telemetry", __name__)
 _VALID_PHASES = {"analyze", "build", "design", "implement", "plan", "review", "scout", "storm", "test"}
 _VALID_EVENT_TYPES = {"PHASE_START", "PHASE_DONE"}
 
+# Maps model-name prefixes to the adapter/CLI that runs them.
+_ADAPTER_PREFIXES: list[tuple[tuple[str, ...], str]] = [
+    (("claude-",),                          "claude"),
+    (("gpt-", "o1-", "o3-", "o4-"),        "codex"),
+    (("gemini-",),                          "google"),
+    (("copilot-",),                         "copilot"),
+]
+
+
+def _infer_adapter(model: str) -> str:
+    """Return a CLI/adapter name inferred from the model-name prefix."""
+    m = model.lower()
+    for prefixes, name in _ADAPTER_PREFIXES:
+        if any(m.startswith(p) for p in prefixes):
+            return name
+    return "unknown" if model else ""
+
 logger = logging.getLogger("pathly.http")
 
 
@@ -149,6 +166,8 @@ def record_activity_endpoint():
             wall_seconds = duration_ms // 1000
 
         if flags.telemetry:
+            _model = str(data.get("model", ""))
+            _adapter = str(data.get("adapter", "")) or _infer_adapter(_model)
             append_activity(
                 agent=data["agent"],
                 feature=data["feature"],
@@ -159,6 +178,8 @@ def record_activity_endpoint():
                 tool_uses=int(data.get("tool_uses", 0)),
                 cost_usd=float(cost_usd_val),
                 total_tokens=int(data.get("total_tokens", 0)),
+                model=_model,
+                adapter=_adapter,
             )
 
         trace_id = data.get("trace_id", "")

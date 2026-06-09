@@ -44,6 +44,14 @@ declare global {
     summary: string | null
   }
 
+  interface DbTrendPoint {
+    day: string        // "YYYY-MM-DD"
+    cost_usd: number
+    tokens_in: number
+    tokens_out: number
+    span_count: number
+  }
+
   interface DbOtelSpan {
     id: number
     trace_id: string | null
@@ -167,6 +175,7 @@ declare global {
         events: (feature: string, projectRoot?: string) => Promise<DbEvent[]>
         agents: (feature: string, projectRoot?: string) => Promise<DbAgent[]>
         otel: (feature: string, projectRoot?: string) => Promise<DbOtelSpan[]>
+        trends: (days?: number) => Promise<DbTrendPoint[]>
         runs: (feature: string, projectRoot?: string) => Promise<DbRun[]>
         query: (sql: string) => Promise<{ rows: Record<string, unknown>[]; error?: string }>
         settings: () => Promise<Record<string, string>>

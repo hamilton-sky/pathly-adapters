@@ -174,6 +174,7 @@ pathly-fsm-call record-activity \
   --agent "<agent>" \
   --feature "<feature>" \
   --summary "<summary>" \
+  --model "<model>" \
   --conversation <conversation> \
   --total-tokens <total_tokens> \
   --tool-uses <tool_uses> \

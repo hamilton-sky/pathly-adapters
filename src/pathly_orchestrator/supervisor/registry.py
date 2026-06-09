@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -11,18 +12,91 @@ from .state import RunnerState, logger
 
 _registry: dict[str, RunnerState] = {}
 _lock = threading.Lock()
-_terminal_started_events: dict[str, threading.Event] = {}
-_terminal_result_events: dict[str, threading.Event] = {}
-_terminal_result_data: dict[str, dict] = {}
-
-# Early-advance signal channels — independent of _terminal_result_events/_terminal_result_data.
-# The watcher sets _agent_done_events[run_id] when AGENT_DONE is detected in SQLite.
-# _agent_done_stop_events[run_id] is set to stop the watcher thread.
-# These dicts MUST NEVER be read from or written to by the /runner/terminal/result handler.
-_agent_done_events: dict[str, threading.Event] = {}
-_agent_done_stop_events: dict[str, threading.Event] = {}
-
 _TERMINAL_RESULT_TIMEOUT = 1800
+
+
+@dataclass
+class TerminalRun:
+    """All lifecycle state for one PTY stage execution, guarded by one Condition.
+
+    Replaces five separate signal dicts (_terminal_started_events,
+    _terminal_result_events, _terminal_result_data, _agent_done_events,
+    _agent_done_stop_events). One object, one lock, all transitions visible.
+    """
+
+    run_id: str
+    started: bool = False
+    pty_result: dict | None = None
+    agent_done: bool = False
+    stop_watcher: bool = False
+    _cond: threading.Condition = field(default_factory=threading.Condition)
+
+    def mark_started(self) -> None:
+        with self._cond:
+            self.started = True
+            self._cond.notify_all()
+
+    def mark_pty_result(self, data: dict) -> None:
+        with self._cond:
+            self.pty_result = data
+            self._cond.notify_all()
+
+    def mark_agent_done(self) -> None:
+        with self._cond:
+            self.agent_done = True
+            self._cond.notify_all()
+
+    def request_stop_watcher(self) -> None:
+        with self._cond:
+            self.stop_watcher = True
+            self._cond.notify_all()
+
+    def wait_started(self, timeout: float) -> bool:
+        with self._cond:
+            return self._cond.wait_for(lambda: self.started, timeout=timeout)
+
+    def wait_pty_result(self, timeout: float) -> bool:
+        with self._cond:
+            return self._cond.wait_for(lambda: self.pty_result is not None, timeout=timeout)
+
+    def wait_result_or_agent_done(self, timeout: float) -> str:
+        """Returns 'agent_done', 'pty_result', or 'timeout'."""
+        with self._cond:
+            fired = self._cond.wait_for(
+                lambda: self.pty_result is not None or self.agent_done,
+                timeout=timeout,
+            )
+            if not fired:
+                return "timeout"
+            if self.agent_done and self.pty_result is None:
+                return "agent_done"
+            return "pty_result"
+
+    def wait_watcher_stop_signal(self, timeout: float) -> bool:
+        """Used by the watcher thread: sleep until stop is requested or timeout elapses."""
+        with self._cond:
+            return self._cond.wait_for(lambda: self.stop_watcher, timeout=timeout)
+
+
+_runs: dict[str, TerminalRun] = {}
+_runs_lock = threading.Lock()
+
+
+def create_run(run_id: str) -> TerminalRun:
+    run = TerminalRun(run_id=run_id)
+    with _runs_lock:
+        _runs[run_id] = run
+    return run
+
+
+def get_run(run_id: str) -> Optional[TerminalRun]:
+    with _runs_lock:
+        return _runs.get(run_id)
+
+
+def drop_run(run_id: str) -> None:
+    with _runs_lock:
+        _runs.pop(run_id, None)
 
 
 def get_state(topic: str) -> Optional[RunnerState]:
@@ -109,10 +183,5 @@ def _set_status(state: RunnerState, status: str, broadcast_fn: Optional[Callable
 
 
 def _cleanup_run_id(run_id: str) -> None:
-    """Pop all four signal dicts for run_id — used by interactive mode (no reconciliation window)."""
-    with _lock:
-        _terminal_result_events.pop(run_id, None)
-        _terminal_result_data.pop(run_id, None)
-        _agent_done_events.pop(run_id, None)
-        _agent_done_stop_events.pop(run_id, None)
-    _terminal_started_events.pop(run_id, None)
+    """Remove all lifecycle state for run_id. Used by interactive mode (no reconciliation window)."""
+    drop_run(run_id)

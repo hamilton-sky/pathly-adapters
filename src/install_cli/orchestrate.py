@@ -145,6 +145,7 @@ _SKILL_GROUPS = {
     "po": "planning",
     "prd-import": "planning",
     "retro": "planning",
+    "reflect": "utilities",
     "review": "development",
     "scout-path": "utilities",
     "start": "controls",

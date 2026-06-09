@@ -1,10 +1,13 @@
+---
+
+---
 ## Feedback protocol
 
 All feedback files live in `<feature_path>/feedback/`. File exists = issue open.
 Absent = resolved.
 
 Priority order (highest first): `HUMAN_QUESTIONS.md` › `ARCH_FEEDBACK.md` › `DESIGN_QUESTIONS.md` ›
-`IMPL_QUESTIONS.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`
+`IMPL_QUESTIONS.md` › `REFLECT_CRITIQUE.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`
 
 When you write a feedback file, use the shared feedback protocol formats and then report blocked.
 The orchestrator routes the highest-priority open file to the responsible agent, one at a time,

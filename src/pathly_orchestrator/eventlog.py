@@ -88,6 +88,13 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
     project_root = str(feature_dir.parent.parent.parent)
     _db.append_event(conn, project_root, feature, event)
 
+    try:
+        from pathly_orchestrator.event_bus import _bus
+        _bus.publish(f"FSM_EVENT:{project_root}:{feature}", event)
+        _bus.publish(event.get("type", ""), event)
+    except Exception:
+        pass  # bus notifications are best-effort
+
     event_type = event.get("type", "")
     if event_type in _TOAST_EVENTS:
         level, msg_fn = _TOAST_EVENTS[event_type]

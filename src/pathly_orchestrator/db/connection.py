@@ -54,6 +54,7 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
         conn = sqlite3.connect(db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
         _run_migrations(conn)
         _conn_cache[db_path] = conn

@@ -18,15 +18,12 @@ from pathly_orchestrator.supervisor import (
     supply_decision,
     reroute_run,
     get_state,
+    get_run,
+    drop_run,
     _lock,
     _registry,
     _write_mirror,
     _run_stage_via_terminal,
-    _terminal_started_events,
-    _terminal_result_events,
-    _terminal_result_data,
-    _agent_done_events,  # type: ignore[attr-defined]
-    _agent_done_stop_events,  # type: ignore[attr-defined]
 )
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -686,11 +683,11 @@ def _make_state(tmp_path, topic="ea-test") -> RunnerState:
 
 
 def _simulate_pty_start(run_id: str) -> None:
-    """Fire the terminal_started event so _run_stage_via_terminal can proceed past spawn."""
+    """Mark the run as started so _run_stage_via_terminal can proceed past spawn."""
     import pathly_orchestrator.supervisor as _sup
-    with _sup._lock:
-        evt = _sup._terminal_started_events.setdefault(run_id, threading.Event())
-    evt.set()
+    run = _sup.get_run(run_id)
+    if run is not None:
+        run.mark_started()
 
 
 def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
@@ -716,18 +713,14 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     # Patch _reconciliation_window to record its start, then simulate billing arriving
     original_recon = _sup._reconciliation_window  # type: ignore[attr-defined]
 
-    def fake_recon(run_id_, stage, topic_, events_path_, **_):
+    def fake_recon(run_, stage, topic_, events_path_, **_):
         recon_started.set()
-        # Simulate billing arriving — set the result event
-        with _sup._lock:
-            result_evt = _sup._terminal_result_events.get(run_id_)
-            _sup._terminal_result_data[run_id_] = {
-                "result": {"cost_usd": 0.07, "session_id": "s1"},
-                "exit_code": 0,
-            }
-        if result_evt is not None:
-            result_evt.set()
-        original_recon(run_id_, stage, topic_, events_path_, timeout=0.2)
+        # Simulate billing arriving via the new TerminalRun API
+        run_.mark_pty_result({
+            "result": {"cost_usd": 0.07, "session_id": "s1"},
+            "exit_code": 0,
+        })
+        original_recon(run_, stage, topic_, events_path_, timeout=0.2)
         advance_called.set()
 
     broadcast_events = []
@@ -750,7 +743,7 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
                 })
             threading.Thread(target=_write_event, daemon=True).start()
 
-    with patch("pathly_orchestrator.supervisor._reconciliation_window", side_effect=fake_recon):
+    with patch("pathly_orchestrator.supervisor.terminal._reconciliation_window", side_effect=fake_recon):
         result = _run_stage_via_terminal(
             state,
             "do stuff",
@@ -770,13 +763,8 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     event_types = [e["type"] for e in written_events]
     assert "STAGE_RECONCILIATION_FAILURE" not in event_types
 
-    # Cleanup
-    with _sup._lock:
-        _sup._terminal_started_events.pop(run_id, None)
-        _sup._terminal_result_events.pop(run_id, None)
-        _sup._terminal_result_data.pop(run_id, None)
-        _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
-        _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]
+    # Cleanup — reconciliation_window drops the run; belt-and-suspenders
+    _sup.drop_run(run_id)
 
 
 def test_early_advance_billing_timeout(tmp_path, monkeypatch):
@@ -801,9 +789,9 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
 
     original_recon = _sup._reconciliation_window  # type: ignore[attr-defined]
 
-    def fake_recon(run_id_, stage, topic_, events_path_, **_):
+    def fake_recon(run_, stage, topic_, events_path_, **_):
         # Use short timeout so billing never arrives
-        original_recon(run_id_, stage, topic_, events_path_, timeout=0.1)
+        original_recon(run_, stage, topic_, events_path_, timeout=0.1)
         recon_done.set()
 
     def fake_broadcast(_, payload):
@@ -823,7 +811,7 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
                 })
             threading.Thread(target=_write_event, daemon=True).start()
 
-    with patch("pathly_orchestrator.supervisor._reconciliation_window", side_effect=fake_recon):
+    with patch("pathly_orchestrator.supervisor.terminal._reconciliation_window", side_effect=fake_recon):
         result = _run_stage_via_terminal(
             state,
             "do stuff",
@@ -843,13 +831,8 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
     # FSM was advanced (result returned from fast path)
     assert "cost_usd" in result
 
-    # Cleanup
-    with _sup._lock:
-        _sup._terminal_started_events.pop(run_id, None)
-        _sup._terminal_result_events.pop(run_id, None)
-        _sup._terminal_result_data.pop(run_id, None)
-        _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
-        _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]
+    # Cleanup — reconciliation_window drops the run; belt-and-suspenders
+    _sup.drop_run(run_id)
 
 
 def test_slow_path_no_regression(tmp_path, monkeypatch):
@@ -875,14 +858,12 @@ def test_slow_path_no_regression(tmp_path, monkeypatch):
             # Simulate PTY completing shortly after start
             def _post_result():
                 pty_result_ready.wait(timeout=2.0)
-                with _sup._lock:
-                    _sup._terminal_result_data[run_id] = {
+                run = _sup.get_run(run_id)
+                if run is not None:
+                    run.mark_pty_result({
                         "result": {"cost_usd": 0.03, "session_id": "s2"},
                         "exit_code": 0,
-                    }
-                    evt = _sup._terminal_result_events.get(run_id)
-                if evt is not None:
-                    evt.set()
+                    })
             t = threading.Thread(target=_post_result, daemon=True)
             t.start()
             pty_result_ready.set()
@@ -899,17 +880,8 @@ def test_slow_path_no_regression(tmp_path, monkeypatch):
     # FSM advance once — result came from PTY data
     assert result.get("cost_usd") == 0.03
 
-    # _agent_done_events was never populated for this run_id
-    with _sup._lock:
-        assert run_id not in _sup._agent_done_events  # type: ignore[attr-defined]
-
-    # Cleanup
-    with _sup._lock:
-        _sup._terminal_started_events.pop(run_id, None)
-        _sup._terminal_result_events.pop(run_id, None)
-        _sup._terminal_result_data.pop(run_id, None)
-        _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
-        _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]
+    # Run was cleaned up after slow path completes
+    assert _sup.get_run(run_id) is None
 
 
 def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
@@ -968,15 +940,8 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
     assert "STAGE_INTERACTIVE_DONE" in _event_types
     assert "STAGE_RECONCILIATION_FAILURE" not in _event_types
 
-    with _sup._lock:
-        assert run_id not in _sup._terminal_result_events  # type: ignore[attr-defined]
-
-    with _sup._lock:
-        _sup._terminal_started_events.pop(run_id, None)
-        _sup._terminal_result_events.pop(run_id, None)
-        _sup._terminal_result_data.pop(run_id, None)
-        _sup._agent_done_events.pop(run_id, None)  # type: ignore[attr-defined]
-        _sup._agent_done_stop_events.pop(run_id, None)  # type: ignore[attr-defined]
+    # Interactive path drops the run before returning
+    assert _sup.get_run(run_id) is None
 
 
 def test_interactive_mode_strips_headless_flags(monkeypatch):

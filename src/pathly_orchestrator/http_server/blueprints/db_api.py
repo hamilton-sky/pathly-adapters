@@ -298,6 +298,38 @@ def db_feature_runs(feature: str):
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/db/stats/trends", methods=["GET"])
+def db_stats_trends():
+    """Daily cost/token aggregates from otel_spans — last N days (default 30)."""
+    try:
+        conn = _get_db()
+        pr = _project_root_param()
+        days = min(int(request.args.get("days", 30)), 365)
+
+        query = """
+            SELECT
+              date(start_time) AS day,
+              COALESCE(ROUND(SUM(CAST(json_extract(attributes,'$.pathly.cost_usd') AS REAL)),6),0)       AS cost_usd,
+              COALESCE(SUM(CAST(json_extract(attributes,'$.gen_ai.usage.input_tokens')  AS INTEGER)),0)  AS tokens_in,
+              COALESCE(SUM(CAST(json_extract(attributes,'$.gen_ai.usage.output_tokens') AS INTEGER)),0)  AS tokens_out,
+              COUNT(*) AS span_count
+            FROM otel_spans
+            WHERE start_time IS NOT NULL
+              AND start_time >= date('now',?)
+        """
+        params: list = [f"-{days} days"]
+        if pr:
+            query += " AND project_root=?"
+            params.append(pr)
+        query += " GROUP BY date(start_time) ORDER BY day ASC"
+
+        rows = conn.execute(query, params).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        logger.exception("db_stats_trends error")
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/db/query", methods=["POST"])
 def db_query():
     """Sandboxed SELECT-only SQL query."""
