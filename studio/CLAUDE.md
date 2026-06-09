@@ -90,7 +90,9 @@ Never use `style={{ ... }}` props. All styling goes in the component's `.module.
 
 **The only accepted exceptions** — values that are genuinely impossible to express in static CSS:
 - Dynamic progress bar width: `style={{ width: \`${pct}%\` }}` → use `<progress value={pct} max={100} />` instead (no style prop needed)
-- CSS custom properties set imperatively via `ref.current.style.setProperty(...)` in a `useEffect` — this bypasses the JSX style prop entirely
+- CSS custom properties injected per-element: `style={{ '--anim-delay': `${index * 55}ms` } as React.CSSProperties}` — the value feeds a `var(--anim-delay)` reference in the CSS module; the style prop carries data, not presentation
+- Non-standard properties with no TypeScript-safe CSS alternative: `style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}` for Electron drag regions
+- Imperative setProperty when the value changes after mount: `ref.current.style.setProperty('--offset', `${y}px`)` inside a `useEffect`
 
 Theme colors and spacing always come from CSS custom properties defined in `tokens.css` (`var(--bg-mantle)`, `var(--accent)`, `var(--text-primary)`, etc.) — never from a `useTheme()` call in JSX.
 
@@ -112,6 +114,42 @@ ComponentName/
 - A repeated render block → named sub-component in the same folder
 - All state + effects + handlers for a large component → a `useComponentName` hook file
 - Pure utility functions (no React) → a `utils.ts` or `componentNameUtils.ts` file
+- Standalone SVG icons with no CSS → a shared `icons.tsx` file in the feature folder (no subfolder, no `.module.css`); size/color via Lucide `size` prop or `currentColor`, never a `style` prop
+
+**Hook naming and location:**
+```
+ComponentName/
+  hooks/
+    useComponentName.ts   ← UI state + event handlers (tab, viewMode, open/close)
+    useFeatureName.ts     ← data fetching and side effects (async loads, subscriptions)
+```
+One hook per concern. UI state hooks return named state + setters + derived handlers. Data hooks return data only — no setters exposed to callers.
+
+### CSS variant pattern — data attributes over class proliferation
+
+When an element has 3+ visual states that differ only in color or decoration, use a `data-*` attribute instead of a cascade of conditional class names. The CSS module handles all variants with attribute selectors:
+
+```tsx
+// Instead of: className={`${s.badge} ${isBlocked ? s.blocked : isActive ? s.active : s.idle}`}
+<span className={styles.badge} data-status={status}>{label}</span>
+```
+```css
+.badge[data-status='blocked'] { color: var(--red); animation: pulseRed 1.8s infinite; }
+.badge[data-status='active']  { color: var(--accent); }
+.badge[data-status='idle']    { color: var(--text-muted); }
+```
+
+Use `.className` modifiers (`.active`, `.pinned`) for simple binary states. Use `data-*` attributes when there are 3+ mutually exclusive states or when the same element accepts values from an enum/union type.
+
+### Hover state — CSS first, JS only when it must cross a component boundary
+
+| Hover reach | Pattern |
+|---|---|
+| Affects only the element itself | CSS `:hover` pseudo-class — no JS |
+| Shows/hides a child of the same element | CSS `.parent:hover .child { opacity: 1; }` — no JS |
+| Shows/hides a sibling in a **different component file** | `const [isHovered, setIsHovered] = useState(false)` in the shared parent → pass as `isHovered: boolean` prop → child applies a CSS class (`.visible`) |
+
+Never put hover state in Zustand. It is ephemeral UI state that belongs to the component that renders the hovered element.
 
 ### Buttons
 Every `<button>` must have an explicit `type="button"` (or `type="submit"` if it submits a form). No exceptions.
