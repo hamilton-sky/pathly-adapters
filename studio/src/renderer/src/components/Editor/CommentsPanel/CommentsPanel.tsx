@@ -61,7 +61,7 @@ export function CommentsPanel({
               onClick={onToggleHighlights}
               aria-label={showHighlights ? 'Hide highlights in preview' : 'Show highlights in preview'}
             >
-              {showHighlights ? <Eye size={13} /> : <EyeOff size={13} />}
+              {showHighlights ? <Eye size={15} /> : <EyeOff size={15} />}
             </button>
           </Tooltip>
           <Tooltip label="Clear all comments" placement="bottom">
@@ -72,7 +72,7 @@ export function CommentsPanel({
               disabled={comments.length === 0}
               aria-label="Clear all comments"
             >
-              <Trash2 size={13} />
+              <Trash2 size={15} />
             </button>
           </Tooltip>
           <Tooltip label="Collapse panel" placement="bottom">
@@ -82,7 +82,7 @@ export function CommentsPanel({
               onClick={onCollapse}
               aria-label="Hide comments panel"
             >
-              <ChevronRight size={13} />
+              <ChevronRight size={15} />
             </button>
           </Tooltip>
         </div>
@@ -133,7 +133,7 @@ export function CommentsPanel({
             onClick={() => void handleSendToAgent()}
             aria-label="Send comments to agent"
           >
-            <SendHorizonal size={13} />
+            <SendHorizonal size={15} />
             Send to Agent
           </button>
         </div>
