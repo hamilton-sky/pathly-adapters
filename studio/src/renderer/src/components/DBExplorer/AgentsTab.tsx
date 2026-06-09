@@ -33,6 +33,7 @@ function parseAgentDone(payload: Record<string, unknown>): AgentRow {
         String(payload.model ?? ''),
         Number(payload.tokens_in ?? 0),
         Number(payload.tokens_out ?? 0),
+        Number(payload.total_tokens ?? 0),
       )
     })(),
     wallSeconds: Number(payload.wall_seconds ?? 0),

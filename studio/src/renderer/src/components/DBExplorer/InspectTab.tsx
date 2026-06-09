@@ -55,7 +55,7 @@ export function InspectTab({ events }: InspectTabProps): JSX.Element {
                 const stored = Number(p.cost_usd ?? 0)
                 return s + (stored > 0
                   ? stored
-                  : computeCost(String(p.model ?? ''), Number(p.tokens_in ?? 0), Number(p.tokens_out ?? 0)))
+                  : computeCost(String(p.model ?? ''), Number(p.tokens_in ?? 0), Number(p.tokens_out ?? 0), Number(p.total_tokens ?? 0)))
               }, 0)
             : undefined,
         }
