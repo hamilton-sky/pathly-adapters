@@ -483,8 +483,7 @@ export function Sidebar(): JSX.Element | null {
     }
   }
 
-  async function createNewCatalogItem(type: CatalogGroup['type'], category?: string): Promise<void> {
-    const name = window.prompt(`New ${type} name:`)
+  async function createNewCatalogItem(type: CatalogGroup['type'], category?: string, name?: string): Promise<void> {
     if (!name?.trim()) return
     await fetch('http://localhost:8765/catalog/item/new', {
       method: 'POST',
@@ -509,7 +508,7 @@ export function Sidebar(): JSX.Element | null {
     const res = await fetch('http://localhost:8765/catalog/item/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, name: item.name, newStem }),
+      body: JSON.stringify({ type, name: item.name, newName: newStem }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({})) as { error?: string }
@@ -567,11 +566,11 @@ export function Sidebar(): JSX.Element | null {
               }
             }}
             onAddCells={(item) => setSplitModalItem(item)}
-            onNewItem={async (type, category) => {
+            onNewItem={async (type, category, name) => {
               if (type === 'flow') {
                 setShowFlowWizard(true)
               } else {
-                await createNewCatalogItem(type, category)
+                await createNewCatalogItem(type, category, name)
               }
             }}
             onDeleteItem={(item, type) => deleteItemViaAPI(item, type)}

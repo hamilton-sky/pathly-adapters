@@ -154,6 +154,54 @@ npm run typecheck
 
 ---
 
+---
+
+## Phase 4 — Skill update: builder emits PHASE_SUMMARY mid-stage
+
+**Files changed:**
+- `src/pathly_data/core/skills/development/build.md`
+- (runner mode) FSM `agent_hint.instructions` template for BUILD stage if skills are injected at runtime
+
+**What to add:**
+
+In the builder skill, add a section instructing the agent to call the progress endpoint at milestones:
+
+```
+## Emitting progress notes
+
+During long-running work, POST progress notes to the FSM so the user can see activity in Studio:
+
+  POST http://127.0.0.1:8765/record_phase_summary
+  Content-Type: application/json
+  {"feature": "<feature>", "agent": "builder", "text": "<short note>"}
+
+Call this:
+- After completing each conversation's implementation
+- After running tests successfully
+- Before starting a large refactor or multi-file change
+
+If the endpoint is unavailable or returns non-200, log the error and continue — never abort work over a missing progress note.
+```
+
+After editing, run `pathly-setup claude --apply --repair` to propagate to `~/.claude/skills/pathly-build.md`.
+
+**Done-when:**
+- Skill file contains the progress note instructions
+- `pathly-setup claude --apply --repair` runs without error
+- After a BUILD stage, at least one PHASE_SUMMARY row with `json_extract(payload, '$.agent') != 'supervisor'` exists in the feature DB
+
+**Note on `conv` field:** The endpoint stores an optional `conv` integer in the payload. The EventLog does not yet display or filter by it — it is reserved for a future conversation-scoped view. Agents may include it when the conversation number is known; it should not block the call if unknown.
+
+---
+
+## Known gaps (not yet planned)
+
+**Automated tests:** Stories 1–3 verify via curl and manual DB queries. Add pytest parametrize tests for the endpoint's 400 validation paths to `tests/test_http_server.py` in a future cleanup pass.
+
+**Supervisor heartbeat:** The supervisor writes only at spawn + complete. A stage running for 20+ minutes goes silent between those two notes. A future story could add a "still running — N min" note every 5 minutes while the PTY is active.
+
+---
+
 ## Conversation breakdown
 
 | Conv | Phase(s) | Stories | Files | Done-when |
@@ -161,3 +209,4 @@ npm run typecheck
 | 1 | Backend endpoint | Stories 1, 2, 5 | `http_server.py` | `/record_phase_summary` returns 200 + seq; SQLite row exists |
 | 2 | Supervisor integration | Story 3 | `supervisor.py` | Two PHASE_SUMMARY rows in DB after one pipeline stage |
 | 3 | Frontend rendering | Story 4 | `EventLog.tsx`, `Monitor.module.css` | Typecheck passes; PHASE_SUMMARY renders in correct color |
+| 4 | Skill update | Story 6 | `core/skills/pathly-build.md` | Skill instructs agent to call endpoint; `--repair` propagates |

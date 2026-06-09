@@ -425,9 +425,12 @@ def create_category():
         if not name:
             return jsonify({"error": "Field 'name' is required"}), 400
 
-        safe = _re.sub(r"[^a-z0-9\-_]", "-", name.lower()).strip("-")
-        if not safe:
+        # Support nested paths (e.g. "planning/hello") by sanitizing each segment
+        segments = [_re.sub(r"[^a-z0-9\-_]", "-", s.lower()).strip("-") for s in name.split("/")]
+        segments = [s for s in segments if s]
+        if not segments:
             return jsonify({"error": "Invalid name"}), 400
+        safe = "/".join(segments)
 
         data_root = _find_data_root()
         if not data_root:
@@ -439,7 +442,7 @@ def create_category():
             base = data_root / "core" / "skills"
         else:
             base = data_root / "core" / "templates"
-        new_dir = base / safe
+        new_dir = base.joinpath(*segments)
         if new_dir.exists():
             return jsonify({"error": f"Category '{safe}' already exists"}), 409
 

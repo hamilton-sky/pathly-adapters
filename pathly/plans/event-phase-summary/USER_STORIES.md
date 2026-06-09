@@ -118,3 +118,33 @@ curl -s -X POST http://127.0.0.1:8765/record_phase_summary \
 3. No new endpoint, no new API field, and no change to the EventSource setup in `useMonitorSession.ts` is required for this story — it is a free property of storing events in SQLite.
 
 **Delivered by:** Conversation 1 (backend foundation) — this is a free property of using `append_event`; no extra implementation needed. AC is a verification story only.
+
+---
+
+## Story 6 — Builder agent emits PHASE_SUMMARY mid-stage
+
+**Who:** A user watching the Studio Monitor during a long BUILD or REVIEW stage
+**What:** Sees PHASE_SUMMARY notes emitted by the active agent (not just the supervisor) as it completes internal milestones
+**Why:** Supervisor auto-notes only appear at stage start/end. A 20-minute build stage stays silent in between unless the agent itself emits progress notes using the new endpoint.
+
+**Acceptance criteria:**
+
+1. The builder skill file (`src/pathly_data/core/skills/pathly-build.md`) contains instructions telling the agent to `POST http://127.0.0.1:8765/record_phase_summary` at key milestones: after finishing each conversation's implementation, after tests pass, before starting a large refactor.
+2. The request body includes `feature`, `agent: "builder"`, a short `text` note, and optionally `conv` (the current conversation number). `project_root` is omitted when `PATHLY_PROJECT_ROOT` is set in the environment.
+3. If the endpoint returns non-200, the agent logs the failure and continues — it never aborts work because a progress note failed.
+4. After a BUILD stage completes end-to-end, at least one PHASE_SUMMARY row with `agent != 'supervisor'` exists in the feature's SQLite DB.
+5. `pathly-setup claude --apply --repair` propagates the updated skill to `~/.claude/skills/pathly-build.md` without error.
+
+**Edge cases:**
+- Agent is running in runner mode (no skill file on disk) — the supervisor injects the full prompt via `-p` argv. The skill update must also be reflected in the FSM's `agent_hint.instructions` template for the BUILD stage.
+- `PATHLY_PROJECT_ROOT` may not be set — agent must fall back to the known project root from its context before skipping the call entirely.
+
+**Open question — `conv` field usage:** The `/record_phase_summary` endpoint accepts an optional `conv` integer stored in the event payload. The EventLog does not currently display or filter by it. Reserved for a future story that scopes the EventLog to a single conversation's events. Do not remove it from the endpoint; do not add UI for it until that story is written.
+
+**Delivered by:** Conversation 4 (skill update)
+
+---
+
+## Automated test gap (non-story)
+
+Stories 1–3 rely on curl and manual DB queries for acceptance verification. The endpoint validation rules (400 on missing `feature`/`agent`/`text`, 400 on text > 2000 chars, 400 on missing feature dir) are strong candidates for pytest parametrize tests. Add these in a future cleanup conversation targeting `tests/test_http_server.py`.

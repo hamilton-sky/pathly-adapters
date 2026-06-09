@@ -1,0 +1,13 @@
+{
+  "comments": [
+    {
+      "id": "c-mq6wozyb-n4rn",
+      "lineNumber": 1,
+      "lineText": "mmit\nThis is the canonical, tool-agnostic Pathly behavior for the commit skill. Adapter skills should load and follow th",
+      "body": "gg",
+      "resolved": false,
+      "createdAt": "2026-06-09T17:21:01.955Z",
+      "color": "orange"
+    }
+  ]
+}

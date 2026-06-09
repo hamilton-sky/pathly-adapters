@@ -12,7 +12,7 @@ interface Props {
   onOpenFlow?: (pathOrName: string) => void
   onInsertCell?: (item: CatalogItemData) => void
   onAddCells?: (item: CatalogItemData) => void
-  onNewItem?: (type: CatalogGroup['type'], category?: string) => Promise<void>
+  onNewItem?: (type: CatalogGroup['type'], category?: string, name?: string) => Promise<void>
   onDeleteItem?: (item: CatalogItemData, type: CatalogGroup['type']) => Promise<void>
   onDeleteCategory?: (type: CatalogGroup['type'], category: string) => Promise<void>
   onNewCategory?: (type: CatalogGroup['type'], name: string) => Promise<void>
@@ -141,6 +141,8 @@ function ItemRow({ item, type, groupIcon, context, displayName, categories, onOp
     menuItems.push({ label: 'Insert as cell', onClick: () => { setMenuOpen(false); onInsertCell?.(item) } })
     if (hasPath) menuItems.push({ label: 'Open to edit', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
     if (hasPath) menuItems.push({ label: 'Split into cells', onClick: () => { setMenuOpen(false); onAddCells?.(item) } })
+  } else {
+    if (hasPath) menuItems.push({ label: 'Open', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
   }
   if (onRenameItem && !isFlow) {
     menuItems.push({ label: 'Rename', onClick: () => {
@@ -504,7 +506,7 @@ interface GroupSectionProps {
   onOpenFlow?: (pathOrName: string) => void
   onInsertCell?: (item: CatalogItemData) => void
   onAddCells?: (item: CatalogItemData) => void
-  onNewItem?: (type: CatalogGroup['type'], category?: string) => Promise<void>
+  onNewItem?: (type: CatalogGroup['type'], category?: string, name?: string) => Promise<void>
   onDeleteItem?: (item: CatalogItemData, type: CatalogGroup['type']) => void
   onDeleteCategory?: (type: CatalogGroup['type'], category: string) => void
   onRequestDeleteCategory?: (type: CatalogGroup['type'], category: string) => void
@@ -519,6 +521,8 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
   const [showCatForm, setShowCatForm] = useState(false)
   const [catName, setCatName]         = useState('')
+  const [showItemForm, setShowItemForm] = useState(false)
+  const [itemFormName, setItemFormName] = useState('')
   const groupMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setOpen(false) }, [collapseKey])
@@ -544,6 +548,14 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
     await onNewCategory?.(group.type, trimmed)
     setShowCatForm(false)
     setCatName('')
+  }
+
+  async function handleCreateItem() {
+    const trimmed = itemFormName.trim()
+    if (!trimmed) return
+    await onNewItem?.(group.type, undefined, trimmed)
+    setShowItemForm(false)
+    setItemFormName('')
   }
 
   const singularLabel = group.label.toLowerCase().replace(/s$/, '')
@@ -584,7 +596,7 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
             <button
               type="button"
               className={styles.menuItem}
-              onClick={() => { setGroupMenuOpen(false); void onNewItem?.(group.type) }}
+              onClick={() => { setGroupMenuOpen(false); setOpen(true); setShowItemForm(true) }}
             >
               <Plus size={11} />
               New {singularLabel}
@@ -623,6 +635,24 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
     </div>
   )
 
+  const itemForm = showItemForm && (
+    <div className={styles.newCatForm}>
+      <input
+        className={styles.newCatInput}
+        value={itemFormName}
+        onChange={e => setItemFormName(e.target.value)}
+        placeholder={`New ${singularLabel} name…`}
+        autoFocus
+        onKeyDown={e => {
+          if (e.key === 'Enter') void handleCreateItem()
+          if (e.key === 'Escape') { setShowItemForm(false); setItemFormName('') }
+        }}
+      />
+      <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateItem()}>Create</button>
+      <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowItemForm(false); setItemFormName('') }}>{'✕'}</button>
+    </div>
+  )
+
   if (useSubcategories) {
     const tree = buildCategoryTree(group.items, group.type)
     const treeCategories = Object.keys(tree).sort()
@@ -631,6 +661,7 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
       <div>
         {groupHeader}
         {catForm}
+        {itemForm}
         {open && treeCategories.map(cat => (
           <SubGroup
             key={cat}
@@ -663,6 +694,7 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
     <div>
       {groupHeader}
       {catForm}
+      {itemForm}
       {open && group.items.map(item => (
         <ItemRow
           key={item.name}
@@ -699,6 +731,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
   const [query, setQuery]           = useState('')
   const [collapseKey, setCollapseKey] = useState(0)
   const [operationError, setOperationError] = useState<string | null>(null)
+  const [operationInfo, setOperationInfo]   = useState<string | null>(null)
 
   const [pendingDelete, setPendingDelete]     = useState<{ item: CatalogItemData; type: CatalogGroup['type'] } | null>(null)
   const [pendingDeleteCat, setPendingDeleteCat] = useState<{ type: CatalogGroup['type']; category: string } | null>(null)
@@ -785,8 +818,8 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
             onOpenFlow={onOpenFlow}
             onInsertCell={onInsertCell}
             onAddCells={onAddCells}
-            onNewItem={onNewItem ? withRefresh(async (type, category) => {
-              await onNewItem(type, category)
+            onNewItem={onNewItem ? withRefresh(async (type, category, name) => {
+              await onNewItem(type, category, name)
             }) : undefined}
             onDeleteItem={onDeleteItem ? requestDelete : undefined}
             onDeleteCategory={onDeleteCategory}
@@ -797,12 +830,25 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
             onMoveItem={onMoveItem ? withRefresh(async (item, type, cat) => {
               await onMoveItem(item, type, cat)
             }) : undefined}
-            onRenameItem={onRenameItem ? withRefresh(async (item, type, stem) => {
-              await onRenameItem(item, type, stem)
-            }) : undefined}
-            onRenameCategory={onRenameCategory ? withRefresh(async (type, old, n) => {
-              await onRenameCategory(type, old, n)
-            }) : undefined}
+            onRenameItem={onRenameItem ? async (item, type, stem) => {
+              const oldName = leafName(item)
+              try {
+                await onRenameItem(item, type, stem)
+                setRefreshKey(k => k + 1)
+                setOperationInfo(`"${oldName}" renamed to "${stem}". Check plan files for any references to the old name.`)
+              } catch (e: unknown) {
+                setOperationError(e instanceof Error ? e.message : 'Rename failed')
+              }
+            } : undefined}
+            onRenameCategory={onRenameCategory ? async (type, old, n) => {
+              try {
+                await onRenameCategory(type, old, n)
+                setRefreshKey(k => k + 1)
+                setOperationInfo(`Category "${old}" renamed to "${n}". Check plan files for any references to the old name.`)
+              } catch (e: unknown) {
+                setOperationError(e instanceof Error ? e.message : 'Category rename failed')
+              }
+            } : undefined}
           />
         ))}
         {filtered.length === 0 && query.trim() && (
@@ -896,6 +942,19 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
             <div className={styles.confirmBody}>{operationError}</div>
             <div className={styles.confirmActions}>
               <button type="button" className={styles.confirmCancel} onClick={() => setOperationError(null)}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rename notice modal ── */}
+      {operationInfo && (
+        <div className={styles.confirmOverlay}>
+          <div className={styles.confirmCard}>
+            <div className={styles.confirmTitle}>Note</div>
+            <div className={styles.confirmBody}>{operationInfo}</div>
+            <div className={styles.confirmActions}>
+              <button type="button" className={styles.confirmCancel} onClick={() => setOperationInfo(null)}>OK</button>
             </div>
           </div>
         </div>

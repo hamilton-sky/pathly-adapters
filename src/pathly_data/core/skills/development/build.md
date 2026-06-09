@@ -156,6 +156,23 @@ After successful verification, report:
 
 Do NOT update PROGRESS.md. Do NOT commit. The orchestrator (`/pathly team`) handles both after the reviewer passes.
 
+## Emitting progress notes
+
+During long-running work, POST progress notes to the FSM so the user can see activity in the Studio Monitor:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/record_phase_summary \
+  -H "Content-Type: application/json" \
+  -d "{\"feature\": \"<feature>\", \"agent\": \"builder\", \"text\": \"<short note>\"}"
+```
+
+Call this at:
+- After completing each conversation's implementation
+- After tests pass
+- Before starting a large multi-file refactor
+
+If `PATHLY_PROJECT_ROOT` is set in the environment, omit `project_root` from the body — the server reads it from the env var. If the endpoint is unreachable or returns non-200, log a one-line warning and continue. Never abort work because a progress note failed.
+
 ## Exit contract
 
 Write `pathly/plans/<feature>/STATE.json`:

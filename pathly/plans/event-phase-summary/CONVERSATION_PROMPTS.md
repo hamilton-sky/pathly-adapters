@@ -254,3 +254,75 @@ npm run typecheck
 ```
 
 Manual check: in a running Studio session with an active pipeline, confirm PHASE_SUMMARY events appear in the Events tab in amber, formatted as `HH:MM:SS  SUMMARY         <agent>  <text>`.
+
+---
+
+## Conversation 4 — Skill update: builder emits PHASE_SUMMARY mid-stage
+
+**Stories delivered:** Story 6 (builder agent calling convention)
+
+**Files to change:**
+- `src/pathly_data/core/skills/development/build.md`
+
+---
+
+You are updating the Pathly builder skill so that builder agents emit progress notes during long-running pipeline stages.
+
+### Context
+
+The FSM server now has a `/record_phase_summary` endpoint (added in Conv 1). The supervisor already auto-writes PHASE_SUMMARY events at stage start and end (Conv 2). However, mid-stage progress — "finished DB layer", "tests passing", "starting frontend changes" — only appears if the builder agent itself calls the endpoint.
+
+The builder skill file drives what builder agents do. Agents running in **interactive mode** read it from `~/.claude/skills/pathly-build.md`. Agents running in **runner mode** receive the skill content injected as a CLI argument by the supervisor — but the source of truth is still `src/pathly_data/core/skills/pathly-build.md`.
+
+### What to build
+
+**Step 1:** Read `src/pathly_data/core/skills/pathly-build.md` to understand the existing structure.
+
+**Step 2:** Add a section titled `## Emitting progress notes` to the skill. Place it near the end of the skill, before any final instructions. Content:
+
+```markdown
+## Emitting progress notes
+
+During long-running work, call the FSM progress endpoint so the user can see activity in the Studio Monitor:
+
+POST http://127.0.0.1:8765/record_phase_summary
+Content-Type: application/json
+{"feature": "<feature>", "agent": "builder", "text": "<short note>"}
+
+Call this at:
+- After completing each conversation's implementation
+- After tests pass
+- Before starting a large multi-file refactor
+
+If `PATHLY_PROJECT_ROOT` is set in the environment, omit `project_root` from the body — the server reads it from the env var. If the endpoint is unreachable or returns non-200, log a one-line warning and continue. Never abort work because a progress note failed.
+```
+
+Replace `<feature>` with the actual feature name (available from `pathly/plans/` directory name or the plan STATE.json).
+
+**Step 3:** After saving the file, run the install propagation:
+```bash
+pathly-setup claude --apply --repair
+```
+This copies the updated skill to `~/.claude/skills/pathly-build.md`.
+
+### Acceptance check
+
+```bash
+# Verify the skill file was updated:
+grep -n "record_phase_summary" src/pathly_data/core/skills/pathly-build.md
+# Must return at least one match
+
+# Verify propagation:
+grep -n "record_phase_summary" ~/.claude/skills/pathly-build.md
+# Must match the source
+
+# Run existing tests:
+python -m pytest tests/ -q
+# Must pass with zero failures
+```
+
+### Important constraints
+
+- Do not add the progress note section to every skill — only `pathly-build.md` for now.
+- The `conv` field is optional. If the builder knows the current conversation number (e.g., from `CONVERSATION_PROMPTS.md`), include `"conv": <int>` in the body. If not, omit it — the endpoint does not require it.
+- Do not add retries. One attempt, log on failure, move on.
