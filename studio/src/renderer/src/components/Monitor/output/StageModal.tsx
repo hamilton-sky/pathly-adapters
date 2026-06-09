@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { marked } from 'marked'
-import type { StageLogEntry } from '../../store/runnerStore'
+import type { StageLogEntry } from '../../../store/runnerStore'
 import styles from './StageModal.module.css'
 
 interface Props {

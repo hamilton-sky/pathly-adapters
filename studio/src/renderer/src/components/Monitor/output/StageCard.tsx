@@ -1,4 +1,4 @@
-import type { StageLogEntry } from '../../store/runnerStore'
+import type { StageLogEntry } from '../../../store/runnerStore'
 import styles from './StageCard.module.css'
 
 interface Props {

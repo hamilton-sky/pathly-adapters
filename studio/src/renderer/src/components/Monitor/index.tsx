@@ -8,7 +8,7 @@ import { MetricsStrip } from './MetricsStrip'
 import { FsmView } from './FsmView'
 import { EventLog } from './EventLog'
 import { HealthCheck } from './HealthCheck'
-import { OutputTab } from './OutputTab'
+import { OutputTab } from './output/OutputTab'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
 import styles from './Monitor.module.css'
 

@@ -3,7 +3,7 @@ import type { FlowSession } from '../../types/index'
 import { extractTopic, flowTypeLabel, truncate } from './utils'
 import styles from './Monitor.module.css'
 
-const PAGE_SIZE = 3
+const PAGE_SIZE = 5
 
 interface Props {
   sessions: Record<string, FlowSession>
