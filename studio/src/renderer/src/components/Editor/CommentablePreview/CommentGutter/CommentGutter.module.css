@@ -54,3 +54,75 @@
   transform: translateY(-50%) scale(1.0);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
+
+/* ── Inline end-of-selection chip ─────────────────────────────────
+   Small numbered circle at the right edge of each highlight.
+   Same color family as the gutter badge, but 18px and semi-transparent. */
+.inlineBadge {
+  position: fixed;
+  top: var(--inline-top, -100px);
+  left: var(--inline-left, -100px);
+  transform: translateY(-50%);
+
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--badge-color, var(--comment-yellow-swatch)) 70%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--badge-color, var(--comment-yellow-swatch)) 80%, #000);
+  color: #0a0f1a;
+  backdrop-filter: blur(2px);
+
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  pointer-events: all;
+  z-index: 21;
+
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  transition: transform var(--transition-fast), opacity var(--transition-fast);
+}
+.inlineBadge:hover {
+  transform: translateY(-50%) scale(1.2);
+  background: var(--badge-color, var(--comment-yellow-swatch));
+}
+.inlineBadge[data-pinned="true"] {
+  opacity: 0.45;
+  transform: translateY(-50%) scale(0.8);
+}
+.inlineBadge:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+/* ── Draft badge — pulsing accent circle while the modal is open ──── */
+.draftBadge {
+  position: fixed;
+  top: var(--draft-top, -100px);
+  left: var(--draft-left, -100px);
+  transform: translateY(-50%);
+
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  border: 2px solid color-mix(in srgb, var(--accent) 60%, #000);
+  z-index: 22;
+  pointer-events: none;
+
+  animation: draftPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes draftPulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  50% {
+    opacity: 0.65;
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}

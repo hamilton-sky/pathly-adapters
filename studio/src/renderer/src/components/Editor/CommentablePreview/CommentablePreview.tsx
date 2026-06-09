@@ -140,6 +140,8 @@ export const CommentablePreview = forwardRef<CommentablePreviewHandle, Props>(
           rangeMapRef={rangeMapRef}
           showHighlights={showHighlights}
           onScrollTo={scrollToComment}
+          draftRangeRef={pendingRangeRef}
+          hasDraft={modalOpen}
         />
         {tooltip && (
           <SelectionTooltip x={tooltip.x} y={tooltip.y} onComment={handleComment} />
