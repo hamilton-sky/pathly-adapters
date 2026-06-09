@@ -6,14 +6,16 @@ interface Props {
   anchorText: string
   x: number
   y: number
+  initialBody?: string
   onAdd: (body: string) => void
   onSendNow: (body: string) => void
-  onClose: () => void   // click outside — keeps anchor/highlight
-  onCancel: () => void  // X button — clears anchor, no highlight
+  onDraftChange: (body: string) => void
+  onClose: () => void   // click outside — keeps anchor/highlight + draft
+  onCancel: () => void  // X button — clears anchor, draft, no highlight
 }
 
-export function CommentModal({ anchorText, x, y, onAdd, onSendNow, onClose, onCancel }: Props): JSX.Element {
-  const [body, setBody] = useState('')
+export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, onDraftChange, onClose, onCancel }: Props): JSX.Element {
+  const [body, setBody] = useState(initialBody ?? '')
   const canSubmit = body.trim().length > 0
   const ref = useRef<HTMLDivElement>(null)
   const preview = anchorText.length > 100 ? anchorText.slice(0, 100).trim() + '…' : anchorText.trim()
@@ -55,7 +57,7 @@ export function CommentModal({ anchorText, x, y, onAdd, onSendNow, onClose, onCa
         className={styles.textarea}
         placeholder="Describe the issue or suggestion…"
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={(e) => { setBody(e.target.value); onDraftChange(e.target.value) }}
         rows={4}
         autoFocus
       />

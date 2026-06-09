@@ -96,6 +96,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
   const [anchorPos, setAnchorPos]         = useState<{ x: number; y: number } | null>(null)
   const [modalOpen, setModalOpen]         = useState(false)
+  const [pendingBody, setPendingBody]     = useState('')
   const [showHighlights, setShowHighlights] = useState(true)
   const submittedAnchors = useMemo(
     () => comments.filter((c) => !c.resolved).map((c) => c.lineText),
@@ -122,6 +123,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     setPendingAnchor(null)
     setAnchorPos(null)
     setModalOpen(false)
+    setPendingBody('')
     setLoading(true)
     setSaveError(null)
     readFile(effectivePath)
@@ -173,6 +175,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     setPendingAnchor(null)
     setAnchorPos(null)
     setModalOpen(false)
+    setPendingBody('')
   }
 
   async function handleModalSendNow(commentBody: string): Promise<void> {
@@ -182,6 +185,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     setPendingAnchor(null)
     setAnchorPos(null)
     setModalOpen(false)
+    setPendingBody('')
     const newItem = { id: 'send-now', lineNumber, lineText: pendingAnchor.slice(0, 120), body: commentBody, resolved: false, createdAt: '' }
     const allUnresolved = [...comments.filter((c) => !c.resolved), newItem]
     const norm = effectivePath.replace(/\\/g, '/')
@@ -307,10 +311,12 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
           anchorText={pendingAnchor}
           x={anchorPos.x}
           y={anchorPos.y}
+          initialBody={pendingBody}
           onAdd={handleModalAdd}
           onSendNow={(b) => void handleModalSendNow(b)}
+          onDraftChange={setPendingBody}
           onClose={() => setModalOpen(false)}
-          onCancel={() => { setModalOpen(false); setPendingAnchor(null); setAnchorPos(null) }}
+          onCancel={() => { setModalOpen(false); setPendingAnchor(null); setAnchorPos(null); setPendingBody('') }}
         />
       )}
     </div>
