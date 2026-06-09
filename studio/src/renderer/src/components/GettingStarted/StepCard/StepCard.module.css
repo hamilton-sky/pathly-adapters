@@ -66,10 +66,10 @@
 .card:hover::before { opacity: 0.65; }
 
 /* Per-step accent colors */
-.step0 { --step-accent: var(--accent); }
-.step1 { --step-accent: var(--blue); }
-.step2 { --step-accent: var(--green); }
-.step3 { --step-accent: var(--purple); }
+.card[data-index="0"] { --step-accent: var(--accent); }
+.card[data-index="1"] { --step-accent: var(--blue); }
+.card[data-index="2"] { --step-accent: var(--green); }
+.card[data-index="3"] { --step-accent: var(--purple); }
 
 /* Staggered entrance delays */
 .card[data-index="0"] { animation-delay: 80ms; }

@@ -28,15 +28,15 @@ export function SlideCarousel({ dsPort, slides }: Props): JSX.Element {
     setIdx(next)
   }, [idx])
 
-  const goNext = useCallback(() => go((idx + 1) % slides.length), [go, idx, slides.length])
-  const goPrev = useCallback(() => go((idx - 1 + slides.length) % slides.length), [go, idx, slides.length])
+  const goNext = useCallback(() => go((idx + 1) % slides.length), [go, slides.length])
+  const goPrev = useCallback(() => go((idx - 1 + slides.length) % slides.length), [go, slides.length])
 
   // Auto-advance
   useEffect(() => {
     if (paused) return undefined
     const t = setTimeout(goNext, AUTO_MS)
     return () => clearTimeout(t)
-  }, [idx, paused, goNext])
+  }, [paused, goNext])
 
   // Keyboard navigation
   useEffect(() => {

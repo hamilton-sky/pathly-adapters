@@ -1,7 +1,5 @@
 import styles from './StepCard.module.css'
 
-const STEP_CLASSES = [styles.step0, styles.step1, styles.step2, styles.step3]
-
 interface Props {
   step: string
   title: string
@@ -11,7 +9,7 @@ interface Props {
 
 export function StepCard({ step, title, desc, index }: Props): JSX.Element {
   return (
-    <div className={`${styles.card} ${STEP_CLASSES[index] ?? ''}`} data-index={index}>
+    <div className={styles.card} data-index={index}>
       <div className={styles.badge}>
         <span className={styles.badgeNum}>{step}</span>
       </div>

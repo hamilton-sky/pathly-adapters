@@ -1,6 +1,3 @@
----
-
----
 # fix/build
 
 FIXING stage for quick-fix flow. Fast, focused, minimal — one targeted change.
