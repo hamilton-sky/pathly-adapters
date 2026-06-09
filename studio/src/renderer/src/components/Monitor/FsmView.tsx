@@ -42,9 +42,11 @@ const PULSE_CSS = `
 const STAGE_AGENTS: Record<string, string> = {
   STORMING:  'planner',
   PLANNING:  'planner',
+  DESIGNING: 'designer',
   BUILDING:  'builder',
   REVIEWING: 'reviewer',
   TESTING:   'tester',
+  RETRO:     'retro',
   DONE:      'retro',
 }
 
@@ -143,8 +145,8 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
     <div className={styles.fsmRoot}>
       <div ref={convLabelRef} aria-live="polite" className={styles.fsmConvLabel}>
         {convNum != null
-          ? `${convLabel} ${convNum} Â· ${doneCount} done Â· ${remainingCount} remaining`
-          : `${doneCount} done Â· ${remainingCount} remaining`}
+          ? `${convLabel} ${convNum} · ${doneCount} done · ${remainingCount} remaining`
+          : `${doneCount} done · ${remainingCount} remaining`}
       </div>
 
       <div
@@ -161,8 +163,8 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
           const isLast = idx === PIPELINE.length - 1
           const retryCount = retryMap[state] ?? 0
           const tooltipLabel = status === 'active-retry'
-            ? `${state} â€” retried ${retryCount}Ã—`
-            : `${state} â€” ${status}`
+            ? `${state} — retried ${retryCount}×`
+            : `${state} — ${status}`
 
           return (
             <div key={state} className={isLast ? styles.fsmStepLast : styles.fsmStep}>
@@ -175,11 +177,11 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
               >
                 <TimelineDot status={status} currentState={activeState ?? ''} />
                 <span className={`${styles.fsmStepLabel} ${labelClass(status)}`}>
-                  {state.slice(0, 8)}
+                  {state}
                 </span>
                 <span className={styles.fsmStepAgent}>{STAGE_AGENTS[state] ?? ''}</span>
                 {status === 'active-retry' && retryCount > 0 && (
-                  <span className={styles.fsmRetryBadge}>â†©{retryCount}</span>
+                  <span className={styles.fsmRetryBadge}>↩{retryCount}</span>
                 )}
               </button>
 

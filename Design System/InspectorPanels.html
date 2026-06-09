@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pathly · Inspector Panels — Design Preview</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #111827; color: #E2E8F0;
+  font-family: 'Geist', 'Inter', system-ui, sans-serif; font-size: 13px;
+  -webkit-font-smoothing: antialiased; }
+
+/* ── layout ── */
+.page { min-height: 100vh; padding: 32px 24px; display: flex; flex-direction: column; gap: 32px; }
+.section-title { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #8899B0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: #283044; }
+.panels-row { display: flex; gap: 24px; flex-wrap: wrap; }
+.panel-wrap { display: flex; flex-direction: column; gap: 8px; }
+.panel-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #38BDF8; }
+
+/* ── panel base ── */
+.panel { width: 330px; background: #0B0F1A; border: 1px solid #283044; border-radius: 8px;
+  display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── panel header ── */
+.ph { display: flex; align-items: center; gap: 9px; padding: 12px 14px 11px;
+  border-bottom: 1px solid #1E2433; flex-shrink: 0; }
+.ph .pip { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.ph .ptitle { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #8899B0; flex: 1; }
+.ph .pclose { width: 22px; height: 22px; border: none; background: transparent; color: #8899B0;
+  cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; padding: 0; flex-shrink: 0; }
+.ph .pclose:hover { background: #1E2433; color: #E2E8F0; }
+
+/* ── panel body ── */
+.pbody { padding: 14px; display: flex; flex-direction: column; gap: 13px; overflow-y: auto; }
+
+/* ── field ── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #8899B0; }
+
+/* ── ctrl (base input style) ── */
+.ctrl { background: #111827; border: 1px solid #283044; border-radius: 5px;
+  padding: 7px 10px; font-size: 13px; color: #E2E8F0; display: flex; align-items: center; gap: 8px;
+  transition: border-color 0.12s; cursor: default; min-height: 34px; }
+.ctrl:hover { border-color: #38BDF8; }
+.ctrl.mono { font-family: 'Geist Mono', 'JetBrains Mono', monospace; }
+.ctrl.editable { cursor: text; }
+.ctrl.editable:focus-within { border-color: #38BDF8; box-shadow: 0 0 0 2px rgba(56,189,248,0.12); }
+.ctrl .edit-hint { margin-left: auto; color: #8899B0; font-size: 12px; }
+.ctrl .edit-hint:hover { color: #38BDF8; }
+
+/* ── select / dropdown ctrl ── */
+.ctrl.sel { cursor: pointer; justify-content: space-between; }
+.ctrl.sel .val { display: flex; align-items: center; gap: 8px; color: #E2E8F0; }
+.ctrl.sel .val.placeholder { color: #8899B0; }
+.ctrl.sel .chev { color: #8899B0; display: inline-flex; font-size: 10px; flex-shrink: 0; }
+
+/* ── prompt preview ── */
+.prompt-preview { background: #111827; border: 1px solid #283044; border-radius: 5px;
+  padding: 9px 11px; font-size: 12px; line-height: 1.55; color: #A8BBCC; }
+.prompt-preview strong { color: #E2E8F0; font-weight: 600; }
+
+/* ── quality gate ── */
+.gate-row { display: flex; align-items: center; gap: 10px; }
+.toggle { width: 34px; height: 20px; border-radius: 999px; background: #34D399;
+  position: relative; flex-shrink: 0; cursor: pointer; }
+.toggle::after { content: ''; position: absolute; right: 2px; top: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; }
+.toggle.off { background: #283044; }
+.toggle.off::after { right: auto; left: 2px; }
+.gate-text { font-family: 'Geist Mono', monospace; font-size: 12px; color: #A8BBCC; }
+
+/* ── transitions ── */
+.trans { display: flex; flex-direction: column; gap: 6px; }
+.tr { display: flex; align-items: center; gap: 8px; }
+.tr-key { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #8899B0; width: 52px; flex-shrink: 0; }
+.state-chip { display: inline-flex; align-items: center; gap: 5px; font-family: 'Geist Mono', monospace;
+  font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+.state-chip.pass { color: #34D399; background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.25); }
+.state-chip.fail { color: #F59E0B; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); }
+.state-chip.neutral { color: #A8BBCC; background: #1E2433; border: 1px solid #283044; }
+
+/* ── links ── */
+.ilink { font-size: 12px; color: #38BDF8; display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; width: fit-content; }
+.ilink:hover { text-decoration: underline; }
+.ilinks { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── danger button ── */
+.btn-danger { width: 100%; padding: 9px; border: 1px solid rgba(248,113,113,0.3); border-radius: 5px;
+  background: rgba(248,113,113,0.07); color: #f87171; font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit; letter-spacing: 0.02em; }
+.btn-danger:hover { background: rgba(248,113,113,0.13); border-color: rgba(248,113,113,0.5); }
+
+/* ── divider ── */
+.divider { height: 1px; background: #1E2433; margin: 2px 0; }
+
+/* ── section header ── */
+.sh { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #8899B0; display: flex; align-items: center; gap: 7px; }
+.sh .shicon { font-size: 12px; }
+
+/* ── EDGE: condition pill ── */
+.cond-pill { display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  background: #111827; border: 1px solid #283044; border-radius: 5px; position: relative; }
+.cond-pill .ctype { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
+.cond-pill .ctype.always { color: #38BDF8; background: rgba(56,189,248,0.12); }
+.cond-pill .ctype.artifact { color: #34D399; background: rgba(52,211,153,0.12); }
+.cond-pill .ctype.content { color: #A78BFA; background: rgba(167,139,250,0.12); }
+.cond-pill .ctype.decide { color: #F59E0B; background: rgba(245,158,11,0.12); }
+.cond-pill .cval { font-family: 'Geist Mono', monospace; font-size: 12px; color: #A8BBCC; flex: 1; }
+.cond-pill .cval strong { color: #E2E8F0; }
+.cond-pill .crem { width: 20px; height: 20px; border: none; background: transparent; color: #8899B0;
+  cursor: pointer; border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; padding: 0; }
+.cond-pill .crem:hover { background: #1E2433; color: #f87171; }
+.conds { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── EDGE: action row ── */
+.action-row { display: flex; align-items: center; gap: 6px; padding: 7px 10px;
+  background: #111827; border: 1px solid #283044; border-radius: 5px; cursor: pointer; }
+.action-row:hover { border-color: #38BDF8; }
+.action-skill { font-family: 'Geist Mono', monospace; font-size: 11px; font-weight: 600;
+  color: #38BDF8; flex-shrink: 0; }
+.action-skill.empty { color: #8899B0; font-weight: 400; }
+.action-msg { font-size: 11px; color: #8899B0; flex: 1; }
+.action-rem { width: 18px; height: 18px; border: none; background: transparent; color: #8899B0;
+  cursor: pointer; border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; }
+.action-rem:hover { background: #1E2433; color: #f87171; }
+.actions { display: flex; flex-direction: column; gap: 5px; }
+
+/* ── add button ── */
+.btn-add { width: 100%; padding: 7px 10px; border: 1px dashed rgba(56,189,248,0.3); border-radius: 5px;
+  background: transparent; color: #38BDF8; font-size: 12px; font-weight: 600; cursor: pointer;
+  font-family: inherit; text-align: left; display: flex; align-items: center; gap: 6px; }
+.btn-add:hover { background: rgba(56,189,248,0.06); border-color: rgba(56,189,248,0.5); }
+
+/* ── edge header ── */
+.edge-header { display: flex; align-items: center; gap: 8px; }
+.edge-src { font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 700;
+  color: #E2E8F0; }
+.edge-arrow { color: #38BDF8; font-size: 14px; }
+.edge-tgt { font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 700;
+  color: #E2E8F0; }
+
+/* ── icons (inline SVG shortcuts) ── */
+.icon { display: inline-flex; align-items: center; flex-shrink: 0; }
+
+/* ── annotations ── */
+.anno { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
+  background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.15);
+  border-radius: 6px; font-size: 11px; color: #8899B0; }
+.anno strong { color: #38BDF8; font-weight: 600; display: block; margin-bottom: 2px; }
+.anno li { margin-left: 14px; margin-bottom: 2px; }
+
+/* ── tab toggle ── */
+.tab-row { display: flex; border: 1px solid #283044; border-radius: 6px; overflow: hidden;
+  width: fit-content; margin-bottom: 4px; }
+.tab-btn { padding: 6px 14px; font-size: 12px; font-weight: 600; border: none; background: transparent;
+  color: #8899B0; cursor: pointer; font-family: inherit; }
+.tab-btn.on { background: #283044; color: #E2E8F0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div>
+    <h1 style="font-size:18px;font-weight:700;margin:0 0 4px;color:#E2E8F0">Inspector Panels — Design Preview</h1>
+    <p style="font-size:12px;color:#8899B0;margin:0">Redesigned Node + Edge panels for the Flow Canvas. Click interactive elements to see states.</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ NODE PANEL ═══ -->
+  <div>
+    <div class="section-title">Node panel · click a state on the canvas</div>
+    <div class="panels-row">
+
+      <!-- NODE PANEL: Normal state -->
+      <div class="panel-wrap">
+        <div class="panel-label">State with everything configured</div>
+        <div class="panel">
+
+          <div class="ph">
+            <span class="pip" style="background:#60A5FA"></span>
+            <span class="ptitle">State · BUILDING</span>
+            <button class="pclose" type="button" title="Close">×</button>
+          </div>
+
+          <div class="pbody">
+
+            <!-- STATE NAME -->
+            <div class="field">
+              <label>State name</label>
+              <div class="ctrl mono editable">
+                <span style="flex:1">BUILDING</span>
+                <span class="edit-hint" title="Rename">✎</span>
+              </div>
+            </div>
+
+            <!-- CLI HOST -->
+            <div class="field">
+              <label>CLI Host</label>
+              <div class="ctrl sel">
+                <span class="val">
+                  <!-- Claude icon -->
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+                    <path fill="#D97757" d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/>
+                  </svg>
+                  Claude Code
+                </span>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+
+            <!-- AGENT -->
+            <div class="field">
+              <label>Agent</label>
+              <div class="ctrl sel">
+                <span class="val">builder</span>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+
+            <!-- SKILL -->
+            <div class="field">
+              <label>Skill</label>
+              <div class="ctrl sel">
+                <span class="val">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;color:#8899B0">
+                    <path d="M12 2L22 7L12 12L2 7L12 2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  </svg>
+                  build.md
+                </span>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+
+            <!-- PROMPT -->
+            <div class="field">
+              <label>Prompt</label>
+              <div class="prompt-preview">
+                <strong>BUILDING stage.</strong> Implement the planned change. Keep the diff focused; run the gate before review.
+              </div>
+            </div>
+
+            <!-- QUALITY GATE -->
+            <div class="field">
+              <label>Quality gate</label>
+              <div class="gate-row">
+                <span class="toggle" title="Toggle quality gate"></span>
+                <span class="gate-text">lint · type · test</span>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- TRANSITIONS -->
+            <div class="field">
+              <label>Transitions</label>
+              <div class="trans">
+                <div class="tr">
+                  <span class="tr-key">On pass</span>
+                  <span class="state-chip pass">REVIEWING</span>
+                </div>
+                <div class="tr">
+                  <span class="tr-key">On fail</span>
+                  <span class="state-chip fail">↩ BUILDING</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- LINKS -->
+            <div class="ilinks">
+              <span class="ilink">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M10 3H6a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2h13a2 2 0 0 0 2-2v-4M14 3h7m0 0v7m0-7-10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Edit routing rules
+              </span>
+              <span class="ilink">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M10 3H6a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2h13a2 2 0 0 0 2-2v-4M14 3h7m0 0v7m0-7-10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Open build.md in Notebook
+              </span>
+            </div>
+
+            <div class="divider"></div>
+            <button class="btn-danger" type="button">Remove from canvas</button>
+
+          </div>
+        </div><!-- /panel -->
+      </div>
+
+      <!-- NODE PANEL: Empty / new state -->
+      <div class="panel-wrap">
+        <div class="panel-label">New / unconfigured state</div>
+        <div class="panel">
+
+          <div class="ph">
+            <span class="pip" style="background:#283044"></span>
+            <span class="ptitle">State · NEW_STATE</span>
+            <button class="pclose" type="button" title="Close">×</button>
+          </div>
+
+          <div class="pbody">
+
+            <div class="field">
+              <label>State name</label>
+              <div class="ctrl mono editable" style="border-color:#38BDF8;box-shadow:0 0 0 2px rgba(56,189,248,0.12)">
+                <span style="flex:1">NEW_STATE</span>
+                <span class="edit-hint">✎</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>CLI Host</label>
+              <div class="ctrl sel">
+                <span class="val placeholder">Select host…</span>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Agent</label>
+              <div class="ctrl sel">
+                <span class="val placeholder">Select agent…</span>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Skill</label>
+              <div class="ctrl sel">
+                <span class="val placeholder">Select skill…</span>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Prompt</label>
+              <div class="prompt-preview" style="color:#8899B0;font-style:italic">
+                Prompt preview will appear when a skill is assigned.
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Quality gate</label>
+              <div class="gate-row">
+                <span class="toggle off" title="Toggle quality gate"></span>
+                <span class="gate-text" style="color:#8899B0">none</span>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field">
+              <label>Transitions</label>
+              <div style="color:#8899B0;font-size:12px;padding:4px 0">
+                No outgoing transitions. Connect this state to another node on the canvas.
+              </div>
+            </div>
+
+            <div class="divider"></div>
+            <button class="btn-danger" type="button">Remove from canvas</button>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ANNOTATION -->
+      <div class="panel-wrap" style="max-width:260px">
+        <div class="panel-label">What changed</div>
+        <div class="anno">
+          <strong>Node panel improvements</strong>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px">
+            <li>✦ <b>CLI Host dropdown</b> — set adapter per-state (Claude / Codex / Antigravity)</li>
+            <li>✦ <b>Agent + Skill dropdowns</b> — replace the search-list with direct selects</li>
+            <li>✦ <b>Prompt preview</b> — see the full skill prompt inline, no modal</li>
+            <li>✦ <b>Quality gate toggle</b> — one click to enable/disable</li>
+            <li>✦ <b>ON PASS / ON FAIL chips</b> — color-coded (green/orange) transitions at a glance</li>
+            <li>✦ <b>Rename inline</b> — click the state name field to rename</li>
+            <li>✦ Quick links to routing rules + skill notebook</li>
+          </ul>
+        </div>
+      </div>
+
+    </div><!-- /panels-row -->
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ EDGE PANEL ═══ -->
+  <div>
+    <div class="section-title">Edge panel · click a connection line on the canvas</div>
+    <div class="panels-row">
+
+      <!-- EDGE: always continues -->
+      <div class="panel-wrap">
+        <div class="panel-label">Default (always) transition</div>
+        <div class="panel">
+
+          <div class="ph">
+            <div class="edge-header">
+              <span class="edge-src">STORMING</span>
+              <span class="edge-arrow">→</span>
+              <span class="edge-tgt">PLANNING</span>
+            </div>
+            <button class="pclose" type="button" style="margin-left:auto" title="Close">×</button>
+          </div>
+
+          <div class="pbody">
+
+            <!-- WHEN -->
+            <div class="field">
+              <div class="sh"><span class="shicon">⚡</span>When</div>
+              <div class="conds">
+                <div class="cond-pill">
+                  <span class="ctype always">Always</span>
+                  <span class="cval">continues to <strong>PLANNING</strong></span>
+                  <button class="crem" type="button" title="Remove">×</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ACTIONS -->
+            <div class="field">
+              <div class="sh"><span class="shicon">⚡</span>Actions before transitioning</div>
+              <div class="actions">
+                <div style="color:#8899B0;font-size:12px;padding:2px 0">None</div>
+              </div>
+              <button class="btn-add" type="button">＋ Add action</button>
+            </div>
+
+            <button class="btn-add" type="button">＋ Add condition</button>
+
+            <div class="divider"></div>
+            <button class="btn-danger" type="button">Delete connection</button>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- EDGE: on artifact (reroute / fail) -->
+      <div class="panel-wrap">
+        <div class="panel-label">On artifact · with actions</div>
+        <div class="panel">
+
+          <div class="ph">
+            <div class="edge-header">
+              <span class="edge-src">BUILDING</span>
+              <span class="edge-arrow" style="color:#F59E0B">↩</span>
+              <span class="edge-tgt">BUILDING</span>
+            </div>
+            <button class="pclose" type="button" style="margin-left:auto" title="Close">×</button>
+          </div>
+
+          <div class="pbody">
+
+            <!-- WHEN -->
+            <div class="field">
+              <div class="sh"><span class="shicon">⚡</span>When</div>
+              <div class="conds">
+                <div class="cond-pill">
+                  <span class="ctype artifact">Artifact</span>
+                  <span class="cval"><strong>REVIEW_FAILURES.md</strong> exists</span>
+                  <button class="crem" type="button" title="Remove">×</button>
+                </div>
+                <div class="cond-pill">
+                  <span class="ctype artifact">Artifact</span>
+                  <span class="cval"><strong>SCOPE_VIOLATION.md</strong> exists</span>
+                  <button class="crem" type="button" title="Remove">×</button>
+                </div>
+              </div>
+              <button class="btn-add" type="button" style="margin-top:4px">＋ Add condition</button>
+            </div>
+
+            <!-- ACTIONS -->
+            <div class="field">
+              <div class="sh"><span class="shicon">⚡</span>Actions before transitioning</div>
+              <div class="actions">
+                <div class="action-row">
+                  <span class="action-skill">archive-artifacts</span>
+                  <span class="action-msg">archive feedback before retry</span>
+                  <button class="action-rem" type="button" title="Remove">×</button>
+                </div>
+              </div>
+              <button class="btn-add" type="button" style="margin-top:4px">＋ Add action</button>
+            </div>
+
+            <div class="divider"></div>
+            <button class="btn-danger" type="button">Delete connection</button>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- EDGE: complex multi-condition -->
+      <div class="panel-wrap">
+        <div class="panel-label">Multiple conditions + human decision</div>
+        <div class="panel">
+
+          <div class="ph">
+            <div class="edge-header">
+              <span class="edge-src">PLANNING</span>
+              <span class="edge-arrow">→</span>
+              <span class="edge-tgt">DESIGNING</span>
+            </div>
+            <button class="pclose" type="button" style="margin-left:auto" title="Close">×</button>
+          </div>
+
+          <div class="pbody">
+
+            <!-- WHEN -->
+            <div class="field">
+              <div class="sh"><span class="shicon">⚡</span>When</div>
+              <div class="conds">
+                <div class="cond-pill">
+                  <span class="ctype artifact">Artifact</span>
+                  <span class="cval"><strong>IMPLEMENTATION_PLAN.md</strong> exists</span>
+                  <button class="crem" type="button" title="Remove">×</button>
+                </div>
+                <div class="cond-pill">
+                  <span class="ctype content">Content</span>
+                  <span class="cval"><strong>PROGRESS.md</strong> contains "DONE"</span>
+                  <button class="crem" type="button" title="Remove">×</button>
+                </div>
+                <div class="cond-pill">
+                  <span class="ctype decide">Human</span>
+                  <span class="cval">"Skip design phase?"</span>
+                  <button class="crem" type="button" title="Remove">×</button>
+                </div>
+              </div>
+              <button class="btn-add" type="button" style="margin-top:4px">＋ Add condition</button>
+            </div>
+
+            <div class="field">
+              <div class="sh"><span class="shicon">⚡</span>Actions before transitioning</div>
+              <div class="actions">
+                <div style="color:#8899B0;font-size:12px;padding:2px 0">None</div>
+              </div>
+              <button class="btn-add" type="button">＋ Add action</button>
+            </div>
+
+            <div class="divider"></div>
+            <button class="btn-danger" type="button">Delete connection</button>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ANNOTATION -->
+      <div class="panel-wrap" style="max-width:260px">
+        <div class="panel-label">What changed</div>
+        <div class="anno">
+          <strong>Edge panel improvements</strong>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px">
+            <li>✦ <b>Color-coded header</b> — arrow turns orange for reroute/fail loops</li>
+            <li>✦ <b>Condition pills</b> — each trigger shown as a compact chip (Always / Artifact / Content / Human) — type + value at a glance</li>
+            <li>✦ <b>+ Add condition inline</b> — appears directly under the condition list</li>
+            <li>✦ <b>Actions section</b> — skill + message inline, click row to edit</li>
+            <li>✦ <b>Delete connection</b> at bottom (danger zone, separate from editing)</li>
+          </ul>
+
+          <strong style="margin-top:8px">Condition types</strong>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px">
+            <li><span style="color:#38BDF8;font-weight:700">Always</span> — default route, no trigger</li>
+            <li><span style="color:#34D399;font-weight:700">Artifact</span> — when a file exists in feedback/</li>
+            <li><span style="color:#A78BFA;font-weight:700">Content</span> — when file contains a string/regex</li>
+            <li><span style="color:#F59E0B;font-weight:700">Human</span> — requires a human decision</li>
+          </ul>
+        </div>
+      </div>
+
+    </div><!-- /panels-row -->
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ ADD CONDITION FORM ═══ -->
+  <div>
+    <div class="section-title">Add condition — inline form (inside edge panel)</div>
+    <div class="panels-row">
+
+      <div class="panel-wrap">
+        <div class="panel-label">Step 1 — choose condition type</div>
+        <div class="panel" style="width:330px">
+          <div class="pbody">
+            <div class="field">
+              <div class="sh">New condition</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <button class="ctrl sel" type="button" style="border-color:#38BDF8;background:rgba(56,189,248,0.06)">
+                  <span class="val"><span class="ctype always" style="display:inline-block;margin-right:4px">Always</span>Default — always continue</span>
+                </button>
+                <button class="ctrl sel" type="button">
+                  <span class="val"><span class="ctype artifact" style="display:inline-block;margin-right:4px">Artifact</span>When a feedback file exists</span>
+                </button>
+                <button class="ctrl sel" type="button">
+                  <span class="val"><span class="ctype content" style="display:inline-block;margin-right:4px">Content</span>When file contains text/regex</span>
+                </button>
+                <button class="ctrl sel" type="button">
+                  <span class="val"><span class="ctype decide" style="display:inline-block;margin-right:4px">Human</span>Require human decision</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-wrap">
+        <div class="panel-label">Step 2 — artifact form (after choosing Artifact)</div>
+        <div class="panel" style="width:330px">
+          <div class="pbody">
+            <div class="field">
+              <label>Artifact filename</label>
+              <div class="ctrl editable" style="border-color:#34D399;box-shadow:0 0 0 2px rgba(52,211,153,0.12)">
+                <span style="font-family:monospace;flex:1">REVIEW_FAILURES.md</span>
+              </div>
+              <div style="font-size:11px;color:#8899B0">File must exist in the <code style="color:#A8BBCC">feedback/</code> folder to trigger this transition.</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn-add" type="button" style="flex:1">✓ Add condition</button>
+              <button type="button" style="padding:7px 12px;border:1px solid #283044;border-radius:5px;background:transparent;color:#8899B0;font-size:12px;cursor:pointer;font-family:inherit">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Make toggles interactive
+  document.querySelectorAll('.toggle').forEach(function(t) {
+    t.addEventListener('click', function() { t.classList.toggle('off'); });
+  });
+  // Fake ctrl hover
+  document.querySelectorAll('.ctrl.sel').forEach(function(c) {
+    c.setAttribute('tabindex', '0');
+  });
+</script>
+</body>
+</html>

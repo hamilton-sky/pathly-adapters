@@ -66,9 +66,11 @@ export function parseProgressMd(md: string): ConvRow[] {
 }
 
 export function usePlanConversations(topicOverride?: string | null): { planConvs: ConvRow[] } {
-  const { projectPath, activeTopic } = useStore()
+  const { projectPath, activeTopic, events } = useStore()
   const topic = topicOverride ?? activeTopic
   const [planConvs, setPlanConvs] = useState<ConvRow[]>([])
+
+  const agentDoneCount = events.filter((e) => e.type === 'AGENT_DONE').length
 
   useEffect(() => {
     if (!projectPath || !topic) { setPlanConvs([]); return }
@@ -80,7 +82,7 @@ export function usePlanConversations(topicOverride?: string | null): { planConvs
       } catch { setPlanConvs([]) }
     }
     void loadPlan()
-  }, [projectPath, topic])
+  }, [projectPath, topic, agentDoneCount])
 
   return { planConvs }
 }

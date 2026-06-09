@@ -4,7 +4,7 @@ After the stage agent completes, write an AGENT_DONE event to the **central DB**
 This is **mandatory** — the supervisor reads this event as the authoritative result.
 
 1. Compute wall_seconds: `python3 -c "import time; print(int(time.time()) - BUILD_START)"`
-2. Parse from the sub-agent's `<usage>` block: `total_tokens`, `tool_uses`, `duration_ms` (0 if absent).
+2. Sum `total_tokens` and `tool_uses` across **ALL** subagents spawned during this stage (analyze, scouts, implement/review, and every fix/retry iteration). Parse each subagent's `<usage>` block (look for `subagent_tokens:` and `tool_uses:` lines in the tool result) and add to running totals. `duration_ms = 0` if absent.
 3. Compute `cost_usd` from `total_tokens` and `model` using an 80/20 input/output token split:
 
    | Model prefix | Input $/MTok | Output $/MTok |

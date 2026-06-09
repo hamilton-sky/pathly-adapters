@@ -31,7 +31,7 @@ export function buildSendPrompt(filePath: string, body: string, unresolved: Comm
     body,
     '---',
     '',
-    `Write the complete revised content back to: ${norm}`,
+    `Write the complete revised content to: ${norm}.draft`,
     'After writing, briefly list which comments you addressed.',
   ].join('\n')
 }

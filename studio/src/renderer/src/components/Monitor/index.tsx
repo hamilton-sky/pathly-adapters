@@ -16,6 +16,7 @@ export function Monitor(): JSX.Element {
   const { activeTopic, activeFlowSessions, activeMonitorTab, setActiveMonitorTab } = useStore()
   const { effectiveTopic, showTabBar } = useMonitorSession()
   const [viewTab, setViewTab] = useState<'events' | 'output'>('events')
+  const [phaseFilter, setPhaseFilter] = useState<'all' | 'build' | 'review'>('all')
   const [configStage, setConfigStage] = useState<string | null>(null)
 
   if (!activeTopic) {
@@ -40,7 +41,7 @@ export function Monitor(): JSX.Element {
       <HealthCheck />
       <FsmView onStageClick={(stage) => setConfigStage(stage)} />
       <MetricsStrip />
-      {/* Sub-tab: Events | Output */}
+      {/* Sub-tab: Events | Output + phase filter pills */}
       <div className={styles.viewTabBar}>
         <button
           type="button"
@@ -56,8 +57,25 @@ export function Monitor(): JSX.Element {
         >
           Output
         </button>
+        {viewTab === 'events' && (
+          <>
+            <span className={styles.viewTabSpacer} />
+            <div className={styles.phaseFilter}>
+              {(['all', 'build', 'review'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className={`${styles.phaseFilterPill} ${phaseFilter === f ? styles.phaseFilterPillActive : ''}`}
+                  onClick={() => setPhaseFilter(f)}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
-      {viewTab === 'events' ? <EventLog /> : <OutputTab />}
+      {viewTab === 'events' ? <EventLog filter={phaseFilter} /> : <OutputTab />}
       {configStage && (
         <ConfigurePhaseModal stage={configStage} onClose={() => setConfigStage(null)} />
       )}

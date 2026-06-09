@@ -10,6 +10,8 @@ import {
   HOST_TO_ADAPTER, ADAPTER_TO_HOST,
   SKILL_FILE_PATHS, STAGE_DEFAULTS, SKILL_PROMPTS,
 } from './configurePhaseModalData'
+import { AssemblyFlowBar } from './AssemblyFlowBar'
+import { PromptPreview } from './PromptPreview'
 import styles from './ConfigurePhaseModal.module.css'
 
 interface Props {
@@ -25,9 +27,9 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
 
-  const projectPath = useStore((s) => s.projectPath)
-  const activeTopic = useStore((s) => s.activeTopic)
-  const setActivePanel = useStore((s) => s.setActivePanel)
+  const projectPath        = useStore((s) => s.projectPath)
+  const activeTopic        = useStore((s) => s.activeTopic)
+  const setActivePanel     = useStore((s) => s.setActivePanel)
   const setSkillNotebookPath = useUiStore((s) => s.setSkillNotebookPath)
 
   useEffect(() => {
@@ -37,9 +39,9 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
       .then((r) => r.ok ? r.json() : null)
       .then((cfg) => {
         if (!cfg) return
-        if (cfg.agent) setAgent(cfg.agent)
+        if (cfg.agent)   setAgent(cfg.agent)
         if (cfg.adapter) setHost(ADAPTER_TO_HOST[cfg.adapter] ?? 'Claude Code')
-        if (cfg.skill) setSkill(cfg.skill)
+        if (cfg.skill)   setSkill(cfg.skill)
       })
       .catch(() => undefined)
   }, [projectPath, activeTopic, stage])
@@ -82,11 +84,13 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   }
 
   const basePreview = SKILL_PROMPTS[skill] ?? `# ${skill}\n\nNo preview available.`
-  const preview = basePreview.replace(/^Host: [^\n]+/m, `Host: ${host} · Agent: ${agent}`)
+  const preview     = basePreview.replace(/^Host: [^\n]+/m, `Host: ${host} · Agent: ${agent}`)
+  const isModified  = host !== 'Claude Code' || agent !== defaults.agent || skill !== defaults.skill
 
   return createPortal(
     <div className={styles.backdrop} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className={styles.modal} role="dialog" aria-modal="true" aria-label={`Configure ${stage} phase`}>
+
         <div className={styles.header}>
           <Settings size={16} className={styles.gearIcon} />
           <span className={styles.title}>Configure phase</span>
@@ -96,39 +100,48 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
         </div>
 
         <div className={styles.body}>
+          <AssemblyFlowBar host={host} agent={agent} skill={skill} />
+
           <div className={styles.section}>
             <div className={styles.sectionLabel}>CLI Host</div>
             <div className={styles.chips}>
               {CLI_HOSTS.map((h) => (
                 <button key={h} type="button"
-                  className={`${styles.chip} ${host === h ? styles.chipActive : ''}`}
+                  className={`${styles.chip} ${host === h ? styles.chipActiveHost : ''}`}
                   onClick={() => setHost(h)}>{h}</button>
               ))}
             </div>
           </div>
+
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Agent</div>
             <div className={styles.chips}>
               {AGENTS.map((a) => (
                 <button key={a} type="button"
-                  className={`${styles.chip} ${styles.chipMono} ${agent === a ? styles.chipActive : ''}`}
+                  className={`${styles.chip} ${styles.chipMono} ${agent === a ? styles.chipActiveAgent : ''}`}
                   onClick={() => setAgent(a)}>{a}</button>
               ))}
             </div>
           </div>
+
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Skill</div>
             <div className={styles.chips}>
               {SKILLS.map((sk) => (
                 <button key={sk} type="button"
-                  className={`${styles.chip} ${styles.chipMono} ${skill === sk ? styles.chipActive : ''}`}
+                  className={`${styles.chip} ${styles.chipMono} ${skill === sk ? styles.chipActiveSkill : ''}`}
                   onClick={() => setSkill(sk)}>{sk}</button>
               ))}
             </div>
           </div>
+
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Prompt Preview</div>
-            <pre className={styles.promptPre}>{preview}</pre>
+            <PromptPreview
+              prompt={preview}
+              isModified={isModified}
+              label={`${skill} · ${agent} · ${host}`}
+            />
           </div>
         </div>
 
@@ -144,6 +157,7 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
             {saved ? <span className={styles.savedHint}>Saved</span> : 'Apply'}
           </button>
         </div>
+
       </div>
     </div>,
     document.body,

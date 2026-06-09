@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import type { FsmEvent } from '../../types/index'
 import { useInjectCSS, useAgentTelemetry } from './utils'
@@ -17,7 +17,11 @@ const FLASH_CSS = `
 }
 `
 
+type PhaseFilter = 'all' | 'build' | 'review'
+
 const INNER_PHASES = new Set(['analyze', 'scout', 'implement'])
+const BUILD_PHASES  = new Set(['STORMING', 'PLANNING', 'DESIGNING', 'BUILDING'])
+const REVIEW_PHASES = new Set(['REVIEWING', 'TESTING', 'RETRO'])
 
 function eventColorClass(ev: FsmEvent, retrograde?: boolean): string {
   if (retrograde) return styles.evColorRetrograde
@@ -150,10 +154,35 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
   }
 }
 
+function getEventActor(ev: FsmEvent): string | null {
+  switch (ev.type) {
+    case 'AGENT_DONE':
+    case 'AGENT_SPAWNED':
+      return ev.agent ?? null
+    case 'PHASE_START':
+    case 'PHASE_DONE':
+    case 'PHASE_SUMMARY':
+      return (ev as Record<string, unknown>).agent as string | null ?? null
+    default:
+      return null
+  }
+}
+
+function getEventCost(ev: FsmEvent): string | null {
+  if (ev.type !== 'AGENT_DONE' || ev.cost_usd == null) return null
+  return ev.cost_usd > 0 ? `$${ev.cost_usd.toFixed(4)}` : '$…'
+}
+
 function RawEventLine({ ev, isNew, retrograde }: { ev: FsmEvent; isNew: boolean; retrograde?: boolean }): JSX.Element {
+  const actor = getEventActor(ev)
+  const cost  = getEventCost(ev)
   return (
-    <div className={`${styles.evLine} ${eventColorClass(ev, retrograde)} ${isNew ? 'pathly-new-row' : ''}`}>
-      {formatEvent(ev, retrograde)}
+    <div className={`${styles.evLineRow} ${isNew ? 'pathly-new-row' : ''}`}>
+      {actor && <span className={styles.evActorChip}>{actor}</span>}
+      <span className={`${styles.evLineText} ${eventColorClass(ev, retrograde)}`}>
+        {formatEvent(ev, retrograde)}
+      </span>
+      {cost && <span className={styles.evCostChip}>{cost}</span>}
     </div>
   )
 }
@@ -170,7 +199,11 @@ function computeRetrograde(events: FsmEvent[]): boolean[] {
   })
 }
 
-export function EventLog(): JSX.Element {
+interface EventLogProps {
+  filter?: PhaseFilter
+}
+
+export function EventLog({ filter = 'all' }: EventLogProps): JSX.Element {
   const events = useStore((s) => s.events)
   const { totalIn, totalOut, totalTokens, agentDone } = useAgentTelemetry()
   const billingPending = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd === 0)
@@ -195,9 +228,19 @@ export function EventLog(): JSX.Element {
       })
     : events
 
+  const displayEvents = useMemo(() => {
+    if (filter === 'all') return visibleEvents
+    const targetSet = filter === 'build' ? BUILD_PHASES : REVIEW_PHASES
+    let phase: string | null = null
+    return visibleEvents.filter((ev) => {
+      if (ev.type === 'STATE_TRANSITION' && ev.to) phase = String(ev.to)
+      return phase != null && targetSet.has(phase)
+    })
+  }, [filter, visibleEvents])
+
   useEffect(() => {
-    const added = visibleEvents.length - prevLengthRef.current
-    prevLengthRef.current = visibleEvents.length
+    const added = displayEvents.length - prevLengthRef.current
+    prevLengthRef.current = displayEvents.length
 
     if (added <= 0) return
 
@@ -210,10 +253,10 @@ export function EventLog(): JSX.Element {
       setNewCount(newCountRef.current)
     }
 
-    setFlashStart(visibleEvents.length - added)
+    setFlashStart(displayEvents.length - added)
     const timer = setTimeout(() => { setFlashStart(Infinity) }, 500)
     return () => clearTimeout(timer)
-  }, [visibleEvents])
+  }, [displayEvents])
 
   const handleScroll = (): void => {
     const el = logRef.current
@@ -237,7 +280,8 @@ export function EventLog(): JSX.Element {
     setNewCount(0)
   }
 
-  const retrogradeFlags = computeRetrograde(visibleEvents)
+  const retrogradeFlags = computeRetrograde(displayEvents)
+  const tokPctIn = (totalIn > 0 || totalOut > 0) ? Math.round((totalIn / (totalIn + totalOut)) * 100) : 50
 
   return (
     <div className={styles.evContainer}>
@@ -249,10 +293,10 @@ export function EventLog(): JSX.Element {
       </div>
       <div className={styles.evLogWrapper}>
         <div ref={logRef} className={styles.evLog} onScroll={handleScroll}>
-          {visibleEvents.length === 0 ? (
-            <div className={styles.evEmpty}>No events yet</div>
+          {displayEvents.length === 0 ? (
+            <div className={styles.evEmpty}>{filter !== 'all' ? `No ${filter} events` : 'No events yet'}</div>
           ) : (
-            visibleEvents.map((ev, i) => (
+            displayEvents.map((ev, i) => (
               <RawEventLine
                 key={`${ev.ts ?? ''}-${ev.type}-${i}`}
                 ev={ev}
@@ -269,26 +313,38 @@ export function EventLog(): JSX.Element {
         )}
       </div>
       <div className={styles.evTotalsBar}>
-        <span className={styles.evTotalsLabel}>in/out</span>
-        <span className={styles.evTotalsValue}>
-          {totalIn > 0 ? `${(totalIn / 1000).toFixed(1)}k` : '—'}↑
-          &nbsp;&nbsp;
-          {totalOut > 0 ? `${(totalOut / 1000).toFixed(1)}k` : '—'}↓
-        </span>
-        {totalTokens > 0 && (
-          <span className={`${styles.evTotalsLabel} ${styles.evTotalsSummary}`}>
-            = {totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens} combined ↑
+        <div className={styles.evTotalsRow}>
+          <span className={styles.evTotalsLabel}>in/out</span>
+          <span className={styles.evTotalsValue}>
+            {totalIn > 0 ? `${(totalIn / 1000).toFixed(1)}k` : '—'}↑
+            &nbsp;&nbsp;
+            {totalOut > 0 ? `${(totalOut / 1000).toFixed(1)}k` : '—'}↓
           </span>
-        )}
-        {billingPending && !missingCostData && (
-          <span className={`${styles.evTotalsLabel} ${styles.evTotalsPending}`}>
-            (billing pending)
-          </span>
-        )}
-        {missingCostData && (
-          <span className={`${styles.evTotalsLabel} ${styles.evTotalsMissing}`}>
-            (no cost data)
-          </span>
+          {totalTokens > 0 && (
+            <span className={`${styles.evTotalsLabel} ${styles.evTotalsSummary}`}>
+              = {totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens} combined
+            </span>
+          )}
+          {billingPending && !missingCostData && (
+            <span className={`${styles.evTotalsLabel} ${styles.evTotalsPending}`}>(billing pending)</span>
+          )}
+          {missingCostData && (
+            <span className={`${styles.evTotalsLabel} ${styles.evTotalsMissing}`}>(no cost data)</span>
+          )}
+        </div>
+        {(totalIn > 0 || totalOut > 0) && (
+          <div className={styles.evTokBarWrap}>
+            <progress
+              className={styles.evTokBar}
+              value={tokPctIn}
+              max={100}
+              aria-label={`${(totalIn / 1000).toFixed(1)}k tokens in · ${(totalOut / 1000).toFixed(1)}k tokens out`}
+            />
+            <div className={styles.evTokBarLabels}>
+              <span className={styles.evTokBarIn}>{`${(totalIn / 1000).toFixed(1)}k in`}</span>
+              <span className={styles.evTokBarOut}>{`${(totalOut / 1000).toFixed(1)}k out`}</span>
+            </div>
+          </div>
         )}
       </div>
     </div>

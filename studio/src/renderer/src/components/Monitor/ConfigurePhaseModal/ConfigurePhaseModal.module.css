@@ -5,10 +5,10 @@
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   z-index: 9000;
-  padding-top: 7vh;
+  padding: 5vh 0;
 }
 
 .modal {
@@ -24,6 +24,7 @@
   flex-direction: column;
 }
 
+/* ── Header ──────────────────────────────────── */
 .header {
   display: flex;
   align-items: center;
@@ -49,9 +50,10 @@
   padding: 2px;
   border-radius: var(--radius-sm);
 }
-.close:hover { color: var(--text-primary); }
+.close:hover         { color: var(--text-primary); }
 .close:focus-visible { outline: var(--focus-ring); }
 
+/* ── Body ────────────────────────────────────── */
 .body {
   padding: 16px 18px;
   display: flex;
@@ -62,6 +64,7 @@
 
 .section {}
 
+/* Section label with trailing divider line */
 .sectionLabel {
   font-size: var(--font-size-xs);
   font-weight: 700;
@@ -69,8 +72,45 @@
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sectionLabel::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
 }
 
+/* ── Assembly flow bar ───────────────────────── */
+.flowBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--bg-terminal);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+}
+
+.flowLabel { color: var(--text-muted); }
+.flowArrow { color: var(--border-color); }
+.flowHint  { color: var(--text-muted); }
+
+.flowTag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+}
+.flowTagHost  { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.flowTagAgent { background: color-mix(in srgb, #a78bfa 15%, transparent);       color: #a78bfa; }
+.flowTagSkill { background: color-mix(in srgb, var(--green) 15%, transparent);  color: var(--green); }
+
+/* ── Chips ───────────────────────────────────── */
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -89,35 +129,32 @@
   color: var(--text-secondary);
   cursor: pointer;
   font-family: var(--font-family-base);
-  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+              color var(--transition-fast);
 }
-
-.chip:hover { border-color: var(--accent-border); color: var(--text-primary); }
+.chip:hover         { border-color: var(--accent-border); color: var(--text-primary); }
 .chip:focus-visible { outline: var(--focus-ring); }
-
-.chipActive {
-  border-color: var(--accent-border);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-}
 
 .chipMono { font-family: var(--font-family-mono); font-size: var(--font-size-sm); }
 
-.promptPre {
-  background: var(--bg-terminal);
-  border: var(--border);
-  border-radius: var(--radius-lg);
-  padding: 14px 15px;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.7;
-  white-space: pre-wrap;
-  overflow: auto;
-  max-height: 200px;
-  color: var(--text-secondary);
-  margin: 0;
+/* Per-group active colors */
+.chipActiveHost {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.chipActiveAgent {
+  border-color: #a78bfa;
+  background: color-mix(in srgb, #a78bfa 12%, transparent);
+  color: #a78bfa;
+}
+.chipActiveSkill {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  color: var(--green);
 }
 
+/* ── Footer ──────────────────────────────────── */
 .footer {
   display: flex;
   align-items: center;
@@ -141,7 +178,7 @@
   padding: 7px 11px;
   cursor: pointer;
 }
-.notebookBtn:hover { color: var(--text-primary); border-color: var(--border-color); }
+.notebookBtn:hover         { color: var(--text-primary); border-color: var(--border-color); }
 .notebookBtn:focus-visible { outline: var(--focus-ring); }
 
 .cancelBtn {
@@ -153,7 +190,7 @@
   padding: 7px 14px;
   cursor: pointer;
 }
-.cancelBtn:hover { color: var(--text-primary); }
+.cancelBtn:hover         { color: var(--text-primary); }
 .cancelBtn:focus-visible { outline: var(--focus-ring); }
 
 .applyBtn {
@@ -169,7 +206,7 @@
   padding: 7px 16px;
   cursor: pointer;
 }
-.applyBtn:hover { filter: brightness(1.1); }
+.applyBtn:hover    { filter: brightness(1.1); }
 .applyBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 .applyBtn:focus-visible { outline: var(--focus-ring); }
 
@@ -182,7 +219,7 @@
   padding: 7px 14px;
   cursor: pointer;
 }
-.resetBtn:hover { color: var(--text-secondary); }
+.resetBtn:hover         { color: var(--text-secondary); }
 .resetBtn:focus-visible { outline: var(--focus-ring); }
 
 .savedHint {

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { SendHorizonal, Eye, EyeOff, ChevronRight, Trash2 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useTerminalStore } from '../../../store/terminalStore'
@@ -21,13 +21,22 @@ interface Props {
   onRemove: (id: string) => void
   onEdit: (id: string, body: string) => void
   onScrollTo: (id: string) => void
+  onDraftReady: (draftPath: string) => void
 }
 
 export function CommentsPanel({
-  filePath, body, comments, showHighlights, orphanedIds, onToggleHighlights, onCollapse, onClearAll, onResolve, onReopen, onRemove, onEdit, onScrollTo,
+  filePath, body, comments, showHighlights, orphanedIds, onToggleHighlights, onCollapse, onClearAll, onResolve, onReopen, onRemove, onEdit, onScrollTo, onDraftReady,
 }: Props): JSX.Element {
   const addTab = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
+
+  const exitUnsubRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    return () => {
+      exitUnsubRef.current?.()
+    }
+  }, [])
 
   const unresolved = comments.filter((c) => !c.resolved)
   const resolved = comments.filter((c) => c.resolved)
@@ -41,6 +50,16 @@ export function CommentsPanel({
     const tabId = `review-${Date.now().toString(36)}`
     addTab(tabId, `Review · ${fileName}`)
     openTab(tabId)
+
+    exitUnsubRef.current?.()
+    exitUnsubRef.current = window.pathly.terminal.onExit((exitedTabId) => {
+      if (exitedTabId !== tabId) return
+      exitUnsubRef.current = null
+      void window.pathly.fs.read(norm + '.draft').then((content) => {
+        if (content !== null && content.trim().length > 0) onDraftReady(norm + '.draft')
+      })
+    })
+
     await window.pathly.terminal.spawn(tabId, cwd, undefined, [
       'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
     ])

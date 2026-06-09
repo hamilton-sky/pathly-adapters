@@ -100,6 +100,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   const [pendingBody, setPendingBody]     = useState('')
   const [showHighlights, setShowHighlights] = useState(true)
   const [showPanel, setShowPanel] = useState(true)
+  const [draftPath, setDraftPath] = useState<string | null>(null)
 
   const previewRef = useRef<CommentablePreviewHandle>(null)
   const [orphanedIds, setOrphanedIds] = useState<Set<string>>(new Set())
@@ -128,6 +129,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
 
   useEffect(() => {
     if (!effectivePath) return
+    setDraftPath(null)
     setTab('preview')
     setPendingAnchor(null)
     setAnchorPos(null)
@@ -326,6 +328,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
                     onRemove={removeComment}
                     onEdit={editComment}
                     onScrollTo={(id) => previewRef.current?.scrollToComment(id)}
+                    onDraftReady={setDraftPath}
                   />
                 )}
               </>
