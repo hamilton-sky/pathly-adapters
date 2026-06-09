@@ -1,0 +1,15 @@
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-family-mono);
+  border-radius: 4px;
+  padding: 1px 6px;
+  opacity: 0.85;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+  border: 1px solid;
+}
+
+.badge[data-flow='team']    { color: var(--accent); border-color: var(--accent); }
+.badge[data-flow='debug']   { color: var(--red);    border-color: var(--red);    }
+.badge[data-flow='explore'] { color: var(--green);  border-color: var(--green);  }

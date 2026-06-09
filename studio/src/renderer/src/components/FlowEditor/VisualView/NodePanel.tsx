@@ -135,14 +135,19 @@ export function NodePanel({
               ✓
             </button>
           </div>
+        ) : onRename ? (
+          <Tooltip label="Click to rename" placement="bottom">
+            <div
+              className={clsx(s.ctrl, s.ctrlMono, s.ctrlClickable)}
+              onClick={() => setRenaming(true)}
+            >
+              <span className={s.ctrlText}>{stateId}</span>
+              <span className={s.ctrlEditHint}>&#x270E;</span>
+            </div>
+          </Tooltip>
         ) : (
-          <div
-            className={clsx(s.ctrl, s.ctrlMono, onRename && s.ctrlClickable)}
-            onClick={() => onRename && setRenaming(true)}
-            title={onRename ? 'Click to rename' : undefined}
-          >
+          <div className={clsx(s.ctrl, s.ctrlMono)}>
             <span className={s.ctrlText}>{stateId}</span>
-            {onRename && <span className={s.ctrlEditHint}>✎</span>}
           </div>
         )}
       </div>
@@ -233,19 +238,20 @@ export function NodePanel({
               const isBackward = tgtIdx < srcIdx || target === stateId
               const condTag = getConditionTag(rules, stateId, target)
               return (
-                <button
-                  key={target}
-                  type="button"
-                  className={s.transRow}
-                  onClick={() => onSelectEdge?.(stateId, target)}
-                  title="Click to configure this transition"
-                >
-                  <span className={s.transKey}>{isBackward ? 'retry' : 'next'}</span>
-                  <span className={clsx(s.transVal, isBackward && s.transValReturn)}>
-                    {isBackward ? '↩ ' : '→ '}{target}
-                  </span>
-                  {condTag && <span className={s.transCondTag}>{condTag}</span>}
-                </button>
+                <Tooltip label="Click to configure this transition" placement="bottom">
+                  <button
+                    key={target}
+                    type="button"
+                    className={s.transRow}
+                    onClick={() => onSelectEdge?.(stateId, target)}
+                  >
+                    <span className={s.transKey}>{isBackward ? 'retry' : 'next'}</span>
+                    <span className={clsx(s.transVal, isBackward && s.transValReturn)}>
+                      {isBackward ? '↩ ' : '→ '}{target}
+                    </span>
+                    {condTag && <span className={s.transCondTag}>{condTag}</span>}
+                  </button>
+                </Tooltip>
               )
             })}
           </div>

@@ -1,7 +1,6 @@
+/* ── Container ── */
 .container {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -9,7 +8,17 @@
   pointer-events: none;
 }
 
+.posBottomRight { bottom: 20px; right: 20px; }
+.posBottomLeft  { bottom: 20px; left: 20px; }
+.posTopRight    { top: 20px; right: 20px; }
+.posTopLeft     { top: 20px; left: 20px; }
+
+.containerBannerBottom { left: 0; right: 0; bottom: 0; gap: 2px; }
+.containerBannerTop    { left: 0; right: 0; top: 0; gap: 2px; }
+
+/* ── Toast base ── */
 .toast {
+  --toast-accent: var(--accent);
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -23,13 +32,62 @@
   min-width: 220px;
   max-width: 380px;
   pointer-events: all;
-  animation: slideIn 0.18s ease-out;
+  animation: slideUp 0.18s ease-out;
 }
 
-.info  { border-left: 3px solid var(--accent); }
-.success { border-left: 3px solid #4ade80; }
-.error { border-left: 3px solid #f87171; }
+/* ── Variant accent lines ── */
+.info    { border-left: 3px solid var(--toast-accent); }
+.success { border-left: 3px solid var(--toast-accent); }
+.error   { border-left: 3px solid var(--toast-accent); }
 
+/* Default variant colors when no category color is set */
+.info    { --toast-accent: var(--accent); }
+.success { --toast-accent: #4ade80; }
+.error   { --toast-accent: #f87171; }
+
+/* ── Style variants ── */
+.styleDefault { /* uses base toast */ }
+
+.styleCard {
+  border: 1px solid var(--toast-accent);
+  border-left: 3px solid var(--toast-accent);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.styleMinimal {
+  background: rgba(15, 15, 20, 0.88);
+  border: none;
+  border-left: 3px solid var(--toast-accent);
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+.styleBanner {
+  border-radius: 0;
+  min-width: 100%;
+  max-width: 100%;
+  border: none;
+  border-top: 2px solid var(--toast-accent);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Animations ── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animateDown {
+  animation: slideDown 0.18s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Text and close ── */
 .message {
   flex: 1;
   line-height: 1.5;
@@ -49,8 +107,3 @@
   transition: color 0.1s, background 0.1s;
 }
 .close:hover { color: var(--text-primary); background: var(--bg-surface1); }
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}

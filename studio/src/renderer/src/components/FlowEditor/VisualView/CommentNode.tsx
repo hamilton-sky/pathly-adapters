@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import React, { useState } from 'react'
 import type { NodeProps } from 'reactflow'
 import { Handle, Position } from 'reactflow'
 import { FileText, MessageCircle, Trash2 } from 'lucide-react'
@@ -10,20 +10,6 @@ interface CommentNodeData extends CommentEntry {
   onUpdate: (id: string, patch: Partial<Omit<CommentEntry, 'id'>>) => void
   onDelete: (id: string) => void
   states?: string[]
-}
-
-const COLOR_BG: Record<CommentColor, string> = {
-  yellow: '#FEFCE8', teal: '#F0FDFA', red: '#FFF1F2', purple: '#FAF5FF', grey: '#F9FAFB',
-}
-const COLOR_BORDER: Record<CommentColor, string> = {
-  yellow: '#FDE047', teal: '#5EEAD4', red: '#FDA4AF', purple: '#D8B4FE', grey: '#D1D5DB',
-}
-const COLOR_TEXT: Record<CommentColor, string> = {
-  yellow: '#422006', teal: '#134E4A', red: '#881337', purple: '#581C87', grey: '#111827',
-}
-
-const SWATCH_COLORS: Record<CommentColor, string> = {
-  yellow: '#FDE047', teal: '#5EEAD4', red: '#FDA4AF', purple: '#D8B4FE', grey: '#D1D5DB',
 }
 
 const ALL_COLORS: CommentColor[] = ['yellow', 'teal', 'red', 'purple', 'grey']
@@ -46,7 +32,7 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
   return (
     <div
       className={nodeClass}
-      style={{ '--cbg': COLOR_BG[data.color], '--cborder': COLOR_BORDER[data.color], '--ctext': COLOR_TEXT[data.color] } as React.CSSProperties}
+      data-color={data.color}
     >
       <div className={styles.toolbar}>
         <Tooltip label={data.shape === 'sticky' ? 'Switch to speech bubble' : 'Switch to sticky note'} placement="top">
@@ -66,10 +52,10 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
               <button
                 type="button"
                 className={[styles.swatch, data.color === c ? styles.swatchActive : ''].filter(Boolean).join(' ')}
-                style={{ '--swatch-color': SWATCH_COLORS[c] } as React.CSSProperties}
+                data-swatch={c}
                 onClick={() => data.onUpdate(data.id, { color: c })}
                 aria-label={`Set color ${c}`}
-                aria-pressed={data.color === c}
+                {...(data.color === c ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
               />
             </Tooltip>
           ))}

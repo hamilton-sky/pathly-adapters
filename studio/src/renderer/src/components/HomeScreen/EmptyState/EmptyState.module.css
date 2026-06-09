@@ -1,0 +1,29 @@
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 48px 32px;
+  animation: fadeSlideUp 300ms ease-out both;
+}
+
+.icon { color: var(--text-muted); }
+
+.title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+}
+
+.sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+}

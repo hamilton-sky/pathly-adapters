@@ -744,6 +744,70 @@ def skills_preview():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+@bp.route("/skills/save", methods=["POST"])
+def skills_save():
+    """Save skill body cells back to disk and upsert to DB.
+
+    Body: {"skill_path": "...", "body_cells": [{"heading": "...", "content": "..."}]}
+    Returns: {"ok": True}
+    """
+    try:
+        from pathly_orchestrator.db import get_db
+        from pathly_orchestrator.db.queries.skill_defs import upsert_skill_definition
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        skill_path = data.get("skill_path", "")
+        body_cells = data.get("body_cells", [])
+
+        if not isinstance(skill_path, str) or not skill_path.strip():
+            return jsonify({"error": "Field 'skill_path' must be a non-empty string"}), 400
+        if not isinstance(body_cells, list):
+            return jsonify({"error": "Field 'body_cells' must be a list"}), 400
+
+        # Reconstruct markdown from body cells
+        parts = []
+        for bc in body_cells:
+            if not isinstance(bc, dict):
+                continue
+            heading = (bc.get("heading") or "").strip()
+            content = (bc.get("content") or "").strip()
+            if heading:
+                parts.append(f"## {heading}\n\n{content}" if content else f"## {heading}")
+            elif content:
+                parts.append(content)
+        markdown = "\n\n".join(parts) + "\n" if parts else ""
+
+        # Write to disk
+        Path(skill_path).write_text(markdown, encoding="utf-8")
+
+        # Derive skill key from path (e.g. "development/build")
+        normalized = skill_path.replace("\\", "/")
+        marker = "core/skills/"
+        idx = normalized.find(marker)
+        skill_key = normalized[idx + len(marker):].removesuffix(".md") if idx != -1 else Path(skill_path).stem
+        filename = Path(skill_path).name
+        natural_language = body_cells[0].get("heading", skill_key) if body_cells else skill_key
+
+        # Upsert to DB
+        conn = get_db()
+        upsert_skill_definition(
+            conn,
+            project_root=None,
+            skill=skill_key,
+            filename=filename,
+            natural_language=natural_language,
+            content=markdown,
+        )
+
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        logging.exception("skills_save error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
 @bp.route("/skills/export", methods=["PUT"])
 def skills_export():
     """Update composition.yaml with a new fragment_order for a skill.

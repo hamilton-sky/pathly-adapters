@@ -3,6 +3,7 @@ import { FileText, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useUiStore } from '../../../store/uiStore'
 import type { PathlyItem, PathlyReorgDragItem, PathlySection } from '../../../types'
 import { PATHLY_DRAG_MIME } from '../../../types'
+import { Tooltip } from '../../ui'
 import { RenameInput } from '../shared/RenameInput'
 import { ContextMenu } from '../shared/ContextMenu'
 import styles from '../Sidebar.module.css'
@@ -102,18 +103,23 @@ export function WorkspaceItem({
           {isActionable && (
             <div className={styles.rowActions}>
               {isUserLocked && (
-                <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked â€” delete disabled">
-                  <Lock size={11} />
-                </span>
+                <Tooltip label="Locked — delete disabled" placement="bottom">
+                  <span className={`${styles.rowAction} ${styles.rowActionLock}`}>
+                    <Lock size={11} />
+                  </span>
+                </Tooltip>
               )}
-              <button
-                ref={menuButtonRef}
-                className={styles.rowAction}
-                title="Actions"
-                onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
-              >
-                <MoreHorizontal size={15} />
-              </button>
+              <Tooltip label="Actions" placement="bottom">
+                <button
+                  type="button"
+                  ref={menuButtonRef}
+                  className={styles.rowAction}
+                  aria-label="Actions"
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+              </Tooltip>
 
               {menuOpen && menuButtonRef.current && (
                 <ContextMenu
@@ -121,19 +127,19 @@ export function WorkspaceItem({
                   onClose={() => setMenuOpen(false)}
                 >
                   {onStartRename && !isUserLocked && (
-                    <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartRename) }}>
+                    <button type="button" className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartRename) }}>
                       <Pencil size={12} />
                       Rename
                     </button>
                   )}
                   {!isUserLocked && onStartDelete && (
-                    <button className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartDelete) }}>
+                    <button type="button" className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartDelete) }}>
                       <Trash2 size={12} />
                       Delete
                     </button>
                   )}
                   <div className={styles.itemMenuSep} />
-                  <button className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); toggleUserLock(item.path); setMenuOpen(false) }}>
+                  <button type="button" className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); toggleUserLock(item.path); setMenuOpen(false) }}>
                     <Lock size={12} />
                     {isUserLocked ? 'Unlock file' : 'Lock file'}
                   </button>

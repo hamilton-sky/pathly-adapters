@@ -1,5 +1,6 @@
 ﻿import { FileText, GripVertical, Pencil, Trash2 } from 'lucide-react'
 import type { PathlyItem } from '../../../types'
+import { Tooltip } from '../../ui'
 import { RenameInput } from '../shared/RenameInput'
 import styles from '../Sidebar.module.css'
 
@@ -62,22 +63,28 @@ export function LibraryItem({ item, isSelected, isCanvasDraggable, deep, onSelec
           {(onStartRename || onStartDelete) && (
             <div className={styles.rowActions}>
               {onStartRename && (
-                <button
-                  className={styles.rowAction}
-                  title="Rename"
-                  onClick={(e) => { e.stopPropagation(); onStartRename() }}
-                >
-                  <Pencil size={11} />
-                </button>
+                <Tooltip label="Rename" placement="bottom">
+                  <button
+                    type="button"
+                    className={styles.rowAction}
+                    aria-label="Rename"
+                    onClick={(e) => { e.stopPropagation(); onStartRename() }}
+                  >
+                    <Pencil size={11} />
+                  </button>
+                </Tooltip>
               )}
               {onStartDelete && (
-                <button
-                  className={`${styles.rowAction} ${styles.rowActionDelete}`}
-                  title="Delete"
-                  onClick={(e) => { e.stopPropagation(); onStartDelete() }}
-                >
-                  <Trash2 size={11} />
-                </button>
+                <Tooltip label="Delete" placement="bottom">
+                  <button
+                    type="button"
+                    className={`${styles.rowAction} ${styles.rowActionDelete}`}
+                    aria-label="Delete"
+                    onClick={(e) => { e.stopPropagation(); onStartDelete() }}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </Tooltip>
               )}
             </div>
           )}

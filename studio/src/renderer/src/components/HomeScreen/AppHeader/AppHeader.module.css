@@ -1,0 +1,69 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--bg-surface0);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  padding-right: 155px;
+  box-sizing: border-box;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  transition: color var(--transition-base), border-color var(--transition-base);
+  letter-spacing: 0.01em;
+}
+
+.tab:hover { color: var(--text-secondary); }
+
+.tab.active {
+  border-bottom-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.themeToggleWrap {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.themeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-base);
+}
+
+.themeBtn:hover { background-color: var(--bg-surface0); }

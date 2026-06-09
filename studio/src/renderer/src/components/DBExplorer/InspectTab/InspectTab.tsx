@@ -89,7 +89,7 @@ export function InspectTab({ events }: InspectTabProps): JSX.Element {
             data-category={typeCategory(type)}
             {...(disabled.has(type) ? {} : { 'data-active': '' })}
             onClick={() => toggle(type)}
-            aria-pressed={!disabled.has(type)}
+            {...(!disabled.has(type) ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
           >
             {type}
           </button>

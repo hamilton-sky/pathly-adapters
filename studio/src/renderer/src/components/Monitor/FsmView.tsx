@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useMemo } from 'react'
 import { Check, CircleDot } from 'lucide-react'
 import { useStore } from '../../store'
+import { Tooltip } from '../ui'
 import { useInjectCSS } from './utils'
 import styles from './Monitor.module.css'
 
@@ -168,9 +169,9 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
 
           return (
             <div key={state} className={isLast ? styles.fsmStepLast : styles.fsmStep}>
+              <Tooltip label={tooltipLabel} placement="top">
               <button
                 type="button"
-                title={tooltipLabel}
                 aria-label={tooltipLabel}
                 className={styles.fsmDotBtn}
                 onClick={() => onStageClick(state, idx)}
@@ -184,6 +185,7 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
                   <span className={styles.fsmRetryBadge}>↩{retryCount}</span>
                 )}
               </button>
+            </Tooltip>
 
               {!isLast && (
                 <div className={`${styles.fsmConnector} ${idx < activeIdx ? styles.fsmConnectorDone : ''}`} />

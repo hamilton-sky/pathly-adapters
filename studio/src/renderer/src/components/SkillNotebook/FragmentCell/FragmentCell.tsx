@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react'
 import { ChevronUp, ChevronDown, MoreHorizontal, Copy, Diamond, Trash2 } from 'lucide-react'
+import { Tooltip } from '../../ui'
 import styles from './FragmentCell.module.css'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 
@@ -61,22 +62,28 @@ export default function FragmentCell({
           </span>
         )}
         <div className={styles.actions}>
-          <button type="button" className={styles.actionBtn} aria-label="Move up" title="Move up" disabled={isFirst} onClick={onMoveUp}>
-            <ChevronUp size={15} />
-          </button>
-          <button type="button" className={styles.actionBtn} aria-label="Move down" title="Move down" disabled={isLast} onClick={onMoveDown}>
-            <ChevronDown size={15} />
-          </button>
-          <div className={styles.menuWrap} ref={menuRef}>
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${menuOpen ? styles.actionBtnActive : ''}`}
-              aria-label="More options"
-              {...(menuOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-              onClick={() => setMenuOpen(o => !o)}
-            >
-              <MoreHorizontal size={15} />
+          <Tooltip label="Move up" placement="top">
+            <button type="button" className={styles.actionBtn} aria-label="Move up" disabled={isFirst} onClick={onMoveUp}>
+              <ChevronUp size={15} />
             </button>
+          </Tooltip>
+          <Tooltip label="Move down" placement="top">
+            <button type="button" className={styles.actionBtn} aria-label="Move down" disabled={isLast} onClick={onMoveDown}>
+              <ChevronDown size={15} />
+            </button>
+          </Tooltip>
+          <div className={styles.menuWrap} ref={menuRef}>
+            <Tooltip label="More options" placement="top">
+              <button
+                type="button"
+                className={`${styles.actionBtn} ${menuOpen ? styles.actionBtnActive : ''}`}
+                aria-label="More options"
+                {...(menuOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+                onClick={() => setMenuOpen(o => !o)}
+              >
+                <MoreHorizontal size={15} />
+              </button>
+            </Tooltip>
             {menuOpen && (
               <div className={styles.menu} role="menu">
                 <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
@@ -86,7 +93,7 @@ export default function FragmentCell({
                   <ChevronUp size={15} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>âŒ˜â†‘</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" disabled={isLast} onClick={() => { onMoveDown?.(); setMenuOpen(false) }}>
-                  <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>âŒ˜â†“</span>
+                  <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>âŒ˜â†"</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                   <Diamond size={15} className={styles.menuIcon} />Convert to body

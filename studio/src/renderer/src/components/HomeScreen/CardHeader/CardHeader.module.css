@@ -1,0 +1,76 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: var(--bg-base);
+}
+
+.header.withBorder { border-bottom: 1px solid var(--bg-surface0); }
+
+.titleGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  font-family: var(--font-family-base);
+}
+
+.path {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-family-mono);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pinBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+  color: var(--text-muted);
+}
+
+.pinBtn.pinned { color: #EAB308; }
+.pinBtn.visible { opacity: 1; }
+
+.removeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--bg-surface0);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  opacity: 0;
+  transition: all var(--transition-base), opacity var(--transition-base);
+}
+
+.removeBtn.visible { opacity: 1; }
+.removeBtn:hover { background: var(--red-bg); border-color: var(--red); color: var(--red); }

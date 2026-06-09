@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useStore } from '../../store'
 import type { FsmEvent } from '../../types/index'
+import { Tooltip } from '../ui'
 import { useInjectCSS, useAgentTelemetry } from './utils'
 import styles from './Monitor.module.css'
 
@@ -329,16 +330,17 @@ export function EventLog(): JSX.Element {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          className={styles.evDenseToggle}
-          onClick={() => setDensePhases((v) => !v)}
-          aria-label={densePhases ? 'Show verbose events' : 'Show dense events'}
-          title={densePhases ? 'verbose' : 'dense'}
-        >
-          {densePhases ? <Eye size={14} /> : <EyeOff size={14} />}
-          <span>{densePhases ? 'verbose' : 'dense'}</span>
-        </button>
+        <Tooltip label={densePhases ? 'Show verbose events' : 'Show dense events'} placement="bottom">
+          <button
+            type="button"
+            className={styles.evDenseToggle}
+            onClick={() => setDensePhases((v) => !v)}
+            aria-label={densePhases ? 'Show verbose events' : 'Show dense events'}
+          >
+            {densePhases ? <Eye size={14} /> : <EyeOff size={14} />}
+            <span>{densePhases ? 'verbose' : 'dense'}</span>
+          </button>
+        </Tooltip>
       </div>
       <div className={styles.evLogWrapper}>
         <div ref={logRef} className={styles.evLog} onScroll={handleScroll}>

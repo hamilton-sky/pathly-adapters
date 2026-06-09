@@ -1,8 +1,10 @@
 ﻿import React, { useState } from 'react'
+import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, Download, FileCode,
 } from 'lucide-react'
-import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
+import { Tooltip } from '../../ui'
+import { useSkillNotebookStore, BodyCell } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './NotebookHeader.module.css'
 
@@ -18,6 +20,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const skillNotebookPath = useUiStore(s => s.skillNotebookPath)
   const setSkillNotebookPath = useUiStore(s => s.setSkillNotebookPath)
   const [exportState, setExportState] = useState<'idle' | 'success' | 'error'>('idle')
+  const [saveState, setSaveState] = useState<'idle' | 'success' | 'error'>('idle')
 
   const canUndo = historyIndex > 0
   const canRedo = historyIndex < history.length - 1
@@ -53,7 +56,29 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   }
 
   const handleSave = async () => {
-    try { await fetch('http://localhost:8765/health') } catch {}
+    const bodyCells = cells
+      .filter(c => c.type === 'body')
+      .map(c => ({ heading: (c as BodyCell).heading, content: (c as BodyCell).content }))
+    try {
+      const res = await fetch('http://localhost:8765/skills/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skill_path: skillNotebookPath, body_cells: bodyCells }),
+      })
+      if (res.ok) {
+        setSaveState('success')
+        useToastStore.getState().push('Skill saved', 'success', { category: 'db_crud' })
+        setTimeout(() => setSaveState('idle'), 2000)
+      } else {
+        setSaveState('error')
+        useToastStore.getState().push('Save failed — server error', 'error', { category: 'db_crud' })
+        setTimeout(() => setSaveState('idle'), 3000)
+      }
+    } catch {
+      setSaveState('error')
+      useToastStore.getState().push('Save failed — server unreachable', 'error', { category: 'db_crud' })
+      setTimeout(() => setSaveState('idle'), 3000)
+    }
   }
 
   return (
@@ -78,29 +103,36 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
       {/* Only show undo/redo and save/export in cells mode */}
       {viewMode === 'cells' && (
         <>
+          <Tooltip label="Undo" shortcut="Ctrl+Z" placement="bottom">
+            <button
+              type="button"
+              className={styles.iconBtn}
+              onClick={undo}
+              disabled={!canUndo}
+              aria-label="Undo"
+            >
+              <Undo2 size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Redo" shortcut="Ctrl+Shift+Z" placement="bottom">
+            <button
+              type="button"
+              className={styles.iconBtn}
+              onClick={redo}
+              disabled={!canRedo}
+              aria-label="Redo"
+            >
+              <Redo2 size={15} />
+            </button>
+          </Tooltip>
           <button
             type="button"
-            className={styles.iconBtn}
-            onClick={undo}
-            disabled={!canUndo}
-            title="Undo"
-            aria-label="Undo"
+            className={`${styles.saveBtn} ${saveState === 'success' ? styles.saveSuccess : saveState === 'error' ? styles.saveError : ''}`}
+            onClick={handleSave}
+            disabled={saveState !== 'idle'}
           >
-            <Undo2 size={15} />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            onClick={redo}
-            disabled={!canRedo}
-            title="Redo"
-            aria-label="Redo"
-          >
-            <Redo2 size={15} />
-          </button>
-          <button type="button" className={styles.saveBtn} onClick={handleSave}>
             <Database size={15} />
-            Save
+            {saveState === 'success' ? 'Saved' : saveState === 'error' ? 'Error' : 'Save'}
           </button>
           <button
             type="button"
@@ -114,17 +146,18 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         </>
       )}
 
-      {/* Mode toggle â€” cells â†” raw editor */}
-      <button
-        type="button"
-        className={`${styles.modeToggleBtn} ${viewMode === 'editor' ? styles.modeToggleActive : ''}`}
-        title={viewMode === 'editor' ? 'Back to notebook view' : 'View as editor (raw source)'}
-        aria-label={viewMode === 'editor' ? 'Notebook view' : 'Editor view'}
-        onClick={onToggleViewMode}
-      >
-        <FileCode size={15} />
-        <span>{viewMode === 'editor' ? 'Notebook' : 'Editor'}</span>
-      </button>
+      {/* Mode toggle — cells ↔ raw editor */}
+      <Tooltip label={viewMode === 'editor' ? 'Back to notebook view' : 'View as editor (raw source)'} placement="bottom">
+        <button
+          type="button"
+          className={`${styles.modeToggleBtn} ${viewMode === 'editor' ? styles.modeToggleActive : ''}`}
+          aria-label={viewMode === 'editor' ? 'Notebook view' : 'Editor view'}
+          onClick={onToggleViewMode}
+        >
+          <FileCode size={15} />
+          <span>{viewMode === 'editor' ? 'Notebook' : 'Editor'}</span>
+        </button>
+      </Tooltip>
     </div>
   )
 }

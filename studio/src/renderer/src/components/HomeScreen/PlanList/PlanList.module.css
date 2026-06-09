@@ -1,0 +1,39 @@
+.empty {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-family: var(--font-family-base);
+}
+
+.list { display: flex; flex-direction: column; }
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 16px 7px 20px;
+  border-bottom: 1px solid var(--bg-base);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  background-color: transparent;
+  transition: all var(--transition-base);
+}
+
+.row:hover {
+  border-left-color: var(--accent);
+  background-color: var(--bg-surface0);
+}
+
+.row.blocked { border-left-color: var(--red); }
+
+.planName {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-family-mono);
+  transition: color var(--transition-base);
+}
+
+.planName.blockedText { color: color-mix(in srgb, var(--red) 80%, transparent); }
+
+.badges { display: flex; align-items: center; gap: 8px; }

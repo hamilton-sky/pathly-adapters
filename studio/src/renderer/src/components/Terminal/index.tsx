@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState, useCallback } from 'react'
 import { Columns2, Menu, X as XIcon } from 'lucide-react'
+import { Tooltip } from '../ui'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
 import { useTheme } from '../../useTheme'
@@ -60,7 +61,7 @@ export function Terminal(): JSX.Element {
     return () => document.removeEventListener('pathly:focus-terminal-tab', handler)
   }, [])
 
-  // Listen for PTY exit â€” write an exit marker into the shared xterm
+  // Listen for PTY exit â€" write an exit marker into the shared xterm
   useEffect(() => {
     const api = window.pathly?.terminal
     if (!api) return
@@ -183,39 +184,53 @@ export function Terminal(): JSX.Element {
           />
           <div className={styles.toolbarActions}>
             {tabs.length >= 2 && (
-              <button className={styles.splitIconBtn} onClick={toggleSplit} title="Split pane side-by-side">
-                <Columns2 size={15} />
-              </button>
+              <Tooltip label="Split pane side-by-side" placement="bottom">
+                <button type="button" aria-label="Split pane side-by-side" className={styles.splitIconBtn} onClick={toggleSplit}>
+                  <Columns2 size={15} />
+                </button>
+              </Tooltip>
             )}
             {tabs.length > 0 && (
-              <button
-                className={`${styles.splitIconBtn} ${instancesRailOpen ? styles.splitIconBtnActive : ''}`}
-                onClick={() => setInstancesRailOpen((v) => !v)}
-                title={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'}
-              >
-                <Menu size={15} />
-              </button>
+              <Tooltip label={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'} placement="bottom">
+                <button
+                  type="button"
+                  aria-label={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'}
+                  className={`${styles.splitIconBtn} ${instancesRailOpen ? styles.splitIconBtnActive : ''}`}
+                  onClick={() => setInstancesRailOpen((v) => !v)}
+                >
+                  <Menu size={15} />
+                </button>
+              </Tooltip>
             )}
-            <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={15} /></button>
+            <Tooltip label="Close terminal" placement="bottom">
+              <button type="button" aria-label="Close terminal" className={styles.closePanelBtn} onClick={toggle}><XIcon size={15} /></button>
+            </Tooltip>
           </div>
         </div>
       )}
 
       {splitEnabled && (
         <div className={styles.splitHeader}>
-          <button className={`${styles.splitIconBtn} ${styles.splitIconBtnActive}`} onClick={toggleSplit} title="Close split">
-            <Columns2 size={15} />
-          </button>
-          {tabs.length > 0 && (
-            <button
-              className={`${styles.splitIconBtn} ${instancesRailOpen ? styles.splitIconBtnActive : ''}`}
-              onClick={() => setInstancesRailOpen((v) => !v)}
-              title={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'}
-            >
-              <Menu size={15} />
+          <Tooltip label="Close split" placement="bottom">
+            <button type="button" aria-label="Close split" className={`${styles.splitIconBtn} ${styles.splitIconBtnActive}`} onClick={toggleSplit}>
+              <Columns2 size={15} />
             </button>
+          </Tooltip>
+          {tabs.length > 0 && (
+            <Tooltip label={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'} placement="bottom">
+              <button
+                type="button"
+                aria-label={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'}
+                className={`${styles.splitIconBtn} ${instancesRailOpen ? styles.splitIconBtnActive : ''}`}
+                onClick={() => setInstancesRailOpen((v) => !v)}
+              >
+                <Menu size={15} />
+              </button>
+            </Tooltip>
           )}
-          <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={15} /></button>
+          <Tooltip label="Close terminal" placement="bottom">
+            <button type="button" aria-label="Close terminal" className={styles.closePanelBtn} onClick={toggle}><XIcon size={15} /></button>
+          </Tooltip>
         </div>
       )}
 
@@ -246,15 +261,16 @@ export function Terminal(): JSX.Element {
           )}
         </div>
         {tabs.length > 0 && !instancesRailOpen && (
-          <button
-            type="button"
-            className={styles.instancesRailToggle}
-            onClick={() => setInstancesRailOpen(true)}
-            title="Open instances panel"
-            aria-label="Open instances panel"
-          >
-            <Menu size={14} />
-          </button>
+          <Tooltip label="Open instances panel" placement="left">
+            <button
+              type="button"
+              className={styles.instancesRailToggle}
+              onClick={() => setInstancesRailOpen(true)}
+              aria-label="Open instances panel"
+            >
+              <Menu size={14} />
+            </button>
+          </Tooltip>
         )}
         {tabs.length > 0 && instancesRailOpen && (
           <TerminalInstancesRail

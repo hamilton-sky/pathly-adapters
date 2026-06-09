@@ -12,6 +12,7 @@ import { useUiStore } from '../../store/uiStore'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext, invalidatePathlyContext, subscribeToMenuUpdates, type PushedMenu } from '../../lib/pathlyContext'
 import { useToastStore } from '../../store/toastStore'
+import type { PushOpts } from '../../store/toastStore'
 import { hasEmbeddedSkills, matchIntent, matchIntentByName, preEmbedSkills } from '../../lib/embedRouter'
 import { askLlm, getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
 import { splitThinkingContent } from '../../lib/thinkingParser'
@@ -243,18 +244,19 @@ export function useHQ() {
               if (!isReconnect) {
                 useRunnerStore.getState().recordStageStart(data.stage as string, data.adapter as string | null, null)
               }
+              useToastStore.getState().push(`Stage: ${data.stage as string}`, 'info', { category: 'phase_changes' })
             } else if (data.type === 'DECISION_MENU') {
               setRunnerState({ status: 'blocked' })
               setDecisionMenu(data.items as DecisionMenuItem[])
               useRunnerStore.getState().setLogCardExpanded(true)
-              useToastStore.getState().push('Runner is waiting for your decision', 'info')
+              useToastStore.getState().push('Runner is waiting for your decision', 'info', { category: 'runner_state' })
             } else if (data.type === 'AGENT_QUESTION') {
               setRunnerState({ status: 'blocked' })
               useRunnerStore.getState().setAgentQuestion({
                 question: data.question as string,
                 options: data.options as AgentQuestionOption[],
               })
-              useToastStore.getState().push('Agent is waiting for your answer', 'info')
+              useToastStore.getState().push('Agent is waiting for your answer', 'info', { category: 'runner_state' })
             } else if (data.type === 'RUNNER_STATUS') {
               setRunnerState({ status: data.status as RunnerStatus })
               if (data.status === 'running') {
@@ -269,7 +271,7 @@ export function useHQ() {
             } else if (data.type === 'SESSION') {
               setRunnerState({ sessionKind: data.kind as SessionKind })
             } else if (data.type === 'RUNNER_WARNING') {
-              useToastStore.getState().push(`Runner warning: ${(data.reason as string) ?? 'unknown'}`, 'info')
+              useToastStore.getState().push(`Runner warning: ${(data.reason as string) ?? 'unknown'}`, 'info', { category: 'runner_state' })
             } else if (data.type === 'RUNNER_ERROR') {
               setRunnerState({ errorMessage: data.message as string, status: 'error' })
             } else if (data.type === 'TERMINAL_SPAWN') {
@@ -324,16 +326,24 @@ export function useHQ() {
                   r.usage?.cache_creation_input_tokens ?? 0,
                   r.duration_ms ?? 0,
                 )
+                useToastStore.getState().push('Agent done', 'success', { category: 'agent_done' })
               }
             } else if (data.type === 'RUN_STARTED') {
               useRunnerStore.getState().snapshotRun()
               useRunnerStore.getState().setRunnerState({ errorMessage: null, status: 'running', cost: 0, stage: null, adapter: null, sessionKind: null })
+              useToastStore.getState().push('Pipeline started', 'info', { category: 'runner_state' })
             } else if (data.type === 'RUN_COMPLETE') {
               // Snapshot the finished/aborted run → moves stageLog to history
               // → docked banner clears (stageLog becomes empty → card returns null)
               // → historical card appears (collapsed) in its place
               useRunnerStore.getState().snapshotRun()
               useRunnerStore.getState().setRunnerState({ status: (data.status as RunnerStatus) ?? 'idle' })
+              const runStatus = data.status as string
+              useToastStore.getState().push(
+                runStatus === 'done' ? 'Pipeline completed' : runStatus === 'aborted' ? 'Pipeline aborted' : 'Pipeline finished',
+                runStatus === 'done' ? 'success' : 'info',
+                { category: 'runner_state' }
+              )
             } else if (data.type === 'TOAST') {
               const rawLevel = data.level as string | undefined
               const variant = (rawLevel === 'success' || rawLevel === 'error') ? rawLevel : 'info'

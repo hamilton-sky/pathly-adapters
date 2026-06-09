@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { ChevronDown, ExternalLink, Menu, Trash2, X } from 'lucide-react'
 import type { TerminalTab } from './types'
+import { Tooltip } from '../ui'
 import { ClaudeIcon, CodexIcon, ShellIcon } from './BrandIcons'
 import styles from './Terminal.module.css'
 
@@ -55,34 +56,37 @@ function TabRow({ tab, active, hidden, onOpenTab, onHideTab, onKillTab }: TabRow
         <span className={styles.instanceLabel}>{tab.label}</span>
       </button>
       <div className={styles.instanceActions}>
-        <button
-          type="button"
-          className={styles.instanceActionBtn}
-          onClick={() => onOpenTab(tab.id)}
-          title={hidden ? 'Show in terminal' : 'Focus terminal'}
-          aria-label={hidden ? 'Show in terminal' : 'Focus terminal'}
-        >
-          <ExternalLink size={11} />
-        </button>
-        <button
-          type="button"
-          className={styles.instanceActionBtn}
-          onClick={() => onHideTab(tab.id)}
-          title="Hide from full terminal"
-          aria-label="Hide from full terminal"
-          disabled={hidden}
-        >
-          <X size={12} />
-        </button>
-        <button
-          type="button"
-          className={`${styles.instanceActionBtn} ${styles.instanceDangerBtn}`}
-          onClick={() => onKillTab(tab.id)}
-          title="Kill terminal and remove instance"
-          aria-label="Kill terminal and remove instance"
-        >
-          <Trash2 size={12} />
-        </button>
+        <Tooltip label={hidden ? 'Show in terminal' : 'Focus terminal'} placement="left">
+          <button
+            type="button"
+            className={styles.instanceActionBtn}
+            onClick={() => onOpenTab(tab.id)}
+            aria-label={hidden ? 'Show in terminal' : 'Focus terminal'}
+          >
+            <ExternalLink size={11} />
+          </button>
+        </Tooltip>
+        <Tooltip label="Hide from full terminal" placement="left">
+          <button
+            type="button"
+            className={styles.instanceActionBtn}
+            onClick={() => onHideTab(tab.id)}
+            aria-label="Hide from full terminal"
+            disabled={hidden}
+          >
+            <X size={12} />
+          </button>
+        </Tooltip>
+        <Tooltip label="Kill terminal and remove instance" placement="left">
+          <button
+            type="button"
+            className={`${styles.instanceActionBtn} ${styles.instanceDangerBtn}`}
+            onClick={() => onKillTab(tab.id)}
+            aria-label="Kill terminal and remove instance"
+          >
+            <Trash2 size={12} />
+          </button>
+        </Tooltip>
       </div>
     </div>
   )
@@ -108,7 +112,7 @@ function PlanGroup({ plan, stage, tabs, activeTabIds, hiddenTabIds, onOpenTab, o
         type="button"
         className={styles.treeGroupHeader}
         onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
+        {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
         <ChevronDown
           size={11}
@@ -158,7 +162,7 @@ function PaneGroup({ label, tabs: paneTabs, activeTabIds, hiddenTabIds, onOpenTa
         type="button"
         className={styles.treeGroupHeader}
         onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
+        {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
         <ChevronDown
           size={11}
@@ -209,15 +213,16 @@ export function TerminalInstancesRail({
     <aside className={styles.instancesRail} aria-label="Terminal instances">
       <div className={styles.instancesRailHeader}>
         <span>Instances</span>
-        <button
-          type="button"
-          className={styles.instancesHeaderBtn}
-          onClick={onClosePanel}
-          title="Close instances panel"
-          aria-label="Close instances panel"
-        >
-          <Menu size={15} />
-        </button>
+        <Tooltip label="Close instances panel" placement="bottom">
+          <button
+            type="button"
+            className={styles.instancesHeaderBtn}
+            onClick={onClosePanel}
+            aria-label="Close instances panel"
+          >
+            <Menu size={15} />
+          </button>
+        </Tooltip>
       </div>
       <div className={styles.instancesList}>
         {splitEnabled ? (

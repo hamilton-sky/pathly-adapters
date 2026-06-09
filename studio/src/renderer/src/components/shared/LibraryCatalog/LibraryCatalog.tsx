@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Sparkles, Search, Brain, Diamond, BookOpen, LayoutGrid, GitBranch, GripVertical, Plus, ChevronLeft, ChevronRight, ChevronsUp, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useCatalogData, CatalogItemData, CatalogGroup } from './useCatalogData'
+import { Tooltip } from '../../ui'
 import { PATHLY_DRAG_MIME } from '../../../types'
 import type { PathlyCanvasDragItem, PathlySection } from '../../../types'
 import styles from './LibraryCatalog.module.css'
@@ -172,6 +173,7 @@ function ItemRow({ item, type, groupIcon, context, displayName, categories, onOp
         <input
           ref={renameRef}
           className={styles.renameInput}
+          aria-label={`Rename ${label}`}
           value={renameVal}
           onChange={e => setRenameVal(e.target.value)}
           onClick={e => e.stopPropagation()}
@@ -188,15 +190,16 @@ function ItemRow({ item, type, groupIcon, context, displayName, categories, onOp
       {!renaming && menuItems.length > 0 && (
         <div className={styles.itemActions}>
           <div className={styles.menuWrap} ref={menuRef}>
-            <button
-              type="button"
-              className={styles.actionBtn}
-              title="More options"
-              aria-label="More options"
-              onClick={e => { e.stopPropagation(); setMenuOpen(o => !o); setPickerOpen(false) }}
-            >
-              <MoreHorizontal size={11} />
-            </button>
+            <Tooltip label="More options" placement="bottom">
+              <button
+                type="button"
+                className={styles.actionBtn}
+                aria-label="More options"
+                onClick={e => { e.stopPropagation(); setMenuOpen(o => !o); setPickerOpen(false) }}
+              >
+                <MoreHorizontal size={11} />
+              </button>
+            </Tooltip>
 
             {menuOpen && !pickerOpen && (
               <div className={styles.menu}>
@@ -338,6 +341,7 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
             <input
               ref={renameRef}
               className={styles.renameInput}
+              aria-label={`Rename category ${label}`}
               value={renameVal}
               onChange={e => setRenameVal(e.target.value)}
               onClick={e => e.stopPropagation()}
@@ -357,15 +361,16 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
 
         {hasActions && !renaming && (
           <div className={styles.menuWrap} ref={subMenuRef}>
-            <button
-              type="button"
-              className={styles.subGroupMenuBtn}
-              title="More options"
-              aria-label="More options"
-              onClick={e => { e.stopPropagation(); setSubMenuOpen(o => !o) }}
-            >
-              <MoreHorizontal size={10} />
-            </button>
+            <Tooltip label="More options" placement="bottom">
+              <button
+                type="button"
+                className={styles.subGroupMenuBtn}
+                aria-label="More options"
+                onClick={e => { e.stopPropagation(); setSubMenuOpen(o => !o) }}
+              >
+                <MoreHorizontal size={10} />
+              </button>
+            </Tooltip>
             {subMenuOpen && (
               <div className={styles.menu}>
                 {!isOtherBucket && onRenameCategory && (
@@ -582,15 +587,16 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
     <div className={styles.groupHeader}>
       {groupLabelButton}
       <div className={styles.menuWrap} ref={groupMenuRef}>
-        <button
-          type="button"
-          className={styles.groupMenuBtn}
-          title="More options"
-          aria-label="More options"
-          onClick={e => { e.stopPropagation(); setGroupMenuOpen(o => !o) }}
-        >
-          <MoreHorizontal size={12} />
-        </button>
+        <Tooltip label="More options" placement="bottom">
+          <button
+            type="button"
+            className={styles.groupMenuBtn}
+            aria-label="More options"
+            onClick={e => { e.stopPropagation(); setGroupMenuOpen(o => !o) }}
+          >
+            <MoreHorizontal size={12} />
+          </button>
+        </Tooltip>
         {groupMenuOpen && (
           <div className={styles.menu}>
             <button
@@ -786,21 +792,23 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
           <Sparkles size={15} className={styles.headerIcon} />
           <span>Catalog</span>
         </div>
-        <button
-          type="button"
-          className={styles.collapseBtn}
-          title="Collapse all"
-          aria-label="Collapse all"
-          onClick={() => setCollapseKey(k => k + 1)}
-        >
-          <ChevronsUp size={15} />
-        </button>
+        <Tooltip label="Collapse all" placement="bottom">
+          <button
+            type="button"
+            className={styles.collapseBtn}
+            aria-label="Collapse all"
+            onClick={() => setCollapseKey(k => k + 1)}
+          >
+            <ChevronsUp size={15} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className={styles.searchRow}>
         <Search size={15} />
         <input
           className={styles.searchInput}
+          aria-label="Search the library"
           placeholder="Search the library…"
           value={query}
           onChange={e => setQuery(e.target.value)}
@@ -859,6 +867,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
           <div className={styles.newCatForm}>
             <select
               className={styles.newCatSelect}
+              aria-label="Category type"
               value={newCatType}
               onChange={e => setNewCatType(e.target.value as CatalogGroup['type'])}
             >

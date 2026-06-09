@@ -1,0 +1,26 @@
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+  border: 1px solid var(--bg-surface0);
+  border-top: 3px solid var(--bg-surface1);
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: var(--bg-mantle);
+  transition: all var(--transition-base);
+  animation: fadeSlideUp 300ms ease-out var(--anim-delay, 80ms) both;
+}
+
+.card:hover {
+  border-color: var(--accent-border);
+  border-top-color: var(--accent-border);
+  box-shadow: 0 0 0 1px var(--accent-bg);
+}
+
+.card[data-status='blocked'] { border-top-color: var(--red); }
+.card[data-status='active']  { border-top-color: var(--accent); }
+.card[data-status='idle']    { border-top-color: var(--bg-surface1); }
+
+.card:hover[data-status='blocked'] { border-color: color-mix(in srgb, var(--red) 30%, transparent); border-top-color: var(--red); }

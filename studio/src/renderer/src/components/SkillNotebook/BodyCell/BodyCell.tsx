@@ -3,6 +3,7 @@ import {
   Pencil, Check, ChevronUp, ChevronDown, MoreHorizontal,
   Copy, Diamond, Trash2, RotateCcw, Sparkles, Code, Bold, Italic, Columns, Scissors,
 } from 'lucide-react'
+import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../../shared/MarkdownRenderer/MarkdownRenderer'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
@@ -90,49 +91,60 @@ export default function BodyCell({
       className={`${styles.cell} ${isSystem ? styles.cellSystem : styles.cellBodyType}${menuOpen ? ` ${styles.cellMenuOpen}` : ''}`}
       tabIndex={-1}
     >
-      {/* â”€â”€ strip: badge + actions sit ON the top border line â”€â”€ */}
+      {/* â"€â"€ strip: badge + actions sit ON the top border line â"€â"€ */}
       <div className={styles.strip}>
         <span className={styles.typeBadge}>{isSystem ? 'system' : 'body'}</span>
 
-        <button type="button" className={styles.actionBtn} title="Move up" aria-label="Move up" disabled={isFirst} onClick={onMoveUp}>
-          <ChevronUp size={15} />
-        </button>
-        <button type="button" className={styles.actionBtn} title="Move down" aria-label="Move down" disabled={isLast} onClick={onMoveDown}>
-          <ChevronDown size={15} />
-        </button>
+        <Tooltip label="Move up" placement="top">
+          <button type="button" className={styles.actionBtn} aria-label="Move up" disabled={isFirst} onClick={onMoveUp}>
+            <ChevronUp size={15} />
+          </button>
+        </Tooltip>
+        <Tooltip label="Move down" placement="top">
+          <button type="button" className={styles.actionBtn} aria-label="Move down" disabled={isLast} onClick={onMoveDown}>
+            <ChevronDown size={15} />
+          </button>
+        </Tooltip>
 
         <span className={styles.stripDiv} />
 
-        <button
-          type="button"
-          className={`${styles.actionBtn} ${cellMode === 'split' ? styles.actionBtnActive : ''}`}
-          title="Split view (edit + preview)"
-          aria-label="Toggle split view"
-          onClick={handleSplitClick}
-        >
-          <Columns size={15} />
-        </button>
+        <Tooltip label="Split view (edit + preview)" placement="top">
+          <button
+            type="button"
+            className={`${styles.actionBtn} ${cellMode === 'split' ? styles.actionBtnActive : ''}`}
+            aria-label="Toggle split view"
+            onClick={handleSplitClick}
+          >
+            <Columns size={15} />
+          </button>
+        </Tooltip>
 
         {!isEditing ? (
-          <button type="button" className={styles.actionBtn} title="Edit" onClick={handleEditClick}>
-            <Pencil size={15} />
-          </button>
+          <Tooltip label="Edit" placement="top">
+            <button type="button" className={styles.actionBtn} aria-label="Edit" onClick={handleEditClick}>
+              <Pencil size={15} />
+            </button>
+          </Tooltip>
         ) : (
-          <button type="button" className={`${styles.actionBtn} ${styles.actionBtnSave}`} title="Save (Ctrl+Enter)" onClick={commitEdit}>
-            <Check size={15} />
-          </button>
+          <Tooltip label="Save" shortcut="Ctrl+Enter" placement="top">
+            <button type="button" className={`${styles.actionBtn} ${styles.actionBtnSave}`} aria-label="Save" onClick={commitEdit}>
+              <Check size={15} />
+            </button>
+          </Tooltip>
         )}
 
         <div className={styles.menuWrap} ref={menuRef}>
-          <button
-            type="button"
-            className={`${styles.actionBtn} ${menuOpen ? styles.actionBtnActive : ''}`}
-            aria-label="More options"
-            {...(menuOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-            onClick={() => setMenuOpen(o => !o)}
-          >
-            <MoreHorizontal size={15} />
-          </button>
+          <Tooltip label="More options" placement="top">
+            <button
+              type="button"
+              className={`${styles.actionBtn} ${menuOpen ? styles.actionBtnActive : ''}`}
+              aria-label="More options"
+              {...(menuOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+              onClick={() => setMenuOpen(o => !o)}
+            >
+              <MoreHorizontal size={15} />
+            </button>
+          </Tooltip>
           {menuOpen && (
             <div className={styles.menu} role="menu">
               <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
@@ -142,7 +154,7 @@ export default function BodyCell({
                 <ChevronUp size={15} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>âŒ˜â†‘</span>
               </button>
               <button type="button" className={styles.menuItem} role="menuitem" disabled={isLast} onClick={() => { onMoveDown?.(); setMenuOpen(false) }}>
-                <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>âŒ˜â†“</span>
+                <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>âŒ˜â†"</span>
               </button>
               <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                 <Diamond size={15} className={styles.menuIcon} />Convert to fragment
@@ -165,7 +177,7 @@ export default function BodyCell({
         </div>
       </div>
 
-      {/* â”€â”€ heading â”€â”€ */}
+      {/* â"€â"€ heading â"€â"€ */}
       {isEditing ? (
         <input
           type="text"
@@ -179,13 +191,14 @@ export default function BodyCell({
         <div className={styles.cellTitle}>{displayTitle}</div>
       )}
 
-      {/* â”€â”€ body â”€â”€ */}
+      {/* â"€â"€ body â"€â"€ */}
       {cellMode === 'split' ? (
         <div className={styles.splitBody}>
           <div className={styles.splitEdit}>
             <textarea
               className={styles.editor}
               value={draft}
+              aria-label="Cell content editor"
               onChange={e => setDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commitEdit() }}
               autoFocus
@@ -202,6 +215,7 @@ export default function BodyCell({
             <textarea
               className={styles.editor}
               value={draft}
+              aria-label="Cell content editor"
               onChange={e => setDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commitEdit() }}
               autoFocus
@@ -227,10 +241,18 @@ export default function BodyCell({
                 <Sparkles size={12} /><span>New cell from selection</span>
               </button>
               <span className={styles.selDivider} />
-              <button type="button" className={styles.selBtnIcon} title="Insert as fragment" onClick={() => setSelBar(null)}><Diamond size={12} /></button>
-              <button type="button" className={styles.selBtnIcon} title="Wrap in code" onClick={() => setSelBar(null)}><Code size={12} /></button>
-              <button type="button" className={styles.selBtnIcon} title="Bold" onClick={() => setSelBar(null)}><Bold size={12} /></button>
-              <button type="button" className={styles.selBtnIcon} title="Italic" onClick={() => setSelBar(null)}><Italic size={12} /></button>
+              <Tooltip label="Insert as fragment" placement="top">
+                <button type="button" className={styles.selBtnIcon} aria-label="Insert as fragment" onClick={() => setSelBar(null)}><Diamond size={12} /></button>
+              </Tooltip>
+              <Tooltip label="Wrap in code" placement="top">
+                <button type="button" className={styles.selBtnIcon} aria-label="Wrap in code" onClick={() => setSelBar(null)}><Code size={12} /></button>
+              </Tooltip>
+              <Tooltip label="Bold" placement="top">
+                <button type="button" className={styles.selBtnIcon} aria-label="Bold" onClick={() => setSelBar(null)}><Bold size={12} /></button>
+              </Tooltip>
+              <Tooltip label="Italic" placement="top">
+                <button type="button" className={styles.selBtnIcon} aria-label="Italic" onClick={() => setSelBar(null)}><Italic size={12} /></button>
+              </Tooltip>
             </div>
           )}
         </div>

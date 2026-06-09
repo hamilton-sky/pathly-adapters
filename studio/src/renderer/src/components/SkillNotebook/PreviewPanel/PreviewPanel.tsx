@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { PanelRightClose } from 'lucide-react'
+import { Tooltip } from '../../ui'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './PreviewPanel.module.css'
@@ -53,20 +54,24 @@ export default function PreviewPanel() {
   return (
     <div className={styles.root}>
       <div className={styles.pvHead}>
-        <span title={skillLabel} className={styles.pvTitle}>{skillLabel}</span>
+        <Tooltip label={skillLabel} placement="bottom">
+          <span className={styles.pvTitle}>{skillLabel}</span>
+        </Tooltip>
         <div className={styles.pvHeadSpacer} />
         <span className={styles.liveBadge}>
           <span className={styles.liveDot} />
           live
         </span>
-        <button
-          type="button"
-          className={styles.pvCloseBtn}
-          onClick={togglePreview}
-          aria-label="Close preview"
-        >
-          <PanelRightClose size={14} />
-        </button>
+        <Tooltip label="Close preview" placement="left">
+          <button
+            type="button"
+            className={styles.pvCloseBtn}
+            onClick={togglePreview}
+            aria-label="Close preview"
+          >
+            <PanelRightClose size={14} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className={`${styles.pvBody} ${previewLoading ? styles.loading : ''}`}>

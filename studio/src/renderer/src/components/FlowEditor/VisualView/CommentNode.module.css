@@ -110,6 +110,7 @@
   word-break: break-word;
   cursor: text;
   line-height: 1.5;
+  -webkit-user-select: none;
   user-select: none;
 }
 .textDisplay:focus-visible { outline: 2px solid var(--cborder, #FDE047); border-radius: 4px; }
@@ -134,6 +135,20 @@
   line-height: 1.5;
   box-sizing: border-box;
 }
+
+/* ── Per-color theme ─────────────────────────────────────────────── */
+.node[data-color='yellow'] { --cbg: #FEFCE8; --cborder: #FDE047; --ctext: #422006; }
+.node[data-color='teal']   { --cbg: #F0FDFA; --cborder: #5EEAD4; --ctext: #134E4A; }
+.node[data-color='red']    { --cbg: #FFF1F2; --cborder: #FDA4AF; --ctext: #881337; }
+.node[data-color='purple'] { --cbg: #FAF5FF; --cborder: #D8B4FE; --ctext: #581C87; }
+.node[data-color='grey']   { --cbg: #F9FAFB; --cborder: #D1D5DB; --ctext: #111827; }
+
+/* ── Per-swatch color ────────────────────────────────────────────── */
+.swatch[data-swatch='yellow'] { --swatch-color: #FDE047; }
+.swatch[data-swatch='teal']   { --swatch-color: #5EEAD4; }
+.swatch[data-swatch='red']    { --swatch-color: #FDA4AF; }
+.swatch[data-swatch='purple'] { --swatch-color: #D8B4FE; }
+.swatch[data-swatch='grey']   { --swatch-color: #D1D5DB; }
 
 /* Source handle for attachment edge (right side, subtle) */
 .attachHandle {

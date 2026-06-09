@@ -1,5 +1,6 @@
 import React from 'react'
 import { ArrowLeft, FileText, BookOpen, Sparkles, ChevronsUp, Plus, Copy, Undo2, PanelRightOpen } from 'lucide-react'
+import { Tooltip } from '../ui'
 import { useUiStore } from '../../store/uiStore'
 import styles from './SkillNotebook.module.css'
 import NotebookHeader, { NotebookViewMode } from './NotebookHeader/NotebookHeader'
@@ -71,15 +72,16 @@ export default function SkillNotebookPanel() {
                 </div>
               </>
             ) : (
-              <button
-                type="button"
-                className={styles.previewReopenBtn}
-                onClick={togglePreview}
-                aria-label="Open preview"
-                title="Open preview"
-              >
-                <PanelRightOpen size={14} />
-              </button>
+              <Tooltip label="Open preview" placement="left">
+                <button
+                  type="button"
+                  className={styles.previewReopenBtn}
+                  onClick={togglePreview}
+                  aria-label="Open preview"
+                >
+                  <PanelRightOpen size={14} />
+                </button>
+              </Tooltip>
             )}
           </div>
           <div className={styles.legend}>

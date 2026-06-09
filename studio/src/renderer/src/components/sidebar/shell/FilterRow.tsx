@@ -1,4 +1,5 @@
 import { ChevronsUp } from 'lucide-react'
+import { Tooltip } from '../../ui'
 import styles from '../Sidebar.module.css'
 
 interface FilterRowProps {
@@ -19,25 +20,28 @@ export function FilterRow({ libraryOpen, filter, onChange, onClear, onCollapseAl
         onChange={(e) => onChange(e.target.value)}
       />
       {filter && (
-        <button
-          type="button"
-          className={styles.filterClear}
-          onClick={onClear}
-          title="Clear filter"
-        >
-          ×
-        </button>
+        <Tooltip label="Clear filter" placement="bottom">
+          <button
+            type="button"
+            className={styles.filterClear}
+            onClick={onClear}
+            aria-label="Clear filter"
+          >
+            ×
+          </button>
+        </Tooltip>
       )}
       {!libraryOpen && onCollapseAll && (
-        <button
-          type="button"
-          className={styles.collapseAll}
-          onClick={onCollapseAll}
-          title="Collapse all folders"
-          aria-label="Collapse all folders"
-        >
-          <ChevronsUp size={14} />
-        </button>
+        <Tooltip label="Collapse all folders" placement="bottom">
+          <button
+            type="button"
+            className={styles.collapseAll}
+            onClick={onCollapseAll}
+            aria-label="Collapse all folders"
+          >
+            <ChevronsUp size={14} />
+          </button>
+        </Tooltip>
       )}
     </div>
   )

@@ -93,30 +93,36 @@ export function PaneTabBar({
             />
           ) : null}
           <div className={styles.tabActions}>
-            <button
-              type="button"
-              aria-label="Pop out to its own window"
-              onClick={(e) => { e.stopPropagation(); onPopout(tab.id) }}
-              className={styles.popoutBtn}
-            >
-              <ExternalLink size={10} />
-            </button>
-            <button
-              type="button"
-              aria-label="Hide from full terminal"
-              onClick={(e) => { e.stopPropagation(); onHideTab(tab.id, e) }}
-              className={styles.hideTabBtn}
-            >
-              <X size={11} />
-            </button>
-            <button
-              type="button"
-              aria-label="Kill terminal and close tab"
-              onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
-              className={styles.closeTabBtn}
-            >
-              <Trash2 size={11} />
-            </button>
+            <Tooltip label="Pop out to its own window" placement="bottom">
+              <button
+                type="button"
+                aria-label="Pop out to its own window"
+                onClick={(e) => { e.stopPropagation(); onPopout(tab.id) }}
+                className={styles.popoutBtn}
+              >
+                <ExternalLink size={10} />
+              </button>
+            </Tooltip>
+            <Tooltip label="Hide from full terminal" placement="bottom">
+              <button
+                type="button"
+                aria-label="Hide from full terminal"
+                onClick={(e) => { e.stopPropagation(); onHideTab(tab.id, e) }}
+                className={styles.hideTabBtn}
+              >
+                <X size={11} />
+              </button>
+            </Tooltip>
+            <Tooltip label="Kill terminal and close tab" placement="bottom">
+              <button
+                type="button"
+                aria-label="Kill terminal and close tab"
+                onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e) }}
+                className={styles.closeTabBtn}
+              >
+                <Trash2 size={11} />
+              </button>
+            </Tooltip>
           </div>
         </div>
       ))}

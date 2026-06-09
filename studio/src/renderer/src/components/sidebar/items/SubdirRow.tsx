@@ -1,5 +1,6 @@
 ﻿import { useRef, useState } from 'react'
 import { ChevronRight, ChevronDown, FilePlus, FolderPlus, Folder, FolderOpen, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Tooltip } from '../../ui'
 import { RenameInput } from '../shared/RenameInput'
 import { ContextMenu } from '../shared/ContextMenu'
 import styles from '../Sidebar.module.css'
@@ -89,33 +90,39 @@ export function SubdirRow({
 
       {isSystemFolder ? (
         <div className={`${styles.rowActions} ${styles.rowActionsLocked}`}>
-          <span
-            className={`${styles.rowAction} ${styles.systemLockIcon}`}
-            title="Managed by Pathly"
-          >
-            <Lock size={11} />
-          </span>
+          <Tooltip label="Managed by Pathly" placement="bottom">
+            <span className={`${styles.rowAction} ${styles.systemLockIcon}`}>
+              <Lock size={11} />
+            </span>
+          </Tooltip>
         </div>
       ) : !renamingThis ? (
         <div className={styles.rowActions}>
           {isUserLocked && (
-            <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked â€” delete disabled">
-              <Lock size={11} />
-            </span>
+            <Tooltip label="Locked — delete disabled" placement="bottom">
+              <span className={`${styles.rowAction} ${styles.rowActionLock}`}>
+                <Lock size={11} />
+              </span>
+            </Tooltip>
           )}
           {onFolderDragStart && !isUserLocked && !isSystemFolder && (
-            <span className={`${styles.rowAction} ${styles.grip}`} title="Drag to move folder">
-              <GripVertical size={12} />
-            </span>
+            <Tooltip label="Drag to move folder" placement="bottom">
+              <span className={`${styles.rowAction} ${styles.grip}`}>
+                <GripVertical size={12} />
+              </span>
+            </Tooltip>
           )}
-          <button
-            ref={menuButtonRef}
-            className={styles.rowAction}
-            title="Actions"
-            onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
-          >
-            <MoreHorizontal size={15} />
-          </button>
+          <Tooltip label="Actions" placement="bottom">
+            <button
+              type="button"
+              ref={menuButtonRef}
+              className={styles.rowAction}
+              aria-label="Actions"
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
+            >
+              <MoreHorizontal size={15} />
+            </button>
+          </Tooltip>
 
           {menuOpen && menuButtonRef.current && (
             <ContextMenu
@@ -124,6 +131,7 @@ export function SubdirRow({
             >
               {onCreateFolderInFolder && (
                 <button
+                  type="button"
                   className={styles.itemMenuItem}
                   onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onCreateFolderInFolder() }}
                 >
@@ -133,6 +141,7 @@ export function SubdirRow({
               )}
               {onCreateFileInFolder && (
                 <button
+                  type="button"
                   className={styles.itemMenuItem}
                   onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onCreateFileInFolder() }}
                 >
@@ -142,6 +151,7 @@ export function SubdirRow({
               )}
               {onStartRenameFolder && (
                 <button
+                  type="button"
                   className={styles.itemMenuItem}
                   onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onStartRenameFolder() }}
                 >
@@ -150,6 +160,7 @@ export function SubdirRow({
                 </button>
               )}
               <button
+                type="button"
                 className={styles.itemMenuItem}
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onToggleFolderLock?.() }}
               >
@@ -160,6 +171,7 @@ export function SubdirRow({
                 <>
                   <div className={styles.itemMenuSep} />
                   <button
+                    type="button"
                     className={`${styles.itemMenuItem} ${styles.itemMenuItemDelete}`}
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onStartDeleteFolder() }}
                   >

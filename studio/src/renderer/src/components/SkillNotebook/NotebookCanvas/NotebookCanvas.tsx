@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
+import { Tooltip } from '../../ui'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './NotebookCanvas.module.css'
@@ -78,15 +79,17 @@ export default function NotebookCanvas() {
         {skillName && (
           <div className={styles.titleRow}>
             <h2 className={styles.nbTitle}>{skillName}</h2>
-            <button
-              type="button"
-              className={styles.addCellBtn}
-              title="Add empty cell at bottom"
-              onClick={() => handleInsert(cells.length > 0 ? cells[cells.length - 1].id : null)}
-            >
-              <Plus size={15} />
-              Add cell
-            </button>
+            <Tooltip label="Add empty cell at bottom" placement="bottom">
+              <button
+                type="button"
+                className={styles.addCellBtn}
+                aria-label="Add empty cell at bottom"
+                onClick={() => handleInsert(cells.length > 0 ? cells[cells.length - 1].id : null)}
+              >
+                <Plus size={15} />
+                Add cell
+              </button>
+            </Tooltip>
           </div>
         )}
         {skillName && (

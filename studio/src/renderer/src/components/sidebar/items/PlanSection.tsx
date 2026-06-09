@@ -2,7 +2,7 @@
 import { Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Plus, Trash2 } from 'lucide-react'
 import type { PathlyItem } from '../../../types'
 import type { PlanFolder } from '../../../hooks/usePlanFiles'
-import { IconButton } from '../../ui'
+import { IconButton, Tooltip } from '../../ui'
 import { SectionHeader } from '../shared/SectionHeader'
 import { SubdirRow } from './SubdirRow'
 import { WorkspaceItem } from './WorkspaceItem'
@@ -108,7 +108,7 @@ export function PlanSection({
           {visibleFolders.map((folder) => {
             const isActive = folder.name === activeTopic
             const badge = folder.convTotal > 0
-              ? `${folder.convDone}/${folder.convTotal}âœ“`
+              ? `${folder.convDone}/${folder.convTotal}âœ"`
               : null
 
             const filteredFiles = lowerFilter
@@ -121,7 +121,6 @@ export function PlanSection({
                   className={`${styles.subdirHeader} ${isActive ? styles.itemRowSelected : ''}`}
                   role="button"
                   tabIndex={0}
-                  title={folder.path}
                   onClick={() => {
                     onToggleFolder(folder.name)
                     onFolderClick(folder.name)
@@ -135,32 +134,38 @@ export function PlanSection({
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {folder.name}
                   </span>
-                  <span className={styles.lockIcon} title="Managed by Pathly â€” cannot be renamed or moved">
-                    <Lock size={10} />
-                  </span>
-                  {badge && (
-                    <span
-                      className={styles.planBadge}
-                      style={{ color: folder.convDone === folder.convTotal ? 'var(--green)' : 'var(--text-muted)' }}
-                      title={`${folder.convDone} of ${folder.convTotal} conversations done`}
-                    >
-                      {badge}
+                  <Tooltip label="Managed by Pathly — cannot be renamed or moved" placement="bottom">
+                    <span className={styles.lockIcon}>
+                      <Lock size={10} />
                     </span>
+                  </Tooltip>
+                  {badge && (
+                    <Tooltip label={`${folder.convDone} of ${folder.convTotal} conversations done`} placement="bottom">
+                      <span
+                        className={styles.planBadge}
+                        style={{ color: folder.convDone === folder.convTotal ? 'var(--green)' : 'var(--text-muted)' }}
+                      >
+                        {badge}
+                      </span>
+                    </Tooltip>
                   )}
                   {onDeletePlanFolder && (
                     <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className={styles.rowAction}
-                        title="Actions"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const next = menuOpenFor === folder.name ? null : folder.name
-                          setMenuOpenFor(next)
-                          if (next) setMenuAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())
-                        }}
-                      >
-                        <MoreHorizontal size={15} />
-                      </button>
+                      <Tooltip label="Actions" placement="bottom">
+                        <button
+                          type="button"
+                          className={styles.rowAction}
+                          aria-label="Actions"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const next = menuOpenFor === folder.name ? null : folder.name
+                            setMenuOpenFor(next)
+                            if (next) setMenuAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())
+                          }}
+                        >
+                          <MoreHorizontal size={15} />
+                        </button>
+                      </Tooltip>
                       {menuOpenFor === folder.name && menuAnchor && (
                         <ContextMenu
                           anchor={menuAnchor}

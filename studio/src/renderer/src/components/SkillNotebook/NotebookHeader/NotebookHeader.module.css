@@ -136,9 +136,24 @@
   flex-shrink: 0;
 }
 
-.saveBtn:hover {
+.saveBtn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.saveBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.saveSuccess {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.saveError {
+  border-color: var(--red);
+  color: var(--red);
 }
 
 .exportBtn {

@@ -1,0 +1,38 @@
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.list { display: flex; flex-direction: column; gap: 12px; }
+
+.fullRow { grid-column: 1 / -1; }
+
+.separator {
+  grid-column: 1 / -1;
+  height: 1px;
+  background-color: var(--bg-surface0);
+  margin: 8px 0;
+}
+
+.showMore {
+  margin-top: 8px;
+  align-self: center;
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 18px;
+  font-family: var(--font-family-base);
+  transition: all var(--transition-base);
+}
+
+.showMore:hover { border-color: var(--accent); color: var(--accent); }

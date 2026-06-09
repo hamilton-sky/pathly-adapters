@@ -68,7 +68,9 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, onRemove
             <span className={s.condPillKey}>default</span>
             <span className={clsx(s.condPillVal, s.condPillTarget)}>{target}</span>
             {onDataChange && (
-              <button type="button" className={s.removeBtn} onClick={removeDefault} title="Remove">×</button>
+              <Tooltip label="Remove" placement="top">
+                <button type="button" className={s.removeBtn} onClick={removeDefault} aria-label="Remove">×</button>
+              </Tooltip>
             )}
           </div>
         )}
@@ -80,7 +82,9 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, onRemove
               <span className={s.condPillKey}>artifact</span>
               <span className={clsx(s.condPillVal, s.condPillArtifact)}>{artifactName}</span>
               {onDataChange && (
-                <button type="button" className={s.removeBtn} onClick={() => removeArtifactEntry(artifactName)} title="Remove">×</button>
+                <Tooltip label="Remove" placement="top">
+                <button type="button" className={s.removeBtn} onClick={() => removeArtifactEntry(artifactName)} aria-label="Remove">×</button>
+              </Tooltip>
               )}
             </div>
           ))
@@ -94,7 +98,9 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, onRemove
               <span className={s.condPillKey}>content</span>
               <span className={s.condPillVal}>{entry.file}{entry.contains ? ` → "${entry.contains}"` : ''}</span>
               {onDataChange && (
-                <button type="button" className={s.removeBtn} onClick={() => removeContentEntry(idx)} title="Remove">×</button>
+                <Tooltip label="Remove" placement="top">
+                <button type="button" className={s.removeBtn} onClick={() => removeContentEntry(idx)} aria-label="Remove">×</button>
+              </Tooltip>
               )}
             </div>
           ))
@@ -109,7 +115,9 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, onRemove
                 {sourceRule.decide.question ? `"${sourceRule.decide.question}"` : 'Human decision'}
               </span>
               {onDataChange && (
-                <button type="button" className={s.removeBtn} onClick={removeDecide} title="Remove">×</button>
+                <Tooltip label="Remove" placement="top">
+                <button type="button" className={s.removeBtn} onClick={removeDecide} aria-label="Remove">×</button>
+              </Tooltip>
               )}
             </div>
           )
@@ -168,7 +176,9 @@ export function EdgePanel({ source, target, data, onAddAction, onClose, onRemove
                   <span className={s.actionMsg}>{action.message || '(message)'}</span>
                 </div>
                 {onDataChange && (
-                  <button type="button" className={s.removeBtn} onClick={(e) => { e.stopPropagation(); removeAction(i) }} title="Remove">×</button>
+                  <Tooltip label="Remove" placement="top">
+                    <button type="button" className={s.removeBtn} onClick={(e) => { e.stopPropagation(); removeAction(i) }} aria-label="Remove">×</button>
+                  </Tooltip>
                 )}
               </div>
             )
