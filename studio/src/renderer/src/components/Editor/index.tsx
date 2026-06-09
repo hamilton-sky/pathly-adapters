@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
@@ -199,6 +199,20 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     ])
   }
 
+  // Stable callbacks — avoids re-running CommentablePreview's mark-injection
+  // effect on every parent render (unstable inline arrows were the culprit)
+  const handleSelectionComment = useCallback((text: string, x: number, y: number) => {
+    setPendingAnchor(text)
+    setAnchorPos({ x, y })
+    setModalOpen(true)
+    setPendingBody('')  // clear any draft from a previous selection
+  }, [])
+
+  const handleResume = useCallback((x: number, y: number) => {
+    setAnchorPos({ x, y })
+    setModalOpen(true)
+  }, [])
+
   if (loading) {
     return <div className={styles.panel}><div className={styles.message}>Loading…</div></div>
   }
@@ -275,8 +289,8 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
                 modalOpen={modalOpen}
                 submittedAnchors={submittedAnchors}
                 showHighlights={showHighlights}
-                onSelectionComment={(text, x, y) => { setPendingAnchor(text); setAnchorPos({ x, y }); setModalOpen(true) }}
-                onResume={(x, y) => { setAnchorPos({ x, y }); setModalOpen(true) }}
+                onSelectionComment={handleSelectionComment}
+                onResume={handleResume}
               />
             </div>
             {effectivePath && (

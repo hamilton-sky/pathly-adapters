@@ -79,6 +79,10 @@ export function CommentablePreview({
 }: Props): JSX.Element {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  // Keep onResume in a ref so the mark-injection effect doesn't re-run just
+  // because the parent re-rendered and produced a new function reference.
+  const onResumeRef = useRef(onResume)
+  useEffect(() => { onResumeRef.current = onResume })
 
   function handleMouseUp(): void {
     const selection = window.getSelection()
@@ -123,11 +127,11 @@ export function CommentablePreview({
         mark.addEventListener('click', (e) => {
           e.stopPropagation()
           const rect = mark.getBoundingClientRect()
-          onResume(rect.left + rect.width / 2, rect.bottom)
+          onResumeRef.current(rect.left + rect.width / 2, rect.bottom)
         })
       }
     }
-  }, [pendingAnchor, modalOpen, content, submittedAnchors, showHighlights, onResume])
+  }, [pendingAnchor, modalOpen, content, submittedAnchors, showHighlights])
 
   return (
     <div ref={containerRef} className={styles.root} onMouseUp={handleMouseUp}>
