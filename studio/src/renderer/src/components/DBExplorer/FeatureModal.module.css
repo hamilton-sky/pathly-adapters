@@ -4,9 +4,9 @@
   background: rgba(3, 5, 12, 0.6);
   backdrop-filter: blur(2px);
   display: none;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 64px 24px;
+  padding: 24px;
   z-index: 100;
 }
 
@@ -17,7 +17,7 @@
 .modal {
   width: 860px;
   max-width: 100%;
-  max-height: calc(100vh - 128px);
+  max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
   background: var(--bg-base);
@@ -122,4 +122,67 @@
   text-align: center;
   color: var(--text-muted);
   font-size: 0.875rem;
+}
+
+/* ── Action bar ─────────────────────────────────────────────── */
+.mActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: var(--radius-md);
+  border: var(--border);
+  background: var(--bg-mantle);
+  color: var(--text-secondary);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-base);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.actionBtn:hover:not(:disabled) {
+  background: var(--btn-b-hover-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.actionBtn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.mStatus {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.mStatusDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 7px;
+  background: var(--state-done);
+  flex-shrink: 0;
+}
+
+.mStatusDot[data-running] {
+  background: var(--state-building);
+  animation: statusPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }

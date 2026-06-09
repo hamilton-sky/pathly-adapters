@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
-import type { FeatureData, TransitionData, AgentData, EventData } from './dbExplorerData'
+import type { FeatureData, TransitionData } from './dbExplorerData'
 import { StatePill } from './StatePill'
 import { TimelineTab } from './TimelineTab'
 import { AgentsTab } from './AgentsTab'
 import { EventsTab } from './EventsTab'
-import { SqlTab } from './SqlTab'
+import { InspectTab } from './InspectTab'
 import styles from './FeatureModal.module.css'
 
-type TabId = 'timeline' | 'events' | 'agents' | 'sql'
+type TabId = 'timeline' | 'events' | 'agents' | 'inspect'
 
 interface FeatureModalProps {
   feature: FeatureData | null
@@ -16,80 +16,67 @@ interface FeatureModalProps {
 
 interface ModalData {
   transitions: TransitionData[]
-  agents: AgentData[]
-  events: EventData[]
+  rawEvents: DbEvent[]
 }
 
-const EMPTY: ModalData = { transitions: [], agents: [], events: [] }
+const EMPTY: ModalData = { transitions: [], rawEvents: [] }
 
-const STATE_COLORS: Record<string, string> = {
-  PLANNING: 'var(--state-planning)',
-  BUILDING: 'var(--state-building)',
-  REVIEWING: 'var(--state-reviewing)',
-  TESTING: 'var(--state-testing)',
-  RETRO: 'var(--state-retro)',
-  DONE: 'var(--state-done)',
+function calcDuration(from: string, to: string): string {
+  const diff = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 1000)
+  if (diff <= 0) return '—'
+  const m = Math.floor(diff / 60)
+  return m > 0 ? `${m}m ${diff % 60}s` : `${diff}s`
 }
 
 function eventsToTransitions(events: DbEvent[]): TransitionData[] {
-  return events
-    .filter((e) => e.event_type === 'STAGE_ENTER')
-    .map((e) => ({
-      state: ((e.payload as Record<string, unknown>)['state'] as string ?? e.event_type) as TransitionData['state'],
+  const stateEvents = events.filter((e) => e.event_type === 'STATE_TRANSITION')
+  return stateEvents.map((e, i) => {
+    const payload = e.payload as Record<string, unknown>
+    const state = ((payload['to'] as string) ?? '').toUpperCase()
+    const next = stateEvents[i + 1]
+    return {
+      state: (state || 'PLANNING') as TransitionData['state'],
       time: e.ts.slice(11, 19),
-      duration: '—',
-    }))
+      duration: next ? calcDuration(e.ts, next.ts) : '—',
+    }
+  })
 }
 
-function agentsToAgentData(agents: DbAgent[]): AgentData[] {
-  const totalCost = agents.reduce((s, a) => s + (a.cost_usd ?? 0), 0)
-  return agents.map((a) => ({
-    role: a.agent_role ?? 'unknown',
-    conv: a.stage ?? '',
-    stateColor: STATE_COLORS[a.stage?.toUpperCase() ?? ''] ?? 'var(--state-building)',
-    costFraction: totalCost > 0 ? (a.cost_usd ?? 0) / totalCost : 0,
-  }))
-}
-
-function eventsToEventData(events: DbEvent[]): EventData[] {
-  return events.slice(0, 100).map((e) => ({
-    time: e.ts.slice(11, 19),
-    type: e.event_type,
-    detail: typeof e.payload === 'object' && e.payload !== null
-      ? Object.entries(e.payload).map(([k, v]) => `${k}: ${v}`).join(' · ')
-      : '',
-    dotColor: e.event_type === 'PIPELINE_DONE' ? 'var(--state-done)'
-      : e.event_type === 'STAGE_REROUTE' ? 'var(--orange)'
-      : e.event_type.includes('REVIEW') ? 'var(--state-reviewing)'
-      : 'var(--state-building)',
-  }))
+function exportJson(feature: FeatureData, data: ModalData): void {
+  const payload = { feature, transitions: data.transitions, events: data.rawEvents }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${feature.name}.json`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>('timeline')
   const [data, setData] = useState<ModalData>(EMPTY)
   const [loading, setLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     if (!feature) { setData(EMPTY); return }
     setLoading(true)
-    Promise.all([
-      window.pathly.db.events(feature.name),
-      window.pathly.db.agents(feature.name),
-    ]).then(([rawEvents, rawAgents]) => {
-      setData({
-        transitions: eventsToTransitions(rawEvents),
-        agents: agentsToAgentData(rawAgents),
-        events: eventsToEventData(rawEvents),
+    window.pathly.db.events(feature.name)
+      .then((rawEvents) => {
+        setData({ transitions: eventsToTransitions(rawEvents), rawEvents })
       })
-    }).catch(() => setData(EMPTY)).finally(() => setLoading(false))
-  }, [feature?.name])
+      .catch(() => setData(EMPTY))
+      .finally(() => setLoading(false))
+  }, [feature?.name, refreshKey])
+
+  const agentCount = data.rawEvents.filter((e) => e.event_type === 'AGENT_DONE').length
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'timeline', label: 'Timeline', count: data.transitions.length || undefined },
-    { id: 'events', label: 'Events', count: data.events.length || undefined },
-    { id: 'agents', label: 'Agents', count: data.agents.length || undefined },
-    { id: 'sql', label: 'SQL' },
+    { id: 'events',   label: 'Events',   count: data.rawEvents.length || undefined },
+    { id: 'agents',   label: 'Agents',   count: agentCount || undefined },
+    { id: 'inspect',  label: 'Inspect' },
   ]
 
   function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>): void {
@@ -108,15 +95,20 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
       {feature && (
         <div className={styles.modal}>
           <ModalHeader feature={feature} onClose={onClose} />
+          <ModalActions
+            feature={feature}
+            onRefresh={() => setRefreshKey((k) => k + 1)}
+            onExport={() => exportJson(feature, data)}
+          />
           <ModalTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
           <div className={styles.mBody}>
             {loading
               ? <div className={styles.mLoading}>Loading…</div>
               : <>
                   {activeTab === 'timeline' && <TimelineTab transitions={data.transitions} />}
-                  {activeTab === 'events' && <EventsTab events={data.events} />}
-                  {activeTab === 'agents' && <AgentsTab agents={data.agents} />}
-                  {activeTab === 'sql' && <SqlTab />}
+                  {activeTab === 'events'   && <EventsTab events={data.rawEvents} />}
+                  {activeTab === 'agents'   && <AgentsTab events={data.rawEvents} />}
+                  {activeTab === 'inspect'  && <InspectTab events={data.rawEvents} />}
                 </>
             }
           </div>
@@ -132,11 +124,35 @@ function ModalHeader({ feature, onClose }: { feature: FeatureData; onClose: () =
       <span className={styles.mName}>{feature.name}</span>
       <StatePill state={feature.state} />
       <span className={styles.mMeta}>
-        <b>{feature.cost}</b> · {feature.tokens} tokens
+        convs {feature.done}/{feature.total}
+        {' · '}events {feature.events}
+        {' · '}cost <b>{feature.cost}</b>
       </span>
       <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close modal">
         ✕
       </button>
+    </div>
+  )
+}
+
+interface ModalActionsProps {
+  feature: FeatureData
+  onRefresh: () => void
+  onExport: () => void
+}
+
+function ModalActions({ feature, onRefresh, onExport }: ModalActionsProps): JSX.Element {
+  const isDone = feature.state === 'DONE'
+  return (
+    <div className={styles.mActions}>
+      <button type="button" className={styles.actionBtn} onClick={onRefresh}>↻ Refresh</button>
+      <button type="button" className={styles.actionBtn} disabled>⇅ Run Migration</button>
+      <button type="button" className={styles.actionBtn} onClick={onExport}>↓ Export JSON</button>
+      <span className={styles.mStatus}>
+        <i className={styles.mStatusDot} {...(isDone ? {} : { 'data-running': '' })} />
+        {isDone ? 'runner: finished' : 'runner: running'}
+        {' · '}{feature.tokens} tok{' · '}{feature.cost}
+      </span>
     </div>
   )
 }
@@ -159,9 +175,7 @@ function ModalTabs({ tabs, activeTab, onTabChange }: ModalTabsProps): JSX.Elemen
           onClick={() => onTabChange(tab.id)}
         >
           {tab.label}
-          {tab.count !== undefined && (
-            <span className={styles.ct}>{tab.count}</span>
-          )}
+          {tab.count !== undefined && <span className={styles.ct}>{tab.count}</span>}
         </button>
       ))}
     </div>

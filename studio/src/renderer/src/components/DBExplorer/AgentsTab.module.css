@@ -1,44 +1,222 @@
-.sublabel {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin: 0 0 16px;
-}
-
-.agents {
+.container {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 24px;
 }
 
-.arow {
-  display: grid;
-  grid-template-columns: 150px 1fr 56px;
-  align-items: center;
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Section ─────────────────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
 }
 
-.aname {
-  font-size: var(--font-size-base);
-  color: var(--text-secondary);
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.conv {
+.sectionTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.sectionMeta {
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
 }
 
-.abar {
+/* ── Cost bars ───────────────────────────────────────────────── */
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.barRow {
+  display: grid;
+  grid-template-columns: 160px 1fr 52px;
+  align-items: center;
+  gap: 12px;
+}
+
+.barLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.convLabel {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.barTrack {
   height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface1);
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
   border-radius: var(--radius-sm);
   width: var(--bar-w, 0%);
   background: var(--bar-color, var(--accent));
+  opacity: 0.75;
+  transition: width 0.35s ease;
 }
 
-.acost {
+.barCost {
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   color: var(--green);
   text-align: right;
+}
+
+/* ── Role tag ────────────────────────────────────────────────── */
+.roleTag {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--role-color, var(--text-secondary));
+}
+
+/* ── Invocations table ───────────────────────────────────────── */
+.tableWrap {
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.th,
+.thR,
+.thC {
+  padding: 7px 12px;
+  background: var(--bg-surface0);
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: var(--border);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.thR { text-align: right; }
+.thC { text-align: center; }
+
+.tr:hover { background: var(--bg-surface0); }
+
+.td,
+.tdNum,
+.tdC,
+.tdMono,
+.tdR,
+.tdCost,
+.tdTrace {
+  padding: 7px 12px;
+  border-bottom: var(--border-subtle);
+  vertical-align: middle;
+}
+
+.tr:last-child td { border-bottom: none; }
+
+.tdNum {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-disabled);
+  text-align: center;
+  width: 36px;
+}
+
+.tdC {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.tdMono {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tdR {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tdCost {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--green);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tdTrace {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-disabled);
+}
+
+/* ── Result pill ─────────────────────────────────────────────── */
+.resultPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+}
+
+.resultPill::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.resultPill[data-kind='pass'] {
+  background: color-mix(in srgb, var(--state-done) 14%, transparent);
+  color: var(--state-done);
+}
+
+.resultPill[data-kind='done'] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.resultPill[data-kind='fail'] {
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--orange);
 }

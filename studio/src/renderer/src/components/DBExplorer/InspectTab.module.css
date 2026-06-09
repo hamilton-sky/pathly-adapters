@@ -1,0 +1,166 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Filter chips ────────────────────────────────────────────── */
+.chipsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: var(--border);
+  background: var(--bg-mantle);
+  color: var(--text-disabled);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  opacity: 0.42;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.chip[data-active] {
+  opacity: 1;
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.chip[data-active][data-category='transition'] {
+  background: color-mix(in srgb, var(--state-done) 14%, transparent);
+  color: var(--state-done);
+  border-color: color-mix(in srgb, var(--state-done) 35%, transparent);
+}
+
+.chip[data-active][data-category='done'] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.chip[data-active][data-category='phase-start'] {
+  background: color-mix(in srgb, var(--state-building) 12%, transparent);
+  color: var(--state-building);
+  border-color: color-mix(in srgb, var(--state-building) 30%, transparent);
+}
+
+.chip[data-active][data-category='warning'] {
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--orange);
+  border-color: color-mix(in srgb, var(--orange) 35%, transparent);
+}
+
+.chip[data-active][data-category='human'] {
+  background: color-mix(in srgb, var(--state-reviewing) 14%, transparent);
+  color: var(--state-reviewing);
+  border-color: color-mix(in srgb, var(--state-reviewing) 35%, transparent);
+}
+
+.chipReset {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.chipReset:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── Stats rows ──────────────────────────────────────────────── */
+.statsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.statRow {
+  display: grid;
+  grid-template-columns: 200px 1fr 44px 1fr;
+  align-items: center;
+  gap: 14px;
+}
+
+.statLabel {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statLabel[data-category='transition'] { color: var(--state-done); }
+.statLabel[data-category='done']       { color: var(--accent); }
+.statLabel[data-category='phase-start'] { color: var(--state-building); }
+.statLabel[data-category='warning']    { color: var(--orange); }
+.statLabel[data-category='human']      { color: var(--state-reviewing); }
+
+.barTrack {
+  height: 10px;
+  border-radius: 99px;
+  background: var(--bg-surface1);
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  border-radius: 99px;
+  width: var(--bar-w, 0%);
+  background: var(--text-disabled);
+  transition: width 0.35s ease;
+}
+
+.bar[data-category='transition'] { background: var(--state-done); opacity: 0.8; }
+.bar[data-category='done']       { background: var(--accent); opacity: 0.8; }
+.bar[data-category='phase-done'] { background: var(--text-secondary); opacity: 0.6; }
+.bar[data-category='phase-start']{ background: var(--state-building); opacity: 0.75; }
+.bar[data-category='warning']    { background: var(--orange); opacity: 0.8; }
+.bar[data-category='human']      { background: var(--state-reviewing); opacity: 0.8; }
+
+.statCount {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.statWindow {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statCost {
+  color: var(--green);
+}
