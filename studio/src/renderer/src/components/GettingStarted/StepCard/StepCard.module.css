@@ -1,0 +1,136 @@
+@keyframes fadeUpCard {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+  --step-accent: var(--accent);
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  background: var(--bg-surface0);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle-color);
+  border-left: 3px solid color-mix(in srgb, var(--step-accent) 35%, transparent);
+  overflow: hidden;
+  transition:
+    background var(--transition-base),
+    border-color var(--transition-base),
+    border-left-color var(--transition-base),
+    transform var(--transition-base),
+    box-shadow var(--transition-base);
+  animation: fadeUpCard 320ms var(--ease-out) both;
+}
+
+/* Top edge gradient line */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--step-accent), transparent 60%);
+  opacity: 0.35;
+  transition: opacity 280ms ease-out;
+  pointer-events: none;
+}
+
+/* Radial glow at top-left on hover */
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 80% 60% at 0% 0%,
+    color-mix(in srgb, var(--step-accent) 7%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+  pointer-events: none;
+}
+
+.card:hover {
+  background: var(--bg-surface1);
+  border-right-color: color-mix(in srgb, var(--step-accent) 30%, transparent);
+  border-top-color: color-mix(in srgb, var(--step-accent) 30%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--step-accent) 30%, transparent);
+  border-left-color: var(--step-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), 0 0 0 1px color-mix(in srgb, var(--step-accent) 10%, transparent);
+}
+
+.card:hover::after { opacity: 1; }
+.card:hover::before { opacity: 0.65; }
+
+/* Per-step accent colors */
+.step0 { --step-accent: var(--accent); }
+.step1 { --step-accent: var(--blue); }
+.step2 { --step-accent: var(--green); }
+.step3 { --step-accent: var(--purple); }
+
+/* Staggered entrance delays */
+.card[data-index="0"] { animation-delay: 80ms; }
+.card[data-index="1"] { animation-delay: 140ms; }
+.card[data-index="2"] { animation-delay: 200ms; }
+.card[data-index="3"] { animation-delay: 260ms; }
+
+.badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--step-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--step-accent) 28%, transparent);
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: background var(--transition-base), border-color var(--transition-base);
+}
+
+.card:hover .badge {
+  background: color-mix(in srgb, var(--step-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--step-accent) 45%, transparent);
+}
+
+.badgeNum {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-family-mono);
+  color: var(--step-accent);
+  letter-spacing: 0.04em;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  letter-spacing: -0.01em;
+  margin: 0;
+  line-height: var(--line-snug);
+}
+
+.desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+  font-family: var(--font-family-base);
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+  .card::after, .card::before { transition: none; }
+  .card:hover { transform: none; }
+}

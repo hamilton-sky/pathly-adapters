@@ -1,3 +1,6 @@
+---
+
+---
 # commit
 
 This is the canonical, tool-agnostic Pathly behavior for the commit skill.

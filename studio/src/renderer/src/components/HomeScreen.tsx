@@ -1,9 +1,10 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Sun, Moon, LayoutGrid, List, Star, FolderOpen } from 'lucide-react'
 import { useStore } from '../store'
-import { listDirs, readFile, pickFolder, openWindow, openSlide, getDsPort } from '../services/pathlyApi'
+import { listDirs, readFile, pickFolder, openWindow } from '../services/pathlyApi'
 import { useTheme } from '../useTheme'
 import { Settings } from './Settings'
+import { GettingStarted } from './GettingStarted/GettingStarted'
 import type { Theme } from '../theme'
 import { isLightPalette } from '../theme'
 import type { ProjectEntry } from '../types'
@@ -25,27 +26,7 @@ const ANIMATIONS = `
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.6; }
 }
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-@keyframes slideInFromRight {
-  from { opacity: 0; transform: translateX(18px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes slideInFromLeft {
-  from { opacity: 0; transform: translateX(-18px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
 `
-
-const SLIDES = [
-  { file: 'title.html',        name: 'Title',        subtitle: 'Brand mark Â· wordmark Â· grid field' },
-  { file: 'pipeline.html',     name: 'Pipeline',     subtitle: 'FSM stages as the hero motif' },
-  { file: 'flow-builder.html', name: 'Flow Builder', subtitle: 'Author your own FSM' },
-  { file: 'metrics.html',      name: 'Metrics',      subtitle: 'Big mono numbers on dark' },
-  { file: 'quote.html',        name: 'Quote',        subtitle: 'Large statement on chrome' },
-] as const
 
 function timeAgo(ts: number): string {
   const diffMs = Date.now() - ts
@@ -201,12 +182,6 @@ export function HomeScreen(): JSX.Element {
   )
   const INITIAL_VISIBLE = 6
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
-  const [slideIdx, setSlideIdx] = useState(0)
-  const [slideScale, setSlideScale] = useState(0.52)
-  const [isSlideLoaded, setIsSlideLoaded] = useState(false)
-  const [slideDir, setSlideDir] = useState<'next' | 'prev'>('next')
-  const [dsPort, setDsPort] = useState<number | null>(null)
-  const slideContainerRef = useRef<HTMLDivElement>(null)
 
   function handleTab(tab: 'projects' | 'getting-started' | 'settings'): void {
     localStorage.setItem('pathly-home-tab', tab)
@@ -270,20 +245,6 @@ export function HomeScreen(): JSX.Element {
     loadAllPlans()
   }, [projects.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const el = slideContainerRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      setSlideScale(entry.contentRect.width / 1280)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  useEffect(() => {
-    getDsPort().then(setDsPort).catch(() => {})
-  }, [])
-
   const sorted = [...projects]
     .filter((p, i, arr) => arr.findIndex((q) => q.path === p.path) === i)
     .sort((a, b) => b.lastOpened - a.lastOpened)
@@ -305,32 +266,6 @@ export function HomeScreen(): JSX.Element {
       if (topicName) setActiveTopic(topicName)
       setProjectPath(project.path)
     }
-  }
-
-  function goNext(): void {
-    if (slideIdx >= SLIDES.length - 1) return
-    setSlideDir('next')
-    setIsSlideLoaded(false)
-    setSlideIdx((i) => i + 1)
-  }
-
-  function goPrev(): void {
-    if (slideIdx <= 0) return
-    setSlideDir('prev')
-    setIsSlideLoaded(false)
-    setSlideIdx((i) => i - 1)
-  }
-
-  function goTo(i: number): void {
-    if (i === slideIdx) return
-    setSlideDir(i > slideIdx ? 'next' : 'prev')
-    setIsSlideLoaded(false)
-    setSlideIdx(i)
-  }
-
-  function openCurrentSlide(): void {
-    if (!dsPort) return
-    void openSlide(`http://127.0.0.1:${dsPort}/slides/${SLIDES[slideIdx].file}`)
   }
 
   function renderSectionLabel(label: string, animDelay: number): JSX.Element {
@@ -676,236 +611,7 @@ export function HomeScreen(): JSX.Element {
       )}
 
       {activeTab === 'getting-started' && (
-        <div style={{
-          width: '100%',
-          maxWidth: '720px',
-          animation: 'fadeSlideUp 300ms ease-out both',
-        }}>
-          <div style={{ width: '100%', marginBottom: '36px', animation: 'fadeSlideUp 300ms ease-out both' }}>
-            {/* Header row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{
-                fontSize: '11px', fontWeight: 600, color: t.textMuted,
-                textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: t.fontFamilyBase
-              }}>
-                See Pathly
-              </span>
-              <span style={{ fontSize: '11px', color: t.textMuted, fontFamily: t.fontFamilyMono }}>
-                {slideIdx + 1} / {SLIDES.length}
-              </span>
-            </div>
-
-            <div style={{
-              borderRadius: '12px', overflow: 'hidden',
-              border: `1px solid ${t.bgSurface0}`,
-              boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-            }}>
-              {/* Thin accent progress bar at top */}
-              <div style={{ height: '2px', background: t.bgSurface0, position: 'relative' }}>
-                <div style={{
-                  position: 'absolute', left: 0, top: 0, height: '100%',
-                  width: `${((slideIdx + 1) / SLIDES.length) * 100}%`,
-                  background: t.accent,
-                  transition: 'width 300ms ease-out',
-                  borderRadius: '0 2px 2px 0',
-                }} />
-              </div>
-
-              {/* Slide viewport */}
-              <div
-                ref={slideContainerRef}
-                style={{ width: '100%', height: `${Math.round(720 * slideScale)}px`, overflow: 'hidden', position: 'relative', background: '#0B0F1A' }}
-              >
-                {/* Skeleton shimmer â€” visible while loading */}
-                {!isSlideLoaded && (
-                  <div style={{
-                    position: 'absolute', inset: 0, zIndex: 2,
-                    background: 'linear-gradient(90deg, #1E2433 25%, #283044 50%, #1E2433 75%)',
-                    backgroundSize: '200% 100%',
-                    animation: 'shimmer 1.4s ease-in-out infinite',
-                  }} />
-                )}
-
-                {/* The iframe */}
-                <iframe
-                  key={slideIdx}
-                  src={dsPort ? `http://127.0.0.1:${dsPort}/slides/${SLIDES[slideIdx].file}` : 'about:blank'}
-                  title={SLIDES[slideIdx].name}
-                  onLoad={() => setIsSlideLoaded(true)}
-                  style={{
-                    width: '1280px', height: '720px',
-                    border: 'none', display: 'block',
-                    transformOrigin: 'top left',
-                    transform: `scale(${slideScale})`,
-                    pointerEvents: 'none',
-                    opacity: isSlideLoaded ? 1 : 0,
-                    transition: 'opacity 250ms ease-out',
-                    animation: isSlideLoaded
-                      ? `${slideDir === 'next' ? 'slideInFromRight' : 'slideInFromLeft'} 280ms ease-out both`
-                      : 'none',
-                  }}
-                />
-              </div>
-
-              {/* Nav bar */}
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '8px 12px',
-                borderTop: `1px solid ${t.bgSurface0}`,
-                background: t.bgMantle,
-              }}>
-                {/* Prev */}
-                <button
-                  type="button"
-                  aria-label="Previous slide"
-                  onClick={goPrev}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: '28px', height: '28px', borderRadius: '6px', border: 'none',
-                    background: slideIdx === 0 ? 'none' : t.bgSurface0,
-                    color: slideIdx === 0 ? t.textMuted : t.textSecondary,
-                    cursor: slideIdx === 0 ? 'default' : 'pointer',
-                    opacity: slideIdx === 0 ? 0.35 : 1,
-                    transition: 'all 150ms ease-out',
-                  }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                    <path d="M7 2L4 5.5L7 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-
-                {/* Slide name + dots */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', color: t.textSecondary, fontFamily: t.fontFamilyBase, fontWeight: 500 }}>
-                    {SLIDES[slideIdx].name}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {SLIDES.map((s, i) => (
-                      <button
-                        key={s.file}
-                        type="button"
-                        aria-label={`Go to ${s.name}`}
-                        onClick={() => goTo(i)}
-                        style={{
-                          width: i === slideIdx ? '20px' : '5px',
-                          height: '5px',
-                          borderRadius: '999px', border: 'none', padding: 0,
-                          background: i === slideIdx ? t.accent : t.bgSurface1,
-                          cursor: i === slideIdx ? 'default' : 'pointer',
-                          transition: 'all 220ms ease-out',
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Next */}
-                <button
-                  type="button"
-                  aria-label="Next slide"
-                  onClick={goNext}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: '28px', height: '28px', borderRadius: '6px', border: 'none',
-                    background: slideIdx === SLIDES.length - 1 ? 'none' : t.bgSurface0,
-                    color: slideIdx === SLIDES.length - 1 ? t.textMuted : t.textSecondary,
-                    cursor: slideIdx === SLIDES.length - 1 ? 'default' : 'pointer',
-                    opacity: slideIdx === SLIDES.length - 1 ? 0.35 : 1,
-                    transition: 'all 150ms ease-out',
-                  }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                    <path d="M4 2L7 5.5L4 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: t.textPrimary, marginBottom: '6px', fontFamily: t.fontFamilyBase }}>
-            Getting Started with Pathly Studio
-          </h2>
-          <p style={{ fontSize: '13px', color: t.textSecondary, marginBottom: '20px', fontFamily: t.fontFamilyBase }}>
-            A quick overview of how the workspace is structured.
-          </p>
-          {[
-            {
-              step: '1',
-              title: 'Open a project folder',
-              desc: 'Click "+ New project" on the Projects tab and pick a folder that contains a pathly.json or has a pathly/ directory. Pathly will discover all plans and flows inside.',
-            },
-            {
-              step: '2',
-              title: 'Create flows in the sidebar',
-              desc: 'Once a project is open, use the sidebar to create agent flows (YAML), editor files, or plan boards. The sidebar tree mirrors your project structure.',
-            },
-            {
-              step: '3',
-              title: 'Run flows with Monitor',
-              desc: 'Select a flow and click Run, or open the Monitor panel (bottom nav) to watch live output and agent logs as your pipeline executes.',
-            },
-            {
-              step: '4',
-              title: 'Track work with the Plan Board',
-              desc: 'Open any plan folder from the sidebar to see the Kanban-style board. Conversations move from TODO â†’ IN PROGRESS â†’ DONE as you build.',
-            },
-          ].map(({ step, title, desc }, idx) => (
-            <div
-              key={step}
-              style={{
-                display: 'flex',
-                gap: '16px',
-                marginBottom: '12px',
-                padding: '16px 18px',
-                background: t.bgSurface0,
-                borderRadius: '10px',
-                border: `1px solid ${t.bgSurface0}`,
-                borderLeft: `3px solid ${t.accent}40`,
-                animation: `fadeSlideUp 300ms ease-out ${idx * 60}ms both`,
-              }}
-            >
-              <div style={{
-                flexShrink: 0,
-                width: '26px',
-                height: '26px',
-                borderRadius: '50%',
-                background: `${t.accent}15`,
-                border: `1px solid ${t.accent}35`,
-                color: t.accent,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '11px',
-                fontWeight: 700,
-                fontFamily: t.fontFamilyMono,
-                marginTop: '1px',
-              }}>
-                {step}
-              </div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: t.textPrimary, marginBottom: '5px', fontFamily: t.fontFamilyBase, letterSpacing: '-0.01em' }}>{title}</div>
-                <div style={{ fontSize: '12px', color: t.textSecondary, lineHeight: 1.65, fontFamily: t.fontFamilyBase }}>{desc}</div>
-              </div>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => handleTab('projects')}
-            style={{
-              marginTop: '8px',
-              padding: '8px 20px',
-              background: t.accent,
-              border: 'none',
-              borderRadius: '7px',
-              color: '#fff',
-              fontSize: '12px',
-              fontWeight: 600,
-              fontFamily: t.fontFamilyBase,
-              cursor: 'pointer',
-            }}
-          >
-            Go to Projects â†’
-          </button>
-        </div>
+        <GettingStarted onGoToProjects={() => handleTab('projects')} />
       )}
 
       {activeTab === 'projects' && <>

@@ -1,0 +1,81 @@
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ctaGlow {
+  0%, 100% { box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 22%, transparent), var(--shadow-sm); }
+  50%       { box-shadow: 0 0 32px color-mix(in srgb, var(--accent) 40%, transparent), var(--shadow-sm); }
+}
+
+.root {
+  width: 100%;
+  max-width: 760px;
+  animation: pageEnter 320ms var(--ease-out) both;
+}
+
+/* ── Steps section ──────────────────────────────────── */
+.stepsSection {
+  margin-top: var(--space-10);
+  animation: pageEnter 320ms var(--ease-out) 60ms both;
+}
+
+.stepsTitle {
+  font-size: 20px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-3);
+  line-height: var(--line-tight);
+}
+
+.stepsSubtitle {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-10);
+  font-family: var(--font-family-base);
+  line-height: var(--line-normal);
+}
+
+.stepsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+/* ── CTA button ─────────────────────────────────────── */
+.ctaBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+  padding: 10px var(--space-12);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-lg);
+  color: var(--bg-mantle);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  animation: ctaGlow 3s ease-in-out infinite;
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.ctaBtn:hover {
+  opacity: 0.88;
+  transform: translateY(-2px);
+}
+
+.ctaBtn:active {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root, .stepsSection { animation: none; }
+  .ctaBtn { animation: none; }
+  .ctaBtn:hover { transform: none; }
+}
