@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { FeatureData } from './dbExplorerData'
 import { StatsStrip } from './StatsStrip'
 import { FeatureGrid } from './FeatureGrid'
-import { FeatureStack } from './FeatureStack'
+import FeatureStack from './FeatureStack'
 import { FeatureModal } from './FeatureModal'
 import { CostChart } from './CostChart/CostChart'
 import styles from './DBExplorer.module.css'
@@ -98,7 +98,7 @@ function DBExplorerHeader({ viewMode, onViewMode, onRefresh }: HeaderProps): JSX
             className={`${styles.toggleBtn} ${viewMode === 'grid' ? styles.toggleBtnActive : ''}`}
             onClick={() => onViewMode('grid')}
             aria-label="Grid view"
-            aria-pressed={viewMode === 'grid'}
+            {...(viewMode === 'grid' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
           >
             ⊞
           </button>
@@ -107,7 +107,7 @@ function DBExplorerHeader({ viewMode, onViewMode, onRefresh }: HeaderProps): JSX
             className={`${styles.toggleBtn} ${viewMode === 'stack' ? styles.toggleBtnActive : ''}`}
             onClick={() => onViewMode('stack')}
             aria-label="Stack view"
-            aria-pressed={viewMode === 'stack'}
+            {...(viewMode === 'stack' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
           >
             ☰
           </button>
