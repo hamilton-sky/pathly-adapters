@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import {
   ArrowLeft, Undo2, Redo2, Database, Download, FileCode,
 } from 'lucide-react'
@@ -68,7 +68,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
       </button>
 
       <div className={styles.breadcrumb}>
-        <span className={styles.breadcrumbText}>Skills › {category} › {skillName}</span>
+        <span className={styles.breadcrumbText}>Skills â€º {category} â€º {skillName}</span>
       </div>
 
       <span className={styles.badge}>NOTEBOOK</span>
@@ -99,7 +99,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             <Redo2 size={15} />
           </button>
           <button type="button" className={styles.saveBtn} onClick={handleSave}>
-            <Database size={13} />
+            <Database size={15} />
             Save
           </button>
           <button
@@ -108,13 +108,13 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             onClick={handleExport}
             disabled={exportState !== 'idle'}
           >
-            <Download size={13} />
+            <Download size={15} />
             {exportState === 'success' ? 'Exported' : exportState === 'error' ? 'Error' : 'Export Skill'}
           </button>
         </>
       )}
 
-      {/* Mode toggle — cells ↔ raw editor */}
+      {/* Mode toggle â€” cells â†” raw editor */}
       <button
         type="button"
         className={`${styles.modeToggleBtn} ${viewMode === 'editor' ? styles.modeToggleActive : ''}`}

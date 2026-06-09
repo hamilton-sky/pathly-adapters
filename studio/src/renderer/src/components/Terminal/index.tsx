@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+﻿import { useEffect, useRef, useState, useCallback } from 'react'
 import { Columns2, Menu, X as XIcon } from 'lucide-react'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useStore } from '../../store'
@@ -60,7 +60,7 @@ export function Terminal(): JSX.Element {
     return () => document.removeEventListener('pathly:focus-terminal-tab', handler)
   }, [])
 
-  // Listen for PTY exit — write an exit marker into the shared xterm
+  // Listen for PTY exit â€” write an exit marker into the shared xterm
   useEffect(() => {
     const api = window.pathly?.terminal
     if (!api) return
@@ -184,7 +184,7 @@ export function Terminal(): JSX.Element {
           <div className={styles.toolbarActions}>
             {tabs.length >= 2 && (
               <button className={styles.splitIconBtn} onClick={toggleSplit} title="Split pane side-by-side">
-                <Columns2 size={13} />
+                <Columns2 size={15} />
               </button>
             )}
             {tabs.length > 0 && (
@@ -193,10 +193,10 @@ export function Terminal(): JSX.Element {
                 onClick={() => setInstancesRailOpen((v) => !v)}
                 title={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'}
               >
-                <Menu size={13} />
+                <Menu size={15} />
               </button>
             )}
-            <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={13} /></button>
+            <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={15} /></button>
           </div>
         </div>
       )}
@@ -204,7 +204,7 @@ export function Terminal(): JSX.Element {
       {splitEnabled && (
         <div className={styles.splitHeader}>
           <button className={`${styles.splitIconBtn} ${styles.splitIconBtnActive}`} onClick={toggleSplit} title="Close split">
-            <Columns2 size={13} />
+            <Columns2 size={15} />
           </button>
           {tabs.length > 0 && (
             <button
@@ -212,10 +212,10 @@ export function Terminal(): JSX.Element {
               onClick={() => setInstancesRailOpen((v) => !v)}
               title={instancesRailOpen ? 'Close instances panel' : 'Open instances panel'}
             >
-              <Menu size={13} />
+              <Menu size={15} />
             </button>
           )}
-          <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={13} /></button>
+          <button className={styles.closePanelBtn} onClick={toggle} title="Close terminal"><XIcon size={15} /></button>
         </div>
       )}
 

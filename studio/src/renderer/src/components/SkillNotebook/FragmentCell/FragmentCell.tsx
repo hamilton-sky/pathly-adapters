@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import { ChevronUp, ChevronDown, MoreHorizontal, Copy, Diamond, Trash2 } from 'lucide-react'
 import styles from './FragmentCell.module.css'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
@@ -34,7 +34,7 @@ export default function FragmentCell({
   const menuRef = useRef<HTMLDivElement>(null)
 
   const isLong = description.length > 200
-  const displayDesc = isLong && !expanded ? description.slice(0, 200).trimEnd() + '…' : description
+  const displayDesc = isLong && !expanded ? description.slice(0, 200).trimEnd() + 'â€¦' : description
 
   useEffect(() => {
     if (!showNew) return
@@ -62,10 +62,10 @@ export default function FragmentCell({
         )}
         <div className={styles.actions}>
           <button type="button" className={styles.actionBtn} aria-label="Move up" title="Move up" disabled={isFirst} onClick={onMoveUp}>
-            <ChevronUp size={13} />
+            <ChevronUp size={15} />
           </button>
           <button type="button" className={styles.actionBtn} aria-label="Move down" title="Move down" disabled={isLast} onClick={onMoveDown}>
-            <ChevronDown size={13} />
+            <ChevronDown size={15} />
           </button>
           <div className={styles.menuWrap} ref={menuRef}>
             <button
@@ -75,25 +75,25 @@ export default function FragmentCell({
               {...(menuOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
               onClick={() => setMenuOpen(o => !o)}
             >
-              <MoreHorizontal size={13} />
+              <MoreHorizontal size={15} />
             </button>
             {menuOpen && (
               <div className={styles.menu} role="menu">
                 <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
-                  <Copy size={13} className={styles.menuIcon} />Duplicate<span className={styles.menuKbd}>⌘D</span>
+                  <Copy size={15} className={styles.menuIcon} />Duplicate<span className={styles.menuKbd}>âŒ˜D</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" disabled={isFirst} onClick={() => { onMoveUp?.(); setMenuOpen(false) }}>
-                  <ChevronUp size={13} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>⌘↑</span>
+                  <ChevronUp size={15} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>âŒ˜â†‘</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" disabled={isLast} onClick={() => { onMoveDown?.(); setMenuOpen(false) }}>
-                  <ChevronDown size={13} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>⌘↓</span>
+                  <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>âŒ˜â†“</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
-                  <Diamond size={13} className={styles.menuIcon} />Convert to body
+                  <Diamond size={15} className={styles.menuIcon} />Convert to body
                 </button>
                 <div className={styles.menuDivider} />
                 <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} role="menuitem" onClick={() => { removeCell(id); setMenuOpen(false) }}>
-                  <Trash2 size={13} className={styles.menuIcon} />Delete<span className={styles.menuKbd}>⌫</span>
+                  <Trash2 size={15} className={styles.menuIcon} />Delete<span className={styles.menuKbd}>âŒ«</span>
                 </button>
               </div>
             )}
@@ -105,7 +105,7 @@ export default function FragmentCell({
           <div className={styles.description}>{displayDesc}</div>
           {isLong && (
             <button type="button" className={styles.toggle} onClick={() => setExpanded(v => !v)}>
-              {expanded ? '▴ Collapse' : '▾ Show more'}
+              {expanded ? 'â–´ Collapse' : 'â–¾ Show more'}
             </button>
           )}
         </div>

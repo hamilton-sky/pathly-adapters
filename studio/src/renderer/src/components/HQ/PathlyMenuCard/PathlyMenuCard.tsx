@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+﻿import { useEffect, useRef } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import type { PathlyMenu, PathlyMenuItem, PushedMenu } from '../../../lib/pathlyContext'
 import { useRunnerStore } from '../../../store/runnerStore'
@@ -8,7 +8,7 @@ import styles from './PathlyMenuCard.module.css'
 interface PathlyMenuCardProps {
   menu: PathlyMenu | PushedMenu
   onSelect?: (item: PathlyMenuItem) => void
-  onDismiss?: () => void   // pushed menus only — × button
+  onDismiss?: () => void   // pushed menus only â€” Ã— button
   isOpen?: boolean
   onToggle?: () => void
   onExpire?: () => void    // fired when the CSS timer animation ends
@@ -69,11 +69,11 @@ export function PathlyMenuCard({
               <X size={11} />
             </button>
           )}
-          {isOpen ? <ChevronUp size={13} className={styles.flexShrinkZero} /> : <ChevronDown size={13} className={styles.flexShrinkZero} />}
+          {isOpen ? <ChevronUp size={15} className={styles.flexShrinkZero} /> : <ChevronDown size={15} className={styles.flexShrinkZero} />}
         </div>
       </button>
 
-      {/* Progress bar — pushed menus only */}
+      {/* Progress bar â€” pushed menus only */}
       {pushed && remainingMs > 0 && (
         <div className={styles.timerBar} onAnimationEnd={onExpire} />
       )}

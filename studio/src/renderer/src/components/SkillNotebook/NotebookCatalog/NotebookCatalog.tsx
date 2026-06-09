@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import {
   Sparkles, Plus, Search, Brain, Diamond, BookOpen, LayoutGrid, GripVertical,
 } from 'lucide-react'
@@ -18,10 +18,10 @@ const CATALOG_GROUPS: CatalogGroup[] = [
 ]
 
 function GroupIcon({ type }: { type: CatalogGroup['icon'] }) {
-  if (type === 'brain') return <Brain size={13} />
-  if (type === 'diamond') return <Diamond size={13} />
-  if (type === 'book-open') return <BookOpen size={13} />
-  return <LayoutGrid size={13} />
+  if (type === 'brain') return <Brain size={15} />
+  if (type === 'diamond') return <Diamond size={15} />
+  if (type === 'book-open') return <BookOpen size={15} />
+  return <LayoutGrid size={15} />
 }
 
 export default function NotebookCatalog() {
@@ -37,11 +37,11 @@ export default function NotebookCatalog() {
   return (
     <div className={styles.catalog}>
       <div className={styles.header}>
-        <Sparkles size={13} className={styles.headerIcon} />
+        <Sparkles size={15} className={styles.headerIcon} />
         <span className={styles.headerLabel}>Catalog</span>
         <div className={styles.spacer} />
         <button type="button" className={styles.addCatBtn} aria-label="Add category">
-          <Plus size={13} />
+          <Plus size={15} />
         </button>
       </div>
 
@@ -49,7 +49,7 @@ export default function NotebookCatalog() {
         <Search size={14} className={styles.searchIcon} />
         <input
           className={styles.searchInput}
-          placeholder="Search the library…"
+          placeholder="Search the libraryâ€¦"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
@@ -75,7 +75,7 @@ export default function NotebookCatalog() {
                   e.dataTransfer.effectAllowed = 'copy'
                 }}
               >
-                <GripVertical size={13} className={styles.itemGrip} />
+                <GripVertical size={15} className={styles.itemGrip} />
                 <span className={styles.itemIcon}>
                   <GroupIcon type={group.icon} />
                 </span>

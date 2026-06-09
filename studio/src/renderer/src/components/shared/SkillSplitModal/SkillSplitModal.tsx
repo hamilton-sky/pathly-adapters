@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import MarkdownRenderer from '../MarkdownRenderer/MarkdownRenderer'
 import styles from './SkillSplitModal.module.css'
@@ -105,7 +105,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
 
   const modalTitle = fileName ? 'Add markdown as cells' : 'Split into cells'
   const modalSubtitle = fileName
-    ? `Dropped ${fileName} — here's how Pathly will split it. Confirm, or insert as a single cell.`
+    ? `Dropped ${fileName} â€” here's how Pathly will split it. Confirm, or insert as a single cell.`
     : "Here's how Pathly will split this cell. Confirm, or insert as a single cell."
 
   return (
@@ -117,7 +117,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
         </div>
 
         <div className={styles.body}>
-          {/* LEFT — proposed cells list */}
+          {/* LEFT â€” proposed cells list */}
           <div className={styles.cellsPanel}>
             <div className={styles.panelHeader}>
               <div className={styles.panelTitle}>PROPOSED CELLS</div>
@@ -149,7 +149,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
                       disabled={idx === 0}
                       onClick={e => { e.stopPropagation(); moveUp(cell.id) }}
                     >
-                      <ChevronUp size={12} />
+                      <ChevronUp size={14} />
                     </button>
                     <button
                       type="button"
@@ -158,7 +158,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
                       disabled={idx === cells.length - 1}
                       onClick={e => { e.stopPropagation(); moveDown(cell.id) }}
                     >
-                      <ChevronDown size={12} />
+                      <ChevronDown size={14} />
                     </button>
                   </div>
                   {cell.heading && <div className={styles.cellTitle}>{cell.heading}</div>}
@@ -170,7 +170,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
             </div>
           </div>
 
-          {/* RIGHT — live preview */}
+          {/* RIGHT â€” live preview */}
           <div className={styles.previewPanel}>
             <div className={styles.panelTitle}>PREVIEW</div>
             <div className={styles.previewBody}>
@@ -201,7 +201,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
             disabled={checkedCount === 0}
             onClick={() => onConfirm(cells.filter(c => c.checked))}
           >
-            Confirm split — {checkedCount} cells
+            Confirm split â€” {checkedCount} cells
           </button>
         </div>
       </div>

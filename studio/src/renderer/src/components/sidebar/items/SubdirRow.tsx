@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+﻿import { useRef, useState } from 'react'
 import { ChevronRight, ChevronDown, FilePlus, FolderPlus, Folder, FolderOpen, GripVertical, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { RenameInput } from '../shared/RenameInput'
 import { ContextMenu } from '../shared/ContextMenu'
@@ -72,8 +72,8 @@ export function SubdirRow({
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
       </span>
       {open
-        ? <FolderOpen size={13} className={styles.subdirFolderIcon} />
-        : <Folder size={13} className={styles.subdirFolderIcon} />
+        ? <FolderOpen size={15} className={styles.subdirFolderIcon} />
+        : <Folder size={15} className={styles.subdirFolderIcon} />
       }
 
       {renamingThis ? (
@@ -99,7 +99,7 @@ export function SubdirRow({
       ) : !renamingThis ? (
         <div className={styles.rowActions}>
           {isUserLocked && (
-            <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked — delete disabled">
+            <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked â€” delete disabled">
               <Lock size={11} />
             </span>
           )}
@@ -114,7 +114,7 @@ export function SubdirRow({
             title="Actions"
             onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
           >
-            <MoreHorizontal size={13} />
+            <MoreHorizontal size={15} />
           </button>
 
           {menuOpen && menuButtonRef.current && (

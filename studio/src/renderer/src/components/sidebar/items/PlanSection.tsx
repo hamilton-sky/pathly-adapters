@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Plus, Trash2 } from 'lucide-react'
 import type { PathlyItem } from '../../../types'
 import type { PlanFolder } from '../../../hooks/usePlanFiles'
@@ -108,7 +108,7 @@ export function PlanSection({
           {visibleFolders.map((folder) => {
             const isActive = folder.name === activeTopic
             const badge = folder.convTotal > 0
-              ? `${folder.convDone}/${folder.convTotal}✓`
+              ? `${folder.convDone}/${folder.convTotal}âœ“`
               : null
 
             const filteredFiles = lowerFilter
@@ -129,13 +129,13 @@ export function PlanSection({
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onToggleFolder(folder.name); onFolderClick(folder.name) } }}
                 >
                   {folder.open
-                    ? <FolderOpen size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                    : <Folder size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    ? <FolderOpen size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                    : <Folder size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                   }
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {folder.name}
                   </span>
-                  <span className={styles.lockIcon} title="Managed by Pathly — cannot be renamed or moved">
+                  <span className={styles.lockIcon} title="Managed by Pathly â€” cannot be renamed or moved">
                     <Lock size={10} />
                   </span>
                   {badge && (
@@ -159,7 +159,7 @@ export function PlanSection({
                           if (next) setMenuAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())
                         }}
                       >
-                        <MoreHorizontal size={13} />
+                        <MoreHorizontal size={15} />
                       </button>
                       {menuOpenFor === folder.name && menuAnchor && (
                         <ContextMenu

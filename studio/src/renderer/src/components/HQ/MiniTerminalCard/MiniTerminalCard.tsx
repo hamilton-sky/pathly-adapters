@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { Maximize2, Minimize2, ExternalLink, Trash2, X } from 'lucide-react'
 import { useTerminalStore } from '../../../store/terminalStore'
 import { AntigravityIcon, ClaudeIcon, CodexIcon, ShellIcon } from '../../Terminal/BrandIcons'
@@ -26,7 +26,7 @@ function TargetIcon({ target }: { target: MiniTerminalCardProps['target'] }): JS
 
 /**
  * Mini xterm peek inside the chat panel. Shares one xterm instance per tabId
- * with the full terminal panel via xtermRegistry — only one host can own the
+ * with the full terminal panel via xtermRegistry â€” only one host can own the
  * DOM at a time. Mutual-exclusion rule: if the full panel is currently
  * showing this tab, the card auto-collapses to a banner preview. When the
  * full panel hides or switches away, the card auto-restores to peek if the
@@ -112,7 +112,7 @@ export function MiniTerminalCard({
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
     >
-      {/* Header row — two-zone layout */}
+      {/* Header row â€” two-zone layout */}
       <div className={styles.header}>
         <div className={styles.meta}>
           <TargetIcon target={target} />
@@ -132,7 +132,7 @@ export function MiniTerminalCard({
               type="button"
               title={userViewState === 'peek' ? 'Collapse' : 'Expand'}
             >
-              {userViewState === 'peek' ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              {userViewState === 'peek' ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
           )}
           <button
@@ -141,7 +141,7 @@ export function MiniTerminalCard({
             type="button"
             title="Open full terminal"
           >
-            <ExternalLink size={13} />
+            <ExternalLink size={15} />
           </button>
           <button
             className={styles.iconBtn}
@@ -149,7 +149,7 @@ export function MiniTerminalCard({
             type="button"
             title="Hide"
           >
-            <X size={13} />
+            <X size={15} />
           </button>
           <button
             className={`${styles.iconBtn} ${styles.dangerBtn}`}
@@ -157,11 +157,11 @@ export function MiniTerminalCard({
             type="button"
             title="Kill terminal and close instance"
           >
-            <Trash2 size={13} />
+            <Trash2 size={15} />
           </button>
         </div>
       </div>
-      {/* Peek area — only renders height when card hosts the live xterm.
+      {/* Peek area â€” only renders height when card hosts the live xterm.
           The container div stays in the tree so the registry can reparent
           back into it cleanly when the card becomes host again. */}
       <div className={cardHosts ? styles.peekWrapper : styles.peekWrapperHidden}>

@@ -1,4 +1,4 @@
-import { FileText, GripVertical, Pencil, Trash2 } from 'lucide-react'
+﻿import { FileText, GripVertical, Pencil, Trash2 } from 'lucide-react'
 import type { PathlyItem } from '../../../types'
 import { RenameInput } from '../shared/RenameInput'
 import styles from '../Sidebar.module.css'
@@ -48,7 +48,7 @@ export function LibraryItem({ item, isSelected, isCanvasDraggable, deep, onSelec
           <GripVertical size={12} />
         </span>
       )}
-      <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <FileText size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
       {isRenaming && onRenameChange && onRenameCommit && onRenameCancel ? (
         <RenameInput
           value={renameValue ?? ''}

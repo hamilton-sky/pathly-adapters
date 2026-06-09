@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import { Sparkles, Search, Brain, Diamond, BookOpen, LayoutGrid, GitBranch, GripVertical, Plus, ChevronRight, ChevronsUp, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useCatalogData, CatalogItemData, CatalogGroup } from './useCatalogData'
 import styles from './LibraryCatalog.module.css'
@@ -17,11 +17,11 @@ interface Props {
 }
 
 function GroupIcon({ icon }: { icon: CatalogGroup['icon'] }) {
-  if (icon === 'brain') return <Brain size={13} />
-  if (icon === 'diamond') return <Diamond size={13} />
-  if (icon === 'book-open') return <BookOpen size={13} />
-  if (icon === 'git-branch') return <GitBranch size={13} />
-  return <LayoutGrid size={13} />
+  if (icon === 'brain') return <Brain size={15} />
+  if (icon === 'diamond') return <Diamond size={15} />
+  if (icon === 'book-open') return <BookOpen size={15} />
+  if (icon === 'git-branch') return <GitBranch size={15} />
+  return <LayoutGrid size={15} />
 }
 
 function leafName(item: CatalogItemData): string {
@@ -92,7 +92,7 @@ function ItemRow({ item, type, groupIcon, context, displayName, onOpenSkill, onO
       onClick={handleRowClick}
       title={item.description ?? item.name}
     >
-      {context === 'canvas' && !isFlow && <GripVertical size={13} className={styles.itemGrip} />}
+      {context === 'canvas' && !isFlow && <GripVertical size={15} className={styles.itemGrip} />}
       <span className={styles.itemIcon}><GroupIcon icon={groupIcon} /></span>
       <span className={styles.itemName}>{label}</span>
 
@@ -234,7 +234,7 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
             className={styles.newCatInput}
             value={subCatName}
             onChange={e => setSubCatName(e.target.value)}
-            placeholder="Subcategory name…"
+            placeholder="Subcategory nameâ€¦"
             autoFocus
             onKeyDown={e => {
               if (e.key === 'Enter') void handleCreateSubcategory()
@@ -242,7 +242,7 @@ function SubGroup({ label, items, subCategories, parentCategory, type, groupIcon
             }}
           />
           <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateSubcategory()}>Create</button>
-          <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowSubCatForm(false); setSubCatName('') }}>✕</button>
+          <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowSubCatForm(false); setSubCatName('') }}>âœ•</button>
         </div>
       )}
 
@@ -419,7 +419,7 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
         className={styles.newCatInput}
         value={catName}
         onChange={e => setCatName(e.target.value)}
-        placeholder={`${singularLabel} category…`}
+        placeholder={`${singularLabel} categoryâ€¦`}
         autoFocus
         onKeyDown={e => {
           if (e.key === 'Enter') void handleCreateCategory()
@@ -427,7 +427,7 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
         }}
       />
       <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateCategory()}>Create</button>
-      <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowCatForm(false); setCatName('') }}>✕</button>
+      <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowCatForm(false); setCatName('') }}>âœ•</button>
     </div>
   )
 
@@ -536,7 +536,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
     <div className={styles.catalog}>
       <div className={styles.header}>
         <div className={styles.headerRow}>
-          <Sparkles size={13} className={styles.headerIcon} />
+          <Sparkles size={15} className={styles.headerIcon} />
           <span>Catalog</span>
         </div>
         <button
@@ -546,15 +546,15 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
           aria-label="Collapse all"
           onClick={() => setCollapseKey(k => k + 1)}
         >
-          <ChevronsUp size={13} />
+          <ChevronsUp size={15} />
         </button>
       </div>
 
       <div className={styles.searchRow}>
-        <Search size={13} />
+        <Search size={15} />
         <input
           className={styles.searchInput}
-          placeholder="Search the library…"
+          placeholder="Search the libraryâ€¦"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
@@ -598,7 +598,7 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
               className={styles.newCatInput}
               value={newCatName}
               onChange={e => setNewCatName(e.target.value)}
-              placeholder="Category name…"
+              placeholder="Category nameâ€¦"
               autoFocus
               onKeyDown={e => {
                 if (e.key === 'Enter') void handleCreateCategory()
@@ -606,11 +606,11 @@ export default function LibraryCatalog({ context, pathlyRoot, onOpenSkill, onOpe
               }}
             />
             <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateCategory()}>Create</button>
-            <button type="button" className={styles.newCatCancelBtn} onClick={() => { setNewCatType(null); setNewCatName('') }}>✕</button>
+            <button type="button" className={styles.newCatCancelBtn} onClick={() => { setNewCatType(null); setNewCatName('') }}>âœ•</button>
           </div>
         ) : (
           <button type="button" className={styles.newCat} onClick={() => setNewCatType('skill')}>
-            <Plus size={13} />
+            <Plus size={15} />
             New category
           </button>
         )}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import type { NodeProps } from 'reactflow'
 import { Handle, Position } from 'reactflow'
 import { FileText, MessageCircle, Trash2 } from 'lucide-react'
@@ -56,7 +56,7 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
             onClick={toggleShape}
             aria-label={data.shape === 'sticky' ? 'Switch to speech bubble' : 'Switch to sticky note'}
           >
-            {data.shape === 'sticky' ? <FileText size={13} /> : <MessageCircle size={13} />}
+            {data.shape === 'sticky' ? <FileText size={15} /> : <MessageCircle size={15} />}
           </button>
         </Tooltip>
 
@@ -83,7 +83,7 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
             aria-label="Link to state"
             title="Attach to state node"
           >
-            <option value="">— link —</option>
+            <option value="">â€” link â€”</option>
             {(data.states ?? []).map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
@@ -119,7 +119,7 @@ export function CommentNode({ data }: NodeProps<CommentNodeData>): JSX.Element {
           onClick={() => setEditing(true)}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setEditing(true) }}
         >
-          {data.text ? data.text : <span className={styles.placeholder}>Click to add note…</span>}
+          {data.text ? data.text : <span className={styles.placeholder}>Click to add noteâ€¦</span>}
         </div>
       )}
       <Handle

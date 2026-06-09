@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react'
+﻿import { useEffect, useRef, useMemo } from 'react'
 import { Check, CircleDot } from 'lucide-react'
 import { useStore } from '../../store'
 import { useInjectCSS } from './utils'
@@ -84,8 +84,8 @@ function TimelineDot({ status, currentState }: { status: StepStatus; currentStat
 
   return (
     <div ref={ref} className={`${styles.fsmDot} ${dotClass(status)}`}>
-      {status === 'completed' && <Check size={13} />}
-      {status === 'active' && <CircleDot size={13} />}
+      {status === 'completed' && <Check size={15} />}
+      {status === 'active' && <CircleDot size={15} />}
     </div>
   )
 }
@@ -143,8 +143,8 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
     <div className={styles.fsmRoot}>
       <div ref={convLabelRef} aria-live="polite" className={styles.fsmConvLabel}>
         {convNum != null
-          ? `${convLabel} ${convNum} · ${doneCount} done · ${remainingCount} remaining`
-          : `${doneCount} done · ${remainingCount} remaining`}
+          ? `${convLabel} ${convNum} Â· ${doneCount} done Â· ${remainingCount} remaining`
+          : `${doneCount} done Â· ${remainingCount} remaining`}
       </div>
 
       <div
@@ -161,8 +161,8 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
           const isLast = idx === PIPELINE.length - 1
           const retryCount = retryMap[state] ?? 0
           const tooltipLabel = status === 'active-retry'
-            ? `${state} — retried ${retryCount}×`
-            : `${state} — ${status}`
+            ? `${state} â€” retried ${retryCount}Ã—`
+            : `${state} â€” ${status}`
 
           return (
             <div key={state} className={isLast ? styles.fsmStepLast : styles.fsmStep}>
@@ -179,7 +179,7 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
                 </span>
                 <span className={styles.fsmStepAgent}>{STAGE_AGENTS[state] ?? ''}</span>
                 {status === 'active-retry' && retryCount > 0 && (
-                  <span className={styles.fsmRetryBadge}>↩{retryCount}</span>
+                  <span className={styles.fsmRetryBadge}>â†©{retryCount}</span>
                 )}
               </button>
 

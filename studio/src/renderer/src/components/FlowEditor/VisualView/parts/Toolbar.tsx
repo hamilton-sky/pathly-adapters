@@ -1,4 +1,4 @@
-import type { FlowExportTarget, CommentShape } from '../../../../types'
+﻿import type { FlowExportTarget, CommentShape } from '../../../../types'
 import { Tooltip } from '../../../ui'
 import { FileText, MessageCircle } from 'lucide-react'
 import { ExportControls } from './ExportControls'
@@ -53,12 +53,12 @@ export function Toolbar({
       <div className={styles.divider} />
       <Tooltip label="Add text note to canvas" placement="bottom">
         <button type="button" className={styles.noteBtn} onClick={() => onAddNote('sticky')} aria-label="Add text note">
-          <FileText size={13} />
+          <FileText size={15} />
         </button>
       </Tooltip>
       <Tooltip label="Add speech bubble to canvas" placement="bottom">
         <button type="button" className={styles.noteBtn} onClick={() => onAddNote('bubble')} aria-label="Add speech bubble">
-          <MessageCircle size={13} />
+          <MessageCircle size={15} />
         </button>
       </Tooltip>
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+﻿import { useRef, useState } from 'react'
 import { FileText, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useUiStore } from '../../../store/uiStore'
 import type { PathlyItem, PathlyReorgDragItem, PathlySection } from '../../../types'
@@ -85,7 +85,7 @@ export function WorkspaceItem({
         e.dataTransfer.effectAllowed = 'move'
       }}
     >
-      <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <FileText size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
 
       {renamingPath === item.path ? (
         <RenameInput
@@ -97,12 +97,12 @@ export function WorkspaceItem({
       ) : (
         <>
           <span className={styles.itemName}>{item.name}</span>
-          {isDirty && <span className={styles.dirtyDot}>●</span>}
+          {isDirty && <span className={styles.dirtyDot}>â—</span>}
 
           {isActionable && (
             <div className={styles.rowActions}>
               {isUserLocked && (
-                <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked — delete disabled">
+                <span className={`${styles.rowAction} ${styles.rowActionLock}`} title="Locked â€” delete disabled">
                   <Lock size={11} />
                 </span>
               )}
@@ -112,7 +112,7 @@ export function WorkspaceItem({
                 title="Actions"
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
               >
-                <MoreHorizontal size={13} />
+                <MoreHorizontal size={15} />
               </button>
 
               {menuOpen && menuButtonRef.current && (

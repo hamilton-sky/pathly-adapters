@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import styles from '../Sidebar.module.css'
 
@@ -13,7 +13,7 @@ export function InlineFolderInput({ onConfirm, onCancel }: Props): JSX.Element {
   useEffect(() => { inputRef.current?.focus() }, [])
   return (
     <div className={styles.inlineCreateRow}>
-      <FolderOpen size={13} className={styles.inlineCreateIcon} />
+      <FolderOpen size={15} className={styles.inlineCreateIcon} />
       <input
         ref={inputRef}
         className={styles.inlineCreateInput}

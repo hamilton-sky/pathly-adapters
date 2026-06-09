@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+﻿import { useEffect, useRef } from 'react'
 import { FileText, Folder } from 'lucide-react'
 import styles from '../Sidebar.module.css'
 
@@ -24,12 +24,12 @@ export function InlineCreateInput({ type, deep, dataLabel, onCommit, onCancel }:
   return (
     <div className={styles.inlineCreateRow} style={rowStyle}>
       <span className={styles.inlineCreateIcon}>
-        {type === 'folder' ? <Folder size={13} /> : <FileText size={13} />}
+        {type === 'folder' ? <Folder size={15} /> : <FileText size={15} />}
       </span>
       <input
         ref={inputRef}
         className={styles.inlineCreateInput}
-        placeholder={type === 'folder' ? 'folder name…' : 'file name…'}
+        placeholder={type === 'folder' ? 'folder nameâ€¦' : 'file nameâ€¦'}
         data-label={dataLabel ?? (type === 'folder' ? 'New Folder Name' : 'New Plan Name')}
         defaultValue=""
         onKeyDown={(e) => {

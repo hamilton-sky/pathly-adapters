@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from 'lucide-react'
+﻿import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './SkillsPanel.module.css'
 
@@ -22,7 +22,7 @@ export function SkillsPanel({ onSkillClick }: SkillsPanelProps): JSX.Element {
         {...(skillsPanelOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
         <span className={styles.title}>/pathly</span>
-        {skillsPanelOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        {skillsPanelOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
       </button>
 
       <div className={skillsPanelOpen ? styles.chips : styles.chipsCompact}>

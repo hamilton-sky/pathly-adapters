@@ -1,4 +1,4 @@
-import { Handle, Position, type NodeProps } from 'reactflow'
+﻿import { Handle, Position, type NodeProps } from 'reactflow'
 import type { StateNodeData } from '../utils/flowToGraph'
 import { ClaudeIcon, CodexIcon, AntigravityIcon } from '../../Terminal/BrandIcons'
 import styles from './StateNode.module.css'
@@ -21,9 +21,9 @@ const ADAPTER_LABELS: Record<string, string> = {
 }
 
 function AdapterChipIcon({ adapter }: { adapter: string }): JSX.Element | null {
-  if (adapter === 'claude') return <ClaudeIcon size={13} />
-  if (adapter === 'codex') return <CodexIcon size={13} />
-  if (adapter === 'antigravity') return <AntigravityIcon size={13} />
+  if (adapter === 'claude') return <ClaudeIcon size={15} />
+  if (adapter === 'codex') return <CodexIcon size={15} />
+  if (adapter === 'antigravity') return <AntigravityIcon size={15} />
   return null
 }
 
@@ -54,32 +54,32 @@ export function StateNode({ data }: NodeProps<StateNodeData>): JSX.Element {
       className={nodeClass}
       style={{ '--node-accent': accent } as React.CSSProperties}
     >
-      {/* Top handles — forward flow */}
+      {/* Top handles â€” forward flow */}
       <Handle type="target" position={Position.Top} id="top-tgt"
         style={{ ...HANDLE_STYLE, background: 'var(--blue)', left: '50%' }} />
       <Handle type="source" position={Position.Top} id="top-src"
         style={{ ...HANDLE_STYLE, background: 'var(--blue)', left: '35%' }} />
 
-      {/* Bottom handles — main forward flow */}
+      {/* Bottom handles â€” main forward flow */}
       <Handle type="source" position={Position.Bottom} id="bot-src"
         style={{ ...HANDLE_STYLE, background: 'var(--blue)', left: '50%' }} />
       <Handle type="target" position={Position.Bottom} id="bot-tgt"
         style={{ ...HANDLE_STYLE, background: 'var(--blue)', left: '35%' }} />
 
-      {/* Left handles — backward loop */}
+      {/* Left handles â€” backward loop */}
       <Handle type="target" position={Position.Left} id="left-tgt"
         style={{ ...HANDLE_STYLE, background: '#F59E0B', top: '35%' }} />
       <Handle type="source" position={Position.Left} id="left-src"
         style={{ ...HANDLE_STYLE, background: '#F59E0B', top: '65%' }} />
 
-      {/* Right handles — backward loop */}
+      {/* Right handles â€” backward loop */}
       <Handle type="target" position={Position.Right} id="right-tgt"
         style={{ ...HANDLE_STYLE, background: '#F59E0B', top: '35%' }} />
       <Handle type="source" position={Position.Right} id="right-src"
         style={{ ...HANDLE_STYLE, background: '#F59E0B', top: '65%' }} />
 
       {data.isStart && (
-        <div className={styles.startBadge} title="Start state">▶</div>
+        <div className={styles.startBadge} title="Start state">â–¶</div>
       )}
 
       {hasWarning && (
@@ -120,7 +120,7 @@ export function StateNode({ data }: NodeProps<StateNodeData>): JSX.Element {
           className={styles.feedbackArrivals}
           title={`feedback_routing: ${data.feedbackArrivals.join(', ')}`}
         >
-          ↩ {data.feedbackArrivals.join(', ')}
+          â†© {data.feedbackArrivals.join(', ')}
         </div>
       )}
     </div>

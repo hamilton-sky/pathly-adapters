@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+﻿import { useState, useRef, useEffect } from 'react'
 import { Send, Square, TerminalSquare, ChevronUp } from 'lucide-react'
 import { useChatStore } from '../../../store/chatStore'
 import { ModelSelector } from '../ModelSelector/ModelSelector'
@@ -51,13 +51,13 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
 
   return (
     <div className={styles.container}>
-      {/* Model loading bar — shown from first mount until model is ready */}
+      {/* Model loading bar â€” shown from first mount until model is ready */}
       {isRouterLoading && (
         <div className={styles.downloadBar}>
           <div className={styles.downloadLabel}>
             {embedProgress > 0
-              ? `⬇ Downloading MiniLM… ${embedProgress}%`
-              : '⬇ Loading MiniLM routing model…'}
+              ? `â¬‡ Downloading MiniLMâ€¦ ${embedProgress}%`
+              : 'â¬‡ Loading MiniLM routing modelâ€¦'}
           </div>
           <progress
             className={`${styles.progressBar} ${embedProgress === 0 ? styles.progressBarPulsing : ''}`}
@@ -127,12 +127,12 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
           className={`${styles.modelPill} ${pillIsActive ? styles.modelPillActive : ''}`}
         >
           {isEmbedding
-            ? '◈ Routing…'
+            ? 'â—ˆ Routingâ€¦'
             : isRouterLoading
-            ? `◈ ${embedProgress}%`
+            ? `â—ˆ ${embedProgress}%`
             : embedReady
-            ? '◈ MiniLM'
-            : '◈ Loading…'}
+            ? 'â—ˆ MiniLM'
+            : 'â—ˆ Loadingâ€¦'}
         </span>
         {isLoading ? (
           <button
@@ -141,7 +141,7 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
             onClick={() => onStop?.()}
             title="Stop"
           >
-            <Square size={13} />
+            <Square size={15} />
           </button>
         ) : (
           <button
@@ -152,7 +152,7 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
             title="Send (Enter)"
             data-label="Send Message"
           >
-            <Send size={13} />
+            <Send size={15} />
           </button>
         )}
       </div>

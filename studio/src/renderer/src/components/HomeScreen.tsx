@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { Sun, Moon, LayoutGrid, List, Star, FolderOpen } from 'lucide-react'
 import { useStore } from '../store'
 import { listDirs, readFile, pickFolder, openWindow, openSlide, getDsPort } from '../services/pathlyApi'
@@ -40,7 +40,7 @@ const ANIMATIONS = `
 `
 
 const SLIDES = [
-  { file: 'title.html',        name: 'Title',        subtitle: 'Brand mark · wordmark · grid field' },
+  { file: 'title.html',        name: 'Title',        subtitle: 'Brand mark Â· wordmark Â· grid field' },
   { file: 'pipeline.html',     name: 'Pipeline',     subtitle: 'FSM stages as the hero motif' },
   { file: 'flow-builder.html', name: 'Flow Builder', subtitle: 'Author your own FSM' },
   { file: 'metrics.html',      name: 'Metrics',      subtitle: 'Big mono numbers on dark' },
@@ -529,7 +529,7 @@ export function HomeScreen(): JSX.Element {
             color: t.textMuted,
             fontFamily: t.fontFamilyBase
           }}>
-            {allPlans.length} topic{allPlans.length !== 1 ? 's' : ''} · {timeAgo(project.lastOpened)}
+            {allPlans.length} topic{allPlans.length !== 1 ? 's' : ''} Â· {timeAgo(project.lastOpened)}
           </span>
 
           <button
@@ -577,7 +577,7 @@ export function HomeScreen(): JSX.Element {
       color: t.textPrimary,
       fontFamily: t.fontFamilyBase
     }}>
-      {/* Combined header — drag region with tabs + dark mode toggle */}
+      {/* Combined header â€” drag region with tabs + dark mode toggle */}
       <div style={{
         position: 'fixed',
         top: 0,
@@ -593,7 +593,7 @@ export function HomeScreen(): JSX.Element {
         paddingRight: '155px',
         boxSizing: 'border-box',
       } as React.CSSProperties}>
-        {/* Tabs — no-drag so clicks register */}
+        {/* Tabs â€” no-drag so clicks register */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -633,7 +633,7 @@ export function HomeScreen(): JSX.Element {
             )
           })}
         </div>
-        {/* Dark mode toggle — pushed to right, no-drag */}
+        {/* Dark mode toggle â€” pushed to right, no-drag */}
         <div style={{
           marginLeft: 'auto',
           display: 'flex',
@@ -716,7 +716,7 @@ export function HomeScreen(): JSX.Element {
                 ref={slideContainerRef}
                 style={{ width: '100%', height: `${Math.round(720 * slideScale)}px`, overflow: 'hidden', position: 'relative', background: '#0B0F1A' }}
               >
-                {/* Skeleton shimmer — visible while loading */}
+                {/* Skeleton shimmer â€” visible while loading */}
                 {!isSlideLoaded && (
                   <div style={{
                     position: 'absolute', inset: 0, zIndex: 2,
@@ -846,7 +846,7 @@ export function HomeScreen(): JSX.Element {
             {
               step: '4',
               title: 'Track work with the Plan Board',
-              desc: 'Open any plan folder from the sidebar to see the Kanban-style board. Conversations move from TODO → IN PROGRESS → DONE as you build.',
+              desc: 'Open any plan folder from the sidebar to see the Kanban-style board. Conversations move from TODO â†’ IN PROGRESS â†’ DONE as you build.',
             },
           ].map(({ step, title, desc }, idx) => (
             <div
@@ -903,7 +903,7 @@ export function HomeScreen(): JSX.Element {
               cursor: 'pointer',
             }}
           >
-            Go to Projects →
+            Go to Projects â†’
           </button>
         </div>
       )}
@@ -988,7 +988,7 @@ export function HomeScreen(): JSX.Element {
                   cursor: 'pointer', transition: 'all 150ms ease-out',
                 }}
               >
-                <LayoutGrid size={13} />
+                <LayoutGrid size={15} />
               </button>
               <button
                 type="button"
@@ -1005,7 +1005,7 @@ export function HomeScreen(): JSX.Element {
                   cursor: 'pointer', transition: 'all 150ms ease-out',
                 }}
               >
-                <List size={13} />
+                <List size={15} />
               </button>
             </div>
             <button

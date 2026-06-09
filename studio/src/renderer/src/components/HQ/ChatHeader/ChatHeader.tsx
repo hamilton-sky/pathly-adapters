@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { X, Zap, SquarePen, History, ChevronDown } from 'lucide-react'
 import type { TerminalKind } from '../../../store/chatStore'
 import { Tooltip, IconButton } from '../../ui'
@@ -73,11 +73,11 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
     <div className={styles.header}>
       <div className={styles.titleRow}>
         <span className={styles.title}>
-          <Zap size={13} /> HQ
+          <Zap size={15} /> HQ
         </span>
       </div>
 
-      {/* Target selector — single dropdown replacing the pill row */}
+      {/* Target selector â€” single dropdown replacing the pill row */}
       <div ref={targetRef} className={styles.targetWrapper}>
         <Tooltip label="Select target terminal" placement="bottom">
           <button
@@ -114,7 +114,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
 
       {/* New session */}
       <IconButton onClick={onClearChat} title="New session" placement="bottom">
-        <SquarePen size={13} />
+        <SquarePen size={15} />
       </IconButton>
 
       {/* Sessions history dropdown */}
@@ -126,7 +126,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
           onClick={() => setSessionsOpen((v) => !v)}
           aria-expanded={sessionsOpen ? 'true' : 'false'}
         >
-          <History size={13} />
+          <History size={15} />
           {sessions.length > 0 && (
             <span className={`${styles.sessionsBadge} ${styles.sessionsBadgeAccent}`}>
               {sessions.length > 9 ? '9+' : sessions.length}
@@ -154,7 +154,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
                   >
                     <span className={styles.sessionTitle}>{s.title}</span>
                     <span className={styles.sessionMeta}>
-                      {s.messageCount} msg · {formatActivity(s.lastActivity)}
+                      {s.messageCount} msg Â· {formatActivity(s.lastActivity)}
                     </span>
                   </button>
                 ))}

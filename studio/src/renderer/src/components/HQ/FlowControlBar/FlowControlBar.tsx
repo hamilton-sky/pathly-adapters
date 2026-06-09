@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Play, Pause, SkipForward, ChevronsRight, Shuffle, RotateCcw, Square, Terminal, EyeOff } from 'lucide-react'
 import { useRunnerStore } from '../../../store/runnerStore'
 import { AbortConfirmStrip } from './AbortConfirmStrip'
@@ -69,24 +69,24 @@ export function FlowControlBar(): JSX.Element {
           }}
           extraClass={startEnabled ? styles.btnPrimary : ''}
         >
-          <Play size={12} />
+          <Play size={14} />
         </RunnerBtn>
         <RunnerBtn label="Pause" tooltip="Pause the running pipeline" enabled={pauseEnabled} onClick={() => { void postAction('pause') }}>
-          <Pause size={12} />
+          <Pause size={14} />
         </RunnerBtn>
         <RunnerBtn label="Resume" tooltip="Continue from where it paused" enabled={resumeEnabled} onClick={() => { void postAction('resume') }}>
-          <SkipForward size={12} />
+          <SkipForward size={14} />
         </RunnerBtn>
 
         <div className={styles.sep} />
 
         {/* Decision group */}
         <RunnerBtn label="Advance" tooltip="Skip past the current decision point" enabled={advanceEnabled} onClick={() => { void postAction('advance') }} extraClass={styles.btnDecision}>
-          <ChevronsRight size={12} />
+          <ChevronsRight size={14} />
         </RunnerBtn>
         <div className={styles.rerouteWrapper}>
           <RunnerBtn label="Reroute" tooltip="Switch to a different AI adapter mid-run" enabled={rerouteEnabled} onClick={() => setShowReroute((v) => !v)} extraClass={styles.btnDecision}>
-            <Shuffle size={12} />
+            <Shuffle size={14} />
           </RunnerBtn>
           {showReroute && rerouteEnabled && (
             <ReroutePopover onClose={() => setShowReroute(false)} onError={(msg) => setRunnerState({ errorMessage: msg })} />
@@ -99,32 +99,32 @@ export function FlowControlBar(): JSX.Element {
           onClick={() => { void postAction('retry', buildRunBody()) }}
           extraClass={styles.btnDecision}
         >
-          <RotateCcw size={12} />
+          <RotateCcw size={14} />
         </RunnerBtn>
 
         <div className={styles.sep} />
 
-        {/* Mode toggle — interactive vs headless */}
+        {/* Mode toggle â€” interactive vs headless */}
         <button
           type="button"
           className={[styles.btn, isInteractive ? styles.btnModeInteractive : styles.btnModeHeadless].join(' ')}
           aria-label={isInteractive ? 'Switch to headless mode' : 'Switch to interactive mode'}
-          title={isInteractive ? 'Interactive — visible PTY (click to switch to headless)' : 'Headless — background run (click to switch to interactive)'}
+          title={isInteractive ? 'Interactive â€” visible PTY (click to switch to headless)' : 'Headless â€” background run (click to switch to interactive)'}
           onClick={() => setRunnerMode(isInteractive ? 'headless' : 'interactive')}
         >
-          {isInteractive ? <Terminal size={12} /> : <EyeOff size={12} />}
+          {isInteractive ? <Terminal size={14} /> : <EyeOff size={14} />}
         </button>
 
         <div className={styles.sep} />
 
         {/* Abort */}
         <RunnerBtn label="Abort" tooltip="Stop the run completely" enabled={abortEnabled} onClick={() => setShowAbort((v) => !v)} abortStyle>
-          <Square size={12} />
+          <Square size={14} />
         </RunnerBtn>
       </div>
 
       {topic === null && (
-        <div className={styles.noTopicWarning}>No active feature — use /pathly go to start one</div>
+        <div className={styles.noTopicWarning}>No active feature â€” use /pathly go to start one</div>
       )}
 
       {showAbort && (

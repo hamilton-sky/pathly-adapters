@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { LayoutGrid, List } from 'lucide-react'
 import { useRunnerStore } from '../../store/runnerStore'
 import type { StageLogEntry, HistoricalRun } from '../../store/runnerStore'
@@ -27,15 +27,15 @@ export function OutputTab(): JSX.Element {
   }
 
   if (stageLog.length === 0 && runHistory.length === 0) {
-    return <div className={styles.empty}>No output yet — start a run to see stage results here.</div>
+    return <div className={styles.empty}>No output yet â€” start a run to see stage results here.</div>
   }
 
   return (
     <div className={styles.container}>
       <div className={styles.runHeader}>
-        <span className={styles.runTopic}>{topic ?? '—'}</span>
+        <span className={styles.runTopic}>{topic ?? 'â€”'}</span>
         <div className={styles.headerRight}>
-          <span className={styles.runMeta}>${cost.toFixed(3)} · {stageLog.length} stage{stageLog.length !== 1 ? 's' : ''}</span>
+          <span className={styles.runMeta}>${cost.toFixed(3)} Â· {stageLog.length} stage{stageLog.length !== 1 ? 's' : ''}</span>
           <div className={styles.viewToggle} role="group" aria-label="Output view mode">
             <button
               type="button"
@@ -43,7 +43,7 @@ export function OutputTab(): JSX.Element {
               onClick={() => handleViewMode('grid')}
               aria-label="Grid view"
             >
-              <LayoutGrid size={13} />
+              <LayoutGrid size={15} />
             </button>
             <button
               type="button"
@@ -51,7 +51,7 @@ export function OutputTab(): JSX.Element {
               onClick={() => handleViewMode('list')}
               aria-label="List view"
             >
-              <List size={13} />
+              <List size={15} />
             </button>
           </div>
         </div>
@@ -76,7 +76,7 @@ export function OutputTab(): JSX.Element {
 function HistoricalRunSection({ run, index, viewMode, onSelect }: { run: HistoricalRun; index: number; viewMode: ViewMode; onSelect: (e: StageLogEntry) => void }): JSX.Element {
   const [expanded, setExpanded] = useState(false)
   const stageCount = run.stageLog.length
-  const timeStr = run.runStartedAt ? new Date(run.runStartedAt).toLocaleTimeString() : '—'
+  const timeStr = run.runStartedAt ? new Date(run.runStartedAt).toLocaleTimeString() : 'â€”'
 
   return (
     <div className={styles.historicalRun}>
@@ -86,8 +86,8 @@ function HistoricalRunSection({ run, index, viewMode, onSelect }: { run: Histori
         onClick={() => setExpanded((v) => !v)}
         {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
-        <span className={styles.chevron}>{expanded ? '▼' : '▶'}</span>
-        <span className={styles.historicalRunLabel}>Run {index} — {stageCount} stage{stageCount !== 1 ? 's' : ''}</span>
+        <span className={styles.chevron}>{expanded ? 'â–¼' : 'â–¶'}</span>
+        <span className={styles.historicalRunLabel}>Run {index} â€” {stageCount} stage{stageCount !== 1 ? 's' : ''}</span>
         <span className={styles.rowMeta}>{timeStr}</span>
         <span className={styles.rowMeta}>${run.cost.toFixed(3)}</span>
       </button>

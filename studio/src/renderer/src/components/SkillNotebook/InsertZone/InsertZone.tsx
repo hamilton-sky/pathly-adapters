@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { Plus } from 'lucide-react'
 import styles from './InsertZone.module.css'
 
@@ -34,7 +34,7 @@ export default function InsertZone({
         aria-label="Insert cell here"
         onClick={onInsert}
       >
-        <Plus size={12} />
+        <Plus size={14} />
       </button>
     </div>
   )

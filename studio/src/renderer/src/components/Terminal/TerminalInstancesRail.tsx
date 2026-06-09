@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { ChevronDown, ExternalLink, Menu, Trash2, X } from 'lucide-react'
 import type { TerminalTab } from './types'
 import { ClaudeIcon, CodexIcon, ShellIcon } from './BrandIcons'
@@ -16,9 +16,9 @@ interface TerminalInstancesRailProps {
 }
 
 function TabBrandIcon({ kind }: { kind?: TerminalTab['kind'] }): JSX.Element | null {
-  if (kind === 'shell' || !kind) return <ShellIcon size={13} />
-  if (kind === 'claude') return <ClaudeIcon size={13} />
-  if (kind === 'codex') return <CodexIcon size={13} />
+  if (kind === 'shell' || !kind) return <ShellIcon size={15} />
+  if (kind === 'claude') return <ClaudeIcon size={15} />
+  if (kind === 'codex') return <CodexIcon size={15} />
   return null
 }
 
@@ -216,7 +216,7 @@ export function TerminalInstancesRail({
           title="Close instances panel"
           aria-label="Close instances panel"
         >
-          <Menu size={13} />
+          <Menu size={15} />
         </button>
       </div>
       <div className={styles.instancesList}>

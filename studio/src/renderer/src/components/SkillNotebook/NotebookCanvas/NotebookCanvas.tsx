@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+﻿import React, { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
@@ -84,14 +84,14 @@ export default function NotebookCanvas() {
               title="Add empty cell at bottom"
               onClick={() => handleInsert(cells.length > 0 ? cells[cells.length - 1].id : null)}
             >
-              <Plus size={13} />
+              <Plus size={15} />
               Add cell
             </button>
           </div>
         )}
         {skillName && (
           <p className={styles.nbMeta}>
-            {cells.length} cells · {cells.filter(c => c.type === 'body').length} body · {cells.filter(c => c.type === 'fragment').length} fragments
+            {cells.length} cells Â· {cells.filter(c => c.type === 'body').length} body Â· {cells.filter(c => c.type === 'fragment').length} fragments
           </p>
         )}
 

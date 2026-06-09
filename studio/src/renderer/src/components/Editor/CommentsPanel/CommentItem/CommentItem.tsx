@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+﻿import React, { useState, useRef, useEffect } from 'react'
 import { Check, X, Pencil, RotateCcw, Crosshair } from 'lucide-react'
 import { Tooltip } from '../../../ui'
 import type { Comment, CommentColor } from '../../useComments'
@@ -43,7 +43,7 @@ export function CommentItem({
 
   const canLocate = !comment.resolved && !isOrphaned
   const anchorFull = comment.lineText
-  const anchorShort = anchorFull.length > 55 ? `${anchorFull.slice(0, 55).trimEnd()}…` : anchorFull
+  const anchorShort = anchorFull.length > 55 ? `${anchorFull.slice(0, 55).trimEnd()}â€¦` : anchorFull
 
   return (
     <div
@@ -59,7 +59,7 @@ export function CommentItem({
       onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && canLocate && !editing) onScrollTo(comment.id) }}
       aria-label={`Comment ${index}: ${isOrphaned ? 'anchor lost' : anchorShort}`}
     >
-      {/* ── Top row: badge • anchor quote • action icons ── */}
+      {/* â”€â”€ Top row: badge â€¢ anchor quote â€¢ action icons â”€â”€ */}
       <div className={styles.topRow}>
         <span className={`${styles.badge} ${comment.resolved ? styles.resolvedBadge : ''}`}>
           {index}
@@ -69,47 +69,47 @@ export function CommentItem({
           className={`${styles.anchorQuote} ${isOrphaned ? styles.anchorLost : ''}`}
           title={isOrphaned ? 'Original anchor text not found in document' : anchorFull}
         >
-          {isOrphaned ? '⚠ anchor lost' : `"${anchorShort}"`}
+          {isOrphaned ? 'âš  anchor lost' : `"${anchorShort}"`}
         </span>
 
         <div className={styles.iconRow} onClick={(e) => e.stopPropagation()}>
           {canLocate && !editing && (
             <Tooltip label="Jump to anchor" placement="top">
               <button type="button" className={styles.iconBtn} aria-label="Jump to anchor" onClick={() => onScrollTo(comment.id)}>
-                <Crosshair size={13} />
+                <Crosshair size={15} />
               </button>
             </Tooltip>
           )}
           {!comment.resolved && !editing && (
             <Tooltip label="Resolve" placement="top">
               <button type="button" className={`${styles.iconBtn} ${styles.resolveBtn}`} aria-label="Resolve" onClick={() => onResolve(comment.id)}>
-                <Check size={13} />
+                <Check size={15} />
               </button>
             </Tooltip>
           )}
           {comment.resolved && !editing && (
             <Tooltip label="Reopen" placement="top">
               <button type="button" className={styles.iconBtn} aria-label="Reopen" onClick={() => onReopen(comment.id)}>
-                <RotateCcw size={13} />
+                <RotateCcw size={15} />
               </button>
             </Tooltip>
           )}
           {!editing && (
             <Tooltip label="Edit" placement="top">
               <button type="button" className={styles.iconBtn} aria-label="Edit" onClick={() => { setDraft(comment.body); setEditing(true) }}>
-                <Pencil size={13} />
+                <Pencil size={15} />
               </button>
             </Tooltip>
           )}
           <Tooltip label="Delete" placement="top">
             <button type="button" className={`${styles.iconBtn} ${styles.deleteBtn}`} aria-label="Delete" onClick={() => onRemove(comment.id)}>
-              <X size={13} />
+              <X size={15} />
             </button>
           </Tooltip>
         </div>
       </div>
 
-      {/* ── Comment body / edit area ── */}
+      {/* â”€â”€ Comment body / edit area â”€â”€ */}
       {editing ? (
         <>
           <textarea
@@ -122,7 +122,7 @@ export function CommentItem({
           />
           <div className={styles.editActions} onClick={(e) => e.stopPropagation()}>
             <button type="button" className={styles.saveBtn} disabled={!draft.trim()} onClick={handleSave}>
-              <Check size={12} /> Save
+              <Check size={14} /> Save
             </button>
             <button type="button" className={styles.cancelBtn} onClick={handleCancel}>
               Cancel

@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { LayoutGrid, Activity, BookOpen, Database } from 'lucide-react'
 import { useStore } from '../../store'
 import { Tooltip } from '../ui'
@@ -24,7 +24,7 @@ export function PanelNav(): JSX.Element {
             }
           }}
         >
-          <LayoutGrid size={13} />
+          <LayoutGrid size={15} />
           Canvas
         </button>
       </Tooltip>
@@ -39,7 +39,7 @@ export function PanelNav(): JSX.Element {
           className={`${styles.navBtn} ${activePanel === 'skill-notebook' ? styles.navBtnActive : ''} ${!skillNotebookPath ? styles.navBtnDisabled : ''}`}
           onClick={() => setActivePanel('skill-notebook')}
         >
-          <BookOpen size={13} />
+          <BookOpen size={15} />
           Notebook
         </button>
       </Tooltip>
@@ -51,7 +51,7 @@ export function PanelNav(): JSX.Element {
           className={`${styles.navBtn} ${activePanel === 'monitor' ? styles.navBtnActive : ''}`}
           onClick={() => setActivePanel('monitor')}
         >
-          <Activity size={13} />
+          <Activity size={15} />
           Monitor
         </button>
       </Tooltip>
@@ -62,7 +62,7 @@ export function PanelNav(): JSX.Element {
           className={`${styles.navBtn} ${activePanel === 'db-explorer' ? styles.navBtnActive : ''}`}
           onClick={() => setActivePanel('db-explorer')}
         >
-          <Database size={13} />
+          <Database size={15} />
           DB Explorer
         </button>
       </Tooltip>
