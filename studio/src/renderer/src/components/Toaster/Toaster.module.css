@@ -10,8 +10,8 @@
 
 .posBottomRight { bottom: 20px; right: 20px; }
 .posBottomLeft  { bottom: 20px; left: 20px; }
-.posTopRight    { top: 20px; right: 20px; }
-.posTopLeft     { top: 20px; left: 20px; }
+.posTopRight    { top: 48px; right: 20px; }
+.posTopLeft     { top: 48px; left: 20px; }
 
 .containerBannerBottom { left: 0; right: 0; bottom: 0; gap: 2px; }
 .containerBannerTop    { left: 0; right: 0; top: 0; gap: 2px; }

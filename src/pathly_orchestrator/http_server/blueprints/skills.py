@@ -780,7 +780,8 @@ def skills_save():
                 parts.append(content)
         markdown = "\n\n".join(parts) + "\n" if parts else ""
 
-        # Write to disk
+        # Write to disk (create parent dir if it was deleted)
+        Path(skill_path).parent.mkdir(parents=True, exist_ok=True)
         Path(skill_path).write_text(markdown, encoding="utf-8")
 
         # Derive skill key from path (e.g. "development/build")

@@ -13,7 +13,7 @@ from pathly_orchestrator.db import append_event as _db_append_event
 from pathly_orchestrator.db.connection import get_db as _get_db
 from pathly_orchestrator.feature_flags import flags
 from pathly_telemetry.storage import append_activity
-from ..pricing import MODEL_PRICING
+from ..telemetry_registry import PricingRegistry
 
 bp = Blueprint("telemetry", __name__)
 
@@ -143,23 +143,20 @@ def record_activity_endpoint():
                 400,
             )
 
-        # Server-side cost computation: if cost_usd is 0.0 but model + tokens are provided,
-        # compute using the canonical Pathly pricing table (same table as log-agent-done skill).
-        # Covers any adapter that passes model + tokens but not cost_usd.
-        if float(cost_usd_val) == 0.0:
-            _model = str(data.get("model", ""))
-            _total = int(data.get("total_tokens", 0)) or int(data.get("input_tokens", 0)) + int(data.get("output_tokens", 0))
-            if _model and _total > 0:
-                _in_rate, _out_rate = next(
-                    (v for k, v in MODEL_PRICING.items() if _model.startswith(k)),
-                    (0.0, 0.0),
-                )
-                if _in_rate > 0:
-                    _in_tok  = int(data.get("input_tokens",  0)) or round(_total * 0.8)
-                    _out_tok = int(data.get("output_tokens", 0)) or round(_total * 0.2)
-                    cost_usd_val = round(
-                        (_in_tok / 1_000_000 * _in_rate) + (_out_tok / 1_000_000 * _out_rate), 6
-                    )
+        # Resolve cost_source and optionally compute cost via PricingRegistry.
+        _model = str(data.get("model", ""))
+        _provider = str(data.get("provider", "")) or _infer_adapter(_model)
+        if not data.get("provider"):
+            logger.warning("record_activity: 'provider' field absent; inferred %r from model %r", _provider, _model)
+
+        if float(cost_usd_val) > 0.0:
+            cost_source = "provider_reported"
+        else:
+            _tokens_in  = int(data.get("input_tokens",  0) or data.get("tokens_in",  0))
+            _tokens_out = int(data.get("output_tokens", 0) or data.get("tokens_out", 0))
+            _computed, cost_source = PricingRegistry().compute(_provider, _model, _tokens_in, _tokens_out)
+            if cost_source == "estimated":
+                cost_usd_val = _computed
 
         wall_seconds = int(data.get("wall_seconds", 0))
         duration_ms = int(data.get("duration_ms", 0))
@@ -260,10 +257,16 @@ def record_activity_endpoint():
             except Exception:
                 logger.debug("otel_spans local write error", exc_info=True)
 
-        return jsonify({"status": "recorded"}), 200
+        return jsonify({"status": "recorded", "cost_source": cost_source}), 200
     except Exception as e:
         logging.exception("record_activity error")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
+@bp.route("/telemetry/pricing", methods=["GET"])
+def pricing_endpoint():
+    """Return the full provider pricing table."""
+    return jsonify({"providers": PricingRegistry().all_providers()}), 200
 
 
 @bp.route("/record_phase", methods=["POST"])

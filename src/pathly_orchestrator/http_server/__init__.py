@@ -65,7 +65,8 @@ from .feedback import (
 )
 
 # Re-export pricing symbols
-from .pricing import MODEL_PRICING, compute_cost_usd
+from .pricing import compute_cost_usd
+from .telemetry_registry import PricingRegistry
 
 # Re-export FSM functions that tests patch via this module's namespace
 from pathly_orchestrator.fsm_ops import next_action, complete_stage
@@ -114,8 +115,8 @@ __all__ = [
     "_process_feedback_file",
     "_feedback_watcher",
     # pricing
-    "MODEL_PRICING",
     "compute_cost_usd",
+    "PricingRegistry",
     # fsm
     "next_action",
     "complete_stage",
