@@ -1,2 +1,2 @@
 RESULT: PASS
-Conv 2 (Phases 4–7): DB migration columns verified in :memory: DB, eventlog round-trip preserves cost_source/cache_read_tokens, storage.py writes provider+cost_source to JSONL; 469 tests pass, 6 pre-existing failures unchanged.
+Conv 3 (Phases 8–10): stop_telemetry.py EVENTS.jsonl patching removed (0 grep matches), gen_ai.vendor attribute added to otel_export.py (line 67), log-agent-done.md inline pricing table removed (0 rate-value matches); 474 tests pass, 1 pre-existing Windows concurrency flake unchanged.

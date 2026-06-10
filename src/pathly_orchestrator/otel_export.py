@@ -13,6 +13,15 @@ _STATUS_OK = 1
 _STATUS_ERROR = 2
 
 
+def _infer_vendor(model: str) -> str:
+    """Return provider slug from model name prefix, or 'unknown'."""
+    from pathly_orchestrator.http_server.telemetry_registry import _ADAPTER_PREFIXES
+    for prefixes, slug in _ADAPTER_PREFIXES:
+        if any(model.startswith(p) for p in prefixes):
+            return slug
+    return "unknown"
+
+
 def _service_version() -> str:
     try:
         return _pkg_version("pathly-adapters")
@@ -25,6 +34,7 @@ def _build_span_payload(event: dict) -> dict:
     span_id = event.get("span_id", "") or secrets.token_hex(8)
     agent = event.get("agent", "")
     feature = event.get("feature", "")
+    vendor = event.get("provider", "") or _infer_vendor(str(event.get("model", "")))
 
     ts_str = event.get("ts", "")
     try:
@@ -54,6 +64,7 @@ def _build_span_payload(event: dict) -> dict:
         {"key": "pathly.cost_usd", "value": {"doubleValue": float(event.get("cost_usd", 0.0) or 0.0)}},
         {"key": "pathly.tool_uses", "value": {"intValue": int(event.get("tool_uses", 0) or 0)}},
         {"key": "pathly.result", "value": {"stringValue": str(event.get("result", ""))}},
+        {"key": "gen_ai.vendor", "value": {"stringValue": vendor}},
     ]
 
     return {

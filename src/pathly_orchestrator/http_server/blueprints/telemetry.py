@@ -216,6 +216,7 @@ def record_activity_endpoint():
                     "cost_usd": float(cost_usd_val),
                     "wall_seconds": wall_seconds,
                     "model": str(data.get("model", "")),
+                    "provider": _provider,
                     "conversation": data.get("conversation"),
                     "summary": str(data.get("summary", "")),
                     "trace_id": str(data.get("trace_id", "")),

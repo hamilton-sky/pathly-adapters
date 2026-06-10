@@ -41,43 +41,10 @@ Build `summary` if not provided: `"<agent> conv <conversation> <result>"`
 
 ## Step 2 — Compute cost_usd
 
-**Priority 1 — Caller-provided cost:**
-If `cost_usd` is present in `$ARGUMENTS` and is a number, use it directly. Skip pricing table.
-
-**Priority 2 — Claude pricing table (Anthropic models only):**
-
-Only applies if model starts with `claude-`. Pricing per million tokens (as of 2025):
-
-| Model prefix | Input $/MTok | Output $/MTok |
-|---|---|---|
-| `claude-opus-4` | 15.00 | 75.00 |
-| `claude-sonnet-4` | 3.00 | 15.00 |
-| `claude-haiku-4` | 0.80 | 4.00 |
-| `claude-*` (other/unknown) | 3.00 | 15.00 |
-
-If both `input_tokens` and `output_tokens` are provided and > 0:
-```
-cost_usd = (input_tokens / 1_000_000 * input_rate) + (output_tokens / 1_000_000 * output_rate)
-```
-
-Else if only `total_tokens` > 0, approximate with 80/20 split:
-```
-input_est  = total_tokens * 0.80
-output_est = total_tokens * 0.20
-cost_usd   = (input_est / 1_000_000 * input_rate) + (output_est / 1_000_000 * output_rate)
-```
-
-**Priority 3 — Non-Claude / unknown models:**
-If model does not start with `claude-` and `cost_usd` was not provided:
-- Set `cost_usd = 0.0`
-- Set `cost_note = "cost not computed — pass cost_usd directly for non-Claude models"`
-- Print: `log-agent-done: cost_usd not computed for model "<model>" — pass cost_usd in arguments if available`
-
-**Final:** Round `cost_usd` to 6 decimal places.
+Pass `cost_usd` from the provider's output payload. Do not compute cost in the skill. The server resolves cost via the pricing registry.
 
 Set `tokens_in` and `tokens_out`:
 - If `input_tokens` / `output_tokens` provided: use directly
-- If only `total_tokens`: `tokens_in = round(total_tokens * 0.80)`, `tokens_out = round(total_tokens * 0.20)`
 - Else: both 0
 
 ## Step 3 — Write AGENT_DONE via HTTP endpoint (primary) with DB/EVENTS.jsonl fallback

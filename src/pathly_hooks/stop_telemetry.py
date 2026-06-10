@@ -4,9 +4,6 @@ Claude Code fires this when the model stops. The payload on stdin contains
 session usage data (tokens, cost). We find the most recently active feature
 in the DB and append a BILLING_UPDATE event so Studio can display real costs.
 
-Also supports legacy EVENTS.jsonl patching for repos that still write files
-(PATHLY_DB_ONLY=0).
-
 Exits 0 always — telemetry failure must never block the user.
 """
 
@@ -40,59 +37,12 @@ def _find_active_feature_dir_db(project_root: str) -> Path | None:
     return None
 
 
-def _find_active_events_file(project_root: str) -> Path | None:
-    """Return the most recently modified EVENTS.jsonl under pathly/plans/ (legacy)."""
-    plans = Path(project_root) / "pathly" / "plans"
-    if not plans.exists():
-        return None
-    candidates = [p for p in plans.rglob("EVENTS.jsonl") if ".archive" not in p.parts]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
-
-
-def _patch_last_agent_done_file(
-    events_file: Path,
-    tokens_in: int,
-    tokens_out: int,
-    cost_usd: float,
-) -> bool:
-    """Patch the last AGENT_DONE line in EVENTS.jsonl (legacy path). Returns True if patched."""
-    try:
-        lines = events_file.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return False
-
-    for i in range(len(lines) - 1, -1, -1):
-        line = lines[i].strip()
-        if not line:
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if event.get("type") == "AGENT_DONE":
-            if event.get("tokens_in", 0) == 0 and event.get("cost_usd", 0.0) == 0.0:
-                event["tokens_in"] = tokens_in
-                event["tokens_out"] = tokens_out
-                event["cost_usd"] = round(cost_usd, 6)
-                lines[i] = json.dumps(event)
-                tmp = events_file.with_suffix(".tmp")
-                try:
-                    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                    tmp.replace(events_file)
-                    return True
-                except OSError:
-                    tmp.unlink(missing_ok=True)
-            return False
-    return False
-
-
 def _write_billing_update_db(
     feature_dir: Path,
     tokens_in: int,
     tokens_out: int,
     cost_usd: float,
+    cost_source: str,
 ) -> bool:
     """Append a BILLING_UPDATE event to the DB for the last AGENT_DONE.
 
@@ -136,6 +86,7 @@ def _write_billing_update_db(
             "wall_seconds": 0,
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "schema_version": 1,
+            "cost_source": cost_source,
         }
         _db_ae(conn, project_root, feature, billing)
         conn.commit()
@@ -176,19 +127,12 @@ def main() -> None:
     if not project_root:
         sys.exit(0)
 
-    # Try legacy EVENTS.jsonl path first (PATHLY_DB_ONLY=0 repos)
-    events_file = _find_active_events_file(project_root)
-    if events_file:
-        _patch_last_agent_done_file(events_file, tokens_in, tokens_out, cost_usd)
-        # Also write BILLING_UPDATE to DB so Studio sees it
-        feature_dir = events_file.parent
-        _write_billing_update_db(feature_dir, tokens_in, tokens_out, cost_usd)
-        sys.exit(0)
+    cost_source = "provider_reported" if cost_usd > 0 else "unpriced"
 
-    # DB-only mode: find active feature from DB and write BILLING_UPDATE
+    # Find active feature from DB and write BILLING_UPDATE
     feature_dir = _find_active_feature_dir_db(project_root)
     if feature_dir:
-        _write_billing_update_db(feature_dir, tokens_in, tokens_out, cost_usd)
+        _write_billing_update_db(feature_dir, tokens_in, tokens_out, cost_usd, cost_source)
 
     sys.exit(0)
 
