@@ -24,6 +24,14 @@ interface ContentProps extends Props {
 
 function DiffContent({ originalPath, draftPath, onApply, onClose, onDiscard, onRetry }: ContentProps) {
   const diff = useDraftDiff(originalPath, draftPath)
+  const pushToast = useToastStore((s) => s.push)
+
+  useEffect(() => {
+    if (!diff.loading && !diff.error && diff.totalChanged === 0) {
+      pushToast('No changes detected — draft is identical to the original', 'info')
+      onClose()
+    }
+  }, [diff.loading, diff.error, diff.totalChanged, onClose, pushToast])
 
   if (diff.loading) {
     return <div className={styles.state}>Loading diff…</div>
@@ -44,14 +52,6 @@ function DiffContent({ originalPath, draftPath, onApply, onClose, onDiscard, onR
       </div>
     )
   }
-
-  const pushToast = useToastStore((s) => s.push)
-  useEffect(() => {
-    if (!diff.loading && !diff.error && diff.totalChanged === 0) {
-      pushToast('No changes detected — draft is identical to the original', 'info')
-      onClose()
-    }
-  }, [diff.loading, diff.error, diff.totalChanged, onClose, pushToast])
 
   if (diff.totalChanged === 0) {
     return null

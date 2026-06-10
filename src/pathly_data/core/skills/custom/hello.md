@@ -1,8 +1,9 @@
+---
+
+---
 # Hello
 
-hello me name is shammai cna you tell ma
-about what you think about me ?
+Once there was a person named Shammai who walked into a room and introduced himself with a warm smile. He looked around at the people gathered there and asked, simply and sincerely, what they thought of him — not out of vanity, but out of genuine curiosity about how the world saw him.
 
-seo what do you htink ???
-check this ???
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+So what do you think?
+Check this.
