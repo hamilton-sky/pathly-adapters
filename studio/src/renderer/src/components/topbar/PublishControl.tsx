@@ -33,7 +33,7 @@ export function PublishControl({ onShowLog }: Props): JSX.Element {
   }
 
   return (
-    <Tooltip label={error ?? 'Install latest Pathly update from PyPI'} placement="bottom">
+    <Tooltip label={error ?? 'Upgrade pathly-adapters from PyPI, then sync agents/skills/templates to all adapters'} placement="bottom">
       <button type="button" className={styles.publishBtn} onClick={() => void handleUpgrade()} disabled={publishing}>
         {publishing ? '…' : error ? 'Retry' : 'Update'}
       </button>

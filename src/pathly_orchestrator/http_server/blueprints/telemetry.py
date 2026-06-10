@@ -171,6 +171,8 @@ def record_activity_endpoint():
                 total_tokens=int(data.get("total_tokens", 0)),
                 model=_model,
                 adapter=_adapter,
+                provider=_provider,
+                cost_source=cost_source,
             )
 
         trace_id = data.get("trace_id", "")

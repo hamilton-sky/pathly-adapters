@@ -117,9 +117,20 @@ export function registerShellHandlers(win: BrowserWindow): void {
 
   ipcMain.handle('shell:upgrade', (_event) => {
     const python = getPythonPath()
-    const proc = spawn(python, ['-m', 'pip', 'install', '--upgrade', 'pathly-adapters'], { stdio: 'pipe' })
-    proc.stdout?.on('data', (d: Buffer) => win.webContents.send('shell:output', d.toString()))
-    proc.stderr?.on('data', (d: Buffer) => win.webContents.send('shell:output', d.toString()))
-    return new Promise((resolve) => proc.on('close', resolve))
+    const send = (d: Buffer): void => win.webContents.send('shell:output', d.toString())
+
+    return new Promise<number | null>((resolve) => {
+      const pip = spawn(python, ['-m', 'pip', 'install', '--upgrade', 'pathly-adapters'], { stdio: 'pipe' })
+      pip.stdout?.on('data', send)
+      pip.stderr?.on('data', send)
+      pip.on('close', (code) => {
+        if (code !== 0) { resolve(code); return }
+        win.webContents.send('shell:output', '\nDeploying agents, skills and templates to adapters…\n')
+        const deploy = spawn(python, ['-m', 'install_cli', '--apply', '--repair'], { stdio: 'pipe' })
+        deploy.stdout?.on('data', send)
+        deploy.stderr?.on('data', send)
+        deploy.on('close', resolve)
+      })
+    })
   })
 }

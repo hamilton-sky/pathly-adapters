@@ -145,7 +145,7 @@ git diff HEAD -- . ":(exclude)pathly/plans/"
   Builder claimed to fix REVIEW_FAILURES.md but no code changed.
   Human decision required: accept as-is, override the rule, or rewrite the conversation scope.
   ```
-  Log `{"type": "NO_DIFF_DETECTED"}` via `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'NO_DIFF_DETECTED','ts':'<iso-timestamp>'})"`.
+  Log `{"type": "NO_DIFF_DETECTED", "ts": "<iso-timestamp>"}` via `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'NO_DIFF_DETECTED','ts':'<iso-timestamp>'})"`.
   Stop: "Zero-diff loop detected for Conv N. Escalated to HUMAN_QUESTIONS.md."
 - If output is **non-empty**: re-run from Phase 1 — Analyze above.
 
