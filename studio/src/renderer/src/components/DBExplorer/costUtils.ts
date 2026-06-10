@@ -1,17 +1,52 @@
-const RATES: Array<[string, number, number]> = [
-  ['claude-opus-4',     5.00, 25.00],
-  ['claude-sonnet-4-6', 3.00, 15.00],
-  ['claude-sonnet-4',   3.00, 15.00],
-  ['claude-haiku-4',    1.00,  5.00],
-]
-
-export function computeCost(model: string, tokensIn: number, tokensOut: number, totalTokens = 0): number {
-  const m = model.toLowerCase()
-  const match = RATES.find(([prefix]) => m.startsWith(prefix))
-  const [, inRate, outRate] = match ?? ['', 3.00, 15.00]
-  if (tokensIn === 0 && tokensOut === 0 && totalTokens > 0) {
-    // tokens_in/tokens_out absent — approximate with 80% in / 20% out (matches server telemetry.py)
-    return (totalTokens * 0.8 / 1_000_000) * inRate + (totalTokens * 0.2 / 1_000_000) * outRate
+export type PricingTable = {
+  providers: {
+    [provider: string]: {
+      [modelPrefix: string]: { input: number; output: number }
+    }
   }
-  return (tokensIn / 1_000_000) * inRate + (tokensOut / 1_000_000) * outRate
+}
+
+export type CostResult = {
+  cost: number | null
+  source: 'provider_reported' | 'estimated' | 'unpriced' | null
+}
+
+export async function fetchPricingTable(): Promise<PricingTable | null> {
+  try {
+    const res = await fetch('http://127.0.0.1:8765/telemetry/pricing')
+    if (!res.ok) return null
+    return (await res.json()) as PricingTable
+  } catch {
+    return null
+  }
+}
+
+export function computeCost(
+  model: string,
+  tokensIn: number,
+  tokensOut: number,
+  table: PricingTable | null,
+): CostResult {
+  if (table === null) return { cost: null, source: null }
+  if (tokensIn === 0 && tokensOut === 0) return { cost: null, source: 'unpriced' }
+
+  const m = model.toLowerCase()
+  for (const providerRates of Object.values(table.providers)) {
+    let bestPrefix = ''
+    let bestRates: { input: number; output: number } | null = null
+    for (const [prefix, rates] of Object.entries(providerRates)) {
+      if (m.startsWith(prefix) && prefix.length > bestPrefix.length) {
+        bestPrefix = prefix
+        bestRates = rates
+      }
+    }
+    if (bestRates !== null) {
+      const cost =
+        (tokensIn / 1_000_000) * bestRates.input +
+        (tokensOut / 1_000_000) * bestRates.output
+      return { cost, source: 'estimated' }
+    }
+  }
+
+  return { cost: null, source: 'unpriced' }
 }

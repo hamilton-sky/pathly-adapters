@@ -109,8 +109,8 @@ TYPE_BILLING_UPDATE = "BILLING_UPDATE"
 #           "cost_usd": float, "tokens_in": int, "tokens_out": int,
 #           "total_tokens": int, "wall_seconds": int, "tool_uses": int,
 #           "ts": str (ISO-8601)}
-# Appended after _patch_last_agent_done rewrites an AGENT_DONE line in-place,
-# so the SSE forward-tailer re-broadcasts the corrected values to Studio.
+# Appended by _patch_last_agent_done to augment an AGENT_DONE with real cost/token data;
+# SSE forward-tailer re-broadcasts the new row to Studio. (Append-only; no in-place mutation.)
 #
 # BILLING_UPDATE required: agent, conversation, cost_usd, tokens_in, tokens_out,
 #   total_tokens, wall_seconds, ts

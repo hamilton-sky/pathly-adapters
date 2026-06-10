@@ -164,3 +164,7 @@
 .statCost {
   color: var(--green);
 }
+
+.statCostNull {
+  color: var(--text-muted);
+}

@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import styles from './InspectTab.module.css'
 import { computeCost } from '../costUtils'
+import type { PricingTable } from '../costUtils'
 
 interface InspectTabProps {
   events: DbEvent[]
+  pricingTable: PricingTable | null
 }
 
 function typeCategory(type: string): string {
@@ -21,10 +23,10 @@ interface TypeStat {
   count: number
   firstTs: string
   lastTs: string
-  totalCost?: number
+  totalCost?: number | null
 }
 
-export function InspectTab({ events }: InspectTabProps): JSX.Element {
+export function InspectTab({ events, pricingTable }: InspectTabProps): JSX.Element {
   const allTypes = useMemo(
     () => Array.from(new Set(events.map((e) => e.event_type))).sort(),
     [events],
@@ -44,24 +46,41 @@ export function InspectTab({ events }: InspectTabProps): JSX.Element {
     return Array.from(map.entries())
       .map(([type, evts]) => {
         const sorted = [...evts].sort((a, b) => a.seq - b.seq)
+        let totalCost: number | null | undefined = undefined
+        if (type === 'AGENT_DONE') {
+          let sum = 0
+          let allNull = true
+          for (const e of evts) {
+            const p = e.payload as Record<string, unknown>
+            const stored = Number(p.cost_usd ?? 0)
+            if (stored > 0) {
+              sum += stored
+              allNull = false
+            } else {
+              const result = computeCost(
+                String(p.model ?? ''),
+                Number(p.tokens_in ?? 0),
+                Number(p.tokens_out ?? 0),
+                pricingTable,
+              )
+              if (result.cost !== null) {
+                sum += result.cost
+                allNull = false
+              }
+            }
+          }
+          totalCost = allNull ? null : sum
+        }
         return {
           type,
           count: evts.length,
           firstTs: sorted[0]?.ts.slice(11, 19) ?? '—',
           lastTs: sorted[sorted.length - 1]?.ts.slice(11, 19) ?? '—',
-          totalCost: type === 'AGENT_DONE'
-            ? evts.reduce((s, e) => {
-                const p = e.payload as Record<string, unknown>
-                const stored = Number(p.cost_usd ?? 0)
-                return s + (stored > 0
-                  ? stored
-                  : computeCost(String(p.model ?? ''), Number(p.tokens_in ?? 0), Number(p.tokens_out ?? 0), Number(p.total_tokens ?? 0)))
-              }, 0)
-            : undefined,
+          totalCost,
         }
       })
       .sort((a, b) => b.count - a.count)
-  }, [events])
+  }, [events, pricingTable])
 
   const maxCount = Math.max(...stats.map((s) => s.count), 1)
   const activeStats = stats.filter((s) => !disabled.has(s.type))
@@ -128,7 +147,9 @@ export function InspectTab({ events }: InspectTabProps): JSX.Element {
                     ? stat.firstTs
                     : `${stat.firstTs} → ${stat.lastTs}`}
                   {stat.totalCost !== undefined && (
-                    <b className={styles.statCost}> · ${stat.totalCost.toFixed(2)}</b>
+                    stat.totalCost !== null
+                      ? <b className={styles.statCost}> · ${stat.totalCost.toFixed(2)}</b>
+                      : <b className={styles.statCostNull}> · —</b>
                   )}
                 </span>
               </div>

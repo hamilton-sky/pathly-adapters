@@ -3,7 +3,7 @@ name: Progress
 ---
 # Provider-Agnostic Telemetry — Progress
 
-## Status: CONV 2 DONE
+## Status: CONV 3 DONE
 
 ## Story Status
 
@@ -26,7 +26,7 @@ name: Progress
 |---|---|---|---|---|
 | 1 | Ph0–Ph3 | S1.1, S1.2, S1.3 | DONE | `curl -s http://127.0.0.1:8765/telemetry/pricing \| python -m json.tool` |
 | 2 | Ph4–Ph7 | S2.1, S2.2, S2.3 | DONE | `python -m pytest tests/ -q` |
-| 3 | Ph8–Ph10 | S3.1, S3.2, S3.3 | TODO | `grep -rn "EVENTS.jsonl" src/pathly_hooks/stop_telemetry.py` (→ 0) |
+| 3 | Ph8–Ph10 | S3.1, S3.2, S3.3 | DONE | `grep -rn "EVENTS.jsonl" src/pathly_hooks/stop_telemetry.py` (→ 0) |
 | 4 | Ph11 | S4.1 | TODO | `cd studio && npx tsc --noEmit` |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.

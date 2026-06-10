@@ -83,6 +83,13 @@
   text-align: right;
 }
 
+.barCostNull {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  text-align: right;
+}
+
 /* ── Role tag ────────────────────────────────────────────────── */
 .roleTag {
   font-family: var(--font-family-mono);
@@ -172,6 +179,14 @@
   font-family: var(--font-family-mono);
   font-size: var(--font-size-sm);
   color: var(--green);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tdCostNull {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
   text-align: right;
   white-space: nowrap;
 }

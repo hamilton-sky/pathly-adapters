@@ -1,2 +1,2 @@
 RESULT: PASS
-Conv 3 (Phases 8–10): stop_telemetry.py EVENTS.jsonl patching removed (0 grep matches), gen_ai.vendor attribute added to otel_export.py (line 67), log-agent-done.md inline pricing table removed (0 rate-value matches); 474 tests pass, 1 pre-existing Windows concurrency flake unchanged.
+Conv 4 (Phase 11): costUtils.ts hardcoded RATES removed (0 stale-rate matches), fetchPricingTable() and new computeCost(model, tokensIn, tokensOut, table) implemented, FeatureModal.tsx fetches on mount, AgentsTab+InspectTab render — when cost is null; tsc --noEmit 0 TS errors.

@@ -6,6 +6,8 @@ import { AgentsTab } from '../AgentsTab'
 import { EventsTab } from '../EventsTab'
 import { InspectTab } from '../InspectTab'
 import { TracesTab } from '../TracesTab'
+import { fetchPricingTable } from '../costUtils'
+import type { PricingTable } from '../costUtils'
 import styles from './FeatureModal.module.css'
 
 type TabId = 'timeline' | 'events' | 'agents' | 'inspect' | 'traces'
@@ -60,6 +62,11 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
   const [data, setData] = useState<ModalData>(EMPTY)
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [pricingTable, setPricingTable] = useState<PricingTable | null>(null)
+
+  useEffect(() => {
+    fetchPricingTable().then(setPricingTable)
+  }, [])
 
   useEffect(() => {
     if (!feature) { setData(EMPTY); return }
@@ -113,9 +120,9 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
               : <>
                   {activeTab === 'timeline' && <TimelineTab transitions={data.transitions} />}
                   {activeTab === 'events'   && <EventsTab events={data.rawEvents} />}
-                  {activeTab === 'agents'   && <AgentsTab events={data.rawEvents} />}
+                  {activeTab === 'agents'   && <AgentsTab events={data.rawEvents} pricingTable={pricingTable} />}
                   {activeTab === 'traces'   && <TracesTab spans={data.otelSpans} />}
-                  {activeTab === 'inspect'  && <InspectTab events={data.rawEvents} />}
+                  {activeTab === 'inspect'  && <InspectTab events={data.rawEvents} pricingTable={pricingTable} />}
                 </>
             }
           </div>
