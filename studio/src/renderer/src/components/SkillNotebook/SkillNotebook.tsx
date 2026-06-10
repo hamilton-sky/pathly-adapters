@@ -10,9 +10,9 @@ import { Editor } from '../Editor'
 import { usePreviewResize } from './usePreviewResize'
 
 const STEPS = [
-  { icon: ArrowLeft, label: 'Go to FILES in the sidebar', sub: 'Switch to the FILES tab on the left' },
-  { icon: FileText, label: 'Click any .md file', sub: 'Skills, agents, templates, plan files…' },
-  { icon: Sparkles, label: 'Edit in notebook mode', sub: 'Drag fragments, preview, export' },
+  { icon: ArrowLeft, label: 'Open the Files tab on the left', sub: 'Click the FILES icon in the sidebar' },
+  { icon: FileText, label: 'Click any skill .md file', sub: 'Skills, agents, templates…' },
+  { icon: Sparkles, label: 'Edit visually or in source', sub: 'Rearrange cells, preview, add comments, export' },
 ]
 
 export default function SkillNotebookPanel() {
@@ -30,7 +30,7 @@ export default function SkillNotebookPanel() {
           <ArrowLeft size={28} />
         </div>
         <BookOpen size={28} className={styles.emptyIcon} />
-        <p className={styles.emptyTitle}>Open a skill to get started</p>
+        <p className={styles.emptyTitle}>No file open — pick one from the Files sidebar</p>
         <ol className={styles.emptySteps}>
           {STEPS.map(({ icon: Icon, label, sub }, i) => (
             <li key={i} className={styles.emptyStep}>
@@ -55,9 +55,9 @@ export default function SkillNotebookPanel() {
       />
 
       {viewMode === 'editor' ? (
-        /* Full editor — raw source view with its own edit/preview/split toggle */
+        /* Source view — Editor in embedded mode; NotebookHeader owns the action bar */
         <div className={styles.editorWrapper}>
-          <Editor path={skillNotebookPath} />
+          <Editor path={skillNotebookPath} embedded />
         </div>
       ) : (
         /* Notebook cells + live preview panel */

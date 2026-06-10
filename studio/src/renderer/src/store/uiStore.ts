@@ -40,9 +40,24 @@ export interface UiState {
   skillNotebookPath: string | null
   skillNotebookViewMode: 'cells' | 'editor'
   notebookPreviewOpen: boolean
+  /** Draft path known to the embedded source editor — null when no draft exists */
+  notebookDraftPath: string | null
+  /** Increment to request the embedded source editor to save */
+  notebookSaveRequested: number
+  /** Increment to request the embedded source editor to open its draft diff viewer */
+  notebookOpenDraftRequested: number
+  /** Increment to request the embedded source editor to undo */
+  notebookUndoRequested: number
+  /** Increment to request the embedded source editor to redo */
+  notebookRedoRequested: number
   setSidebarCollapsed: (v: boolean) => void
   setSkillNotebookViewMode: (mode: 'cells' | 'editor') => void
   toggleNotebookPreview: () => void
+  setNotebookDraftPath: (p: string | null) => void
+  requestNotebookSave: () => void
+  requestNotebookOpenDraft: () => void
+  requestNotebookUndo: () => void
+  requestNotebookRedo: () => void
   setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer') => void
   setSkillNotebookPath: (path: string | null) => void
   markDirty: (path: string) => void
@@ -78,8 +93,18 @@ export const useUiStore = create<UiState>()(
       skillNotebookPath: null,
       skillNotebookViewMode: 'cells',
       notebookPreviewOpen: true,
+      notebookDraftPath: null,
+      notebookSaveRequested: 0,
+      notebookOpenDraftRequested: 0,
+      notebookUndoRequested: 0,
+      notebookRedoRequested: 0,
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       toggleNotebookPreview: () => set((s) => ({ notebookPreviewOpen: !s.notebookPreviewOpen })),
+      setNotebookDraftPath: (p) => set({ notebookDraftPath: p }),
+      requestNotebookSave: () => set((s) => ({ notebookSaveRequested: s.notebookSaveRequested + 1 })),
+      requestNotebookOpenDraft: () => set((s) => ({ notebookOpenDraftRequested: s.notebookOpenDraftRequested + 1 })),
+      requestNotebookUndo: () => set((s) => ({ notebookUndoRequested: s.notebookUndoRequested + 1 })),
+      requestNotebookRedo: () => set((s) => ({ notebookRedoRequested: s.notebookRedoRequested + 1 })),
       setActivePanel: (p) => set({ activePanel: p }),
       setSkillNotebookPath: (path) => set({ skillNotebookPath: path }),
       setSkillNotebookViewMode: (mode) => set({ skillNotebookViewMode: mode }),

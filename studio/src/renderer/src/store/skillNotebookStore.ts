@@ -26,6 +26,8 @@ interface SkillNotebookState {
   cells: NotebookCell[]
   history: NotebookCell[][]
   historyIndex: number
+  /** historyIndex at the time of the last successful save (or initial load) */
+  savedHistoryIndex: number
   featurePath: string | null
   compositionKey: string
   previewSections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>
@@ -34,6 +36,8 @@ interface SkillNotebookState {
   pushCells: (cells: NotebookCell[]) => void
   undo: () => void
   redo: () => void
+  /** Call after a successful save or after loadSkill to mark the current state as clean */
+  markCellsSaved: () => void
   setFeaturePath: (path: string | null) => void
   setPreview: (sections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>, tokens: number) => void
   setPreviewLoading: (loading: boolean) => void
@@ -51,6 +55,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
   cells: [],
   history: [],
   historyIndex: -1,
+  savedHistoryIndex: -1,
   featurePath: null,
   compositionKey: '',
   previewSections: [],
@@ -75,6 +80,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
     const newIndex = historyIndex + 1
     set({ cells: history[newIndex], historyIndex: newIndex })
   },
+  markCellsSaved: () => set({ savedHistoryIndex: get().historyIndex }),
   setFeaturePath: (path) => set({ featurePath: path }),
   setPreview: (sections, tokens) => set({ previewSections: sections, previewTokens: tokens, previewLoading: false }),
   setPreviewLoading: (loading) => set({ previewLoading: loading }),
@@ -107,6 +113,8 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
       }))
       set({ compositionKey: data.composition_key ?? '' })
       get().pushCells([...bodyCells, ...fragmentCells])
+      // Mark the just-loaded state as clean so the Save button starts as "Saved"
+      get().markCellsSaved()
     } catch {
       get().setPreviewLoading(false)
     }

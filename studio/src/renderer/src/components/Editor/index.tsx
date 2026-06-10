@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GitCompare } from 'lucide-react'
 import { useStore } from '../../store'
+import { useUiStore } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
 import type { FrontmatterValues } from '../../types'
 import { Tooltip } from '../ui'
 import { ConfigForm } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
+import type { MarkdownEditorHandle } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
 import { CommentsPanel } from './CommentsPanel/CommentsPanel'
 import { CommentsPanelRail } from './CommentsPanel/CommentsPanelRail/CommentsPanelRail'
@@ -85,8 +87,14 @@ function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
   return 'other'
 }
 
-export function Editor({ path: pathOverride }: { path?: string | null } = {}): JSX.Element {
+export function Editor({ path: pathOverride, embedded }: { path?: string | null; embedded?: boolean } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
+  const setNotebookDraftPath  = useUiStore(s => s.setNotebookDraftPath)
+  const notebookSaveRequested = useUiStore(s => s.notebookSaveRequested)
+  const notebookOpenDraftReq  = useUiStore(s => s.notebookOpenDraftRequested)
+  const notebookUndoReq       = useUiStore(s => s.notebookUndoRequested)
+  const notebookRedoReq       = useUiStore(s => s.notebookRedoRequested)
+  const markdownEditorRef     = useRef<MarkdownEditorHandle>(null)
 
   const effectivePath = pathOverride ?? selectedItem?.path ?? null
 
@@ -163,7 +171,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     return () => document.removeEventListener('keydown', onKeyDown)
   })
 
-  async function performSave(currentBody: string, currentConfig: FrontmatterValues): Promise<void> {
+  const performSave = useCallback(async (currentBody: string, currentConfig: FrontmatterValues): Promise<void> => {
     if (!effectivePath) return
     setSaveError(null)
     const merged = `---\n${serializeFrontmatter(currentConfig)}\n---\n${currentBody}`
@@ -173,7 +181,63 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))
     }
-  }
+  }, [effectivePath, clearDirty])
+
+  // ── Refs so embedded coordination effects always see the latest body/config ─
+  const bodyRef   = useRef(body)
+  const configRef = useRef(config)
+  bodyRef.current   = body
+  configRef.current = config
+
+  // ── Embedded: sync draft path into uiStore so NotebookHeader can read it ───
+  useEffect(() => {
+    if (!embedded) return
+    setNotebookDraftPath(draftPath)
+    return () => setNotebookDraftPath(null)
+  }, [embedded, draftPath, setNotebookDraftPath])
+
+  // ── Embedded: save when NotebookHeader's Save button is pressed ───────────
+  const prevSaveReqRef = useRef(notebookSaveRequested)
+  useEffect(() => {
+    if (!embedded) return
+    if (notebookSaveRequested === prevSaveReqRef.current) return
+    prevSaveReqRef.current = notebookSaveRequested
+    void performSave(bodyRef.current, configRef.current)
+  }, [embedded, notebookSaveRequested, performSave])
+
+  // ── Embedded: open draft viewer when NotebookHeader's Review Draft is pressed
+  const pendingOpenDraftRef   = useRef(false)
+  const prevOpenDraftReqRef   = useRef(notebookOpenDraftReq)
+  useEffect(() => {
+    if (!embedded) return
+    if (notebookOpenDraftReq === prevOpenDraftReqRef.current) return
+    prevOpenDraftReqRef.current = notebookOpenDraftReq
+    if (draftPath) { setDraftViewerOpen(true) } else { pendingOpenDraftRef.current = true }
+  }, [embedded, notebookOpenDraftReq, draftPath])
+
+  useEffect(() => {
+    if (pendingOpenDraftRef.current && draftPath) {
+      setDraftViewerOpen(true)
+      pendingOpenDraftRef.current = false
+    }
+  }, [draftPath])
+
+  // ── Embedded: undo/redo via CodeMirror when NotebookHeader buttons pressed ─
+  const prevUndoReqRef = useRef(notebookUndoReq)
+  useEffect(() => {
+    if (!embedded) return
+    if (notebookUndoReq === prevUndoReqRef.current) return
+    prevUndoReqRef.current = notebookUndoReq
+    markdownEditorRef.current?.undo()
+  }, [embedded, notebookUndoReq])
+
+  const prevRedoReqRef = useRef(notebookRedoReq)
+  useEffect(() => {
+    if (!embedded) return
+    if (notebookRedoReq === prevRedoReqRef.current) return
+    prevRedoReqRef.current = notebookRedoReq
+    markdownEditorRef.current?.redo()
+  }, [embedded, notebookRedoReq])
 
   function handleConfigChange(v: FrontmatterValues): void {
     setConfig(v)
@@ -262,7 +326,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
 
   return (
     <div className={styles.panel}>
-      <div className={styles.toolbar}>
+      <div className={styles.toolbar} {...(embedded ? { 'data-embedded': 'true' } : {})}>
         <div className={styles.tabs}>
           {tabs.map((t_) => {
             const tabLabels: Record<TabMode, { label: string; shortcut?: string }> = {
@@ -274,6 +338,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
             return (
               <Tooltip key={t_} label={label} shortcut={shortcut} placement="bottom">
                 <button
+                  type="button"
                   className={tab === t_ ? styles.tabActive : styles.tab}
                   onClick={() => setTab(t_)}
                 >
@@ -283,37 +348,40 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
             )
           })}
         </div>
-        <span className={styles.breadcrumb}>{breadcrumb}</span>
-        <div className={styles.actions}>
-          {saveError && <span className={styles.error}>{saveError}</span>}
-          {draftPath && (
-            <Tooltip label="Agent draft is ready — click to review changes" placement="bottom">
+        {!embedded && <span className={styles.breadcrumb}>{breadcrumb}</span>}
+        {!embedded && (
+          <div className={styles.actions}>
+            {saveError && <span className={styles.error}>{saveError}</span>}
+            {draftPath && (
+              <Tooltip label="Agent draft is ready — click to review changes" placement="bottom">
+                <button
+                  type="button"
+                  className={styles.draftReadyBtn}
+                  onClick={() => setDraftViewerOpen(true)}
+                >
+                  <GitCompare size={13} />
+                  Review draft
+                </button>
+              </Tooltip>
+            )}
+            {tab === 'preview' && (
+              <Tooltip label="Edit raw source" placement="bottom">
+                <button type="button" className={styles.tab} onClick={() => setTab('edit')}>
+                  Edit source
+                </button>
+              </Tooltip>
+            )}
+            <Tooltip label="Save file" shortcut="Ctrl+S" placement="bottom">
               <button
                 type="button"
-                className={styles.draftReadyBtn}
-                onClick={() => setDraftViewerOpen(true)}
+                className={`${styles.saveBtn} ${isDirty ? '' : styles.saveBtnClean}`}
+                onClick={() => void performSave(body, config)}
               >
-                <GitCompare size={13} />
-                Review draft
+                {isDirty ? 'Save ●' : 'Saved'}
               </button>
             </Tooltip>
-          )}
-          {tab === 'preview' && (
-            <Tooltip label="Edit raw source" placement="bottom">
-              <button className={styles.tab} onClick={() => setTab('edit')}>
-                Edit source
-              </button>
-            </Tooltip>
-          )}
-          <Tooltip label="Save file" shortcut="Ctrl+S" placement="bottom">
-            <button
-              className={`${styles.saveBtn} ${isDirty ? '' : styles.saveBtnClean}`}
-              onClick={() => void performSave(body, config)}
-            >
-              {isDirty ? 'Save ●' : 'Saved'}
-            </button>
-          </Tooltip>
-        </div>
+          </div>
+        )}
       </div>
 
       {isPreviewDefault && (
@@ -327,7 +395,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
       <div className={styles.editorArea}>
         {tab === 'edit' && (
           <div className={styles.full}>
-            <MarkdownEditor value={body} onChange={handleBodyChange} />
+            <MarkdownEditor ref={markdownEditorRef} value={body} onChange={handleBodyChange} />
           </div>
         )}
         {tab === 'preview' && (
@@ -377,7 +445,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
         {tab === 'split' && (
           <div className={styles.splitRow}>
             <div className={styles.half}>
-              <MarkdownEditor value={body} onChange={handleBodyChange} />
+              <MarkdownEditor ref={markdownEditorRef} value={body} onChange={handleBodyChange} />
             </div>
             <div className={styles.splitDivider} />
             <div className={styles.half}>

@@ -20,6 +20,14 @@
   flex-shrink: 0;
 }
 
+/* Sub-toolbar when Editor is embedded inside the Notebook panel */
+.toolbar[data-embedded='true'] {
+  height: 38px;
+  background: var(--bg-base);
+  border-bottom: var(--border);
+  border-top: var(--border);
+}
+
 .tabs { display: flex; gap: 2px; }
 
 .tab {

@@ -41,6 +41,34 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Clickable intermediate segment (e.g. "fragments") */
+.breadcrumbSegment {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: inherit;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.breadcrumbSegment:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Last segment — current file, not interactive */
+.breadcrumbCurrent {
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .badge {
@@ -87,43 +115,96 @@
 }
 
 
-.modeToggleBtn {
+.viewToggle {
+  display: flex;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.viewToggleBtn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 11px;
+  padding: 5px 11px;
   background: transparent;
-  border: var(--border);
-  border-radius: var(--radius-md);
+  border: none;
+  border-left: var(--border);
   color: var(--text-muted);
   cursor: pointer;
   font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
   white-space: nowrap;
-  flex-shrink: 0;
-  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 
-.modeToggleBtn:hover {
+.viewToggleBtn:first-child {
+  border-left: none;
+}
+
+.viewToggleBtn:hover {
   color: var(--text-primary);
-  border-color: var(--accent-border);
+  background: var(--bg-surface0);
 }
 
-.modeToggleActive {
+.viewToggleBtn[data-active='true'] {
   background: var(--accent-bg);
-  border-color: var(--accent-border);
   color: var(--accent);
 }
 
-.modeToggleActive:hover {
+.viewToggleBtn[data-active='true']:hover {
+  background: var(--accent-bg);
   color: var(--accent);
+}
+
+.draftBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* Match saveBtn height exactly */
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  /* default = no-draft state — same solid background as saveBtn */
+  background: var(--bg-surface0);
+  border: var(--border);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* Active — draft exists */
+.draftBtn[data-has-draft='true'] {
+  background: color-mix(in srgb, var(--green) 12%, var(--bg-surface0));
+  border: 1px solid color-mix(in srgb, var(--green) 60%, transparent);
+  color: var(--green);
+  cursor: pointer;
+  animation: draftPulse 2.2s ease-in-out infinite;
+}
+
+.draftBtn[data-has-draft='true']:hover {
+  background: color-mix(in srgb, var(--green) 22%, var(--bg-surface0));
+  animation: none;
+}
+
+@keyframes draftPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 35%, transparent); }
+  50%       { box-shadow: 0 0 0 4px transparent; }
 }
 
 .saveBtn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   padding: 7px 12px;
+  /* Wide enough for "Saved" + icon at --font-size-sm (11px) — never shrinks to "Save" width */
+  min-width: 78px;
   background: var(--bg-surface0);
   border: var(--border);
   border-radius: var(--radius-md);
@@ -146,12 +227,24 @@
   opacity: 0.7;
 }
 
-.saveSuccess {
+/* Transient green flash — brief confirmation right after a save action */
+.saveBtn[data-state='success'] {
   border-color: var(--green);
   color: var(--green);
 }
 
-.saveError {
+/* Persistent clean-file indicator — dim text only, background stays solid to match Visual idle */
+.saveBtn[data-state='saved'] {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* Override the :disabled opacity so the saved state never goes semi-transparent */
+.saveBtn[data-state='saved']:disabled {
+  opacity: 1;
+}
+
+.saveBtn[data-state='error'] {
   border-color: var(--red);
   color: var(--red);
 }
@@ -179,10 +272,5 @@
   opacity: 0.7;
 }
 
-.exportSuccess {
-  background: var(--green);
-}
-
-.exportError {
-  background: var(--red);
-}
+.exportBtn[data-state='success'] { background: var(--green); }
+.exportBtn[data-state='error']   { background: var(--red); }
