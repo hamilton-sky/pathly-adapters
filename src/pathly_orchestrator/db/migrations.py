@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 
 
-def _run_migrations(conn: sqlite3.Connection) -> None:
+def _run_migrations(conn: sqlite3.Connection, vec_available: bool = False) -> None:
     """Idempotent schema creation for all 14 tables + schema_version."""
     conn.executescript("""
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -207,8 +207,50 @@ CREATE TABLE IF NOT EXISTS app_settings (
     value      TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS comms_messages (
+    id                TEXT PRIMARY KEY,
+    board             TEXT NOT NULL,
+    scope             TEXT NOT NULL,
+    from_agent        TEXT NOT NULL,
+    to_agent          TEXT NOT NULL DEFAULT '*',
+    type              TEXT NOT NULL,
+    text              TEXT NOT NULL,
+    options           TEXT,
+    reply_to          TEXT,
+    stage             TEXT,
+    conv              INTEGER,
+    ts                TEXT NOT NULL,
+    read_by           TEXT DEFAULT '[]',
+    acknowledged_by   TEXT DEFAULT '[]',
+    status            TEXT DEFAULT 'pending',
+    deleted_at        TEXT,
+    promoted_to       TEXT,
+    promoted_from     TEXT,
+    original_scope    TEXT,
+    artifact_path     TEXT,
+    artifact_type     TEXT,
+    artifact_url      TEXT,
+    task_status       TEXT,
+    assigned_to_stage TEXT,
+    assigned_to_agent TEXT,
+    embedding_model   TEXT
+);
 """)
     conn.commit()
+    if vec_available:
+        try:
+            conn.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS comms_embeddings USING vec0("
+                "message_id TEXT PRIMARY KEY, "
+                "embedding  FLOAT[384], "
+                "chunk_index INTEGER DEFAULT 0, "
+                "chunk_text  TEXT"
+                ")"
+            )
+            conn.commit()
+        except Exception:
+            pass
     _add_additive_migrations(conn)
 
 

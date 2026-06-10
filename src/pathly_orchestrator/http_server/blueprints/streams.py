@@ -20,6 +20,8 @@ from ..sse import (
     _menu_lock,
     _runner_clients,
     _runner_lock,
+    _comms_clients,
+    _comms_lock,
 )
 from ..middleware import _inc
 
@@ -206,4 +208,40 @@ def events_stream():
             "X-Accel-Buffering": "no",
             "Access-Control-Allow-Origin": os.environ.get("PATHLY_CORS_ORIGIN", "*"),
         },
+    )
+
+
+@bp.route("/events/comms", methods=["GET"])
+def comms_events_endpoint():
+    """SSE endpoint: streams COMMS_UPDATE events for a given scope.
+
+    Query param: scope (default 'global').
+    """
+    from flask import Response, stream_with_context
+
+    scope = request.args.get("scope", "global").strip() or "global"
+
+    q: queue.Queue = queue.Queue(maxsize=50)
+    with _comms_lock:
+        _comms_clients.setdefault(scope, []).append(q)
+
+    def generate():
+        try:
+            yield 'data: {"type":"connected"}\n\n'
+            while True:
+                try:
+                    data = q.get(timeout=25)
+                    yield f"data: {data}\n\n"
+                except queue.Empty:
+                    yield ": keepalive\n\n"
+        finally:
+            with _comms_lock:
+                clients = _comms_clients.get(scope, [])
+                if q in clients:
+                    clients.remove(q)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

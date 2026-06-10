@@ -7,7 +7,7 @@ name = "pathly-adapters"
 version = "2.14.1"
 description = "Pathly adapter installer â€” stitches and deploys agent files to AI host tools."
 requires-python = ">=3.11"
-dependencies = ["pyyaml>=6.0,<7", "flask>=2.3,<4"]
+dependencies = ["pyyaml>=6.0,<7", "flask>=2.3,<4", "sqlite-vec==0.1.6", "sentence-transformers>=2.7.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-cov>=5", "build", "twine", "jsonschema>=4", "black>=24", "mypy>=1.8"]

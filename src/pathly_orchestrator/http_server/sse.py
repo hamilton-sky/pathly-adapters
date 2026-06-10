@@ -36,6 +36,10 @@ _menu_lock = threading.Lock()
 _runner_clients: dict[str, list[queue.Queue]] = {}
 _runner_lock = threading.Lock()
 
+# Comms SSE client registry. Keyed by scope; each value is a list of per-client queues.
+_comms_clients: dict[str, list[queue.Queue]] = {}
+_comms_lock = threading.Lock()
+
 # Pushed-menu TTL timer
 _push_timer: threading.Timer | None = None
 _push_timer_lock = threading.Lock()
@@ -133,3 +137,21 @@ def _broadcast_runner(topic: str, payload: dict) -> None:
                 q.put_nowait(raw)
             except queue.Full:
                 pass
+
+
+def _broadcast_comms(scope: str, payload: dict) -> None:
+    """Broadcast a COMMS_UPDATE event to all /events/comms clients subscribed to *scope*."""
+    try:
+        raw = json.dumps(payload)
+        with _comms_lock:
+            clients = _comms_clients.get(scope, [])
+            dead = [q for q in clients if q.full()]
+            for q in dead:
+                clients.remove(q)
+            for q in clients:
+                try:
+                    q.put_nowait(raw)
+                except queue.Full:
+                    pass
+    except Exception:
+        pass

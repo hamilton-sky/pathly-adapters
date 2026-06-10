@@ -1,11 +1,14 @@
 """Connection management for pathly_orchestrator SQLite database."""
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
 from pathlib import Path
 
 from .migrations import _run_migrations
+
+_VEC_AVAILABLE: bool = False
 
 _conn_cache: dict[str, sqlite3.Connection] = {}
 _cache_lock = threading.Lock()
@@ -56,7 +59,17 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
-        _run_migrations(conn)
+        global _VEC_AVAILABLE
+        try:
+            conn.enable_load_extension(True)
+            import sqlite_vec
+            sqlite_vec.load(conn)
+            conn.enable_load_extension(False)
+            _VEC_AVAILABLE = True
+        except Exception:
+            _VEC_AVAILABLE = False
+            logging.warning("sqlite-vec unavailable — comms board uses recency-only retrieval")
+        _run_migrations(conn, vec_available=_VEC_AVAILABLE)
         _conn_cache[db_path] = conn
         conn_id: int = id(conn)
         _write_locks[conn_id] = threading.Lock()

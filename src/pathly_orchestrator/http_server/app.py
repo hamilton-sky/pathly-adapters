@@ -25,6 +25,7 @@ from .blueprints.chat import bp as chat_bp
 from .blueprints.streams import bp as streams_bp
 from .blueprints import flows as _flows_bp
 from .blueprints.db_api import bp as db_api_bp
+from .blueprints.comms import bp as comms_bp
 
 app = Flask(__name__)
 
@@ -42,6 +43,7 @@ app.register_blueprint(chat_bp)
 app.register_blueprint(streams_bp)
 app.register_blueprint(_flows_bp.bp)
 app.register_blueprint(db_api_bp)
+app.register_blueprint(comms_bp)
 
 # Register request/response hooks
 app.before_request(_log_request)
@@ -86,6 +88,11 @@ def main() -> None:
         threading.Thread(
             target=_feedback_watcher, args=(project_root, _watcher_stop), daemon=True
         ).start()
+
+    # Warm the embedding model in the background so the first POST /comms/post
+    # doesn't block on the ~1-2s model load.
+    from pathly_orchestrator.runner.embeddings import warm as _warm_embeddings
+    threading.Thread(target=_warm_embeddings, daemon=True).start()
 
     # Run Flask in non-debug mode, with warnings suppressed
     app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
