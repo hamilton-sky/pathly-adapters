@@ -103,6 +103,7 @@ contextBridge.exposeInMainWorld('pathly', {
     openVsCode: (path: string): Promise<void> => ipcRenderer.invoke('shell:openVsCode', path),
     openInApp: (path: string, appType: string): Promise<void> => ipcRenderer.invoke('shell:openInApp', path, appType),
     publish: (cwd: string): Promise<number | null> => ipcRenderer.invoke('shell:publish', cwd),
+    upgrade: (): Promise<number | null> => ipcRenderer.invoke('shell:upgrade'),
     onOutput: (cb: (line: string) => void): (() => void) => {
       const listener = (_e: Electron.IpcRendererEvent, line: string): void => cb(line)
       ipcRenderer.on('shell:output', listener)

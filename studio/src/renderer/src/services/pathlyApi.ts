@@ -5,6 +5,7 @@ export const listDirs        = (dir: string): Promise<string[]>                 
 export const getAppRoot      = (): Promise<string>                                                            => window.pathly.fs.appRoot()
 export const pickFolder      = (): Promise<string | null>                                                     => window.pathly.fs.pickFolder()
 export const publish         = (cwd: string): Promise<number | null>                                         => window.pathly.shell.publish(cwd)
+export const upgrade         = (): Promise<number | null>                                                    => window.pathly.shell.upgrade()
 export const onPublishOutput = (cb: (line: string) => void): (() => void)                                    => window.pathly.shell.onOutput(cb)
 export const openWindow      = (path: string): Promise<void>                                                  => window.pathly.shell.openWindow(path)
 export const openSlide       = (filePath: string): Promise<void>                                             => window.pathly.shell.openSlide(filePath)

@@ -1,7 +1,25 @@
 {
   "conv_start_sha": "75b8e33e7b4bbd3e85f15a96d614fdf412dd4244",
   "convs_total": 4,
-  "convs_done": 0,
+  "convs_done": 2,
   "current": "BUILDING",
-  "updated_at": "2026-06-10T20:30:00Z"
+  "updated_at": "2026-06-10T20:50:06.879459+00:00",
+  "build_baseline": {
+    "started_at": "2026-06-10T20:50:08.198668+00:00",
+    "preexisting_dirty": [
+      "pathly/pipeline-walkthrough/provider-agnostic-telemetry/",
+      "pathly/plans/provider-agnostic-telemetry/STATE.json",
+      "src/pathly_data/core/skills/development/build.md.comments.json",
+      "src/pathly_orchestrator/http_server/blueprints/telemetry.py",
+      "src/pathly_orchestrator/http_server/pricing.py",
+      "src/pathly_orchestrator/http_server/telemetry_registry.py",
+      "studio/src/main/ipc/shell.ts",
+      "studio/src/main/preload/index.ts",
+      "studio/src/renderer/src/components/topbar/PublishControl.tsx",
+      "studio/src/renderer/src/components/topbar/PublishLog.tsx",
+      "studio/src/renderer/src/components/topbar/TopBar.module.css",
+      "studio/src/renderer/src/services/pathlyApi.ts",
+      "studio/src/renderer/src/types/global.d.ts"
+    ]
+  }
 }

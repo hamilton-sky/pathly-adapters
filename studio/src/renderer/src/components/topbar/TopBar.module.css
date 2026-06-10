@@ -148,19 +148,19 @@
 .terminalBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .publishBtn {
-  background: var(--accent);
-  border: none;
+  background: none;
+  border: 1px solid var(--bg-surface1);
   border-radius: 5px;
-  color: #fff;
+  color: var(--text-secondary);
   cursor: pointer;
-  padding: 2px 12px;
+  padding: 4px 10px;
   font-size: var(--font-size-sm);
-  font-weight: 700;
   white-space: nowrap;
-  transition: opacity 0.12s;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
 }
-.publishBtn:hover { filter: brightness(1.1); }
-.publishBtn:active { transform: scale(0.97); filter: brightness(0.95); }
+.publishBtn:hover { background: var(--btn-b-hover-bg); border-color: var(--btn-b-hover-border); color: var(--btn-b-hover-color); }
+.publishBtn:active { transform: scale(0.95); }
 .publishBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 .publishBtn:disabled { opacity: 0.5; cursor: default; }
 

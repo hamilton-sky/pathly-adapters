@@ -1,7 +1,7 @@
 """Pricing table and cost computation helpers."""
 from __future__ import annotations
 
-from pathly_orchestrator.http_server.telemetry_registry import PricingRegistry
+from pathly_orchestrator.http_server.telemetry_registry import PricingRegistry, _ADAPTER_PREFIXES
 
 # Legacy per-model pricing table — kept as reference only; no longer used at runtime.
 # MODEL_PRICING: dict[str, tuple[float, float]] = {
@@ -9,14 +9,6 @@ from pathly_orchestrator.http_server.telemetry_registry import PricingRegistry
 #     "claude-sonnet-4":  ( 3.00, 15.00),
 #     "claude-haiku-4":   ( 0.80,  4.00),
 # }
-
-# Maps model-name prefixes to provider slugs for delegation to PricingRegistry.
-_ADAPTER_PREFIXES: list[tuple[tuple[str, ...], str]] = [
-    (("claude-",),                     "claude"),
-    (("gpt-", "o1-", "o3-", "o4-"),   "codex"),
-    (("gemini-",),                     "google"),
-    (("copilot-",),                    "copilot"),
-]
 
 
 def _infer_provider(model: str) -> str:

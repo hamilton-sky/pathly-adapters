@@ -1,0 +1,13 @@
+{
+  "comments": [
+    {
+      "id": "c-mq8jcs1c-ff64",
+      "lineNumber": 1,
+      "lineText": "This core prompt uses host-neutral Pathly route names. Adapters are responsible for rendering those routes in their host",
+      "body": "vvvmnvnmb",
+      "resolved": false,
+      "createdAt": "2026-06-10T20:43:09.168Z",
+      "color": "blue"
+    }
+  ]
+}

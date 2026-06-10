@@ -13,20 +13,12 @@ from pathly_orchestrator.db import append_event as _db_append_event
 from pathly_orchestrator.db.connection import get_db as _get_db
 from pathly_orchestrator.feature_flags import flags
 from pathly_telemetry.storage import append_activity
-from ..telemetry_registry import PricingRegistry
+from ..telemetry_registry import PricingRegistry, _ADAPTER_PREFIXES
 
 bp = Blueprint("telemetry", __name__)
 
 _VALID_PHASES = {"analyze", "build", "design", "implement", "plan", "review", "scout", "storm", "test"}
 _VALID_EVENT_TYPES = {"PHASE_START", "PHASE_DONE"}
-
-# Maps model-name prefixes to the adapter/CLI that runs them.
-_ADAPTER_PREFIXES: list[tuple[tuple[str, ...], str]] = [
-    (("claude-",),                          "claude"),
-    (("gpt-", "o1-", "o3-", "o4-"),        "codex"),
-    (("gemini-",),                          "google"),
-    (("copilot-",),                         "copilot"),
-]
 
 
 def _infer_adapter(model: str) -> str:
@@ -54,6 +46,7 @@ def _append_agent_done_event(
     tool_uses: int,
     wall_seconds: int,
     cost_usd: float,
+    cost_source: str = "unpriced",
     trace_id: str = "",
     span_id: str = "",
 ) -> None:
@@ -75,6 +68,7 @@ def _append_agent_done_event(
             "tool_uses": tool_uses,
             "wall_seconds": wall_seconds,
             "cost_usd": cost_usd,
+            "cost_source": cost_source,
         }
         if conversation is not None:
             event["conversation"] = conversation
@@ -164,7 +158,6 @@ def record_activity_endpoint():
             wall_seconds = duration_ms // 1000
 
         if flags.telemetry:
-            _model = str(data.get("model", ""))
             _adapter = str(data.get("adapter", "")) or _infer_adapter(_model)
             append_activity(
                 agent=data["agent"],
@@ -203,6 +196,7 @@ def record_activity_endpoint():
                 tool_uses=int(data.get("tool_uses", 0)),
                 wall_seconds=wall_seconds,
                 cost_usd=float(cost_usd_val),
+                cost_source=cost_source,
                 trace_id=str(trace_id) if trace_id else "",
                 span_id=str(span_id) if span_id else "",
             )

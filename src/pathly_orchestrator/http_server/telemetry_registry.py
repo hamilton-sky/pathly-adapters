@@ -1,6 +1,15 @@
 """Provider-agnostic pricing registry and cost resolver."""
 from __future__ import annotations
 
+# Maps model-name prefixes to provider/adapter slugs.
+# Shared by pricing.py and blueprints/telemetry.py — single source of truth.
+_ADAPTER_PREFIXES: list[tuple[tuple[str, ...], str]] = [
+    (("claude-",),                     "claude"),
+    (("gpt-", "o1-", "o3-", "o4-"),   "codex"),
+    (("gemini-",),                     "google"),
+    (("copilot-",),                    "copilot"),
+]
+
 # Keyed by provider slug → model-family-prefix → (input_$/MTok, output_$/MTok).
 # Prefix matching: longest matching prefix wins.
 PRICING: dict[str, dict[str, tuple[float, float]]] = {
@@ -64,9 +73,12 @@ class PricingRegistry:
         )
         return (cost, "estimated")
 
-    def all_providers(self) -> dict[str, dict[str, tuple[float, float]]]:
+    def all_providers(self) -> dict[str, dict[str, dict[str, float]]]:
         """Return the full pricing table for the API endpoint."""
         return {
-            provider: dict(models)
+            provider: {
+                model: {"input": in_rate, "output": out_rate}
+                for model, (in_rate, out_rate) in models.items()
+            }
             for provider, models in PRICING.items()
         }

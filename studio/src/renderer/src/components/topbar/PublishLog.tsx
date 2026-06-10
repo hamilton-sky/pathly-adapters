@@ -19,7 +19,7 @@ export function PublishLog({ onClose }: Props): JSX.Element {
   return (
     <div className={styles.logPanel}>
       <div className={styles.logHeader}>
-        <span>Publish output</span>
+        <span>Update output</span>
         <IconButton onClick={onClose} title="Close publish log">
           <X size={12} />
         </IconButton>

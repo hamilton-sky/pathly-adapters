@@ -104,6 +104,7 @@ declare global {
         openVsCode: (path: string) => Promise<void>
         openInApp: (path: string, appType: string) => Promise<void>
         publish: (cwd: string) => Promise<number | null>
+        upgrade: () => Promise<number | null>
         onOutput: (cb: (line: string) => void) => () => void
         openSlide: (filePath: string) => Promise<void>
         dsPort: () => Promise<number>
