@@ -80,6 +80,30 @@
 
 .error { color: var(--red); font-size: 12px; }
 
+.draftReadyBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--green) 12%, var(--bg-surface0));
+  border: 1px solid color-mix(in srgb, var(--green) 60%, transparent);
+  border-radius: 5px;
+  color: var(--green);
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  animation: draftPulse 2.2s ease-in-out infinite;
+}
+.draftReadyBtn:hover {
+  background: color-mix(in srgb, var(--green) 22%, var(--bg-surface0));
+  animation: none;
+}
+
+@keyframes draftPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 35%, transparent); }
+  50%       { box-shadow: 0 0 0 4px transparent; }
+}
+
 /* ── Content area ── */
 .editorArea {
   flex: 1;

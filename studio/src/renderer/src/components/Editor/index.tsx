@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { GitCompare } from 'lucide-react'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
@@ -102,6 +103,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   const [showHighlights, setShowHighlights] = useState(true)
   const [showPanel, setShowPanel] = useState(true)
   const [draftPath, setDraftPath] = useState<string | null>(null)
+  const [draftViewerOpen, setDraftViewerOpen] = useState(false)
 
   const previewRef = useRef<CommentablePreviewHandle>(null)
   const [orphanedIds, setOrphanedIds] = useState<Set<string>>(new Set())
@@ -131,6 +133,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
   useEffect(() => {
     if (!effectivePath) return
     setDraftPath(null)
+    setDraftViewerOpen(false)
     setTab('preview')
     setPendingAnchor(null)
     setAnchorPos(null)
@@ -225,6 +228,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     await window.pathly.fs.write(effectivePath, newContent)
     await window.pathly.fs.delete(effectivePath + '.draft')
     setDraftPath(null)
+    setDraftViewerOpen(false)
     const parsed = parseFrontmatter(newContent)
     setConfig(parsed.config)
     setBody(parsed.body)
@@ -235,6 +239,7 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     if (!effectivePath) return
     await window.pathly.fs.delete(effectivePath + '.draft')
     setDraftPath(null)
+    setDraftViewerOpen(false)
   }
 
   const handleSelectionComment = useCallback((text: string, x: number, y: number) => {
@@ -281,6 +286,18 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
         <span className={styles.breadcrumb}>{breadcrumb}</span>
         <div className={styles.actions}>
           {saveError && <span className={styles.error}>{saveError}</span>}
+          {draftPath && (
+            <Tooltip label="Agent draft is ready — click to review changes" placement="bottom">
+              <button
+                type="button"
+                className={styles.draftReadyBtn}
+                onClick={() => setDraftViewerOpen(true)}
+              >
+                <GitCompare size={13} />
+                Review draft
+              </button>
+            </Tooltip>
+          )}
           {tab === 'preview' && (
             <Tooltip label="Edit raw source" placement="bottom">
               <button className={styles.tab} onClick={() => setTab('edit')}>
@@ -384,12 +401,12 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
         />
       )}
 
-      {draftPath && effectivePath && (
+      {draftPath && effectivePath && draftViewerOpen && (
         <DraftDiffViewer
           originalPath={effectivePath}
           draftPath={draftPath}
           onApply={(content) => void handleDiffApply(content)}
-          onClose={() => setDraftPath(null)}
+          onClose={() => setDraftViewerOpen(false)}
           onDiscard={() => void handleDiffDiscard()}
         />
       )}

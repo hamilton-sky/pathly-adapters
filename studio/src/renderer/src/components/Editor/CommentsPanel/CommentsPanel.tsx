@@ -95,14 +95,24 @@ export function CommentsPanel({
     exitUnsubRef.current = window.pathly.terminal.onExit((exitedTabId) => {
       if (exitedTabId !== tabId) return
       exitUnsubRef.current = null
-      void window.pathly.fs.read(norm + '.draft').then((content) => {
-        setIsWorking(false)
-        if (content !== null && content.trim().length > 0) {
-          onDraftReady(norm + '.draft')
-        } else {
-          pushToast('Agent finished but wrote no draft — check the terminal for errors', 'error')
-        }
-      })
+      // Retry up to 5 times with 600 ms gaps — agent may still be flushing the file
+      // to disk when the PTY exit event arrives.
+      let attempt = 0
+      const check = (): void => {
+        attempt++
+        void window.pathly.fs.read(norm + '.draft').then((content) => {
+          if (content !== null && content.trim().length > 0) {
+            setIsWorking(false)
+            onDraftReady(norm + '.draft')
+          } else if (attempt < 5) {
+            setTimeout(check, 600)
+          } else {
+            setIsWorking(false)
+            pushToast('Agent finished but wrote no draft — check the terminal for errors', 'error')
+          }
+        })
+      }
+      check()
     })
 
     await window.pathly.terminal.spawn(tabId, cwd, undefined, [
