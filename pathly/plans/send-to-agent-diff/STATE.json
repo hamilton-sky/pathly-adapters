@@ -1,1 +1,38 @@
-{"current": "BUILDING"}
+{
+  "conv_start_sha": "a0adfdda7f8ae897fa0a6c9809ca7bdd7fdfe801",
+  "build_baseline": {
+    "started_at": "2026-06-10T06:21:07.993823+00:00",
+    "preexisting_dirty": [
+      "canvas-fixed-s3.png",
+      "getting-started-bottom.png",
+      "getting-started-final.png",
+      "getting-started-preview.png",
+      "getting-started-redesign.png",
+      "getting-started-steps.png",
+      "getting-started-top.png",
+      "library-current-state.png",
+      "pathly-projects-tab.png",
+      "pathly/plans/brightsky-agent-upgrade/feedback/",
+      "reports/allure-results/00e68479-c3b9-4de5-b5d3-8b04b46da7b6-container.json",
+      "reports/allure-results/0714e21a-074a-4be3-b8bc-3f0d46750bcf-container.json",
+      "reports/allure-results/16f68e41-5f84-45a5-b9fc-ea565f714480-container.json",
+      "reports/allure-results/1e9e5b73-1403-4b1b-8a5b-48745e66209d-container.json",
+      "reports/allure-results/2127834a-10cd-492b-b512-12b112bb9894-container.json",
+      "reports/allure-results/2d16fa92-257a-4032-a7c3-f152ec376aab-container.json",
+      "reports/allure-results/2f5f8935-0318-48cf-a0b9-4b11a5a3eef1-container.json",
+      "reports/allure-results/3674160f-4744-4681-b008-a51663dcdf1a-container.json",
+      "reports/allure-results/5c0a68c2-74b5-4140-b9cc-05bed6e4bcc8-result.json",
+      "reports/allure-results/7d24ce4e-8b6a-4f2d-8ae6-93277b9a3852-result.json",
+      "reports/allure-results/853d91a6-96a5-4a7b-ac36-f6f8887d3148-result.json",
+      "reports/allure-results/8ab3819d-277e-4554-bf87-4c3a64a3d98c-container.json",
+      "reports/allure-results/a0619a34-ae51-4391-966d-39927d7e7743-result.json",
+      "reports/allure-results/a78bf695-5f32-4a33-8b3e-fa5723259da7-container.json",
+      "reports/allure-results/d25a40e8-8f81-4775-aeac-0db79e91b841-container.json",
+      "reports/allure-results/dc058be4-fbc1-49dd-804a-7deaf9ccdcf8-container.json"
+    ]
+  },
+  "convs_total": 3,
+  "convs_done": 1,
+  "current": "BUILDING",
+  "updated_at": "2026-06-10T06:21:08Z"
+}
