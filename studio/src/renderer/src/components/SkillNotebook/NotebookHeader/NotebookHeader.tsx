@@ -114,17 +114,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
 
       <div className={styles.breadcrumb}>
         <span className={styles.breadcrumbText}>
-          Skills ›{' '}
-          <button
-            type="button"
-            className={styles.breadcrumbSegment}
-            onClick={() => setSkillNotebookPath(null)}
-            title="Return to file browser"
-          >
-            {category}
-          </button>
-          {' › '}
-          <span className={styles.breadcrumbCurrent}>{skillName}</span>
+          Skills › {category} › <span className={styles.breadcrumbCurrent}>{skillName}</span>
         </span>
       </div>
 

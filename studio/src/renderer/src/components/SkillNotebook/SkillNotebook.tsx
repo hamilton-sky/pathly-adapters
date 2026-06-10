@@ -1,19 +1,14 @@
 import React from 'react'
-import { ArrowLeft, FileText, BookOpen, Sparkles, ChevronsUp, Plus, Copy, Undo2, PanelRightOpen } from 'lucide-react'
+import { Sparkles, ChevronsUp, Plus, Copy, Undo2, PanelRightOpen } from 'lucide-react'
 import { Tooltip } from '../ui'
 import { useUiStore } from '../../store/uiStore'
 import styles from './SkillNotebook.module.css'
 import NotebookHeader, { NotebookViewMode } from './NotebookHeader/NotebookHeader'
 import NotebookCanvas from './NotebookCanvas/NotebookCanvas'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
+import NotebookLanding from './NotebookLanding/NotebookLanding'
 import { Editor } from '../Editor'
 import { usePreviewResize } from './usePreviewResize'
-
-const STEPS = [
-  { icon: ArrowLeft, label: 'Open the Files tab on the left', sub: 'Click the FILES icon in the sidebar' },
-  { icon: FileText, label: 'Click any skill .md file', sub: 'Skills, agents, templates…' },
-  { icon: Sparkles, label: 'Edit visually or in source', sub: 'Rearrange cells, preview, add comments, export' },
-]
 
 export default function SkillNotebookPanel() {
   const skillNotebookPath = useUiStore((s) => s.skillNotebookPath)
@@ -24,27 +19,7 @@ export default function SkillNotebookPanel() {
   const preview = usePreviewResize()
 
   if (!skillNotebookPath) {
-    return (
-      <div className={styles.empty}>
-        <div className={styles.emptyArrow}>
-          <ArrowLeft size={28} />
-        </div>
-        <BookOpen size={28} className={styles.emptyIcon} />
-        <p className={styles.emptyTitle}>No file open — pick one from the Files sidebar</p>
-        <ol className={styles.emptySteps}>
-          {STEPS.map(({ icon: Icon, label, sub }, i) => (
-            <li key={i} className={styles.emptyStep}>
-              <span className={styles.emptyStepNum}>{i + 1}</span>
-              <Icon size={15} className={styles.emptyStepIcon} />
-              <span className={styles.emptyStepText}>
-                <strong>{label}</strong>
-                <span>{sub}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      </div>
-    )
+    return <NotebookLanding />
   }
 
   return (
