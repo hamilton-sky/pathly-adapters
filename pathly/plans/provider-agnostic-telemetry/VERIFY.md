@@ -1,3 +1,2 @@
 RESULT: PASS
-
-GET /telemetry/pricing returned 200 with all four providers (claude, codex, google, antigravity), PricingRegistry.compute("claude","claude-sonnet-4-6",800,200) returned (0.0054,"estimated"), 80/20 split block removed, cost_source included in record_activity response, and all 469 previously passing tests continued to pass (6 pre-existing failures unchanged).
+Conv 2 (Phases 4–7): DB migration columns verified in :memory: DB, eventlog round-trip preserves cost_source/cache_read_tokens, storage.py writes provider+cost_source to JSONL; 469 tests pass, 6 pre-existing failures unchanged.

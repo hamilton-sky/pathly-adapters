@@ -257,8 +257,15 @@ CREATE TABLE IF NOT EXISTS comms_messages (
 def _add_additive_migrations(conn: sqlite3.Connection) -> None:
     """ALTER TABLE migrations — safe to re-run; skips columns that already exist."""
     for table, col, ctype in [
-        ("catalog_items",    "content",   "TEXT"),
-        ("flow_definitions", "file_path", "TEXT"),
+        ("catalog_items",       "content",              "TEXT"),
+        ("flow_definitions",    "file_path",            "TEXT"),
+        # Phase 4 (provider-agnostic-telemetry): cost confidence + provider tracking
+        ("agent_invocations",   "cost_source",          "TEXT DEFAULT 'unpriced'"),
+        ("agent_invocations",   "provider",             "TEXT"),
+        ("agent_invocations",   "cache_read_tokens",    "INTEGER DEFAULT 0"),
+        ("agent_invocations",   "cache_write_tokens",   "INTEGER DEFAULT 0"),
+        ("run_history",         "cost_source",          "TEXT DEFAULT 'unpriced'"),
+        ("run_history",         "provider",             "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

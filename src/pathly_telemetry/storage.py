@@ -21,6 +21,8 @@ def append_activity(
     total_tokens: int = 0,
     model: str = "",
     adapter: str = "",
+    provider: str = "unknown",
+    cost_source: str = "unpriced",
 ) -> None:
     ACTIVITY_FILE.parent.mkdir(parents=True, exist_ok=True)
     if ACTIVITY_FILE.exists() and ACTIVITY_FILE.stat().st_size > 5 * 1024 * 1024:
@@ -41,5 +43,7 @@ def append_activity(
         entry["model"] = model
     if adapter:
         entry["adapter"] = adapter
+    entry["provider"] = provider
+    entry["cost_source"] = cost_source
     with open(ACTIVITY_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")

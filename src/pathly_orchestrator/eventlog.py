@@ -85,6 +85,8 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
     conn = _db.get_db()
     feature = feature_dir.name
     project_root = _norm_root(feature_dir.parent.parent.parent)
+    # Full event dict is stored as a JSON blob in the payload column — no key whitelisting.
+    # New optional fields (cost_source, cache_read_tokens, cache_write_tokens) pass through transparently.
     _db.append_event(conn, project_root, feature, event)
 
     try:

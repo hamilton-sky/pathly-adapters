@@ -38,10 +38,24 @@ immediately when the condition is detected.
 #   result     str   — "PASS" | "FAIL" | "DONE" | "BLOCKED"
 #   tokens_in  int   — input tokens (from agent self-report or 0 if unknown)
 #   tokens_out int   — output tokens
+#   total_tokens int — tokens_in + tokens_out (or provider-reported total)
 #   cost_usd   float — cost in USD (0.0 if unknown)
 #   tool_uses  int   — number of tool calls made
 #   wall_seconds int — elapsed seconds
-#   summary    str   — (optional) semantic result text written by the agent; used as authoritative result by the supervisor
+#   ts         str   — ISO-8601 UTC timestamp
+#   schema_version int — event schema version
+# AGENT_DONE optional:
+#   summary          str   — semantic result text written by the agent; used as authoritative result by the supervisor
+#   trace_id         str   — OTel trace ID
+#   span_id          str   — OTel span ID
+#   cost_source      str   — "estimated" | "provider_reported" | "unpriced" (default "unpriced")
+#   cache_read_tokens  int — prompt cache read tokens (default 0)
+#   cache_write_tokens int — prompt cache write tokens (default 0)
+#
+# AGENT_DONE required: agent, model, conversation, result, tokens_in, tokens_out,
+#   total_tokens, cost_usd, tool_uses, wall_seconds, ts, schema_version
+# AGENT_DONE optional: summary, trace_id, span_id,
+#   cost_source (default "unpriced"), cache_read_tokens (default 0), cache_write_tokens (default 0)
 #
 # FILE_CREATED — written when a feedback file appears in plans/<feature>/feedback/
 #   file       str   — filename, e.g. "REVIEW_FAILURES.md"
@@ -97,6 +111,11 @@ TYPE_BILLING_UPDATE = "BILLING_UPDATE"
 #           "ts": str (ISO-8601)}
 # Appended after _patch_last_agent_done rewrites an AGENT_DONE line in-place,
 # so the SSE forward-tailer re-broadcasts the corrected values to Studio.
+#
+# BILLING_UPDATE required: agent, conversation, cost_usd, tokens_in, tokens_out,
+#   total_tokens, wall_seconds, ts
+# BILLING_UPDATE optional: tool_uses,
+#   cost_source (default "unpriced"), cache_read_tokens (default 0), cache_write_tokens (default 0)
 
 TYPE_STAGE_INTERACTIVE_DONE = "STAGE_INTERACTIVE_DONE"
 # Schema: {"type": "STAGE_INTERACTIVE_DONE", "topic": str, "stage": str, "ts": str}
