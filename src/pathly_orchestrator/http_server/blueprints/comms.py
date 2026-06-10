@@ -45,9 +45,13 @@ def comms_post():
         if not isinstance(text, str) or not text.strip():
             return jsonify({"error": "Field 'text' must be a non-empty string"}), 400
 
-        scope = data.get("scope", "feature")
+        # SPEC convention: board = tier (feature|project|global); scope = identifier.
+        board = data.get("board", "feature")
+        if not isinstance(board, str) or board not in ("feature", "project", "global"):
+            board = "feature"
+        scope = data.get("scope")
         if not isinstance(scope, str) or not scope.strip():
-            scope = "feature"
+            scope = "global" if board == "global" else feature
 
         to_agent = data.get("to", "*") or "*"
         options = data.get("options")
@@ -63,7 +67,7 @@ def comms_post():
         conn = _get_db()
         message_id = _post_message(
             conn,
-            board=feature,
+            board=board,
             scope=scope,
             from_agent=from_agent,
             to_agent=to_agent,
@@ -81,6 +85,7 @@ def comms_post():
             "type": "COMMS_UPDATE",
             "message_id": message_id,
             "feature": feature,
+            "board": board,
             "scope": scope,
             "msg_type": msg_type,
         })
@@ -106,7 +111,10 @@ def comms_get():
         if not feature:
             return jsonify({"error": "Query parameter 'feature' is required"}), 400
 
-        scope = request.args.get("scope", "feature").strip() or "feature"
+        board = (request.args.get("board") or "feature").strip() or "feature"
+        if board not in ("feature", "project", "global"):
+            board = "feature"
+        scope = (request.args.get("scope") or feature).strip() or feature
         msg_type = request.args.get("type") or None
         status = request.args.get("status") or None
         try:
@@ -117,7 +125,7 @@ def comms_get():
         conn = _get_db()
         messages = _get_messages(
             conn,
-            board=feature,
+            board=board,
             scope=scope,
             type=msg_type,
             status=status,
@@ -152,7 +160,10 @@ def comms_search():
         if not isinstance(feature, str) or not feature.strip():
             return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
 
-        scope = data.get("scope", "feature") or "feature"
+        board = data.get("board", "feature")
+        if board not in ("feature", "project", "global"):
+            board = "feature"
+        scope = data.get("scope") or feature
         k = data.get("k", 5)
         if not isinstance(k, int) or k <= 0:
             k = 5
@@ -160,10 +171,10 @@ def comms_search():
         embedding = _embed(query)
         conn = _get_db()
         if embedding is not None:
-            results = _search(conn, embedding=embedding, boards=[feature], scopes=[scope], k=k)
+            results = _search(conn, embedding=embedding, boards=[board], scopes=[scope], k=k)
         else:
             from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
-            results = _get_messages(conn, board=feature, scope=scope, limit=k)
+            results = _get_messages(conn, board=board, scope=scope, limit=k)
 
         return jsonify(results), 200
     except Exception as exc:
