@@ -35,7 +35,7 @@ export function DraftHunkCard({ hunk, onToggle, onMarkReviewed }: Props) {
   const draftContent = hunk.status !== 'removed' ? (hunk.draftContent ?? '')   : null
 
   return (
-    <div className={`${styles.card} ${styles[hunk.status]}`}>
+    <div className={styles.card} data-status={hunk.status}>
 
       <button
         type="button"

@@ -1,15 +1,15 @@
 {
   "convs_total": 3,
-  "convs_done": 1,
-  "current": "BUILDING",
-  "updated_at": "2026-06-10T06:21:08Z",
-  "conv_start_sha": "01e67815de04d7de2c398ac90e3d93012e89e2f6",
+  "convs_done": 3,
+  "current": "REVIEWING",
+  "updated_at": "2026-06-10T10:34:03Z",
   "build_baseline": {
     "started_at": "2026-06-10T08:02:30.068081+00:00",
     "preexisting_dirty": [
       "pathly/plans/send-to-agent-diff/STATE.json",
       "pathly/plans/send-to-agent-diff/VERIFY.md",
       "pathly/plans/send-to-agent-diff/feedback/",
+      "src/pathly_orchestrator/http_server/blueprints/runner.py",
       "src/pathly_orchestrator/http_server/blueprints/telemetry.py",
       "src/pathly_orchestrator/supervisor/orchestrator.py",
       "src/pathly_orchestrator/supervisor/terminal.py",
