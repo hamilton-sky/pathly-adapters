@@ -30,7 +30,12 @@ export function DraftHunkCard({ hunk, onToggle, onMarkReviewed }: Props) {
     setExpanded((v) => !v)
   }
 
-  const heading = hunk.heading === '__preamble__' ? 'Preamble' : hunk.heading
+  const paraMatch = hunk.heading.match(/^__para_(\d+)__$/)
+  const heading = hunk.heading === '__preamble__'
+    ? 'Preamble'
+    : paraMatch
+      ? `Paragraph ${Number(paraMatch[1]) + 1}`
+      : hunk.heading
   const origContent = hunk.status !== 'added'   ? (hunk.originalContent ?? '') : null
   const draftContent = hunk.status !== 'removed' ? (hunk.draftContent ?? '')   : null
 

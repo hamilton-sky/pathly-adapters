@@ -14,7 +14,7 @@ export interface DiffHunk {
 
 function parseIntoSections(text: string): Array<{ heading: string; content: string }> {
   const parts = ('\n' + text).split(/\n(?=## )/)
-  return parts
+  const sections = parts
     .map((p) => p.trimStart())
     .filter(Boolean)
     .map((p) => {
@@ -25,16 +25,35 @@ function parseIntoSections(text: string): Array<{ heading: string; content: stri
       return { heading: '__preamble__', content: p.trim() }
     })
     .filter((s) => s.heading || s.content)
+
+  // No ## headings found — fall back to paragraph-level splitting so the viewer
+  // shows per-paragraph hunks instead of a single all-or-nothing block.
+  if (sections.every((s) => s.heading === '__preamble__')) {
+    const fullText = sections.map((s) => s.content).join('\n\n')
+    return fullText
+      .split(/\n\n+/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((content, i) => ({ heading: `__para_${i}__`, content }))
+  }
+
+  return sections
 }
 
 export function reconstruct(hunks: DiffHunk[]): string {
   return hunks
-    .filter((h) => h.status !== 'removed' || h.accepted)
+    .filter((h) => {
+      if (h.status === 'unchanged') return true
+      if (h.status === 'removed') return !h.accepted
+      if (h.status === 'added') return h.accepted
+      // 'changed': always include (content chosen per accepted flag below)
+      return true
+    })
     .map((h) => {
-      const content = h.status === 'added' || (h.status === 'changed' && h.accepted)
+      const content = (h.status === 'added' || (h.status === 'changed' && h.accepted))
         ? h.draftContent ?? ''
         : h.originalContent ?? ''
-      if (h.heading === '__preamble__') return content
+      if (h.heading === '__preamble__' || h.heading.startsWith('__para_')) return content
       return `## ${h.heading}\n\n${content}`
     })
     .join('\n\n')
@@ -73,6 +92,19 @@ export function useDraftDiff(originalPath: string, draftPath: string) {
       setLoading(false)
     }).catch(() => { setError(true); setLoading(false) })
   }, [originalPath, draftPath])
+
+  // Poll every 3 seconds after load to detect if the draft file disappears while the viewer is open
+  useEffect(() => {
+    if (loading || error) return
+    const interval = setInterval(() => {
+      window.pathly.fs.read(draftPath).then((content) => {
+        if (content === null) {
+          setError(true)
+        }
+      }).catch(() => { setError(true) })
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [loading, error, draftPath])
 
   function toggle(id: string): void {
     setHunks((prev) => prev.map((h) => h.id === id ? { ...h, accepted: !h.accepted } : h))

@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef } from 'react'
-import { SendHorizonal, Eye, EyeOff, ChevronRight, Trash2 } from 'lucide-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { SendHorizonal, Loader2, Eye, EyeOff, ChevronRight, Trash2 } from 'lucide-react'
 import { Tooltip } from '../../ui'
-import { useTerminalStore } from '../../../store/terminalStore'
+import { useToastStore } from '../../../store/toastStore'
 import type { Comment } from '../useComments'
 import { buildSendPrompt, getSpawnCwd } from '../commentUtils'
 import { CommentItem } from './CommentItem/CommentItem'
@@ -40,8 +40,8 @@ interface Props {
 export function CommentsPanel({
   filePath, body, comments, showHighlights, orphanedIds, onToggleHighlights, onCollapse, onClearAll, onResolve, onReopen, onRemove, onEdit, onScrollTo, onDraftReady,
 }: Props): JSX.Element {
-  const addTab = useTerminalStore((s) => s.addTab)
-  const openTab = useTerminalStore((s) => s.openTab)
+  const pushToast = useToastStore((s) => s.push)
+  const [isWorking, setIsWorking] = useState(false)
 
   const panelRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
@@ -84,21 +84,24 @@ export function CommentsPanel({
   const resolved = comments.filter((c) => c.resolved)
 
   async function handleSendToAgent(): Promise<void> {
-    if (!unresolved.length) return
+    if (!unresolved.length || isWorking) return
     const norm = filePath.replace(/\\/g, '/')
-    const fileName = norm.split('/').pop() ?? 'file'
     const cwd = getSpawnCwd(filePath)
     const prompt = buildSendPrompt(filePath, body, unresolved)
     const tabId = `review-${Date.now().toString(36)}`
-    addTab(tabId, `Review · ${fileName}`)
-    openTab(tabId)
 
+    setIsWorking(true)
     exitUnsubRef.current?.()
     exitUnsubRef.current = window.pathly.terminal.onExit((exitedTabId) => {
       if (exitedTabId !== tabId) return
       exitUnsubRef.current = null
       void window.pathly.fs.read(norm + '.draft').then((content) => {
-        if (content !== null && content.trim().length > 0) onDraftReady(norm + '.draft')
+        setIsWorking(false)
+        if (content !== null && content.trim().length > 0) {
+          onDraftReady(norm + '.draft')
+        } else {
+          pushToast('Agent finished but wrote no draft — check the terminal for errors', 'error')
+        }
       })
     })
 
@@ -193,10 +196,13 @@ export function CommentsPanel({
             type="button"
             className={styles.sendBtn}
             onClick={() => void handleSendToAgent()}
-            aria-label="Send comments to agent"
+            disabled={isWorking}
+            aria-label={isWorking ? 'Agent is working…' : 'Send comments to agent'}
           >
-            <SendHorizonal size={15} />
-            Send to Agent
+            {isWorking
+              ? <Loader2 size={15} className={styles.spinning} />
+              : <SendHorizonal size={15} />}
+            {isWorking ? 'Working…' : 'Send to Agent'}
           </button>
         </div>
       )}

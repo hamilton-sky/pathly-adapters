@@ -186,7 +186,10 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
       // PowerShell requires a newline immediately before the closing marker.
       const body = a.endsWith('\n') ? a : `${a}\n`
       varDecls.push(`${varName} = @'\n${body}'@`)
-      callTokens.push(varName)
+      // PS 5.1 does not escape " when passing a variable to a native exe, so
+      // the C-runtime argument parser sees unescaped quotes and truncates the value.
+      // Replace " with \" so the C-runtime receives the literal double-quote characters.
+      callTokens.push(`(${varName}.Replace('"', '\\"'))`)
     } else {
       callTokens.push(`'${a}'`)
     }

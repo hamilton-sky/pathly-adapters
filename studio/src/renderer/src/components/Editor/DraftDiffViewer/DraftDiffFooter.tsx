@@ -39,7 +39,7 @@ export function DraftDiffFooter({
   return (
     <div className={styles.footerWrap}>
       {unreviewedCount > 0 && (
-        <div className={styles.warning}>{unreviewedCount} sections not yet reviewed</div>
+        <div className={styles.warning}>You have {unreviewedCount} unreviewed sections</div>
       )}
       <div className={styles.footer}>
         <button type="button" className={styles.btnDiscard} onClick={() => setShowConfirm(true)}>

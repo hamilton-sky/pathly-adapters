@@ -22,6 +22,7 @@ export function buildSendPrompt(filePath: string, body: string, unresolved: Comm
     `You are revising the file: ${norm}`,
     '',
     'Address each reviewer comment below. Do not change sections that have no comments.',
+    'Do not ask clarifying questions. Make your best interpretation of each comment and apply it directly.',
     '',
     '--- REVIEWER COMMENTS ---',
     commentLines,
@@ -32,6 +33,6 @@ export function buildSendPrompt(filePath: string, body: string, unresolved: Comm
     '---',
     '',
     `Write the complete revised content to: ${norm}.draft`,
-    'After writing, briefly list which comments you addressed.',
+    'Do not write anything else — only the file content goes to that path. Exit when done.',
   ].join('\n')
 }

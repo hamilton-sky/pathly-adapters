@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDraftDiff } from './useDraftDiff'
 import { DraftHunkList } from './DraftHunkList'
 import { DraftPreviewPanel } from './DraftPreviewPanel'
 import { DraftDiffFooter } from './DraftDiffFooter'
+import { useToastStore } from '../../../store/toastStore'
 import styles from './DraftDiffViewer.module.css'
 
 interface Props {
@@ -44,17 +45,16 @@ function DiffContent({ originalPath, draftPath, onApply, onClose, onDiscard, onR
     )
   }
 
+  const pushToast = useToastStore((s) => s.push)
+  useEffect(() => {
+    if (!diff.loading && !diff.error && diff.totalChanged === 0) {
+      pushToast('No changes detected — draft is identical to the original', 'info')
+      onClose()
+    }
+  }, [diff.loading, diff.error, diff.totalChanged, onClose, pushToast])
+
   if (diff.totalChanged === 0) {
-    return (
-      <div className={styles.state}>
-        <div className={styles.stateText}>No changes detected — draft is identical</div>
-        <div className={styles.stateActions}>
-          <button type="button" className={styles.btnPrimary} onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    )
+    return null
   }
 
   return (

@@ -144,4 +144,13 @@
   font-weight: 700;
   transition: opacity 0.12s;
 }
-.sendBtn:hover { opacity: 0.85; }
+.sendBtn:hover:not(:disabled) { opacity: 0.85; }
+.sendBtn:disabled { opacity: 0.65; cursor: default; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 0.75s linear infinite;
+}

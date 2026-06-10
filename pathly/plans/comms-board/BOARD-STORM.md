@@ -1,10 +1,17 @@
-# Board-Storm — Consultation Mode Design
+# Board-Storm — Multi-Agent Consultation Flow
 
-**Feature:** Pre-pipeline ideation through the communication board  
+**Feature:** Pre-pipeline ideation through the communication board — a separate FSM flow
+that replaces the (always-skipped) STORM phase with an iterative, multi-agent expert panel.  
 **Parent spec:** [SPEC.md](SPEC.md) (the comms board)  
+**Related:** [STORM-REMOVAL.md](STORM-REMOVAL.md) (cutting STORMING from the team flow)  
 **Status:** Design  
 **Date:** 2026-06-10  
 **Depends on:** Comms board Phase 1 (backend) + Phase 2 (CommsPanel)  
+
+> **Evolution note (v2.0):** This doc began as a *single-consultant* design. It is now a
+> *multi-agent panel*: PO + architect + designer consult the human through the board, and
+> **each expert fills the plan template that matches their domain** (§15). The single-consultant
+> flow in §1–§14 is the mechanical substrate; the panel in §15 is how it is actually staffed.
 
 ---
 
@@ -340,6 +347,128 @@ into the next agent invocation.
 **v1 simplification:** skip the editor entirely. The user replies to the artefact
 as a threaded board message. The editor panel is a v2 enhancement.
 
+### 9.1 The editor loop ALREADY EXISTS — codebase finding (2026-06-10)
+
+The annotation editor described above is not a thing to build. It already exists
+and runs in the app today as the **file-review workflow** in
+`studio/src/renderer/src/components/Editor/index.tsx`. It is used for reviewing
+and revising plan/skill `.md` files with an AI agent.
+
+**The existing loop (Editor/index.tsx), step by step:**
+
+```
+1. Open a .md file        → loads body, checks for existing <file>.draft
+2. Select text in preview → CommentablePreview → handleSelectionComment → CommentModal
+3. Add anchored comment   → addComment(deriveLineNumber(body, anchor), anchor, body)
+4. "Send to agent"        → handleModalSendNow:
+                              buildSendPrompt(path, body, unresolvedComments)
+                              spawn: claude -p <prompt> --print --dangerously-skip-permissions
+                              agent writes <file>.draft
+5. Draft appears          → DraftDiffViewer shows diff, [Apply] / [Discard]
+6. Apply                  → writes revised content to file, deletes draft
+7. resolve / reopen       → per-comment verification lifecycle
+```
+
+**The comment data model** (`Editor/useComments.ts`):
+
+```ts
+interface Comment {
+  id: string
+  lineNumber: number    // position — RE-DERIVED from anchor text, not fixed
+  lineText: string      // ← the RESILIENT anchor (the text content itself)
+  body: string          // the comment
+  resolved: boolean     // ← the verification lifecycle
+  createdAt: string
+  color: CommentColor
+}
+```
+
+Comments persist to a sidecar file: `<filePath>.comments.json`.
+
+**Resilient anchoring is already solved** (`Editor/commentUtils.ts`):
+
+```ts
+// deriveLineNumber re-finds the anchored line after the agent rewrites the file
+const idx = lines.findIndex((l) => l.includes(firstLine))
+return idx !== -1 ? idx + 1 : 1
+```
+
+The anchor is the TEXT, not a DOM/pixel offset — so it survives the agent
+rewriting the artefact. There is even an orphan detector (`getOrphanedIds`)
+for comments whose anchor text disappeared after a rewrite.
+
+**The send-to-agent compiler already exists** (`Editor/commentUtils.ts → buildSendPrompt`):
+
+```
+"You are revising the file: <path>"
+"Address each reviewer comment below. Do not change sections that have no comments."
+--- REVIEWER COMMENTS ---
+Line 12 ("the SSE box"): use existing SSE infra
+--- CURRENT FILE CONTENT ---
+<body>
+"Write the complete revised content to: <path>.draft"
+"After writing, briefly list which comments you addressed."
+```
+
+**Reusable components (all under `Editor/`):**
+
+| Component | Role in board-storm |
+|---|---|
+| `Editor/index.tsx` | The full review loop orchestration — the template for the consult editor |
+| `CommentablePreview/` | Select text → anchored comment; highlights; selection tooltip |
+| `useComments.ts` | Comment CRUD + resolve/reopen lifecycle |
+| `commentUtils.ts → buildSendPrompt` | The "send to agent with comments" compiler |
+| `commentUtils.ts → deriveLineNumber` | Resilient re-anchoring after rewrites |
+| `DraftDiffViewer/` | Diff of agent revision vs original, with Apply / Discard |
+| `CommentsPanel/` + `CommentsPanelRail/` | Side panel listing comments, resolve/reopen |
+| `CommentModal/` | The add-comment popover |
+
+### 9.2 What board-storm actually is, given this
+
+```
+Board-storm  =  the EXISTING file-review loop (Editor/index.tsx)
+              + a session FSM driving it (OPEN → THINKING ⇄ AWAITING → CONVERTING)
+              + a "consultant" agent persona (questions/architecture/spec —
+                instead of buildSendPrompt's generic "revise this file")
+              + a convert-to-feature step
+```
+
+The hard 80% — anchored comments, resilient anchoring, the send-to-agent
+compiler, the draft/diff/apply loop — is built. Board-storm adds orchestration.
+
+### 9.3 Two integration paths
+
+**Path A — file-backed (recommended for v1 and v2):**
+
+```
+Artefacts ARE .md files in a consult session folder:
+  pathly/plans/.consult/<session_id>/
+    questions.md
+    architecture.md
+    draft_spec.md
+    implementation_plan.md
+
+Comments stay in sidecar files (<artefact>.comments.json).
+Reuse Editor + CommentablePreview + DraftDiffViewer + buildSendPrompt VERBATIM.
+
+Payoff: conversion becomes almost a FILE MOVE —
+  draft_spec.md          → pathly/plans/<feature>/USER_STORIES.md
+  implementation_plan.md → pathly/plans/<feature>/IMPLEMENTATION_PLAN.md
+  all artefacts          → copied as feature board messages (one DB insert each)
+```
+
+**Path B — board-native (later, when SSE/cross-feature memory needs the comments):**
+
+```
+Comments become comms_messages rows:
+  { type:'comment', reply_to:<artefact_msg_id>,
+    anchor:{ kind:'line', ref:lineNumber, text:lineText }, text:body, status }
+More work; do it only when the board itself must surface consultation comments.
+```
+
+The existing `Comment` model maps 1:1 onto Path B's message shape, so Path A → B
+is a later migration, not a rewrite.
+
 ---
 
 ## 10. Designer Note — It Should Feel Like a Document Review
@@ -404,14 +533,28 @@ GET  /events/consult?session_id=X  → SSE stream for real-time updates
 
 ```
 Step 1  consult.md skill + consultant agent role          (src/pathly_data/)
+        consultant prompt = adapt buildSendPrompt's structure to produce
+        questions/architecture/spec artefacts as .md files
 Step 2  session state via app_settings                    (no new table)
 Step 3  consult.py blueprint — 5 routes                   (http_server/blueprints/)
 Step 4  consult.py loop driver — the FSM                  (supervisor/)
-Step 5  consult_convert.py — artefacts → plan files       (runner/)
-Step 6  ConsultPanel — reuse CommsPanel + artefact cards  (studio/components/HQ/)
+Step 5  consult_convert.py — artefact .md files → plan files (runner/)
+        (Path A: near file-move — see §9.3)
+Step 6  Consult view — REUSE the existing Editor loop      (studio/components/)
+        Editor/index.tsx + CommentablePreview + DraftDiffViewer already
+        provide the entire annotate → send → revise → diff → apply cycle.
+        New work: a session/thread shell + "Start pipeline" button.
 ```
 
-Prerequisite: comms board Phase 1 (backend) + Phase 2 (CommsPanel) shipped.
+Prerequisite for the EDITOR surface: none — `Editor/index.tsx` and its comment
+stack already exist and run (used for plan/skill file review).
+Prerequisite for the BOARD/thread + SSE surface: comms board Phase 1 + Phase 2.
+
+**Path A insight:** because the editor loop is file-backed today, board-storm v1
+can ship on files alone — artefacts as `.md` in `pathly/plans/.consult/<session>/`,
+reusing the existing Editor verbatim — before the comms board DB layer is even
+built. The DB/board layer is only needed for the thread view, SSE, and
+cross-feature memory.
 
 **Phase 5 deliverable:** the user can open a blank board, discuss an idea with a
 consultant agent through evolving artefacts, and convert the session into a
@@ -425,7 +568,9 @@ that was decided.
 | Question | Options | Recommendation |
 |---|---|---|
 | How does the agent emit artefacts? | Agent calls /comms/post itself (skill) vs server parses agent stdout | Agent posts via skill — reuses comms write path |
-| Editor annotation in v1? | Build it / threaded replies only | Threaded replies only; editor is v2 |
+| Editor annotation in v1? | Build it / threaded replies only | RESOLVED — the editor loop already exists (Editor/index.tsx, §9.1). Reuse it; no build needed. |
+| Anchor model — survives agent rewrites? | DOM offset / line / text | RESOLVED — existing code anchors by TEXT (lineText) + re-derives line; orphan detection included (§9.1) |
+| Artefact storage — files or DB? | .md files / comms_messages rows | Path A: `.md` files in `pathly/plans/.consult/<session>/` for v1 (reuses Editor verbatim); migrate to DB later (§9.3) |
 | Consultant model | sonnet vs opus | opus — this is the thinking work |
 | Does board-storm need its own board type? | New `board='consult'` vs reuse `board='feature'` | New `board='consult'`, scope=session_id; promoted to feature on convert |
 | What if the user abandons a session? | Auto-trash after N days / keep forever | Trash after 30 days (same as comms board lifecycle) |
@@ -433,4 +578,152 @@ that was decided.
 
 ---
 
-*Board-storm design v1.0 — consultation mode over the comms board*
+---
+
+## 15. Multi-Agent Consultation Flow
+
+### 15.1 Why a panel, not one consultant
+
+A single consultant has to be a generalist. Real pre-build thinking has three distinct
+jobs: **what** to build (scope/requirements), **how** to build it (architecture), and
+**how it should look/feel** (UX). Those are three different experts. The consult flow
+staffs them as a panel — the same three voices that already exist as agents (`po`,
+`architect`, `designer`) and that authored `CONSULTATION.md`.
+
+This flow **replaces the STORM phase** entirely (see STORM-REMOVAL.md). The team flow
+loses STORMING and enters at PLANNING (or later — §15.5).
+
+### 15.2 The panel through the board
+
+```
+CONSULTING — the human talks to a panel via the board (using the `to_agent` field):
+
+  👤 human  ──"a notification system across features"──►  consult board
+       │
+       ├─► 🧭 po        → fills USER_STORIES.md · EDGE_CASES.md · HAPPY_FLOW.md
+       ├─► 🏛 architect  → fills ARCHITECTURE_PROPOSAL.md · IMPLEMENTATION_PLAN.md · FLOW_DIAGRAM.md
+       └─► 🎨 designer   → fills DESIGN.md          (UI features only)
+
+  Each expert posts artefacts to the board. The human reviews/annotates them in the
+  editor surface (§9 — the existing comment loop) and replies. The `to_agent` field
+  routes a follow-up to one named expert: "architect, reconsider the SSE choice."
+```
+
+The `to_agent` field already in the message schema (SPEC §5) was built for exactly this.
+
+### 15.3 Per-expert template ownership ⭐
+
+The core refinement: the planner no longer authors everything alone. **Each expert is
+handed the plan template that matches their domain and fills it.** The planner runs last
+as the *integrator*.
+
+| Expert | Owns these templates | Why |
+|---|---|---|
+| 🧭 **po** | `USER_STORIES.md`, `EDGE_CASES.md`, `HAPPY_FLOW.md` | the what / why / user journey |
+| 🏛 **architect** | `ARCHITECTURE_PROPOSAL.md`, `IMPLEMENTATION_PLAN.md`, `FLOW_DIAGRAM.md` | the how / phases / file targets |
+| 🎨 **designer** | `DESIGN.md` (UI features only) | the look / UX system (design subsystem already emits this) |
+| 🗂 **planner** | `FEATURE_INDEX.md`, `PROGRESS.md`, `CONVERSATION_PROMPTS.md` | **integrate + slice + track** |
+
+The planner **never invents architecture**. It reads the architect's `IMPLEMENTATION_PLAN.md`,
+slices the phases into ≤4 conversations, and writes the index/progress/prompts that stitch
+everyone's output into a buildable plan — exactly what a PM does.
+
+### 15.4 Template-native artefacts = the file-move conversion
+
+Because each expert fills their **actual template** during consultation (not free-form text
+that is converted later), the consultation artefact *is* the plan file:
+
+```
+po's artefact            IS   USER_STORIES.md          (no lossy conversion)
+human annotates          →    the real USER_STORIES.md via the editor comment loop (§9)
+conversion               =    move files → pathly/plans/<feature>/   (Path A — §9.3)
+```
+
+This is why Path A (file-backed, §9.3) is the right substrate: artefacts live as `.md`
+files in `pathly/plans/.consult/<session>/`, get annotated by the existing editor, and
+convert by moving into the feature folder.
+
+### 15.5 What's left for the team flow — entry point
+
+If PO + architect + designer + planner fill **all** the plan and design templates during
+consultation, then PLAN and DESIGN are already done at conversion. The team flow shrinks:
+
+```
+consult flow (PO + architect + designer + planner — fills every template)
+    │  convert = move files
+    ▼
+team flow:  PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO → DONE
+            └─ pre-filled ─┘   └────────── pure execution ──────────┘
+```
+
+**Recommendation:** enter the team flow at **PLANNING**, where the planner does a fast
+integration/validation pass over the pre-filled files — keeping one checkpoint before BUILD.
+Entering directly at **BUILDING** is where this logically ends up (PLAN+DESIGN fully done in
+consult), but keep the PLAN checkpoint until the consult flow is proven in practice.
+
+### 15.6 Panel orchestration — hybrid
+
+```
+Default choreography (a relay — each expert builds on the prior one's template):
+  PO scopes  →  architect designs against that scope  →  designer styles that design
+                                                      →  planner integrates all
+
+The human can interject at any point (board to_agent routing makes this natural):
+  "go back to PO, the scope is wrong"
+  "skip designer — backend only"
+  "architect, give me a second option"
+```
+
+Rigor scales the panel:
+
+| Rigor | Panel | Rounds |
+|---|---|---|
+| `nano` | PO only | 1 |
+| `lite` | PO + architect | 1–2 |
+| `standard` | PO + architect (+ designer if UI) | a few |
+| `strict` | full panel, `risks` artefact required | multiple |
+
+**Designer is conditional** — invoked only when the feature has a UI surface. A pure-backend
+feature (e.g. comms-board Phase 1) skips designer and skips `DESIGN.md`.
+
+### 15.7 Consultation FSM (revised for the panel)
+
+```
+OPEN → CONSULTING ⇄ AWAITING → CONVERTING → DONE
+
+CONSULTING   the active expert (po/architect/designer/planner) runs headless, fills its
+             template artefact, posts to the board, exits.
+AWAITING     human reviews/annotates the template in the editor; replies or redirects
+             (to_agent picks the next/same expert).
+             → CONSULTING  (next expert or another round)
+             → CONVERTING  (human: "Start pipeline")
+CONVERTING   move the filled template files → pathly/plans/<feature>/ ; register the
+             feature in the team flow at PLANNING.
+DONE
+```
+
+The substrate is unchanged from §7 — it is the same single-agent loop, just invoked once
+per expert with `to_agent` selecting who runs.
+
+### 15.8 Reuses existing primitives
+
+| Need | Already exists |
+|---|---|
+| PO expert | `po` agent + `pathly-po` skill (interactive requirements) |
+| Architect expert | `architect` agent |
+| Designer expert | `designer` agent + `pathly-design` + the design subsystem (emits `DESIGN.md`) |
+| Planner integrator | `planner` agent + the plan skill (already template-driven) |
+| Multi-agent discussion | `pathly-meet` skill (candidate primitive) |
+| Templates | `core/templates/plan/*.template.md` — already one per file |
+| Editor annotation loop | `Editor/index.tsx` + comment stack (§9.1) |
+
+Nothing new to build at the agent layer — the consult flow *orchestrates* existing experts
+through the board, handing each the template it owns.
+
+---
+
+*Board-storm design v2.0 — generalized to a multi-agent consultation flow: PO + architect +
+designer panel via board `to_agent` routing; per-expert template ownership (planner integrates
+last); template-native artefacts make conversion a file-move; replaces the removed STORM phase
+(see STORM-REMOVAL.md); team flow enters at PLANNING pre-filled. Single-consultant substrate
+(§1–§14) unchanged — the panel is how it is staffed.*

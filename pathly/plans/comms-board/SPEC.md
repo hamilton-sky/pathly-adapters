@@ -1898,4 +1898,70 @@ retrieval valuable. You need to fill the boards before you need to search across
 
 ---
 
-*Spec version 5.0 — Board-Storm folded in as Phase 5; final phase ordering locked (1→2→3→5→4); full board-storm design in BOARD-STORM.md*
+---
+
+## 25. Flow Architecture Change — STORM Removed, Consult Flow Added
+
+> Detail in [STORM-REMOVAL.md](STORM-REMOVAL.md) (audit + removal plan) and
+> [BOARD-STORM.md](BOARD-STORM.md) §15 (the multi-agent consultation flow).
+
+### 25.1 The change
+
+The always-skipped STORM phase is removed from the team flow. A separate **consult flow**
+(the multi-agent panel) replaces it. The board is what powers that flow, which is why the
+board backend (Phase 1) ships first.
+
+```
+BEFORE
+  team:  STORM → PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO → DONE
+          ↑ one-shot, always skipped
+
+AFTER
+  consult:  OPEN → CONSULTING ⇄ AWAITING → CONVERTING → DONE
+            (PO + architect + designer + planner — each fills its own template)
+                │  convert = move filled template files into pathly/plans/<feature>/
+                ▼
+  team:     PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO → DONE
+            (enters at PLAN, pre-filled; PLAN is a fast integration/validation pass)
+```
+
+### 25.2 Per-expert template ownership
+
+The consult flow distributes plan-template authoring across the panel; the planner
+integrates last (full table in BOARD-STORM.md §15.3):
+
+| Expert | Templates |
+|---|---|
+| po | `USER_STORIES.md`, `EDGE_CASES.md`, `HAPPY_FLOW.md` |
+| architect | `ARCHITECTURE_PROPOSAL.md`, `IMPLEMENTATION_PLAN.md`, `FLOW_DIAGRAM.md` |
+| designer | `DESIGN.md` (UI only) |
+| planner | `FEATURE_INDEX.md`, `PROGRESS.md`, `CONVERSATION_PROMPTS.md` |
+
+### 25.3 Removal surface (summary)
+
+Mandatory to remove the state: **Tier 1** (`team.flow.yaml`, `test.flow.yaml`,
+`fsm_ops.py`, `blueprints/skills.py`) + **Tier 2** (≈7 Studio state-list files) +
+a `STORMING→PLANNING` recovery shim for in-flight features. The FSM has no hardcoded
+state enum in Python — states are data-driven from the flow YAML — so the backend surface
+is small. Skill/agent/doc rewiring (Tiers 3–6) follows as the consult flow lands; telemetry
+keeps `storm` valid for back-compat (Tier 7). Full tier table in STORM-REMOVAL.md.
+
+### 25.4 Sequencing vs the comms-board phases
+
+```
+comms-board Phase 1   board backend (this plan folder)        ← powers everything below
+        ▼
+STORM-REMOVAL Steps 1–3   cut STORMING from pipeline + UI + recovery shim  (independent, can land early)
+        ▼
+comms-board Phase 5   consult flow = the multi-agent panel over the board
+        │             (PO + architect + designer + planner, per-expert templates)
+        ▼
+team flow             now enters at PLAN, pre-filled by the consult flow
+```
+
+---
+
+*Spec version 6.0 — Flow architecture change added: STORM removed from the team flow
+(audit in STORM-REMOVAL.md), replaced by the multi-agent consultation flow (BOARD-STORM.md
+§15) with per-expert template ownership; team flow enters at PLAN pre-filled. Prior:
+v5.0 folded Board-Storm in as Phase 5 with phase ordering 1→2→3→5→4.*

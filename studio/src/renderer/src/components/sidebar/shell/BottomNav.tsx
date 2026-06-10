@@ -1,3 +1,4 @@
+import { Database, Settings } from 'lucide-react'
 import styles from '../Sidebar.module.css'
 
 interface BottomNavProps {
@@ -27,7 +28,8 @@ export function BottomNav({ activePanel, onMonitor, onSettings, onDbExplorer }: 
         className={`${styles.bottomRow} ${activePanel === 'db-explorer' ? styles.bottomRowActive : ''}`}
         onClick={onDbExplorer}
       >
-        ⊞ DB Explorer
+        <Database size={15} />
+        DB Explorer
       </button>
 
       <button
@@ -36,7 +38,8 @@ export function BottomNav({ activePanel, onMonitor, onSettings, onDbExplorer }: 
         className={`${styles.bottomRow} ${activePanel === 'settings' ? styles.bottomRowActive : ''}`}
         onClick={onSettings}
       >
-        ⚙ Settings
+        <Settings size={15} />
+        Settings
       </button>
 
       <div className={styles.divider} />
