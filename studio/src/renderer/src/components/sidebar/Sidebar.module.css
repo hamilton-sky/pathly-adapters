@@ -799,6 +799,23 @@
   cursor: grab;
 }
 
+/* ── Popover mode (narrow windows) ── */
+.popover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  z-index: 200;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 199;
+  background: rgba(0, 0, 0, 0.4);
+}
+
 .subdirRowDragOver {
   background: var(--accent, rgba(100,200,255,0.12));
   outline: 1px dashed var(--accent, #7ec8e3);

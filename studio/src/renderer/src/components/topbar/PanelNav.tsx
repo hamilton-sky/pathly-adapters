@@ -5,7 +5,11 @@ import { Tooltip } from "../ui";
 import { readFile } from "../../services/pathlyApi";
 import styles from "./TopBar.module.css";
 
-export function PanelNav(): JSX.Element {
+interface PanelNavProps {
+  compact?: boolean
+}
+
+export function PanelNav({ compact }: PanelNavProps): JSX.Element {
   const {
     activePanel,
     selectedItem,
@@ -41,7 +45,7 @@ export function PanelNav(): JSX.Element {
           }}
         >
           <LayoutGrid size={15} />
-          Canvas
+          {!compact && <span className={styles.navBtnLabel}>Canvas</span>}
         </button>
       </Tooltip>
       <Tooltip label="Skill notebook" shortcut="Ctrl+2" placement="bottom">
@@ -52,7 +56,7 @@ export function PanelNav(): JSX.Element {
           onClick={() => setActivePanel("skill-notebook")}
         >
           <BookOpen size={15} />
-          Notebook
+          {!compact && <span className={styles.navBtnLabel}>Notebook</span>}
         </button>
       </Tooltip>
       <Tooltip label="Live monitor" shortcut="Ctrl+3" placement="bottom">
@@ -64,7 +68,7 @@ export function PanelNav(): JSX.Element {
           onClick={() => setActivePanel("monitor")}
         >
           <Activity size={15} />
-          Monitor
+          {!compact && <span className={styles.navBtnLabel}>Monitor</span>}
         </button>
       </Tooltip>
       <Tooltip
@@ -79,7 +83,7 @@ export function PanelNav(): JSX.Element {
           onClick={() => setActivePanel("db-explorer")}
         >
           <Database size={15} />
-          DB Explorer
+          {!compact && <span className={styles.navBtnLabel}>DB Explorer</span>}
         </button>
       </Tooltip>
     </div>

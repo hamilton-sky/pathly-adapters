@@ -1,0 +1,87 @@
+.strip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 44px;
+  height: 100%;
+  background: var(--bg-mantle);
+  border-right: 1px solid var(--bg-surface0);
+  padding: 8px 0 6px;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.expandBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.expandBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+.expandBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.divider {
+  width: 24px;
+  height: 1px;
+  background: var(--bg-surface0);
+  margin: 4px 0;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.iconBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+.iconBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.iconBtnActive {
+  color: var(--accent);
+}
+.iconBtnActive:hover {
+  color: var(--accent);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  margin-top: 2px;
+}

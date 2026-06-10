@@ -13,13 +13,17 @@ import SkillSplitModal from '../shared/SkillSplitModal/SkillSplitModal'
 import type { CatalogGroup, CatalogItemData } from '../shared/LibraryCatalog/useCatalogData'
 import { useSkillNotebookStore } from '../../store/skillNotebookStore'
 import { useSidebarResize } from './shell/useSidebarResize'
+import { useWindowWidth } from './shell/useWindowWidth'
 import { TabBar } from './shell/TabBar'
 import { FilterRow } from './shell/FilterRow'
 import { BottomNav } from './shell/BottomNav'
 import { BrightskyProfile } from './shell/BrightskyProfile'
 import { SidebarDialogs } from './shell/SidebarDialogs'
+import { IconStrip } from './shell/IconStrip'
 import type { Section } from './types'
 import styles from './Sidebar.module.css'
+
+const POPOVER_BREAKPOINT = 700
 
 const CORE_RESOURCE_DIRS = [
   'src/pathly_data/core/flows',
@@ -54,10 +58,13 @@ export function Sidebar(): JSX.Element | null {
     activeTopic,
     setActiveTopic,
     sidebarCollapsed,
+    setSidebarCollapsed,
     selectedItem,
     setSelectedItem,
     setActivePanel,
     setSkillNotebookPath,
+    skillNotebookViewMode,
+    setSkillNotebookViewMode,
     dirtyItems,
     activePanel,
     setLastUsedFlowPath,
@@ -111,6 +118,7 @@ export function Sidebar(): JSX.Element | null {
   const activePanelUi = useUiStore((s) => s.activePanel)
 
   const { sidebarRef, onDragStart } = useSidebarResize()
+  const windowWidth = useWindowWidth()
 
   const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
@@ -140,7 +148,32 @@ export function Sidebar(): JSX.Element | null {
   const lowerFilter = deferredFilter.toLowerCase()
 
 
-  if (sidebarCollapsed) return null
+  const isNarrow = windowWidth < POPOVER_BREAKPOINT
+
+  // Narrow + collapsed → completely hidden (TopBar toggle re-opens as popover)
+  if (sidebarCollapsed && isNarrow) return null
+
+  // Wide + collapsed → icon strip (no layout impact, thin rail)
+  if (sidebarCollapsed && !isNarrow) {
+    const openTab = (tab: 'library' | 'workspace'): void => {
+      setSidebarCollapsed(false)
+      setLibraryOpen(tab === 'library')
+      setFilter('')
+      try { localStorage.setItem('pathly:sidebarTab', tab) } catch { /* ignore */ }
+    }
+    return (
+      <IconStrip
+        activePanel={activePanel}
+        libraryOpen={libraryOpen}
+        onExpand={() => setSidebarCollapsed(false)}
+        onWorkspace={() => openTab('workspace')}
+        onLibrary={() => openTab('library')}
+        onMonitor={() => setActivePanel('monitor')}
+        onDbExplorer={() => setActivePanel('db-explorer')}
+        onSettings={() => setActivePanel('settings')}
+      />
+    )
+  }
 
   function toggleSection(label: string): void {
     setSections((prev) => ({ ...prev, [label]: { ...prev[label], open: !prev[label].open } }))
@@ -528,8 +561,20 @@ export function Sidebar(): JSX.Element | null {
     }
   }
 
+  const sidebarClass = isNarrow
+    ? `${styles.sidebar} ${styles.popover}`
+    : styles.sidebar
+
   return (
-    <div ref={sidebarRef} className={styles.sidebar}>
+    <>
+    {isNarrow && (
+      <div
+        className={styles.backdrop}
+        onClick={() => setSidebarCollapsed(true)}
+        aria-hidden="true"
+      />
+    )}
+    <div ref={sidebarRef} className={sidebarClass}>
       <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
 
       {!libraryOpen && (
@@ -556,12 +601,15 @@ export function Sidebar(): JSX.Element | null {
               setLastUsedFlowPath(pathOrName)
             }}
             onInsertCell={(item) => {
+              if (skillNotebookViewMode !== 'cells') setSkillNotebookViewMode('cells')
               const lastCell = notebookCells[notebookCells.length - 1]
               if (item.itemType === 'fragment') {
                 insertFragment(item.name, lastCell?.id ?? null)
               } else if (item.path) {
                 void window.pathly.fs.read(item.path).then(raw => {
                   insertBodyCell(item.name, raw ?? '', lastCell?.id ?? null)
+                }).catch(() => {
+                  insertBodyCell(item.name, '', lastCell?.id ?? null)
                 })
               }
             }}
@@ -689,11 +737,13 @@ export function Sidebar(): JSX.Element | null {
           onClose={() => setSplitModalItem(null)}
           onInsertOne={(raw) => {
             setSplitModalItem(null)
+            if (skillNotebookViewMode !== 'cells') setSkillNotebookViewMode('cells')
             const lastCell = notebookCells[notebookCells.length - 1]
             insertBodyCell(splitModalItem.name, raw, lastCell?.id ?? null)
           }}
           onConfirm={(cells) => {
             setSplitModalItem(null)
+            if (skillNotebookViewMode !== 'cells') setSkillNotebookViewMode('cells')
             let lastId = notebookCells[notebookCells.length - 1]?.id ?? null
             for (const cell of cells) {
               lastId = insertBodyCell(cell.heading, cell.content, lastId)
@@ -702,5 +752,6 @@ export function Sidebar(): JSX.Element | null {
         />
       )}
     </div>
+    </>
   )
 }

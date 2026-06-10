@@ -10,7 +10,10 @@ import { TerminalLauncher } from './TerminalLauncher'
 import { PanelNav } from './PanelNav'
 import { PublishControl } from './PublishControl'
 import { PublishLog } from './PublishLog'
+import { useWindowWidth } from '../sidebar/shell/useWindowWidth'
 import styles from './TopBar.module.css'
+
+const TOPBAR_COMPACT_BREAKPOINT = 1060
 
 export function TopBar(): JSX.Element {
   const {
@@ -27,6 +30,7 @@ export function TopBar(): JSX.Element {
 
   const { chatOpen, toggleChat } = useUiStore()
   const [showLog, setShowLog] = useState(false)
+  const compact = useWindowWidth() < TOPBAR_COMPACT_BREAKPOINT
 
   const badgeLabel = monitorSource === 'sse' ? 'SSE live' : 'File watch'
 
@@ -47,9 +51,9 @@ export function TopBar(): JSX.Element {
         </Tooltip>
 
         <div className={styles.center}>
-          <TopicSelector />
+          <TopicSelector compact={compact} />
           <EditorLauncher />
-          {projectPath && (
+          {projectPath && !compact && (
             <IconButton
               onClick={() => void window.pathly.shell.openWindow(projectPath)}
               title="New Pathly window"
@@ -59,7 +63,7 @@ export function TopBar(): JSX.Element {
               <Copy size={14} />
             </IconButton>
           )}
-          <PanelNav />
+          <PanelNav compact={compact} />
         </div>
 
         <div className={styles.right}>
