@@ -10,7 +10,6 @@ export function PanelNav(): JSX.Element {
     activePanel,
     selectedItem,
     lastUsedFlowPath,
-    skillNotebookPath,
     setActivePanel,
     setSelectedItem,
     setLastUsedFlowPath,
@@ -45,21 +44,11 @@ export function PanelNav(): JSX.Element {
           Canvas
         </button>
       </Tooltip>
-      <Tooltip
-        label={
-          skillNotebookPath
-            ? "Skill notebook"
-            : "Open a skill .md file to use the notebook"
-        }
-        shortcut={skillNotebookPath ? "Ctrl+2" : undefined}
-        placement="bottom"
-      >
+      <Tooltip label="Skill notebook" shortcut="Ctrl+2" placement="bottom">
         <button
           type="button"
           data-testid="topbar-panel-notebook"
-          className={`${styles.navBtn} ${activePanel === "skill-notebook" ? styles.navBtnActive : ""}
-           ${!skillNotebookPath ? styles.navBtnDisabled : ""}
-           `}
+          className={`${styles.navBtn} ${activePanel === "skill-notebook" ? styles.navBtnActive : ""}`}
           onClick={() => setActivePanel("skill-notebook")}
         >
           <BookOpen size={15} />
