@@ -1,2 +1,2 @@
 RESULT: PASS
-Verified: conversation 2 complete — 11 DraftDiffViewer files (useDraftDiff + 5 components + 5 CSS modules) created with correct ARIA (role=dialog, role=tablist/tab, aria-selected), all buttons type="button", no inline styles, typecheck exits zero.
+Verified: conversation 3 complete — DraftDiffViewer mounted in Editor/index.tsx with all handlers (handleDiffApply, handleDiffDiscard) wired, orphaned-draft detection on file open present, typecheck passes with zero errors.

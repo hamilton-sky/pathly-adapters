@@ -3,13 +3,25 @@
   "convs_done": 1,
   "current": "BUILDING",
   "updated_at": "2026-06-10T06:21:08Z",
-  "conv_start_sha": "611895a7c2f0630cdcc8d4c3ab2e80071e3caa18",
+  "conv_start_sha": "01e67815de04d7de2c398ac90e3d93012e89e2f6",
   "build_baseline": {
-    "started_at": "2026-06-10T07:44:57.224494+00:00",
+    "started_at": "2026-06-10T08:02:30.068081+00:00",
     "preexisting_dirty": [
       "pathly/plans/send-to-agent-diff/STATE.json",
-      "studio/src/main/ipc/terminal.ts",
-      "studio/src/renderer/src/components/Editor/index.tsx"
+      "pathly/plans/send-to-agent-diff/VERIFY.md",
+      "pathly/plans/send-to-agent-diff/feedback/",
+      "src/pathly_orchestrator/http_server/blueprints/telemetry.py",
+      "src/pathly_orchestrator/supervisor/orchestrator.py",
+      "src/pathly_orchestrator/supervisor/terminal.py",
+      "studio/src/main/preload/index.ts",
+      "studio/src/renderer/src/components/HQ/useHQ.tsx",
+      "studio/src/renderer/src/components/shared/SkillSplitModal/SkillSplitModal.tsx",
+      "studio/src/renderer/src/components/sidebar/Sidebar.tsx",
+      "studio/src/renderer/src/lib/pathlyContextCollector.ts",
+      "studio/src/renderer/src/lib/studioAnalyzer.ts",
+      "studio/src/renderer/src/store/notificationStore.ts",
+      "studio/src/renderer/src/store/runnerStore.ts",
+      "studio/src/renderer/src/types/global.d.ts"
     ]
   }
 }

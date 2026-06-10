@@ -87,12 +87,13 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('window:setTitleBarOverlay', { color, symbolColor }),
   },
   fs: {
-    read: (path: string): Promise<string> => ipcRenderer.invoke('fs:read', path),
+    read: (path: string): Promise<string | null> => ipcRenderer.invoke('fs:read', path),
     write: (path: string, content: string): Promise<void> =>
       ipcRenderer.invoke('fs:write', path, content),
     list: (dir: string): Promise<string[]> => ipcRenderer.invoke('fs:list', dir),
     listDirs: (dir: string): Promise<string[]> => ipcRenderer.invoke('fs:listDirs', dir),
     delete: (path: string): Promise<void> => ipcRenderer.invoke('fs:delete', path),
+    moveToParent: (filePath: string): Promise<string> => ipcRenderer.invoke('fs:moveToParent', filePath),
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('fs:pickFolder'),
     userHome: (): Promise<string> => ipcRenderer.invoke('fs:userHome'),
     appRoot: (): Promise<string> => ipcRenderer.invoke('fs:appRoot')

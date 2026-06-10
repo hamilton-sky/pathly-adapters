@@ -515,6 +515,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                 stage=state.current_state or "",
                 agent="supervisor",
                 text=f"{(state.current_state or 'stage').lower()} complete — {preferred_adapter} finished",
+                broadcast_fn=broadcast_fn,
             )
 
             # next_state — continue loop

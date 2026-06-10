@@ -71,8 +71,8 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
       setCells(parseMdToCells(rawContentProp))
     } else if (filePath) {
       window.pathly.fs.read(filePath).then((content) => {
-        setRawContent(content)
-        setCells(parseMdToCells(content))
+        setRawContent(content ?? '')
+        setCells(parseMdToCells(content ?? ''))
       }).catch(() => {})
     }
   }, [filePath, rawContentProp])

@@ -371,6 +371,13 @@ def record_phase_summary_endpoint():
         conn = _get_db()
         seq = _db_append_event(conn, str(project_root), feature, event)
 
+        # Live-broadcast to Studio so the log card updates in headless mode
+        try:
+            from pathly_orchestrator.http_server.sse import _broadcast_runner
+            _broadcast_runner(feature, event)
+        except Exception:
+            pass
+
         return jsonify({"status": "recorded", "seq": seq}), 200
     except Exception as e:
         logging.exception("record_phase_summary error")

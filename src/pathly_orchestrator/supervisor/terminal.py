@@ -26,8 +26,9 @@ def _write_supervisor_phase_summary(
     stage: str,
     agent: str,
     text: str,
+    broadcast_fn=None,
 ) -> None:
-    """Write a PHASE_SUMMARY event to the feature's SQLite DB. Silent on failure."""
+    """Write a PHASE_SUMMARY event to the feature's SQLite DB and broadcast to Studio via SSE."""
     import time as _time
     if not project_root or not topic:
         return
@@ -49,6 +50,12 @@ def _write_supervisor_phase_summary(
         if phase:
             event["phase"] = phase
         _db.append_event(conn, project_root, topic, event)
+        # Broadcast to Studio so live log cards update in headless mode
+        if broadcast_fn:
+            try:
+                broadcast_fn(topic, event)
+            except Exception:
+                pass
     except Exception:
         logger.debug("_write_supervisor_phase_summary failed", exc_info=True)
 
@@ -210,6 +217,7 @@ def _run_stage_via_terminal(
             project_root=state.project_root,
             topic=state.topic,
             stage=state.current_state or "",
+            broadcast_fn=broadcast_fn,
             agent="supervisor",
             text=f"Starting {(state.current_state or 'stage').lower()} — {adapter} agent spawned",
         )

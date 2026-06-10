@@ -89,7 +89,7 @@ declare global {
     __pathlyNavigate?: (panelName: string) => void
     pathly: {
       fs: {
-        read: (path: string) => Promise<string>
+        read: (path: string) => Promise<string | null>
         write: (path: string, content: string) => Promise<void>
         list: (dir: string) => Promise<string[]>
         listDirs: (dir: string) => Promise<string[]>

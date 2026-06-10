@@ -43,6 +43,13 @@ export interface HistoricalRun {
   cost: number
 }
 
+export interface PhaseSummaryEntry {
+  agent: string
+  text: string
+  stage: string
+  ts: number
+}
+
 export type RunnerMode = 'interactive' | 'headless'
 
 interface RunnerState {
@@ -56,6 +63,7 @@ interface RunnerState {
   topic: string | null
   projectRoot: string | null
   stageLog: StageLogEntry[]
+  phaseSummaries: PhaseSummaryEntry[]
   activeRunnerTabId: string | null
   logCardExpanded: boolean
   runStartedAt: number | null
@@ -66,7 +74,7 @@ interface RunnerState {
   maxCostUsd: number
   maxIterations: number
   setAgentQuestion: (q: AgentQuestion | null) => void
-  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory' | 'removeHistoricalRun' | 'recordStagePrompt' | 'recordStageResult' | 'setAgentQuestion' | 'setRunnerMode' | 'setRunConfig'>>) => void
+  setRunnerState: (patch: Partial<Omit<RunnerState, 'setRunnerState' | 'resetRunner' | 'setDecisionMenu' | 'setRunnerConfig' | 'recordStageStart' | 'recordStageEnd' | 'attachTerminalToStage' | 'setActiveRunnerTabId' | 'setLogCardExpanded' | 'jumpToLiveTab' | 'snapshotRun' | 'resetRunHistory' | 'removeHistoricalRun' | 'recordStagePrompt' | 'recordStageResult' | 'setAgentQuestion' | 'setRunnerMode' | 'setRunConfig' | 'appendPhaseSummary'>>) => void
   resetRunner: () => void
   setDecisionMenu: (items: DecisionMenuItem[] | null) => void
   setRunnerConfig: (topic: string, projectRoot: string) => void
@@ -83,6 +91,7 @@ interface RunnerState {
   snapshotRun: () => void
   resetRunHistory: () => void
   removeHistoricalRun: (index: number) => void
+  appendPhaseSummary: (entry: PhaseSummaryEntry) => void
 }
 
 const initialState = {
@@ -96,6 +105,7 @@ const initialState = {
   topic: null,
   projectRoot: null,
   stageLog: [] as StageLogEntry[],
+  phaseSummaries: [] as PhaseSummaryEntry[],
   activeRunnerTabId: null,
   logCardExpanded: false,
   runStartedAt: null,
@@ -168,5 +178,9 @@ export const useRunnerStore = create<RunnerState>()((set, get) => ({
   resetRunHistory: () => set({ runHistory: [] }),
   removeHistoricalRun: (index) => set((s) => ({
     runHistory: s.runHistory.filter((_, i) => i !== index),
+  })),
+  appendPhaseSummary: (entry) => set((s) => ({
+    // Keep last 50 summaries per run — prevents unbounded growth
+    phaseSummaries: [...s.phaseSummaries, entry].slice(-50),
   })),
 }))

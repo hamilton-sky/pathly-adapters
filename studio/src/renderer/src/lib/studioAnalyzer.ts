@@ -15,7 +15,8 @@ type ToolHandler = (params: unknown) => Promise<unknown>
 async function safeRead(path: string, maxChars: number): Promise<string> {
   try {
     const content = await window.pathly.fs.read(path)
-    return content.length > maxChars ? content.slice(0, maxChars) : content
+    const text = content ?? ''
+    return text.length > maxChars ? text.slice(0, maxChars) : text
   } catch {
     return ''
   }

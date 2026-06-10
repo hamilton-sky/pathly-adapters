@@ -561,7 +561,7 @@ export function Sidebar(): JSX.Element | null {
                 insertFragment(item.name, lastCell?.id ?? null)
               } else if (item.path) {
                 void window.pathly.fs.read(item.path).then(raw => {
-                  insertBodyCell(item.name, raw, lastCell?.id ?? null)
+                  insertBodyCell(item.name, raw ?? '', lastCell?.id ?? null)
                 })
               }
             }}

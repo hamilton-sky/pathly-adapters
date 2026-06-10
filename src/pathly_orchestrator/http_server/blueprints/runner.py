@@ -158,9 +158,16 @@ def runner_terminal_result():
                     summary = agent_done.get("summary", "")
                     if summary:
                         parsed["result"] = summary
-                    # Use EVENTS.jsonl cost as fallback when stdout didn't capture it
+                    # Use EVENTS.jsonl values as fallback when PTY stdout buffer was
+                    # truncated and parseClaudeJsonResult couldn't find the final JSON.
                     if not parsed.get("cost_usd") and agent_done.get("cost_usd", 0.0) > 0.0:
                         parsed["cost_usd"] = agent_done["cost_usd"]
+                    if not parsed.get("tokens_in") and agent_done.get("tokens_in", 0) > 0:
+                        parsed["tokens_in"] = agent_done["tokens_in"]
+                    if not parsed.get("tokens_out") and agent_done.get("tokens_out", 0) > 0:
+                        parsed["tokens_out"] = agent_done["tokens_out"]
+                    if not parsed.get("tool_uses") and agent_done.get("tool_uses", 0) > 0:
+                        parsed["tool_uses"] = agent_done["tool_uses"]
             except Exception as exc:
                 logging.getLogger("pathly.http").warning("runner_terminal_result: EVENTS.jsonl read failed: %s", exc)
 

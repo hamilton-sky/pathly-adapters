@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type NotifCategory = 'db_crud' | 'runner_state' | 'phase_changes' | 'events_log' | 'agent_done'
+export type NotifCategory = 'db_crud' | 'runner_state' | 'phase_changes' | 'events_log' | 'agent_done' | 'phase_summary'
 export type ToastPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
 export type ToastStyle = 'default' | 'card' | 'minimal' | 'banner'
 
@@ -16,6 +16,7 @@ export const DEFAULT_CATEGORIES: Record<NotifCategory, CategoryPrefs> = {
   phase_changes:  { enabled: true,  color: '#c084fc' },
   events_log:     { enabled: false, color: '#94a3b8' },
   agent_done:     { enabled: true,  color: '#fb923c' },
+  phase_summary:  { enabled: true,  color: '#38bdf8' },
 }
 
 interface NotificationState {

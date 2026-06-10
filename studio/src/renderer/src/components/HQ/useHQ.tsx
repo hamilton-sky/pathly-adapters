@@ -328,9 +328,16 @@ export function useHQ() {
                 )
                 useToastStore.getState().push('Agent done', 'success', { category: 'agent_done' })
               }
+            } else if (data.type === 'PHASE_SUMMARY') {
+              // Live progress note from agent or supervisor — show as a brief toast
+              // so the user sees activity in headless mode without opening a terminal.
+              const who = (data.agent as string | undefined) ?? 'agent'
+              const msg = (data.text as string | undefined) ?? ''
+              if (msg) useToastStore.getState().push(`${who}: ${msg}`, 'info', { category: 'phase_summary' })
+              useRunnerStore.getState().appendPhaseSummary({ agent: who, text: msg, stage: (data.phase as string | undefined) ?? '', ts: Date.now() })
             } else if (data.type === 'RUN_STARTED') {
               useRunnerStore.getState().snapshotRun()
-              useRunnerStore.getState().setRunnerState({ errorMessage: null, status: 'running', cost: 0, stage: null, adapter: null, sessionKind: null })
+              useRunnerStore.getState().setRunnerState({ errorMessage: null, status: 'running', cost: 0, stage: null, adapter: null, sessionKind: null, phaseSummaries: [] })
               useToastStore.getState().push('Pipeline started', 'info', { category: 'runner_state' })
             } else if (data.type === 'RUN_COMPLETE') {
               // Snapshot the finished/aborted run → moves stageLog to history
