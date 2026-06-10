@@ -294,18 +294,21 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         // terminal output — that confirms Ink has finished processing the paste
         // and the input field is active. Then send \r to submit.
         // Same event-driven approach as waiting for '> ' before injecting.
-        // Fallback: send \r after 2 s if the indicator never appears.
+        // Fallback: send \r after 6 s if the indicator never appears (large prompts
+        // can take several seconds to render in Claude's Ink UI).
         let enterSent = false
         const enterFallback = setTimeout(() => {
           if (!enterSent) { enterSent = true; ptyProcess.write('\r') }
-        }, 2000)
+        }, 6000)
         let pasteBuf = ''
         const pasteRenderSub = ptyProcess.onData((chunk: string) => {
           if (enterSent) return
           pasteBuf += chunk
             .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
             .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
-          if (pasteBuf.includes('[Pasted text')) {
+          // Claude shows "[Pasted text", "[Large input", or "[Input (N lines)]"
+          // depending on prompt size — match any of these paste-complete signals.
+          if (/\[Pasted text|\[Large input|\[Input \(/.test(pasteBuf)) {
             enterSent = true
             clearTimeout(enterFallback)
             pasteRenderSub.dispose()

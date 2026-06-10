@@ -10,6 +10,7 @@ import { MarkdownPreview } from './MarkdownPreview'
 import { CommentsPanel } from './CommentsPanel/CommentsPanel'
 import { CommentsPanelRail } from './CommentsPanel/CommentsPanelRail/CommentsPanelRail'
 import { CommentablePreview } from './CommentablePreview/CommentablePreview'
+import { DraftDiffViewer } from './DraftDiffViewer/DraftDiffViewer'
 import type { CommentablePreviewHandle } from './CommentablePreview/CommentablePreview'
 import { CommentModal } from './CommentModal/CommentModal'
 import { useComments } from './useComments'
@@ -137,6 +138,10 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     setPendingBody('')
     setLoading(true)
     setSaveError(null)
+    const draft = effectivePath + '.draft'
+    void window.pathly.fs.read(draft).then((d) => {
+      if (d != null && d !== '') setDraftPath(draft)
+    })
     readFile(effectivePath)
       .then((content) => {
         const parsed = parseFrontmatter(content ?? '')
@@ -213,6 +218,23 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
     await window.pathly.terminal.spawn(tabId, getSpawnCwd(effectivePath), undefined, [
       'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
     ])
+  }
+
+  async function handleDiffApply(newContent: string): Promise<void> {
+    if (!effectivePath) return
+    await window.pathly.fs.write(effectivePath, newContent)
+    await window.pathly.fs.delete(effectivePath + '.draft')
+    setDraftPath(null)
+    const parsed = parseFrontmatter(newContent)
+    setConfig(parsed.config)
+    setBody(parsed.body)
+    clearDirty(effectivePath)
+  }
+
+  async function handleDiffDiscard(): Promise<void> {
+    if (!effectivePath) return
+    await window.pathly.fs.delete(effectivePath + '.draft')
+    setDraftPath(null)
   }
 
   const handleSelectionComment = useCallback((text: string, x: number, y: number) => {
@@ -359,6 +381,16 @@ export function Editor({ path: pathOverride }: { path?: string | null } = {}): J
           onDraftChange={setPendingBody}
           onClose={() => setModalOpen(false)}
           onCancel={() => { setModalOpen(false); setPendingAnchor(null); setAnchorPos(null); setPendingBody('') }}
+        />
+      )}
+
+      {draftPath && effectivePath && (
+        <DraftDiffViewer
+          originalPath={effectivePath}
+          draftPath={draftPath}
+          onApply={(content) => void handleDiffApply(content)}
+          onClose={() => setDraftPath(null)}
+          onDiscard={() => void handleDiffDiscard()}
         />
       )}
     </div>
