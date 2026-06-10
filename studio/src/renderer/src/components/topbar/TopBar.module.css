@@ -469,3 +469,10 @@
 .navBtnDisabled {
   opacity: 0.5;
 }
+
+.panelNav {
+  display: flex;
+  gap: 4px;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
