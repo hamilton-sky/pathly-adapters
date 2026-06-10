@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { SendHorizonal, Eye, EyeOff, ChevronRight, Trash2 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useTerminalStore } from '../../../store/terminalStore'
@@ -6,6 +6,19 @@ import type { Comment } from '../useComments'
 import { buildSendPrompt, getSpawnCwd } from '../commentUtils'
 import { CommentItem } from './CommentItem/CommentItem'
 import styles from './CommentsPanel.module.css'
+
+const MIN_WIDTH = 200
+const MAX_WIDTH = 380
+const STORAGE_KEY = 'comments-panel-width'
+
+function getStoredWidth(): number {
+  const stored = localStorage.getItem(STORAGE_KEY)
+  if (stored) {
+    const n = parseInt(stored, 10)
+    if (!isNaN(n)) return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, n))
+  }
+  return 290
+}
 
 interface Props {
   filePath: string
@@ -30,7 +43,36 @@ export function CommentsPanel({
   const addTab = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
 
+  const panelRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
+  const initialWidth = useRef(getStoredWidth())
   const exitUnsubRef = useRef<(() => void) | null>(null)
+
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startWidth = panelRef.current?.getBoundingClientRect().width ?? initialWidth.current
+    dragRef.current = { startX: e.clientX, startWidth }
+
+    function onMouseMove(ev: MouseEvent): void {
+      if (!dragRef.current || !panelRef.current) return
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, dragRef.current.startWidth + dragRef.current.startX - ev.clientX))
+      panelRef.current.style.setProperty('--panel-width', `${newWidth}px`)
+    }
+
+    function onMouseUp(): void {
+      if (panelRef.current) {
+        const w = Math.round(panelRef.current.getBoundingClientRect().width)
+        localStorage.setItem(STORAGE_KEY, String(w))
+        initialWidth.current = w
+      }
+      dragRef.current = null
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -66,7 +108,8 @@ export function CommentsPanel({
   }
 
   return (
-    <div className={styles.panel}>
+    <div ref={panelRef} className={styles.panel} style={{ '--panel-width': `${initialWidth.current}px` } as React.CSSProperties}>
+      <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
       <div className={styles.header}>
         <span className={styles.title}>
           Comments
