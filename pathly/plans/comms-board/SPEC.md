@@ -1361,4 +1361,541 @@ Persisted to `localStorage` under `pathly-command-center-layout`.
 
 ---
 
-*Spec version 3.2 — Collapse unified across both layout modes: side-by-side collapses to ~48px vertical strip, stacked collapses to ~40px horizontal bar; both show icon + pending badge; click anywhere to re-expand*
+---
+
+## 21. Implementation Assessment — Codebase Audit (2026-06-10)
+
+This section records exactly what exists in the codebase today versus what needs
+to be built. Every component of the communication board is absent — nothing has
+been started. The audit below gives precise file paths so each task can be picked
+up without further exploration.
+
+### 21.1 Database layer
+
+| Component | Status | Notes |
+|---|---|---|
+| `comms_messages` table | ❌ MISSING | Not in `db/migrations.py` |
+| `comms_embeddings` virtual table (sqlite-vec) | ❌ MISSING | Not in `db/migrations.py` |
+| All other tables (14 total) | ✅ EXISTS | fsm_events, fsm_state, runner_state, agent_invocations, feedback_items, etc. |
+
+**What is already in `src/pathly_orchestrator/db/migrations.py`:**
+The migration system exists and is clean. Adding the two comms tables is a
+straightforward append to the existing migration block. No schema changes to
+existing tables are needed.
+
+**What needs to be added:**
+```sql
+-- comms_messages: one row per message
+CREATE TABLE IF NOT EXISTS comms_messages (
+    id               TEXT PRIMARY KEY,
+    board            TEXT NOT NULL,      -- 'feature' | 'project' | 'global'
+    scope            TEXT NOT NULL,      -- feature name, project root, or 'global'
+    from_agent       TEXT NOT NULL,
+    to_agent         TEXT NOT NULL DEFAULT '*',
+    type             TEXT NOT NULL,      -- nudge/question/answer/status/decision/...
+    text             TEXT NOT NULL,
+    options          TEXT,               -- JSON array (for question type)
+    reply_to         TEXT,
+    stage            TEXT,
+    conv             INTEGER,
+    ts               TEXT NOT NULL,
+    read_by          TEXT DEFAULT '[]',
+    acknowledged_by  TEXT DEFAULT '[]',
+    status           TEXT DEFAULT 'pending',
+    deleted_at       TEXT,
+    promoted_to      TEXT,
+    promoted_from    TEXT,
+    original_scope   TEXT,
+    artifact_path    TEXT,
+    artifact_type    TEXT,
+    artifact_url     TEXT,
+    task_status      TEXT,
+    assigned_to_stage TEXT,
+    assigned_to_agent TEXT,
+    embedding_model  TEXT
+);
+
+-- comms_embeddings: sqlite-vec virtual table (requires sqlite-vec extension)
+CREATE VIRTUAL TABLE IF NOT EXISTS comms_embeddings USING vec0(
+    message_id TEXT PRIMARY KEY,
+    embedding  FLOAT[384],
+    chunk_index INTEGER DEFAULT 0,
+    chunk_text  TEXT
+);
+```
+
+### 21.2 DB query module
+
+| Component | Status | File |
+|---|---|---|
+| `comms.py` query module | ❌ MISSING | `src/pathly_orchestrator/db/queries/comms.py` |
+| All other query modules (15 files) | ✅ EXISTS | fsm_events.py, fsm_state.py, runner_state.py, etc. |
+
+**What needs to be created — `db/queries/comms.py`:**
+```python
+# Functions needed:
+post_message(board, scope, from_agent, to_agent, type, text, ...)  → str (message_id)
+get_messages(board, scope, type=None, status=None, limit=50)        → list[dict]
+acknowledge_message(message_id, agent)                              → None
+answer_question(question_id, answer_text, option_id=None)          → str (answer message_id)
+store_embedding(message_id, embedding, chunk_index, chunk_text)    → None
+search_by_embedding(embedding, boards, scopes, k=6)                 → list[dict]
+get_pending_decisions(boards, scopes)                               → list[dict]
+get_trash(scope)                                                    → list[dict]
+restore_messages(message_ids)                                       → None
+purge_expired_trash(days=30)                                        → int (count purged)
+get_promotable_messages(scope)                                      → list[dict]
+```
+
+### 21.3 HTTP blueprint
+
+| Component | Status | File |
+|---|---|---|
+| `comms.py` blueprint | ❌ MISSING | `src/pathly_orchestrator/http_server/blueprints/comms.py` |
+| All other blueprints (11 files) | ✅ EXISTS | runner.py, fsm.py, health.py, telemetry.py, etc. |
+
+**What needs to be created — routes:**
+```
+POST /comms/post        → post a message to a board
+GET  /comms             → fetch messages (filterable)
+POST /comms/search      → semantic search across boards
+POST /comms/acknowledge → mark message read by agent
+POST /comms/answer      → answer a question
+POST /comms/attach      → attach a file/url artifact
+GET  /comms/trash       → list trashed messages for a scope
+POST /comms/restore     → restore trashed messages
+```
+
+Blueprint must be registered in `src/pathly_orchestrator/http_server/app.py`
+(same pattern as all other blueprints — one line: `app.register_blueprint(comms_bp)`).
+
+### 21.4 SSE system
+
+| Component | Status | File |
+|---|---|---|
+| `_comms_clients` registry | ❌ MISSING | `src/pathly_orchestrator/http_server/sse.py` |
+| `COMMS_UPDATE` broadcast function | ❌ MISSING | `src/pathly_orchestrator/http_server/sse.py` |
+| `GET /events/comms` SSE stream endpoint | ❌ MISSING | `src/pathly_orchestrator/http_server/blueprints/streams.py` |
+| Existing runner SSE (`_runner_clients`, `_broadcast_runner`) | ✅ EXISTS | `sse.py` |
+
+**What needs to be added to `sse.py`:**
+```python
+_comms_clients: dict[str, list] = {}   # scope → list of SSE queues
+
+def _broadcast_comms(scope: str, event: dict) -> None:
+    """Broadcast a COMMS_UPDATE event to all Studio clients watching this scope."""
+    ...
+```
+
+**What needs to be added to `streams.py`:**
+```python
+@bp.route('/events/comms')
+def comms_stream():
+    scope = request.args.get('scope', 'global')
+    # SSE generator — same pattern as /events/runner
+    ...
+```
+
+### 21.5 FSM context injection
+
+| Component | Status | File / Location |
+|---|---|---|
+| `## Communication Board` block in prompt | ❌ MISSING | `src/pathly_orchestrator/fsm_ops.py` |
+| `retrieve_board_context()` function | ❌ MISSING | Needs to be written |
+| `build_prompt()` injection point | ✅ EXISTS | `fsm_ops.py:158–199` |
+| `## Current task` block | ✅ EXISTS | `fsm_ops.py` |
+| `## Pipeline History` block | ✅ EXISTS | `runner/history.py` → `build_pipeline_history_block()` |
+
+**What the current `build_prompt()` injects (lines 158–199):**
+```
+## Current task
+Feature: {feature_name}
+State: {state_name}
+Storage path: {storage_path}
+
+## Pipeline History
+- **{agent} (conv {conv_num})**: {summary}
+```
+
+**What needs to be added after `## Pipeline History`:**
+```python
+# In fsm_ops.py build_prompt():
+board_context = retrieve_board_context(topic, project_root, task_description)
+if board_context:
+    prompt += "\n\n" + board_context   # appends ## Communication Board block
+```
+
+`retrieve_board_context()` needs to be a new function in `fsm_ops.py` (or a
+separate `runner/comms_context.py` module) that embeds the task description,
+queries all enabled boards, and formats the markdown block.
+
+### 21.6 STATE.json schema
+
+| Component | Status | Notes |
+|---|---|---|
+| `board_scope` field | ❌ MISSING | Not present in any STATE.json |
+| Existing STATE.json fields | ✅ EXISTS | convs_total, convs_done, current, updated_at, conv_start_sha, build_baseline |
+
+**What needs to be added** (defaulted by the FSM if absent):
+```json
+{
+  "board_scope": {
+    "feature": true,
+    "project": true,
+    "global": true
+  }
+}
+```
+
+`write_state()` in `db/queries/fsm_state.py` already exists — it just needs to
+preserve `board_scope` when it writes (currently it only writes the fields it
+knows about). Or the FSM reads it separately before calling write_state.
+
+### 21.7 Python dependencies
+
+| Dependency | Status | Needed for |
+|---|---|---|
+| `sqlite-vec` | ❌ MISSING | Vector similarity search |
+| `sentence-transformers` | ❌ MISSING | Generating message embeddings |
+| `pyyaml>=6.0,<7` | ✅ EXISTS | Already in pyproject.toml |
+| `flask>=2.3,<4` | ✅ EXISTS | Already in pyproject.toml |
+
+**Note on sqlite-vec:** The extension must be loaded at DB connection time:
+```python
+import sqlite_vec
+conn.enable_load_extension(True)
+sqlite_vec.load(conn)
+```
+This needs to be added to `db/connection.py` where `get_db()` creates connections.
+
+**Note on sentence-transformers:** Loading the model takes ~1–2s on first use.
+The embedding worker should load it once at server startup and keep it in memory.
+
+**What needs to be added to `pyproject.toml`:**
+```toml
+[project]
+dependencies = [
+    "pyyaml>=6.0,<7",
+    "flask>=2.3,<4",
+    "sqlite-vec>=0.1.6",
+    "sentence-transformers>=2.7.0",
+]
+```
+
+### 21.8 Studio stores
+
+| Component | Status | File |
+|---|---|---|
+| `commsStore.ts` | ❌ MISSING | `studio/src/renderer/src/store/commsStore.ts` |
+| `commandCenterStore.ts` | ❌ MISSING | `studio/src/renderer/src/store/commandCenterStore.ts` |
+| `runnerStore.ts` | ✅ EXISTS | Has PhaseSummaryEntry, appendPhaseSummary, etc. |
+| `terminalStore.ts` | ✅ EXISTS | Tab registry, openTab, addTab |
+| `chatStore.ts` | ✅ EXISTS | Existing HQ chat — good pattern reference for commsStore |
+| `notificationStore.ts` | ✅ EXISTS | Toast categories incl. phase_summary |
+| `toastStore.ts` | ✅ EXISTS | push() helper |
+
+**`commsStore.ts` needs to manage:**
+```ts
+messages: CommsMessage[]          // current board thread
+board: 'feature' | 'project' | 'global'
+scope: string                     // feature name / project root / 'global'
+pendingCount: number              // unread/pending badge
+appendMessage(msg: CommsMessage): void
+markRead(messageId: string): void
+setBoard(board, scope): void
+```
+
+**`commandCenterStore.ts` needs to manage:**
+```ts
+panels: Array<'feature' | 'project' | 'global'>  // visible panels + order
+direction: 'row' | 'column'                       // side-by-side vs stacked
+sizes: Record<string, number>                     // saved widths/heights
+collapsed: Record<string, boolean>               // per-panel collapse state
+```
+
+### 21.9 Studio components
+
+| Component | Status | Location |
+|---|---|---|
+| `CommsPanel/` | ❌ MISSING | `studio/src/renderer/src/components/HQ/CommsPanel/` |
+| `CommandCenter/` | ❌ MISSING | `studio/src/renderer/src/components/HQ/CommandCenter/` |
+| `HQ/` folder (44 files) | ✅ EXISTS | All existing panels, cards, and controls |
+| `RunnerLogCard/` | ✅ EXISTS | Good pattern reference for a log-style panel |
+| `AgentQuestionCard/` | ✅ EXISTS | Good pattern reference for question + options UI |
+| `ChatPanel/` + `MessageList/` | ✅ EXISTS | Good pattern reference for message thread |
+
+**`CommsPanel/` sub-components needed:**
+```
+CommsPanel/
+  CommsPanel.tsx          ← outer shell: scope selector, tabs, send bar
+  CommsPanel.module.css
+  CommsMsgList.tsx        ← message thread (reuse pattern from MessageList)
+  CommsMsgList.module.css
+  CommsMsgCard.tsx        ← individual message card with type-specific rendering
+  CommsMsgCard.module.css
+  CommsInput.tsx          ← message compose bar with type picker
+  CommsInput.module.css
+  useCommsPanel.ts        ← SSE subscription, send handlers, pending count
+```
+
+**`CommandCenter/` sub-components needed:**
+```
+CommandCenter/
+  CommandCenter.tsx       ← outer shell: tab toggles, layout toggle, panel grid
+  CommandCenter.module.css
+  PanelSlot.tsx           ← one resizable, collapsible slot holding a CommsPanel
+  PanelSlot.module.css
+  usePanelResize.ts       ← drag-to-resize logic (width/height per slot)
+  useCommandCenter.ts     ← panel state: which boards visible, order, direction
+```
+
+### 21.10 Skills
+
+| Skill | Status | Notes |
+|---|---|---|
+| `comms-query.md` | ❌ MISSING | Agent skill to query the board mid-work |
+| `log-board-message.md` | ❌ MISSING | Agent skill to post status/discovery |
+| Board reading in `build.md` | ❌ MISSING | `build.md` has no reference to boards |
+| Board reading in `review.md` | ❌ MISSING | `review.md` has no reference to boards |
+| `log-agent-done.md` | ✅ EXISTS | Writes AGENT_DONE to DB — similar pattern needed for board |
+| `log-phase.md` | ✅ EXISTS | Phase summary logging — good pattern reference |
+
+---
+
+## 22. Revised Implementation Phases (with precise file targets)
+
+### Phase 1 — Backend core (no UI, fully testable via curl)
+
+**Step 1 — Dependencies**
+- File: `pyproject.toml`
+- Add: `sqlite-vec>=0.1.6`, `sentence-transformers>=2.7.0`
+- Run: `pip install sqlite-vec sentence-transformers` to verify
+
+**Step 2 — DB connection: load sqlite-vec extension**
+- File: `src/pathly_orchestrator/db/connection.py`
+- Add: `import sqlite_vec` + `sqlite_vec.load(conn)` in `get_db()`
+- Test: `from pathly_orchestrator.db.connection import get_db; get_db()`
+
+**Step 3 — DB migrations: add comms tables**
+- File: `src/pathly_orchestrator/db/migrations.py`
+- Add: `comms_messages` table + `comms_embeddings` virtual table (see §21.1)
+- Run: `python -m pathly_orchestrator.db.migrations` to verify
+
+**Step 4 — DB queries**
+- File: `src/pathly_orchestrator/db/queries/comms.py` (new file)
+- Implement all 11 functions listed in §21.2
+- Export from `db/queries/__init__.py`
+
+**Step 5 — Embedding worker**
+- File: `src/pathly_orchestrator/runner/embeddings.py` (new file)
+- `embed(text: str) → list[float]` — loads `all-MiniLM-L6-v2` once, cached
+- `embed_async(message_id, text)` — background thread wrapper
+- Called by `/comms/post` after storing the message
+
+**Step 6 — SSE: add comms channel**
+- File: `src/pathly_orchestrator/http_server/sse.py`
+- Add `_comms_clients` dict + `_broadcast_comms(scope, event)` function
+
+**Step 7 — HTTP blueprint**
+- File: `src/pathly_orchestrator/http_server/blueprints/comms.py` (new file)
+- Implement 8 routes (see §21.3)
+- Register in: `src/pathly_orchestrator/http_server/app.py`
+
+**Step 8 — SSE stream endpoint**
+- File: `src/pathly_orchestrator/http_server/blueprints/streams.py`
+- Add `GET /events/comms?scope=<scope>` route
+
+**Step 9 — FSM injection**
+- File: `src/pathly_orchestrator/runner/comms_context.py` (new file)
+- `retrieve_board_context(topic, project_root, task_desc, board_scope) → str`
+- File: `src/pathly_orchestrator/fsm_ops.py` lines ~195–199
+- Add call to `retrieve_board_context()` + append result to prompt
+
+**Step 10 — STATE.json: board_scope default**
+- File: `src/pathly_orchestrator/db/queries/fsm_state.py`
+- When reading STATE.json, default `board_scope` to `{feature:true, project:true, global:true}` if absent
+
+**Phase 1 deliverable:** Post messages via curl → verify they appear in next
+agent's prompt. Zero Studio changes needed.
+
+---
+
+### Phase 2 — Studio CommsPanel
+
+**Step 11 — commsStore.ts**
+- File: `studio/src/renderer/src/store/commsStore.ts` (new file)
+- Pattern reference: `chatStore.ts` (same message list pattern)
+
+**Step 12 — commandCenterStore.ts**
+- File: `studio/src/renderer/src/store/commandCenterStore.ts` (new file)
+- Manages panel layout config, persists to localStorage
+
+**Step 13 — SSE handler**
+- File: `studio/src/renderer/src/components/HQ/useHQ.tsx`
+- Add `COMMS_UPDATE` event handler → `commsStore.appendMessage()`
+- Add `comms_update` to `NotifCategory` in `notificationStore.ts`
+
+**Step 14 — CommsPanel component**
+- Folder: `studio/src/renderer/src/components/HQ/CommsPanel/`
+- Pattern references: `MessageList/` (thread), `AgentQuestionCard/` (options), `ChatInput/` (compose bar)
+- 5 files: CommsPanel, CommsMsgList, CommsMsgCard, CommsInput, useCommsPanel
+
+**Step 15 — CommandCenter component**
+- Folder: `studio/src/renderer/src/components/HQ/CommandCenter/`
+- 5 files: CommandCenter, PanelSlot, usePanelResize, useCommandCenter, CSS modules
+
+**Phase 2 deliverable:** Full visual board in Studio. Human can post, answer
+questions, see agent updates in real time, switch between boards.
+
+---
+
+### Phase 3 — Agent skill integration
+
+**Step 16 — comms-query skill**
+- File: `src/pathly_data/core/skills/comms-query.md` (new file)
+- Agents use `GET /comms/search` to query board mid-work
+
+**Step 17 — log-board-message skill**
+- File: `src/pathly_data/core/skills/log-board-message.md` (new file)
+- Agents use `POST /comms/post` to post status/discovery/warning
+
+**Step 18 — Update build.md**
+- File: `src/pathly_data/core/skills/team/build.md` (and `development/build.md`)
+- Add: read board at start (via context already injected), post status at key milestones
+
+**Step 19 — Update review.md**
+- File: `src/pathly_data/core/skills/team/review.md`
+- Add: post warnings as board messages, not only as REVIEW_FAILURES.md blocks
+
+---
+
+### Phase 4 — Cross-feature memory & artifacts
+
+**Step 20 — Artifact ingestion**
+- File: `src/pathly_orchestrator/runner/artifacts_ingestion.py` (new file)
+- PDF text extraction, URL fetch, code file reading, chunking
+- Called by `POST /comms/attach`
+
+**Step 21 — Project + Global board seeding**
+- When a new feature starts, seed its board with relevant project/global decisions
+- Retrieved by similarity to the feature description
+
+**Step 22 — Promote-before-delete**
+- Studio: show promotion dialog when a feature is deleted
+- Backend: `GET /comms/promotable?scope=<feature>` + `POST /comms/promote`
+
+**Step 23 — Trash + auto-purge**
+- Nightly cron (or on-startup check): `purge_expired_trash(days=30)`
+- Studio: Trash view in sidebar
+
+---
+
+---
+
+## 23. Phase 5 — Board-Storm (Consultation Mode)
+
+> Full design in [BOARD-STORM.md](BOARD-STORM.md). Summarised here for the spec record.
+
+### 23.1 What it is
+
+A pre-pipeline "thinking mode." The user opens a blank board, posts an idea, and
+a headless consultant agent responds with an **artefact** (questions, architecture
+diagram, trade-off analysis) instead of a chat message. The user replies or
+annotates; the agent revises. This loops until the user is satisfied, then one
+click converts the session into a pipeline-ready feature with plan files
+pre-populated.
+
+```
+Chat:         message → reply → message  (ephemeral, linear)
+Board-storm:  request → ARTEFACT → annotate → revised ARTEFACT  (persistent, structured)
+              The artefact is the unit of communication, not the message.
+```
+
+### 23.2 Why it ships before the command center (Phase 4)
+
+```
+Board-storm FILLS boards with rich content.
+The command center SEARCHES across filled boards.
+You must fill before you search → build the producer first.
+
+Board-storm needs:  one board + headless agent (exists) + CommsPanel (Phase 2)
+                    → ~500 lines of new Python
+Command center needs: vector search across 100s of boards + 3-panel Electron layout
+                    → ~4 weeks of Studio work
+```
+
+### 23.3 It is 80% reuse
+
+```
+Board-storm  =  comms board (Phase 1)
+              + headless agent invocation (runner/invoke.py — ALREADY EXISTS)
+              + CommsPanel UI (Phase 2)
+              + a small consultation loop (the only new bit)
+```
+
+### 23.4 The consultation FSM (separate from the 8-stage pipeline)
+
+```
+OPEN ──user posts request──▶ THINKING ──agent posts artefact──▶ AWAITING
+AWAITING ──user replies──▶ THINKING                              (loop)
+AWAITING ──"Start pipeline"──▶ CONVERTING ──plan files──▶ DONE
+```
+
+### 23.5 The conversion step — discussion becomes a feature
+
+```
+draft_spec artefact ───────────▶ USER_STORIES.md
+implementation_plan artefact ──▶ IMPLEMENTATION_PLAN.md
+all artefacts ─────────────────▶ feature board messages (pre-filled)
+STATE.json ────────────────────▶ { current: "PLAN" }  (storm already done)
+register in main FSM ──────────▶ feature enters the team pipeline
+```
+
+The builder later starts with a `## Communication Board` block already full of
+everything the consultation decided — more context than any current Pathly
+pipeline gives an agent.
+
+### 23.6 Build steps (file targets)
+
+```
+1. src/pathly_data/core/skills/consult.md          consultant skill (new)
+2. src/pathly_data/core/agents/consultant.md        consultant role (new, opus)
+3. app_settings key consult:{session_id}            session state (no new table)
+4. http_server/blueprints/consult.py                5 routes (new)
+5. supervisor/consult.py                            FSM loop driver (new)
+6. runner/consult_convert.py                        artefacts → plan files (new)
+7. studio/components/HQ/ConsultPanel/               reuses CommsPanel (new)
+```
+
+Prerequisite: comms board Phase 1 + Phase 2 shipped.
+
+---
+
+## 24. Final Phase Ordering
+
+```
+Phase 1    Backend injection only                          ~3 weeks
+           Post nudges via curl → verify in agent prompts; zero Studio changes
+
+Phase 2    Studio CommsPanel (one feature at a time)        ~2 weeks
+           Message thread · question cards · SSE updates
+
+Phase 3    Skill integration                                ~1 week
+           Agents post status/warnings · build.md reads board
+
+Phase 5    Board-Storm consultation mode                    ~4 weeks
+           New consultation flow · consultant agent · convert to pipeline
+           ↑ before Phase 4 — fills boards with content, more user-facing value
+
+Phase 4    Cross-feature memory + command center            ~6 weeks
+           Three-panel layout · global seeding · artifacts · vector search at scale
+           ↑ last — searches across the boards that Phase 5 filled
+```
+
+Board-storm (Phase 5) intentionally precedes cross-feature memory (Phase 4):
+the consultation mode creates the rich board content that makes cross-feature
+retrieval valuable. You need to fill the boards before you need to search across them.
+
+---
+
+*Spec version 5.0 — Board-Storm folded in as Phase 5; final phase ordering locked (1→2→3→5→4); full board-storm design in BOARD-STORM.md*
