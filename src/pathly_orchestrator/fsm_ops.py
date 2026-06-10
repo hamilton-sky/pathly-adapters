@@ -196,7 +196,27 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     import os
     feature_dir = os.path.join(project_root, "pathly", "plans", feature)
     history = build_pipeline_history_block(feature_dir)
-    return agent_text + context + history
+
+    board_block = ""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db_comms
+        from pathly_orchestrator.db.queries.app_settings import get_board_scope
+        from pathly_orchestrator.runner.comms_context import retrieve_board_context
+        _conn = _get_db_comms()
+        _scope = get_board_scope(_conn, project_root, feature)
+        board_block = retrieve_board_context(
+            topic=feature,
+            project_root=project_root,
+            task_description=context,
+            board_scope=_scope,
+        )
+    except Exception:
+        pass
+
+    prompt = agent_text + context + history
+    if board_block:
+        prompt += "\n" + board_block
+    return prompt
 
 
 def build_prompt_for_agent(
