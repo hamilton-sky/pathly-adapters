@@ -1,0 +1,90 @@
+.wrap {
+  position: relative;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 11px;
+  background-color: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font: 600 11px/1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.trigger:hover {
+  border-color: var(--accent-border);
+  color: var(--text-primary);
+  background-color: var(--bg-surface1);
+}
+
+.trigger[aria-expanded='true'] {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background-color: var(--bg-surface1);
+}
+
+.chev {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Drop-UP menu — opens above the trigger */
+.menu {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 0;
+  z-index: 50;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 10px 6px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 11px/1 var(--font-family-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.item:hover {
+  background-color: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
+.item[data-active] {
+  color: var(--accent);
+}
+
+.check {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent);
+}

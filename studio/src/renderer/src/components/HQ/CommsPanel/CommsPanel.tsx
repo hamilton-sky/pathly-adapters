@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { Check } from 'lucide-react'
 import type { BoardScope, MessageType } from '../CommandCenter/types'
-import { COMPOSE_TYPES } from '../CommandCenter/constants'
 import { CommsMsgList } from './CommsMsgList'
 import { CommsInput } from './CommsInput'
+import { TypePicker } from './TypePicker'
 import { useCommsPanel } from './hooks/useCommsPanel'
 import s from './CommsPanel.module.css'
 
@@ -49,14 +49,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
               ))}
             </div>
           )}
-          <select
-            className={s.typePick}
-            value={type}
-            aria-label="Message type"
-            onChange={(e) => setType(e.target.value as MessageType)}
-          >
-            {COMPOSE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <TypePicker value={type} onChange={setType} />
         </div>
         <CommsInput scope={scope} mainFeature={mainFeature} onSend={(text) => post(type, text)} />
       </div>
