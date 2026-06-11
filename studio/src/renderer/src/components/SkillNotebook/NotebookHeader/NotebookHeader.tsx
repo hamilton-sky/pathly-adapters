@@ -2,12 +2,14 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, Download, FileCode, BookOpen, GitCompare,
-  Scissors, ScanText,
+  Scissors, ScanText, FileSearch, SlidersHorizontal,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useSkillNotebookStore, BodyCell } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import { useNotebookAgentActions } from './hooks/useNotebookAgentActions'
+import { buildSplitPrompt, buildAnalyzePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
+import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import styles from './NotebookHeader.module.css'
 
 export type NotebookViewMode = 'cells' | 'editor'
@@ -29,11 +31,24 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const requestNotebookOpenDraft  = useUiStore(s => s.requestNotebookOpenDraft)
   const requestNotebookUndo       = useUiStore(s => s.requestNotebookUndo)
   const requestNotebookRedo       = useUiStore(s => s.requestNotebookRedo)
-
-  const { handleSplit, handleAnalyze, splitState, analyzeState } = useNotebookAgentActions(skillNotebookPath)
+  const notebookAnalysisPath       = useUiStore(s => s.notebookAnalysisPath)
+  const notebookAnalysisPanelOpen  = useUiStore(s => s.notebookAnalysisPanelOpen)
+  const setNotebookAnalysisPanelOpen = useUiStore(s => s.setNotebookAnalysisPanelOpen)
 
   const [exportState, setExportState] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveState,   setSaveState]   = useState<'idle' | 'success' | 'error'>('idle')
+  const [splitPeekOpen,    setSplitPeekOpen]    = useState(false)
+  const [analyzePeekOpen,  setAnalyzePeekOpen]  = useState(false)
+  const [splitOncePrompt,  setSplitOncePrompt]  = useState<string | null>(null)
+  const [analyzeOncePrompt, setAnalyzeOncePrompt] = useState<string | null>(null)
+
+  const { handleSplit, handleAnalyze, splitState, analyzeState } = useNotebookAgentActions(
+    skillNotebookPath,
+    splitOncePrompt,
+    analyzeOncePrompt,
+    () => setSplitOncePrompt(null),
+    () => setAnalyzeOncePrompt(null),
+  )
 
   const headerRef = useRef<HTMLDivElement>(null)
   const [isCompact, setIsCompact] = useState(false)
@@ -48,20 +63,16 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
     return () => obs.disconnect()
   }, [])
 
-  // Cells mode: history-depth gating; Source mode: always allow (CodeMirror will no-op if empty)
   const canUndo = viewMode === 'cells' ? historyIndex > 0            : true
   const canRedo = viewMode === 'cells' ? historyIndex < history.length - 1 : true
 
-  // Visual mode: dirty when cells have changed since the last save (or load)
   const isCellsDirty = historyIndex !== savedHistoryIndex
-  // Source mode: dirty when the raw text has been edited
   const isSourceDirty = skillNotebookPath ? dirtyItems.has(skillNotebookPath) : false
 
   const pathParts = skillNotebookPath ? skillNotebookPath.replace(/\\/g, '/').split('/') : []
   const skillName = pathParts[pathParts.length - 1]?.replace('.md', '') ?? ''
   const category  = pathParts[pathParts.length - 2] ?? ''
 
-  // ── Export (same for both modes) ──────────────────────────────────────────
   const handleExport = async () => {
     const fragmentOrder = cells
       .filter(c => c.type === 'fragment')
@@ -80,7 +91,6 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
     } catch      { setExportState('error');    setTimeout(() => setExportState('idle'), 3000) }
   }
 
-  // ── Save — cells mode: POST cells to FSM; source mode: signal embedded Editor
   const handleCellsSave = async () => {
     const bodyCells = cells
       .filter(c => c.type === 'body')
@@ -108,11 +118,9 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
     }
   }
 
-  // ── Undo / Redo — routes to cell store (Visual) or CodeMirror (Source) ─────
   const handleUndo = () => { if (viewMode === 'cells') { undo() } else { requestNotebookUndo() } }
   const handleRedo = () => { if (viewMode === 'cells') { redo() } else { requestNotebookRedo() } }
 
-  // ── Review Draft — switch to source if needed, then open the diff viewer ──
   const handleReviewDraft = () => {
     if (viewMode !== 'editor') setSkillNotebookViewMode('editor')
     requestNotebookOpenDraft()
@@ -139,7 +147,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
 
       <span className={styles.badge}>NOTEBOOK</span>
 
-      {/* View mode toggle — left side, next to title */}
+      {/* View mode toggle */}
       <div className={styles.viewToggle} role="group" aria-label="View mode">
         <Tooltip label="Visual cell editor" placement="bottom">
           <button
@@ -189,47 +197,116 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         </button>
       </Tooltip>
 
-      {/* Split */}
-      <Tooltip
-        label={splitState === 'running'
-          ? 'Agent is splitting the skill…'
-          : 'Ask an agent to split this skill into well-organized sections (produces a reviewable draft)'}
-        placement="bottom"
-      >
-        <button
-          type="button"
-          className={styles.agentBtn}
-          data-state={splitState}
-          disabled={splitState === 'running' || !skillNotebookPath}
-          onClick={() => void handleSplit()}
-          aria-label="Split skill into sections"
+      {/* Split pill */}
+      <div className={styles.agentPill}>
+        <Tooltip
+          label={splitState === 'running'
+            ? `Reorganizing "${skillName}" into sections…`
+            : `AI will reorganize "${skillName}" into clean ## sections — delivers a diff you review and accept`}
+          placement="bottom"
         >
-          <Scissors size={13} />
-          <span className={styles.btnLabel}>
-            {splitState === 'running' ? 'Splitting…' : splitState === 'success' ? 'Split!' : splitState === 'error' ? 'Error' : 'Split'}
-          </span>
-        </button>
-      </Tooltip>
+          <button
+            type="button"
+            className={styles.agentPillMain}
+            data-state={splitState}
+            disabled={splitState === 'running' || !skillNotebookPath}
+            onClick={() => void handleSplit()}
+            aria-label="Split skill into sections"
+          >
+            <Scissors size={13} />
+            <span className={styles.btnLabel}>
+              {splitState === 'running' ? 'Splitting…' : splitState === 'success' ? 'Split!' : splitState === 'error' ? 'Error' : 'Split'}
+            </span>
+          </button>
+        </Tooltip>
+        <Tooltip label="View or edit the prompt sent to Claude" placement="bottom">
+          <button
+            type="button"
+            className={styles.agentPillSettings}
+            data-state={splitState}
+            disabled={!skillNotebookPath}
+            onClick={() => setSplitPeekOpen(v => !v)}
+            aria-label="Edit split prompt"
+          >
+            <SlidersHorizontal size={11} />
+          </button>
+        </Tooltip>
+        {splitPeekOpen && skillNotebookPath && (
+          <PromptPeekModal
+            title="PROMPT — Split"
+            fileName={skillName + '.md'}
+            defaultPrompt={buildSplitPrompt(skillNotebookPath)}
+            storageKey={STORAGE_KEY_SPLIT}
+            onClose={() => setSplitPeekOpen(false)}
+            onUseOnce={(p) => { setSplitOncePrompt(p); setSplitPeekOpen(false) }}
+          />
+        )}
+      </div>
 
-      {/* Analyze */}
+      {/* Analyze pill */}
+      <div className={styles.agentPill}>
+        <Tooltip
+          label={analyzeState === 'running'
+            ? `Auditing "${skillName}" for quality issues…`
+            : `AI will audit "${skillName}" for clarity, gaps, and redundancies — opens a quality report in a side panel`}
+          placement="bottom"
+        >
+          <button
+            type="button"
+            className={styles.agentPillMain}
+            data-state={analyzeState}
+            disabled={analyzeState === 'running' || !skillNotebookPath}
+            onClick={() => void handleAnalyze()}
+            aria-label="Analyze skill"
+          >
+            <ScanText size={13} />
+            <span className={styles.btnLabel}>
+              {analyzeState === 'running' ? 'Analyzing…' : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'Analyze'}
+            </span>
+          </button>
+        </Tooltip>
+        <Tooltip label="View or edit the prompt sent to Claude" placement="bottom">
+          <button
+            type="button"
+            className={styles.agentPillSettings}
+            data-state={analyzeState}
+            disabled={!skillNotebookPath}
+            onClick={() => setAnalyzePeekOpen(v => !v)}
+            aria-label="Edit analyze prompt"
+          >
+            <SlidersHorizontal size={11} />
+          </button>
+        </Tooltip>
+        {analyzePeekOpen && skillNotebookPath && (
+          <PromptPeekModal
+            title="PROMPT — Analyze"
+            fileName={skillName + '.md'}
+            defaultPrompt={buildAnalyzePrompt(skillNotebookPath)}
+            storageKey={STORAGE_KEY_ANALYZE}
+            onClose={() => setAnalyzePeekOpen(false)}
+            onUseOnce={(p) => { setAnalyzeOncePrompt(p); setAnalyzePeekOpen(false) }}
+          />
+        )}
+      </div>
+
+      {/* View Analysis Report */}
       <Tooltip
-        label={analyzeState === 'running'
-          ? 'Agent is analyzing the skill…'
-          : 'Ask an agent to analyze this skill for clarity, gaps, and improvements'}
+        label={
+          !notebookAnalysisPath ? 'No report yet — run Analyze first' :
+          notebookAnalysisPanelOpen ? 'Close report panel' :
+          'Quality report ready — click to open'
+        }
         placement="bottom"
       >
         <button
           type="button"
-          className={styles.agentBtn}
-          data-state={analyzeState}
-          disabled={analyzeState === 'running' || !skillNotebookPath}
-          onClick={() => void handleAnalyze()}
-          aria-label="Analyze skill"
+          className={styles.analysisBtn}
+          data-has-analysis={!!notebookAnalysisPath}
+          aria-disabled={!notebookAnalysisPath}
+          onClick={notebookAnalysisPath ? () => setNotebookAnalysisPanelOpen(!notebookAnalysisPanelOpen) : undefined}
         >
-          <ScanText size={13} />
-          <span className={styles.btnLabel}>
-            {analyzeState === 'running' ? 'Analyzing…' : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'Analyze'}
-          </span>
+          <FileSearch size={13} />
+          <span className={styles.btnLabel}>Report</span>
         </button>
       </Tooltip>
 

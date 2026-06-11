@@ -21,7 +21,7 @@ interface Props {
   onClose: () => void
 }
 
-function parseMdToCells(raw: string): ProposedCell[] {
+function parseMdToCells(raw: string, depth: 1 | 2 | 3 = 2): ProposedCell[] {
   const lines = raw.split('\n')
   const cells: ProposedCell[] = []
   let currentType: 'heading' | 'markdown' = 'markdown'
@@ -31,13 +31,7 @@ function parseMdToCells(raw: string): ProposedCell[] {
   function flush(idx: number) {
     const content = currentLines.join('\n').trim()
     if (currentHeading || content) {
-      cells.push({
-        id: String(idx),
-        type: currentType,
-        heading: currentHeading,
-        content,
-        checked: true,
-      })
+      cells.push({ id: String(idx), type: currentType, heading: currentHeading, content, checked: true })
     }
   }
 
@@ -48,10 +42,15 @@ function parseMdToCells(raw: string): ProposedCell[] {
       currentType = 'heading'
       currentHeading = line.slice(2).trim()
       currentLines = []
-    } else if (line.startsWith('## ')) {
+    } else if (depth >= 2 && line.startsWith('## ') && !line.startsWith('### ')) {
       flush(cellIndex++)
       currentType = 'markdown'
       currentHeading = line.slice(3).trim()
+      currentLines = []
+    } else if (depth >= 3 && line.startsWith('### ')) {
+      flush(cellIndex++)
+      currentType = 'markdown'
+      currentHeading = line.slice(4).trim()
       currentLines = []
     } else {
       currentLines.push(line)
@@ -63,19 +62,24 @@ function parseMdToCells(raw: string): ProposedCell[] {
 
 export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, onConfirm, onInsertOne, onClose }: Props) {
   const [rawContent, setRawContent] = useState(rawContentProp ?? '')
-  const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? parseMdToCells(rawContentProp) : [])
+  const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? parseMdToCells(rawContentProp, 2) : [])
+  const [splitDepth, setSplitDepth] = useState<1 | 2 | 3>(2)
 
   useEffect(() => {
     if (rawContentProp !== undefined) {
       setRawContent(rawContentProp)
-      setCells(parseMdToCells(rawContentProp))
+      setCells(parseMdToCells(rawContentProp, splitDepth))
     } else if (filePath) {
       window.pathly.fs.read(filePath).then((content) => {
         setRawContent(content ?? '')
-        setCells(parseMdToCells(content ?? ''))
+        setCells(parseMdToCells(content ?? '', splitDepth))
       }).catch(() => {})
     }
   }, [filePath, rawContentProp])
+
+  useEffect(() => {
+    setCells(parseMdToCells(rawContent, splitDepth))
+  }, [splitDepth, rawContent])
 
   const checkedCount = cells.filter(c => c.checked).length
   const checkedCells = cells.filter(c => c.checked)
@@ -115,6 +119,20 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
         <div className={styles.modalHeader}>
           <div className={styles.modalTitle}>{modalTitle}</div>
           <div className={styles.modalSubtitle}>{modalSubtitle}</div>
+          <div className={styles.depthRow}>
+            <span className={styles.depthLabel}>Split on:</span>
+            {([1, 2, 3] as const).map(d => (
+              <button
+                key={d}
+                type="button"
+                className={styles.depthBtn}
+                data-active={splitDepth === d}
+                onClick={() => setSplitDepth(d)}
+              >
+                {'#'.repeat(d)} H{d}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className={styles.body}>

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useTerminalStore } from '../../../../store/terminalStore'
 import { useUiStore } from '../../../../store/uiStore'
-import { buildSplitPrompt, buildAnalyzePrompt, getSpawnCwd } from '../../../Editor/commentUtils'
+import { buildSplitPrompt, buildAnalyzePrompt, getSpawnCwd, getEffectivePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../../Editor/commentUtils'
 
 type ActionState = 'idle' | 'running' | 'success' | 'error'
 
@@ -14,7 +14,13 @@ async function pollForFile(path: string): Promise<boolean> {
   return false
 }
 
-export function useNotebookAgentActions(skillNotebookPath: string | null) {
+export function useNotebookAgentActions(
+  skillNotebookPath: string | null,
+  splitOncePrompt: string | null,
+  analyzeOncePrompt: string | null,
+  onSplitOnceUsed: () => void,
+  onAnalyzeOnceUsed: () => void,
+) {
   const addTab  = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
   const setNotebookDraftPath     = useUiStore((s) => s.setNotebookDraftPath)
@@ -27,6 +33,7 @@ export function useNotebookAgentActions(skillNotebookPath: string | null) {
   const handleSplit = useCallback(async () => {
     if (!skillNotebookPath || splitState === 'running') return
     setSplitState('running')
+    onSplitOnceUsed()
     const draftPath = skillNotebookPath + '.draft'
     const norm = skillNotebookPath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
@@ -48,14 +55,16 @@ export function useNotebookAgentActions(skillNotebookPath: string | null) {
         }
       })
     })
+    const prompt = splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, skillNotebookPath)
     await window.pathly.terminal.spawn(tabId, getSpawnCwd(skillNotebookPath), undefined, [
-      'claude', '-p', buildSplitPrompt(skillNotebookPath), '--print', '--dangerously-skip-permissions',
+      'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
     ])
-  }, [skillNotebookPath, splitState, addTab, openTab, setNotebookDraftPath, setSkillNotebookViewMode])
+  }, [skillNotebookPath, splitState, splitOncePrompt, onSplitOnceUsed, addTab, openTab, setNotebookDraftPath, setSkillNotebookViewMode])
 
   const handleAnalyze = useCallback(async () => {
     if (!skillNotebookPath || analyzeState === 'running') return
     setAnalyzeState('running')
+    onAnalyzeOnceUsed()
     const analysisPath = skillNotebookPath + '.analysis'
     const norm = skillNotebookPath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
@@ -76,10 +85,11 @@ export function useNotebookAgentActions(skillNotebookPath: string | null) {
         }
       })
     })
+    const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, skillNotebookPath)
     await window.pathly.terminal.spawn(tabId, getSpawnCwd(skillNotebookPath), undefined, [
-      'claude', '-p', buildAnalyzePrompt(skillNotebookPath), '--print', '--dangerously-skip-permissions',
+      'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
     ])
-  }, [skillNotebookPath, analyzeState, addTab, openTab, setNotebookAnalysisPath])
+  }, [skillNotebookPath, analyzeState, analyzeOncePrompt, onAnalyzeOnceUsed, addTab, openTab, setNotebookAnalysisPath])
 
   return { handleSplit, handleAnalyze, splitState, analyzeState }
 }

@@ -44,6 +44,8 @@ export interface UiState {
   notebookDraftPath: string | null
   /** Analysis file path — set when an agent has written a .analysis report */
   notebookAnalysisPath: string | null
+  notebookAnalysisPanelOpen: boolean
+  setNotebookAnalysisPanelOpen: (v: boolean) => void
   /** Increment to request the embedded source editor to save */
   notebookSaveRequested: number
   /** Increment to request the embedded source editor to open its draft diff viewer */
@@ -98,6 +100,7 @@ export const useUiStore = create<UiState>()(
       notebookPreviewOpen: true,
       notebookDraftPath: null,
       notebookAnalysisPath: null,
+      notebookAnalysisPanelOpen: false,
       notebookSaveRequested: 0,
       notebookOpenDraftRequested: 0,
       notebookUndoRequested: 0,
@@ -105,7 +108,8 @@ export const useUiStore = create<UiState>()(
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       toggleNotebookPreview: () => set((s) => ({ notebookPreviewOpen: !s.notebookPreviewOpen })),
       setNotebookDraftPath: (p) => set({ notebookDraftPath: p }),
-      setNotebookAnalysisPath: (p) => set({ notebookAnalysisPath: p }),
+      setNotebookAnalysisPath: (p) => set({ notebookAnalysisPath: p, ...(p !== null ? { notebookAnalysisPanelOpen: true } : {}) }),
+      setNotebookAnalysisPanelOpen: (v) => set({ notebookAnalysisPanelOpen: v }),
       requestNotebookSave: () => set((s) => ({ notebookSaveRequested: s.notebookSaveRequested + 1 })),
       requestNotebookOpenDraft: () => set((s) => ({ notebookOpenDraftRequested: s.notebookOpenDraftRequested + 1 })),
       requestNotebookUndo: () => set((s) => ({ notebookUndoRequested: s.notebookUndoRequested + 1 })),

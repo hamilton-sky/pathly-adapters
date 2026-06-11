@@ -188,6 +188,89 @@
   color: var(--red);
 }
 
+/* ── Agent pill (main action + settings icon) ── */
+.agentPill {
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.agentPill .agentPillMain {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-right: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.agentPill .agentPillMain:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.agentPill .agentPillMain:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agentPill .agentPillMain[data-state='running'] {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  cursor: wait;
+}
+
+.agentPill .agentPillMain[data-state='success'] {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.agentPill .agentPillMain[data-state='error'] {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.agentPillSettings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.agentPillSettings:hover:not(:disabled) {
+  background: var(--bg-surface1);
+  color: var(--text-secondary);
+}
+
+.agentPillSettings:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.agentPillSettings[data-state='running'] {
+  border-color: var(--yellow);
+  cursor: wait;
+}
+
+.agentPillSettings[data-state='success'] { border-color: var(--green); }
+.agentPillSettings[data-state='error']   { border-color: var(--red); }
+
 .draftBtn {
   display: inline-flex;
   align-items: center;
@@ -222,6 +305,42 @@
 
 @keyframes draftPulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 35%, transparent); }
+  50%       { box-shadow: 0 0 0 4px transparent; }
+}
+
+.analysisBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  background: var(--bg-surface0);
+  border: var(--border);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.analysisBtn[data-has-analysis='true'] {
+  background: color-mix(in srgb, var(--yellow) 12%, var(--bg-surface0));
+  border: 1px solid color-mix(in srgb, var(--yellow) 60%, transparent);
+  color: var(--yellow);
+  cursor: pointer;
+  animation: analysisPulse 2.2s ease-in-out infinite;
+}
+
+.analysisBtn[data-has-analysis='true']:hover {
+  background: color-mix(in srgb, var(--yellow) 22%, var(--bg-surface0));
+  animation: none;
+}
+
+@keyframes analysisPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--yellow) 35%, transparent); }
   50%       { box-shadow: 0 0 0 4px transparent; }
 }
 
@@ -309,6 +428,14 @@
 
 .headerRoot[data-compact='true'] .agentBtn,
 .headerRoot[data-compact='true'] .draftBtn {
+  padding: 4px 7px;
+}
+
+.headerRoot[data-compact='true'] .analysisBtn {
+  padding: 4px 7px;
+}
+
+.headerRoot[data-compact='true'] .agentPillMain {
   padding: 4px 7px;
 }
 

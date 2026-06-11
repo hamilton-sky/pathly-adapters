@@ -40,6 +40,42 @@
   line-height: 1.5;
 }
 
+.depthRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.depthLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.depthBtn {
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-family: var(--font-family-mono);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 80ms, color 80ms, border-color 80ms;
+}
+
+.depthBtn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-surface0);
+}
+
+.depthBtn[data-active='true'] {
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg-surface1));
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--accent);
+}
+
 .body {
   display: flex;
   flex: 1;

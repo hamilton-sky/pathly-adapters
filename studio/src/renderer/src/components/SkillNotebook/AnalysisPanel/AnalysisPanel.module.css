@@ -72,3 +72,54 @@
 .spinner {
   animation: spin 1s linear infinite;
 }
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: var(--border);
+  flex-shrink: 0;
+  background: var(--bg-mantle);
+}
+
+.openBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 9px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.openBtn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.discardBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 9px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.discardBtn:hover {
+  color: var(--red);
+  border-color: var(--red);
+}

@@ -70,6 +70,22 @@ export function getSpawnCwd(filePath: string): string {
   return planIdx !== -1 ? norm.slice(0, planIdx) : norm.slice(0, norm.lastIndexOf('/'))
 }
 
+export const STORAGE_KEY_SPLIT   = 'pathly:prompt_override_split'
+export const STORAGE_KEY_ANALYZE = 'pathly:prompt_override_analyze'
+
+export function getEffectivePrompt(
+  builder: (path: string) => string,
+  storageKey: string,
+  filePath: string,
+): string {
+  try {
+    const saved = localStorage.getItem(storageKey)
+    return saved ?? builder(filePath)
+  } catch {
+    return builder(filePath)
+  }
+}
+
 export function buildSendPrompt(filePath: string, body: string, unresolved: Comment[]): string {
   const norm = filePath.replace(/\\/g, '/')
   const commentLines = unresolved

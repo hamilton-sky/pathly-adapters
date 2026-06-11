@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { X, RefreshCw } from 'lucide-react'
+import { X, RefreshCw, FileCode, Trash2 } from 'lucide-react'
 import { useUiStore } from '../../../store/uiStore'
 import { MarkdownPreview } from '../../Editor/MarkdownPreview'
 import styles from './AnalysisPanel.module.css'
@@ -7,6 +7,11 @@ import styles from './AnalysisPanel.module.css'
 export default function AnalysisPanel() {
   const analysisPath    = useUiStore((s) => s.notebookAnalysisPath)
   const setAnalysisPath = useUiStore((s) => s.setNotebookAnalysisPath)
+  const panelOpen       = useUiStore((s) => s.notebookAnalysisPanelOpen)
+  const setPanelOpen    = useUiStore((s) => s.setNotebookAnalysisPanelOpen)
+  const setSkillNotebookPath     = useUiStore((s) => s.setSkillNotebookPath)
+  const setSkillNotebookViewMode = useUiStore((s) => s.setSkillNotebookViewMode)
+
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -19,12 +24,20 @@ export default function AnalysisPanel() {
     })
   }, [analysisPath])
 
-  async function handleClose() {
+  async function handleDiscard() {
     if (analysisPath) await window.pathly.fs.delete(analysisPath)
     setAnalysisPath(null)
+    setPanelOpen(false)
   }
 
-  if (!analysisPath) return null
+  function handleOpenInEditor() {
+    if (!analysisPath) return
+    setSkillNotebookPath(analysisPath)
+    setSkillNotebookViewMode('editor')
+    setPanelOpen(false)
+  }
+
+  if (!analysisPath || !panelOpen) return null
 
   return (
     <div className={styles.panel}>
@@ -33,7 +46,7 @@ export default function AnalysisPanel() {
         <button
           type="button"
           className={styles.closeBtn}
-          onClick={() => void handleClose()}
+          onClick={() => setPanelOpen(false)}
           aria-label="Close analysis"
         >
           <X size={14} />
@@ -48,6 +61,16 @@ export default function AnalysisPanel() {
         ) : (
           <MarkdownPreview content={content} />
         )}
+      </div>
+      <div className={styles.footer}>
+        <button type="button" className={styles.openBtn} onClick={handleOpenInEditor}>
+          <FileCode size={12} />
+          Open in editor
+        </button>
+        <button type="button" className={styles.discardBtn} onClick={() => void handleDiscard()}>
+          <Trash2 size={12} />
+          Discard
+        </button>
       </div>
     </div>
   )
