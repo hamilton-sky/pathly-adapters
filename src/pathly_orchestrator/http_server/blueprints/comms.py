@@ -383,3 +383,35 @@ def comms_scope_set():
     except Exception as exc:
         logging.exception("comms_scope_set error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/delete", methods=["POST"])
+def comms_delete():
+    """Retract (soft-delete) a message — only while no agent has read it.
+
+    Required body field: message_id.
+    Returns 200 {ok:true} on delete, 409 if an agent has already read it
+    (locked), 404 if the message does not exist.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import soft_delete_message as _soft_delete
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        result = _soft_delete(conn, message_id)
+        if result == "not_found":
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+        if result == "locked":
+            return jsonify({"ok": False, "error": "Message already read by an agent — cannot retract"}), 409
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("comms_delete error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import type { BoardScope } from './types'
 import { useCommsStore } from '../../../store/commsStore'
 import { useCommandCenterStore } from '../../../store/commandCenterStore'
+import { useProjectStore } from '../../../store/projectStore'
 import { useSectionResize } from './hooks/useSectionResize'
 import { CommandCenterHeader } from './CommandCenterHeader'
 import { FeatureSidebar } from './FeatureSidebar'
@@ -15,7 +16,25 @@ import s from './CommandCenter.module.css'
 export function CommandCenter() {
   const store = useCommsStore()
   const cc = useCommandCenterStore()
+  const projectPath = useProjectStore((s) => s.projectPath)
+  const activeTopic = useProjectStore((s) => s.activeTopic)
   const onResize = useSectionResize(cc.direction, cc.setSize)
+
+  // Load the real feature list from the project's plan folders.
+  useEffect(() => {
+    if (projectPath) void store.loadFeatures(projectPath)
+  }, [projectPath, store.loadFeatures])
+
+  // The persisted main feature may be a stale seed id — point it at a real
+  // feature once the list loads (prefer the active topic, else the first).
+  useEffect(() => {
+    if (store.features.length === 0) return
+    if (store.features.some((f) => f.id === cc.mainFeature)) return
+    const next = activeTopic && store.features.some((f) => f.id === activeTopic)
+      ? activeTopic
+      : store.features[0].id
+    cc.setMainFeature(next)
+  }, [store.features, cc.mainFeature, activeTopic, cc.setMainFeature])
 
   return (
     <div className={s.cc}>

@@ -267,3 +267,31 @@ def get_promotable_messages(
         (scope,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def soft_delete_message(conn: sqlite3.Connection, message_id: str) -> str:
+    """Retract a message by soft-deleting it — but only while no agent has read it.
+
+    A human reading their own message (``read_by`` containing only ``human``/``you``)
+    does not lock it; any other reader does. Returns one of:
+    ``"deleted"`` · ``"locked"`` (already read by an agent) · ``"not_found"``.
+    """
+    row = conn.execute(
+        "SELECT read_by FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+        (message_id,),
+    ).fetchone()
+    if row is None:
+        return "not_found"
+    try:
+        read_by = json.loads(row["read_by"] or "[]")
+    except (json.JSONDecodeError, TypeError):
+        read_by = []
+    if any(reader not in ("human", "you") for reader in read_by):
+        return "locked"
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET deleted_at=?, status='trashed' WHERE id=?",
+            (_now(), message_id),
+        )
+        conn.commit()
+    return "deleted"

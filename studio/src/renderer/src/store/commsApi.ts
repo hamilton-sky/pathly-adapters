@@ -1,0 +1,236 @@
+import type { Message, Feature, BoardScope, MessageType, Stage, QuestionOption, AgentId } from '../components/HQ/CommandCenter/types'
+
+export const COMMS_BASE = 'http://localhost:8765'
+
+const KNOWN_AGENT_IDS = new Set<string>(['you', 'builder', 'reviewer', 'architect', 'tester', 'retro'])
+
+// ── Relative-time helper ─────────────────────────────────────────────
+
+export function relativeTime(isoTs: string): string {
+  const ms = Date.now() - new Date(isoTs).getTime()
+  if (ms < 60_000) return 'now'
+  const mins = Math.floor(ms / 60_000)
+  if (mins < 60) return `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d`
+  const wks = Math.floor(days / 7)
+  return `${wks}w`
+}
+
+// ── Backend row shape ────────────────────────────────────────────────
+
+export interface CommsRow {
+  id: string
+  board: string
+  scope: string
+  from_agent: string
+  to_agent: string | null
+  type: string
+  text: string
+  options: string | null
+  reply_to: string | null
+  stage: string | null
+  conv: number | null
+  ts: string
+  read_by: string | null
+  acknowledged_by: string | null
+  status: string | null
+  deleted_at: string | null
+  artifact_path: string | null
+  artifact_type: string | null
+  artifact_url: string | null
+}
+
+interface BackendOption {
+  id: string
+  label: string
+  description?: string
+}
+
+function toAgentId(raw: string): AgentId {
+  if (raw === 'human') return 'you'
+  if (KNOWN_AGENT_IDS.has(raw)) return raw as AgentId
+  return 'builder'
+}
+
+function parseJsonArray(raw: string | null): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function parseOptions(raw: string | null): QuestionOption[] | undefined {
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw) as BackendOption[]
+    if (!Array.isArray(parsed)) return undefined
+    return parsed.map((o) => ({ id: o.id, label: o.label, desc: o.description }))
+  } catch {
+    return undefined
+  }
+}
+
+function basename(path: string | null): string | undefined {
+  if (!path) return undefined
+  return path.split(/[/\\]/).pop()
+}
+
+// ── Row → Message adapter ────────────────────────────────────────────
+
+export function rowToMessage(row: CommsRow): Message {
+  const readBy = parseJsonArray(row.read_by)
+  const ackedBy = parseJsonArray(row.acknowledged_by)
+  const readByAgent = readBy.some((r) => r !== 'you' && r !== 'human')
+  const options = parseOptions(row.options)
+
+  const m: Message = {
+    id: row.id,
+    type: row.type as Message['type'],
+    from: toAgentId(row.from_agent),
+    text: row.text,
+    stage: (row.stage as Stage) ?? null,
+    time: relativeTime(row.ts),
+    pinned: row.type === 'decision',
+    ack: ackedBy.length > 0,
+    readByAgent,
+  }
+
+  if (row.status) m.status = row.status as Message['status']
+  if (options) m.options = options
+
+  if (row.type === 'artifact' && row.artifact_path) {
+    m.artifact = basename(row.artifact_path)
+    if (row.artifact_type) m.atype = row.artifact_type as Message['atype']
+  }
+
+  return m
+}
+
+// ── boardKey convention ──────────────────────────────────────────────
+
+export function scopeToParams(scope: BoardScope, key: string): { board: string; scope: string } {
+  if (scope === 'feature') return { board: 'feature', scope: key }
+  if (scope === 'project') return { board: 'project', scope: key.replace(/\\/g, '/').replace(/\/$/, '') }
+  return { board: 'global', scope: 'global' }
+}
+
+// ── Fetch helpers ─────────────────────────────────────────────────────
+
+export async function fetchBoard(
+  feature: string,
+  board: string,
+  scope: string,
+): Promise<Message[]> {
+  try {
+    const params = new URLSearchParams({ feature, board, scope })
+    const r = await fetch(`${COMMS_BASE}/comms?${params}`)
+    if (!r.ok) return []
+    const rows = await r.json() as CommsRow[]
+    return rows.map(rowToMessage)
+  } catch {
+    return []
+  }
+}
+
+export async function apiPost(
+  feature: string,
+  board: string,
+  scope: string,
+  type: MessageType,
+  text: string,
+  stage?: Stage | null,
+): Promise<string | null> {
+  try {
+    const r = await fetch(`${COMMS_BASE}/comms/post`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature, from: 'human', type, text, board, scope, stage: stage ?? null }),
+    })
+    if (!r.ok) return null
+    const json = await r.json() as { message_id: string }
+    return json.message_id
+  } catch {
+    return null
+  }
+}
+
+export async function apiAnswer(
+  questionId: string,
+  answer: string,
+  optionId?: string,
+): Promise<boolean> {
+  try {
+    const r = await fetch(`${COMMS_BASE}/comms/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_id: questionId, answer, option_id: optionId }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+export async function apiAcknowledge(messageId: string, agent: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${COMMS_BASE}/comms/acknowledge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId, agent }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+export async function apiToggleScope(
+  feature: string,
+  projectRoot: string,
+  scope: { feature: boolean; project: boolean; global: boolean },
+): Promise<boolean> {
+  try {
+    const r = await fetch(`${COMMS_BASE}/comms/scope`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature, project_root: projectRoot, scope }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+export async function apiDelete(messageId: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${COMMS_BASE}/comms/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+// ── Feature list helper ───────────────────────────────────────────────
+
+export function buildFeature(id: string): Feature {
+  return {
+    id,
+    stage: 'PLANNING',
+    conv: 0,
+    status: 'idle',
+    agent: 'builder',
+    last: '',
+    scope: { feature: true, project: true, global: true },
+    // TODO: enrich stage/status/agent/last from GET /status?topic=<id>&project_root=<root>
+  }
+}

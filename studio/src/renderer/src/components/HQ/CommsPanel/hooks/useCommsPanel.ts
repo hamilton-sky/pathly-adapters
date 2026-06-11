@@ -1,18 +1,52 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BoardScope, MessageType } from '../../CommandCenter/types'
 import { useCommsStore } from '../../../../store/commsStore'
+import { useProjectStore } from '../../../../store/projectStore'
+import { COMMS_BASE } from '../../../../store/commsApi'
 
 // Per-section binding: messages for one board scope + send/answer/resolve handlers
 // + a one-shot flash for freshly-posted messages.
-// TODO: also owns SSE subscription (GET /events/comms?scope=) → store.appendMessage
+// Owns board load on mount/change and SSE subscription (GET /events/comms?scope=).
 export function useCommsPanel(scope: BoardScope, mainFeature: string) {
   const store = useCommsStore()
+  const projectPath = useProjectStore((s) => s.projectPath)
   const [flashId, setFlashId] = useState<string | null>(null)
 
   const key = scope === 'feature' ? mainFeature : scope
   const messages = store.messagesFor(scope, mainFeature)
   const feature = store.features.find((f) => f.id === mainFeature)
   const pendingCount = store.pendingCount(mainFeature)
+
+  const projectRoot = projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+
+  // Stable ref so the SSE handler always calls the current loadBoard without
+  // re-creating the EventSource on every render.
+  const loadRef = useRef<() => void>(() => { /* noop until effect runs */ })
+  loadRef.current = () => { void store.loadBoard(scope, key, projectRoot) }
+
+  // Board load + SSE subscription
+  useEffect(() => {
+    if (!key) return
+
+    void store.loadBoard(scope, key, projectRoot)
+
+    let es: EventSource | null = null
+    try {
+      es = new EventSource(`${COMMS_BASE}/events/comms?scope=${encodeURIComponent(key)}`)
+      es.onmessage = (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data as string) as { type: string }
+          if (data.type === 'COMMS_UPDATE') {
+            loadRef.current()
+          }
+        } catch { /* ignore parse errors */ }
+      }
+      es.onerror = () => { /* EventSource auto-reconnects */ }
+    } catch { /* EventSource not available — silently skip */ }
+
+    return () => { es?.close() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, key, projectRoot])
 
   const flash = (id: string) => {
     setFlashId(id)
@@ -38,8 +72,8 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
   )
 
   const toggleScope = useCallback(
-    (s: BoardScope) => store.toggleScope(mainFeature, s),
-    [store, mainFeature],
+    (s: BoardScope) => store.toggleScope(mainFeature, s, projectRoot),
+    [store, mainFeature, projectRoot],
   )
 
   const del = useCallback(
