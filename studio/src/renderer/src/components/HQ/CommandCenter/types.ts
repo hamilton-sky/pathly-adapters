@@ -37,6 +37,9 @@ export interface Message {
   resolution?: string
   artifact?: string
   atype?: 'md' | 'code' | 'pdf' | 'image' | 'json' | 'url' | 'snippet'
+  /** True once any agent has read this message. Maps to a non-empty read_by
+   *  (SPEC §5). Your own messages can be retracted only while this is false. */
+  readByAgent?: boolean
 }
 
 export interface Feature {

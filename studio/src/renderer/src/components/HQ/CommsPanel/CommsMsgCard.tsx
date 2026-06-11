@@ -1,5 +1,5 @@
 import React from 'react'
-import { Check } from 'lucide-react'
+import { Check, Trash2 } from 'lucide-react'
 import type { Message } from '../CommandCenter/types'
 import { AGENTS } from '../CommandCenter/constants'
 import { Avatar } from './Avatar'
@@ -12,10 +12,12 @@ export interface CommsMsgCardProps {
   flash?: boolean
   onAnswer?: (messageId: string, optionId: string) => void
   onResolve?: (messageId: string, mode: 'block' | 'note' | 'ignore') => void
+  onDelete?: (messageId: string) => void
 }
 
-export function CommsMsgCard({ message: m, flash, onAnswer, onResolve }: CommsMsgCardProps) {
+export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete }: CommsMsgCardProps) {
   const agent = AGENTS[m.from]
+  const canDelete = m.from === 'you' && !m.readByAgent && !!onDelete
   return (
     <div className={`${s.msg}${flash ? ` ${s.flash}` : ''}`} data-msg={m.id}>
       <div className={s.msgMeta}>
@@ -30,6 +32,17 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve }: CommsMs
           </span>
         )}
         <span className={s.msgTime}>{m.time} ago</span>
+        {canDelete && (
+          <button
+            type="button"
+            className={s.msgDel}
+            title="Delete — not yet read by any agent"
+            aria-label="Delete message"
+            onClick={() => onDelete!(m.id)}
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
 
       <div className={s.msgCard} data-type={m.type}>

@@ -1,4 +1,4 @@
-import { BookOpen, Layers, Activity, Database, Settings, ChevronRight } from 'lucide-react'
+import { BookOpen, Layers, Activity, Database, Settings, ChevronRight, MessageSquare } from 'lucide-react'
 import { useBrightskyStore } from '../../../store/brightskyStore'
 import { Tooltip } from '../../ui'
 import styles from './IconStrip.module.css'
@@ -12,6 +12,7 @@ interface IconStripProps {
   onMonitor: () => void
   onDbExplorer: () => void
   onSettings: () => void
+  onCommandCenter: () => void
 }
 
 export function IconStrip({
@@ -23,6 +24,7 @@ export function IconStrip({
   onMonitor,
   onDbExplorer,
   onSettings,
+  onCommandCenter,
 }: IconStripProps): JSX.Element {
   const displayName = useBrightskyStore((s) => s.userDisplayName)
   const initials = displayName
@@ -71,6 +73,17 @@ export function IconStrip({
           aria-label="Monitor"
         >
           <Activity size={16} />
+        </button>
+      </Tooltip>
+
+      <Tooltip label="Command Center" placement="right">
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${activePanel === 'command-center' ? styles.iconBtnActive : ''}`}
+          onClick={onCommandCenter}
+          aria-label="Command Center"
+        >
+          <MessageSquare size={16} />
         </button>
       </Tooltip>
 

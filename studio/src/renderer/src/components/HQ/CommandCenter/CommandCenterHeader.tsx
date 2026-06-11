@@ -52,6 +52,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
               key={sc}
               type="button"
               className={s.tab}
+              title={`Toggle the ${SCOPES[sc].label} board`}
               {...(on ? { 'data-on': '' } : {})}
               aria-pressed={on}
               onClick={() => p.onToggleSection(sc)}
@@ -75,7 +76,12 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
 
       <div className={s.headRight}>
         {p.sections.length >= 2 && (
-          <button type="button" className={s.ctl} onClick={p.onToggleDirection}>
+          <button
+            type="button"
+            className={s.ctl}
+            title={p.direction === 'row' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
+            onClick={p.onToggleDirection}
+          >
             {p.direction === 'row' ? <Columns2 size={13} /> : <List size={13} />}
             {p.direction === 'row' ? 'side by side' : 'stacked'}
           </button>

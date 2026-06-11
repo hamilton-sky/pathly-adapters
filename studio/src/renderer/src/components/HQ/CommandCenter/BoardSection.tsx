@@ -54,7 +54,7 @@ export function BoardSection(props: BoardSectionProps) {
         <span className={s.bsSep}>—</span>
         <span className={s.bsName}>{NAME[scope](mainFeature)}</span>
         <div className={s.bsHeadActs}>
-          <button type="button" className={s.bsIconbtn} title="Attach artifact">
+          <button type="button" className={s.bsIconbtn} title="Attach artifact (coming soon)">
             <Plus size={15} />
           </button>
           <button

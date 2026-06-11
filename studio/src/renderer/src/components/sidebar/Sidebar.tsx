@@ -171,6 +171,7 @@ export function Sidebar(): JSX.Element | null {
         onMonitor={() => setActivePanel('monitor')}
         onDbExplorer={() => setActivePanel('db-explorer')}
         onSettings={() => setActivePanel('settings')}
+        onCommandCenter={() => setActivePanel('command-center')}
       />
     )
   }

@@ -42,5 +42,10 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
     [store, mainFeature],
   )
 
-  return { messages, feature, pendingCount, flashId, post, answer, resolve, toggleScope }
+  const del = useCallback(
+    (mid: string) => store.deleteMessage(key, mid),
+    [store, key],
+  )
+
+  return { messages, feature, pendingCount, flashId, post, answer, resolve, toggleScope, del }
 }

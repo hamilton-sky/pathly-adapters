@@ -1,13 +1,12 @@
 import React, { useState, useRef } from 'react'
 import { Send } from 'lucide-react'
-import type { BoardScope, MessageType } from '../CommandCenter/types'
-import { COMPOSE_TYPES } from '../CommandCenter/constants'
+import type { BoardScope } from '../CommandCenter/types'
 import s from './CommsInput.module.css'
 
 export interface CommsInputProps {
   scope: BoardScope
   mainFeature: string
-  onSend: (type: MessageType, text: string) => void
+  onSend: (text: string) => void
 }
 
 const PLACEHOLDER: Record<BoardScope, (f: string) => string> = {
@@ -16,23 +15,23 @@ const PLACEHOLDER: Record<BoardScope, (f: string) => string> = {
   global: () => 'Global policy (permanent, all agents)…',
 }
 
-// Compose bar + message-type picker. Cmd/Ctrl+Enter sends.
+// Compose row: textarea + send. Cmd/Ctrl+Enter sends. The message-type picker
+// lives above the input, in the CommsPanel controls row.
 export function CommsInput({ scope, mainFeature, onSend }: CommsInputProps) {
   const [text, setText] = useState('')
-  const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
   const ta = useRef<HTMLTextAreaElement>(null)
 
   const send = () => {
     const t = text.trim()
     if (!t) return
-    onSend(type, t)
+    onSend(t)
     setText('')
     if (ta.current) ta.current.style.height = 'auto'
   }
 
   const grow = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 96)}px`
+    el.style.height = `${Math.min(el.scrollHeight, 72)}px`
   }
 
   return (
@@ -51,23 +50,15 @@ export function CommsInput({ scope, mainFeature, onSend }: CommsInputProps) {
             }
           }}
         />
-        <div className={s.composeBar}>
-          <select
-            className={s.typePick}
-            value={type}
-            onChange={(e) => setType(e.target.value as MessageType)}
-          >
-            {COMPOSE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
       </div>
       <button
         type="button"
         className={s.composeSend}
         disabled={!text.trim()}
         onClick={send}
+        title="Send (Ctrl+Enter)"
       >
-        <Send size={13} />Send
+        <Send size={12} />Send
       </button>
     </div>
   )

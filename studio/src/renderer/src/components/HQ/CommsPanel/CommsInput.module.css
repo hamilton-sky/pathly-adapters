@@ -7,7 +7,6 @@
 .composeField {
   flex: 1;
   display: flex;
-  flex-direction: column;
   background: var(--bg-surface0);
   border: var(--border);
   border-radius: var(--radius-md);
@@ -20,65 +19,34 @@
 }
 
 .composeField textarea {
+  flex: 1;
   resize: none;
   border: none;
   background: transparent;
   outline: none;
   color: var(--text-primary);
-  font: var(--font-size-base)/1.5 var(--font-family-base);
-  padding: 9px 11px 4px;
-  min-height: 20px;
-  max-height: 96px;
+  font: var(--font-size-base)/1.4 var(--font-family-base);
+  padding: 7px 10px;
+  min-height: 18px;
+  max-height: 72px;
 }
 
 .composeField textarea::placeholder {
   color: var(--text-muted);
 }
 
-.composeBar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px 6px 8px;
-}
-
-.typePick {
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--bg-mantle);
-  border: var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font: 600 10px/1 var(--font-family-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 5px 22px 5px 8px;
-  cursor: pointer;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
-    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
-  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
-  background-size: 4px 4px, 4px 4px;
-  background-repeat: no-repeat;
-}
-
-.typePick:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
 .composeSend {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 36px;
+  gap: 5px;
+  height: 34px;
   padding: 0 14px;
   flex-shrink: 0;
   border: none;
   border-radius: var(--radius-md);
   background: var(--accent);
   color: #fff;
-  font: 600 12px/1 var(--font-family-base);
+  font: 600 11px/1 var(--font-family-base);
   cursor: pointer;
   transition: filter var(--transition-fast);
 }

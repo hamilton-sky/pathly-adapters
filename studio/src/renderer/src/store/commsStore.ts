@@ -72,7 +72,11 @@ const SEED_BOARDS: Boards = {
 
 function cloneBoards(b: Boards): Boards {
   const out: Boards = {}
-  for (const k of Object.keys(b)) out[k] = b[k].map((m) => ({ ...m }))
+  // Seed history is treated as already read by agents → not retractable. Only
+  // messages you post live (readByAgent: false) can be deleted.
+  for (const k of Object.keys(b)) {
+    out[k] = b[k].map((m) => ({ ...m, readByAgent: m.from === 'you' ? true : m.readByAgent }))
+  }
   return out
 }
 
@@ -97,6 +101,8 @@ export interface CommsState {
   resolve: (messageId: string, mode: 'block' | 'note' | 'ignore') => void
   setFeatureStatus: (featureId: string, status: FeatureStatus, stage?: Stage) => void
   toggleScope: (featureId: string, scope: BoardScope) => void  // TODO: POST /comms/scope
+  /** Retract one of your own messages — only while no agent has read it. */
+  deleteMessage: (key: string, messageId: string) => void
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -114,7 +120,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   post: (key, type, text, stage) => {
     const m: Message = {
       id: nextId(), type, from: 'you', time: 'now', text,
-      stage: stage ?? null, pinned: type === 'decision',
+      stage: stage ?? null, pinned: type === 'decision', readByAgent: false,
       ...(type === 'question'
         ? { status: 'pending', options: [{ id: 'a', label: 'Option A' }, { id: 'b', label: 'Option B' }] }
         : {}),
@@ -196,4 +202,13 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         f.id === fid ? { ...f, scope: { ...f.scope, [scope]: !f.scope[scope] } } : f),
     }))
   },
+
+  deleteMessage: (key, messageId) =>
+    // TODO: live → POST /comms/delete (soft-trash); the server rejects once read_by is non-empty.
+    set((s) => {
+      const arr = s.boards[key] || []
+      const m = arr.find((x) => x.id === messageId)
+      if (!m || m.from !== 'you' || m.readByAgent) return s  // only your own, still-unread
+      return { boards: { ...s.boards, [key]: arr.filter((x) => x.id !== messageId) } }
+    }),
 }))

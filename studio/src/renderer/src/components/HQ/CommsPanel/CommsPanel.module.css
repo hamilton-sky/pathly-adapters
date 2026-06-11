@@ -5,13 +5,53 @@
   background: var(--bg-mantle);
 }
 
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .scopes {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 9px;
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.typePick {
+  height: 28px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font: 600 11px/1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0 28px 0 11px;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.typePick:hover {
+  border-color: var(--accent-border);
+  color: var(--text-primary);
+  background: var(--bg-surface1);
+}
+
+.typePick:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 .lbl {

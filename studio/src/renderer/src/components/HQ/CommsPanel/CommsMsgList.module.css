@@ -48,6 +48,28 @@
   color: var(--accent);
 }
 
+.pinBody { flex: 1; min-width: 0; }
+
+.pinDel {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+
+.pin:hover .pinDel { opacity: 1; }
+.pinDel:hover { color: var(--red); background: var(--red-bg); }
+
 @media (prefers-reduced-motion: no-preference) {
   .flash {
     animation: ccflash 0.9s var(--ease-out);
