@@ -28,6 +28,16 @@ _metrics: dict[str, int | float] = {
 _metrics_lock = threading.Lock()
 
 
+# The standard attributes present on every LogRecord instance — used to keep
+# only genuine `extra=` fields. The previous check used LogRecord.__dict__ (the
+# CLASS dict), which does NOT contain instance attributes like `args`, so they
+# all leaked into the JSON. A third party logging a non-serializable arg (e.g.
+# an httpx URL object) then crashed json.dumps on every request.
+_STD_LOGRECORD_ATTRS = set(
+    logging.LogRecord("", logging.INFO, "", 0, "", None, None).__dict__
+) | {"message", "asctime", "taskName"}
+
+
 class _JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         log: dict = {
@@ -41,10 +51,11 @@ class _JsonFormatter(logging.Formatter):
         extra = {
             k: v
             for k, v in record.__dict__.items()
-            if k not in logging.LogRecord.__dict__ and not k.startswith("_")
+            if k not in _STD_LOGRECORD_ATTRS and not k.startswith("_")
         }
         log.update(extra)
-        return json.dumps(log)
+        # default=str: never let a stray non-serializable value crash logging.
+        return json.dumps(log, default=str)
 
 
 def _setup_logging() -> None:
