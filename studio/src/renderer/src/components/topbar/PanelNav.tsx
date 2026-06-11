@@ -21,7 +21,56 @@ export function PanelNav({ compact }: PanelNavProps): JSX.Element {
 
   return (
     <div className={styles.panelNav}>
-      <Tooltip label="Flow canvas" shortcut="Ctrl+1" placement="bottom">
+      <Tooltip label="Communication board" shortcut="Ctrl+1" placement="bottom">
+        <button
+          type="button"
+          data-testid="topbar-panel-command-center"
+          className={`${styles.navBtn} ${activePanel === "command-center" ? styles.navBtnActive : ""}`}
+          onClick={() => setActivePanel("command-center")}
+        >
+          <MessageSquare size={15} />
+          {!compact && <span className={styles.navBtnLabel}>Command Center</span>}
+        </button>
+      </Tooltip>
+      <Tooltip label="Live monitor" shortcut="Ctrl+2" placement="bottom">
+        <button
+          type="button"
+          data-testid="topbar-panel-monitor"
+          data-label="Monitor"
+          className={`${styles.navBtn} ${activePanel === "monitor" ? styles.navBtnActive : ""}`}
+          onClick={() => setActivePanel("monitor")}
+        >
+          <Activity size={15} />
+          {!compact && <span className={styles.navBtnLabel}>Monitor</span>}
+        </button>
+      </Tooltip>
+      <Tooltip
+        label="Pipeline database explorer"
+        shortcut="Ctrl+3"
+        placement="bottom"
+      >
+        <button
+          type="button"
+          data-testid="topbar-panel-db-explorer"
+          className={`${styles.navBtn} ${activePanel === "db-explorer" ? styles.navBtnActive : ""}`}
+          onClick={() => setActivePanel("db-explorer")}
+        >
+          <Database size={15} />
+          {!compact && <span className={styles.navBtnLabel}>DB Explorer</span>}
+        </button>
+      </Tooltip>
+      <Tooltip label="Skill notebook" shortcut="Ctrl+4" placement="bottom">
+        <button
+          type="button"
+          data-testid="topbar-panel-notebook"
+          className={`${styles.navBtn} ${activePanel === "skill-notebook" ? styles.navBtnActive : ""}`}
+          onClick={() => setActivePanel("skill-notebook")}
+        >
+          <BookOpen size={15} />
+          {!compact && <span className={styles.navBtnLabel}>Notebook</span>}
+        </button>
+      </Tooltip>
+      <Tooltip label="Flow canvas" shortcut="Ctrl+5" placement="bottom">
         <button
           type="button"
           data-testid="topbar-panel-flow"
@@ -46,55 +95,6 @@ export function PanelNav({ compact }: PanelNavProps): JSX.Element {
         >
           <LayoutGrid size={15} />
           {!compact && <span className={styles.navBtnLabel}>Canvas</span>}
-        </button>
-      </Tooltip>
-      <Tooltip label="Skill notebook" shortcut="Ctrl+2" placement="bottom">
-        <button
-          type="button"
-          data-testid="topbar-panel-notebook"
-          className={`${styles.navBtn} ${activePanel === "skill-notebook" ? styles.navBtnActive : ""}`}
-          onClick={() => setActivePanel("skill-notebook")}
-        >
-          <BookOpen size={15} />
-          {!compact && <span className={styles.navBtnLabel}>Notebook</span>}
-        </button>
-      </Tooltip>
-      <Tooltip label="Live monitor" shortcut="Ctrl+3" placement="bottom">
-        <button
-          type="button"
-          data-testid="topbar-panel-monitor"
-          data-label="Monitor"
-          className={`${styles.navBtn} ${activePanel === "monitor" ? styles.navBtnActive : ""}`}
-          onClick={() => setActivePanel("monitor")}
-        >
-          <Activity size={15} />
-          {!compact && <span className={styles.navBtnLabel}>Monitor</span>}
-        </button>
-      </Tooltip>
-      <Tooltip
-        label="Pipeline database explorer"
-        shortcut="Ctrl+4"
-        placement="bottom"
-      >
-        <button
-          type="button"
-          data-testid="topbar-panel-db-explorer"
-          className={`${styles.navBtn} ${activePanel === "db-explorer" ? styles.navBtnActive : ""}`}
-          onClick={() => setActivePanel("db-explorer")}
-        >
-          <Database size={15} />
-          {!compact && <span className={styles.navBtnLabel}>DB Explorer</span>}
-        </button>
-      </Tooltip>
-      <Tooltip label="Communication board" shortcut="Ctrl+5" placement="bottom">
-        <button
-          type="button"
-          data-testid="topbar-panel-command-center"
-          className={`${styles.navBtn} ${activePanel === "command-center" ? styles.navBtnActive : ""}`}
-          onClick={() => setActivePanel("command-center")}
-        >
-          <MessageSquare size={15} />
-          {!compact && <span className={styles.navBtnLabel}>Command Center</span>}
         </button>
       </Tooltip>
     </div>

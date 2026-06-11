@@ -212,6 +212,27 @@ function MainApp(): JSX.Element | null {
   }, [setActivePanel])
 
   useEffect(() => {
+    const PANEL_KEYS: Record<string, 'command-center' | 'monitor' | 'db-explorer' | 'skill-notebook' | 'flow'> = {
+      '1': 'command-center',
+      '2': 'monitor',
+      '3': 'db-explorer',
+      '4': 'skill-notebook',
+      '5': 'flow',
+    }
+    const handler = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return
+      const panel = PANEL_KEYS[e.key]
+      if (!panel) return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
+      e.preventDefault()
+      setActivePanel(panel)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [setActivePanel])
+
+  useEffect(() => {
     let prevUserId = useBrightskyStore.getState().userId
     const unsub = useBrightskyStore.subscribe((state) => {
       const newId = state.userId
