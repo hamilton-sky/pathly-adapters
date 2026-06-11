@@ -447,6 +447,10 @@
   font-family: var(--font-family-base);
   white-space: nowrap;
 }
+
+.newCatConfirm:hover:not(:disabled) {
+  opacity: 0.88;
+}
 .newCatCancelBtn {
   flex-shrink: 0;
   background: none;

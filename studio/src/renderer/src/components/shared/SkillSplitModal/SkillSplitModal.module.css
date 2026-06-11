@@ -168,6 +168,10 @@
   opacity: 0.4;
 }
 
+.cellCard:hover {
+  opacity: 0.85;
+}
+
 /* strip sits ON the top border, mirrors BodyCell */
 .strip {
   position: absolute;

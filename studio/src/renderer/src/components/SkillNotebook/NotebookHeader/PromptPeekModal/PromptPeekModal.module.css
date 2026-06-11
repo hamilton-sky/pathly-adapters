@@ -109,7 +109,10 @@
   transition: color var(--transition-fast);
 }
 
-.cancelBtn:hover { color: var(--text-secondary); }
+.cancelBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--text-secondary);
+}
 
 .useOnceBtn {
   background: var(--bg-surface0);

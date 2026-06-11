@@ -41,6 +41,11 @@
   transition: all var(--transition-fast);
 }
 
+.scopeChk:hover {
+  border-color: var(--text-muted);
+  color: var(--text-secondary);
+}
+
 .scopeChk[data-on] {
   color: var(--accent);
   border-color: var(--accent-border);

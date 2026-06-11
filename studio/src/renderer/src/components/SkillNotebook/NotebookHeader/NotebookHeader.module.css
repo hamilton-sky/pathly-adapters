@@ -413,6 +413,10 @@
   transition: opacity var(--transition-fast);
 }
 
+.exportBtn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
 .exportBtn:disabled {
   cursor: not-allowed;
   opacity: 0.7;
