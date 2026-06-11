@@ -203,9 +203,6 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
             ))}
           </div>
         </div>
-        <button type="button" className={`${s.ctl} ${s.exit}`} title="Exit Command Center">
-          <X size={15} />
-        </button>
       </div>
     </div>
   )
