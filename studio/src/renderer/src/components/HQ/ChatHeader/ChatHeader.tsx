@@ -154,7 +154,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
                   >
                     <span className={styles.sessionTitle}>{s.title}</span>
                     <span className={styles.sessionMeta}>
-                      {s.messageCount} msg Â· {formatActivity(s.lastActivity)}
+                      {s.messageCount} msg · {formatActivity(s.lastActivity)}
                     </span>
                   </button>
                 ))}

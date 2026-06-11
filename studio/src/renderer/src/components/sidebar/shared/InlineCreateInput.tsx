@@ -29,7 +29,7 @@ export function InlineCreateInput({ type, deep, dataLabel, onCommit, onCancel }:
       <input
         ref={inputRef}
         className={styles.inlineCreateInput}
-        placeholder={type === 'folder' ? 'folder nameâ€¦' : 'file nameâ€¦'}
+        placeholder={type === 'folder' ? 'folder name…' : 'file name…'}
         data-label={dataLabel ?? (type === 'folder' ? 'New Folder Name' : 'New Plan Name')}
         defaultValue=""
         onKeyDown={(e) => {

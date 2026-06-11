@@ -94,7 +94,7 @@ export default function NotebookCanvas() {
         )}
         {skillName && (
           <p className={styles.nbMeta}>
-            {cells.length} cells Â· {cells.filter(c => c.type === 'body').length} body Â· {cells.filter(c => c.type === 'fragment').length} fragments
+            {cells.length} cells · {cells.filter(c => c.type === 'body').length} body · {cells.filter(c => c.type === 'fragment').length} fragments
           </p>
         )}
 

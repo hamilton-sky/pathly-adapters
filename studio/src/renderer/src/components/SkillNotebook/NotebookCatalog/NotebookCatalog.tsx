@@ -49,7 +49,7 @@ export default function NotebookCatalog() {
         <Search size={14} className={styles.searchIcon} />
         <input
           className={styles.searchInput}
-          placeholder="Search the libraryâ€¦"
+          placeholder="Search the library…"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />

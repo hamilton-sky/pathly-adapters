@@ -106,7 +106,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
 
   const modalTitle = fileName ? 'Add markdown as cells' : 'Split into cells'
   const modalSubtitle = fileName
-    ? `Dropped ${fileName} â€" here's how Pathly will split it. Confirm, or insert as a single cell.`
+    ? `Dropped ${fileName} — here's how Pathly will split it. Confirm, or insert as a single cell.`
     : "Here's how Pathly will split this cell. Confirm, or insert as a single cell."
 
   return (
@@ -207,7 +207,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
             disabled={checkedCount === 0}
             onClick={() => onConfirm(cells.filter(c => c.checked))}
           >
-            Confirm split â€" {checkedCount} cells
+            Confirm split — {checkedCount} cells
           </button>
         </div>
       </div>

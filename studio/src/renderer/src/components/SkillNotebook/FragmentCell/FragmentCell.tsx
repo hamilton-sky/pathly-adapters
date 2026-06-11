@@ -35,7 +35,7 @@ export default function FragmentCell({
   const menuRef = useRef<HTMLDivElement>(null)
 
   const isLong = description.length > 200
-  const displayDesc = isLong && !expanded ? description.slice(0, 200).trimEnd() + 'â€¦' : description
+  const displayDesc = isLong && !expanded ? description.slice(0, 200).trimEnd() + '…' : description
 
   useEffect(() => {
     if (!showNew) return
@@ -87,20 +87,20 @@ export default function FragmentCell({
             {menuOpen && (
               <div className={styles.menu} role="menu">
                 <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
-                  <Copy size={15} className={styles.menuIcon} />Duplicate<span className={styles.menuKbd}>âŒ˜D</span>
+                  <Copy size={15} className={styles.menuIcon} />Duplicate<span className={styles.menuKbd}>⌘D</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" disabled={isFirst} onClick={() => { onMoveUp?.(); setMenuOpen(false) }}>
-                  <ChevronUp size={15} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>âŒ˜â†‘</span>
+                  <ChevronUp size={15} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>⌘↑</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" disabled={isLast} onClick={() => { onMoveDown?.(); setMenuOpen(false) }}>
-                  <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>âŒ˜â†"</span>
+                  <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>⌘↓</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                   <Diamond size={15} className={styles.menuIcon} />Convert to body
                 </button>
                 <div className={styles.menuDivider} />
                 <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} role="menuitem" onClick={() => { removeCell(id); setMenuOpen(false) }}>
-                  <Trash2 size={15} className={styles.menuIcon} />Delete<span className={styles.menuKbd}>âŒ«</span>
+                  <Trash2 size={15} className={styles.menuIcon} />Delete<span className={styles.menuKbd}>⌫</span>
                 </button>
               </div>
             )}
@@ -112,7 +112,7 @@ export default function FragmentCell({
           <div className={styles.description}>{displayDesc}</div>
           {isLong && (
             <button type="button" className={styles.toggle} onClick={() => setExpanded(v => !v)}>
-              {expanded ? 'â–´ Collapse' : 'â–¾ Show more'}
+              {expanded ? '▴ Collapse' : '▾ Show more'}
             </button>
           )}
         </div>

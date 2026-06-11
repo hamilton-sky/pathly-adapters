@@ -56,8 +56,8 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
         <div className={styles.downloadBar}>
           <div className={styles.downloadLabel}>
             {embedProgress > 0
-              ? `â¬‡ Downloading MiniLMâ€¦ ${embedProgress}%`
-              : 'â¬‡ Loading MiniLM routing modelâ€¦'}
+              ? `⬇ Downloading MiniLM… ${embedProgress}%`
+              : '⬇ Loading MiniLM routing model…'}
           </div>
           <progress
             className={`${styles.progressBar} ${embedProgress === 0 ? styles.progressBarPulsing : ''}`}
@@ -127,12 +127,12 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
           className={`${styles.modelPill} ${pillIsActive ? styles.modelPillActive : ''}`}
         >
           {isEmbedding
-            ? 'â—ˆ Routingâ€¦'
+            ? '◈ Routing…'
             : isRouterLoading
-            ? `â—ˆ ${embedProgress}%`
+            ? `◈ ${embedProgress}%`
             : embedReady
-            ? 'â—ˆ MiniLM'
-            : 'â—ˆ Loadingâ€¦'}
+            ? '◈ MiniLM'
+            : '◈ Loading…'}
         </span>
         {isLoading ? (
           <button

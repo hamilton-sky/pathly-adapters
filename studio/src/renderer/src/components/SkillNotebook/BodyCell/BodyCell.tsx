@@ -148,13 +148,13 @@ export default function BodyCell({
           {menuOpen && (
             <div className={styles.menu} role="menu">
               <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
-                <Copy size={15} className={styles.menuIcon} />Duplicate<span className={styles.menuKbd}>âŒ˜D</span>
+                <Copy size={15} className={styles.menuIcon} />Duplicate<span className={styles.menuKbd}>⌘D</span>
               </button>
               <button type="button" className={styles.menuItem} role="menuitem" disabled={isFirst} onClick={() => { onMoveUp?.(); setMenuOpen(false) }}>
-                <ChevronUp size={15} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>âŒ˜â†‘</span>
+                <ChevronUp size={15} className={styles.menuIcon} />Move up<span className={styles.menuKbd}>⌘↑</span>
               </button>
               <button type="button" className={styles.menuItem} role="menuitem" disabled={isLast} onClick={() => { onMoveDown?.(); setMenuOpen(false) }}>
-                <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>âŒ˜â†"</span>
+                <ChevronDown size={15} className={styles.menuIcon} />Move down<span className={styles.menuKbd}>⌘↓</span>
               </button>
               <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                 <Diamond size={15} className={styles.menuIcon} />Convert to fragment
@@ -169,7 +169,7 @@ export default function BodyCell({
                 </button>
               ) : (
                 <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} role="menuitem" onClick={() => { onRemove?.(); setMenuOpen(false) }}>
-                  <Trash2 size={15} className={styles.menuIcon} />Delete<span className={styles.menuKbd}>âŒ«</span>
+                  <Trash2 size={15} className={styles.menuIcon} />Delete<span className={styles.menuKbd}>⌫</span>
                 </button>
               )}
             </div>
@@ -226,7 +226,7 @@ export default function BodyCell({
               <MarkdownRenderer content={preview} />
               {isLong && (
                 <button type="button" className={styles.toggle} onClick={() => setExpanded(v => !v)}>
-                  {expanded ? 'â–´ Collapse' : 'â–¾ Show full content'}
+                  {expanded ? '▴ Collapse' : '▾ Show full content'}
                 </button>
               )}
             </>

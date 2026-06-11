@@ -43,7 +43,7 @@ export function CommentItem({
 
   const canLocate = !comment.resolved && !isOrphaned
   const anchorFull = comment.lineText
-  const anchorShort = anchorFull.length > 55 ? `${anchorFull.slice(0, 55).trimEnd()}â€¦` : anchorFull
+  const anchorShort = anchorFull.length > 55 ? `${anchorFull.slice(0, 55).trimEnd()}…` : anchorFull
 
   return (
     <div
