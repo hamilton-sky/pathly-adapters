@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useStore } from '../../store'
 import type { FsmEvent } from '../../types/index'
@@ -19,11 +19,7 @@ const FLASH_CSS = `
 }
 `
 
-type PhaseFilter = 'all' | 'build' | 'review'
-
 const INNER_PHASES = new Set(['analyze', 'scout', 'implement'])
-const BUILD_PHASES  = new Set(['STORMING', 'PLANNING', 'DESIGNING', 'BUILDING'])
-const REVIEW_PHASES = new Set(['REVIEWING', 'TESTING', 'RETRO'])
 
 function eventColorClass(ev: FsmEvent, retrograde?: boolean): string {
   if (retrograde) return styles.evColorRetrograde
@@ -39,17 +35,19 @@ function eventColorClass(ev: FsmEvent, retrograde?: boolean): string {
       return INNER_PHASES.has(phase) ? styles.evColorMuted : styles.evColorPhase
     }
     case 'FILE_CREATED':
-    case 'FILE_DELETED':   return styles.evColorYellow
-    case 'RETRY':          return styles.evColorRed
-    case 'HUMAN_RESPONSE': return styles.evColorSecondary
-    case 'GATE_FAILED':    return styles.evColorGateFail
-    case 'GATE_SKIPPED':   return styles.evColorGateSkip
-    case 'AGENT_SPAWNED':  return styles.evColorSpawned
+    case 'FILE_DELETED':          return styles.evColorYellow
+    case 'RETRY':                 return styles.evColorRed
+    case 'HUMAN_RESPONSE':        return styles.evColorSecondary
+    case 'GATE_FAILED':           return styles.evColorGateFail
+    case 'GATE_SKIPPED':          return styles.evColorGateSkip
+    case 'AGENT_SPAWNED':         return styles.evColorSpawned
     case 'STAGE_COMPLETE':
-    case 'IMPLEMENT_COMPLETE': return styles.evColorStage
-    case 'WARNING':        return styles.evColorYellow
-    case 'PHASE_SUMMARY':  return styles.evColorSummary
-    default:               return styles.evColorMuted
+    case 'STAGE_INTERACTIVE_DONE':
+    case 'IMPLEMENT_COMPLETE':    return styles.evColorStage
+    case 'WARNING':               return styles.evColorYellow
+    case 'PHASE_SUMMARY':         return styles.evColorSummary
+    case 'FEEDBACK_RESOLVED':     return styles.evColorGreen
+    default:                      return styles.evColorMuted
   }
 }
 
@@ -132,6 +130,16 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
       return `${ts}  ${pad('GATE_SKIPPED', 14)}  ${ev.key ?? ev.detail ?? ''}${ev.reason ? `  reason: ${ev.reason}` : ''}`
     case 'STAGE_COMPLETE':
       return `${ts}  ${pad('STAGE_COMPLETE', 14)}  ${ev.stage ?? ev.from ?? '?'} → ${ev.next ?? ev.to ?? '?'}`
+    case 'STAGE_INTERACTIVE_DONE': {
+      const stage = (ev as Record<string, unknown>).stage as string | undefined ?? '?'
+      const seq = (ev as Record<string, unknown>).seq as number | undefined
+      return `${ts}  ${pad('STAGE_DONE', 14)}  ${stage}${seq != null ? `  #${seq}` : ''}`
+    }
+    case 'FEEDBACK_RESOLVED': {
+      const file = (ev as Record<string, unknown>).file as string | undefined ?? ''
+      const seq = (ev as Record<string, unknown>).seq as number | undefined
+      return `${ts}  ${pad('FEEDBACK_RESOLVED', 18)}  ${file}${seq != null ? `  seq=${seq}` : ''}`
+    }
     case 'PHASE_SUMMARY': {
       const agent = (ev as Record<string, unknown>).agent as string | undefined ?? '?'
       const text = (ev as Record<string, unknown>).text as string | undefined ?? '(no text)'
@@ -213,14 +221,6 @@ export function EventLog(): JSX.Element {
   const billingPending = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd === 0)
   const missingCostData = agentDone.length > 0 && agentDone.every((ev) => ev.cost_usd == null)
   const [densePhases, setDensePhases] = useState(true)
-  const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>('all')
-
-  function pillActive(f: PhaseFilter): string {
-    if (phaseFilter !== f) return ''
-    if (f === 'all')    return styles.phaseFilterPillActiveAll
-    if (f === 'build')  return styles.phaseFilterPillActiveBuild
-    return styles.phaseFilterPillActiveReview
-  }
 
   useInjectCSS(FLASH_CSS)
 
@@ -240,38 +240,9 @@ export function EventLog(): JSX.Element {
       })
     : events
 
-  const displayEvents = useMemo(() => {
-    if (phaseFilter === 'all') return visibleEvents
-    const targetSet = phaseFilter === 'build' ? BUILD_PHASES : REVIEW_PHASES
-    const BUILD_ACTORS  = new Set(['builder', 'planner', 'designer'])
-    const REVIEW_ACTORS = new Set(['reviewer', 'tester', 'retro'])
-    const targetActors  = phaseFilter === 'build' ? BUILD_ACTORS : REVIEW_ACTORS
-
-    // Primary: track phase via STATE_TRANSITION events
-    let phase: string | null = null
-    let hasTransitions = false
-    const stateFiltered: typeof visibleEvents = []
-    for (const ev of visibleEvents) {
-      if (ev.type === 'STATE_TRANSITION' && ev.to) { phase = String(ev.to); hasTransitions = true }
-      if (phase != null && targetSet.has(phase)) stateFiltered.push(ev)
-    }
-    if (hasTransitions) return stateFiltered
-
-    // Fallback: infer stream from most-recently-seen agent actor
-    let currentActor: string | null = null
-    return visibleEvents.filter((ev) => {
-      const actor = getEventActor(ev)
-      if (actor) {
-        const base = actor.split(' ')[0]
-        if (BUILD_ACTORS.has(base) || REVIEW_ACTORS.has(base)) currentActor = base
-      }
-      return currentActor != null && targetActors.has(currentActor)
-    })
-  }, [phaseFilter, visibleEvents])
-
   useEffect(() => {
-    const added = displayEvents.length - prevLengthRef.current
-    prevLengthRef.current = displayEvents.length
+    const added = visibleEvents.length - prevLengthRef.current
+    prevLengthRef.current = visibleEvents.length
 
     if (added <= 0) return
 
@@ -284,10 +255,10 @@ export function EventLog(): JSX.Element {
       setNewCount(newCountRef.current)
     }
 
-    setFlashStart(displayEvents.length - added)
+    setFlashStart(visibleEvents.length - added)
     const timer = setTimeout(() => { setFlashStart(Infinity) }, 500)
     return () => clearTimeout(timer)
-  }, [displayEvents])
+  }, [visibleEvents])
 
   const handleScroll = (): void => {
     const el = logRef.current
@@ -311,25 +282,13 @@ export function EventLog(): JSX.Element {
     setNewCount(0)
   }
 
-  const retrogradeFlags = computeRetrograde(displayEvents)
+  const retrogradeFlags = computeRetrograde(visibleEvents)
   const tokPctIn = (totalIn > 0 || totalOut > 0) ? Math.round((totalIn / (totalIn + totalOut)) * 100) : 50
 
   return (
     <div className={styles.evContainer}>
       <div className={styles.evTitleRow}>
         <span className={styles.evTitle}>Event Log</span>
-        <div className={styles.phaseFilter}>
-          {(['all', 'build', 'review'] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              className={`${styles.phaseFilterPill} ${pillActive(f)}`}
-              onClick={() => setPhaseFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
         <Tooltip label={densePhases ? 'Show verbose events' : 'Show dense events'} placement="bottom">
           <button
             type="button"
@@ -344,10 +303,10 @@ export function EventLog(): JSX.Element {
       </div>
       <div className={styles.evLogWrapper}>
         <div ref={logRef} className={styles.evLog} onScroll={handleScroll}>
-          {displayEvents.length === 0 ? (
-            <div className={styles.evEmpty}>{phaseFilter !== 'all' ? `No ${phaseFilter} events` : 'No events yet'}</div>
+          {visibleEvents.length === 0 ? (
+            <div className={styles.evEmpty}>No events yet</div>
           ) : (
-            displayEvents.map((ev, i) => (
+            visibleEvents.map((ev, i) => (
               <RawEventLine
                 key={`${ev.ts ?? ''}-${ev.type}-${i}`}
                 ev={ev}
