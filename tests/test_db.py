@@ -230,7 +230,7 @@ def test_mark_stale_runners(tmp_path: Path) -> None:
 # Concurrency test
 # ---------------------------------------------------------------------------
 
-def test_concurrent_appends(tmp_path: Path) -> None:
+def test_concurrent_appends() -> None:
     # Each thread must call get_db() for its own per-thread connection.
     errors: list[Exception] = []
 
@@ -329,7 +329,7 @@ def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
 # feedback_items tests
 # ---------------------------------------------------------------------------
 
-def test_write_and_read_feedback_items(tmp_path: Path) -> None:
+def test_write_and_read_feedback_items() -> None:
     conn = get_db()
     write_feedback_item(conn, _PROJECT_ROOT, "feat-fb", "REVIEW_FAILURES.md", "fix this")
     write_feedback_item(conn, _PROJECT_ROOT, "feat-fb", "TEST_FAILURES.md", "test failed")
@@ -340,7 +340,7 @@ def test_write_and_read_feedback_items(tmp_path: Path) -> None:
     assert filenames == {"REVIEW_FAILURES.md", "TEST_FAILURES.md"}
 
 
-def test_write_feedback_item_idempotent(tmp_path: Path) -> None:
+def test_write_feedback_item_idempotent() -> None:
     conn = get_db()
     write_feedback_item(conn, _PROJECT_ROOT, "feat-fb2", "REVIEW_FAILURES.md", "v1")
     write_feedback_item(conn, _PROJECT_ROOT, "feat-fb2", "REVIEW_FAILURES.md", "v2")
@@ -350,7 +350,7 @@ def test_write_feedback_item_idempotent(tmp_path: Path) -> None:
     assert items[0]["content"] == "v1"  # INSERT OR IGNORE: original content preserved
 
 
-def test_resolve_feedback_item(tmp_path: Path) -> None:
+def test_resolve_feedback_item() -> None:
     conn = get_db()
     write_feedback_item(conn, _PROJECT_ROOT, "feat-fb3", "REVIEW_FAILURES.md", "fix me")
     resolve_feedback_item(conn, _PROJECT_ROOT, "feat-fb3", "REVIEW_FAILURES.md")
@@ -359,7 +359,7 @@ def test_resolve_feedback_item(tmp_path: Path) -> None:
     assert items == []
 
 
-def test_read_feedback_items_empty(tmp_path: Path) -> None:
+def test_read_feedback_items_empty() -> None:
     conn = get_db()
     items = read_feedback_items(conn, _PROJECT_ROOT, "feat-fb-missing")
     assert items == []

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as jsYaml from 'js-yaml'
-import { fetchFlow, saveFlow } from '../../../services/pathlyApi'
+import { fetchFlowGraph, saveFlow, saveFlowGraph } from '../../../services/pathlyApi'
 import type { FlowYaml } from '../../../types'
 
 type TabMode = 'visual' | 'yaml'
@@ -69,27 +69,17 @@ export function useFlowFile(
     setYamlParseError(null)
     setYamlSyncContent(null)
     lastValidFlowDataRef.current = null
-    fetchFlow(name)
+    fetchFlowGraph(name)
       .then((result) => {
-        const content = result?.flow_yaml ?? ''
-        setRawYaml(content)
-        try {
-          const parsed = parseFirstDoc(content)
-          if (parsed) {
-            setFlowData(parsed)
-            lastValidFlowDataRef.current = parsed
-          } else {
-            setFlowData(null)
-            setYamlParseError('Empty or unreadable YAML document')
-          }
-        } catch (error) {
+        if (result?.graph) {
+          const parsed = result.graph
+          setFlowData(parsed)
+          lastValidFlowDataRef.current = parsed
+          setRawYaml(jsYaml.dump(parsed, { lineWidth: 120 }))
+        } else {
           setFlowData(null)
-          if (error instanceof jsYaml.YAMLException) {
-            const line = (error.mark?.line ?? 0) + 1
-            setYamlParseError(`YAML parse error on line ${line}: ${error.reason ?? error.message}`)
-          } else {
-            setYamlParseError((error as Error).message)
-          }
+          setRawYaml('')
+          setYamlParseError('Empty or unreadable flow graph')
         }
       })
       .catch(() => {
@@ -153,9 +143,8 @@ export function useFlowFile(
     const name = flowNameFromPath(selectedItem.path)
     if (!name) return
     setSaveError(null)
-    const content = jsYaml.dump(flowDataRef.current, { lineWidth: 120 })
     try {
-      await saveFlow(name, content)
+      await saveFlowGraph(name, flowDataRef.current)
       clearDirty(selectedItem.path)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))

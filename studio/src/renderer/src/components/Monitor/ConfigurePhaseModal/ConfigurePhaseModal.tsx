@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Settings, BookOpen, Check } from 'lucide-react'
 import { useStore } from '../../../store'
@@ -9,9 +9,12 @@ import {
   CLI_HOSTS, AGENTS, SKILLS,
   HOST_TO_ADAPTER, ADAPTER_TO_HOST,
   SKILL_FILE_PATHS, AGENT_FILE_PATHS, STAGE_DEFAULTS, SKILL_PROMPTS,
+  DEFAULT_SKILL_PATHS,
 } from './configurePhaseModalData'
+import { useAgentCatalog, useSkillCatalog } from './hooks/usePhaseModalCatalog'
 import { AssemblyFlowBar } from './AssemblyFlowBar'
 import { PromptPreview } from './PromptPreview'
+import { CatalogDropdown } from './CatalogDropdown/CatalogDropdown'
 import styles from './ConfigurePhaseModal.module.css'
 
 interface Props {
@@ -31,6 +34,16 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   const activeTopic        = useStore((s) => s.activeTopic)
   const setActivePanel     = useStore((s) => s.setActivePanel)
   const setSkillNotebookPath = useUiStore((s) => s.setSkillNotebookPath)
+
+  const agentCatalog = useAgentCatalog(projectPath)
+  const skillCatalog = useSkillCatalog(projectPath)
+  const agentPathMap = useMemo(
+    () => new Map(agentCatalog.map((i) => [i.name, i.path])),
+    [agentCatalog]
+  )
+
+  const isCustomAgent = !(AGENTS as readonly string[]).includes(agent)
+  const isCustomSkill = !(SKILLS as readonly string[]).includes(skill)
 
   useEffect(() => {
     if (!projectPath || !activeTopic) return
@@ -98,13 +111,12 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   useEffect(() => {
     setLoadedAgentText(null)
     if (!projectPath) return
-    const relPath = AGENT_FILE_PATHS[agent]
-    if (!relPath) return
+    const relPath = AGENT_FILE_PATHS[agent] ?? agentPathMap.get(agent) ?? agent
     const fullPath = `${projectPath}/src/pathly_data/core/agents/${relPath}.md`
     window.pathly.fs.read(fullPath)
       .then((text) => setLoadedAgentText(text ?? null))
       .catch(() => setLoadedAgentText(null))
-  }, [agent, projectPath])
+  }, [agent, projectPath, agentPathMap])
 
   const basePreview = loadedSkillText ?? SKILL_PROMPTS[skill] ?? `# ${skill}\n\nNo preview available.`
   const preview     = basePreview.replace(/^Host: [^\n]+/m, `Host: ${host} · Agent: ${agent}`)
@@ -144,6 +156,19 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
                   className={`${styles.chip} ${styles.chipMono} ${agent === a ? styles.chipActiveAgent : ''}`}
                   onClick={() => setAgent(a)}>{a}</button>
               ))}
+              {isCustomAgent && (
+                <button type="button"
+                  className={`${styles.chip} ${styles.chipMono} ${styles.chipActiveAgent}`}
+                  onClick={() => setAgent(agent)}>{agent}</button>
+              )}
+              <CatalogDropdown
+                catalog={agentCatalog}
+                isExcluded={(item) =>
+                  (AGENTS as readonly string[]).includes(item.name) || item.name === agent
+                }
+                onSelect={(item) => setAgent(item.name)}
+                color="agent"
+              />
             </div>
           </div>
 
@@ -155,6 +180,19 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
                   className={`${styles.chip} ${styles.chipMono} ${skill === sk ? styles.chipActiveSkill : ''}`}
                   onClick={() => setSkill(sk)}>{sk}</button>
               ))}
+              {isCustomSkill && (
+                <button type="button"
+                  className={`${styles.chip} ${styles.chipMono} ${styles.chipActiveSkill}`}
+                  onClick={() => setSkill(skill)}>{skill}</button>
+              )}
+              <CatalogDropdown
+                catalog={skillCatalog}
+                isExcluded={(item) =>
+                  DEFAULT_SKILL_PATHS.has(item.path) || item.name === skill
+                }
+                onSelect={(item) => setSkill(item.name)}
+                color="skill"
+              />
             </div>
           </div>
 

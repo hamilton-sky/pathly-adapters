@@ -181,20 +181,15 @@ def test_complete_stage_blocked_by_review_failures(tmp_path):
 
 # ── Two-call decide protocol ──────────────────────────────────────────────────
 
-def _make_decide_agent_files(tmp_path: Path) -> None:
-    agents_dir = tmp_path / "fake_agents"
-    agents_dir.mkdir(parents=True, exist_ok=True)
-
-
 def _patch_load_flow(monkeypatch, flow: dict) -> None:
-    monkeypatch.setattr(fsm_ops, "_load_flow", lambda _name, _root=None: flow)
+    monkeypatch.setattr(fsm_ops, "_load_flow", lambda *_: flow)
 
 
 def _patch_build_prompt(monkeypatch) -> None:
     monkeypatch.setattr(
         fsm_ops,
         "build_prompt",
-        lambda flow_config, state_name, storage_path: f"instructions for {state_name}",
+        lambda *args: f"instructions for {args[1]}",
     )
 
 
@@ -440,7 +435,7 @@ def test_escalate_when_no_routable_feedback(tmp_path, monkeypatch):
     monkeypatch.setattr(
         fsm_ops,
         "run_gates",
-        lambda *_args, **_kwargs: {"gate_failed": "verify_gate", "feedback_file": "REVIEW_FAILURES.md"},
+        lambda *_: {"gate_failed": "verify_gate", "feedback_file": "REVIEW_FAILURES.md"},
     )
 
     result = complete_stage({
@@ -550,3 +545,56 @@ def test_build_prompt_includes_pipeline_history(tmp_path):
 
     assert "## Pipeline History" in result, f"History block missing from prompt:\n{result}"
     assert "smoke test entry" in result, f"History entry missing from prompt:\n{result}"
+
+
+# ── T2.4 — FSM loads flow from rows (Phase 2 regression) ─────────────────────
+
+@pytest.mark.parametrize("flow_name,expected_first_state", [
+    ("team",      "STORMING"),
+    ("debug",     "INVESTIGATING"),
+    ("explore",   "FRAMING"),
+    ("test",      "STORMING"),
+    ("quick-fix", "SCOPING"),
+])
+def test_load_flow_from_rows(flow_name, expected_first_state):
+    """_load_flow returns a rows-assembled dict equal to the original YAML."""
+    import sqlite3 as _sqlite3
+    import yaml as _yaml
+    from importlib.resources import files as _files
+    from pathly_orchestrator.db.migrations import _run_migrations
+    from pathly_orchestrator.db.queries.flow_defs import upsert_flow_definition
+    # Build an isolated in-memory DB with the flow rows populated.
+    # We cannot use get_db() here (that returns the per-test DB which already has
+    # the flows from _refresh_flows). Instead, patch _load_flow to use a fresh conn.
+    conn = _sqlite3.connect(":memory:")
+    conn.row_factory = _sqlite3.Row
+    _run_migrations(conn)
+
+    text = _files("pathly_data").joinpath(f"core/flows/{flow_name}.flow.yaml").read_text(encoding="utf-8")
+    original = _yaml.safe_load(text)
+    upsert_flow_definition(conn, None, flow_name, "", text)
+
+    import json as _json
+    from pathly_orchestrator.db.queries.flow_defs import (
+        _assemble_flow_dict,
+        read_flow_definitions,
+        read_flow_nodes,
+    )
+
+    rows = read_flow_definitions(conn, project_root=None)
+    row = next(r for r in rows if r["name"] == flow_name)
+    node_rows = read_flow_nodes(conn, row["id"])
+    assert node_rows, f"No node rows found for {flow_name}"
+
+    flow_level_config = _json.loads(row.get("config_json") or "{}")
+    assembled = _assemble_flow_dict(conn, row["id"], flow_level_config)
+
+    assert assembled["states"][0] == expected_first_state
+    assert "states" in assembled
+    assert "transitions" in assembled
+    assert "agent_map" in assembled
+    assert assembled == original, (
+        f"Assembled dict does not match original for {flow_name}. "
+        f"Keys in original not in assembled: {set(original) - set(assembled)}. "
+        f"Keys in assembled not in original: {set(assembled) - set(original)}."
+    )

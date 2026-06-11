@@ -1,3 +1,5 @@
+import type { FlowYaml } from '../types'
+
 export const readFile        = (path: string): Promise<string | null>                                         => window.pathly.fs.read(path)
 export const writeFile       = (path: string, content: string): Promise<void>                                 => window.pathly.fs.write(path, content)
 export const listDir         = (dir: string): Promise<string[]>                                               => window.pathly.fs.list(dir)
@@ -33,5 +35,27 @@ export async function saveFlow(name: string, flow_yaml: string): Promise<void> {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ flow_yaml }),
+  })
+}
+
+export async function fetchFlowGraph(
+  name: string
+): Promise<{ name: string; graph: FlowYaml } | null> {
+  const { apiFetch } = await import('../lib/config')
+  try {
+    const r = await apiFetch(`/flows/${encodeURIComponent(name)}/graph`)
+    if (!r.ok) return null
+    return r.json()
+  } catch {
+    return null
+  }
+}
+
+export async function saveFlowGraph(name: string, graph: FlowYaml): Promise<void> {
+  const { apiFetch } = await import('../lib/config')
+  await apiFetch(`/flows/${encodeURIComponent(name)}/graph`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ graph }),
   })
 }

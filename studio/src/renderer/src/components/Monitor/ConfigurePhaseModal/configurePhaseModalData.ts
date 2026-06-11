@@ -40,6 +40,8 @@ export const STAGE_DEFAULTS: Record<string, { agent: string; skill: string }> = 
   DONE:      { agent: 'retro',    skill: 'retro/archive' },
 }
 
+export const DEFAULT_SKILL_PATHS = new Set(Object.values(SKILL_FILE_PATHS))
+
 export const SKILL_PROMPTS: Record<string, string> = {
   'plan/storm':     '# plan/storm\nHost: Claude Code · Agent: planner\n\nRole: Stage orchestrator — Brainstorm.\nExplore the problem space. Generate options. No code yet.',
   'plan/scope':     '# plan/scope\nHost: Claude Code · Agent: planner\n\nRole: Stage orchestrator — Scope.\nDefine user stories, acceptance criteria, conversation breakdown.',

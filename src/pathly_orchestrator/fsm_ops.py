@@ -67,12 +67,23 @@ _SCHEMA_VERSION = "1"
 def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
     if project_root is not None:
         try:
+            import json as _json
             from pathly_orchestrator.db.connection import get_db
-            from pathly_orchestrator.db.queries.flow_defs import read_flow_definitions
+            from pathly_orchestrator.db.queries.flow_defs import (
+                _assemble_flow_dict,
+                read_flow_definitions,
+                read_flow_nodes,
+            )
             conn = get_db(project_root)
             for search_root in [project_root, None]:
                 for row in read_flow_definitions(conn, search_root):
                     if row["name"] == flow_name:
+                        # Rows-if-present path (Phase 2)
+                        node_rows = read_flow_nodes(conn, row["id"])
+                        if node_rows:
+                            flow_level_config = _json.loads(row.get("config_json") or "{}")
+                            return _assemble_flow_dict(conn, row["id"], flow_level_config)
+                        # Fallback: blob
                         return yaml.safe_load(row["flow_yaml"])
         except Exception:
             pass
@@ -220,7 +231,6 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
 
 
 def build_prompt_for_agent(
-    flow_config: dict,  # noqa: ARG001 — kept for call-site compat
     agent_name: str,
     storage_path: Path,
 ) -> str:
@@ -586,7 +596,8 @@ def next_action(args: dict) -> dict:
         _elog_ws.write_state(str(storage_path), {**stamped_state, "current": state_info["current_state"]}, flow_config)
         prior_state = stamped_state
 
-    # Apply per-feature stage config override if present
+    # stage_configs override: operates on the assembled flow_config dict (Q3 DESIGN_SPEC).
+    # No change needed here — _load_flow now returns rows-assembled dict, same shape.
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.stage_configs import read_stage_config as _read_stage_cfg
@@ -611,7 +622,7 @@ def next_action(args: dict) -> dict:
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
-                    flow_config, feedback["target_agent"], storage_path
+                    feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
@@ -689,7 +700,7 @@ def complete_stage(args: dict) -> dict:
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
-                    flow_config, feedback["target_agent"], storage_path
+                    feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
@@ -759,7 +770,7 @@ def complete_stage(args: dict) -> dict:
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
-                    flow_config, feedback["target_agent"], storage_path
+                    feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)

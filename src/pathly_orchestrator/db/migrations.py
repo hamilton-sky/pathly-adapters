@@ -174,6 +174,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_def_role_global
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_def_role_proj
     ON agent_definitions(role, project_root) WHERE project_root IS NOT NULL;
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_nodes_def_node
+    ON flow_nodes(flow_def_id, node_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_edges_def_src_tgt
+    ON flow_edges(flow_def_id, source_node, target_node);
+
 CREATE TABLE IF NOT EXISTS catalog_items (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     item_type    TEXT NOT NULL,
@@ -266,6 +272,16 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("agent_invocations",   "cache_write_tokens",   "INTEGER DEFAULT 0"),
         ("run_history",         "cost_source",          "TEXT DEFAULT 'unpriced'"),
         ("run_history",         "provider",             "TEXT"),
+        # flow-nodes-edges-migration: normalized storage for flow graph
+        ("flow_nodes",          "agent",                "TEXT"),
+        ("flow_nodes",          "role",                 "TEXT"),
+        ("flow_nodes",          "adapter",              "TEXT"),
+        ("flow_nodes",          "skill",                "TEXT"),
+        ("flow_nodes",          "is_terminal",          "INTEGER DEFAULT 0"),
+        ("flow_nodes",          "position",             "INTEGER DEFAULT 0"),
+        ("flow_edges",          "config_json",          "TEXT"),
+        ("flow_edges",          "ordinal",              "INTEGER DEFAULT 0"),
+        ("flow_definitions",    "config_json",          "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")
