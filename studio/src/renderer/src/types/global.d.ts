@@ -52,6 +52,21 @@ declare global {
     span_count: number
   }
 
+  interface DailyTrendBucket {
+    bucket: string
+    count: number
+    total_tokens: number
+    input_tokens: number
+    cache_read_tokens: number
+    cache_write_tokens: number
+    cost_usd_reported: number
+    has_estimated_rows: number
+  }
+
+  interface TrendsResponse {
+    trends: DailyTrendBucket[]
+  }
+
   interface DbOtelSpan {
     id: number
     trace_id: string | null
@@ -176,7 +191,7 @@ declare global {
         events: (feature: string, projectRoot?: string) => Promise<DbEvent[]>
         agents: (feature: string, projectRoot?: string) => Promise<DbAgent[]>
         otel: (feature: string, projectRoot?: string) => Promise<DbOtelSpan[]>
-        trends: (days?: number) => Promise<DbTrendPoint[]>
+        trends: (feature: string, days?: number) => Promise<TrendsResponse | null>
         runs: (feature: string, projectRoot?: string) => Promise<DbRun[]>
         query: (sql: string) => Promise<{ rows: Record<string, unknown>[]; error?: string }>
         settings: () => Promise<Record<string, string>>

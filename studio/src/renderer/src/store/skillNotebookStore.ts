@@ -30,6 +30,8 @@ interface SkillNotebookState {
   savedHistoryIndex: number
   featurePath: string | null
   compositionKey: string
+  /** Path of the last skill successfully loaded into the store — used to skip redundant reloads */
+  lastAppliedPath: string | null
   previewSections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>
   previewTokens: number
   previewLoading: boolean
@@ -38,6 +40,8 @@ interface SkillNotebookState {
   redo: () => void
   /** Call after a successful save or after loadSkill to mark the current state as clean */
   markCellsSaved: () => void
+  /** Reset lastAppliedPath to force a reload on next canvas mount (e.g. after source-mode save) */
+  resetLastAppliedPath: () => void
   setFeaturePath: (path: string | null) => void
   setPreview: (sections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>, tokens: number) => void
   setPreviewLoading: (loading: boolean) => void
@@ -57,6 +61,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
   historyIndex: -1,
   savedHistoryIndex: -1,
   featurePath: null,
+  lastAppliedPath: null,
   compositionKey: '',
   previewSections: [],
   previewTokens: 0,
@@ -81,10 +86,14 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
     set({ cells: history[newIndex], historyIndex: newIndex })
   },
   markCellsSaved: () => set({ savedHistoryIndex: get().historyIndex }),
+  resetLastAppliedPath: () => set({ lastAppliedPath: null }),
   setFeaturePath: (path) => set({ featurePath: path }),
   setPreview: (sections, tokens) => set({ previewSections: sections, previewTokens: tokens, previewLoading: false }),
   setPreviewLoading: (loading) => set({ previewLoading: loading }),
   loadSkill: async (skillPath: string) => {
+    // Skip if the same path was already loaded — prevents re-loading when the notebook
+    // canvas remounts after a view-mode switch (which would wipe manually inserted cells).
+    if (skillPath === get().lastAppliedPath) return
     try {
       const res = await fetch('http://localhost:8765/skills/parse', {
         method: 'POST',
@@ -111,7 +120,7 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
         category: fc.category,
         description: fc.description,
       }))
-      set({ compositionKey: data.composition_key ?? '' })
+      set({ compositionKey: data.composition_key ?? '', lastAppliedPath: skillPath })
       get().pushCells([...bodyCells, ...fragmentCells])
       // Mark the just-loaded state as clean so the Save button starts as "Saved"
       get().markCellsSaved()

@@ -49,6 +49,21 @@ interface DbTrendPoint {
   span_count: number
 }
 
+interface DailyTrendBucket {
+  bucket: string
+  count: number
+  total_tokens: number
+  input_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  cost_usd_reported: number
+  has_estimated_rows: number
+}
+
+interface TrendsResponse {
+  trends: DailyTrendBucket[]
+}
+
 interface DbOtelSpan {
   id: number
   trace_id: string | null
@@ -251,8 +266,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('db:agents', feature, projectRoot),
     otel: (feature: string, projectRoot?: string): Promise<DbOtelSpan[]> =>
       ipcRenderer.invoke('db:otel', feature, projectRoot),
-    trends: (days?: number): Promise<DbTrendPoint[]> =>
-      ipcRenderer.invoke('db:trends', days),
+    trends: (feature: string, days?: number): Promise<TrendsResponse | null> =>
+      ipcRenderer.invoke('db:trends', feature, days),
     runs: (feature: string, projectRoot?: string): Promise<DbRun[]> =>
       ipcRenderer.invoke('db:runs', feature, projectRoot),
     query: (sql: string): Promise<{ rows: Record<string, unknown>[]; error?: string }> =>

@@ -10,8 +10,12 @@ name: Feature Index
 > HTTP API + FSM injection). It delivers board context into agent prompts with **zero Studio
 > changes**, testable entirely via curl. Later phases live in their own plan folders:
 > `comms-board-studio` (Phase 2 UI), `comms-board-skills` (Phase 3), `board-storm` (Phase 5),
-> `comms-board-command-center` (Phase 4). Design docs: `SPEC.md` v5.0, `CONSULTATION.md` v1.0,
-> `BOARD-STORM.md` v1.1 — all in this folder.
+> `comms-board-command-center` (Phase 4). Design docs: `SPEC.md` v6.1, `UI-DIRECTION.md`,
+> `CONSULTATION.md` v1.0, `BOARD-STORM.md` v1.1 — all in this folder.
+>
+> **UI direction (2026-06-11):** The Studio UI is a full-screen **workspace** — resizable left
+> sidebar for All-Features navigation + full-area board sections + "Set as main feature" swap.
+> [UI-DIRECTION.md](UI-DIRECTION.md) is canonical and supersedes SPEC §7/§16/§19.
 
 ---
 
@@ -29,7 +33,8 @@ name: Feature Index
 
 | File | Purpose |
 |---|---|
-| `SPEC.md` (v5.0) | Full comms board architecture — schema, scopes, endpoints, all 5 phases |
+| `SPEC.md` (v6.1) | Full comms board architecture — schema, scopes, endpoints, all 5 phases |
+| `UI-DIRECTION.md` | **Canonical UI design** — supersedes SPEC §7/§16/§19 (workspace + sidebar + sections) |
 | `CONSULTATION.md` (v1.0) | Architecture / PO / Designer review — **read §1.2 for the 5 build risks** |
 | `BOARD-STORM.md` (v1.1) | Phase 5 consultation mode design (out of scope for this plan) |
 

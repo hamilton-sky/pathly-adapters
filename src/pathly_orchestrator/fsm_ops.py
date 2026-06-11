@@ -779,11 +779,13 @@ def complete_stage(args: dict) -> dict:
         state_info["conv"],
     )
 
-    prior_state = dict(state_before or {})
+    # Re-read state after transition actions ran — update_progress writes convs_done
+    # to the DB inside run_transition_actions(); using stale state_before would overwrite it.
+    from pathly_orchestrator import eventlog as _elog_ws
+    prior_state = _elog_ws.read_state(str(storage_path)) or dict(state_before or {})
     # Clear per-conversation baselines so the next conversation gets fresh snapshots.
     prior_state.pop("conv_start_sha", None)
     prior_state.pop("build_baseline", None)
-    from pathly_orchestrator import eventlog as _elog_ws
     _elog_ws.write_state(str(storage_path), {**prior_state, "current": next_state}, flow_config)
 
     append_event(

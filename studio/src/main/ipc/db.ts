@@ -63,9 +63,10 @@ export function registerDbHandlers(): void {
     try { return await fsmGet(`/db/features/${encodeURIComponent(feature)}/runs${qs}`) } catch { return [] }
   })
 
-  ipcMain.handle('db:trends', async (_e, days?: number) => {
-    const qs = days ? `?days=${days}` : ''
-    try { return await fsmGet(`/db/stats/trends${qs}`) } catch { return [] }
+  ipcMain.handle('db:trends', async (_e, feature: string, days?: number) => {
+    const qs = new URLSearchParams({ feature })
+    if (days !== undefined) qs.set('days', String(days))
+    try { return await fsmGet(`/telemetry/trends?${qs}`) } catch { return null }
   })
 
   ipcMain.handle('db:query', async (_e, sql: string) => {

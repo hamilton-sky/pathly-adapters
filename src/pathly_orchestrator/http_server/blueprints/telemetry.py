@@ -260,6 +260,26 @@ def record_activity_endpoint():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+@bp.route("/telemetry/trends", methods=["GET"])
+def trends_endpoint():
+    """Return daily aggregate trend data for a feature."""
+    feature = request.args.get("feature")
+    if not feature:
+        return jsonify({"error": "Missing required query param: feature"}), 400
+
+    days = request.args.get("days", 126, type=int)
+    days = max(1, min(days, 365))
+
+    try:
+        from pathly_orchestrator.db.queries.trends import get_daily_trends
+        conn = _get_db()
+        buckets = get_daily_trends(conn, feature, days)
+        return jsonify({"trends": buckets}), 200
+    except Exception:
+        logger.exception("trends_endpoint error")
+        return jsonify({"trends": []}), 200
+
+
 @bp.route("/telemetry/pricing", methods=["GET"])
 def pricing_endpoint():
     """Return the full provider pricing table."""

@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Command Center — TS components preview</title>
+<!-- Renders the TypeScript component build (src/*.tsx) from the compiled
+     _ds_bundle.js, to prove the componentization matches the vanilla kit.
+     The kit's ../index.html remains the canonical visual spec. -->
+<link rel="stylesheet" href="../../../styles.css">
+<link rel="stylesheet" href="../../_shell/shell.css">
+<link rel="stylesheet" href="./command-center.css">
+<style>html,body{margin:0;height:100%;background:var(--bg-base);} #cc-root{height:100vh;}</style>
+</head>
+<body>
+  <div id="cc-root"></div>
+  <script src="../../../assets/vendor/react.production.min.js"></script>
+  <script src="../../../assets/vendor/react-dom.production.min.js"></script>
+  <script src="../../../assets/vendor/icons.js"></script>
+  <script src="../../../_ds_bundle.js"></script>
+  <script>
+    var ns = window.PathlyDesignSystem_2f5f97 || {};
+    var h = React.createElement;
+    if (ns.CommandCenter && ns.CommsProvider) {
+      ReactDOM.createRoot(document.getElementById('cc-root'))
+        .render(h(ns.CommsProvider, null, h(ns.CommandCenter)));
+    } else {
+      document.getElementById('cc-root').innerHTML =
+        '<p style="color:var(--text-muted);font-family:var(--font-family-base);padding:40px">' +
+        'Bundle not built yet — the design-system compiler regenerates _ds_bundle.js at the end of a turn. Reload after that.</p>';
+    }
+  </script>
+</body></html>

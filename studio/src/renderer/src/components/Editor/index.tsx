@@ -3,6 +3,7 @@ import { GitCompare } from 'lucide-react'
 import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
+import { useSkillNotebookStore } from '../../store/skillNotebookStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
 import type { FrontmatterValues } from '../../types'
 import { Tooltip } from '../ui'
@@ -89,6 +90,7 @@ function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
 
 export function Editor({ path: pathOverride, embedded }: { path?: string | null; embedded?: boolean } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
+  const resetLastAppliedPath = useSkillNotebookStore((s) => s.resetLastAppliedPath)
   const setNotebookDraftPath  = useUiStore(s => s.setNotebookDraftPath)
   const notebookSaveRequested = useUiStore(s => s.notebookSaveRequested)
   const notebookOpenDraftReq  = useUiStore(s => s.notebookOpenDraftRequested)
@@ -178,10 +180,12 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     try {
       await writeFile(effectivePath, merged)
       clearDirty(effectivePath)
+      // Allow cells view to reload fresh content after a source edit
+      resetLastAppliedPath()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))
     }
-  }, [effectivePath, clearDirty])
+  }, [effectivePath, clearDirty, resetLastAppliedPath])
 
   // ── Refs so embedded coordination effects always see the latest body/config ─
   const bodyRef   = useRef(body)

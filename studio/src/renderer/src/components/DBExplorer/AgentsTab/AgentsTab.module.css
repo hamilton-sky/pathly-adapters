@@ -197,6 +197,27 @@
   color: var(--text-disabled);
 }
 
+/* ── Source badge ────────────────────────────────────────────── */
+.sourceBadge {
+  font-family: var(--font-family-mono);
+  font-size: 0.7em;
+  opacity: 0.8;
+  margin-left: 4px;
+  color: var(--text-muted);
+}
+
+.sourceBadge[data-source='estimated'] {
+  color: var(--text-muted);
+}
+
+.sourceBadge[data-source='unpriced'] {
+  color: var(--state-reviewing);
+}
+
+.sourceBadge[data-source='provider_reported'] {
+  color: var(--accent);
+}
+
 /* ── Result pill ─────────────────────────────────────────────── */
 .resultPill {
   display: inline-flex;

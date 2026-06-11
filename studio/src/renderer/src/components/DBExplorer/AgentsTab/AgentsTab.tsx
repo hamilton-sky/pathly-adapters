@@ -14,6 +14,7 @@ type AgentRow = {
   model: string
   totalTokens: number
   costUsd: number | null
+  costSource: string | null
   wallSeconds: number
   result: string
   traceId: string
@@ -22,8 +23,10 @@ type AgentRow = {
 function parseAgentDone(payload: Record<string, unknown>, pricingTable: PricingTable | null): AgentRow {
   const stored = Number(payload.cost_usd ?? 0)
   let costUsd: number | null = null
+  let costSource: string | null = null
   if (stored > 0) {
     costUsd = stored
+    costSource = 'provider_reported'
   } else {
     const result = computeCost(
       String(payload.model ?? ''),
@@ -32,6 +35,7 @@ function parseAgentDone(payload: Record<string, unknown>, pricingTable: PricingT
       pricingTable,
     )
     costUsd = result.cost
+    costSource = result.source
   }
   return {
     agent: String(payload.agent ?? payload.agent_role ?? 'unknown'),
@@ -42,6 +46,7 @@ function parseAgentDone(payload: Record<string, unknown>, pricingTable: PricingT
       (Number(payload.tokens_in ?? 0) + Number(payload.tokens_out ?? 0))
     ),
     costUsd,
+    costSource,
     wallSeconds: Number(payload.wall_seconds ?? 0),
     result: String(payload.result ?? '—'),
     traceId: String(payload.trace_id ?? '—'),
@@ -151,6 +156,11 @@ export function AgentsTab({ events, pricingTable }: AgentsTabProps): JSX.Element
                   <td className={styles.tdR}>{row.totalTokens.toLocaleString()}</td>
                   <td className={row.costUsd !== null ? styles.tdCost : styles.tdCostNull}>
                     {row.costUsd !== null ? `$${row.costUsd.toFixed(2)}` : '—'}
+                    {row.costSource !== null && (
+                      <span className={styles.sourceBadge} data-source={row.costSource}>
+                        {row.costSource === 'provider_reported' ? 'reported' : row.costSource}
+                      </span>
+                    )}
                   </td>
                   <td className={styles.tdR}>{fmtWall(row.wallSeconds)}</td>
                   <td className={styles.td}><ResultPill result={row.result} /></td>

@@ -24,6 +24,7 @@ interface TypeStat {
   firstTs: string
   lastTs: string
   totalCost?: number | null
+  costSourceSummary?: string | null
 }
 
 export function InspectTab({ events, pricingTable }: InspectTabProps): JSX.Element {
@@ -47,6 +48,7 @@ export function InspectTab({ events, pricingTable }: InspectTabProps): JSX.Eleme
       .map(([type, evts]) => {
         const sorted = [...evts].sort((a, b) => a.seq - b.seq)
         let totalCost: number | null | undefined = undefined
+        let costSourceSummary: string | null | undefined = undefined
         if (type === 'AGENT_DONE') {
           let sum = 0
           let allNull = true
@@ -70,6 +72,13 @@ export function InspectTab({ events, pricingTable }: InspectTabProps): JSX.Eleme
             }
           }
           totalCost = allNull ? null : sum
+          if (pricingTable === null) {
+            costSourceSummary = null
+          } else if (allNull) {
+            costSourceSummary = 'unpriced'
+          } else {
+            costSourceSummary = 'estimated'
+          }
         }
         return {
           type,
@@ -77,6 +86,7 @@ export function InspectTab({ events, pricingTable }: InspectTabProps): JSX.Eleme
           firstTs: sorted[0]?.ts.slice(11, 19) ?? '—',
           lastTs: sorted[sorted.length - 1]?.ts.slice(11, 19) ?? '—',
           totalCost,
+          costSourceSummary,
         }
       })
       .sort((a, b) => b.count - a.count)
@@ -148,8 +158,8 @@ export function InspectTab({ events, pricingTable }: InspectTabProps): JSX.Eleme
                     : `${stat.firstTs} → ${stat.lastTs}`}
                   {stat.totalCost !== undefined && (
                     stat.totalCost !== null
-                      ? <b className={styles.statCost}> · ${stat.totalCost.toFixed(2)}</b>
-                      : <b className={styles.statCostNull}> · —</b>
+                      ? <b className={styles.statCost}> · ${stat.totalCost.toFixed(2)} <span className={styles.sourceBadge} data-source={stat.costSourceSummary ?? undefined}>est</span></b>
+                      : <b className={styles.statCostNull}> · <span className={styles.sourceBadge} data-source="unpriced">unpriced</span></b>
                   )}
                 </span>
               </div>

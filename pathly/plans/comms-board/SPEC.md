@@ -360,6 +360,14 @@ can actively interrogate their memory. A builder that discovers an edge case can
 
 ## 7. Studio UI — The Comms Panel
 
+> **⚠ Superseded by [UI-DIRECTION.md](UI-DIRECTION.md) (2026-06-11).** The standalone
+> single-feature CommsPanel tab described here is **not** being shipped as its own HQ tab.
+> The CommsPanel *components* are still built (and reused by the CommandCenter and Phase 5
+> ConsultPanel), but they are verified standalone against the live SSE stream and then hosted
+> inside the CommandCenter workspace — there is no intermediate one-board-at-a-time tab.
+> §7.3 (message interactions: question cards, decision pinning, warning/escalation banners)
+> still applies. Read UI-DIRECTION.md for the current layout.
+
 ### 7.1 Position in the layout
 
 ```
@@ -756,6 +764,17 @@ When a **project** is deleted:
 
 ## 16. Three-Panel Command Center — Session Mode
 
+> **⚠ Layout revised by [UI-DIRECTION.md](UI-DIRECTION.md) (2026-06-11) — three-up and
+> stacked are KEPT.** What stays: showing 1, 2, or **3 board sections side-by-side**, OR
+> **stacked** (the `[⊞ side by side] ↔ [☰ stacked]` toggle), all resizable. What changes: the
+> third equal column here was the **Features *list***; that list moves to a resizable left
+> **sidebar** (per the user's request). So the three side-by-side sections are now the three
+> board *scopes* — Global \| Project \| Feature *thread* — with the feature list in the sidebar,
+> reachable as the "Board view" preset. Asymmetric widths (Feature 50 / Project 30 / Global 20)
+> are just the preset's *default* — drag to equal if you want. A "Set as main feature" swap
+> action connects the sidebar to the Feature Board section. Behaviors below still apply — §16.4
+> (per-feature `board_scope` read toggles) and §16.5 (cross-scope task dispatch / broadcast).
+
 ### 16.1 What session mode is
 
 The CommsPanel (Section 7) shows communication for **one feature** at a time.  
@@ -1110,6 +1129,14 @@ POST /comms/attach
 ---
 
 ## 19. Flexible Panel Layout
+
+> **⚠ Superseded by [UI-DIRECTION.md](UI-DIRECTION.md) (2026-06-11).** The equal-panel
+> add/remove/resize model here is replaced by full-area **board sections** plus a separate
+> resizable **left sidebar** for All-Features navigation. The multi-select tab bar (§19.1) and
+> resize/collapse mechanics (§19.4–19.5) carry over conceptually, but they now toggle and size
+> *sections* and the *sidebar* — not co-equal panels. `commandCenterStore` (§19.6) gains
+> `sidebarWidth`, `sidebarCollapsed`, and `mainFeature`; `PanelSlot`/`usePanelResize` become
+> `BoardSection` + `FeatureSidebar`. See UI-DIRECTION.md §7 for the revised store + components.
 
 ### 19.1 Tab bar — multi-select toggles
 
@@ -1720,32 +1747,35 @@ agent's prompt. Zero Studio changes needed.
 
 ---
 
-### Phase 2 — Studio CommsPanel
+### Phase 2 — Studio CommsPanel components (standalone)
+
+> **Revised 2026-06-11 — see [UI-DIRECTION.md](UI-DIRECTION.md).** No standalone single-feature
+> CommsPanel HQ tab ships. Phase 2 builds and verifies the **reusable CommsPanel component
+> library** against the live SSE stream; Phase 4 then hosts it in the CommandCenter workspace.
+> Phase 2 and Phase 4 merge at the UI layer — there is no intermediate one-board-at-a-time tab.
 
 **Step 11 — commsStore.ts**
 - File: `studio/src/renderer/src/store/commsStore.ts` (new file)
 - Pattern reference: `chatStore.ts` (same message list pattern)
 
-**Step 12 — commandCenterStore.ts**
-- File: `studio/src/renderer/src/store/commandCenterStore.ts` (new file)
-- Manages panel layout config, persists to localStorage
-
-**Step 13 — SSE handler**
+**Step 12 — SSE handler**
 - File: `studio/src/renderer/src/components/HQ/useHQ.tsx`
 - Add `COMMS_UPDATE` event handler → `commsStore.appendMessage()`
 - Add `comms_update` to `NotifCategory` in `notificationStore.ts`
 
-**Step 14 — CommsPanel component**
+**Step 13 — CommsPanel component library (no HQ tab wiring)**
 - Folder: `studio/src/renderer/src/components/HQ/CommsPanel/`
 - Pattern references: `MessageList/` (thread), `AgentQuestionCard/` (options), `ChatInput/` (compose bar)
 - 5 files: CommsPanel, CommsMsgList, CommsMsgCard, CommsInput, useCommsPanel
 
-**Step 15 — CommandCenter component**
-- Folder: `studio/src/renderer/src/components/HQ/CommandCenter/`
-- 5 files: CommandCenter, PanelSlot, usePanelResize, useCommandCenter, CSS modules
+**Phase 2 deliverable:** Verified CommsPanel component library — message thread,
+question cards, decision pinning, compose bar — driven by the live `/events/comms`
+SSE stream. Reused as-is by the CommandCenter (Phase 4) and ConsultPanel (Phase 5).
 
-**Phase 2 deliverable:** Full visual board in Studio. Human can post, answer
-questions, see agent updates in real time, switch between boards.
+> **Note:** `commandCenterStore.ts` and the CommandCenter component (formerly steps
+> 12 and 15 here) move to **Phase 4** below — they belong to the workspace, not the
+> standalone component library. The workspace uses `BoardSection` + `FeatureSidebar`,
+> **not** the `PanelSlot`/`usePanelResize` equal-panel model. See UI-DIRECTION.md §7.
 
 ---
 
@@ -1769,7 +1799,24 @@ questions, see agent updates in real time, switch between boards.
 
 ---
 
-### Phase 4 — Cross-feature memory & artifacts
+### Phase 4 — Command center + cross-feature memory & artifacts
+
+> **Revised 2026-06-11 — see [UI-DIRECTION.md](UI-DIRECTION.md).** The CommandCenter
+> workspace (full-screen canvas: resizable left **FeatureSidebar** for All-Features
+> navigation + full-area **BoardSection**s for content + `[Presets ▾]`) lands here, hosting the
+> Phase 2 CommsPanel library. It replaces the equal-panel `PanelSlot` model from SPEC §16/§19.
+
+**Step 20a — commandCenterStore.ts**
+- File: `studio/src/renderer/src/store/commandCenterStore.ts` (new file)
+- State: `sections[]`, order, `sizes`, `preset`, `sidebarWidth`, `sidebarCollapsed`, `mainFeature`
+- Persists to `localStorage` under `pathly-command-center-layout`
+
+**Step 20b — CommandCenter workspace**
+- Folder: `studio/src/renderer/src/components/HQ/CommandCenter/`
+- Files: `CommandCenter.tsx`, `FeatureSidebar.tsx` (left nav, accordion, "Set as main ↗"),
+  `BoardSection.tsx` (full-area section hosting a CommsPanel), `useSectionResize.ts`,
+  `useCommandCenter.ts`, CSS modules
+- **Not** `PanelSlot`/`usePanelResize` — see UI-DIRECTION.md §7
 
 **Step 20 — Artifact ingestion**
 - File: `src/pathly_orchestrator/runner/artifacts_ingestion.py` (new file)
@@ -1961,7 +2008,12 @@ team flow             now enters at PLAN, pre-filled by the consult flow
 
 ---
 
-*Spec version 6.0 — Flow architecture change added: STORM removed from the team flow
-(audit in STORM-REMOVAL.md), replaced by the multi-agent consultation flow (BOARD-STORM.md
-§15) with per-expert template ownership; team flow enters at PLAN pre-filled. Prior:
-v5.0 folded Board-Storm in as Phase 5 with phase ordering 1→2→3→5→4.*
+*Spec version 6.1 — UI direction revised (see [UI-DIRECTION.md](UI-DIRECTION.md)): §7
+(standalone CommsPanel tab), §16 (three-equal-panel command center), and §19 (flexible
+panel layout) superseded by a full-screen workspace — resizable left sidebar for All-Features
+navigation + full-area board sections + "Set as main feature" swap + asymmetric widths.
+§22 Phase 2/4 build steps revised (CommsPanel components standalone → CommandCenter hosts them;
+PanelSlot → BoardSection + FeatureSidebar). Prior: v6.0 — Flow architecture change: STORM
+removed from the team flow (audit in STORM-REMOVAL.md), replaced by the multi-agent
+consultation flow (BOARD-STORM.md §15) with per-expert template ownership; team flow enters at
+PLAN pre-filled. v5.0 folded Board-Storm in as Phase 5 with phase ordering 1→2→3→5→4.*
