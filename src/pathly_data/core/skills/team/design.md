@@ -51,14 +51,20 @@ Stack: <stack>
 Query: "<description>"
 ```
 
-Run:
+**Primary — invoke `ui-ux-pro-max` skill via the Skill tool:**
+Call the Skill tool with:
+- skill: `"ui-ux-pro-max"`
+- args: `"<description> design system for <stack> stack"`
+
+The skill output IS the design system. Capture everything it produces.
+
+**Fallback (if Skill tool is unavailable or returns empty output):**
 ```bash
 pathly-design "<description>" --design-system --stack <stack> -p "<feature>"
 ```
-
 If `pathly-design` is not found, fall back to `python -m pathly_data.core.design.cli`.
 
-Capture the full output. If the command fails (Python not found, script error), write a minimal `DESIGN.md` with the error noted and continue — do not block the pipeline.
+Capture the full output. If both methods fail, write a minimal `DESIGN.md` with the error noted and continue — do not block the pipeline.
 
 ## Step 4 — Write DESIGN.md
 

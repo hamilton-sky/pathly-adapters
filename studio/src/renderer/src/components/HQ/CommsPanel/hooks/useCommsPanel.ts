@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BoardScope, MessageType } from '../../CommandCenter/types'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useProjectStore } from '../../../../store/projectStore'
-import { COMMS_BASE } from '../../../../store/commsApi'
+import { PATHLY_API_BASE } from '../../../../lib/config'
 
 // Per-section binding: messages for one board scope + send/answer/resolve handlers
 // + a one-shot flash for freshly-posted messages.
@@ -32,7 +32,7 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
 
     let es: EventSource | null = null
     try {
-      es = new EventSource(`${COMMS_BASE}/events/comms?scope=${encodeURIComponent(key)}`)
+      es = new EventSource(`${PATHLY_API_BASE}/events/comms?scope=${encodeURIComponent(key)}`)
       es.onmessage = (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data as string) as { type: string }

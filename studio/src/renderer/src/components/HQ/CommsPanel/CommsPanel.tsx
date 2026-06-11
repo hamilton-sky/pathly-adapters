@@ -3,18 +3,43 @@ import { Check } from 'lucide-react'
 import type { BoardScope, MessageType } from '../CommandCenter/types'
 import { CommsMsgList } from './CommsMsgList'
 import { CommsInput } from './CommsInput'
-import { TypePicker } from './TypePicker'
 import { useCommsPanel } from './hooks/useCommsPanel'
 import s from './CommsPanel.module.css'
 
-const READ_SCOPES: BoardScope[] = ['feature', 'project', 'global']
+// Which chips each panel type shows, and their default on/off state.
+// Feature panel reads come from feature.scope (backend-synced).
+// Project/global panels use independent local state — toggling one
+// never affects the other.
+const PANEL_SCOPES: Record<BoardScope, BoardScope[]> = {
+  feature: ['feature', 'project', 'global'],
+  project: ['project', 'global'],
+  global:  ['global'],
+}
+const LOCAL_DEFAULTS: Record<BoardScope, Record<BoardScope, boolean>> = {
+  feature: { feature: true, project: true, global: true },
+  project: { feature: false, project: true, global: true },
+  global:  { feature: false, project: false, global: true },
+}
 
-// Reusable board-thread building block: message list + a controls row
-// (feature-only read-scope toggles + message-type picker) above the compose
-// input. Reused by every BoardSection and, in Phase 5, the ConsultPanel.
 export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeature: string }) {
   const { messages, feature, flashId, post, answer, resolve, toggleScope, del } = useCommsPanel(scope, mainFeature)
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
+  // Independent per-panel reads — only used for project/global panels.
+  // Feature panel reads are authoritative from feature.scope.
+  const [localReads, setLocalReads] = useState<Record<BoardScope, boolean>>(LOCAL_DEFAULTS[scope])
+
+  const panelScopes = PANEL_SCOPES[scope]
+
+  const getActive = (k: BoardScope) =>
+    scope === 'feature' ? (feature?.scope[k] ?? false) : localReads[k]
+
+  const handleToggle = (k: BoardScope) => {
+    if (scope === 'feature') {
+      toggleScope(k)
+    } else {
+      setLocalReads((r) => ({ ...r, [k]: !r[k] }))
+    }
+  }
 
   return (
     <>
@@ -28,30 +53,32 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
       />
 
       <div className={s.foot}>
-        <div className={s.controls}>
-          {scope === 'feature' && feature && (
-            <div className={s.scopes}>
-              <span className={s.lbl}>Reads:</span>
-              {READ_SCOPES.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  className={s.scopeChk}
-                  {...(feature.scope[k] ? { 'data-on': '' } : {})}
-                  aria-pressed={feature.scope[k]}
-                  onClick={() => toggleScope(k)}
-                >
-                  <span className={s.box}>
-                    {feature.scope[k] && <Check size={8} />}
-                  </span>
-                  {k.charAt(0).toUpperCase() + k.slice(1)}
-                </button>
-              ))}
-            </div>
-          )}
-          <TypePicker value={type} onChange={setType} />
+        <div className={s.scopeRow}>
+          <span className={s.lbl}>Reads:</span>
+          {panelScopes.map((k) => {
+            const active = getActive(k)
+            return (
+              <button
+                key={k}
+                type="button"
+                className={s.scopeChk}
+                {...(active ? { 'data-on': '' } : {})}
+                aria-pressed={active}
+                onClick={() => handleToggle(k)}
+              >
+                <span className={s.box}>{active && <Check size={8} />}</span>
+                {k.charAt(0).toUpperCase() + k.slice(1)}
+              </button>
+            )
+          })}
         </div>
-        <CommsInput scope={scope} mainFeature={mainFeature} onSend={(text) => post(type, text)} />
+        <CommsInput
+          scope={scope}
+          mainFeature={mainFeature}
+          type={type}
+          onTypeChange={setType}
+          onSend={(text) => post(type, text)}
+        />
       </div>
     </>
   )

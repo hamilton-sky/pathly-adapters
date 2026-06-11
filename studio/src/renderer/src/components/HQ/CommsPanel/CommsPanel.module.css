@@ -1,37 +1,36 @@
 .foot {
   flex-shrink: 0;
   border-top: var(--border);
-  padding: 10px 12px;
+  padding: 8px 12px 10px;
   background: var(--bg-mantle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  /* No overflow:hidden — TypePicker drop-up must open upward past this boundary */
 }
 
-.controls {
+/* Reads row — always visible in all panels */
+.scopeRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
-
-.scopes {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-/* message-type picker styles live in TypePicker.module.css (custom drop-up) */
 
 .lbl {
-  font-family: var(--font-family-mono);
+  font: 11px/1 var(--font-family-mono);
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .scopeChk {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 8px;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
   cursor: pointer;
   border: var(--border);
   border-radius: var(--radius-full);
@@ -39,9 +38,10 @@
   color: var(--text-muted);
   font: 500 11px/1 var(--font-family-base);
   transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
-.scopeChk:hover {
+.scopeChk:hover:not([data-readonly]) {
   border-color: var(--text-muted);
   color: var(--text-secondary);
 }
@@ -52,14 +52,16 @@
   background: var(--accent-bg);
 }
 
+
 .box {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
   border: 1.5px solid var(--text-disabled);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .scopeChk[data-on] .box {

@@ -20,24 +20,28 @@ Done when: All UI components in scope have a documented design decision or spec 
 
 ## Script
 
-The UI UX Pro Max search engine is bundled into pathly as the `pathly-design` CLI command.
+**Primary — invoke the `ui-ux-pro-max` skill via the Skill tool:**
+Always use the Skill tool first. It contains the full UI UX Pro Max design intelligence.
 
-**Generate a full design system:**
-```bash
-pathly-design "<product description>" --design-system --stack <stack> -p "<project name>"
+Generate a full design system:
+```
+Skill({ skill: "ui-ux-pro-max", args: "<product description> design system for <stack> stack" })
 ```
 
-**Query a specific domain:**
+Query a specific domain:
+```
+Skill({ skill: "ui-ux-pro-max", args: "<keyword> -- domain <style|color|typography|ux|chart|product|landing>" })
+```
+
+The skill output is the ground truth for all design decisions in the session.
+
+**Fallback — CLI (use when Skill tool is unavailable):**
 ```bash
+pathly-design "<product description>" --design-system --stack <stack> -p "<project name>"
 pathly-design "<keyword>" --domain <style|color|typography|ux|chart|product|landing>
 ```
 
-**Query a specific stack:**
-```bash
-pathly-design "<keyword>" --stack <react|nextjs|vue|svelte|astro|flutter|react-native|html-tailwind>
-```
-
-Always run `--design-system` before doing component or page work. The output is the ground truth for all design decisions in the session.
+Always generate the full design system before doing component or page work.
 
 ## Responsibilities
 

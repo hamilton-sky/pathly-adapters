@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { LayoutGrid } from 'lucide-react'
-import type { BoardScope } from './types'
+import { MAX_SECTIONS } from './types'
 import { useCommsStore } from '../../../store/commsStore'
 import { useCommandCenterStore } from '../../../store/commandCenterStore'
 import { useProjectStore } from '../../../store/projectStore'
@@ -10,9 +10,6 @@ import { FeatureSidebar } from './FeatureSidebar'
 import { BoardSection } from './BoardSection'
 import s from './CommandCenter.module.css'
 
-// The full-screen workspace shell (UI-DIRECTION §2):
-// header tabs + presets, a resizable All-Features sidebar, and one or more
-// full-area board sections. Not yet wired into HQ navigation — see remaining steps.
 export function CommandCenter() {
   const store = useCommsStore()
   const cc = useCommandCenterStore()
@@ -20,13 +17,10 @@ export function CommandCenter() {
   const activeTopic = useProjectStore((s) => s.activeTopic)
   const onResize = useSectionResize(cc.direction, cc.setSize)
 
-  // Load the real feature list from the project's plan folders.
   useEffect(() => {
     if (projectPath) void store.loadFeatures(projectPath)
   }, [projectPath, store.loadFeatures])
 
-  // The persisted main feature may be a stale seed id — point it at a real
-  // feature once the list loads (prefer the active topic, else the first).
   useEffect(() => {
     if (store.features.length === 0) return
     if (store.features.some((f) => f.id === cc.mainFeature)) return
@@ -40,10 +34,15 @@ export function CommandCenter() {
     <div className={s.cc}>
       <CommandCenterHeader
         sections={cc.sections}
+        featureTabs={cc.featureTabs}
         preset={cc.preset}
         direction={cc.direction}
+        mainFeature={cc.mainFeature}
         featurePending={store.pendingCount(cc.mainFeature)}
+        atCap={cc.sections.length >= MAX_SECTIONS}
         onToggleSection={cc.toggleSection}
+        onToggleFeatureSection={cc.toggleFeatureSection}
+        onRemoveFeatureTab={cc.removeFeatureTab}
         onAddSection={cc.addAnySection}
         onToggleDirection={cc.toggleDirection}
         onApplyPreset={cc.applyPreset}
@@ -56,10 +55,13 @@ export function CommandCenter() {
           mainFeature={cc.mainFeature}
           collapsed={cc.sidebarCollapsed}
           pendingCount={store.pendingCount}
+          openBoards={cc.featureTabs}
+          atCap={cc.featureTabs.length >= MAX_SECTIONS}
           onToggleSidebar={cc.toggleSidebar}
           onToggleFeature={cc.toggleOpenFeature}
           onSetMain={cc.setMainFeature}
           onRailOpen={cc.openFeatureFromRail}
+          onOpenBoard={cc.addFeatureSection}
           onStatus={store.setFeatureStatus}
         />
 
@@ -72,23 +74,26 @@ export function CommandCenter() {
           </div>
         ) : (
           <div className={`${s.sections}${cc.direction === 'column' ? ` ${s.stacked}` : ''}`}>
-            {cc.sections.map((scope, i) => (
-              <React.Fragment key={scope}>
+            {cc.sections.map((sec, i) => (
+              <React.Fragment key={sec.id}>
                 {i > 0 && (
                   <div
                     className={s.resize}
                     role="separator"
                     aria-orientation={cc.direction === 'row' ? 'vertical' : 'horizontal'}
-                    onMouseDown={(e) => onResize(e, cc.sections[i - 1], scope as BoardScope)}
+                    onMouseDown={(e) => onResize(e, cc.sections[i - 1].id, sec.id)}
                   />
                 )}
                 <BoardSection
-                  scope={scope}
+                  section={sec}
                   mainFeature={cc.mainFeature}
                   preset={cc.preset}
                   direction={cc.direction}
-                  size={cc.sizes[scope]}
-                  onClose={cc.toggleSection}
+                  size={cc.sizes[sec.id]}
+                  onClose={() => {
+                    if (sec.scope === 'feature') cc.toggleFeatureSection(sec.featureId)
+                    else cc.toggleSection(sec.scope as 'project' | 'global')
+                  }}
                 />
               </React.Fragment>
             ))}

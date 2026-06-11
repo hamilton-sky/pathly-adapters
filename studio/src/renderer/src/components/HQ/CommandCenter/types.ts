@@ -59,12 +59,20 @@ export type Boards = Record<string, Message[]>
 export type Direction = 'row' | 'column'
 export type Preset = 'board' | 'pipeline' | 'focus' | 'custom'
 
+export type SectionDef =
+  | { id: string; scope: 'feature'; featureId: string }
+  | { id: 'project'; scope: 'project' }
+  | { id: 'global'; scope: 'global' }
+
+export const MAX_SECTIONS = 3
+
 export interface CommandCenterState {
-  sections: BoardScope[]
+  sections: SectionDef[]
+  featureTabs: string[]
   direction: Direction
   preset: Preset
   mainFeature: string
   sidebarCollapsed: boolean
   openFeature: string | null
-  sizes: Partial<Record<BoardScope, number>>
+  sizes: Partial<Record<string, number>>
 }

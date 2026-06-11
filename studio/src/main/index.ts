@@ -123,8 +123,8 @@ function createWindow(projectPath?: string): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 640,
-    minHeight: 420,
+    minWidth: 920,
+    minHeight: 580,
     title: 'Pathly Studio',
     titleBarStyle: 'hidden',
     titleBarOverlay: {

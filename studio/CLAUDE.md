@@ -85,6 +85,17 @@ This guarantees the new server always starts, even against old server versions t
 
 ## UI coding rules — non-negotiable
 
+### Responsive to container — always
+
+Every component and every button must resize gracefully as its container changes width. Non-negotiable rules:
+
+- **No fixed `width` on containers** — use `width: 100%`, `flex: 1`, or `min-width: 0` instead.
+- **Flex children that must shrink need `min-width: 0`** — without it a flex item won't shrink below its content width, causing overflow.
+- **Buttons must use `min-width` only as a floor, never a fixed width** — they must be allowed to shrink or wrap.
+- **`flex-shrink: 0` is reserved for elements that must never shrink** (icons, single-char badges). Do not apply it to input fields or buttons that contain text.
+- **Every panel layout must be verified at ≤200px wide** — use `overflow: hidden` on section containers so nothing escapes the panel bounds.
+- **Never use `overflow: visible` on a scroll container** — use `overflow: hidden` or `overflow: auto`.
+
 ### No inline styles
 Never use `style={{ ... }}` props. All styling goes in the component's `.module.css` file.
 

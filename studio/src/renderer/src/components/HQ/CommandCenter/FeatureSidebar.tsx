@@ -10,10 +10,13 @@ export interface FeatureSidebarProps {
   mainFeature: string
   collapsed: boolean
   pendingCount: (id: string) => number
+  openBoards: string[]
+  atCap: boolean
   onToggleSidebar: () => void
   onToggleFeature: (id: string) => void
   onSetMain: (id: string) => void
   onRailOpen: (id: string) => void
+  onOpenBoard: (id: string) => void
   onStatus: (id: string, status: 'running' | 'idle', stage?: 'BUILDING' | 'TESTING') => void
 }
 
@@ -60,8 +63,6 @@ function CollapsedRail(p: FeatureSidebarProps) {
   )
 }
 
-// Left navigation — "All Features". Resizable/collapsible (VS Code / Notion
-// file-tree pattern). Collapsed → icon strip with badges; expanded → accordion.
 export function FeatureSidebar(p: FeatureSidebarProps) {
   if (p.collapsed) return <CollapsedRail {...p} />
 
@@ -89,8 +90,11 @@ export function FeatureSidebar(p: FeatureSidebarProps) {
             open={p.openFeature === f.id}
             isMain={p.mainFeature === f.id}
             pending={p.pendingCount(f.id)}
+            boardOpen={p.openBoards.includes(f.id)}
+            atCap={p.atCap}
             onToggle={p.onToggleFeature}
             onSetMain={p.onSetMain}
+            onOpenBoard={p.onOpenBoard}
             onStatus={p.onStatus}
           />
         ))}

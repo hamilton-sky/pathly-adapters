@@ -1,15 +1,20 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown, Check, X } from 'lucide-react'
-import type { BoardScope, Direction, Preset } from './types'
+import type { BoardScope, Direction, Preset, SectionDef } from './types'
 import { SCOPES } from './constants'
 import s from './CommandCenterHeader.module.css'
 
 export interface CommandCenterHeaderProps {
-  sections: BoardScope[]
+  sections: SectionDef[]
+  featureTabs: string[]
   preset: Preset
   direction: Direction
+  mainFeature: string
   featurePending: number
-  onToggleSection: (scope: BoardScope) => void
+  atCap: boolean
+  onToggleSection: (scope: 'project' | 'global') => void
+  onToggleFeatureSection: (fid: string) => void
+  onRemoveFeatureTab: (fid: string) => void
   onAddSection: () => void
   onToggleDirection: () => void
   onApplyPreset: (preset: 'board' | 'pipeline' | 'focus') => void
@@ -27,10 +32,26 @@ const PRESET_ITEMS: Array<{ id: 'board' | 'pipeline' | 'focus'; name: string; de
   { id: 'focus',    name: 'Focus',         desc: 'Feature board, full width' },
 ]
 
-// Workspace header: section tabs (multi-select), layout direction toggle,
-// presets menu, exit.
 export function CommandCenterHeader(p: CommandCenterHeaderProps) {
   const [menu, setMenu] = useState(false)
+  const headRef = useRef<HTMLDivElement>(null)
+  const [compact, setCompact] = useState(false)
+
+  const checkCompact = useCallback(() => {
+    const el = headRef.current
+    if (!el) return
+    // Brand ~190px + headRight ~280px (with dirPill) or ~100px + gaps 30px + ~122px per tab
+    const headRightPx = p.sections.length >= 2 ? 280 : 100
+    const needed = 220 + headRightPx + (2 + p.featureTabs.length) * 122
+    setCompact(el.offsetWidth < needed)
+  }, [p.featureTabs.length, p.sections.length])
+
+  useEffect(() => {
+    const obs = new ResizeObserver(checkCompact)
+    if (headRef.current) obs.observe(headRef.current)
+    checkCompact()
+    return () => obs.disconnect()
+  }, [checkCompact])
 
   useEffect(() => {
     if (!menu) return
@@ -39,52 +60,122 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
     return () => document.removeEventListener('click', close)
   }, [menu])
 
+  const projectOn = p.sections.some((sec) => sec.scope === 'project')
+  const globalOn  = p.sections.some((sec) => sec.scope === 'global')
+  const isOnly = p.featureTabs.length <= 1
+  const canAdd = !p.atCap && (!projectOn || !globalOn)
+
   return (
-    <div className={s.head}>
+    <div ref={headRef} className={s.head}>
       <div className={s.brand}><span className={s.dot}>◈</span>Command Center</div>
 
-      <div className={s.tabs}>
-        {(['feature', 'project', 'global'] as BoardScope[]).map((sc) => {
-          const on = p.sections.indexOf(sc) > -1
-          const pend = sc === 'feature' ? p.featurePending : 0
+      <div
+        className={s.tabs}
+        {...(compact ? { 'data-compact': '' } : {})}
+      >
+        {/* Global tab — first */}
+        <button
+          key="global"
+          type="button"
+          className={s.tab}
+          title={`Toggle the ${SCOPES['global'].label} board`}
+          {...(globalOn ? { 'data-on': '' } : {})}
+          aria-pressed={globalOn}
+          onClick={() => p.onToggleSection('global')}
+        >
+          {SCOPE_ICONS['global']}
+          <span className={s.tabLabel}>{SCOPES['global'].label}</span>
+          <span className={s.st}>{globalOn ? '●' : '○'}</span>
+        </button>
+
+        {/* Project tab — second */}
+        <button
+          key="project"
+          type="button"
+          className={s.tab}
+          title={`Toggle the ${SCOPES['project'].label} board`}
+          {...(projectOn ? { 'data-on': '' } : {})}
+          aria-pressed={projectOn}
+          onClick={() => p.onToggleSection('project')}
+        >
+          {SCOPE_ICONS['project']}
+          <span className={s.tabLabel}>{SCOPES['project'].label}</span>
+          <span className={s.st}>{projectOn ? '●' : '○'}</span>
+        </button>
+
+        {/* Feature tabs — one per featureTabs entry */}
+        {p.featureTabs.map((fid) => {
+          const isActive = p.sections.some(
+            (sec): sec is Extract<SectionDef, { scope: 'feature' }> => sec.scope === 'feature' && sec.featureId === fid
+          )
+          const pend = fid === p.mainFeature ? p.featurePending : 0
           return (
-            <button
-              key={sc}
-              type="button"
-              className={s.tab}
-              title={`Toggle the ${SCOPES[sc].label} board`}
-              {...(on ? { 'data-on': '' } : {})}
-              aria-pressed={on}
-              onClick={() => p.onToggleSection(sc)}
+            <div
+              key={fid}
+              className={`${s.tab} ${s.featureTab}`}
+              {...(isActive ? { 'data-on': '' } : {})}
+              role="button"
+              tabIndex={0}
+              title={isActive ? `Hide ${fid} panel` : `Show ${fid} panel`}
+              onClick={() => p.onToggleFeatureSection(fid)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') p.onToggleFeatureSection(fid) }}
             >
-              {SCOPE_ICONS[sc]}
-              <span>{SCOPES[sc].label}</span>
-              <span className={s.st}>{on ? '●' : '○'}</span>
+              <GitBranch size={13} />
+              <span className={s.tabLabel}>{fid}</span>
+              <span className={s.st}>{isActive ? '●' : '○'}</span>
               {pend > 0 && <span className={`${s.badge} ${s.msg}`}>{pend}</span>}
-            </button>
+              {!isOnly && (
+                <button
+                  type="button"
+                  className={s.tabClose}
+                  title={`Remove ${fid} tab`}
+                  aria-label={`Remove ${fid} tab`}
+                  onClick={(e) => { e.stopPropagation(); p.onRemoveFeatureTab(fid) }}
+                >
+                  <X size={11} />
+                </button>
+              )}
+            </div>
           )
         })}
-        <button
-          type="button"
-          className={`${s.tab} ${s.add}`}
-          title="Toggle a board section"
-          onClick={p.onAddSection}
-        >
-          <Plus size={13} />Add
-        </button>
+
+        {/* + Add button — only for project/global panels */}
+        {canAdd && (
+          <button
+            type="button"
+            className={`${s.tab} ${s.add}`}
+            title="Add a board section"
+            onClick={p.onAddSection}
+          >
+            <Plus size={13} /><span className={s.tabLabel}>Add</span>
+          </button>
+        )}
       </div>
 
       <div className={s.headRight}>
         {p.sections.length >= 2 && (
-          <button
-            type="button"
-            className={s.ctl}
-            title={p.direction === 'row' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
-            onClick={p.onToggleDirection}
-          >
-            {p.direction === 'row' ? <Columns2 size={13} /> : <List size={13} />}
-            {p.direction === 'row' ? 'side by side' : 'stacked'}
-          </button>
+          <div className={s.dirPill}>
+            <button
+              type="button"
+              className={s.dirOpt}
+              {...(p.direction === 'column' ? { 'data-active': '' } : {})}
+              aria-pressed={p.direction === 'column'}
+              title="Stacked layout"
+              onClick={() => p.direction !== 'column' && p.onToggleDirection()}
+            >
+              <List size={13} />Stacked
+            </button>
+            <button
+              type="button"
+              className={s.dirOpt}
+              {...(p.direction === 'row' ? { 'data-active': '' } : {})}
+              aria-pressed={p.direction === 'row'}
+              title="Side by side layout"
+              onClick={() => p.direction !== 'row' && p.onToggleDirection()}
+            >
+              <Columns2 size={13} />Side by side
+            </button>
+          </div>
         )}
         <div className={s.menuWrap}>
           <button

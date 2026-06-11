@@ -1,5 +1,5 @@
 import React from 'react'
-import { ChevronDown, ChevronUp, History, MessageSquare, Play, SkipForward, Pause, ExternalLink, Check } from 'lucide-react'
+import { ChevronDown, ChevronUp, History, MessageSquare, Play, SkipForward, Pause, ExternalLink, Check, Columns2 } from 'lucide-react'
 import type { Feature } from './types'
 import s from './FeatureCard.module.css'
 
@@ -8,14 +8,15 @@ export interface FeatureCardProps {
   open: boolean
   isMain: boolean
   pending: number
+  boardOpen: boolean
+  atCap: boolean
   onToggle: (id: string) => void
   onSetMain: (id: string) => void
+  onOpenBoard: (id: string) => void
   onStatus: (id: string, status: 'running' | 'idle', stage?: 'BUILDING' | 'TESTING') => void
 }
 
-// One accordion card in the All-Features sidebar.
-// Carries the "Set as main feature" bridge action and quick status controls.
-export function FeatureCard({ feature: f, open, isMain, pending, onToggle, onSetMain, onStatus }: FeatureCardProps) {
+export function FeatureCard({ feature: f, open, isMain, pending, boardOpen, atCap, onToggle, onSetMain, onOpenBoard, onStatus }: FeatureCardProps) {
   return (
     <div
       className={`${s.feat}${open ? ` ${s.open}` : ''}${isMain ? ` ${s.main}` : ''}`}
@@ -51,6 +52,20 @@ export function FeatureCard({ feature: f, open, isMain, pending, onToggle, onSet
                 <ExternalLink size={12} />Set as main
               </button>
             )}
+          {boardOpen
+            ? <span className={`${s.featAct} ${s.boardChip}`}><Columns2 size={12} />In board</span>
+            : (
+              <button
+                type="button"
+                className={s.featAct}
+                disabled={atCap}
+                title={atCap ? 'Close a panel first (max 3 open)' : `Open ${f.id} in a board panel`}
+                onClick={() => onOpenBoard(f.id)}
+              >
+                <Columns2 size={12} />Open board
+              </button>
+            )
+          }
           {f.status === 'blocked' && (
             <>
               <button type="button" className={`${s.featAct} ${s.warn}`} onClick={() => onStatus(f.id, 'running', 'BUILDING')}>
