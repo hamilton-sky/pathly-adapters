@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, Download, FileCode, BookOpen, GitCompare,
@@ -34,6 +34,19 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
 
   const [exportState, setExportState] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveState,   setSaveState]   = useState<'idle' | 'success' | 'error'>('idle')
+
+  const headerRef = useRef<HTMLDivElement>(null)
+  const [isCompact, setIsCompact] = useState(false)
+
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const obs = new ResizeObserver(entries => {
+      setIsCompact(entries[0].contentRect.width < 760)
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   // Cells mode: history-depth gating; Source mode: always allow (CodeMirror will no-op if empty)
   const canUndo = viewMode === 'cells' ? historyIndex > 0            : true
@@ -79,7 +92,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         body: JSON.stringify({ skill_path: skillNotebookPath, body_cells: bodyCells }),
       })
       if (res.ok) {
-        markCellsSaved()                    // record this historyIndex as the new clean baseline
+        markCellsSaved()
         setSaveState('success')
         useToastStore.getState().push('Skill saved', 'success', { category: 'db_crud' })
         setTimeout(() => setSaveState('idle'), 2000)
@@ -105,8 +118,10 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
     requestNotebookOpenDraft()
   }
 
+  const exportLabel = exportState === 'success' ? 'Exported' : exportState === 'error' ? 'Error' : 'Export Skill'
+
   return (
-    <div className={styles.headerRoot}>
+    <div ref={headerRef} className={styles.headerRoot} data-compact={isCompact}>
       <button
         type="button"
         className={styles.backBtn}
@@ -124,16 +139,44 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
 
       <span className={styles.badge}>NOTEBOOK</span>
 
+      {/* View mode toggle — left side, next to title */}
+      <div className={styles.viewToggle} role="group" aria-label="View mode">
+        <Tooltip label="Visual cell editor" placement="bottom">
+          <button
+            type="button"
+            className={styles.viewToggleBtn}
+            data-active={viewMode === 'cells'}
+            aria-pressed={viewMode === 'cells'}
+            onClick={() => viewMode !== 'cells' && onToggleViewMode()}
+          >
+            <BookOpen size={13} />
+            <span className={styles.btnLabel}>Visual</span>
+          </button>
+        </Tooltip>
+        <Tooltip label="Raw source editor" placement="bottom">
+          <button
+            type="button"
+            className={styles.viewToggleBtn}
+            data-active={viewMode === 'editor'}
+            aria-pressed={viewMode === 'editor'}
+            onClick={() => viewMode !== 'editor' && onToggleViewMode()}
+          >
+            <FileCode size={13} />
+            <span className={styles.btnLabel}>Source</span>
+          </button>
+        </Tooltip>
+      </div>
+
       <div className={styles.spacer} />
 
-      {/* Undo / Redo — both modes; cells = cell history, source = CodeMirror history */}
+      {/* Undo / Redo */}
       <Tooltip
         label={viewMode === 'cells' ? 'Undo' : 'Undo (source editor)'}
         shortcut="Ctrl+Z"
         placement="bottom"
       >
         <button type="button" className={styles.iconBtn} onClick={handleUndo} disabled={!canUndo} aria-label="Undo">
-          <Undo2 size={15} />
+          <Undo2 size={14} />
         </button>
       </Tooltip>
       <Tooltip
@@ -142,11 +185,11 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         placement="bottom"
       >
         <button type="button" className={styles.iconBtn} onClick={handleRedo} disabled={!canRedo} aria-label="Redo">
-          <Redo2 size={15} />
+          <Redo2 size={14} />
         </button>
       </Tooltip>
 
-      {/* Split — agent restructures cells; produces a .draft for diff review */}
+      {/* Split */}
       <Tooltip
         label={splitState === 'running'
           ? 'Agent is splitting the skill…'
@@ -161,12 +204,14 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
           onClick={() => void handleSplit()}
           aria-label="Split skill into sections"
         >
-          <Scissors size={14} />
-          {splitState === 'running' ? 'Splitting…' : splitState === 'success' ? 'Split!' : splitState === 'error' ? 'Error' : 'Split'}
+          <Scissors size={13} />
+          <span className={styles.btnLabel}>
+            {splitState === 'running' ? 'Splitting…' : splitState === 'success' ? 'Split!' : splitState === 'error' ? 'Error' : 'Split'}
+          </span>
         </button>
       </Tooltip>
 
-      {/* Analyze — agent writes a quality report to .analysis */}
+      {/* Analyze */}
       <Tooltip
         label={analyzeState === 'running'
           ? 'Agent is analyzing the skill…'
@@ -181,12 +226,14 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
           onClick={() => void handleAnalyze()}
           aria-label="Analyze skill"
         >
-          <ScanText size={14} />
-          {analyzeState === 'running' ? 'Analyzing…' : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'Analyze'}
+          <ScanText size={13} />
+          <span className={styles.btnLabel}>
+            {analyzeState === 'running' ? 'Analyzing…' : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'Analyze'}
+          </span>
         </button>
       </Tooltip>
 
-      {/* Review Draft — always visible; disabled until an agent draft exists */}
+      {/* Review Draft */}
       <Tooltip
         label={notebookDraftPath
           ? 'Agent draft ready — click to review changes'
@@ -200,12 +247,12 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
           aria-disabled={!notebookDraftPath}
           onClick={notebookDraftPath ? handleReviewDraft : undefined}
         >
-          <GitCompare size={14} />
-          Review draft
+          <GitCompare size={13} />
+          <span className={styles.btnLabel}>Review draft</span>
         </button>
       </Tooltip>
 
-      {/* Save — both modes, different handlers, identical appearance logic */}
+      {/* Save — both modes, different handlers */}
       {viewMode === 'cells' ? (
         <Tooltip label="Save skill" shortcut="Ctrl+S" placement="bottom">
           <button
@@ -215,8 +262,10 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             onClick={isCellsDirty ? handleCellsSave : undefined}
             disabled={!isCellsDirty && saveState === 'idle'}
           >
-            <Database size={15} />
-            {saveState === 'error' ? 'Error' : isCellsDirty ? 'Save' : 'Saved'}
+            <Database size={14} />
+            <span className={styles.btnLabel}>
+              {saveState === 'error' ? 'Error' : isCellsDirty ? 'Save' : 'Saved'}
+            </span>
           </button>
         </Tooltip>
       ) : (
@@ -228,51 +277,28 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             onClick={requestNotebookSave}
             disabled={!isSourceDirty}
           >
-            <Database size={15} />
-            {isSourceDirty ? 'Save' : 'Saved'}
+            <Database size={14} />
+            <span className={styles.btnLabel}>
+              {isSourceDirty ? 'Save' : 'Saved'}
+            </span>
           </button>
         </Tooltip>
       )}
 
-      {/* Export Skill — both modes */}
-      <button
-        type="button"
-        className={styles.exportBtn}
-        data-state={exportState}
-        onClick={handleExport}
-        disabled={exportState !== 'idle'}
-      >
-        <Download size={15} />
-        {exportState === 'success' ? 'Exported' : exportState === 'error' ? 'Error' : 'Export Skill'}
-      </button>
-
-      {/* View mode toggle — Visual (cells) ↔ Source (raw editor) */}
-      <div className={styles.viewToggle} role="group" aria-label="View mode">
-        <Tooltip label="Visual cell editor" placement="bottom">
-          <button
-            type="button"
-            className={styles.viewToggleBtn}
-            data-active={viewMode === 'cells'}
-            aria-pressed={viewMode === 'cells'}
-            onClick={() => viewMode !== 'cells' && onToggleViewMode()}
-          >
-            <BookOpen size={14} />
-            <span>Visual</span>
-          </button>
-        </Tooltip>
-        <Tooltip label="Raw source editor" placement="bottom">
-          <button
-            type="button"
-            className={styles.viewToggleBtn}
-            data-active={viewMode === 'editor'}
-            aria-pressed={viewMode === 'editor'}
-            onClick={() => viewMode !== 'editor' && onToggleViewMode()}
-          >
-            <FileCode size={14} />
-            <span>Source</span>
-          </button>
-        </Tooltip>
-      </div>
+      {/* Export Skill — far right */}
+      <Tooltip label={exportLabel} placement="bottom">
+        <button
+          type="button"
+          className={styles.exportBtn}
+          data-state={exportState}
+          onClick={handleExport}
+          disabled={exportState !== 'idle'}
+          aria-label={exportLabel}
+        >
+          <Download size={14} />
+          <span className={styles.btnLabel}>{exportLabel}</span>
+        </button>
+      </Tooltip>
     </div>
   )
 }

@@ -1,17 +1,17 @@
 .headerRoot {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 48px;
-  padding: 0 12px;
+  gap: 5px;
+  height: 42px;
+  padding: 0 10px;
   background: var(--bg-mantle);
   border-bottom: var(--border);
   flex-shrink: 0;
 }
 
 .backBtn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -57,8 +57,8 @@
   background: var(--accent-bg);
   border: 1px solid var(--accent-border);
   border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 9.5px;
+  padding: 2px 7px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -70,9 +70,14 @@
   flex: 1;
 }
 
+/* Text hidden in compact mode — present on all labeled buttons */
+.btnLabel {
+  display: inline;
+}
+
 .iconBtn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -107,8 +112,8 @@
 .viewToggleBtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
+  gap: 4px;
+  padding: 3px 8px;
   background: transparent;
   border: none;
   border-left: var(--border);
@@ -142,8 +147,8 @@
 .agentBtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 7px 12px;
+  gap: 4px;
+  padding: 4px 9px;
   background: var(--bg-surface0);
   border: var(--border);
   border-radius: var(--radius-md);
@@ -186,9 +191,8 @@
 .draftBtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  /* Match saveBtn height exactly */
-  padding: 7px 12px;
+  gap: 4px;
+  padding: 4px 9px;
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
@@ -196,7 +200,6 @@
   white-space: nowrap;
   flex-shrink: 0;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
-  /* default = no-draft state — same solid background as saveBtn */
   background: var(--bg-surface0);
   border: var(--border);
   color: var(--text-muted);
@@ -226,10 +229,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 7px 12px;
-  /* Wide enough for "Saved" + icon at --font-size-sm (11px) — never shrinks to "Save" width */
-  min-width: 78px;
+  gap: 4px;
+  padding: 4px 9px;
+  min-width: 62px;
   background: var(--bg-surface0);
   border: var(--border);
   border-radius: var(--radius-md);
@@ -277,8 +279,8 @@
 .exportBtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 7px 13px;
+  gap: 4px;
+  padding: 4px 10px;
   background: var(--accent);
   border: none;
   border-radius: var(--radius-md);
@@ -299,3 +301,26 @@
 
 .exportBtn[data-state='success'] { background: var(--green); }
 .exportBtn[data-state='error']   { background: var(--red); }
+
+/* ── Compact mode — collapse text labels to icon-only ──────────────────────── */
+.headerRoot[data-compact='true'] .btnLabel {
+  display: none;
+}
+
+.headerRoot[data-compact='true'] .agentBtn,
+.headerRoot[data-compact='true'] .draftBtn {
+  padding: 4px 7px;
+}
+
+.headerRoot[data-compact='true'] .saveBtn {
+  padding: 4px 7px;
+  min-width: unset;
+}
+
+.headerRoot[data-compact='true'] .exportBtn {
+  padding: 4px 8px;
+}
+
+.headerRoot[data-compact='true'] .viewToggleBtn {
+  padding: 3px 7px;
+}
