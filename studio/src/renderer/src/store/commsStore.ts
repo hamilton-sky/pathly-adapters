@@ -11,6 +11,7 @@ import {
   buildFeature,
   fetchFeatureState,
   featureBlocked,
+  fetchLastSummary,
 } from './commsApi'
 import { listDirs } from '../services/pathlyApi'
 
@@ -76,11 +77,12 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       // Enrich each feature from its STATE.json (stage + conv) and feedback/ (blocked).
       const features: Feature[] = await Promise.all(
         filtered.map(async (id) => {
-          const [state, blocked] = await Promise.all([
+          const [state, blocked, last] = await Promise.all([
             fetchFeatureState(projectPath, id),
             featureBlocked(projectPath, id),
+            fetchLastSummary(projectPath, id),
           ])
-          return buildFeature(id, state, blocked)
+          return buildFeature(id, state, blocked, last)
         }),
       )
       set({ features })

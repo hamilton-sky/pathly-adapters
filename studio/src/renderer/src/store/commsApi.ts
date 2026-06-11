@@ -282,7 +282,48 @@ export async function featureBlocked(projectPath: string, featureId: string): Pr
   }
 }
 
-export function buildFeature(id: string, state?: FeatureState | null, blocked = false): Feature {
+interface AgentDoneEvent {
+  type?: string
+  agent?: string
+  summary?: string
+}
+
+function summarize(agent: string | undefined, summary: string): string {
+  const clean = summary.replace(/\s+/g, ' ').trim()
+  const text = clean.length > 160 ? `${clean.slice(0, 159)}…` : clean
+  return agent ? `${agent}: ${text}` : text
+}
+
+/** Latest AGENT_DONE summary from a feature's EVENTS.jsonl — the card's "last activity" line. */
+export async function fetchLastSummary(projectPath: string, featureId: string): Promise<string> {
+  try {
+    const raw = await readFile(`${projectPath}/pathly/plans/${featureId}/EVENTS.jsonl`)
+    if (!raw) return ''
+    const lines = raw.split('\n')
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim()
+      if (!line) continue
+      try {
+        const ev = JSON.parse(line) as AgentDoneEvent
+        if (ev.type === 'AGENT_DONE' && ev.summary && ev.summary.trim()) {
+          return summarize(ev.agent, ev.summary)
+        }
+      } catch {
+        // skip a malformed line and keep scanning backwards
+      }
+    }
+    return ''
+  } catch {
+    return ''
+  }
+}
+
+export function buildFeature(
+  id: string,
+  state?: FeatureState | null,
+  blocked = false,
+  last = '',
+): Feature {
   const stage = toStage(state?.current)
   const status: FeatureStatus = stage === 'DONE' ? 'done' : blocked ? 'blocked' : 'idle'
   return {
@@ -291,7 +332,7 @@ export function buildFeature(id: string, state?: FeatureState | null, blocked = 
     conv: state?.convs_done ?? 0,
     status,
     agent: STAGE_AGENT[stage],
-    last: '',
+    last,
     scope: { feature: true, project: true, global: true },
   }
 }
