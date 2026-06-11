@@ -207,6 +207,7 @@ Current major panes:
 
 | Pane | Runtime source |
 |---|---|
+| Flow Editor | visual canvas + raw YAML tab; save via `PUT /flows/<name>`; export to `pathly-package`, `claude-code`, or `codex` targets |
 | Canvas | bundled `src/pathly_data/core/flows/*.flow.yaml` plus editable user flow files |
 | Plan | project-local `pathly/plans/**` artifacts |
 | Monitor | `pathly-fsm-http` SSE stream from `/events/stream` |
@@ -230,7 +231,7 @@ instance rail for focusing, hiding, and killing terminal instances.
 
 ## Flow YAMLs
 
-`src/pathly_data/core/flows/` contains four FSM definition files consumed by the orchestrator:
+Flows are fully user-definable. `src/pathly_data/core/flows/` ships four reference flows, but users can create any number of custom flows with any stages in any order.
 
 | Flow | File | States | Used for |
 |---|---|---|---|
@@ -239,9 +240,23 @@ instance rail for focusing, hiding, and killing terminal instances.
 | `explore` | `explore.flow.yaml` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE | Codebase exploration |
 | `test` | `test.flow.yaml` | STORMING → PLANNING → BUILDING → REVIEWING → TESTING → DONE | Lightweight build+test pipeline (no retro/archive) |
 
-Each flow YAML specifies: `states`, `transitions`, `agent_map`, `feedback_routing`, `transition_rules`, and `transition_actions`.
+Each flow YAML specifies: `states`, `transitions`, `agent_map`, `role_map`, `feedback_routing`, `transition_rules`, `transition_actions`, and an optional `adapter_map` for routing stages to different CLI adapters.
 
 `transition_actions` are skills the orchestrator spawns automatically at specific state transitions (e.g., `commit` on `BUILDING->REVIEWING`, `archive-artifacts` on `RETRO->DONE`). These are transparent to the user.
+
+**Creating custom flows:** write a `.flow.yaml` file and place it in `src/pathly_data/core/flows/` (bundled) or export it from Studio to `.claude/pathly-flows/` / `.codex/pathly-flows/` (project-local). The FSM server loads flows from the DB on startup and falls back to disk files if not found.
+
+## Database
+
+The FSM server persists state in SQLite at `~/.pathly/pathly.db`.
+
+| Table | Purpose |
+|---|---|
+| `flow_definitions` | Full flow YAML content indexed by name. Refreshed from disk on every server start. `PUT /flows/<name>` writes both DB and disk (write-through). |
+| `flow_nodes` | Per-node config (reserved — unused, for future visual flow builder) |
+| `flow_edges` | Per-edge config (reserved — unused, for future visual flow builder) |
+
+**Connection model:** each Flask thread gets its own `sqlite3.Connection` via `threading.local()`. WAL mode means readers never block writers. A background daemon thread checkpoints the WAL file every 30 seconds.
 
 ## Source of Truth
 

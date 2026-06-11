@@ -12,6 +12,49 @@ scope enforcement, and marketplace manifest integrity checks.
 
 ---
 
+## FSM Server Authentication
+
+The FSM HTTP server requires a shared secret on all mutating endpoints.
+
+**How it works:**
+
+- On first start, `~/.pathly/server_secret.txt` is created with a random 64-char hex token.
+- The token is loaded into `Settings.api_secret` at startup and injected into `middleware.configure()`.
+- Every `POST` request must carry `X-Pathly-Secret: <token>` or receive a `401 Unauthorized`.
+- `GET /events/*` endpoints are **exempt** — the browser `EventSource` API cannot send custom headers, so SSE streams are auth-by-IP-binding (127.0.0.1 only) rather than by header.
+- Studio's Electron main process reads the same file via `studio/src/main/apiConfig.ts`, exposes it to the renderer over IPC (`shell:apiConfig`), and injects it into every `apiFetch()` call via `lib/config.ts`.
+- PTY result callbacks (`POST /runner/terminal/result`) also include the header, injected in `studio/src/main/ipc/terminal.ts`.
+
+**Trust model:** the secret is effective against other local processes on the same machine. It does not protect against a process running as the same OS user (they can read `~/.pathly/server_secret.txt`). The server should never be bound to a non-loopback interface.
+
+**Rotation:** delete `~/.pathly/server_secret.txt` and restart both the FSM server and Studio. Both will generate/read the new value on next start.
+
+Remaining gap:
+
+- The token is stored in plaintext. OS-level file permissions (`chmod 600`) are the only protection.
+- No token expiry or rotation schedule is enforced automatically.
+
+---
+
+## Database Concurrency Safety
+
+The FSM server uses SQLite in WAL mode at `~/.pathly/pathly.db`.
+
+**Design:**
+
+- Each Flask thread gets its own `sqlite3.Connection` via `threading.local()`. There is no shared connection pool and no application-level write lock.
+- `PRAGMA journal_mode=WAL` — readers never block writers; writers never block readers.
+- `PRAGMA busy_timeout=5000` — a write that finds the WAL locked will retry for up to 5 seconds before raising `SQLITE_BUSY`.
+- `PRAGMA foreign_keys=ON` — referential integrity enforced at the DB layer.
+- A background daemon thread runs `PRAGMA wal_checkpoint(PASSIVE)` every 30 seconds to keep the WAL file from growing unbounded.
+
+**Risk:**
+
+- Concurrent writes from multiple threads are serialized by SQLite's file-level WAL lock. Under very high write concurrency the 5-second busy timeout may expire; callers will see a `500` response.
+- The DB file is user-owned and not encrypted. Anyone with read access to `~/.pathly/` can read pipeline state.
+
+---
+
 ## Hook Injection Risks
 
 Hooks are installed by pathly-adapters into host tool settings. They run local

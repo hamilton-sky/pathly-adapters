@@ -27,6 +27,7 @@ Copy `.env.example` to `.env` and configure:
 | `PATHLY_FSM_HTTP_PORT` | `8765` | Port for the FSM HTTP server |
 | `PATHLY_FSM_HTTP_HOST` | `127.0.0.1` | Host to bind (use 127.0.0.1 for local-only) |
 | `PATHLY_PROJECT_ROOT` | _(none)_ | Absolute path to your project root — **required for hooks** |
+| `PATHLY_API_SECRET` | _(auto)_ | Shared secret for `X-Pathly-Secret` auth. If unset, a 64-char hex token is auto-generated and saved to `~/.pathly/server_secret.txt` on first run. Set explicitly to pin the secret across restarts or share it with external callers. |
 | `ANTHROPIC_API_KEY` | _(none)_ | Enables feedback auto-classification (optional) |
 | `PATHLY_CORS_ORIGIN` | `null` | Allowed CORS origin for SSE stream (e.g. `http://localhost:3000`) |
 
@@ -96,6 +97,22 @@ Create `~/Library/LaunchAgents/com.pathly.fsm.plist`:
 ```
 
 Then: `launchctl load ~/Library/LaunchAgents/com.pathly.fsm.plist`
+
+## Auth Token
+
+The FSM server requires `X-Pathly-Secret` on all POST routes. The token is auto-generated on first run at `~/.pathly/server_secret.txt`. Studio reads it automatically via `shell:apiConfig` IPC.
+
+**To rotate:** delete `~/.pathly/server_secret.txt`, then restart both the FSM server and Studio. Both will pick up the new value.
+
+**To pin:** set `PATHLY_API_SECRET` in your environment before starting the server. The env var takes precedence over the file.
+
+**Calling the API manually:**
+```bash
+SECRET=$(cat ~/.pathly/server_secret.txt)
+curl -X POST http://127.0.0.1:8765/health -H "X-Pathly-Secret: $SECRET"
+```
+
+---
 
 ## Hook Setup
 

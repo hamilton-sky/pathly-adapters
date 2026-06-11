@@ -101,6 +101,10 @@ POST http://127.0.0.1:8765/runner/terminal/result    ← PTY exit callback from 
 POST http://127.0.0.1:8765/runner/terminal/started   ← PTY started confirmation from Studio
 ```
 
+**Authentication:** All `POST` routes require the `X-Pathly-Secret` header. The secret is a 64-char hex token auto-generated on first run and stored at `~/.pathly/server_secret.txt`. Studio reads and injects it automatically. `GET /events/*` endpoints are exempt (EventSource API cannot send custom headers). See [docs/SECURITY.md](docs/SECURITY.md#fsm-server-authentication).
+
+**State storage:** The FSM uses SQLite (WAL mode) at `~/.pathly/pathly.db`. Each Flask thread gets its own connection via `threading.local()` — no locking required. Flow definitions are stored in the `flow_definitions` table and refreshed from disk YAML on every server start.
+
 Start it manually if needed:
 ```bash
 pathly-fsm-http
@@ -114,6 +118,7 @@ The `fsm-call` skill (shared by all FSM-using skills) handles health-check, auto
 This repository also ships Pathly Studio, a local Electron UI for inspecting and
 driving Pathly workflows:
 
+- **Flow Editor**: visual canvas + raw YAML editor for flow definitions. Changes sync bidirectionally between the graph view and the YAML source. Save writes back to disk via `PUT /flows/<name>`. Export targets: `pathly-package` (overwrites the bundled `.flow.yaml`), `claude-code` (`.claude/pathly-flows/`), or `codex` (`.codex/pathly-flows/`). Export validates for errors before writing; warnings require confirmation.
 - **Canvas**: visual flow editing and validation for shipped flow YAMLs.
 - **Plan**: project-local plan files and workflow artifacts.
 - **Monitor**: live FSM events from `GET /events/stream`.
