@@ -1,5 +1,6 @@
 import { BookOpen, Layers, Activity, Database, Settings, ChevronRight } from 'lucide-react'
 import { useBrightskyStore } from '../../../store/brightskyStore'
+import { Tooltip } from '../../ui'
 import styles from './IconStrip.module.css'
 
 interface IconStripProps {
@@ -30,70 +31,79 @@ export function IconStrip({
 
   return (
     <aside className={styles.strip} aria-label="Collapsed sidebar">
-      <button type="button" className={styles.expandBtn} onClick={onExpand} title="Expand sidebar" aria-label="Expand sidebar">
-        <ChevronRight size={14} />
-      </button>
+      <Tooltip label="Expand sidebar" placement="right">
+        <button type="button" className={styles.expandBtn} onClick={onExpand} aria-label="Expand sidebar">
+          <ChevronRight size={14} />
+        </button>
+      </Tooltip>
 
       <div className={styles.divider} />
 
-      <button
-        type="button"
-        className={`${styles.iconBtn} ${!libraryOpen ? styles.iconBtnActive : ''}`}
-        onClick={onWorkspace}
-        title="Workspace"
-        aria-label="Workspace"
-      >
-        <Layers size={16} />
-      </button>
+      <Tooltip label="Workspace" placement="right">
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${!libraryOpen ? styles.iconBtnActive : ''}`}
+          onClick={onWorkspace}
+          aria-label="Workspace"
+        >
+          <Layers size={16} />
+        </button>
+      </Tooltip>
 
-      <button
-        type="button"
-        className={`${styles.iconBtn} ${libraryOpen ? styles.iconBtnActive : ''}`}
-        onClick={onLibrary}
-        title="Library"
-        aria-label="Library"
-      >
-        <BookOpen size={16} />
-      </button>
+      <Tooltip label="Library" placement="right">
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${libraryOpen ? styles.iconBtnActive : ''}`}
+          onClick={onLibrary}
+          aria-label="Library"
+        >
+          <BookOpen size={16} />
+        </button>
+      </Tooltip>
 
       <div className={styles.spacer} />
 
-      <button
-        type="button"
-        className={`${styles.iconBtn} ${activePanel === 'monitor' ? styles.iconBtnActive : ''}`}
-        onClick={onMonitor}
-        title="Monitor"
-        aria-label="Monitor"
-      >
-        <Activity size={16} />
-      </button>
+      <Tooltip label="Monitor" placement="right">
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${activePanel === 'monitor' ? styles.iconBtnActive : ''}`}
+          onClick={onMonitor}
+          aria-label="Monitor"
+        >
+          <Activity size={16} />
+        </button>
+      </Tooltip>
 
-      <button
-        type="button"
-        className={`${styles.iconBtn} ${activePanel === 'db-explorer' ? styles.iconBtnActive : ''}`}
-        onClick={onDbExplorer}
-        title="DB Explorer"
-        aria-label="DB Explorer"
-      >
-        <Database size={16} />
-      </button>
+      <Tooltip label="DB Explorer" placement="right">
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${activePanel === 'db-explorer' ? styles.iconBtnActive : ''}`}
+          onClick={onDbExplorer}
+          aria-label="DB Explorer"
+        >
+          <Database size={16} />
+        </button>
+      </Tooltip>
 
-      <button
-        type="button"
-        className={`${styles.iconBtn} ${activePanel === 'settings' ? styles.iconBtnActive : ''}`}
-        onClick={onSettings}
-        title="Settings"
-        aria-label="Settings"
-      >
-        <Settings size={16} />
-      </button>
+      <Tooltip label="Settings" placement="right">
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${activePanel === 'settings' ? styles.iconBtnActive : ''}`}
+          onClick={onSettings}
+          aria-label="Settings"
+        >
+          <Settings size={16} />
+        </button>
+      </Tooltip>
 
       <div className={styles.divider} />
 
       {initials && (
-        <div className={styles.avatar} title="Profile">
-          {initials}
-        </div>
+        <Tooltip label="Profile" placement="right">
+          <div className={styles.avatar} aria-label="Profile">
+            {initials}
+          </div>
+        </Tooltip>
       )}
     </aside>
   )
