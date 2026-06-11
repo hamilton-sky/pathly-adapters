@@ -139,6 +139,50 @@
   color: var(--accent);
 }
 
+.agentBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.agentBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.agentBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agentBtn[data-state='running'] {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  cursor: wait;
+}
+
+.agentBtn[data-state='success'] {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.agentBtn[data-state='error'] {
+  border-color: var(--red);
+  color: var(--red);
+}
+
 .draftBtn {
   display: inline-flex;
   align-items: center;

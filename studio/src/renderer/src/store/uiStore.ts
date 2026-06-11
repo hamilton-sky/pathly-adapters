@@ -25,7 +25,7 @@ function loadLastUsedFlowPath(): string | null {
 
 export interface UiState {
   sidebarCollapsed: boolean
-  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer'
+  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer' | 'command-center'
   dirtyItems: Set<string>
   theme: ThemeName
   preferredDark: ThemeName
@@ -42,6 +42,8 @@ export interface UiState {
   notebookPreviewOpen: boolean
   /** Draft path known to the embedded source editor — null when no draft exists */
   notebookDraftPath: string | null
+  /** Analysis file path — set when an agent has written a .analysis report */
+  notebookAnalysisPath: string | null
   /** Increment to request the embedded source editor to save */
   notebookSaveRequested: number
   /** Increment to request the embedded source editor to open its draft diff viewer */
@@ -54,11 +56,12 @@ export interface UiState {
   setSkillNotebookViewMode: (mode: 'cells' | 'editor') => void
   toggleNotebookPreview: () => void
   setNotebookDraftPath: (p: string | null) => void
+  setNotebookAnalysisPath: (p: string | null) => void
   requestNotebookSave: () => void
   requestNotebookOpenDraft: () => void
   requestNotebookUndo: () => void
   requestNotebookRedo: () => void
-  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer') => void
+  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer' | 'command-center') => void
   setSkillNotebookPath: (path: string | null) => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void
@@ -94,6 +97,7 @@ export const useUiStore = create<UiState>()(
       skillNotebookViewMode: 'cells',
       notebookPreviewOpen: true,
       notebookDraftPath: null,
+      notebookAnalysisPath: null,
       notebookSaveRequested: 0,
       notebookOpenDraftRequested: 0,
       notebookUndoRequested: 0,
@@ -101,6 +105,7 @@ export const useUiStore = create<UiState>()(
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       toggleNotebookPreview: () => set((s) => ({ notebookPreviewOpen: !s.notebookPreviewOpen })),
       setNotebookDraftPath: (p) => set({ notebookDraftPath: p }),
+      setNotebookAnalysisPath: (p) => set({ notebookAnalysisPath: p }),
       requestNotebookSave: () => set((s) => ({ notebookSaveRequested: s.notebookSaveRequested + 1 })),
       requestNotebookOpenDraft: () => set((s) => ({ notebookOpenDraftRequested: s.notebookOpenDraftRequested + 1 })),
       requestNotebookUndo: () => set((s) => ({ notebookUndoRequested: s.notebookUndoRequested + 1 })),

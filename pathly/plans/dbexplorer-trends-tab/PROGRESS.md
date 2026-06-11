@@ -3,7 +3,7 @@ name: Progress
 ---
 # DBExplorer Trends Tab — Progress
 
-## Status: IN PROGRESS (Conv 2 of 3 — complete; Conv 3 pending)
+## Status: COMPLETE
 
 ## Story Status
 
@@ -14,8 +14,8 @@ name: Progress
 | S3 | Activity heatmap — 18-week GitHub-style grid | Conv 2 | DONE |
 | S4 | CSV export of all agent invocations | Conv 2 | DONE |
 | S5 | Empty state — graceful degradation for features with no runs | Conv 2 | DONE |
-| S6 | Cache efficiency line chart | Conv 3 | TODO |
-| S7 | Trends tab wired into FeatureModal | Conv 3 | TODO |
+| S6 | Cache efficiency line chart | Conv 3 | DONE |
+| S7 | Trends tab wired into FeatureModal | Conv 3 | DONE |
 
 ## Conversation Breakdown
 
@@ -23,7 +23,7 @@ name: Progress
 |------|--------|---------|--------|--------|
 | 1 | 1–4 | S1 | DONE | `GET /telemetry/trends?feature=X` returns valid JSON; IPC smoke test |
 | 2 | 5–9 | S2, S3, S4, S5 | DONE | TrendsTab renders all three sections; `npm run typecheck` passes |
-| 3 | 10–13 | S6, S7 | TODO | Cache line chart renders with gaps; FeatureModal shows Trends tab; `npm run typecheck` passes |
+| 3 | 10–13 | S6, S7 | DONE | Cache line chart renders with gaps; FeatureModal shows Trends tab; `npm run typecheck` passes |
 
 See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 
@@ -40,10 +40,10 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 2 | 7 Heatmap | `TrendsTab/ActivityHeatmap.tsx` | 18×7 CSS grid + data-level | Exactly 126 cells; hover title correct | DONE |
 | 2 | 8 Root + CSV | `TrendsTab/TrendsTab.tsx` | Root component + CSV Blob export | CSV downloads with correct columns | DONE |
 | 2 | 9 Verify | — | Typecheck + visual | `npm run typecheck` passes; all Conv 2 criteria pass | DONE |
-| 3 | 10 Cache chart | `TrendsTab/CacheEfficiencyChart.tsx` | Recharts LineChart; null for zero-denom | Gaps visible for zero-input invocations | TODO |
-| 3 | 11 featureName | `TrendsTab/TrendsTab.tsx` | Confirm featureName prop pattern | TrendsTab prop interface matches Decision 2 | TODO |
-| 3 | 12 Modal wiring | `FeatureModal.tsx` | Add 'trends' TabId + panel | Trends tab visible; existing tabs unaffected | TODO |
-| 3 | 13 Verify | — | Typecheck + full visual | `npm run typecheck` passes; all Conv 3 criteria pass | TODO |
+| 3 | 10 Cache chart | `TrendsTab/CacheEfficiencyChart.tsx` | Recharts LineChart; null for zero-denom | Gaps visible for zero-input invocations | DONE |
+| 3 | 11 featureName | `TrendsTab/TrendsTab.tsx` | Confirm featureName prop pattern | TrendsTab prop interface matches Decision 2 | DONE |
+| 3 | 12 Modal wiring | `FeatureModal.tsx` | Add 'trends' TabId + panel | Trends tab visible; existing tabs unaffected | DONE |
+| 3 | 13 Verify | — | Typecheck + full visual | `npm run typecheck` passes; all Conv 3 criteria pass | DONE |
 
 ## Prerequisites
 - Studio dependencies installed (`npm install` in `studio/`)

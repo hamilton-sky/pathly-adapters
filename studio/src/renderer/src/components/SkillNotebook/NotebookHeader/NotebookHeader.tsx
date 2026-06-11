@@ -2,10 +2,12 @@ import React, { useState } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, Download, FileCode, BookOpen, GitCompare,
+  Scissors, ScanText,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useSkillNotebookStore, BodyCell } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
+import { useNotebookAgentActions } from './hooks/useNotebookAgentActions'
 import styles from './NotebookHeader.module.css'
 
 export type NotebookViewMode = 'cells' | 'editor'
@@ -27,6 +29,8 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const requestNotebookOpenDraft  = useUiStore(s => s.requestNotebookOpenDraft)
   const requestNotebookUndo       = useUiStore(s => s.requestNotebookUndo)
   const requestNotebookRedo       = useUiStore(s => s.requestNotebookRedo)
+
+  const { handleSplit, handleAnalyze, splitState, analyzeState } = useNotebookAgentActions(skillNotebookPath)
 
   const [exportState, setExportState] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveState,   setSaveState]   = useState<'idle' | 'success' | 'error'>('idle')
@@ -139,6 +143,46 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
       >
         <button type="button" className={styles.iconBtn} onClick={handleRedo} disabled={!canRedo} aria-label="Redo">
           <Redo2 size={15} />
+        </button>
+      </Tooltip>
+
+      {/* Split — agent restructures cells; produces a .draft for diff review */}
+      <Tooltip
+        label={splitState === 'running'
+          ? 'Agent is splitting the skill…'
+          : 'Ask an agent to split this skill into well-organized sections (produces a reviewable draft)'}
+        placement="bottom"
+      >
+        <button
+          type="button"
+          className={styles.agentBtn}
+          data-state={splitState}
+          disabled={splitState === 'running' || !skillNotebookPath}
+          onClick={() => void handleSplit()}
+          aria-label="Split skill into sections"
+        >
+          <Scissors size={14} />
+          {splitState === 'running' ? 'Splitting…' : splitState === 'success' ? 'Split!' : splitState === 'error' ? 'Error' : 'Split'}
+        </button>
+      </Tooltip>
+
+      {/* Analyze — agent writes a quality report to .analysis */}
+      <Tooltip
+        label={analyzeState === 'running'
+          ? 'Agent is analyzing the skill…'
+          : 'Ask an agent to analyze this skill for clarity, gaps, and improvements'}
+        placement="bottom"
+      >
+        <button
+          type="button"
+          className={styles.agentBtn}
+          data-state={analyzeState}
+          disabled={analyzeState === 'running' || !skillNotebookPath}
+          onClick={() => void handleAnalyze()}
+          aria-label="Analyze skill"
+        >
+          <ScanText size={14} />
+          {analyzeState === 'running' ? 'Analyzing…' : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'Analyze'}
         </button>
       </Tooltip>
 

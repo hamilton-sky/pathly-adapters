@@ -20,6 +20,7 @@ import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
 import { HQ } from './components/HQ'
+import { CommandCenter } from './components/HQ/CommandCenter/CommandCenter'
 import { Toaster } from './components/Toaster'
 import { themes } from './theme'
 import appStyles from './App.module.css'
@@ -56,6 +57,7 @@ function MainPanel(): JSX.Element {
   if (activePanel === 'settings') return <Settings />
   if (activePanel === 'skill-notebook') return <SkillNotebookPanel />
   if (activePanel === 'db-explorer') return <DBExplorer />
+  if (activePanel === 'command-center') return <CommandCenter />
   return (
     <div className={appStyles.mainPanel}>
       <span className={appStyles.placeholder}>Select an item from the sidebar</span>
@@ -198,11 +200,11 @@ function MainApp(): JSX.Element | null {
         if (!useTerminalStore.getState().open) useTerminalStore.getState().toggle()
         return
       }
-      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'skill-notebook', 'db-explorer'])
+      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'skill-notebook', 'db-explorer', 'command-center'])
       if (!allowed.has(panelName)) {
         throw new Error(`Unknown panel: ${panelName}`)
       }
-      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer')
+      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer' | 'command-center')
     }
     return () => {
       delete bridge.__pathlyNavigate

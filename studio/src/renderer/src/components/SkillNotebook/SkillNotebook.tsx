@@ -7,6 +7,7 @@ import NotebookHeader, { NotebookViewMode } from './NotebookHeader/NotebookHeade
 import NotebookCanvas from './NotebookCanvas/NotebookCanvas'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
 import NotebookLanding from './NotebookLanding/NotebookLanding'
+import AnalysisPanel from './AnalysisPanel/AnalysisPanel'
 import { Editor } from '../Editor'
 import { usePreviewResize } from './usePreviewResize'
 
@@ -24,6 +25,7 @@ export default function SkillNotebookPanel() {
 
   return (
     <div className={styles.root}>
+      <AnalysisPanel />
       <NotebookHeader
         viewMode={viewMode}
         onToggleViewMode={() => setViewMode(viewMode === 'cells' ? 'editor' : 'cells')}

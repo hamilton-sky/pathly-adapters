@@ -29,6 +29,13 @@ export function DailyCostChart({ data }: DailyCostChartProps): JSX.Element {
     return <p className={styles.empty}>No cost data recorded yet</p>
   }
 
+  const cs = getComputedStyle(document.documentElement)
+  const textMuted = cs.getPropertyValue('--text-muted').trim() || '#94a3b8'
+  const bgSurface0 = cs.getPropertyValue('--bg-surface0').trim() || '#0d1117'
+  const borderColor = cs.getPropertyValue('--border').trim() || '#283044'
+  const textPrimary = cs.getPropertyValue('--text-primary').trim() || '#e2e8f0'
+  const fontMono = cs.getPropertyValue('--font-family-mono').trim() || 'monospace'
+
   const reportedColor = 'var(--green)'
   const estimatedColor = 'var(--runtime)'
 
@@ -38,14 +45,14 @@ export function DailyCostChart({ data }: DailyCostChartProps): JSX.Element {
         <XAxis
           dataKey="date"
           tickFormatter={formatDate}
-          tick={{ fontSize: 'var(--font-size-xs)', fill: 'var(--text-muted)', fontFamily: 'var(--font-family-mono)' }}
+          tick={{ fontSize: 10, fill: textMuted, fontFamily: fontMono }}
           tickLine={false}
           axisLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
           tickFormatter={formatDollar}
-          tick={{ fontSize: 'var(--font-size-xs)', fill: 'var(--text-muted)', fontFamily: 'var(--font-family-mono)' }}
+          tick={{ fontSize: 10, fill: textMuted, fontFamily: fontMono }}
           tickLine={false}
           axisLine={false}
           width={72}
@@ -57,10 +64,10 @@ export function DailyCostChart({ data }: DailyCostChartProps): JSX.Element {
           ]}
           labelFormatter={(label) => formatDate(String(label ?? ''))}
           contentStyle={{
-            background: 'var(--bg-mantle)',
-            border: '1px solid var(--border-color)',
-            color: 'var(--text-primary)',
-            fontSize: 'var(--font-size-sm)',
+            background: bgSurface0,
+            border: `1px solid ${borderColor}`,
+            color: textPrimary,
+            fontSize: 12,
           }}
         />
         <Legend

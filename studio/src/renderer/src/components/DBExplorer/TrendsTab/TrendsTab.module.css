@@ -48,6 +48,19 @@
 .heatmapCell[data-level="3"] { background: var(--heatmap-level-3); }
 .heatmapCell[data-level="4"] { background: var(--heatmap-level-4); }
 
+/* ── Cache efficiency chart ───────────────────────────────────── */
+.cacheChartWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cacheSummary {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
 /* ── CSV button ───────────────────────────────────────────────── */
 .csvBtn {
   height: 28px;

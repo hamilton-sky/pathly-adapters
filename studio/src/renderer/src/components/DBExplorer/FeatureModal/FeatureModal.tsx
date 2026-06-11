@@ -8,9 +8,10 @@ import { InspectTab } from '../InspectTab'
 import { TracesTab } from '../TracesTab'
 import { fetchPricingTable } from '../costUtils'
 import type { PricingTable } from '../costUtils'
+import { TrendsTab } from '../TrendsTab/TrendsTab'
 import styles from './FeatureModal.module.css'
 
-type TabId = 'timeline' | 'events' | 'agents' | 'inspect' | 'traces'
+type TabId = 'timeline' | 'events' | 'agents' | 'inspect' | 'traces' | 'trends'
 
 interface FeatureModalProps {
   feature: FeatureData | null
@@ -90,6 +91,7 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
     { id: 'agents',   label: 'Agents',   count: agentCount || undefined },
     { id: 'traces',   label: 'Traces',   count: data.otelSpans.length || undefined },
     { id: 'inspect',  label: 'Inspect' },
+    { id: 'trends',   label: 'Trends' },
   ]
 
   function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>): void {
@@ -123,6 +125,7 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
                   {activeTab === 'agents'   && <AgentsTab events={data.rawEvents} pricingTable={pricingTable} />}
                   {activeTab === 'traces'   && <TracesTab spans={data.otelSpans} />}
                   {activeTab === 'inspect'  && <InspectTab events={data.rawEvents} pricingTable={pricingTable} />}
+                  {activeTab === 'trends'   && <TrendsTab featureName={feature.name} events={data.rawEvents} pricingTable={pricingTable} />}
                 </>
             }
           </div>

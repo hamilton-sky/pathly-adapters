@@ -3,6 +3,7 @@ import { useTrends } from './useTrends'
 import type { CsvRow } from './useTrends'
 import { DailyCostChart } from './DailyCostChart'
 import { ActivityHeatmap } from './ActivityHeatmap'
+import { CacheEfficiencyChart } from './CacheEfficiencyChart'
 import styles from './TrendsTab.module.css'
 
 interface TrendsTabProps {
@@ -72,7 +73,10 @@ export function TrendsTab({ featureName, events, pricingTable }: TrendsTabProps)
         <ActivityHeatmap cells={heatmapCells} />
       </section>
 
-      {/* CacheEfficiencyChart added in Conv 3 */}
+      <section className={styles.section}>
+        <h4 className={styles.sectionHeading}>Cache Efficiency</h4>
+        <CacheEfficiencyChart events={events} />
+      </section>
 
       <section className={styles.section}>
         <button type="button" className={styles.csvBtn} onClick={handleCsvExport}>

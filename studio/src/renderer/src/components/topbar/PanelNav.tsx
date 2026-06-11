@@ -1,5 +1,5 @@
 ﻿import React from "react";
-import { LayoutGrid, Activity, BookOpen, Database } from "lucide-react";
+import { LayoutGrid, Activity, BookOpen, Database, MessageSquare } from "lucide-react";
 import { useStore } from "../../store";
 import { Tooltip } from "../ui";
 import { readFile } from "../../services/pathlyApi";
@@ -84,6 +84,17 @@ export function PanelNav({ compact }: PanelNavProps): JSX.Element {
         >
           <Database size={15} />
           {!compact && <span className={styles.navBtnLabel}>DB Explorer</span>}
+        </button>
+      </Tooltip>
+      <Tooltip label="Communication board" shortcut="Ctrl+5" placement="bottom">
+        <button
+          type="button"
+          data-testid="topbar-panel-command-center"
+          className={`${styles.navBtn} ${activePanel === "command-center" ? styles.navBtnActive : ""}`}
+          onClick={() => setActivePanel("command-center")}
+        >
+          <MessageSquare size={15} />
+          {!compact && <span className={styles.navBtnLabel}>Command Center</span>}
         </button>
       </Tooltip>
     </div>

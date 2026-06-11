@@ -1,2 +1,2 @@
 RESULT: PASS
-Verified: conversation 2 complete — useTrends.ts, DailyCostChart.tsx, ActivityHeatmap.tsx, TrendsTab.tsx, TrendsTab.module.css created; recharts installed; typecheck 0 errors
+Verified: conversation 3 complete — CacheEfficiencyChart (connectNulls=false, null gaps per EC-2.1), TrendsTab wired to FeatureModal with Trends tab; typecheck 0 errors

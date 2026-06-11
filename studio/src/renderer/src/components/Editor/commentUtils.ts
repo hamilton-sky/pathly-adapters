@@ -1,5 +1,62 @@
 import type { Comment } from './useComments'
 
+export function buildSplitPrompt(filePath: string): string {
+  const norm = filePath.replace(/\\/g, '/')
+  return [
+    `You are restructuring a Pathly skill file into well-organized sections.`,
+    ``,
+    `Read the file at: ${norm}`,
+    ``,
+    `Analyze the content and identify natural split points. Each logical concern, phase, or topic`,
+    `should become its own ## section — small enough to be an independent cell in the skill editor.`,
+    ``,
+    `Rules:`,
+    `- Preserve all existing content exactly — do not rewrite, add, or remove instructions`,
+    `- Group related paragraphs under a single ## heading`,
+    `- Use short, descriptive ## headings (3–5 words)`,
+    `- Maintain the original logical order`,
+    `- If the content already has ## sections, refine them for better granularity`,
+    ``,
+    `Write the restructured content to: ${norm}.draft`,
+    ``,
+    `Do not write anything else. Exit when done.`,
+  ].join('\n')
+}
+
+export function buildAnalyzePrompt(filePath: string): string {
+  const norm = filePath.replace(/\\/g, '/')
+  return [
+    `You are reviewing a Pathly skill file for quality.`,
+    ``,
+    `Read the file at: ${norm}`,
+    ``,
+    `Write an analysis report to: ${norm}.analysis`,
+    ``,
+    `Format your report as markdown with these sections:`,
+    ``,
+    `## Summary`,
+    `1–2 sentence overview of what this skill does.`,
+    ``,
+    `## Strengths`,
+    `What this skill does well — clear instructions, good structure, appropriate scope.`,
+    ``,
+    `## Gaps & Ambiguities`,
+    `Unclear instructions, missing edge cases, or steps that could be misinterpreted.`,
+    `Reference exact phrases or sections where possible.`,
+    ``,
+    `## Redundancies`,
+    `Verbose or repeated sections that could be tightened without losing meaning.`,
+    ``,
+    `## Suggested Improvements`,
+    `Concrete, actionable changes ranked by impact. 1–2 sentences each.`,
+    ``,
+    `## Token Estimate`,
+    `Rough token cost per invocation and whether it is appropriate for the task complexity.`,
+    ``,
+    `Do not write anything else. Exit when done.`,
+  ].join('\n')
+}
+
 export function deriveLineNumber(fileBody: string, anchorText: string): number {
   const lines = fileBody.split('\n')
   const firstLine = anchorText.split('\n')[0].trim()
