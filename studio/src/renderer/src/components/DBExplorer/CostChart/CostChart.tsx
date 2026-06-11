@@ -2,8 +2,26 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { CostBars } from './CostBars'
 import styles from './CostChart.module.css'
 
+interface TrendPoint {
+  day: string
+  cost_usd: number
+  tokens_in: number
+  tokens_out: number
+  span_count: number
+}
+
+function bucketToPoint(b: DailyTrendBucket): TrendPoint {
+  return {
+    day: b.bucket,
+    cost_usd: b.cost_usd_reported,
+    tokens_in: b.input_tokens,
+    tokens_out: 0,
+    span_count: b.count,
+  }
+}
+
 interface TooltipState {
-  point: DbTrendPoint
+  point: TrendPoint
   svgX: number   // relative X inside the SVG element (0-560)
 }
 
@@ -49,8 +67,12 @@ function Tooltip({ tip, containerWidth }: TooltipProps): JSX.Element {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function CostChart(): JSX.Element {
-  const [points, setPoints]  = useState<DbTrendPoint[]>([])
+interface CostChartProps {
+  featureName: string
+}
+
+export function CostChart({ featureName }: CostChartProps): JSX.Element {
+  const [points, setPoints]  = useState<TrendPoint[]>([])
   const [days, setDays]      = useState<30 | 14 | 7>(30)
   const [tip, setTip]        = useState<TooltipState | null>(null)
   const [loading, setLoading] = useState(true)
@@ -67,21 +89,22 @@ export function CostChart(): JSX.Element {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await window.pathly.db.trends(days)
-      setPoints(Array.isArray(data) ? data : [])
+      const data = await window.pathly.db.trends(featureName, days)
+      const raw = data?.trends ?? []
+      setPoints(raw.map(bucketToPoint))
     } catch {
       setPoints([])
     } finally {
       setLoading(false)
     }
-  }, [days])
+  }, [featureName, days])
 
   useEffect(() => { load() }, [load])
 
   const totalCost = points.reduce((s, p) => s + p.cost_usd, 0)
   const totalSpans = points.reduce((s, p) => s + p.span_count, 0)
 
-  const handleHover = useCallback((p: DbTrendPoint | null, svgX: number) => {
+  const handleHover = useCallback((p: TrendPoint | null, svgX: number) => {
     setTip(p ? { point: p, svgX } : null)
   }, [])
 

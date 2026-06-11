@@ -1,0 +1,80 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Section ─────────────────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionHeading {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ── Heatmap grid ─────────────────────────────────────────────── */
+.heatmapGrid {
+  display: grid;
+  grid-template-columns: repeat(18, 1fr);
+  gap: 3px;
+}
+
+.heatmapCell {
+  aspect-ratio: 1;
+  border-radius: var(--radius-xs);
+  transition: opacity 150ms ease-out;
+}
+
+.heatmapCell:hover {
+  opacity: 0.8;
+}
+
+.heatmapCell[data-level="0"] { background: var(--heatmap-level-0); }
+.heatmapCell[data-level="1"] { background: var(--heatmap-level-1); }
+.heatmapCell[data-level="2"] { background: var(--heatmap-level-2); }
+.heatmapCell[data-level="3"] { background: var(--heatmap-level-3); }
+.heatmapCell[data-level="4"] { background: var(--heatmap-level-4); }
+
+/* ── CSV button ───────────────────────────────────────────────── */
+.csvBtn {
+  height: 28px;
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+  border: var(--border);
+  background: var(--bg-surface1);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  align-self: flex-start;
+}
+
+.csvBtn:hover {
+  background: var(--btn-b-hover-bg);
+  border-color: var(--btn-b-hover-border);
+  color: var(--btn-b-hover-color);
+}
+
+.csvBtn:active {
+  background: var(--btn-b-active-bg);
+}
+
+.csvBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

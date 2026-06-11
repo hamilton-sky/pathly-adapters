@@ -264,8 +264,10 @@ def record_activity_endpoint():
 def trends_endpoint():
     """Return daily aggregate trend data for a feature."""
     feature = request.args.get("feature")
-    if not feature:
+    if feature is None:
         return jsonify({"error": "Missing required query param: feature"}), 400
+    if not feature.strip():
+        return jsonify({"trends": []}), 200
 
     days = request.args.get("days", 126, type=int)
     days = max(1, min(days, 365))

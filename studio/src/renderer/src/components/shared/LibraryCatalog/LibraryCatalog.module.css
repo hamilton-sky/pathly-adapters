@@ -424,6 +424,7 @@
 }
 .newCatInput {
   flex: 1;
+  min-width: 0;
   background: var(--bg-base);
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
@@ -434,6 +435,7 @@
   outline: none;
 }
 .newCatConfirm {
+  flex-shrink: 0;
   background: var(--accent);
   border: none;
   border-radius: var(--radius-sm);
@@ -446,6 +448,7 @@
   white-space: nowrap;
 }
 .newCatCancelBtn {
+  flex-shrink: 0;
   background: none;
   border: none;
   color: var(--text-muted);

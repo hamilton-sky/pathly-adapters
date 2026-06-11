@@ -68,7 +68,7 @@ export function DBExplorer(): JSX.Element {
     <div className={styles.panel}>
       <DBExplorerHeader viewMode={viewMode} onViewMode={setViewMode} onRefresh={load} />
       <StatsStrip stats={stats} features={features} />
-      <CostChart />
+      <CostChart featureName="" />
       {loading
         ? <div className={styles.loading}>Loading…</div>
         : viewMode === 'grid'

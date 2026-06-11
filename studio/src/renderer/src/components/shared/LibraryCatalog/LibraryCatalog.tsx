@@ -635,9 +635,10 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
           if (e.key === 'Enter') void handleCreateCategory()
           if (e.key === 'Escape') { setShowCatForm(false); setCatName('') }
         }}
+        onBlur={() => { if (!catName.trim()) { setShowCatForm(false); setCatName('') } }}
       />
-      <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateCategory()}>Create</button>
-      <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowCatForm(false); setCatName('') }}>{'✕'}</button>
+      <button type="button" className={styles.newCatConfirm} onMouseDown={e => e.preventDefault()} onClick={() => void handleCreateCategory()}>Create</button>
+      <button type="button" className={styles.newCatCancelBtn} onMouseDown={e => e.preventDefault()} onClick={() => { setShowCatForm(false); setCatName('') }}>{'✕'}</button>
     </div>
   )
 
@@ -653,9 +654,10 @@ function GroupSection({ group, context, collapseKey, onOpenSkill, onOpenFlow, on
           if (e.key === 'Enter') void handleCreateItem()
           if (e.key === 'Escape') { setShowItemForm(false); setItemFormName('') }
         }}
+        onBlur={() => { if (!itemFormName.trim()) { setShowItemForm(false); setItemFormName('') } }}
       />
-      <button type="button" className={styles.newCatConfirm} onClick={() => void handleCreateItem()}>Create</button>
-      <button type="button" className={styles.newCatCancelBtn} onClick={() => { setShowItemForm(false); setItemFormName('') }}>{'✕'}</button>
+      <button type="button" className={styles.newCatConfirm} onMouseDown={e => e.preventDefault()} onClick={() => void handleCreateItem()}>Create</button>
+      <button type="button" className={styles.newCatCancelBtn} onMouseDown={e => e.preventDefault()} onClick={() => { setShowItemForm(false); setItemFormName('') }}>{'✕'}</button>
     </div>
   )
 
