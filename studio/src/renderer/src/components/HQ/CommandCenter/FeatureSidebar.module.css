@@ -15,7 +15,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 40px;
+  height: 42px;
   padding: 0 8px 0 14px;
   border-bottom: var(--border);
   flex-shrink: 0;
@@ -62,12 +62,33 @@
 /* Collapsed rail */
 .sbRail {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   padding: 10px 0;
+}
+
+.sbRail::-webkit-scrollbar { display: none; }
+
+/* Collapsed header: same fixed height as expanded, button + count stacked */
+.collapsed .sbHead {
+  flex-direction: column;
+  height: 42px;
+  padding: 0 8px;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+}
+
+.collapsed .sbCollapse { margin-left: 0; }
+
+.sbCountTiny {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  color: var(--text-muted);
 }
 
 .railbtn {

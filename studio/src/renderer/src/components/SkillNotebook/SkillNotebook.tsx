@@ -62,7 +62,7 @@ export default function SkillNotebookPanel() {
             )}
           </div>
           <div className={styles.legend}>
-            <span className={styles.legendItem}><ChevronsUp size={12} /><b>Drag a cell or ⌘↑/↓</b> to move cells</span>
+            <span className={styles.legendItem}><ChevronsUp size={12} /><b>⌘↑/↓</b> to move cells</span>
             <span className={styles.legendItem}><Plus size={12} /><b>Insert</b> a new cell, or drag from the catalog</span>
             <span className={styles.legendItem}><Copy size={12} /><b>⋯ menu</b> — duplicate · convert · delete</span>
             <span className={styles.legendItem}><Sparkles size={12} /><b>Select text</b> → new cell from selection</span>

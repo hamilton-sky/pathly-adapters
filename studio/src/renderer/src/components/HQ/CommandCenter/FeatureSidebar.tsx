@@ -31,6 +31,7 @@ function CollapsedRail(p: FeatureSidebarProps) {
         >
           <PanelLeft size={15} />
         </button>
+        <span className={s.sbCountTiny}>{p.features.length}</span>
       </div>
       <div className={s.sbRail}>
         {p.features.map((f) => {
