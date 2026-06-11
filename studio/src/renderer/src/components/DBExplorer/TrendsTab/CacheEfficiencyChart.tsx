@@ -60,7 +60,7 @@ export function CacheEfficiencyChart({ events }: CacheEfficiencyChartProps): JSX
 
   const hasAnyData = points.some((p) => p.rate !== null)
   const summaryLabel =
-    overallRate === null ? 'No cache data' : `Overall: ${overallRate.toFixed(1)}%`
+    overallRate === null ? 'No cache data' : `${overallRate.toFixed(1)}% overall cache hit rate`
 
   return (
     <div className={styles.cacheChartWrapper}>

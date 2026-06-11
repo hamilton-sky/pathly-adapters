@@ -1,2 +1,2 @@
 RESULT: PASS
-Reviewed: conversation 2 complete — TrendsTab components, useTrends, trendUtils, DailyCostChart, ActivityHeatmap; all line limits met; no inline styles; typecheck clean
+Reviewed: conversation 3 complete — CacheEfficiencyChart (connectNulls=false on Line, null gaps per EC-2.1, CSS var color reads), TrendsTab wired into FeatureModal with Trends tab; typecheck clean

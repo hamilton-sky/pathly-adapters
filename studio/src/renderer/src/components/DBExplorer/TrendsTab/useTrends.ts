@@ -68,7 +68,20 @@ export function useTrends(
     return () => { cancelled = true }
   }, [featureName])
 
-  const dailyCost = gapFill(buckets)
+  const agentDoneByDate = new Map<string, DbEvent[]>()
+  for (const e of events) {
+    if (e.event_type === 'AGENT_DONE' && Number(e.payload.cost_usd ?? 0) === 0) {
+      const dateKey = e.ts.slice(0, 10)
+      const existing = agentDoneByDate.get(dateKey)
+      if (existing) {
+        existing.push(e)
+      } else {
+        agentDoneByDate.set(dateKey, [e])
+      }
+    }
+  }
+
+  const dailyCost = gapFill(buckets, { agentDoneByDate, pricingTable })
   const heatmapCells = buildHeatmap(buckets)
   const csvRows = buildCsvRows(events, featureName, pricingTable)
 

@@ -194,9 +194,8 @@ feature without leaving the modal.
 **Acceptance Criteria:**
 - [ ] `TabId` union in `FeatureModal.tsx` includes `'trends'`
 - [ ] The `tabs` array includes `{ id: 'trends', label: 'Trends' }` entry
-- [ ] Selecting the Trends tab renders `<TrendsTab events={data.rawEvents} pricingTable={pricingTable} />`
-- [ ] `TrendsTab` props are `{ events: DbEvent[]; pricingTable: PricingTable | null }` — same
-  pattern as `AgentsTab` and `InspectTab`
+- [ ] Selecting the Trends tab renders `<TrendsTab featureName={feature.name} events={data.rawEvents} pricingTable={pricingTable} />`
+- [ ] `TrendsTab` props are `{ featureName: string; events: DbEvent[]; pricingTable: PricingTable | null }` — `featureName` is required for the IPC call and CSV filename
 - [ ] `npm run typecheck` passes for the modified `FeatureModal.tsx`
 - [ ] Opening and switching to the Trends tab does not affect the behavior of any existing tab
 

@@ -16,7 +16,15 @@ export function addDays(dateStr: string, n: number): string {
   return d.toLocaleDateString('en-CA')
 }
 
-export function gapFill(buckets: DailyTrendBucket[]): DailyCostPoint[] {
+type GapFillContext = {
+  agentDoneByDate: Map<string, DbEvent[]>
+  pricingTable: PricingTable | null
+}
+
+export function gapFill(
+  buckets: DailyTrendBucket[],
+  ctx?: GapFillContext,
+): DailyCostPoint[] {
   if (buckets.length === 0) return []
 
   const byDate = new Map<string, DailyTrendBucket>()
@@ -32,10 +40,23 @@ export function gapFill(buckets: DailyTrendBucket[]): DailyCostPoint[] {
     const b = byDate.get(cur)
     if (b) {
       const hasEstimated = b.has_estimated_rows === 1
+      let costEstimated = 0
+      if (hasEstimated && ctx?.pricingTable) {
+        const dayEvents = ctx.agentDoneByDate.get(cur) ?? []
+        for (const e of dayEvents) {
+          const result = computeCost(
+            String(e.payload.model ?? ''),
+            Number(e.payload.input_tokens ?? 0),
+            Number(e.payload.total_tokens ?? 0) - Number(e.payload.input_tokens ?? 0),
+            ctx.pricingTable,
+          )
+          costEstimated += result.cost ?? 0
+        }
+      }
       result.push({
         date: cur,
         costReported: b.cost_usd_reported,
-        costEstimated: 0,
+        costEstimated,
         hasEstimated,
       })
     } else {
