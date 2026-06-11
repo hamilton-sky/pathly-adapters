@@ -1,4 +1,5 @@
-import type { Message, Feature, BoardScope, MessageType, Stage, QuestionOption, AgentId } from '../components/HQ/CommandCenter/types'
+import type { Message, Feature, FeatureStatus, BoardScope, MessageType, Stage, QuestionOption, AgentId } from '../components/HQ/CommandCenter/types'
+import { readFile, listDir } from '../services/pathlyApi'
 
 export const COMMS_BASE = 'http://localhost:8765'
 
@@ -220,17 +221,77 @@ export async function apiDelete(messageId: string): Promise<boolean> {
   }
 }
 
-// ── Feature list helper ───────────────────────────────────────────────
+// ── Feature list + per-feature enrichment from STATE.json ─────────────
 
-export function buildFeature(id: string): Feature {
+interface FeatureState {
+  current?: string
+  convs_done?: number
+  convs_total?: number
+}
+
+// FSM state name → kit Stage (the card's 6-stage colour vocabulary).
+const STAGE_MAP: Record<string, Stage> = {
+  STORM: 'PLANNING', STORMING: 'PLANNING',
+  PLAN: 'PLANNING', PLANNING: 'PLANNING',
+  DESIGN: 'PLANNING', DESIGNING: 'PLANNING',
+  BUILD: 'BUILDING', BUILDING: 'BUILDING',
+  REVIEW: 'REVIEWING', REVIEWING: 'REVIEWING',
+  TEST: 'TESTING', TESTING: 'TESTING',
+  RETRO: 'RETRO', RETROSPECTIVE: 'RETRO',
+  DONE: 'DONE',
+}
+
+function toStage(current: string | undefined): Stage {
+  if (!current) return 'PLANNING'
+  return STAGE_MAP[current.toUpperCase()] ?? 'PLANNING'
+}
+
+const STAGE_AGENT: Record<Stage, AgentId> = {
+  PLANNING: 'architect',
+  BUILDING: 'builder',
+  REVIEWING: 'reviewer',
+  TESTING: 'tester',
+  RETRO: 'retro',
+  DONE: 'retro',
+}
+
+// An open feedback file means the stage is blocked on a human/agent response.
+const BLOCKER_FILES = new Set([
+  'REVIEW_FAILURES.md', 'TEST_FAILURES.md',
+  'HUMAN_QUESTIONS.md', 'IMPL_QUESTIONS.md', 'DESIGN_QUESTIONS.md',
+])
+
+/** Read a feature's STATE.json (filesystem) — current stage + conversation count. */
+export async function fetchFeatureState(projectPath: string, featureId: string): Promise<FeatureState | null> {
+  try {
+    const raw = await readFile(`${projectPath}/pathly/plans/${featureId}/STATE.json`)
+    if (!raw) return null
+    return JSON.parse(raw) as FeatureState
+  } catch {
+    return null
+  }
+}
+
+/** A feature is blocked when its feedback/ folder holds an open failure/question file. */
+export async function featureBlocked(projectPath: string, featureId: string): Promise<boolean> {
+  try {
+    const files = await listDir(`${projectPath}/pathly/plans/${featureId}/feedback`).catch(() => [] as string[])
+    return files.some((f) => BLOCKER_FILES.has(f))
+  } catch {
+    return false
+  }
+}
+
+export function buildFeature(id: string, state?: FeatureState | null, blocked = false): Feature {
+  const stage = toStage(state?.current)
+  const status: FeatureStatus = stage === 'DONE' ? 'done' : blocked ? 'blocked' : 'idle'
   return {
     id,
-    stage: 'PLANNING',
-    conv: 0,
-    status: 'idle',
-    agent: 'builder',
+    stage,
+    conv: state?.convs_done ?? 0,
+    status,
+    agent: STAGE_AGENT[stage],
     last: '',
     scope: { feature: true, project: true, global: true },
-    // TODO: enrich stage/status/agent/last from GET /status?topic=<id>&project_root=<root>
   }
 }

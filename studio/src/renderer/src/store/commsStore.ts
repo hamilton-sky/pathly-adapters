@@ -9,6 +9,8 @@ import {
   apiDelete,
   scopeToParams,
   buildFeature,
+  fetchFeatureState,
+  featureBlocked,
 } from './commsApi'
 import { listDirs } from '../services/pathlyApi'
 
@@ -71,7 +73,16 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       const plansDir = `${projectPath}/pathly/plans`
       const names = await listDirs(plansDir).catch(() => [] as string[])
       const filtered = names.filter((n) => n !== '.archive')
-      const features: Feature[] = filtered.map(buildFeature)
+      // Enrich each feature from its STATE.json (stage + conv) and feedback/ (blocked).
+      const features: Feature[] = await Promise.all(
+        filtered.map(async (id) => {
+          const [state, blocked] = await Promise.all([
+            fetchFeatureState(projectPath, id),
+            featureBlocked(projectPath, id),
+          ])
+          return buildFeature(id, state, blocked)
+        }),
+      )
       set({ features })
     } catch {
       // leave existing features list intact on error
