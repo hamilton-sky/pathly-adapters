@@ -1,0 +1,149 @@
+.feat {
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface0);
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.main { border-color: var(--accent-border); }
+
+.featBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.main .featBar { border-left-color: var(--accent); }
+.featBar:hover  { background: var(--bg-surface1); }
+
+/* Status dot */
+.featStdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* CSS class names can't start with a number — use st_ prefix for status variants */
+.st_running { background: var(--state-building); box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-building) 22%, transparent); }
+.st_idle    { background: var(--text-muted); }
+.st_blocked { background: var(--orange); box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 22%, transparent); }
+.st_done    { background: var(--green); }
+
+.featName {
+  font: 600 12px/1.2 var(--font-family-mono);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.featBadges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.featBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  font: 600 9px/1 var(--font-family-mono);
+}
+
+.msg { background: var(--accent-bg); color: var(--accent); }
+.blk { background: var(--orange-bg); color: var(--orange); }
+
+.featChev {
+  color: var(--text-muted);
+  display: inline-flex;
+}
+
+.featBody {
+  padding: 0 11px 11px 22px;
+  display: none;
+}
+
+.open .featBody { display: block; }
+
+.featStage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 8px;
+}
+
+.stg {
+  font: 600 9px/1 var(--font-family-mono);
+  letter-spacing: 0.05em;
+}
+
+/* Stage color via data-stage */
+.stg[data-stage='PLANNING']  { color: var(--state-planning); }
+.stg[data-stage='BUILDING']  { color: var(--state-building); }
+.stg[data-stage='REVIEWING'] { color: var(--state-reviewing); }
+.stg[data-stage='TESTING']   { color: var(--state-testing); }
+.stg[data-stage='RETRO']     { color: var(--state-retro); }
+.stg[data-stage='DONE']      { color: var(--state-done); }
+
+.featConv {
+  color: var(--text-muted);
+  font: 10px/1 var(--font-family-mono);
+}
+
+.featLast {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.featActs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.featAct {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font: 500 11px/1 var(--font-family-base);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.featAct:hover { color: var(--accent); border-color: var(--accent-border); background: var(--btn-b-hover-bg); }
+
+/* "Main feature" — non-interactive chip */
+.mainChip {
+  cursor: default;
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+.mainChip:hover { color: var(--accent); border-color: var(--accent-border); background: var(--bg-base); }
+
+.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.primary:hover { filter: brightness(1.06); color: #fff; }
+
+.warn { color: var(--orange); border-color: var(--orange-border); }
+.warn:hover { background: var(--orange-bg); }

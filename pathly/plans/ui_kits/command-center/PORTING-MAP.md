@@ -101,7 +101,7 @@ to existing tokens. This is the bulk of the inline-style removal and it keeps fu
 | `post(key,type,text)` | `POST /comms/post` | optimistic append, reconcile on echo |
 | `answer(fid,mid,opt)` | `POST /comms/answer` | |
 | `resolve(mid, block\|note\|ignore)` | `POST /comms/acknowledge` (+ `POST /comms/post` decision on `note`) | mirrors SPEC §9 flow |
-| `toggleScope(fid,scope)` | board_scope set | ⚠ **gap:** Phase-1 added `get/set_board_scope` query helpers but verify an HTTP route exists; add `POST /comms/scope` if not. |
+| `toggleScope(fid,scope)` | `GET/POST /comms/scope` ✅ | **Route added 2026-06-11** (`comms.py`, tested in `tests/test_comms_scope.py`). `GET /comms/scope?feature=&project_root=` → `{feature,project,global}`; `POST {feature, project_root, scope:{…}}` merges + persists (partial scope flips only named tiers; `project_root` normalized to forward-slash to match injection-time read). Wire `toggleScope` to `POST` it, and hydrate the feature card's `Reads: ☑F ☑P ☑G` from `GET`. |
 | live updates | `GET /events/comms?scope=` (SSE `COMMS_UPDATE`) | subscribe in `useCommsPanel`; route to `commsStore.appendMessage` (mirror `runnerStore` SSE wiring + add `comms_update` to `NotifCategory`). |
 
 ---

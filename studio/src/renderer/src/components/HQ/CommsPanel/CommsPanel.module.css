@@ -1,0 +1,56 @@
+.foot {
+  flex-shrink: 0;
+  border-top: var(--border);
+  padding: 10px 12px;
+  background: var(--bg-mantle);
+}
+
+.scopes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.lbl {
+  font-family: var(--font-family-mono);
+}
+
+.scopeChk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  cursor: pointer;
+  border: var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface0);
+  color: var(--text-muted);
+  font: 500 11px/1 var(--font-family-base);
+  transition: all var(--transition-fast);
+}
+
+.scopeChk[data-on] {
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.box {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1.5px solid var(--text-disabled);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scopeChk[data-on] .box {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}

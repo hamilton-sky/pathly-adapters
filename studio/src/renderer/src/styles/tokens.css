@@ -80,6 +80,10 @@
   --orange: #f97316;
   --purple: #a78bfa;
 
+  /* Reviewing / warning surface — parity with --red-bg / --red-border */
+  --orange-bg:     rgba(249, 115, 22, 0.13);
+  --orange-border: rgba(249, 115, 22, 0.40);
+
   /* --- Border color atoms ----------------------------------------- */
   --border-color:        #283044;
   --border-subtle-color: #1E2433;
@@ -162,6 +166,13 @@
   --comment-blue-swatch:   #60A5FA;  --comment-blue-tint:   rgba(96, 165, 250, 0.22);  --comment-blue-border:   rgba(96, 165, 250, 0.50);
   --comment-purple-swatch: #A78BFA;  --comment-purple-tint: rgba(167, 139, 250, 0.22); --comment-purple-border: rgba(167, 139, 250, 0.50);
   --comment-orange-swatch: #F97316;  --comment-orange-tint: rgba(249, 115, 22, 0.22);  --comment-orange-border: rgba(249, 115, 22, 0.50);
+
+  /* --- Heatmap intensity levels ----------------------------------- */
+  --heatmap-level-0: #1E2433;
+  --heatmap-level-1: rgba(52, 211, 153, 0.18);
+  --heatmap-level-2: rgba(52, 211, 153, 0.38);
+  --heatmap-level-3: rgba(52, 211, 153, 0.62);
+  --heatmap-level-4: var(--green);
 }
 
 /* â”€â”€â”€ Pathly Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -207,6 +218,13 @@
   --comment-blue-swatch:   #1D4ED8;
   --comment-purple-swatch: #7C3AED;
   --comment-orange-swatch: #C2410C;
+
+  /* --- Heatmap intensity levels (light) --------------------------- */
+  --heatmap-level-0: #E2E8F0;
+  --heatmap-level-1: rgba(4, 120, 87, 0.18);
+  --heatmap-level-2: rgba(4, 120, 87, 0.38);
+  --heatmap-level-3: rgba(4, 120, 87, 0.62);
+  --heatmap-level-4: #047857;
 }
 
 /* â”€â”€â”€ Nord â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */

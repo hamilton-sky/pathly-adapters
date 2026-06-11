@@ -299,3 +299,87 @@ def comms_restore():
     except Exception as exc:
         logging.exception("comms_restore error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+# board_scope: project_root is normalized to forward-slash form to match the
+# key used at injection time (runner/comms_context.retrieve_board_context),
+# otherwise a UI-set scope would be stored under a different key than the FSM
+# reads and the toggle would silently have no effect.
+def _norm_project_root(project_root: str) -> str:
+    return project_root.replace("\\", "/").rstrip("/")
+
+
+@bp.route("/comms/scope", methods=["GET"])
+def comms_scope_get():
+    """Return the board_scope for a feature.
+
+    Query params: feature (required), project_root (required).
+    Returns {"feature": bool, "project": bool, "global": bool},
+    defaulting to all-enabled when never set.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import get_board_scope as _get_scope
+
+        feature = request.args.get("feature", "").strip()
+        project_root = request.args.get("project_root", "").strip()
+        if not feature:
+            return jsonify({"error": "Query parameter 'feature' is required"}), 400
+        if not project_root:
+            return jsonify({"error": "Query parameter 'project_root' is required"}), 400
+
+        conn = _get_db()
+        scope = _get_scope(conn, project_root=_norm_project_root(project_root), feature=feature)
+        return jsonify(scope), 200
+    except Exception as exc:
+        logging.exception("comms_scope_get error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/scope", methods=["POST"])
+def comms_scope_set():
+    """Persist the board_scope for a feature.
+
+    Required body fields: feature, project_root, scope (object containing any
+    of 'feature'/'project'/'global' → bool). A partial scope only flips the
+    named keys. Returns the merged, persisted scope.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import (
+            get_board_scope as _get_scope,
+            set_board_scope as _set_scope,
+        )
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        feature = data.get("feature", "")
+        project_root = data.get("project_root", "")
+        scope = data.get("scope")
+        if not isinstance(feature, str) or not feature.strip():
+            return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
+        if not isinstance(project_root, str) or not project_root.strip():
+            return jsonify({"error": "Field 'project_root' must be a non-empty string"}), 400
+        if not isinstance(scope, dict):
+            return jsonify({"error": "Field 'scope' must be an object"}), 400
+
+        allowed = {"feature", "project", "global"}
+        updates = {k: bool(v) for k, v in scope.items() if k in allowed}
+        if not updates:
+            return jsonify({
+                "error": "Field 'scope' must contain at least one of: feature, project, global"
+            }), 400
+
+        conn = _get_db()
+        norm_root = _norm_project_root(project_root)
+        # Merge onto the existing (or default) scope so a partial update leaves
+        # the other tiers untouched.
+        merged = _get_scope(conn, project_root=norm_root, feature=feature)
+        merged.update(updates)
+        _set_scope(conn, project_root=norm_root, feature=feature, scope_dict=merged)
+        return jsonify(merged), 200
+    except Exception as exc:
+        logging.exception("comms_scope_set error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

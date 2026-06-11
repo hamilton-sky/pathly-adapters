@@ -1,0 +1,26 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  margin-bottom: 8px;
+  font: 600 10px/1 var(--font-family-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--bg-surface1);
+}
+
+/* Type-specific tints — used via data-type on the card wrapper */
+.badge[data-type='nudge']     { color: var(--accent);   background: var(--accent-bg); }
+.badge[data-type='status']    { color: var(--text-muted); background: var(--bg-surface1); }
+.badge[data-type='discovery'] { color: var(--blue);     background: var(--badge-body-bg); }
+.badge[data-type='answer']    { color: var(--green);    background: var(--badge-frag-bg); }
+.badge[data-type='task']      { color: var(--purple);   background: color-mix(in srgb, var(--purple) 16%, transparent); }
+.badge[data-type='decision']  { color: var(--accent);   background: var(--accent-bg); }
+.badge[data-type='question']  { color: var(--yellow);   background: var(--badge-integration-bg); }
+.badge[data-type='warning']   { color: var(--orange);   background: var(--orange-bg); }
+.badge[data-type='escalation']{ color: var(--red);      background: var(--red-bg); }
+.badge[data-type='artifact']  { color: var(--runtime);  background: var(--runner-bg); }

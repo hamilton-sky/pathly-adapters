@@ -1,0 +1,22 @@
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font: 600 9px/1 var(--font-family-mono);
+}
+
+.you {
+  background: var(--brand-gradient);
+}
+
+/* Agent color via data-agent — resolves to state tokens, no inline style needed */
+.avatar[data-agent='builder']   { background: var(--state-building); }
+.avatar[data-agent='reviewer']  { background: var(--state-reviewing); }
+.avatar[data-agent='architect'] { background: var(--state-planning); }
+.avatar[data-agent='tester']    { background: var(--state-testing); }
+.avatar[data-agent='retro']     { background: var(--state-retro); }

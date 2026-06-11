@@ -1,0 +1,114 @@
+.sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  background: var(--bg-mantle);
+  border-right: var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  transition: width var(--transition-base);
+}
+
+.collapsed { width: 50px; }
+
+.sbHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 14px;
+  border-bottom: var(--border);
+  flex-shrink: 0;
+}
+
+.sbTitle {
+  font: 600 var(--font-size-sm)/1 var(--font-family-base);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sbCount {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.sbCollapse {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sbCollapse:hover { color: var(--accent); background: var(--bg-surface0); }
+
+.sbList {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Collapsed rail */
+.sbRail {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.railbtn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.railbtn:hover { background: var(--bg-surface0); }
+
+.railBadge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: #fff;
+  font: 600 8px/13px var(--font-family-mono);
+  text-align: center;
+}
+
+.blk.railBadge { background: var(--orange); }
+
+/* Feature status dots (reused in rail) */
+.featStdot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.st_running { background: var(--state-building); box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-building) 22%, transparent); }
+.st_idle    { background: var(--text-muted); }
+.st_blocked { background: var(--orange); box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 22%, transparent); }
+.st_done    { background: var(--green); }
