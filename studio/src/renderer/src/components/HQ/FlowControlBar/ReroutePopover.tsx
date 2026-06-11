@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ADAPTERS } from '../../../lib/adapters.gen'
 import { useRunnerStore } from '../../../store/runnerStore'
 import styles from './ReroutePopover.module.css'
-
-const RUNNER_BASE = 'http://127.0.0.1:8765'
+import { apiFetch } from '../../../lib/config'
 
 interface ReroutePopoverProps {
   onClose: () => void
@@ -34,7 +33,7 @@ export function ReroutePopover({ onClose, onError }: ReroutePopoverProps): JSX.E
   async function handleReroute(): Promise<void> {
     const { topic } = useRunnerStore.getState()
     try {
-      const res = await fetch(`${RUNNER_BASE}/runner/reroute`, {
+      const res = await apiFetch('/runner/reroute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic, adapter: selected }),

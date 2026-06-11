@@ -1,5 +1,5 @@
 """db package — re-exports all public symbols for backward-compatible imports."""
-from .connection import get_db, _conn_cache, _cache_lock, _write_locks
+from .connection import get_db, _write_locks
 from .queries.fsm_events import append_event, read_events, read_last_agent_done
 from .queries.fsm_state import write_state, read_state
 from .queries.runner_state import write_runner_state, read_runner_state, mark_stale_runners

@@ -41,7 +41,8 @@ export default function NotebookCanvas() {
       setSkillNotebookViewMode('editor')
       return
     }
-    const res = await fetch('http://localhost:8765/catalog/all').then(r => r.json()).catch(() => null)
+    const { apiFetch } = await import('../../../lib/config')
+    const res = await apiFetch('/catalog/all').then(r => r.json()).catch(() => null)
     const found = res?.fragments?.find((f: { name: string; path: string }) => f.name === name)
     if (found?.path) {
       setSkillNotebookPath(found.path)

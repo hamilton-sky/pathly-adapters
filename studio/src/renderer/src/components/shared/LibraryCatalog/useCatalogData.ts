@@ -53,7 +53,7 @@ function flowToItem(f: FlowListItem): CatalogItemData {
   }
 }
 
-const FSM = 'http://localhost:8765'
+import { apiFetch } from '../../../lib/config'
 
 /**
  * Fetch the full catalog from the FSM server in one round-trip.
@@ -66,8 +66,8 @@ export function useCatalogData(_pathlyRoot?: string | null, refreshKey?: number)
 
   useEffect(() => {
     Promise.all([
-      fetch(`${FSM}/catalog/all`).then(r => r.json() as Promise<CatalogAllResponse>),
-      fetch(`${FSM}/flows`).then(r => r.json() as Promise<FlowListItem[]>).catch(() => [] as FlowListItem[]),
+      apiFetch('/catalog/all').then(r => r.json() as Promise<CatalogAllResponse>),
+      apiFetch('/flows').then(r => r.json() as Promise<FlowListItem[]>).catch(() => [] as FlowListItem[]),
     ]).then(([data, flows]) => {
       const next: CatalogGroup[] = []
       if (flows?.length)

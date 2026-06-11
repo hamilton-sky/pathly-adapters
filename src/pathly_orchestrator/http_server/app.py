@@ -67,6 +67,7 @@ def main() -> None:
     from pathly_orchestrator.http_server import middleware as _middleware
     _middleware._RATE_LIMIT_MAX = settings.rate_limit_max
     _middleware._RATE_LIMIT_WINDOW = settings.rate_limit_window
+    _middleware.configure(cors_origin=settings.cors_origin, api_secret=settings.api_secret)
     # Also keep the package-level names in sync for backward compat
     _self._RATE_LIMIT_MAX = settings.rate_limit_max
     _self._RATE_LIMIT_WINDOW = settings.rate_limit_window

@@ -15,6 +15,17 @@ logger = logging.getLogger("pathly.http")
 
 _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 120  # requests per window per IP
+
+# Configurable at startup by app.main() via configure()
+_cors_origin: str = "*"
+_api_secret: str = ""
+
+
+def configure(cors_origin: str, api_secret: str) -> None:
+    """Apply runtime settings — called once by app.main() after Settings.from_env()."""
+    global _cors_origin, _api_secret
+    _cors_origin = cors_origin
+    _api_secret = api_secret
 _rate_counters: dict[str, collections.deque] = {}
 _rate_lock = threading.Lock()
 
@@ -103,10 +114,18 @@ def _log_request():
     if request.method == "OPTIONS":
         from flask import Response as _Resp
         resp = _Resp()
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
-        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        if _cors_origin:
+            resp.headers["Access-Control-Allow-Origin"] = _cors_origin
+            resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Pathly-Secret"
+            resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return resp
+
+    # Auth check — skip for health (already exited above) and read-only SSE streams
+    if _api_secret and not request.path.startswith("/events/"):
+        token = request.headers.get("X-Pathly-Secret") or request.args.get("token", "")
+        if token != _api_secret:
+            from flask import jsonify as _jsonify
+            return _jsonify({"error": "unauthorized"}), 401
 
     if flags.rate_limiting and not _check_rate_limit(request.remote_addr or "unknown"):
         _inc("pathly_requests_rate_limited_total")
@@ -133,8 +152,8 @@ def _log_response(response):
     )
     if response.status_code >= 500:
         _inc("pathly_request_errors_total")
-    # Allow renderer (Vite dev server at localhost:5173 or Electron) to call the API
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    if _cors_origin:
+        response.headers["Access-Control-Allow-Origin"] = _cors_origin
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Pathly-Secret"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response

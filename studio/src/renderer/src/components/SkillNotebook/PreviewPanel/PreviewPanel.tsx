@@ -5,6 +5,7 @@ import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './PreviewPanel.module.css'
 import PreviewSection from './PreviewSection/PreviewSection'
+import { apiFetch } from '../../../lib/config'
 
 export default function PreviewPanel() {
   const {
@@ -31,7 +32,7 @@ export default function PreviewPanel() {
         .filter(c => c.type === 'fragment')
         .map(c => ({ type: 'fragment', fragmentName: (c as any).fragmentName }))
 
-      fetch('http://localhost:8765/skills/preview', {
+      apiFetch('/skills/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

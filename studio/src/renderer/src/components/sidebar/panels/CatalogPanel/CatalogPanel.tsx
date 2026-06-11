@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import styles from './CatalogPanel.module.css'
 import FragmentCard from './FragmentCard/FragmentCard'
+import { apiFetch } from '../../../../lib/config'
 
 interface Fragment {
   name: string
@@ -14,7 +15,7 @@ export default function CatalogPanel() {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    fetch('http://localhost:8765/skills/catalog')
+    apiFetch('/skills/catalog')
       .then(r => r.json())
       .then(setFragments)
       .catch(() => {})

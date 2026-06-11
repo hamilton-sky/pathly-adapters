@@ -1,7 +1,6 @@
 import { useRunnerStore } from '../../../store/runnerStore'
 import styles from './AbortConfirmStrip.module.css'
-
-const RUNNER_BASE = 'http://127.0.0.1:8765'
+import { apiFetch } from '../../../lib/config'
 
 interface AbortConfirmStripProps {
   onDone: () => void
@@ -13,7 +12,7 @@ export function AbortConfirmStrip({ onDone, onCancel, onError }: AbortConfirmStr
   async function handleConfirm(): Promise<void> {
     const { topic } = useRunnerStore.getState()
     try {
-      const res = await fetch(`${RUNNER_BASE}/runner/abort`, {
+      const res = await apiFetch('/runner/abort', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic }),

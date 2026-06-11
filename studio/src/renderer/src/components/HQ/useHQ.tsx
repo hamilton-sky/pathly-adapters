@@ -8,6 +8,7 @@ import { useAutomationStore } from '../../store/automationStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import type { TerminalTab } from '../../types/terminal'
 import { useStore } from '../../store'
+import { apiFetch } from '../../lib/config'
 import { useUiStore } from '../../store/uiStore'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext, invalidatePathlyContext, subscribeToMenuUpdates, type PushedMenu } from '../../lib/pathlyContext'
@@ -295,7 +296,7 @@ export function useHQ() {
               void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id, label)
                 .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv, initialInput))
                 .then(() => {
-                  fetch('http://127.0.0.1:8765/runner/terminal/started', {
+                  apiFetch('/runner/terminal/started', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ tab_id, run_id, topic: activeTopic, pid: 0 }),
@@ -405,8 +406,7 @@ export function useHQ() {
   // Fallback: if no tab is open yet, ask the server which feature was last active.
   useEffect(() => {
     if (activeTopic || !projectPath) return   // tab already set — no need to query
-    const url = `http://127.0.0.1:8765/status?project_root=${encodeURIComponent(projectPath)}`
-    fetch(url)
+    apiFetch(`/status?project_root=${encodeURIComponent(projectPath)}`)
       .then((r) => r.json())
       .then((data: Record<string, unknown>) => {
         const feature = data.feature as string | undefined
@@ -785,7 +785,7 @@ export function useHQ() {
   function handleAgentAnswer(answer: string): void {
     if (!activeTopic) return
     useRunnerStore.getState().setAgentQuestion(null)
-    fetch('http://127.0.0.1:8765/runner/agent-answer', {
+    apiFetch('/runner/agent-answer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic: activeTopic, answer }),

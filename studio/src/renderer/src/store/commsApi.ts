@@ -1,7 +1,7 @@
 import type { Message, Feature, FeatureStatus, BoardScope, MessageType, Stage, QuestionOption, AgentId } from '../components/HQ/CommandCenter/types'
 import { readFile, listDir } from '../services/pathlyApi'
 
-export const COMMS_BASE = 'http://localhost:8765'
+import { apiFetch } from '../lib/config'
 
 const KNOWN_AGENT_IDS = new Set<string>(['you', 'builder', 'reviewer', 'architect', 'tester', 'retro'])
 
@@ -130,7 +130,7 @@ export async function fetchBoard(
 ): Promise<Message[]> {
   try {
     const params = new URLSearchParams({ feature, board, scope })
-    const r = await fetch(`${COMMS_BASE}/comms?${params}`)
+    const r = await apiFetch(`/comms?${params}`)
     if (!r.ok) return []
     const rows = await r.json() as CommsRow[]
     return rows.map(rowToMessage)
@@ -148,7 +148,7 @@ export async function apiPost(
   stage?: Stage | null,
 ): Promise<string | null> {
   try {
-    const r = await fetch(`${COMMS_BASE}/comms/post`, {
+    const r = await apiFetch(`/comms/post`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ feature, from: 'human', type, text, board, scope, stage: stage ?? null }),
@@ -167,7 +167,7 @@ export async function apiAnswer(
   optionId?: string,
 ): Promise<boolean> {
   try {
-    const r = await fetch(`${COMMS_BASE}/comms/answer`, {
+    const r = await apiFetch(`/comms/answer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question_id: questionId, answer, option_id: optionId }),
@@ -180,7 +180,7 @@ export async function apiAnswer(
 
 export async function apiAcknowledge(messageId: string, agent: string): Promise<boolean> {
   try {
-    const r = await fetch(`${COMMS_BASE}/comms/acknowledge`, {
+    const r = await apiFetch(`/comms/acknowledge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message_id: messageId, agent }),
@@ -197,7 +197,7 @@ export async function apiToggleScope(
   scope: { feature: boolean; project: boolean; global: boolean },
 ): Promise<boolean> {
   try {
-    const r = await fetch(`${COMMS_BASE}/comms/scope`, {
+    const r = await apiFetch(`/comms/scope`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ feature, project_root: projectRoot, scope }),
@@ -210,7 +210,7 @@ export async function apiToggleScope(
 
 export async function apiDelete(messageId: string): Promise<boolean> {
   try {
-    const r = await fetch(`${COMMS_BASE}/comms/delete`, {
+    const r = await apiFetch(`/comms/delete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message_id: messageId }),

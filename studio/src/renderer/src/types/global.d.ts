@@ -123,6 +123,7 @@ declare global {
         onOutput: (cb: (line: string) => void) => () => void
         openSlide: (filePath: string) => Promise<void>
         dsPort: () => Promise<number>
+        apiConfig: () => Promise<{ base: string; secret: string }>
       }
       fsm: {
         ping: () => Promise<boolean>

@@ -5,6 +5,7 @@ import { useUiStore } from '../../store/uiStore'
 import type { PathlyItem, PathlyCanvasDragItem, PathlyReorgDragItem } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../types'
 import { listDir, listDirs } from '../../services/pathlyApi'
+import { apiFetch } from '../../lib/config'
 import { useProjectFiles } from '../../hooks/useProjectFiles'
 import { usePlanFiles } from '../../hooks/usePlanFiles'
 import { WorkspacePanel } from './panels/WorkspacePanel'
@@ -511,15 +512,15 @@ export function Sidebar(): JSX.Element | null {
 
   async function deleteItemViaAPI(item: CatalogItemData, type: CatalogGroup['type']): Promise<void> {
     if (type === 'flow') {
-      await fetch(`http://localhost:8765/flows/${encodeURIComponent(item.name)}`, { method: 'DELETE' })
+      await apiFetch(`/flows/${encodeURIComponent(item.name)}`, { method: 'DELETE' })
     } else {
-      await fetch(`http://localhost:8765/catalog/item?type=${type}&name=${encodeURIComponent(item.name)}`, { method: 'DELETE' })
+      await apiFetch(`/catalog/item?type=${type}&name=${encodeURIComponent(item.name)}`, { method: 'DELETE' })
     }
   }
 
   async function createNewCatalogItem(type: CatalogGroup['type'], category?: string, name?: string): Promise<void> {
     if (!name?.trim()) return
-    await fetch('http://localhost:8765/catalog/item/new', {
+    await apiFetch('/catalog/item/new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, name: name.trim(), category: category || '' }),
@@ -527,7 +528,7 @@ export function Sidebar(): JSX.Element | null {
   }
 
   async function moveCatalogItem(item: CatalogItemData, type: CatalogGroup['type'], newCategory: string): Promise<void> {
-    const res = await fetch('http://localhost:8765/catalog/item/move', {
+    const res = await apiFetch('/catalog/item/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, name: item.name, newCategory }),
@@ -539,7 +540,7 @@ export function Sidebar(): JSX.Element | null {
   }
 
   async function renameCatalogItem(item: CatalogItemData, type: CatalogGroup['type'], newStem: string): Promise<void> {
-    const res = await fetch('http://localhost:8765/catalog/item/rename', {
+    const res = await apiFetch('/catalog/item/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, name: item.name, newName: newStem }),
@@ -551,7 +552,7 @@ export function Sidebar(): JSX.Element | null {
   }
 
   async function renameCatalogCategory(type: CatalogGroup['type'], oldName: string, newName: string): Promise<void> {
-    const res = await fetch('http://localhost:8765/catalog/category/rename', {
+    const res = await apiFetch('/catalog/category/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, oldName, newName }),
@@ -627,14 +628,14 @@ export function Sidebar(): JSX.Element | null {
             onRenameItem={(item, type, stem) => renameCatalogItem(item, type, stem)}
             onRenameCategory={(type, old, n) => renameCatalogCategory(type, old, n)}
             onNewCategory={async (type, name) => {
-              await fetch('http://localhost:8765/catalog/category/new', {
+              await apiFetch('/catalog/category/new', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ type, name }),
               })
             }}
             onDeleteCategory={async (type, category) => {
-              await fetch(`http://localhost:8765/catalog/category?type=${type}&name=${encodeURIComponent(category)}`, { method: 'DELETE' })
+              await apiFetch(`/catalog/category?type=${type}&name=${encodeURIComponent(category)}`, { method: 'DELETE' })
             }}
           />
         )}

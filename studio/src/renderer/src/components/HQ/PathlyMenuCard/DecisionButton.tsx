@@ -29,7 +29,8 @@ export function DecisionButton({ item, onError, onDone, onRevert }: DecisionButt
     onDone()
     const { topic } = useRunnerStore.getState()
     try {
-      const res = await fetch('http://127.0.0.1:8765/runner/decision', {
+      const { apiFetch } = await import('../../../lib/config')
+      const res = await apiFetch('/runner/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic, decision: item.id }),

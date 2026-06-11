@@ -3,8 +3,23 @@
 from __future__ import annotations
 
 import os
+import secrets as _secrets_mod
 import sys
 from dataclasses import dataclass
+
+
+def _load_or_create_secret() -> str:
+    """Read the shared API secret from ~/.pathly/server_secret.txt, creating it if absent."""
+    from pathlib import Path
+    secret_file = Path.home() / ".pathly" / "server_secret.txt"
+    secret_file.parent.mkdir(parents=True, exist_ok=True)
+    if secret_file.exists():
+        val = secret_file.read_text().strip()
+        if val:
+            return val
+    val = _secrets_mod.token_hex(32)
+    secret_file.write_text(val)
+    return val
 
 
 @dataclass(frozen=True)
@@ -12,6 +27,7 @@ class Settings:
     host: str
     port: int
     cors_origin: str
+    api_secret: str
     project_root: str
     rate_limit_max: int
     rate_limit_window: int
@@ -35,6 +51,7 @@ class Settings:
             host=os.environ.get("PATHLY_FSM_HTTP_HOST", "127.0.0.1"),
             port=port,
             cors_origin=os.environ.get("PATHLY_CORS_ORIGIN", "*"),
+            api_secret=os.environ.get("PATHLY_API_SECRET") or _load_or_create_secret(),
             project_root=os.environ.get("PATHLY_PROJECT_ROOT", ""),
             rate_limit_max=int(os.environ.get("PATHLY_RATE_LIMIT_MAX", "120")),
             rate_limit_window=int(os.environ.get("PATHLY_RATE_LIMIT_WINDOW", "60")),

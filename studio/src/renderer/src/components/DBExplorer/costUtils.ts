@@ -12,8 +12,9 @@ export type CostResult = {
 }
 
 export async function fetchPricingTable(): Promise<PricingTable | null> {
+  const { apiFetch } = await import('../../lib/config')
   try {
-    const res = await fetch('http://127.0.0.1:8765/telemetry/pricing')
+    const res = await apiFetch('/telemetry/pricing')
     if (!res.ok) return null
     return (await res.json()) as PricingTable
   } catch {

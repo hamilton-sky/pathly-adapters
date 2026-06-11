@@ -8,8 +8,6 @@ from pathlib import Path
 import pytest
 
 from pathly_orchestrator.db import (
-    _conn_cache,
-    _cache_lock,
     append_event,
     get_db,
     mark_stale_runners,
@@ -233,14 +231,15 @@ def test_mark_stale_runners(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_concurrent_appends(tmp_path: Path) -> None:
-    conn = get_db()
+    # Each thread must call get_db() for its own per-thread connection.
     errors: list[Exception] = []
 
     def append_50(thread_id: int) -> None:
         try:
+            thread_conn = get_db()
             for i in range(50):
                 append_event(
-                    conn,
+                    thread_conn,
                     _PROJECT_ROOT,
                     "feat-concurrent",
                     {"type": "EV", "ts": f"t-{thread_id}-{i}", "thread": thread_id, "i": i},
@@ -257,6 +256,8 @@ def test_concurrent_appends(tmp_path: Path) -> None:
 
     assert not errors, f"Concurrent append raised: {errors}"
 
+    # Read back from the main thread's connection
+    conn = get_db()
     rows = conn.execute(
         "SELECT seq FROM fsm_events WHERE project_root=? AND feature='feat-concurrent' ORDER BY seq ASC",
         (_PROJECT_ROOT,),

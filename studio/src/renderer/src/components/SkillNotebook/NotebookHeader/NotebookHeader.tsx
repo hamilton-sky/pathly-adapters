@@ -8,6 +8,7 @@ import { Tooltip } from '../../ui'
 import { useSkillNotebookStore, BodyCell } from '../../../store/skillNotebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import { useNotebookAgentActions } from './hooks/useNotebookAgentActions'
+import { apiFetch } from '../../../lib/config'
 import { buildSplitPrompt, buildAnalyzePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import styles from './NotebookHeader.module.css'
@@ -81,7 +82,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
       ? skillNotebookPath.replace(/\\/g, '/').replace(/^.*core\/skills\//, '').replace('.md', '')
       : 'unknown'
     try {
-      const res = await fetch('http://localhost:8765/skills/export', {
+      const res = await apiFetch('/skills/export', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skill: skillKey, fragment_order: fragmentOrder }),
@@ -96,7 +97,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
       .filter(c => c.type === 'body')
       .map(c => ({ heading: (c as BodyCell).heading, content: (c as BodyCell).content }))
     try {
-      const res = await fetch('http://localhost:8765/skills/save', {
+      const res = await apiFetch('/skills/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skill_path: skillNotebookPath, body_cells: bodyCells }),

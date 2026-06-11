@@ -5,8 +5,7 @@ import { AbortConfirmStrip } from './AbortConfirmStrip'
 import { ReroutePopover } from './ReroutePopover'
 import { RunnerBtn } from './RunnerBtn'
 import styles from './FlowControlBar.module.css'
-
-const RUNNER_BASE = 'http://127.0.0.1:8765'
+import { apiFetch } from '../../../lib/config'
 
 type Action = 'start' | 'pause' | 'resume' | 'advance' | 'retry'
 
@@ -23,7 +22,7 @@ export function FlowControlBar(): JSX.Element {
     const { topic, projectRoot } = useRunnerStore.getState()
     const body: Record<string, unknown> = { topic, ...extraBody }
     try {
-      const res = await fetch(`${RUNNER_BASE}/runner/${action}`, {
+      const res = await apiFetch(`/runner/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

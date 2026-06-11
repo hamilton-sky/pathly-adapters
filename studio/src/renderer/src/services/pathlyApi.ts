@@ -14,11 +14,12 @@ export const fsmPing         = (): Promise<boolean>                             
 export const watchStart      = (projectPath: string, topic: string): Promise<void>                           => window.pathly.watch.start(projectPath, topic)
 export const onWatchEvent    = (cb: (data: { path: string; content: string }) => void): (() => void)         => window.pathly.watch.onEvent(cb)
 
-export const FSM_BASE = 'http://localhost:8765'
+export { PATHLY_API_BASE, apiFetch } from '../lib/config'
 
 export async function fetchFlow(name: string): Promise<{ name: string; flow_yaml: string; file_path: string } | null> {
+  const { apiFetch } = await import('../lib/config')
   try {
-    const r = await fetch(`${FSM_BASE}/flows/${encodeURIComponent(name)}`)
+    const r = await apiFetch(`/flows/${encodeURIComponent(name)}`)
     if (!r.ok) return null
     return r.json()
   } catch {
@@ -27,7 +28,8 @@ export async function fetchFlow(name: string): Promise<{ name: string; flow_yaml
 }
 
 export async function saveFlow(name: string, flow_yaml: string): Promise<void> {
-  await fetch(`${FSM_BASE}/flows/${encodeURIComponent(name)}`, {
+  const { apiFetch } = await import('../lib/config')
+  await apiFetch(`/flows/${encodeURIComponent(name)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ flow_yaml }),

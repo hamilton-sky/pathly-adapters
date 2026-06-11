@@ -95,7 +95,8 @@ export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
     // canvas remounts after a view-mode switch (which would wipe manually inserted cells).
     if (skillPath === get().lastAppliedPath) return
     try {
-      const res = await fetch('http://localhost:8765/skills/parse', {
+      const { apiFetch } = await import('../lib/config')
+      const res = await apiFetch('/skills/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skill_path: skillPath }),

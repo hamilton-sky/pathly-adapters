@@ -8,14 +8,42 @@ from pathlib import Path
 
 from .migrations import _run_migrations
 
-_VEC_AVAILABLE: bool = False
-
-_conn_cache: dict[str, sqlite3.Connection] = {}
-_cache_lock = threading.Lock()
-# Per-connection write lock keyed by id(conn).
-# Python's sqlite3 module is not thread-safe for concurrent writes on a shared
-# connection even with check_same_thread=False; this serialises them.
+_VEC_AVAILABLE: bool = False          # set on first connection
+_local = threading.local()             # per-thread connection storage
+_init_lock = threading.Lock()          # guards one-time initialization
+_init_once_done = False
 _write_locks: dict[int, threading.Lock] = {}
+_write_locks_meta = threading.Lock()
+
+
+def _load_vec(conn: sqlite3.Connection) -> bool:
+    """Try to load sqlite_vec into *conn*. Returns True on success."""
+    try:
+        conn.enable_load_extension(True)
+        import sqlite_vec
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+        return True
+    except Exception:
+        try:
+            conn.enable_load_extension(False)
+        except Exception:
+            pass
+        return False
+
+
+def _make_conn(db_path: str) -> sqlite3.Connection:
+    """Open a new SQLite connection with standard PRAGMAs."""
+    conn = sqlite3.connect(db_path, check_same_thread=True)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA cache_size=-4096")   # 4 MB in-process page cache
+    if _VEC_AVAILABLE:
+        _load_vec(conn)
+    return conn
 
 
 def _seed_if_empty(conn: sqlite3.Connection) -> None:
@@ -24,66 +52,93 @@ def _seed_if_empty(conn: sqlite3.Connection) -> None:
 
 
 def _refresh_catalog(conn: sqlite3.Connection) -> None:
-    """Rebuild the catalog_items index on every server start. Never raises."""
     try:
         from pathly_orchestrator.db.queries.catalog_items import rebuild_catalog
         rebuild_catalog(conn)
     except Exception:
-        pass  # never block server start due to catalog failures
+        pass
 
 
 def _refresh_flows(conn: sqlite3.Connection) -> None:
-    """Refresh flow_definitions from filesystem on every server start. Never raises."""
     try:
         from pathly_orchestrator.db.queries.flow_defs import _refresh_flows as _do_refresh
         _do_refresh(conn)
     except Exception:
-        pass  # never block server start
+        pass
+
+
+def _wal_checkpoint_loop(db_path: str) -> None:
+    """Run WAL checkpoint every 5 minutes in a background daemon thread."""
+    import time
+    while True:
+        time.sleep(300)
+        try:
+            conn = sqlite3.connect(db_path, check_same_thread=True)
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            conn.close()
+        except Exception:
+            pass
 
 
 def get_db(_deprecated_path=None) -> sqlite3.Connection:
-    """Return a cached sqlite3.Connection for ~/.pathly/pathly.db.
+    """Return a per-thread sqlite3.Connection for ~/.pathly/pathly.db.
 
-    _deprecated_path is accepted for backward compat but ignored.
-    Always opens ~/.pathly/pathly.db (resolved at call time so tests can patch Path.home()).
+    The first call (any thread) runs one-time initialization: migrations,
+    seed, catalog refresh, flows refresh, and the WAL checkpoint thread.
+    Subsequent calls return (or create) the calling thread's own connection.
     """
+    global _init_once_done, _VEC_AVAILABLE
+
     db_dir = Path.home() / ".pathly"
     db_dir.mkdir(parents=True, exist_ok=True)
     db_path = str(db_dir / "pathly.db")
 
-    with _cache_lock:
-        if db_path in _conn_cache:
-            return _conn_cache[db_path]
-        conn = sqlite3.connect(db_path, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        global _VEC_AVAILABLE
-        try:
-            conn.enable_load_extension(True)
-            import sqlite_vec
-            sqlite_vec.load(conn)
-            conn.enable_load_extension(False)
-            _VEC_AVAILABLE = True
-        except Exception:
-            _VEC_AVAILABLE = False
-            logging.warning("sqlite-vec unavailable — comms board uses recency-only retrieval")
-        _run_migrations(conn, vec_available=_VEC_AVAILABLE)
-        _conn_cache[db_path] = conn
-        conn_id: int = id(conn)
-        _write_locks[conn_id] = threading.Lock()
+    # Create this thread's connection if it doesn't have one yet.
+    if not hasattr(_local, "conn") or _local.conn is None:
+        _local.conn = _make_conn(db_path)
+        with _write_locks_meta:
+            _write_locks[id(_local.conn)] = threading.Lock()
 
-    _seed_if_empty(conn)
-    _refresh_catalog(conn)
-    _refresh_flows(conn)
+    conn = _local.conn
+
+    # One-time initialization -- runs exactly once across all threads.
+    if not _init_once_done:
+        with _init_lock:
+            if not _init_once_done:
+                try:
+                    # Determine vec availability on this first connection.
+                    if _load_vec(conn):
+                        _VEC_AVAILABLE = True
+                    else:
+                        _VEC_AVAILABLE = False
+                        logging.warning(
+                            "sqlite-vec unavailable - comms board uses recency-only retrieval"
+                        )
+                    _run_migrations(conn, vec_available=_VEC_AVAILABLE)
+                    _seed_if_empty(conn)
+                    _refresh_catalog(conn)
+                    _refresh_flows(conn)
+                    threading.Thread(
+                        target=_wal_checkpoint_loop,
+                        args=(db_path,),
+                        daemon=True,
+                        name="pathly-wal-checkpoint",
+                    ).start()
+                finally:
+                    _init_once_done = True
+
     return conn
 
 
 def _get_write_lock(conn: sqlite3.Connection) -> threading.Lock:
-    """Return the write lock for *conn*, keyed by connection identity."""
-    conn_id: int = id(conn)
-    with _cache_lock:
+    """Return the write lock for *conn*.
+
+    With per-thread connections each thread owns its connection, so the lock
+    is never contended. It is kept for backward compatibility with callers
+    that do `with _get_write_lock(conn): conn.execute(...); conn.commit()`.
+    """
+    conn_id = id(conn)
+    with _write_locks_meta:
         if conn_id not in _write_locks:
             _write_locks[conn_id] = threading.Lock()
         return _write_locks[conn_id]

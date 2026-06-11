@@ -29,23 +29,32 @@ def _isolate_db(tmp_path, monkeypatch):
     Patches Path.home() so get_db() writes to tmp_path/.pathly/pathly.db.
     Clears the db connection cache before and after each test.
     """
-    import pathly_orchestrator.db as _db
+    import pathly_orchestrator.db.connection as _conn_mod
 
     fake_home = tmp_path
     (fake_home / ".pathly").mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(Path, "home", staticmethod(lambda: fake_home))
 
-    with _db._cache_lock:
-        _db._conn_cache.clear()
-        _db._write_locks.clear()
+    # Reset per-thread connection and one-time init flag so each test gets a fresh DB.
+    if hasattr(_conn_mod._local, "conn") and _conn_mod._local.conn is not None:
+        try:
+            _conn_mod._local.conn.close()
+        except Exception:
+            pass
+        _conn_mod._local.conn = None
+    with _conn_mod._write_locks_meta:
+        _conn_mod._write_locks.clear()
+    _conn_mod._init_once_done = False
 
     yield
 
-    with _db._cache_lock:
-        for conn in _db._conn_cache.values():
-            try:
-                conn.close()
-            except Exception:
-                pass
-        _db._conn_cache.clear()
-        _db._write_locks.clear()
+    # Cleanup after test.
+    if hasattr(_conn_mod._local, "conn") and _conn_mod._local.conn is not None:
+        try:
+            _conn_mod._local.conn.close()
+        except Exception:
+            pass
+        _conn_mod._local.conn = None
+    with _conn_mod._write_locks_meta:
+        _conn_mod._write_locks.clear()
+    _conn_mod._init_once_done = False

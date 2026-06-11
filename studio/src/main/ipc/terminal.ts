@@ -1,4 +1,5 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
+import { getApiSecret } from '../apiConfig'
 import { join } from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -387,7 +388,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         })
         const doPost = () => fetch('http://127.0.0.1:8765/runner/terminal/result', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Pathly-Secret': getApiSecret() },
           body: postBody,
         })
         doPost().catch(() => setTimeout(() => doPost().catch(() => { /* give up */ }), 1000))

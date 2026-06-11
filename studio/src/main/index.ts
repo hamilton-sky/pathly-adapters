@@ -8,6 +8,7 @@ import { registerWatcherHandlers } from './ipc/watcher'
 import { registerFsmHandlers } from './ipc/fsm'
 import { registerShellHandlers } from './ipc/shell'
 import { registerTerminalHandlers, killAllPtys } from './ipc/terminal'
+import { initApiConfig, getApiSecret, getApiBase } from './apiConfig'
 import { spawn, ChildProcess, execSync } from 'child_process'
 import net from 'net'
 import { getPythonPath } from './python'
@@ -19,6 +20,8 @@ import { registerDbHandlers } from './ipc/db'
 import { autoUpdater } from 'electron-updater'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
+
+initApiConfig()
 
 const DS_MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -79,7 +82,11 @@ function isFsmRunning(): Promise<boolean> {
 
 async function shutdownExistingFsm(): Promise<void> {
   try {
-    await fetch(`${FSM_BASE}/shutdown`, { method: 'POST', signal: AbortSignal.timeout(800) })
+    await fetch(`${FSM_BASE}/shutdown`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(800),
+      headers: { 'X-Pathly-Secret': getApiSecret() },
+    })
     await new Promise((r) => setTimeout(r, 400))
   } catch {
     // Server didn't respond — already gone or too old to have /shutdown
@@ -250,6 +257,7 @@ function registerIpcHandlers(win: BrowserWindow): void {
     win.setTitleBarOverlay({ ...opts, height: 36 })
   })
 
+  ipcMain.handle('shell:apiConfig', () => ({ base: getApiBase(), secret: getApiSecret() }))
   ipcMain.handle('clipboard:read', () => clipboard.readText())
   ipcMain.handle('clipboard:write', (_event, text: string) => { clipboard.writeText(text) })
   ipcMain.handle('clipboard:readImagePath', async () => {

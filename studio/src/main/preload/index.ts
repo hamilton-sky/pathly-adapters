@@ -126,6 +126,7 @@ contextBridge.exposeInMainWorld('pathly', {
     },
     openSlide: (filePath: string): Promise<void> => ipcRenderer.invoke('shell:openSlide', filePath),
     dsPort: (): Promise<number> => ipcRenderer.invoke('shell:dsPort'),
+    apiConfig: (): Promise<{ base: string; secret: string }> => ipcRenderer.invoke('shell:apiConfig'),
   },
   fsm: {
     ping: (): Promise<boolean> => ipcRenderer.invoke('fsm:ping'),
