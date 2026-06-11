@@ -1,5 +1,5 @@
-import type { DiffHunk } from './useDraftDiff'
-import { DraftHunkCard } from './DraftHunkCard'
+import type { DiffHunk } from '../useDraftDiff'
+import { DraftHunkCard } from '../DraftHunkCard/DraftHunkCard'
 import styles from './DraftHunkList.module.css'
 
 interface Props {
@@ -19,12 +19,7 @@ export function DraftHunkList({ hunks, onToggle, onMarkReviewed }: Props) {
       </div>
       <div className={styles.list}>
         {changed.map((hunk) => (
-          <DraftHunkCard
-            key={hunk.id}
-            hunk={hunk}
-            onToggle={onToggle}
-            onMarkReviewed={onMarkReviewed}
-          />
+          <DraftHunkCard key={hunk.id} hunk={hunk} onToggle={onToggle} onMarkReviewed={onMarkReviewed} />
         ))}
       </div>
     </div>

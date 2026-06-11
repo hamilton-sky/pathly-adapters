@@ -1,0 +1,32 @@
+.toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-mantle);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+}
+
+.toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  padding: 6px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.toggle button:hover {
+  color: var(--text-secondary);
+}
+.toggle button.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+.toggle svg {
+  display: block;
+}

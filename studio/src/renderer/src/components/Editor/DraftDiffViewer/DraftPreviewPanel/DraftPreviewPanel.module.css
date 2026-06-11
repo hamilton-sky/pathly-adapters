@@ -28,12 +28,10 @@
   font-family: var(--font-family-base);
   transition: color 80ms, background 80ms;
 }
-
 .tab:hover {
   color: var(--text-secondary);
   background: var(--bg-surface1);
 }
-
 .tabActive {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -55,19 +53,20 @@
   padding: 32px 0;
 }
 
-.changeSection {
+.section {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.changeHeading {
+.sectionHeading {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--text-muted);
   padding-bottom: 6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-transform: uppercase;
 }
 
 .changeText {
@@ -78,21 +77,4 @@
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.5;
-}
-
-/* ── Diff tab ────────────────────────────────────────────────── */
-.diffSection {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.diffHeading {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  text-transform: uppercase;
 }

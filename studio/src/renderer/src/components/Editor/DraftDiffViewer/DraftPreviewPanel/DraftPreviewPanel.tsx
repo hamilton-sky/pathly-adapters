@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import type { DiffHunk } from './useDraftDiff'
-import { DiffCodeBlock } from './DiffCodeBlock'
-import MarkdownRenderer from '../../shared/MarkdownRenderer/MarkdownRenderer'
+import type { DiffHunk } from '../useDraftDiff'
+import { DiffCodeBlock } from '../DiffCodeBlock/DiffCodeBlock'
+// Local minimal markdown renderer — in the Studio app you can swap this for the
+// shared one (../../shared/MarkdownRenderer/MarkdownRenderer).
+import MarkdownRenderer from '../MarkdownRenderer/MarkdownRenderer'
 import styles from './DraftPreviewPanel.module.css'
 
 interface Props {
@@ -10,6 +12,10 @@ interface Props {
 }
 
 type Mode = 'result' | 'changes' | 'diff'
+
+function displayHeading(heading: string): string {
+  return heading === '__preamble__' ? 'Preamble' : heading
+}
 
 export function DraftPreviewPanel({ content, changedHunks }: Props) {
   const [mode, setMode] = useState<Mode>('result')
@@ -42,14 +48,9 @@ export function DraftPreviewPanel({ content, changedHunks }: Props) {
             <div className={styles.empty}>No changes to diff</div>
           ) : (
             changed.map((hunk) => (
-              <div key={hunk.id} className={styles.diffSection}>
-                <div className={styles.diffHeading}>
-                  {hunk.heading === '__preamble__' ? 'Preamble' : hunk.heading}
-                </div>
-                <DiffCodeBlock
-                  original={hunk.originalContent}
-                  draft={hunk.draftContent}
-                />
+              <div key={hunk.id} className={styles.section}>
+                <div className={styles.sectionHeading}>{displayHeading(hunk.heading)}</div>
+                <DiffCodeBlock original={hunk.originalContent} draft={hunk.draftContent} />
               </div>
             ))
           )
@@ -57,10 +58,8 @@ export function DraftPreviewPanel({ content, changedHunks }: Props) {
           <div className={styles.empty}>No changes selected</div>
         ) : (
           accepted.map((hunk) => (
-            <div key={hunk.id} className={styles.changeSection}>
-              <div className={styles.changeHeading}>
-                {hunk.heading === '__preamble__' ? 'Preamble' : hunk.heading}
-              </div>
+            <div key={hunk.id} className={styles.section}>
+              <div className={styles.sectionHeading}>{displayHeading(hunk.heading)}</div>
               <pre className={styles.changeText}>{hunk.draftContent ?? ''}</pre>
             </div>
           ))

@@ -39,7 +39,9 @@ export function DraftDiffFooter({
   return (
     <div className={styles.footerWrap}>
       {unreviewedCount > 0 && (
-        <div className={styles.warning}>You have {unreviewedCount} unreviewed sections</div>
+        <div className={styles.warning}>
+          You have <b>{unreviewedCount}</b> unreviewed {unreviewedCount === 1 ? 'section' : 'sections'}
+        </div>
       )}
       <div className={styles.footer}>
         <button type="button" className={styles.btnDiscard} onClick={() => setShowConfirm(true)}>
@@ -49,12 +51,7 @@ export function DraftDiffFooter({
           <button type="button" className={styles.btnCancel} onClick={onClose}>
             Close
           </button>
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            disabled={acceptedCount === 0}
-            onClick={onApply}
-          >
+          <button type="button" className={styles.btnPrimary} disabled={acceptedCount === 0} onClick={onApply}>
             Apply {acceptedCount} of {totalChanged} changes
           </button>
         </div>

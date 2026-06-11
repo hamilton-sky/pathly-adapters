@@ -22,15 +22,25 @@
 }
 
 .header {
-  padding: 18px 24px 14px;
+  padding: 13px 18px 13px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
+
+.spacer { flex: 1; }
 
 .title {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
+}
+.file {
+  font-family: var(--font-family-mono);
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .body {
@@ -40,6 +50,7 @@
   min-height: 0;
 }
 
+/* ── Loading / error states ── */
 .state {
   flex: 1;
   display: flex;
@@ -50,13 +61,11 @@
   padding: 48px 24px;
   min-height: 200px;
 }
-
 .stateText {
   font-size: 13px;
   color: var(--text-muted);
   text-align: center;
 }
-
 .stateActions {
   display: flex;
   align-items: center;
@@ -75,7 +84,6 @@
   font-family: var(--font-family-base);
   transition: opacity 80ms;
 }
-
 .btnPrimary:hover {
   opacity: 0.88;
 }
@@ -92,7 +100,6 @@
   border-radius: 7px;
   transition: color 80ms;
 }
-
 .btnCancel:hover {
   color: var(--text-secondary);
 }
