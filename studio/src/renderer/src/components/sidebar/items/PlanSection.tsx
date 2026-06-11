@@ -36,6 +36,7 @@ interface Props {
   onStartDelete: (item: PathlyItem) => void
   onDeletePlanFolder?: (folderPath: string) => void
   onTogglePlanSubdir?: (folderName: string, subdirName: string) => void
+  onSplitIntoCells?: (item: PathlyItem) => void
 }
 
 export function PlanSection({
@@ -63,6 +64,7 @@ export function PlanSection({
   onStartDelete,
   onDeletePlanFolder,
   onTogglePlanSubdir,
+  onSplitIntoCells,
 }: Props): JSX.Element {
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null)
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null)
@@ -212,6 +214,7 @@ export function PlanSection({
                           onRenameCancel={onRenameCancel}
                           onStartRename={isProtected ? undefined : () => onStartRename(file, folder.path)}
                           onStartDelete={isProtected ? undefined : () => onStartDelete(file)}
+                          onSplitIntoCells={onSplitIntoCells ? () => onSplitIntoCells(file) : undefined}
                         />
                       )
                     })}
@@ -245,6 +248,7 @@ export function PlanSection({
                               onRenameCancel={onRenameCancel}
                               onStartRename={() => onStartRename(file, subdirPath)}
                               onStartDelete={() => onStartDelete(file)}
+                              onSplitIntoCells={onSplitIntoCells ? () => onSplitIntoCells(file) : undefined}
                             />
                           ))}
                         </div>

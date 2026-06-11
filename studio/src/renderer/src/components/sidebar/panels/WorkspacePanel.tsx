@@ -55,6 +55,7 @@ interface Props {
   onInlineCreateFolderInFolder?: (folderPath: string) => void
   onReorgDrop?: (sourcePath: string, targetDir: string, sectionId: string) => void
   onMoveFolder?: (sourcePath: string, targetSectionDir: string) => void
+  onSplitIntoCells?: (item: PathlyItem) => void
   customWorkspaceSections?: Section[]
 }
 
@@ -72,7 +73,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
     planOpen, onTogglePlan, onToggleFolder, onFolderClick,
     onRenameFolder, onDeleteFolder, onDeletePlanFolder, onTogglePlanSubdir,
     onDeleteCustomSection, onInlineCreateFileInFolder, onInlineCreateFolderInFolder,
-    onReorgDrop, onMoveFolder, customWorkspaceSections = [],
+    onReorgDrop, onMoveFolder, onSplitIntoCells, customWorkspaceSections = [],
   } = props
 
   const { userLockedFolders, toggleFolderLock } = useUiStore()
@@ -124,6 +125,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
         onRenameCancel={onRenameCancel}
         onStartRename={onStartRename}
         onStartDelete={onStartDelete}
+        onSplitIntoCells={onSplitIntoCells}
       />
 
       {WORKSPACE_FILE_SECTIONS.map((section) => {
@@ -207,6 +209,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                     onRenameCancel={onRenameCancel}
                     onStartRename={() => onStartRename(item, sectionTargetDir)}
                     onStartDelete={() => onStartDelete(item)}
+                    onSplitIntoCells={onSplitIntoCells ? () => onSplitIntoCells(item) : undefined}
                     sectionId={section.type}
                     isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
                   />
@@ -301,6 +304,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           onRenameCancel={onRenameCancel}
                           onStartRename={() => onStartRename(item, itemDir)}
                           onStartDelete={() => onStartDelete(item)}
+                          onSplitIntoCells={onSplitIntoCells ? () => onSplitIntoCells(item) : undefined}
                           sectionId={section.type}
                           isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
                         />
@@ -367,6 +371,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                     onRenameCancel={onRenameCancel}
                     onStartRename={() => onStartRename(item, sectionTargetDir)}
                     onStartDelete={() => onStartDelete(item)}
+                    onSplitIntoCells={onSplitIntoCells ? () => onSplitIntoCells(item) : undefined}
                     sectionId={section.type}
                     isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
                   />
@@ -434,6 +439,7 @@ export function WorkspacePanel(props: Props): JSX.Element {
                           onRenameCancel={onRenameCancel}
                           onStartRename={() => onStartRename(item, itemDir)}
                           onStartDelete={() => onStartDelete(item)}
+                          onSplitIntoCells={onSplitIntoCells ? () => onSplitIntoCells(item) : undefined}
                           sectionId={section.type}
                           isProtectedFile={PROTECTED_FILENAMES.has(item.name)}
                         />

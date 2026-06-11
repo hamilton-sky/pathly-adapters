@@ -1,5 +1,5 @@
 ﻿import { useRef, useState } from 'react'
-import { FileText, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { FileText, Lock, MoreHorizontal, Pencil, Plus, Scissors, Trash2 } from 'lucide-react'
 import { useUiStore } from '../../../store/uiStore'
 import type { PathlyItem, PathlyReorgDragItem, PathlySection } from '../../../types'
 import { PATHLY_DRAG_MIME } from '../../../types'
@@ -22,6 +22,7 @@ interface Props {
   onRenameCancel: () => void
   onStartRename?: () => void
   onStartDelete?: () => void
+  onSplitIntoCells?: () => void
   sectionId?: string
   isProtectedFile?: boolean
 }
@@ -39,10 +40,11 @@ export function WorkspaceItem({
   onRenameCancel,
   onStartRename,
   onStartDelete,
+  onSplitIntoCells,
   sectionId,
   isProtectedFile,
 }: Props): JSX.Element {
-  const { userLockedPaths, toggleUserLock } = useUiStore()
+  const { userLockedPaths, toggleUserLock, activePanel } = useUiStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -126,6 +128,19 @@ export function WorkspaceItem({
                   anchor={menuButtonRef.current.getBoundingClientRect()}
                   onClose={() => setMenuOpen(false)}
                 >
+                  {activePanel === 'skill-notebook' && item.name.endsWith('.md') && onSplitIntoCells && (
+                    <>
+                      <button type="button" className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onSplitIntoCells) }}>
+                        <Plus size={12} />
+                        Insert as cell
+                      </button>
+                      <button type="button" className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onSplitIntoCells) }}>
+                        <Scissors size={12} />
+                        Split into cells
+                      </button>
+                      {(onStartRename ?? onStartDelete) && <div className={styles.itemMenuSep} />}
+                    </>
+                  )}
                   {onStartRename && !isUserLocked && (
                     <button type="button" className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onStartRename) }}>
                       <Pencil size={12} />

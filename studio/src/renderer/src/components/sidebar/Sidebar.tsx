@@ -135,7 +135,7 @@ export function Sidebar(): JSX.Element | null {
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
   const [confirmDeleteSection, setConfirmDeleteSection] = useState<{ dir: string; name: string } | null>(null)
   const [dragOverPath, setDragOverPath] = useState<string | null>(null)
-  const [splitModalItem, setSplitModalItem] = useState<CatalogItemData | null>(null)
+  const [splitModalItem, setSplitModalItem] = useState<{ path?: string; name: string } | null>(null)
   const [inlineCreate, setInlineCreate] = useState<{
     target: string   // 'workspace-root' | 'plan-folder' | 'plan-file' | section label
     parentDir: string
@@ -681,6 +681,7 @@ export function Sidebar(): JSX.Element | null {
             onInlineCreateFolderInFolder={handleInlineCreateFolderInFolder}
             onReorgDrop={(src, tgt, sid) => { void handleReorgDrop(src, tgt, sid) }}
             onMoveFolder={(src, tgt) => { void handleMoveFolder(src, tgt) }}
+            onSplitIntoCells={(item) => setSplitModalItem(item)}
             customWorkspaceSections={customWorkspaceSections}
           />
         )}

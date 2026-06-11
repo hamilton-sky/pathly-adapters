@@ -118,6 +118,7 @@ function ItemRow({ item, type, groupIcon, context, displayName, categories, onOp
   async function handleRenameCommit() {
     const trimmed = renameVal.trim()
     if (!trimmed) { setRenaming(false); return }
+    if (trimmed === leafName(item).replace(/\.[^.]+$/, '')) { setRenaming(false); return }
     try {
       await onRenameItem?.(item, type, trimmed)
     } finally {
