@@ -22,12 +22,20 @@ function _loadOrCreateSecret(): string {
 export function initApiConfig(): void {
   const port = process.env['PATHLY_FSM_HTTP_PORT'] ?? '8765'
   _apiBase = `http://127.0.0.1:${port}`
-  _apiSecret = process.env['PATHLY_API_SECRET'] ?? _loadOrCreateSecret()
-  // Make it available to the FSM server via inherited env
+  // Use || (not ??) so an empty-string env var falls back to the persisted file.
+  _apiSecret = process.env['PATHLY_API_SECRET'] || _loadOrCreateSecret()
+  // Mirror into process.env so the spawned FSM server AND any duplicated bundle
+  // copy of this module (see getApiSecret) resolve the same secret.
   process.env['PATHLY_API_SECRET'] = _apiSecret
 }
 
-export function getApiSecret(): string { return _apiSecret }
+// Read process.env first. electron-vite's dev bundler can inline a second,
+// never-initialized copy of this module whose private _apiSecret stays ''.
+// process.env is the one shared singleton, so every copy resolves the real
+// secret here regardless of which copy a given caller (e.g. db.ts) bound to.
+export function getApiSecret(): string {
+  return process.env['PATHLY_API_SECRET'] || _apiSecret
+}
 export function getApiBase(): string { return _apiBase }
 
 export function apiHeaders(): Record<string, string> {

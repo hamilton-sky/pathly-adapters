@@ -1,11 +1,15 @@
 import { ipcMain } from 'electron'
 import { cwd } from 'process'
+import { getApiSecret } from '../apiConfig'
 
 const FSM_BASE = `http://127.0.0.1:${process.env['PATHLY_FSM_HTTP_PORT'] ?? '8765'}`
 const _PR = encodeURIComponent(process.env['PATHLY_PROJECT_ROOT'] ?? cwd())
 
 async function fsmGet(path: string): Promise<unknown> {
-  const res = await fetch(`${FSM_BASE}${path}`, { signal: AbortSignal.timeout(3000) })
+  const res = await fetch(`${FSM_BASE}${path}`, {
+    headers: { 'X-Pathly-Secret': getApiSecret() },
+    signal: AbortSignal.timeout(3000),
+  })
   if (!res.ok) throw new Error(`FSM ${res.status}: ${path}`)
   return res.json()
 }
@@ -13,7 +17,7 @@ async function fsmGet(path: string): Promise<unknown> {
 async function fsmPost(path: string, body: unknown): Promise<unknown> {
   const res = await fetch(`${FSM_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Pathly-Secret': getApiSecret() },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(3000),
   })
@@ -24,7 +28,7 @@ async function fsmPost(path: string, body: unknown): Promise<unknown> {
 async function fsmPut(path: string, body: unknown): Promise<unknown> {
   const res = await fetch(`${FSM_BASE}${path}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Pathly-Secret': getApiSecret() },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(3000),
   })
