@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { cwd } from 'process'
-import { getApiSecret } from '../apiConfig'
+import { getApiSecret } from '@main/apiConfig'
 
 const FSM_BASE = `http://127.0.0.1:${process.env['PATHLY_FSM_HTTP_PORT'] ?? '8765'}`
 const _PR = encodeURIComponent(process.env['PATHLY_PROJECT_ROOT'] ?? cwd())

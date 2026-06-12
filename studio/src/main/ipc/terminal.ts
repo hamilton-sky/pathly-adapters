@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
-import { getApiSecret } from '../apiConfig'
+import { getApiSecret } from '@main/apiConfig'
 import { join } from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
