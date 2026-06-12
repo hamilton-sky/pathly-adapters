@@ -1,0 +1,31 @@
+{
+  "comments": [
+    {
+      "id": "c-mq9c4wi6-z26j",
+      "lineNumber": 1,
+      "lineText": "ply command deploys hook scripts to disk (~/.claude/plugins/pathly/hooks/",
+      "body": "xZXcZxcZcx",
+      "resolved": false,
+      "createdAt": "2026-06-11T10:08:50.574Z",
+      "color": "orange"
+    },
+    {
+      "id": "c-mq9c58zf-1oja",
+      "lineNumber": 1,
+      "lineText": "Codex hooks: src/install_cli/materialize.py lines 20-70 implement deploy_codex_hooks() which:\n\nReads/creates ~/.codex/ho",
+      "body": "ZXcZxczxc",
+      "resolved": false,
+      "createdAt": "2026-06-11T10:09:06.747Z",
+      "color": "blue"
+    },
+    {
+      "id": "c-mq9c8w60-bf86",
+      "lineNumber": 1,
+      "lineText": ") which:\n\nWrites individual hook JSON files to .github/hooks/\nClaude hooks: Missing entirely. setup_command.py lines 226",
+      "body": "xZvCVxcv",
+      "resolved": false,
+      "createdAt": "2026-06-11T10:11:56.760Z",
+      "color": "orange"
+    }
+  ]
+}

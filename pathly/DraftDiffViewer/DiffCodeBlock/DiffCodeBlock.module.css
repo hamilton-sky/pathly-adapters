@@ -1,0 +1,94 @@
+/* ── Word-level inline diff (default) ── */
+.root {
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+  background: var(--bg-mantle);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary);
+}
+
+.tokenRemove {
+  background: color-mix(in srgb, var(--red) 20%, transparent);
+  color: color-mix(in srgb, var(--red) 78%, var(--text-secondary));
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--red) 55%, transparent);
+  border-radius: 2px;
+  padding: 0.5px 2px;
+  margin: 0 0.5px;
+}
+
+.tokenAdd {
+  background: color-mix(in srgb, var(--green) 20%, transparent);
+  color: color-mix(in srgb, var(--green) 80%, var(--text-primary));
+  border-radius: 2px;
+  padding: 0.5px 2px;
+  margin: 0 0.5px;
+}
+
+/* ── Legend ── */
+.legend {
+  display: flex;
+  gap: 12px;
+  margin-top: 7px;
+  font-family: var(--font-family-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.swatchRemove,
+.swatchAdd {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.swatchRemove { background: color-mix(in srgb, var(--red) 30%, transparent); }
+.swatchAdd { background: color-mix(in srgb, var(--green) 30%, transparent); }
+
+/* ── Line mode (mode="line", for code) ── */
+.rootLines {
+  white-space: normal;
+  word-break: normal;
+  padding: 4px 0;
+}
+.line {
+  display: flex;
+  align-items: baseline;
+  padding: 0 10px;
+  gap: 8px;
+  min-height: 1.65em;
+}
+.lineRemove { background: color-mix(in srgb, var(--red) 10%, transparent); }
+.lineAdd { background: color-mix(in srgb, var(--green) 10%, transparent); }
+.lineSame {}
+
+.prefix {
+  width: 12px;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 12px;
+  user-select: none;
+  text-align: center;
+}
+.lineRemove .prefix { color: var(--red); }
+.lineAdd .prefix { color: var(--green); }
+.lineSame .prefix { color: transparent; }
+
+.lineText {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.lineSame .lineText { color: var(--text-secondary); }
+.lineRemove .lineText { color: color-mix(in srgb, var(--red) 60%, var(--text-secondary)); }
+.lineAdd .lineText { color: color-mix(in srgb, var(--green) 60%, var(--text-secondary)); }

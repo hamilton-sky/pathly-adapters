@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>DraftDiffViewer — Split view mockup</title>
+<style>
+:root {
+  --bg-base:     #1e1e2e;
+  --bg-mantle:   #181825;
+  --bg-surface0: #313244;
+  --bg-surface1: #45475a;
+  --text-primary:   #cdd6f4;
+  --text-secondary: #a6adc8;
+  --text-muted:     #585b70;
+  --accent: #89b4fa;
+  --green:  #a6e3a1;
+  --red:    #f38ba8;
+  --orange: #fab387;
+  --font-mono: 'Menlo','Consolas','Courier New',monospace;
+  --font-ui:   -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg-base);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+}
+
+/* ── Modal ───────────────────────────────────────── */
+.modal {
+  width: 920px;
+  max-width: calc(100vw - 32px);
+  height: 560px;
+  background: var(--bg-surface0);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 24px 64px rgba(0,0,0,.75);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ──────────────────────────────────────── */
+.header {
+  padding: 16px 22px 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.title { font-size: 14px; font-weight: 700; color: var(--text-primary); flex: 1; }
+.title .file { color: var(--accent); }
+
+/* view toggle */
+.vtog {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-mantle);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 7px;
+  padding: 3px;
+}
+.vbtn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px;
+  border: none; border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px; font-weight: 600;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+.vbtn.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+/* ── Body ────────────────────────────────────────── */
+.body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Pane ────────────────────────────────────────── */
+.pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+.pane + .pane { border-left: 1px solid rgba(255,255,255,0.08); }
+
+.pane-head {
+  padding: 6px 14px;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-surface0);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pane-head .badge {
+  font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  padding: 1px 6px; border-radius: 4px;
+}
+.pane-head.orig .badge {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red) 30%, transparent);
+}
+.pane-head.draft .badge {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
+}
+
+.pane-scroll {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-mantle);
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-surface1) transparent;
+}
+
+/* ── Diff rows ───────────────────────────────────── */
+.row {
+  display: flex;
+  align-items: stretch;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+  min-height: 1.7em;
+}
+
+.ln {
+  width: 34px;
+  text-align: right;
+  padding: 0 8px 0 4px;
+  color: var(--text-muted);
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.gutter {
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+  font-weight: 800;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.code {
+  flex: 1;
+  padding: 0 14px 0 6px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+/* same */
+.row.same .gutter { color: transparent; }
+
+/* removed (left pane) */
+.row.rem {
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+.row.rem .ln    { color: color-mix(in srgb, var(--red) 45%, var(--text-muted)); }
+.row.rem .gutter{ color: var(--red); }
+.row.rem .code  { color: color-mix(in srgb, var(--red) 65%, var(--text-secondary)); }
+
+/* added (right pane) */
+.row.add {
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
+.row.add .ln    { color: color-mix(in srgb, var(--green) 45%, var(--text-muted)); }
+.row.add .gutter{ color: var(--green); }
+.row.add .code  { color: color-mix(in srgb, var(--green) 65%, var(--text-secondary)); }
+
+/* ghost — placeholder row on the side that has no content */
+.row.ghost {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--text-muted) 5%, transparent),
+    color-mix(in srgb, var(--text-muted) 5%, transparent) 3px,
+    transparent 3px,
+    transparent 8px
+  );
+}
+.row.ghost .ln,.row.ghost .gutter,.row.ghost .code { color: transparent; }
+
+/* ── Footer ──────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 20px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+  gap: 8px;
+}
+.footer-right { display: flex; align-items: center; gap: 8px; }
+.btn { border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 600; font-family: var(--font-ui); cursor: pointer; }
+.btn-discard { background: none; border: 1px solid color-mix(in srgb, var(--red) 50%, transparent); color: var(--red); }
+.btn-cancel  { background: none; border: none; color: var(--text-muted); padding: 6px 10px; font-family:var(--font-ui); font-size:12px; font-weight:500; cursor:pointer; }
+.btn-apply   { background: var(--accent); border: none; color: #1e1e2e; }
+</style>
+</head>
+<body>
+<div class="modal">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="title">Reviewing draft — <span class="file">CONCLUSIONS.md.draft</span></div>
+    <div class="vtog">
+      <button class="vbtn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="12" height="5" rx="1"/><rect x="2" y="9" width="12" height="5" rx="1"/></svg>
+        Cards
+      </button>
+      <button class="vbtn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+        List
+      </button>
+      <button class="vbtn active">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="2" width="6" height="12" rx="1"/><rect x="9" y="2" width="6" height="12" rx="1"/></svg>
+        Split
+      </button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+
+    <!-- LEFT: Original -->
+    <div class="pane">
+      <div class="pane-head orig">Original <span class="badge">3 removed</span></div>
+      <div class="pane-scroll" id="left">
+
+        <div class="row same"><span class="ln">1</span><span class="gutter"></span><span class="code"># Conclusions — studio-terminal-launcher</span></div>
+        <div class="row same"><span class="ln">2</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">3</span><span class="gutter"></span><span class="code">## Answer</span></div>
+        <div class="row same"><span class="ln">4</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row rem"> <span class="ln">5</span><span class="gutter">−</span><span class="code">Adding Antigravity (agy) requires changes to 5 files.</span></div>
+        <div class="row rem"> <span class="ln">6</span><span class="gutter">−</span><span class="code">The pattern is established — claude and codex were</span></div>
+        <div class="row rem"> <span class="ln">7</span><span class="gutter">−</span><span class="code">added the same way.</span></div>
+        <div class="row ghost"><span class="ln"></span><span class="gutter"></span><span class="code"> </span></div>
+        <div class="row same"><span class="ln">8</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">9</span><span class="gutter"></span><span class="code">## Exact changes needed</span></div>
+        <div class="row same"><span class="ln">10</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">11</span><span class="gutter"></span><span class="code">### Layer 1: Main process (Electron)</span></div>
+        <div class="row same"><span class="ln">12</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row rem"> <span class="ln">13</span><span class="gutter">−</span><span class="code">studio/src/main/ipc/terminal.ts — 1 edit</span></div>
+        <div class="row ghost"><span class="ln"></span><span class="gutter"></span><span class="code"> </span></div>
+        <div class="row same"><span class="ln">14</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">15</span><span class="gutter"></span><span class="code">1. Add 'agy' to ALLOWED_SHELLS allowlist (line 13)</span></div>
+        <div class="row ghost"><span class="ln"></span><span class="gutter"></span><span class="code"> </span></div>
+        <div class="row ghost"><span class="ln"></span><span class="gutter"></span><span class="code"> </span></div>
+        <div class="row same"><span class="ln">16</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">17</span><span class="gutter"></span><span class="code">### Layer 2: Renderer (React/TypeScript)</span></div>
+        <div class="row same"><span class="ln">18</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row rem"> <span class="ln">19</span><span class="gutter">−</span><span class="code">studio/src/renderer/src/types/terminal.ts — 1 edit</span></div>
+        <div class="row same"><span class="ln">20</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">21</span><span class="gutter"></span><span class="code">2. Add 'agy' to TerminalShell union type</span></div>
+
+      </div>
+    </div>
+
+    <!-- RIGHT: Draft -->
+    <div class="pane">
+      <div class="pane-head draft">Draft <span class="badge">4 added</span></div>
+      <div class="pane-scroll" id="right">
+
+        <div class="row same"><span class="ln">1</span><span class="gutter"></span><span class="code"># Conclusions — studio-terminal-launcher</span></div>
+        <div class="row same"><span class="ln">2</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">3</span><span class="gutter"></span><span class="code">## Answer</span></div>
+        <div class="row same"><span class="ln">4</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row add"> <span class="ln">5</span><span class="gutter">+</span><span class="code">Adding Antigravity (agy) as a fourth terminal requires</span></div>
+        <div class="row add"> <span class="ln">6</span><span class="gutter">+</span><span class="code">changes to 7 files across two layers (main process +</span></div>
+        <div class="row add"> <span class="ln">7</span><span class="gutter">+</span><span class="code">renderer). The pattern is well-established — claude and</span></div>
+        <div class="row add"> <span class="ln">8</span><span class="gutter">+</span><span class="code">codex were added the same way.</span></div>
+        <div class="row same"><span class="ln">9</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">10</span><span class="gutter"></span><span class="code">## Exact changes needed</span></div>
+        <div class="row same"><span class="ln">11</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">12</span><span class="gutter"></span><span class="code">### Layer 1: Main process (Electron)</span></div>
+        <div class="row same"><span class="ln">13</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row add"> <span class="ln">14</span><span class="gutter">+</span><span class="code">studio/src/main/ipc/terminal.ts — 2 edits</span></div>
+        <div class="row same"><span class="ln">15</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">16</span><span class="gutter"></span><span class="code">1. Add 'agy' to ALLOWED_SHELLS allowlist (line 13)</span></div>
+        <div class="row add"> <span class="ln">17</span><span class="gutter">+</span><span class="code">2. Add 'agy' to resolveShell() Windows/non-Windows</span></div>
+        <div class="row add"> <span class="ln">18</span><span class="gutter">+</span><span class="code">   dispatch (lines 38–48) — same pattern as 'codex'</span></div>
+        <div class="row same"><span class="ln">19</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">20</span><span class="gutter"></span><span class="code">### Layer 2: Renderer (React/TypeScript)</span></div>
+        <div class="row same"><span class="ln">21</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row add"> <span class="ln">22</span><span class="gutter">+</span><span class="code">studio/src/renderer/src/types/terminal.ts — 1 edit</span></div>
+        <div class="row same"><span class="ln">23</span><span class="gutter"></span><span class="code"></span></div>
+        <div class="row same"><span class="ln">24</span><span class="gutter"></span><span class="code">2. Add 'agy' to TerminalShell union type</span></div>
+
+      </div>
+    </div>
+
+  </div><!-- /body -->
+
+  <!-- Footer -->
+  <div class="footer">
+    <button class="btn btn-discard">Discard agent changes</button>
+    <div class="footer-right">
+      <button class="btn-cancel">Close</button>
+      <button class="btn btn-apply">Apply all changes</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Sync scroll between the two panes
+  const left  = document.getElementById('left')
+  const right = document.getElementById('right')
+  let syncing = false
+  left.addEventListener('scroll', () => {
+    if (syncing) return; syncing = true
+    right.scrollTop = left.scrollTop; syncing = false
+  })
+  right.addEventListener('scroll', () => {
+    if (syncing) return; syncing = true
+    left.scrollTop = right.scrollTop; syncing = false
+  })
+</script>
+</body>
+</html>

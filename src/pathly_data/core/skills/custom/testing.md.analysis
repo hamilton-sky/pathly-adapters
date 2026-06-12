@@ -1,0 +1,64 @@
+# Skill Analysis — `testing.md` (chat-stop-proxy Conversation Prompts)
+
+## Summary
+
+This file contains detailed, phase-by-phase builder prompts for two implementation conversations in the `chat-stop-proxy` feature: adding a Stop button to the HQ chat input (Conv 1) and adding a Claude Code proxy mode (Conv 2), plus a pre-flight verification pass (Conv 0). It is not a reusable skill but a feature-specific conversation script embedded under `core/skills/custom/`.
+
+---
+
+## Strengths
+
+- **Pre-flight verification is thorough.** Conv 0 reads exact file paths and named symbols before touching anything — this pattern reliably catches stale assumptions and prevents the builder from editing the wrong file.
+- **Done-when clauses are specific and measurable.** Each phase ends with a concrete exit condition tied to TypeScript compilation and named behavior (e.g., "`<Square>` renders when `isLoading=true`"), which reduces ambiguity about when a phase is complete.
+- **Acceptance criteria are granular and numbered.** The AC checklists (AC-01a through AC-06e) are fine-grained enough that a builder can verify them independently without re-reading the spec.
+- **Inline code stubs are given verbatim.** Providing the exact `handleStop` function and the `handleSend` branch removes guesswork and reduces hallucination risk in the builder agent.
+- **Explicit note on `handleSend` location.** The `← handleSend lives here, NOT in index.tsx` annotation in Conv 2's "Verify before edit" section directly addresses a likely confusion point.
+
+---
+
+## Gaps & Ambiguities
+
+1. **`outputByTarget.claude.running` transition is undocumented.** Conv 2, Phase 2.4 includes a comment block:
+   > `// watch outputByTarget.claude.running transition to false`
+
+   No instruction tells the builder *how* to watch this — poll a `useEffect`? Subscribe via a store selector? The comment reads like a design note that was never turned into an imperative step.
+
+2. **"Self-approved as the builder" is ambiguous.** Conv 1, Phase 1.1 says "Get the design spec approved (or self-approved as the builder)." This creates an escape hatch that effectively makes the design gate optional, undermining the purpose of having a design pass at all.
+
+3. **Conv 0's file list is inconsistent with its verification list.** Step 1 says "verify these files exist" (six files), but Step 2's "Verify before edit" checklist covers only four of them — `llmBridge.ts`, `chatStore.ts`, `ChatInput.tsx`, and `ChatPanel/index.tsx`. `useHQ.tsx` and `launchTerminal.ts` are listed in Step 1 but have no corresponding symbol checks in Step 2.
+
+4. **The splitting rule at the end is context-free.** The `## ## Splitting rule` section appears after Conv 2 with no explanation of how it applies to *this* script. It is unclear whether it is a global policy, a post-hoc note, or a reminder for future conversations.
+
+5. **`writeToTerminal` signature is mentioned but not shown.** Conv 2, Phase 2.4 says "Confirm `writeToTerminal` signature" but never provides the expected signature or return type. The builder must infer it from the call site, which may have drifted.
+
+6. **No error recovery guidance for Conv 1 TypeScript errors.** Conv 1, Phase 1.4 says "Manually verify (or write a dev test)" but gives no instruction if TypeScript errors are found during verification — should the builder fix and re-verify, or escalate?
+
+---
+
+## Redundancies
+
+- **"Read the file first to find the actual line numbers"** appears as a standalone instruction in Conv 1 Phase 1.2 but is already covered by the "Verify before edit" section at the top of Conv 1. The Phase 1.2 reminder is not wrong but duplicates the convention.
+- **The PROGRESS.md update step** ("Update `pathly/plans/chat-stop-proxy/PROGRESS.md`") is repeated identically at the end of Conv 0, Conv 1, and Conv 2. A single standing instruction at the top of the document (e.g., "After each conversation, mark items complete in PROGRESS.md") would reduce noise.
+- **`## ##` double-heading prefix** (`## ## Conv 0`, `## ## Conv 1`, `## ## Conv 2`) is present throughout. This renders as literal `##` text rather than a nested heading — likely a copy-paste artifact.
+
+---
+
+## Suggested Improvements
+
+1. **Replace the `outputByTarget.claude.running` comment with an imperative step.** Specify the exact mechanism (e.g., a `useEffect` that watches the store field) and the exact state transitions that trigger `setLoading(false)`. This is the most likely point of builder confusion and the hardest to infer from context.
+
+2. **Remove the "self-approved" escape hatch from Phase 1.1 and Phase 2.1.** Either require a real design spec to be written to a file before proceeding, or remove the design gate entirely. The current wording makes the gate effectively optional.
+
+3. **Add symbol checks for `useHQ.tsx` and `launchTerminal.ts` to Conv 0's verification step.** Ensure every file in the Step 1 list has a corresponding named-symbol check in Step 2, so the pre-flight pass is complete.
+
+4. **Consolidate the PROGRESS.md update into a standing instruction.** State once at the top of the document that PROGRESS.md must be updated after each conversation completes, and remove the per-conversation repetitions.
+
+5. **Fix the `## ##` double-heading prefix** to a single `##` level throughout. This is a cosmetic defect but affects rendered readability in any Markdown viewer.
+
+6. **Provide the expected `writeToTerminal` signature inline in Phase 2.4**, or reference the exact file and function line. The builder should not need to search for this during implementation.
+
+---
+
+## Token Estimate
+
+The file is approximately 650–700 tokens. At standard builder invocation, Conv 1 and Conv 2 each consume the full document as context, so each run costs ~700 tokens just for the skill. This is moderately high for a single-feature script but is appropriate given the complexity: three conversations, two design gates, fourteen phases, and twenty-two acceptance criteria. The token cost would be acceptable if the file were reused across multiple runs; since it is feature-specific and single-use, consider splitting it into three separate files (one per Conv) to reduce per-run context overhead.

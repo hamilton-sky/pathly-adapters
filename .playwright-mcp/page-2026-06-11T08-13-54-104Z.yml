@@ -1,0 +1,135 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]: Current — split panel
+    - generic [ref=e5]:
+      - generic [ref=e7]: Reviewing draft — CONCLUSIONS.md.draft
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]:
+            - generic [ref=e11]: Changes
+            - generic [ref=e12]: "5"
+          - generic [ref=e13]:
+            - generic [ref=e14]:
+              - button "Answer REMOVED ▸ show diff unreviewed" [ref=e15] [cursor=pointer]:
+                - generic [ref=e16]:
+                  - generic [ref=e17]: Answer
+                  - generic [ref=e18]: REMOVED
+                - generic [ref=e19]:
+                  - generic [ref=e20]: ▸ show diff
+                  - generic [ref=e21]: unreviewed
+              - button "Discarding" [ref=e23] [cursor=pointer]
+            - generic [ref=e24]:
+              - button "Exact changes needed REMOVED ▸ show diff unreviewed" [ref=e25] [cursor=pointer]:
+                - generic [ref=e26]:
+                  - generic [ref=e27]: Exact changes needed
+                  - generic [ref=e28]: REMOVED
+                - generic [ref=e29]:
+                  - generic [ref=e30]: ▸ show diff
+                  - generic [ref=e31]: unreviewed
+              - button "Discarding" [ref=e33] [cursor=pointer]
+            - generic [ref=e34]:
+              - button "Summary ADDED ▸ show diff unreviewed" [ref=e35] [cursor=pointer]:
+                - generic [ref=e36]:
+                  - generic [ref=e37]: Summary
+                  - generic [ref=e38]: ADDED
+                - generic [ref=e39]:
+                  - generic [ref=e40]: ▸ show diff
+                  - generic [ref=e41]: unreviewed
+              - button "Including" [ref=e43] [cursor=pointer]
+            - generic [ref=e44]:
+              - button "Conversation Split Plan ADDED ▸ show diff unreviewed" [ref=e45] [cursor=pointer]:
+                - generic [ref=e46]:
+                  - generic [ref=e47]: Conversation Split Plan
+                  - generic [ref=e48]: ADDED
+                - generic [ref=e49]:
+                  - generic [ref=e50]: ▸ show diff
+                  - generic [ref=e51]: unreviewed
+              - button "Including" [ref=e53] [cursor=pointer]
+            - generic [ref=e54]:
+              - button "Plan Recommendation CHANGED ▸ show diff" [ref=e55] [cursor=pointer]:
+                - generic [ref=e56]:
+                  - generic [ref=e57]: Plan Recommendation
+                  - generic [ref=e58]: CHANGED
+                - generic [ref=e60]: ▸ show diff
+              - button "Using draft" [ref=e62] [cursor=pointer]
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - button "Result" [ref=e65] [cursor=pointer]
+            - button "Changes" [ref=e66] [cursor=pointer]
+            - button "Diff" [ref=e67] [cursor=pointer]
+          - generic [ref=e68]:
+            - generic [ref=e69]: Conclusions — studio-terminal-launcher
+            - generic [ref=e70]: Adding Antigravity (agy) as a fourth terminal in the studio requires changes to 7 files across two layers (main process + renderer). The pattern is well-established — claude and codex were added the same way.
+      - generic [ref=e71]:
+        - generic [ref=e72]: 3 unreviewed · 4 of 5 accepted
+        - generic [ref=e73]:
+          - button "Discard agent changes" [ref=e74] [cursor=pointer]
+          - button "Close" [ref=e75] [cursor=pointer]
+          - button "Apply 4 of 5 changes" [ref=e76] [cursor=pointer]
+  - generic [ref=e77]:
+    - generic [ref=e78]: Inline accordion — proposed
+    - generic [ref=e79]:
+      - generic [ref=e81]: Reviewing draft — CONCLUSIONS.md.draft
+      - generic [ref=e82]:
+        - generic [ref=e83]:
+          - generic [ref=e84]: Changes
+          - generic [ref=e85]: "5"
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - button "Answer REMOVED ▸ show diff unreviewed" [ref=e88] [cursor=pointer]:
+              - generic [ref=e89]:
+                - generic [ref=e90]: Answer
+                - generic [ref=e91]: REMOVED
+              - generic [ref=e92]:
+                - generic [ref=e93]: ▸ show diff
+                - generic [ref=e94]: unreviewed
+            - button "Discarding" [ref=e96] [cursor=pointer]
+          - generic [ref=e97]:
+            - button "Exact changes needed REMOVED ▾ collapse" [ref=e98] [cursor=pointer]:
+              - generic [ref=e99]:
+                - generic [ref=e100]: Exact changes needed
+                - generic [ref=e101]: REMOVED
+              - generic [ref=e103]: ▾ collapse
+            - generic [ref=e104]:
+              - generic [ref=e105]:
+                - button "Diff" [ref=e106] [cursor=pointer]
+                - button "Original" [ref=e107] [cursor=pointer]
+              - generic [ref=e108]:
+                - generic [ref=e109]: "- studio/src/main/ipc/terminal.ts — 2 edits"
+                - generic [ref=e110]: "- Add 'agy' to ALLOWED_SHELLS allowlist"
+                - generic [ref=e111]: "- Add 'agy' to resolveShell() dispatch"
+                - generic [ref=e112]: "Layer 2: Renderer (React/TypeScript)"
+            - button "Discarding" [ref=e114] [cursor=pointer]
+          - generic [ref=e115]:
+            - button "Summary ADDED ▸ show diff Accepted" [ref=e116] [cursor=pointer]:
+              - generic [ref=e117]:
+                - generic [ref=e118]: Summary
+                - generic [ref=e119]: ADDED
+              - generic [ref=e120]:
+                - generic [ref=e121]: ▸ show diff
+                - generic "Accepted" [ref=e122]
+            - button "Including" [ref=e124] [cursor=pointer]
+          - generic [ref=e125]:
+            - button "Conversation Split Plan ADDED ▸ show diff Accepted" [ref=e126] [cursor=pointer]:
+              - generic [ref=e127]:
+                - generic [ref=e128]: Conversation Split Plan
+                - generic [ref=e129]: ADDED
+              - generic [ref=e130]:
+                - generic [ref=e131]: ▸ show diff
+                - generic "Accepted" [ref=e132]
+            - button "Including" [ref=e134] [cursor=pointer]
+          - generic [ref=e135]:
+            - button "Plan Recommendation CHANGED ▸ show diff Accepted" [ref=e136] [cursor=pointer]:
+              - generic [ref=e137]:
+                - generic [ref=e138]: Plan Recommendation
+                - generic [ref=e139]: CHANGED
+              - generic [ref=e140]:
+                - generic [ref=e141]: ▸ show diff
+                - generic "Accepted" [ref=e142]
+            - button "Using draft" [ref=e144] [cursor=pointer]
+      - generic [ref=e145]:
+        - generic [ref=e146]: 1 unreviewed · 4 of 5 accepted
+        - generic [ref=e147]:
+          - button "Discard agent changes" [ref=e148] [cursor=pointer]
+          - button "Close" [ref=e149] [cursor=pointer]
+          - button "Apply 4 of 5 changes" [ref=e150] [cursor=pointer]

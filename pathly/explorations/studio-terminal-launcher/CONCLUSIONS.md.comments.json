@@ -1,0 +1,13 @@
+{
+  "comments": [
+    {
+      "id": "c-mq9536u8-bd8h",
+      "lineNumber": 1,
+      "lineText": "terminal.ts — 2 edits\n\nAdd 'agy' to ALLOWED_SHELLS allowlist (line 13)\nAdd 'agy' to resolveShell()",
+      "body": "dfgdfgdfgfg",
+      "resolved": false,
+      "createdAt": "2026-06-11T06:51:33.344Z",
+      "color": "green"
+    }
+  ]
+}
