@@ -4,6 +4,7 @@ import { useViewMode } from '../useViewMode'
 import { ViewToggle } from '../ViewToggle/ViewToggle'
 import { DraftHunkList } from '../DraftHunkList/DraftHunkList'
 import { DraftTriageList } from '../DraftTriageList/DraftTriageList'
+import { CodeDiffView } from '../CodeDiffView/CodeDiffView'
 import { DraftPreviewPanel } from '../DraftPreviewPanel/DraftPreviewPanel'
 import { DraftDiffFooter } from '../DraftDiffFooter/DraftDiffFooter'
 import type { ViewMode } from '../useViewMode'
@@ -64,13 +65,15 @@ function DiffContent({ originalPath, draftPath, onApply, onClose, onDiscard, pus
           <DraftHunkList hunks={diff.hunks} onToggle={diff.toggle} onMarkReviewed={diff.markReviewed} />
           <DraftPreviewPanel content={diff.reconstruct()} changedHunks={diff.hunks} />
         </div>
-      ) : (
+      ) : view === 'list' ? (
         <DraftTriageList
           hunks={diff.hunks}
           onToggle={diff.toggle}
           onMarkReviewed={diff.markReviewed}
           onSetAll={diff.setAll}
         />
+      ) : (
+        <CodeDiffView hunks={diff.hunks} fileName={filename(originalPath)} />
       )}
       <DraftDiffFooter
         unreviewedCount={diff.unreviewedCount}

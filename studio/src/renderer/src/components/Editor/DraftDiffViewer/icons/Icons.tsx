@@ -42,6 +42,16 @@ export function ListIcon({ size = 16 }: IconProps) {
   )
 }
 
+/** Split panes — the file-level "Code diff" (VS Code-style) view. */
+export function CodeDiffIcon({ size = 16 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <rect x="3" y="4" width="18" height="16" rx="1.5" />
+      <line x1="12" y1="4" x2="12" y2="20" />
+    </svg>
+  )
+}
+
 /** Disclosure chevron — points right when closed, down when open. */
 export function Chevron({ open, size = 14 }: IconProps & { open: boolean }) {
   return (

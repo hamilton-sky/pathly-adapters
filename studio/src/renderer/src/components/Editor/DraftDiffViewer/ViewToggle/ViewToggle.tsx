@@ -1,5 +1,5 @@
 import React from 'react'
-import { CardsIcon, ListIcon } from '../icons/Icons'
+import { CardsIcon, ListIcon, CodeDiffIcon } from '../icons/Icons'
 import type { ViewMode } from '../useViewMode'
 import styles from './ViewToggle.module.css'
 
@@ -8,7 +8,7 @@ interface Props {
   onChange: (v: ViewMode) => void
 }
 
-/** Icon-only segmented control switching the viewer between Cards and List. */
+/** Icon-only segmented control switching the viewer between Cards, List and Code. */
 export function ViewToggle({ value, onChange }: Props) {
   return (
     <div className={styles.toggle} role="tablist" aria-label="View">
@@ -33,6 +33,17 @@ export function ViewToggle({ value, onChange }: Props) {
         onClick={() => onChange('list')}
       >
         <ListIcon />
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={value === 'code'}
+        aria-label="Code diff view"
+        title="Code diff"
+        className={value === 'code' ? styles.active : ''}
+        onClick={() => onChange('code')}
+      >
+        <CodeDiffIcon />
       </button>
     </div>
   )

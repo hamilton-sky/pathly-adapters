@@ -7,6 +7,9 @@ export { DraftHunkCard } from './DraftHunkCard/DraftHunkCard'
 export { DraftTriageList } from './DraftTriageList/DraftTriageList'
 export { DraftTriageRow } from './DraftTriageRow/DraftTriageRow'
 export { DraftPreviewPanel } from './DraftPreviewPanel/DraftPreviewPanel'
+export { CodeDiffView } from './CodeDiffView/CodeDiffView'
+export { SplitDiff } from './SplitDiff/SplitDiff'
+export { UnifiedDiff } from './UnifiedDiff/UnifiedDiff'
 export { DraftDiffFooter } from './DraftDiffFooter/DraftDiffFooter'
 export { DiffCodeBlock } from './DiffCodeBlock/DiffCodeBlock'
 export { default as MarkdownRenderer } from './MarkdownRenderer/MarkdownRenderer'
@@ -15,7 +18,7 @@ export { default as MarkdownRenderer } from './MarkdownRenderer/MarkdownRenderer
 export { StatusBadge } from './StatusBadge/StatusBadge'
 export { AcceptToggleChip } from './AcceptToggleChip/AcceptToggleChip'
 export { ViewToggle } from './ViewToggle/ViewToggle'
-export { CardsIcon, ListIcon, Chevron } from './icons/Icons'
+export { CardsIcon, ListIcon, CodeDiffIcon, Chevron } from './icons/Icons'
 
 // Hooks
 export { useDraftDiff, reconstruct } from './useDraftDiff'
@@ -27,3 +30,11 @@ export type { ViewMode } from './useViewMode'
 export { computeWordDiff, computeLineDiff, countWordChanges } from './diffUtils'
 export type { DiffLine, WordToken, DiffOpType, WordChangeCount } from './diffUtils'
 export { statusBadgeLabel, acceptChipLabel, displayHeading, previewText } from './hunkLabels'
+export {
+  buildDocument,
+  fileDiffOps,
+  diffStats,
+  toSplitRows,
+  toUnifiedRows,
+} from './fileDiffUtils'
+export type { SplitRow, UnifiedRow, FileDiffStats, DocSide, SplitCellType } from './fileDiffUtils'
