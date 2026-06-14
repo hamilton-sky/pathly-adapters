@@ -27,6 +27,24 @@ def _base_url(host: str, port: int) -> str:
     return f"http://{host}:{port}"
 
 
+def _load_secret() -> str:
+    """Read the shared API secret the server authenticates against.
+
+    Mirrors the server's resolution order (``PATHLY_API_SECRET`` env, then
+    ``~/.pathly/server_secret.txt``) but never creates the file — a missing
+    secret simply means no header is sent, which is correct for an unsecured
+    server.
+    """
+    env = os.environ.get("PATHLY_API_SECRET")
+    if env:
+        return env.strip()
+    secret_file = Path.home() / ".pathly" / "server_secret.txt"
+    try:
+        return secret_file.read_text().strip()
+    except OSError:
+        return ""
+
+
 def _request_raw(
     method: str,
     path: str,
@@ -42,6 +60,9 @@ def _request_raw(
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
+    secret = _load_secret()
+    if secret:
+        headers["X-Pathly-Secret"] = secret
     req = Request(url, data=data, headers=headers, method=method)
     try:
         with urlopen(req, timeout=timeout) as resp:
