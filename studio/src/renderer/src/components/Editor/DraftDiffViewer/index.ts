@@ -8,6 +8,7 @@ export { DraftTriageList } from './DraftTriageList/DraftTriageList'
 export { DraftTriageRow } from './DraftTriageRow/DraftTriageRow'
 export { DraftPreviewPanel } from './DraftPreviewPanel/DraftPreviewPanel'
 export { CodeDiffView } from './CodeDiffView/CodeDiffView'
+export { DraftEditView } from './DraftEditView/DraftEditView'
 export { SplitDiff } from './SplitDiff/SplitDiff'
 export { UnifiedDiff } from './UnifiedDiff/UnifiedDiff'
 export { DraftDiffFooter } from './DraftDiffFooter/DraftDiffFooter'
@@ -18,7 +19,7 @@ export { default as MarkdownRenderer } from './MarkdownRenderer/MarkdownRenderer
 export { StatusBadge } from './StatusBadge/StatusBadge'
 export { AcceptToggleChip } from './AcceptToggleChip/AcceptToggleChip'
 export { ViewToggle } from './ViewToggle/ViewToggle'
-export { CardsIcon, ListIcon, CodeDiffIcon, Chevron } from './icons/Icons'
+export { CardsIcon, ListIcon, CodeDiffIcon, EditIcon, Chevron } from './icons/Icons'
 
 // Hooks
 export { useDraftDiff, reconstruct } from './useDraftDiff'

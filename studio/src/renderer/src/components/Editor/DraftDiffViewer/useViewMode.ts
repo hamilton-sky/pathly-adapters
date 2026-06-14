@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 
-export type ViewMode = 'cards' | 'list' | 'code'
+export type ViewMode = 'cards' | 'list' | 'code' | 'edit'
 
 const STORAGE_KEY = 'pathly.diffViewMode'
 
@@ -12,7 +12,7 @@ export function useViewMode(initial: ViewMode = 'cards'): [ViewMode, (v: ViewMod
   const [mode, setMode] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
-      return saved === 'cards' || saved === 'list' || saved === 'code' ? saved : initial
+      return saved === 'cards' || saved === 'list' || saved === 'code' || saved === 'edit' ? saved : initial
     } catch {
       return initial
     }

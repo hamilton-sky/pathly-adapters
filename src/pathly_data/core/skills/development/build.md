@@ -119,6 +119,17 @@ Report to the user before starting:
 
 Run: `python -c "import time; print(int(time.time()))"` and note the printed integer as `BUILD_START`.
 
+## Step 4.6: DAG task loop (comms board)
+
+If the comms board is active for this feature:
+1. Call `GET http://127.0.0.1:8765/comms/tasks?feature=<feature>&ready=true`
+2. If tasks are returned, implement them in order (they are already unblocked)
+3. After completing each task, call `POST http://127.0.0.1:8765/comms/tasks/complete` with body `{"message_id": "<task_id>", "feature": "<feature>"}`
+4. Poll `GET /comms/tasks?feature=<feature>&ready=true` again — new tasks may have unlocked
+5. Continue until no ready tasks remain, then proceed to Step 5 as normal
+
+If the endpoint returns an empty list or is unreachable, skip to Step 5 directly. The DAG loop supplements the conversation prompt — it does not replace it. If no task messages exist on the board, the builder works exactly as before.
+
 ## Step 5: Implement
 
 Execute exactly what the conversation prompt specifies:

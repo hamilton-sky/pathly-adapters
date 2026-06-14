@@ -13,7 +13,11 @@
   border-radius: 12px;
   width: 800px;
   max-width: calc(100vw - 40px);
-  max-height: 80vh;
+  /* Definite height (not just max-height) so percentage-height descendants —
+     e.g. the CodeMirror edit pane (height:100%) — can resolve and scroll
+     internally. A fixed surface also stops the modal resizing when toggling
+     between the short (Cards) and tall (Code/Edit) views. */
+  height: 80vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;

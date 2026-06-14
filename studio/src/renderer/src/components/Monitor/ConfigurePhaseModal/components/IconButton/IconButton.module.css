@@ -1,0 +1,31 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.btn:focus-visible {
+  outline: var(--focus-ring);
+}
+
+.active,
+.active:hover {
+  border-color: var(--orange);
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}

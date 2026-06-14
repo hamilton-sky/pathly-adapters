@@ -5,6 +5,7 @@ import { ViewToggle } from '../ViewToggle/ViewToggle'
 import { DraftHunkList } from '../DraftHunkList/DraftHunkList'
 import { DraftTriageList } from '../DraftTriageList/DraftTriageList'
 import { CodeDiffView } from '../CodeDiffView/CodeDiffView'
+import { DraftEditView } from '../DraftEditView/DraftEditView'
 import { DraftPreviewPanel } from '../DraftPreviewPanel/DraftPreviewPanel'
 import { DraftDiffFooter } from '../DraftDiffFooter/DraftDiffFooter'
 import type { ViewMode } from '../useViewMode'
@@ -28,6 +29,9 @@ type ContentProps = DraftDiffViewerProps & { view: ViewMode; onRetry: () => void
 
 function DiffContent({ originalPath, draftPath, onApply, onClose, onDiscard, pushToast, view, onRetry }: ContentProps) {
   const diff = useDraftDiff(originalPath, draftPath)
+  // null = follow the per-section accept/reject choices; a string = the user's
+  // manual edit of the result, which then wins on Apply.
+  const [edited, setEdited] = useState<string | null>(null)
 
   useEffect(() => {
     if (!diff.loading && !diff.error && diff.totalChanged === 0) {
@@ -58,12 +62,14 @@ function DiffContent({ originalPath, draftPath, onApply, onClose, onDiscard, pus
 
   if (diff.totalChanged === 0) return null
 
+  const result = diff.reconstruct()
+
   return (
     <>
       {view === 'cards' ? (
         <div className={styles.body}>
           <DraftHunkList hunks={diff.hunks} onToggle={diff.toggle} onMarkReviewed={diff.markReviewed} />
-          <DraftPreviewPanel content={diff.reconstruct()} changedHunks={diff.hunks} />
+          <DraftPreviewPanel content={result} changedHunks={diff.hunks} />
         </div>
       ) : view === 'list' ? (
         <DraftTriageList
@@ -72,16 +78,24 @@ function DiffContent({ originalPath, draftPath, onApply, onClose, onDiscard, pus
           onMarkReviewed={diff.markReviewed}
           onSetAll={diff.setAll}
         />
-      ) : (
+      ) : view === 'code' ? (
         <CodeDiffView hunks={diff.hunks} fileName={filename(originalPath)} />
+      ) : (
+        <DraftEditView
+          value={edited ?? result}
+          onChange={setEdited}
+          edited={edited !== null}
+          onReset={() => setEdited(null)}
+        />
       )}
       <DraftDiffFooter
         unreviewedCount={diff.unreviewedCount}
         acceptedCount={diff.acceptedCount}
         totalChanged={diff.totalChanged}
+        editedManually={edited !== null}
         onDiscard={onDiscard}
         onClose={onClose}
-        onApply={() => onApply(diff.reconstruct())}
+        onApply={() => onApply(edited ?? result)}
       />
     </>
   )

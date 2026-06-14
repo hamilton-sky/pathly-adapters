@@ -1,0 +1,40 @@
+.recipe {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  row-gap: 7px;
+  padding: 10px 14px;
+  background: var(--bg-terminal);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.key {
+  color: var(--text-muted);
+}
+
+.arrow {
+  color: color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+
+.done {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--green);
+}
+
+.tag {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.host  { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.agent { background: color-mix(in srgb, var(--purple) 16%, transparent); color: var(--purple); }
+.skill { background: color-mix(in srgb, var(--green) 16%, transparent);  color: var(--green); }

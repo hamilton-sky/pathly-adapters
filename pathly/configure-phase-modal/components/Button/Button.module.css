@@ -1,0 +1,63 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn:focus-visible {
+  outline: var(--focus-ring);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* primary — accent fill */
+.primary {
+  padding: 8px 18px;
+  border: none;
+  color: #fff;
+  background: var(--accent);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 1px 0 color-mix(in srgb, #000 18%, transparent);
+}
+.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* ghost — surface card */
+.ghost {
+  padding: 8px 12px;
+  border: var(--border);
+  color: var(--text-secondary);
+  background: var(--bg-surface0);
+  font-size: var(--font-size-sm);
+}
+.ghost:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-border);
+  background: var(--bg-surface1);
+}
+
+/* quiet — transparent outline */
+.quiet {
+  padding: 8px 14px;
+  border: var(--border);
+  color: var(--text-muted);
+  background: transparent;
+  font-size: var(--font-size-base);
+}
+.quiet:hover {
+  color: var(--text-secondary);
+  border-color: var(--accent-border);
+  background: var(--bg-surface1);
+}

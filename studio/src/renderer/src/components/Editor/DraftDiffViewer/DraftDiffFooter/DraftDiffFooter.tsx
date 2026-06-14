@@ -5,6 +5,8 @@ interface Props {
   unreviewedCount: number
   acceptedCount: number
   totalChanged: number
+  /** True when the user hand-edited the result (Edit view), overriding toggles. */
+  editedManually?: boolean
   onDiscard: () => void
   onClose: () => void
   onApply: () => void
@@ -14,6 +16,7 @@ export function DraftDiffFooter({
   unreviewedCount,
   acceptedCount,
   totalChanged,
+  editedManually = false,
   onDiscard,
   onClose,
   onApply,
@@ -51,8 +54,8 @@ export function DraftDiffFooter({
           <button type="button" className={styles.btnCancel} onClick={onClose}>
             Close
           </button>
-          <button type="button" className={styles.btnPrimary} disabled={acceptedCount === 0} onClick={onApply}>
-            Apply {acceptedCount} of {totalChanged} changes
+          <button type="button" className={styles.btnPrimary} disabled={!editedManually && acceptedCount === 0} onClick={onApply}>
+            {editedManually ? 'Apply edited result' : `Apply ${acceptedCount} of ${totalChanged} changes`}
           </button>
         </div>
       </div>
