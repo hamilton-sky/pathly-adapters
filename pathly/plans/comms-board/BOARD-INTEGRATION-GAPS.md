@@ -4,6 +4,19 @@
 > Backend: complete (Phases 11–14 shipped)  
 > This document covers what is missing between the backend and a fully live board.
 
+> ## ✅ RESOLUTION STATUS — 2026-06-15 (P0 + P1 landed)
+> Full design + file-by-file spec: [LIVE-BOARD-ARCHITECTURE.md](LIVE-BOARD-ARCHITECTURE.md).
+>
+> | Gap | Status | Evidence |
+> |---|---|---|
+> | **1 — Skills silent** | ✅ DONE | `comms-post.md` fragment wired into review/test/design/explore/debug/retro (both `team/*` + `development/*`); synced via `pathly-setup --apply --repair` + `python -m build`. Compose tests 65/65. |
+> | **2 — Warning resolve → FSM** | ✅ CODE COMPLETE | `commsStore.resolve()` now drives `POST /runner/decision` (guarded: only when `runnerStore.topic===key` && run is `awaiting_decision`; block→`block`, note/ignore→`continue`); `note` also posts a `decision`. Renderer typecheck clean. *Not yet runtime-verified in a live Studio run.* |
+> | **3 — Async question loop** | ✅ PART A DONE · ⏸ PART B DEFERRED | Part A: "Asking a question" recipe in `comms-post.md` (synced). Part B (answer→`/runner/agent-answer`) deferred — needs a board↔run `question_id` bridge. |
+> | **4 — Search / supersede / attach** | ✅ CODE COMPLETE | Backend `/comms/attach` 501→real (`attach_artifact_to_message`, broadcasts; 23 tests pass). Studio: `SearchBar/` overlay, `SupersedeMenu/` (newer-same-type only), paperclip enabled via hidden file input. Typecheck clean. *Not yet runtime-verified.* |
+> | **5 — ConfigurePhaseModal** | ✅ already integrated | (verified 2026-06-14) |
+>
+> **Remaining to call P1 "live":** a manual end-to-end smoke in a running Studio session (start a run → hit a review-warning gate → Block/Note/Ignore → confirm the FSM moves; search; supersede; attach). **Rich artifacts (P1.5)** — 5-thumbnail compose tray + `ArtifactBubble` + motion + an `artifacts[]` JSON column — is a planned follow-up, not yet built.
+
 ---
 
 ## Gap 1 — Skills are silent (highest priority)

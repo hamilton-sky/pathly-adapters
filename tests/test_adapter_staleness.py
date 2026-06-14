@@ -65,7 +65,7 @@ def test_stitch_shared_sections_appear_at_most_once(adapter, skill):
 @pytest.mark.parametrize("adapter", _ADAPTERS)
 def test_stitch_unconverted_skill_stays_raw(adapter):
     """A skill absent from the manifest must stitch to its raw body for every adapter."""
-    skill = "development/design"
+    skill = "development/fix"
     core_path = _core_path(skill)
     raw = _read_skill_body(skill)
     assert _compose_or_read(core_path, skill, adapter) == raw

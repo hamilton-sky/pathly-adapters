@@ -12,8 +12,14 @@ import {
   fetchFeatureState,
   featureBlocked,
   fetchLastSummary,
+  apiRunnerDecision,
+  apiRunnerAwaitingDecision,
+  apiSearch,
+  apiSupersede,
+  apiAttach,
 } from './commsApi'
 import { listDirs } from '../services/pathlyApi'
+import { useRunnerStore } from './runnerStore'
 
 function isPending(m: Message): boolean {
   return (m.type === 'question' && m.status === 'pending')
@@ -40,11 +46,19 @@ export interface CommsState {
 
   post: (key: string, type: MessageType, text: string, stage?: Stage | null) => string
   answer: (featureId: string, messageId: string, optionId: string) => void
-  resolve: (messageId: string, mode: 'block' | 'note' | 'ignore') => void
+  resolve: (key: string, messageId: string, mode: 'block' | 'note' | 'ignore') => Promise<void>
   setFeatureStatus: (featureId: string, status: FeatureStatus, stage?: Stage) => void
   toggleScope: (featureId: string, scope: BoardScope, projectRoot: string) => void
   /** Retract one of your own messages — only while no agent has read it. */
   deleteMessage: (key: string, messageId: string) => void
+
+  // GAP 4 — management actions + transient search overlay state.
+  searchResults: Message[] | null
+  searchTerm: string
+  runSearch: (key: string, query: string) => Promise<void>
+  clearSearch: () => void
+  supersede: (key: string, oldId: string, newId: string) => void
+  attach: (key: string, messageId: string, path: string, atype?: Message['atype']) => void
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -147,27 +161,41 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     apiAnswer(mid, `Use \`${label}\`. Keep it simple.`, opt).catch(() => { /* optimistic stays */ })
   },
 
-  resolve: (mid, mode) => {
-    // TODO: full FSM block/note/ignore semantics — POST /comms/acknowledge covers the
-    // acknowledge path; block→RETRY and note→decision-post require additional FSM calls
-    // that are out of scope for this wiring task.
+  resolve: async (key, mid, mode) => {
+    // 1. Optimistic board annotation.
     set((s) => {
-      const key = Object.keys(s.boards).find((k) => (s.boards[k] || []).some((m) => m.id === mid))
-      if (!key) return s
       const resolution =
-        mode === 'block' ? 'blocked → RETRY (builder)'
-        : mode === 'note' ? 'noted as v2 → REVIEWING advances'
-        : 'ignored → REVIEWING advances'
+        mode === 'block' ? 'blocked → builder retry'
+        : mode === 'note' ? 'noted as future work'
+        : 'ignored'
       const arr = (s.boards[key] || []).map((m) =>
         m.id === mid ? { ...m, status: 'resolved' as const, resolution } : m)
-      const newStatus: FeatureStatus = 'running'
-      const newStage: Stage = mode === 'block' ? 'BUILDING' : 'TESTING'
-      const features = s.features.map((f) =>
-        f.id === key ? { ...f, status: newStatus, stage: newStage } : f)
-      return { boards: { ...s.boards, [key]: arr }, features }
+      return { boards: { ...s.boards, [key]: arr } }
     })
 
-    apiAcknowledge(mid, 'you').catch(() => { /* best-effort */ })
+    // 2. Mark handled on the board (best-effort).
+    void apiAcknowledge(mid, 'you')
+
+    // 3. mode==='note' → record the choice as a durable decision on the board.
+    if (mode === 'note') {
+      const params = scopeToParams('feature', key)
+      const stage = get().features.find((f) => f.id === key)?.stage ?? null
+      void apiPost(key, params.board, params.scope, 'decision',
+        'Noted as future work (deferred from a warning).', stage)
+    }
+
+    // 4. Drive the FSM ONLY when this feature is the active awaiting-decision run.
+    const { topic } = useRunnerStore.getState()
+    if (topic && topic === key) {
+      const options = await apiRunnerAwaitingDecision(topic)
+      if (options) {
+        const wanted = mode === 'block' ? 'block' : 'continue'
+        const decision = options.includes(wanted)
+          ? wanted
+          : (options.includes('continue') ? 'continue' : options[0])
+        void apiRunnerDecision(topic, decision)
+      }
+    }
   },
 
   setFeatureStatus: (fid, status, stage) => {
@@ -210,5 +238,40 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       return { boards: { ...s.boards, [key]: arr.filter((x) => x.id !== messageId) } }
     })
     apiDelete(messageId).catch(() => { /* best-effort */ })
+  },
+
+  searchResults: null,
+  searchTerm: '',
+
+  runSearch: async (key, query) => {
+    const q = query.trim()
+    if (!q) { set({ searchResults: null, searchTerm: '' }); return }
+    set({ searchTerm: q })
+    const isFeature = key !== 'project' && key !== 'global'
+    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
+    const params = scopeToParams(scope, key)
+    const feature = isFeature ? key : (scope === 'global' ? 'global' : key)
+    const results = await apiSearch(q, feature, params.board, params.scope)
+    set({ searchResults: results })
+  },
+
+  clearSearch: () => set({ searchResults: null, searchTerm: '' }),
+
+  supersede: (key, oldId, newId) => {
+    set((s) => {
+      const arr = (s.boards[key] || []).map((m) =>
+        m.id === oldId ? { ...m, supersededBy: newId } : m)
+      return { boards: { ...s.boards, [key]: arr } }
+    })
+    void apiSupersede(oldId, newId)
+  },
+
+  attach: (key, messageId, path, atype) => {
+    set((s) => {
+      const arr = (s.boards[key] || []).map((m) =>
+        m.id === messageId ? { ...m, artifact: path.split(/[/\\]/).pop(), atype } : m)
+      return { boards: { ...s.boards, [key]: arr } }
+    })
+    void apiAttach(messageId, path, atype)
   },
 }))

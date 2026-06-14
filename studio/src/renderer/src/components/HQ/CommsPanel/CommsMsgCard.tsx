@@ -5,6 +5,7 @@ import { AGENTS } from '../../CommandCenter/constants'
 import { Avatar } from './Avatar'
 import { MessageTypeBadge } from './MessageTypeBadge'
 import { CardBody } from './CardBody'
+import { SupersedeMenu } from './SupersedeMenu/SupersedeMenu'
 import s from './CommsMsgCard.module.css'
 
 export interface CommsMsgCardProps {
@@ -13,13 +14,19 @@ export interface CommsMsgCardProps {
   onAnswer?: (messageId: string, optionId: string) => void
   onResolve?: (messageId: string, mode: 'block' | 'note' | 'ignore') => void
   onDelete?: (messageId: string) => void
+  onSupersede?: (oldId: string, newId: string) => void
+  siblings?: Message[]
 }
 
-export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete }: CommsMsgCardProps) {
+export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSupersede, siblings }: CommsMsgCardProps) {
   const agent = AGENTS[m.from]
   const canDelete = m.from === 'you' && !m.readByAgent && !!onDelete
   return (
-    <div className={`${s.msg}${flash ? ` ${s.flash}` : ''}`} data-msg={m.id}>
+    <div
+      className={`${s.msg}${flash ? ` ${s.flash}` : ''}`}
+      data-msg={m.id}
+      {...(m.supersededBy ? { 'data-superseded': '' } : {})}
+    >
       <div className={s.msgMeta}>
         <Avatar from={m.from} />
         <span className={s.msgAuthor}>{agent.label}</span>
@@ -38,10 +45,17 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete 
             className={s.msgDel}
             title="Delete — not yet read by any agent"
             aria-label="Delete message"
-            onClick={() => onDelete!(m.id)}
+            onClick={() => onDelete?.(m.id)}
           >
             <Trash2 size={12} />
           </button>
+        )}
+        {onSupersede && !m.supersededBy && (
+          <SupersedeMenu
+            message={m}
+            candidates={siblings ?? []}
+            onSupersede={onSupersede}
+          />
         )}
       </div>
 

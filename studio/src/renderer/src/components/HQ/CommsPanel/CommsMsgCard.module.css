@@ -239,6 +239,22 @@
   font-family: var(--font-family-mono);
 }
 
+/* Superseded card — struck-through and dimmed */
+.msg[data-superseded] .msgCard {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+/* Superseded banner inside the card body */
+.supersededNote {
+  font: 600 10px/1 var(--font-family-mono);
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Flash animation for newly posted messages */
 @media (prefers-reduced-motion: no-preference) {
   .flash .msgCard {

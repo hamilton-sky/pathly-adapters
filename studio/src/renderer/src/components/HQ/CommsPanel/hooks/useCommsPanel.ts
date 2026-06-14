@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { BoardScope, MessageType } from '../../../CommandCenter/types'
+import type { BoardScope, Message, MessageType } from '../../../CommandCenter/types'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useProjectStore } from '../../../../store/projectStore'
 import { PATHLY_API_BASE } from '../../../../lib/config'
@@ -67,12 +67,12 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
   )
 
   const resolve = useCallback(
-    (mid: string, mode: 'block' | 'note' | 'ignore') => store.resolve(mid, mode),
-    [store],
+    (mid: string, mode: 'block' | 'note' | 'ignore') => { void store.resolve(key, mid, mode) },
+    [store, key],
   )
 
   const toggleScope = useCallback(
-    (s: BoardScope) => store.toggleScope(mainFeature, s, projectRoot),
+    (sc: BoardScope) => store.toggleScope(mainFeature, sc, projectRoot),
     [store, mainFeature, projectRoot],
   )
 
@@ -81,5 +81,24 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
     [store, key],
   )
 
-  return { messages, feature, pendingCount, flashId, post, answer, resolve, toggleScope, del }
+  const supersede = useCallback(
+    (oldId: string, newId: string) => store.supersede(key, oldId, newId),
+    [store, key],
+  )
+
+  const attach = useCallback(
+    (mid: string, path: string, atype?: Message['atype']) => store.attach(key, mid, path, atype),
+    [store, key],
+  )
+
+  const searchResults = store.searchResults
+  const searchTerm = store.searchTerm
+  const runSearch = useCallback((q: string) => { void store.runSearch(key, q) }, [store, key])
+  const clearSearch = useCallback(() => store.clearSearch(), [store])
+
+  return {
+    messages, feature, pendingCount, flashId, post, answer, resolve,
+    toggleScope, del, supersede, attach,
+    searchResults, searchTerm, runSearch, clearSearch,
+  }
 }

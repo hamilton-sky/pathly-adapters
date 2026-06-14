@@ -388,8 +388,70 @@ def comms_tasks_complete():
 
 @bp.route("/comms/attach", methods=["POST"])
 def comms_attach():
-    """Attach a file or URL artifact to a message. (Not implemented in this phase.)"""
-    return jsonify({"error": "Artifact attachments are not implemented in this phase"}), 501
+    """Attach a file or URL artifact to an existing message.
+
+    Required body fields: message_id, and at least one of artifact_path / artifact_url.
+    Optional: artifact_type ('md'|'code'|'pdf'|'image'|'json'|'url'|'snippet').
+    Returns 200 {ok, message_id} | 400 bad input | 404 message not found.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import (
+            attach_artifact_to_message as _attach,
+        )
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+
+        artifact_path = data.get("artifact_path")
+        artifact_url = data.get("artifact_url")
+        artifact_type = data.get("artifact_type")
+
+        has_path = isinstance(artifact_path, str) and artifact_path.strip()
+        has_url = isinstance(artifact_url, str) and artifact_url.strip()
+        if not has_path and not has_url:
+            return jsonify({
+                "error": "Provide at least one of 'artifact_path' or 'artifact_url'"
+            }), 400
+        if artifact_type is not None and not isinstance(artifact_type, str):
+            return jsonify({"error": "Field 'artifact_type' must be a string or null"}), 400
+
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            (message_id,),
+        ).fetchone()
+        if row is None:
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+
+        result = _attach(
+            conn,
+            message_id=message_id,
+            artifact_path=artifact_path if has_path else None,
+            artifact_type=artifact_type,
+            artifact_url=artifact_url if has_url else None,
+        )
+        if result == "not_found":
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+
+        _broadcast_comms(row["scope"], {
+            "type": "COMMS_UPDATE",
+            "message_id": message_id,
+            "event": "artifact_attached",
+            "board": row["board"],
+            "scope": row["scope"],
+            "artifact_type": artifact_type,
+        })
+
+        return jsonify({"ok": True, "message_id": message_id}), 200
+    except Exception as exc:
+        logging.exception("comms_attach error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
 @bp.route("/comms/trash", methods=["GET"])

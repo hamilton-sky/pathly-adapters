@@ -42,6 +42,7 @@ export interface CommsRow {
   artifact_path: string | null
   artifact_type: string | null
   artifact_url: string | null
+  superseded_by?: string | null
 }
 
 interface BackendOption {
@@ -97,6 +98,7 @@ export function rowToMessage(row: CommsRow): Message {
     text: row.text,
     stage: (row.stage as Stage) ?? null,
     time: relativeTime(row.ts),
+    ts: row.ts,
     pinned: row.type === 'decision',
     ack: ackedBy.length > 0,
     readByAgent,
@@ -109,6 +111,8 @@ export function rowToMessage(row: CommsRow): Message {
     m.artifact = basename(row.artifact_path)
     if (row.artifact_type) m.atype = row.artifact_type as Message['atype']
   }
+
+  if (row.superseded_by) m.supersededBy = row.superseded_by
 
   return m
 }
@@ -214,6 +218,89 @@ export async function apiDelete(messageId: string): Promise<boolean> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message_id: messageId }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+// ── GAP 2: resolve → FSM decision gate ───────────────────────────────
+export async function apiRunnerDecision(topic: string, decision: string): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/runner/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, decision }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+export async function apiRunnerAwaitingDecision(topic: string): Promise<string[] | null> {
+  try {
+    const r = await apiFetch(`/runner/status?topic=${encodeURIComponent(topic)}`)
+    if (!r.ok) return null
+    const s = await r.json() as { status?: string; pending_menu?: { options?: Record<string, string> } }
+    if (s.status !== 'awaiting_decision' || !s.pending_menu?.options) return null
+    return Object.keys(s.pending_menu.options)
+  } catch {
+    return null
+  }
+}
+
+// ── GAP 4(a): hybrid search ──────────────────────────────────────────
+export async function apiSearch(
+  query: string,
+  feature: string,
+  board: string,
+  scope: string,
+): Promise<Message[]> {
+  try {
+    const r = await apiFetch(`/comms/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, feature, board, scope, mode: 'hybrid' }),
+    })
+    if (!r.ok) return []
+    const rows = await r.json() as CommsRow[]
+    return rows.map(rowToMessage)
+  } catch {
+    return []
+  }
+}
+
+// ── GAP 4(b): supersede ──────────────────────────────────────────────
+export async function apiSupersede(oldId: string, newId: string): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/comms/supersede`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_id: oldId, new_id: newId }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+// ── GAP 4(c): attach ─────────────────────────────────────────────────
+export async function apiAttach(
+  messageId: string,
+  artifactPath: string,
+  artifactType?: Message['atype'],
+): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/comms/attach`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message_id: messageId,
+        artifact_path: artifactPath,
+        artifact_type: artifactType ?? null,
+      }),
     })
     return r.ok
   } catch {

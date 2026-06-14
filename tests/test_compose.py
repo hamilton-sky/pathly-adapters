@@ -35,12 +35,13 @@ _SHARED_SECTIONS = [
 
 # ── Inert-seam: real (empty) manifest is a no-op ────────────────────────────
 
-@pytest.mark.parametrize("skill", ["development/design", "development/debug", "development/explore"])
+@pytest.mark.parametrize("skill", ["development/fix", "development/quick-fix", "development/commit"])
 def test_unconverted_skill_composes_raw_body(skill):
     """A skill ABSENT from the manifest composes byte-identical to its raw body.
 
     These development/* skills are not in the composition manifest, so the
     resolver must return their raw body unchanged — the inert-seam guarantee.
+    (design/debug/explore were moved into the manifest for Gap 1 board write-back.)
     """
     from pathly_orchestrator.compose import _read_skill_body
 

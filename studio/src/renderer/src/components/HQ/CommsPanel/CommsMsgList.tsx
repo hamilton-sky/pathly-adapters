@@ -9,14 +9,40 @@ import s from './CommsMsgList.module.css'
 export interface CommsMsgListProps {
   scope: BoardScope
   messages: Message[]
+  searchResults?: Message[] | null
+  searchTerm?: string
   flashId?: string | null
   onAnswer?: (messageId: string, optionId: string) => void
   onResolve?: (messageId: string, mode: 'block' | 'note' | 'ignore') => void
   onDelete?: (messageId: string) => void
+  onSupersede?: (oldId: string, newId: string) => void
 }
 
 // Pinned decisions tray + the message thread.
-export function CommsMsgList({ scope, messages, flashId, onAnswer, onResolve, onDelete }: CommsMsgListProps) {
+export function CommsMsgList({ scope, messages, searchResults, searchTerm, flashId, onAnswer, onResolve, onDelete, onSupersede }: CommsMsgListProps) {
+  // Search overlay — replaces the normal thread when active.
+  if (searchResults) {
+    return (
+      <div className={s.thread}>
+        <div className={s.searchHead}>
+          {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for &ldquo;{searchTerm}&rdquo;
+        </div>
+        {searchResults.map((m) => (
+          <CommsMsgCard
+            key={m.id}
+            message={m}
+            flash={false}
+            onAnswer={onAnswer}
+            onResolve={onResolve}
+            onDelete={onDelete}
+            onSupersede={onSupersede}
+            siblings={messages}
+          />
+        ))}
+      </div>
+    )
+  }
+
   const pins = messages.filter((m) => m.pinned)
   const thread = messages.filter((m) => !m.pinned)
 
@@ -59,6 +85,8 @@ export function CommsMsgList({ scope, messages, flashId, onAnswer, onResolve, on
             onAnswer={onAnswer}
             onResolve={onResolve}
             onDelete={onDelete}
+            onSupersede={onSupersede}
+            siblings={messages}
           />
         ))
         : (

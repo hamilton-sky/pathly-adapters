@@ -11,9 +11,14 @@ export interface CardBodyProps {
 }
 
 export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
+  const supersededBanner = m.supersededBy
+    ? <div className={s.supersededNote}>superseded — see newer message</div>
+    : null
+
   if (m.type === 'artifact') {
     return (
       <>
+        {supersededBanner}
         <div className={s.art}>
           <span className={s.artIco}><FileText size={15} /></span>
           <span className={s.artName}>{m.artifact}</span>
@@ -27,6 +32,7 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
   if (m.type === 'question') {
     return (
       <>
+        {supersededBanner}
         <MarkdownRenderer content={m.text} className={s.msgText} />
         <div className={s.opts}>
           {(m.options || []).map((o) => (
@@ -62,6 +68,7 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
   if (m.type === 'warning' || m.type === 'escalation') {
     return (
       <>
+        {supersededBanner}
         <MarkdownRenderer content={m.text} className={s.msgText} />
         {m.status === 'resolved'
           ? (
@@ -86,5 +93,10 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
     )
   }
 
-  return <MarkdownRenderer content={m.text} className={s.msgText} />
+  return (
+    <>
+      {supersededBanner}
+      <MarkdownRenderer content={m.text} className={s.msgText} />
+    </>
+  )
 }

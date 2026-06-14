@@ -29,6 +29,9 @@ export interface Message {
   text: string
   stage?: Stage | null
   time: string
+  /** Raw ISO timestamp (maps to comms_messages.ts). Kept alongside the relative
+   *  `time` label so messages can be ordered — e.g. supersede only by a newer one. */
+  ts?: string
   pinned?: boolean
   ack?: boolean
   status?: 'pending' | 'answered' | 'open' | 'resolved'
@@ -37,6 +40,9 @@ export interface Message {
   resolution?: string
   artifact?: string
   atype?: 'md' | 'code' | 'pdf' | 'image' | 'json' | 'url' | 'snippet'
+  /** Set when this message has been superseded by a newer one (maps to
+   *  comms_messages.superseded_by; surfaced as a struck-through card). */
+  supersededBy?: string
   /** True once any agent has read this message. Maps to a non-empty read_by
    *  (SPEC §5). Your own messages can be retracted only while this is false. */
   readByAgent?: boolean

@@ -248,6 +248,36 @@ def get_active_escalations(
     return [dict(r) for r in conn.execute(sql, list(boards) + list(scopes)).fetchall()]
 
 
+def attach_artifact_to_message(
+    conn: sqlite3.Connection,
+    message_id: str,
+    artifact_path: str | None = None,
+    artifact_type: str | None = None,
+    artifact_url: str | None = None,
+) -> str:
+    """Set artifact_* fields on an existing message.
+
+    Returns 'ok' | 'not_found'. Mirrors supersede_message()'s status-string
+    contract so the route can map to 404 cleanly.
+    Reuses the already-present artifact_path / artifact_type / artifact_url
+    columns (migrations.py:237-239); never creates a new row.
+    """
+    row = conn.execute(
+        "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+        (message_id,),
+    ).fetchone()
+    if row is None:
+        return "not_found"
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages "
+            "SET artifact_path=?, artifact_type=?, artifact_url=? WHERE id=?",
+            (artifact_path, artifact_type, artifact_url, message_id),
+        )
+        conn.commit()
+    return "ok"
+
+
 def acknowledge_message(
     conn: sqlite3.Connection,
     message_id: str,

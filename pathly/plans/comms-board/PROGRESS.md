@@ -7,11 +7,13 @@ name: Progress
 
 > **This plan is backend-only.** No Studio/Electron code is touched here.
 >
-> **Phase 1** (Backend Core — Convs 1–3): all phases done · reviewed · 469 passed / 6 pre-existing failures  
+> **Phase 1** (Backend Core — Convs 1–3): all phases done · reviewed · full suite green (the earlier "6 pre-existing failures" no longer reproduce; note `test_supervisor.py::test_early_advance_with_billing_reconciliation` is a pre-existing concurrency test that can hang — needs a timeout guard, unrelated to comms)  
 > **Phase 1.4** (Retrieval Correctness — Conv 4): COMPLETE — superseded_by suppression, embed curation, governance/context channels, dead code removed  
 > **Phase 1.5** (Retrieval Quality + Permissions — Conv 5): COMPLETE — FTS5+hybrid search (RRF), role-based write permissions (feature/project/global), /comms/permissions route  
 > **Conv 6** (Backend handoff): no code — writes RETRO + emits BACKEND_COMPLETE, then this plan is DONE  
-> **Phase 14 DAG**: deferred — bundles with Phase 3 skill integration  
+> **Skill write-back (Gap 1)**: ✅ DONE (2026-06-15) — `comms-post.md` fragment wired into review/test/design/explore/debug/retro (both families); synced. Board no longer goes dark after PLAN.  
+> **Live board P1 (Gaps 2/4 + Gap 3 Part A)**: ✅ CODE COMPLETE (2026-06-15) — warning→FSM, search, supersede, real attach, question-post recipe. Renderer typecheck clean · backend 23/23 · compose 65/65. Pending: live-Studio smoke test. See [BOARD-INTEGRATION-GAPS.md](BOARD-INTEGRATION-GAPS.md) resolution table + [LIVE-BOARD-ARCHITECTURE.md](LIVE-BOARD-ARCHITECTURE.md).  
+> **Phase 14 DAG**: SHIPPED — `depends_on` column, `get_ready_tasks()`/`complete_task()`, `GET /comms/tasks` + `POST /comms/tasks/complete`; consumed by `plan.md` (posts tasks) and `build.md` (polls `?ready=true`)  
 > **Frontend gate**: do NOT open `comms-board-studio` until design consultation complete
 
 > **Review note (board/scope alignment):** Conv 2/3 originally stored `board`=feature-name,
@@ -36,7 +38,7 @@ name: Progress
 | S1.4d | PR4 — remove get_promotable_messages() dead code | Conv 4 | DONE |
 | S3.1 | Hybrid BM25 + semantic retrieval | Conv 5 | DONE |
 | S3.2 | Role-based write permissions | Conv 5 | DONE |
-| S3.3 | DAG task decomposition | Deferred (Phase 3 bundle) | TODO |
+| S3.3 | DAG task decomposition | Conv 5 / Phase 14 | DONE (backend + plan/build skill consumption) |
 
 ## Conversation Breakdown
 
@@ -74,7 +76,7 @@ See **CONVERSATION_PROMPTS.md** for exact prompts to paste in each conversation.
 | 5 | 11 FTS5 + hybrid helpers | `db/migrations.py` + `db/connection.py` + `db/queries/comms.py` | comms_fts + _FTS_AVAILABLE + search_by_keyword/hybrid | exact-id query ranks first | DONE |
 | 5 | 12 Hybrid mode in API + retrieval | `blueprints/comms.py` + `runner/comms_context.py` | mode param + hybrid default in retrieve | /comms/search mode=keyword works | DONE |
 | 5 | 13 Write permissions | `blueprints/comms.py` + `db/queries/app_settings.py` | _PROJECT/_GLOBAL_WRITERS + 403 + /comms/permissions | builder→global returns 403 | DONE |
-| — | 14 DAG tasks | DEFERRED | see SPEC §28; bundles with Phase 3 skills | t2 ready after t1 complete | DEFERRED |
+| 5 | 14 DAG tasks | `db/migrations.py` + `db/queries/comms.py` + `blueprints/comms.py` | `depends_on` col, `get_ready_tasks()`, `complete_task()`, `GET /comms/tasks`, `POST /comms/tasks/complete` | t2 ready after t1 complete | DONE |
 
 ## Prerequisites
 - Python 3.10+, package installed editable (`pip install -e .`)

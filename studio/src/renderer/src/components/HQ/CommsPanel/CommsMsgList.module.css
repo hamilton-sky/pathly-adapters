@@ -81,6 +81,15 @@
   }
 }
 
+/* Search overlay header */
+.searchHead {
+  font: 600 11px/1 var(--font-family-mono);
+  color: var(--text-muted);
+  padding: 2px 0 6px;
+  border-bottom: var(--border-subtle);
+  margin-bottom: 4px;
+}
+
 /* Empty state */
 .empty {
   flex: 1;

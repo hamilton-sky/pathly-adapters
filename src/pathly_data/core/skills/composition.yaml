@@ -56,11 +56,13 @@ skills:
       - scout-choreography
       - feedback-protocol
       - { name: spawn-rules, requires: can_spawn }
+      - comms-post
   team/test:
     fragments:
       - completion-report
       - scout-choreography
       - feedback-protocol
+      - comms-post
   development/build:
     fragments:
       - completion-report
@@ -70,9 +72,11 @@ skills:
     fragments:
       - scout-choreography
       - { name: spawn-rules, requires: can_spawn }
+      - comms-post
   development/test:
     fragments:
       - scout-choreography
+      - comms-post
 
   debug/build:
     fragments:
@@ -80,11 +84,13 @@ skills:
       - scout-choreography
       - feedback-protocol
       - { name: spawn-rules, requires: can_spawn }
+      - comms-post
 
   debug/verify:
     fragments:
       - completion-report
       - scout-choreography
+      - comms-post
 
   fix/build:
     fragments:
@@ -102,3 +108,25 @@ skills:
   team/design:
     fragments:
       - completion-report
+      - comms-post
+
+  # ── Gap 1: silent-skill board write-back ────────────────────────────────────
+  # These five were previously loaded raw (no fragments). Adding them to the map
+  # gives them the `progress-logging` default plus `comms-post`. Verified safe:
+  # explore/debug/retro carry no log-phase prose, and development/design's existing
+  # log-phase markers were previously unexplained — the default now covers them.
+  development/design:
+    fragments:
+      - comms-post
+  development/explore:
+    fragments:
+      - comms-post
+  development/debug:
+    fragments:
+      - comms-post
+  planning/retro:
+    fragments:
+      - comms-post
+  team/retro:
+    fragments:
+      - comms-post
