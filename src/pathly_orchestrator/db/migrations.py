@@ -231,9 +231,9 @@ CREATE TABLE IF NOT EXISTS comms_messages (
     acknowledged_by   TEXT DEFAULT '[]',
     status            TEXT DEFAULT 'pending',
     deleted_at        TEXT,
-    promoted_to       TEXT,
-    promoted_from     TEXT,
-    original_scope    TEXT,
+    promoted_to       TEXT,    -- reserved for future promotion feature
+    promoted_from     TEXT,    -- reserved for future promotion feature
+    original_scope    TEXT,    -- reserved for future promotion feature
     artifact_path     TEXT,
     artifact_type     TEXT,
     artifact_url      TEXT,
@@ -282,6 +282,8 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("flow_edges",          "config_json",          "TEXT"),
         ("flow_edges",          "ordinal",              "INTEGER DEFAULT 0"),
         ("flow_definitions",    "config_json",          "TEXT"),
+        # Phase 1.4a (comms-board): supersede stale decisions
+        ("comms_messages",      "superseded_by",         "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

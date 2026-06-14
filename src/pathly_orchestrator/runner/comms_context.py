@@ -129,6 +129,7 @@ def retrieve_board_context(
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import (
+            get_active_escalations,
             get_pending_decisions,
             search_by_embedding,
         )
@@ -176,65 +177,90 @@ def retrieve_board_context(
                 seen_ids.add(row_id)
                 retrieved.append(row)
 
-    # --- Always include pending decisions and escalations -------------------
+    # --- Always include pending decisions and active escalations (governance) ---
     # SPEC convention: board = tier, scope = identifier.
     all_boards = [b for b, _, _ in enabled_boards]
     all_scopes = [s for _, s, _ in enabled_boards]
 
-    mandatory: list[dict] = []
+    decisions: list[dict] = []
+    escalations: list[dict] = []
     try:
-        mandatory = get_pending_decisions(conn, boards=all_boards, scopes=all_scopes)
+        decisions = get_pending_decisions(conn, boards=all_boards, scopes=all_scopes)
     except Exception:
-        mandatory = []
+        decisions = []
+    try:
+        escalations = get_active_escalations(conn, boards=all_boards, scopes=all_scopes)
+    except Exception:
+        escalations = []
 
-    mandatory_ids = {m.get("id", "") for m in mandatory}
+    governance_ids = {m.get("id", "") for m in decisions} | {m.get("id", "") for m in escalations}
 
-    # --- Partition into sections --------------------------------------------
-    decisions: list[dict] = list(mandatory)
+    # --- Partition semantic results into context (excluding governance msgs) -
     context_msgs: list[dict] = []
-    questions: list[dict] = []
 
     for msg in retrieved:
         msg_id = msg.get("id", "")
-        if msg_id in mandatory_ids:
+        if msg_id in governance_ids:
             continue
         msg_type = msg.get("type", "")
-        if msg_type == "decision":
-            if msg_id not in {d.get("id", "") for d in decisions}:
-                decisions.append(msg)
-        elif msg_type in ("question",) and msg.get("status") == "pending":
-            questions.append(msg)
-        else:
-            context_msgs.append(msg)
+        # Escalations are in the governance channel — exclude from context pool.
+        if msg_type == "escalation":
+            continue
+        # Superseded messages must not surface anywhere — they have been replaced.
+        if msg.get("superseded_by"):
+            continue
+        context_msgs.append(msg)
 
     # Nothing to show
-    if not decisions and not context_msgs and not questions:
+    if not decisions and not escalations and not context_msgs:
         return ""
 
-    # --- Build markdown block -----------------------------------------------
-    lines: list[str] = [
-        "## Communication Board",
-        "",
-        "> These are messages from your team. Decisions override your defaults.",
-        "> Read all entries. Acknowledge questions that are addressed to you.",
-    ]
+    # --- Build two-channel markdown block ------------------------------------
+    lines: list[str] = ["## Communication Board", ""]
 
-    if decisions:
+    # Governance channel — always applies, injected deterministically
+    if decisions or escalations:
+        lines.append("### 🔒 Governance (always applies — do not override)")
+        lines.append("Active decisions and open escalations injected unconditionally.")
         lines.append("")
-        lines.append("### 📌 Decisions (always apply)")
-        for msg in decisions:
-            lines.append(_format_decision(msg))
+        if decisions:
+            lines.append("**Decisions:**")
+            for msg in decisions:
+                tier = msg.get("board", "feature")
+                text = msg.get("text", "")
+                ts_str = msg.get("ts", "")
+                age = _format_age(ts_str) if ts_str else ""
+                lines.append(f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]")
+        if escalations:
+            lines.append("**Open escalations (human input required):**")
+            for msg in escalations:
+                tier = msg.get("board", "feature")
+                text = msg.get("text", "")
+                ts_str = msg.get("ts", "")
+                age = _format_age(ts_str) if ts_str else ""
+                lines.append(f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
 
+    # Semantic / context channel — labeled as advisory
     if context_msgs:
+        lines.append("### 💡 Context (possibly relevant — verify before acting)")
+        lines.append("Semantic matches for this task. Inform but do not override governance above.")
         lines.append("")
-        lines.append("### 💬 Recent context")
         for msg in context_msgs:
-            lines.append(_format_context_line(msg))
-
-    if questions:
-        lines.append("")
-        lines.append("### ❓ Open questions (answer if relevant to your work)")
-        for msg in questions:
-            lines.append(_format_question(msg))
+            from_agent = msg.get("from_agent", "?")
+            to_agent = msg.get("to_agent", "*")
+            stage = msg.get("stage") or ""
+            ts_str = msg.get("ts", "")
+            age = _format_age(ts_str) if ts_str else ""
+            parts = [f"{from_agent} → {to_agent}"]
+            if stage:
+                parts.append(stage)
+            if age:
+                parts.append(age)
+            header = ", ".join(parts)
+            text = msg.get("text", "")
+            lines.append(f"  • {text}  [{header}]")
 
     return "\n".join(lines) + "\n"

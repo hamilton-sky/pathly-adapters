@@ -129,10 +129,50 @@ def get_pending_decisions(
         "SELECT * FROM comms_messages "
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
         "AND type='decision' AND status='pending' AND deleted_at IS NULL "
+        "AND (superseded_by IS NULL OR superseded_by = '') "
         "ORDER BY ts ASC"
     )
     rows = conn.execute(sql, list(boards) + list(scopes)).fetchall()
     return [dict(r) for r in rows]
+
+
+def supersede_message(conn: sqlite3.Connection, old_id: str, new_id: str) -> str:
+    """Mark old_id as superseded by new_id. Returns 'ok'|'not_found'|'already_superseded'."""
+    row = conn.execute(
+        "SELECT superseded_by FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+        (old_id,)
+    ).fetchone()
+    if row is None:
+        return "not_found"
+    if row["superseded_by"]:
+        return "already_superseded"
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET superseded_by=? WHERE id=?",
+            (new_id, old_id)
+        )
+        conn.commit()
+    return "ok"
+
+
+def get_active_escalations(
+    conn: sqlite3.Connection,
+    boards: list[str],
+    scopes: list[str],
+) -> list[dict]:
+    """Return all unresolved escalation messages for the given boards/scopes."""
+    if not boards or not scopes:
+        return []
+    board_ph = ",".join("?" * len(boards))
+    scope_ph = ",".join("?" * len(scopes))
+    sql = (
+        "SELECT * FROM comms_messages "
+        f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
+        "AND type='escalation' AND status='pending' AND deleted_at IS NULL "
+        "AND (superseded_by IS NULL OR superseded_by = '') "
+        "ORDER BY ts ASC"
+    )
+    return [dict(r) for r in conn.execute(sql, list(boards) + list(scopes)).fetchall()]
 
 
 def acknowledge_message(
@@ -252,21 +292,6 @@ def purge_expired_trash(
         )
         conn.commit()
         return cur.rowcount
-
-
-def get_promotable_messages(
-    conn: sqlite3.Connection,
-    scope: str,
-) -> list[dict]:
-    """Return messages eligible for promotion to a higher-scope board (not yet promoted)."""
-    rows = conn.execute(
-        "SELECT * FROM comms_messages "
-        "WHERE scope=? AND promoted_to IS NULL AND deleted_at IS NULL "
-        "AND type IN ('decision', 'discovery') "
-        "ORDER BY ts DESC",
-        (scope,),
-    ).fetchall()
-    return [dict(r) for r in rows]
 
 
 def soft_delete_message(conn: sqlite3.Connection, message_id: str) -> str:

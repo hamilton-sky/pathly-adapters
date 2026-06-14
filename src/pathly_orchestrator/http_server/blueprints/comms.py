@@ -9,6 +9,10 @@ from ..sse import _broadcast_comms
 
 bp = Blueprint("comms", __name__)
 
+_EMBED_TYPES: frozenset[str] = frozenset({
+    "decision", "discovery", "constraint", "warning", "escalation", "artifact"
+})
+
 
 @bp.route("/comms/post", methods=["POST"])
 def comms_post():
@@ -79,7 +83,8 @@ def comms_post():
             conv=conv,
         )
 
-        _embed_async(message_id, text)
+        if msg_type in _EMBED_TYPES:
+            _embed_async(message_id, text)
 
         _broadcast_comms(scope, {
             "type": "COMMS_UPDATE",
@@ -298,6 +303,40 @@ def comms_restore():
         return jsonify({"ok": True, "restored": len(message_ids)}), 200
     except Exception as exc:
         logging.exception("comms_restore error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/supersede", methods=["POST"])
+def comms_supersede():
+    """Mark a decision as superseded by a newer one.
+
+    Required body fields: old_id, new_id.
+    Returns 200 {ok:true} | 404 not found | 409 already superseded.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import supersede_message as _supersede
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        old_id = data.get("old_id", "")
+        new_id = data.get("new_id", "")
+        if not isinstance(old_id, str) or not old_id.strip():
+            return jsonify({"error": "Field 'old_id' must be a non-empty string"}), 400
+        if not isinstance(new_id, str) or not new_id.strip():
+            return jsonify({"error": "Field 'new_id' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        result = _supersede(conn, old_id=old_id, new_id=new_id)
+        if result == "not_found":
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+        if result == "already_superseded":
+            return jsonify({"ok": False, "error": "Message already superseded"}), 409
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("comms_supersede error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
