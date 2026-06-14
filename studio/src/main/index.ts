@@ -1,6 +1,5 @@
-import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu, globalShortcut, protocol, net as electronNet } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu, globalShortcut } from 'electron'
 import { join, extname } from 'path'
-import { pathToFileURL } from 'url'
 import { createServer } from 'http'
 import { createReadStream, statSync } from 'fs'
 import { registerFsHandlers } from './ipc/fs'
@@ -38,11 +37,16 @@ const DS_MIME: Record<string, string> = {
 
 let dsServerPort = 0
 
-function startDsFileServer(dsRoot: string): Promise<number> {
+function startDsFileServer(slidesRoot: string): Promise<number> {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
       const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0])
-      const filePath = join(dsRoot, 'Design System', urlPath)
+      const filePath = join(slidesRoot, urlPath)
+      // Guard against path traversal — join() normalizes `..`, so anything
+      // that escapes the slides root no longer starts with it.
+      if (!filePath.startsWith(slidesRoot)) {
+        res.writeHead(403); res.end(); return
+      }
       try {
         statSync(filePath)
       } catch {
@@ -63,10 +67,6 @@ function startDsFileServer(dsRoot: string): Promise<number> {
     })
   })
 }
-
-protocol.registerSchemesAsPrivileged([
-  { scheme: 'ds', privileges: { standard: true, secure: true, corsEnabled: true, supportFetchAPI: true } },
-])
 
 let fsmServer: ChildProcess | null = null
 
@@ -162,19 +162,12 @@ function createWindow(projectPath?: string): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
-  protocol.handle('ds', (request) => {
-    const urlPath = decodeURIComponent(new URL(request.url).pathname)
-    const root = app.isPackaged
-      ? join(process.resourcesPath, 'pathly-library')
-      : join(app.getAppPath(), '..')
-    const filePath = join(root, 'Design System', urlPath)
-    return electronNet.fetch(pathToFileURL(filePath).href)
-  })
-
-  const dsLibRoot = app.isPackaged
-    ? join(process.resourcesPath, 'pathly-library')
-    : join(app.getAppPath(), '..')
-  await startDsFileServer(dsLibRoot)
+  // Getting Started carousel slides — app-owned static bundle served over a
+  // loopback HTTP origin (iframes + web fonts need a real origin, not file://).
+  const slidesRoot = app.isPackaged
+    ? join(process.resourcesPath, 'getting-started')
+    : join(__dirname, '../../resources/getting-started')
+  await startDsFileServer(slidesRoot)
 
   const alreadyRunning = await isFsmRunning()
   if (alreadyRunning) {

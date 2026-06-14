@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown, Check, X } from 'lucide-react'
 import type { BoardScope, Direction, Preset, SectionDef } from './types'
 import { SCOPES } from './constants'
-import { Tooltip } from '../../ui'
+import { Tooltip } from '../ui'
 import s from './CommandCenterHeader.module.css'
 
 export interface CommandCenterHeaderProps {
