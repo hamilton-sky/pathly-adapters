@@ -733,7 +733,13 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
             def _write_event():
                 import time as _time
                 _time.sleep(0.05)
-                _db.append_event(conn, project_root, topic, {
+                # Own DB connection: sqlite3 connects with check_same_thread=True,
+                # so reusing the main-thread `conn` here raises ProgrammingError,
+                # which a daemon thread swallows silently — the AGENT_DONE would
+                # never land and wait_result_or_agent_done would block the full
+                # 1800s _TERMINAL_RESULT_TIMEOUT. get_db() is per-thread.
+                _thread_conn = _db.get_db()
+                _db.append_event(_thread_conn, project_root, topic, {
                     "type": "AGENT_DONE",
                     "agent": "builder",
                     "conversation": 2,
@@ -801,7 +807,12 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
             def _write_event():
                 import time as _time
                 _time.sleep(0.05)
-                _db.append_event(_db_conn, _project_root, topic, {
+                # Own DB connection: sqlite3 check_same_thread=True means the
+                # main-thread _db_conn cannot be reused here — the cross-thread
+                # write raises and a daemon thread swallows it, so AGENT_DONE never
+                # lands and the wait blocks the full 1800s. get_db() is per-thread.
+                _thread_conn = _db.get_db()
+                _db.append_event(_thread_conn, _project_root, topic, {
                     "type": "AGENT_DONE",
                     "agent": "builder",
                     "conversation": 2,
@@ -911,7 +922,12 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
             def _write_event():
                 import time as _time
                 _time.sleep(0.05)
-                _db.append_event(_db_conn, _project_root, topic, {
+                # Own DB connection: sqlite3 check_same_thread=True means the
+                # main-thread _db_conn cannot be reused here — the cross-thread
+                # write raises and a daemon thread swallows it, so AGENT_DONE never
+                # lands and the wait blocks the full 1800s. get_db() is per-thread.
+                _thread_conn = _db.get_db()
+                _db.append_event(_thread_conn, _project_root, topic, {
                     "type": "AGENT_DONE",
                     "agent": "builder",
                     "conversation": 4,
