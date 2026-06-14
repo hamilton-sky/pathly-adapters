@@ -76,19 +76,18 @@
 .sendBtn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 10px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   margin-left: auto;
   flex-shrink: 0;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--accent);
   color: #fff;
-  font: 600 11px/1 var(--font-family-base);
   cursor: pointer;
   transition: filter var(--transition-fast);
-  white-space: nowrap;
 }
 
 .sendBtn:hover:not(:disabled) { filter: brightness(1.08); }

@@ -1,6 +1,6 @@
 # pathly-adapters
 
-Stitches Pathly agent files and installs them into AI host tools (Claude Code, Codex, Copilot).
+Stitches Pathly agent files and installs them into AI host tools (Claude Code, Codex, Copilot, Antigravity).
 
 ## Install (end users)
 
@@ -26,7 +26,7 @@ pathly-setup --dry-run    # preview what will be installed
 pathly-setup --apply      # install into all detected hosts
 ```
 
-That's it. Pathly detects Claude Code, Codex, and Copilot automatically.
+That's it. Pathly detects Claude Code, Codex, Copilot, and Antigravity automatically.
 
 Then open Claude Code in your project directory and start:
 
@@ -50,6 +50,7 @@ pathly-setup --apply                # install into all detected hosts
 pathly-setup claude --apply         # install for Claude Code only
 pathly-setup codex --apply          # install for Codex only
 pathly-setup copilot --apply        # install for Copilot / VS Code only
+pathly-setup antigravity --apply    # install for Antigravity (Gemini CLI) only
 pathly-setup --repair               # overwrite Pathly-owned files
 pathly-setup --force                # overwrite all files, even non-Pathly-owned
 pathly-setup --uninstall            # remove all Pathly-owned files
@@ -69,6 +70,7 @@ pathly-studio                       # launch the local Pathly Studio desktop UI
 | `claude` | `~/.claude/` directory exists | `~/.claude/agents/` (behavioral contracts)<br>`~/.claude/skills/` (skill folders) |
 | `codex` | Codex config directory exists | `~/.codex/agents/` + `~/.agents/skills/` + local plugin marketplace |
 | `copilot` | VS Code + Copilot detected | `~/.vscode/extensions/pathly/agents/`<br>`~/.vscode/extensions/pathly/skills/` |
+| `antigravity` | `~/.gemini/antigravity-cli/` directory exists | `~/.gemini/antigravity-cli/agents/`<br>`~/.gemini/antigravity-cli/skills/` |
 
 ## How It Works
 
@@ -177,7 +179,7 @@ twine upload dist/*
 | [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) | Adapter release criteria: install checks for each host, pathly-setup flags, package build/publish, marketplace manifests |
 | [docs/SECURITY.md](docs/SECURITY.md) | Hook injection risks, subprocess calls in installer, file write safety, trust boundaries, marketplace manifest integrity |
 | [docs/SYSTEM_REVIEW.md](docs/SYSTEM_REVIEW.md) | Adapter strengths, risks, design decisions, hardening recommendations |
-| [src/pathly_data/core/SKILLS_OVERVIEW.md](src/pathly_data/core/SKILLS_OVERVIEW.md) | Full reference for all 29 user-facing Pathly skills + 2 internal transition-action skills, with ASCII flow diagrams |
+| [src/pathly_data/core/SKILLS_OVERVIEW.md](src/pathly_data/core/SKILLS_OVERVIEW.md) | Full reference for all user-facing Pathly skills + internal transition-action skills, with ASCII flow diagrams |
 | [docs/API.md](docs/API.md) | FSM HTTP server endpoint contracts (request/response shapes, error codes) |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Environment variables, persistent server setup (systemd/launchd), hook configuration |
 | [docs/RISK_ASSESSMENT.md](docs/RISK_ASSESSMENT.md) | Architecture risk assessment — known issues and proposed solutions |
@@ -188,11 +190,11 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Core adapter package metadata is at 2.11.10. The Studio app package is at
-2.11.11 and the latest repository tag is `v2.11.11`. Core install path
-(`--dry-run`, `--apply`, `--uninstall`) is verified with full rollback on
-failure. Copilot destination paths follow the VS Code Copilot agent spec and may
-require `--repair` after a VS Code update.
+Current version: **2.14.1**. Four adapters ship: Claude Code, Codex, Copilot,
+and Antigravity. Core install path (`--dry-run`, `--apply`, `--uninstall`) is
+verified with full rollback on failure. Copilot destination paths follow the VS
+Code Copilot agent spec and may require `--repair` after a VS Code update.
+Antigravity model names are placeholders until verified against a live binary.
 
 ## Known Limitations
 

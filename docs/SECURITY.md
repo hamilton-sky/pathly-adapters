@@ -25,7 +25,9 @@ The FSM HTTP server requires a shared secret on all mutating endpoints.
 - Studio's Electron main process reads the same file via `studio/src/main/apiConfig.ts`, exposes it to the renderer over IPC (`shell:apiConfig`), and injects it into every `apiFetch()` call via `lib/config.ts`.
 - PTY result callbacks (`POST /runner/terminal/result`) also include the header, injected in `studio/src/main/ipc/terminal.ts`.
 
-**Trust model:** the secret is effective against other local processes on the same machine. It does not protect against a process running as the same OS user (they can read `~/.pathly/server_secret.txt`). The server should never be bound to a non-loopback interface.
+**Trust model:** the secret is effective against other local processes on the same machine. It does not protect against a process running as the same OS user (they can read `~/.pathly/server_secret.txt`). The server must only be bound to a loopback interface — this is now **enforced at startup** (see below).
+
+**Bind-host enforcement:** `Settings.from_env()` (config.py) rejects any non-loopback value for `PATHLY_FSM_HTTP_HOST` with a hard `sys.exit(1)`. The only way to bind a non-loopback address is to also set `PATHLY_EXPOSE_HOST=true`, which prints a loud warning to stderr about the unauthenticated `/events/*` surface. This enforces the invariant that the SSE streams are never silently exposed on a network interface.
 
 **Rotation:** delete `~/.pathly/server_secret.txt` and restart both the FSM server and Studio. Both will generate/read the new value on next start.
 
@@ -158,15 +160,16 @@ Risk:
 
 Mitigation applied (security-fixes):
 
-- `ALLOWED_HOSTS = {"claude", "codex", "copilot"}` is defined at module level in
-  `install_cli/setup_command.py`.
+- `ALLOWED_HOSTS = {"claude", "codex", "copilot", "antigravity"}` is defined at module level
+  in `install_cli/orchestrate.py`.
 - `main()` validates every host in the resolved host list against `ALLOWED_HOSTS` before
   any filesystem access. Invalid hosts cause an immediate exit with a descriptive error.
 
 Production recommendation:
 
 - Keep `ALLOWED_HOSTS` as the single source of truth. Any new supported host must be
-  added there explicitly.
+  added there explicitly (and also to `_KNOWN_ADAPTERS` in `pathly_orchestrator/fsm/state.py`
+  if it should be allowed in `adapter_map` flow YAML).
 
 ---
 
@@ -198,7 +201,7 @@ Production recommendation:
 
 Risk:
 
-- Installer writes to `~/.claude/`, `~/.codex/`, and Copilot workspace paths.
+- Installer writes to `~/.claude/`, `~/.codex/`, Copilot workspace paths, and `~/.gemini/antigravity-cli/`.
 - `--force` could overwrite user-owned files not created by Pathly.
 - A stale manifest could misidentify non-Pathly files as Pathly-owned.
 
@@ -279,6 +282,7 @@ Status of automatic hook integration per host:
 | **Codex** | Supported | ✅ (`pathly-setup codex --apply`) | Writes `~/.codex/hooks.json` with `PostToolUse` entries under the `pathly` namespace. |
 | **Copilot VS Code** | Supported | ✅ (`pathly-setup copilot --apply`) | Writes `.github/hooks/pathly-classify.json` and `.github/hooks/pathly-ttl.json`. |
 | **Copilot CLI** | Not supported | ❌ (no hook event system) | No hook event system available in this host. |
+| **Antigravity** | Unknown | ❓ (not yet verified) | Hook event system availability in Antigravity CLI has not been confirmed. |
 
 ---
 

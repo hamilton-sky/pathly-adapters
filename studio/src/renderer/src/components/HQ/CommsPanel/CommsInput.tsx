@@ -73,8 +73,7 @@ export function CommsInput({ scope, mainFeature, type, onTypeChange, onSend }: C
           title="Send (Ctrl+Enter)"
           aria-label="Send message"
         >
-          <Send size={11} />
-          <span>Send</span>
+          <Send size={13} />
         </button>
       </div>
     </div>

@@ -65,50 +65,33 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │       │   │   ├── scout.md
 │       │   │   ├── tester.md
 │       │   │   └── web-researcher.md
-│       │   ├── skills/          ← Skill logic in natural language (tool-agnostic .md)
-│       │   │   ├── pathly.md    ← dispatcher (routes /pathly subcommands)
-│       │   │   ├── start.md
-│       │   │   ├── go.md
-│       │   │   ├── build.md
-│       │   │   ├── plan.md
-│       │   │   ├── test.md      ← standalone acceptance test runner (tester + scout-flow)
-│       │   │   ├── team.md      ← full pipeline entry point (/pathly team)
-│       │   │   ├── storm.md
-│       │   │   ├── review.md
-│       │   │   ├── debug.md
-│       │   │   ├── explore.md   ← routes through explorer agent + scout-flow
-│       │   │   ├── scout-path.md ← called by other skills, not users directly
-│       │   │   ├── po.md        ← product owner consultation (/pathly po)
-│       │   │   ├── meet.md
-│       │   │   ├── verify-state.md
-│       │   │   ├── pause.md
-│       │   │   ├── end.md
-│       │   │   ├── retro.md
-│       │   │   ├── archive.md
-│       │   │   ├── lessons.md
-│       │   │   ├── prd-import.md
-│       │   │   ├── help.md
-│       │   │   ├── fix.md       ← resolve open feedback files for active feature
-│       │   │   ├── ff.md        ← fast-forward FSM state (CLI wrapper)
-│       │   │   ├── back.md      ← roll back FSM one state (CLI wrapper)
-│       │   │   ├── status.md    ← cross-feature dashboard (CLI wrapper)
-│       │   │   ├── log.md       ← event timeline for active/named feature (CLI wrapper)
-│       │   │   ├── design.md    ← generate DESIGN.md visual spec (after plan, before build)
-│       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
-│       │   │   ├── archive-artifacts.md ← transition-action skill (orchestrator only)
-│       │   │   └── team/        ← sub-skills for team pipeline phases (discover, plan, build, review, test, retro)
+│       │   ├── skills/          ← Skill logic in natural language, grouped by category
+│       │   │   ├── controls/    ← start, go, ff, back, pause, end, status
+│       │   │   ├── development/ ← build, review, test, design, debug, explore, fix, build-debug, verify-debug
+│       │   │   ├── planning/    ← plan, po, prd-import, storm, retro
+│       │   │   ├── team/        ← team, discover, team-build, team-review, team-test, team-plan, team-design, team-retro
+│       │   │   ├── utilities/   ← archive, log, log-agent-done, lessons, meet, verify-state, fsm-call,
+│       │   │   │                   scout-path, reflect, commit, dispatch, help, pathly
+│       │   │   ├── fix/         ← fix variants
+│       │   │   ├── fix-hutk/    ← hook-triggered fix variants
+│       │   │   ├── custom/      ← user-defined custom skills
+│       │   │   ├── debug/       ← debug-specific skills
+│       │   │   ├── fragments/   ← reusable prompt fragments
+│       │   │   ├── hello/       ← onboarding/welcome skills
+│       │   │   └── planning-hello/ ← planning onboarding skills
 │       │   ├── flows/           ← FSM flow definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml, test.flow.yaml)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
 │           ├── claude/          ← .claude-plugin/ + _meta/*.yaml per agent/skill
 │           ├── codex/           ← .codex-plugin/ + _meta/*.yaml per agent/skill
-│           └── copilot/         ← _meta/*.yaml per agent/skill
+│           ├── copilot/         ← _meta/*.yaml per agent/skill
+│           └── antigravity/     ← _meta/*.yaml per agent/skill (Gemini models)
 │
 └── pyproject.toml               ← entry_points: pathly-setup, pathly-tokens, pathly-events, pathly-state,
-                                                  pathly-fsm-http, pathly-validate-flow, pathly-run,
-                                                  pathly-status, pathly-log, pathly-back, pathly-ff,
-                                                  pathly-studio, pathly-design
+                                                  pathly-fsm-http, pathly-fsm-call, pathly-validate-flow,
+                                                  pathly-run, pathly-status, pathly-log, pathly-back,
+                                                  pathly-ff, pathly-studio, pathly-design, pathly-otel-export
 ```
 
 ---
@@ -134,7 +117,7 @@ CLI implementation modules (`detect.py`, `stitch.py`, `materialize.py`, `orchest
 
 | Module | Purpose |
 |---|---|
-| `src/install_cli/detect.py` | Discovers which AI tools (Claude Code, Codex, Copilot) are installed by checking for their config directories |
+| `src/install_cli/detect.py` | Discovers which AI tools (Claude Code, Codex, Copilot, Antigravity) are installed by checking for their config directories |
 | `src/install_cli/stitch.py` | Merges `core/` content with adapter `_meta/*.yaml` into deployable agent and skill files |
 | `src/install_cli/materialize.py` | Writes stitched output to `~/.claude/`, `~/.codex/`, etc. Maintains a manifest of Pathly-owned files. Install is atomic — already-written files are rolled back if anything fails. |
 | `src/install_cli/setup_command.py` | CLI entry point logic. Handles `--dry-run`, `--apply`, `--repair`, `--force`, `--uninstall`, and per-host subcommands. |
@@ -156,6 +139,7 @@ package's internal resource API rather than repo-relative path assumptions.
 - `src/pathly_data/adapters/claude/` — `.claude-plugin/plugin.json` + `_meta/` per-agent and per-skill `.yaml` files
 - `src/pathly_data/adapters/codex/` — `.codex-plugin/plugin.json` + `_meta/`
 - `src/pathly_data/adapters/copilot/` — `_meta/`
+- `src/pathly_data/adapters/antigravity/` — `_meta/` (Gemini models: `gemini-2.5-pro` / `gemini-2.5-flash`)
 
 ---
 
@@ -281,19 +265,21 @@ metadata only.
 
 ```toml
 [project.scripts]
-pathly-setup = "install_cli.__main__:main"
-pathly-tokens = "pathly_telemetry.report:main"
-pathly-events = "pathly_orchestrator.eventlog:_cli"
-pathly-state = "pathly_orchestrator.eventlog:_state_cli"
-pathly-fsm-http = "pathly_orchestrator.http_server:main"
-pathly-validate-flow = "pathly_orchestrator.state:validate_flow_cli"
-pathly-run = "pathly_orchestrator.runner:main"
-pathly-status = "pathly_orchestrator.status_cli:main"
-pathly-log = "pathly_orchestrator.log_cli:main"
-pathly-back = "pathly_orchestrator.back_cli:main"
-pathly-ff = "pathly_orchestrator.ff_cli:main"
-pathly-studio = "pathly_studio_cli.install:main"
-pathly-design = "pathly_data.core.design.cli:main"
+pathly-setup         = "install_cli.__main__:main"
+pathly-tokens        = "pathly_telemetry.report:main"
+pathly-events        = "pathly_orchestrator.eventlog:_cli"
+pathly-state         = "pathly_orchestrator.eventlog:_state_cli"
+pathly-fsm-http      = "pathly_orchestrator.http_server:main"
+pathly-fsm-call      = "pathly_orchestrator.fsm.http_client:main"
+pathly-validate-flow = "pathly_orchestrator.fsm.state:validate_flow_cli"
+pathly-run           = "pathly_orchestrator.runner:main"
+pathly-status        = "pathly_orchestrator.cli.status:main"
+pathly-log           = "pathly_orchestrator.cli.log:main"
+pathly-back          = "pathly_orchestrator.cli.back:main"
+pathly-ff            = "pathly_orchestrator.cli.ff:main"
+pathly-studio        = "pathly_studio_cli.install:main"
+pathly-design        = "pathly_data.core.design.cli:main"
+pathly-otel-export   = "pathly_orchestrator.otel_export:cli_main"
 ```
 
 ---

@@ -15,12 +15,22 @@ core/
                   director.md (top-level router)
 
   skills/       skill markdown, grouped by category:
-                  flow/         ff, back, pause, end, status
-                  development/  build, review, test, design, debug, explore, fix
+                  controls/     start, go, ff, back, pause, end, status
+                  development/  build, review, test, design, debug, explore, fix,
+                                build-debug, verify-debug
                   planning/     plan, po, prd-import, storm, retro
-                  team/         discover, plan, design, build, review, test
+                  team/         team, discover, team-discover, team-plan, team-design,
+                                team-build, team-review, team-test
                   utilities/    archive, log, log-agent-done, lessons, meet,
-                                verify-state, fsm-call, scout-path
+                                verify-state, fsm-call, scout-path, reflect,
+                                commit, dispatch, help, pathly
+                  fix/          fix variants
+                  fix-hutk/     hook-triggered fix variants
+                  custom/       user-defined custom skills
+                  debug/        debug-specific skills
+                  fragments/    reusable prompt fragments
+                  hello/        onboarding/welcome skills
+                  planning-hello/ planning onboarding skills
 
   templates/    plan file templates:
                   plan/   USER_STORIES, IMPLEMENTATION_PLAN, CONVERSATION_PROMPTS,
@@ -43,22 +53,24 @@ core/
                   cli.py
 
 adapters/
-  claude/       Claude Code adapter
-                  _meta/          agent YAMLs + skill YAMLs (one per agent/skill)
-                  .claude-plugin/ plugin.json, marketplace.json
-  codex/        Codex adapter (_meta/ agent + skill YAMLs)
-  copilot/      Copilot adapter (_meta/ agent + skill YAMLs)
+  claude/        Claude Code adapter
+                   _meta/          agent YAMLs + skill YAMLs (one per agent/skill)
+                   .claude-plugin/ plugin.json, marketplace.json
+  codex/         Codex adapter (_meta/ agent + skill YAMLs)
+  copilot/       Copilot adapter (_meta/ agent + skill YAMLs)
+  antigravity/   Antigravity CLI adapter (_meta/ agent + skill YAMLs; Gemini models)
 ```
 
 ## Adapters
 
-Three adapters derive from `core/`:
+Four adapters derive from `core/`:
 
 | Adapter | Install destination |
 |---|---|
 | `claude/` | `~/.claude/agents/` and `~/.claude/skills/pathly-*/` |
 | `codex/` | `~/.codex/agents/`, `~/.agents/skills/`, and `~/.codex/plugins/pathly/` |
 | `copilot/` | `~/.vscode/extensions/pathly/agents/` and `~/.vscode/extensions/pathly/skills/` |
+| `antigravity/` | `~/.gemini/antigravity-cli/agents/` and `~/.gemini/antigravity-cli/skills/` |
 
 Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that supply host-specific metadata (model name, tool list, `can_spawn` flag, install destination). `pathly-setup <host> --apply` stitches `core/` content with `_meta/` and writes deployable files.
 
@@ -76,7 +88,7 @@ Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that 
 
 ```yaml
 adapter_map:
-  default: claude          # REQUIRED if adapter_map is present; must be in {claude, codex, copilot}
+  default: claude          # REQUIRED if adapter_map is present; must be in {claude, codex, copilot, antigravity}
   BUILDING: codex          # optional per-state override; key must be a declared state
   REVIEWING: claude
 ```
@@ -87,15 +99,15 @@ adapter_map:
 3. `adapter_map["default"]`
 4. `""` — no `adapter_map`; fully backward-compatible
 
-**Known adapter set:** `claude`, `codex`, `copilot`. The FSM validator (`state.py`) enforces this set and requires `default`. Studio serializer (`utils.ts`) must conform to this exact shape — a round-trip test enforces it.
+**Known adapter set:** `claude`, `codex`, `copilot`, `antigravity`. The FSM validator (`state.py`) enforces this set and requires `default`. Studio serializer (`utils.ts`) must conform to this exact shape — a round-trip test enforces it.
 
 ---
 
 ## Adapter sync rule — CRITICAL
 
-`core/` is the **single source of truth**. The three adapters (`claude/`, `codex/`, `copilot/`) are derived outputs.
+`core/` is the **single source of truth**. The four adapters (`claude/`, `codex/`, `copilot/`, `antigravity/`) are derived outputs.
 
-**Any change to a core agent or skill must be reflected in all three adapter `_meta/` directories.**
+**Any change to a core agent or skill must be reflected in all four adapter `_meta/` directories.**
 
 The right way to do this:
 
@@ -114,7 +126,7 @@ python -m build
 > every time you update an existing core agent, skill, or fragment — otherwise installed files
 > stay stale and the changes never reach the running agent.
 
-If you manually edit `_meta/` files in one adapter, you **must** make the same change in the other two, or run the build step above. Never patch one adapter and leave the others stale.
+If you manually edit `_meta/` files in one adapter, you **must** make the same change in the other three, or run the build step above. Never patch one adapter and leave the others stale.
 
 ## Editing an agent or skill
 

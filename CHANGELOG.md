@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.14.1 — 2026-06-12
+
+### Antigravity adapter + Studio improvements
+
+- Add `antigravity` adapter (`src/pathly_data/adapters/antigravity/`) — installs Pathly
+  skills and agents into the Antigravity CLI (`~/.gemini/antigravity-cli/`). Models:
+  `gemini-2.5-pro` (pro-tier) and `gemini-2.5-flash` (flash-tier). Install via
+  `pathly-setup antigravity --apply`.
+- Add `antigravity` to `_KNOWN_ADAPTERS` in FSM validator — `adapter_map` entries using
+  `antigravity` now pass flow validation instead of raising an error.
+- Add `antigravity` to `ALLOWED_HOSTS` in `install_cli/orchestrate.py` and to
+  `detect.py` host discovery (detected by `~/.gemini/antigravity-cli/` directory).
+- Comms board: multi-feature boards, per-panel reads, live DB connection, feature
+  card last-activity from EVENTS.jsonl, real feature stage/status from STATE.json,
+  retract-while-unread, compose redesign, custom drop-up message-type picker.
+- Flow storage: normalize flow graph into DB tables (`flow_nodes`, `flow_edges`);
+  FSM reads rows-first with disk fallback.
+- Studio: responsive sidebar collapse, topbar compact mode, Notebook landing page,
+  breadcrumb cleanup, Ctrl+1–5 panel shortcuts, `Update` button (pip upgrade + deploy).
+- Security: per-thread SQLite connections (WAL mode), `X-Pathly-Secret` header auth
+  on all POST routes, centralized `apiFetch` in renderer.
+- Skills directory reorganized from flat layout to categorized subdirectories
+  (`controls/`, `development/`, `planning/`, `team/`, `utilities/`, `fix/`,
+  `custom/`, `debug/`, `fragments/`).
+
+---
+
 ## 2.11.7 - 2026-05-27
 
 ### Studio library packaging

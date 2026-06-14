@@ -1,0 +1,47 @@
+name: Studio CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "studio/**"
+      - ".github/workflows/studio-ci.yml"
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "studio/**"
+      - ".github/workflows/studio-ci.yml"
+
+jobs:
+  typecheck-and-test:
+    name: TypeScript typecheck + unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: studio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: studio
+        run: npm ci
+
+      # Renderer (React) — tsconfig.web.json
+      # Uses tsc --noEmit: catches type errors that esbuild silently strips.
+      - name: Typecheck renderer (tsconfig.web.json)
+        working-directory: studio
+        run: npx tsc --noEmit -p tsconfig.web.json
+
+      # Main process (Electron) — tsconfig.node.json
+      - name: Typecheck main process (tsconfig.node.json)
+        working-directory: studio
+        run: npx tsc --noEmit -p tsconfig.node.json
+
+      # Vitest unit tests (jsdom environment)
+      - name: Run unit tests
+        working-directory: studio
+        run: npm run test

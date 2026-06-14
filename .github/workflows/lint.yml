@@ -25,6 +25,28 @@ jobs:
       - name: Type check (mypy)
         run: mypy src/ --ignore-missing-imports --no-strict-optional
 
+  consistency:
+    name: Consistency checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Version sync (pyproject.toml = package.json = studio/package.json)
+        run: python scripts/check_version_sync.py
+
+      - name: Adapter consistency (dirs = ALLOWED_HOSTS = detect.py = _KNOWN_ADAPTERS)
+        run: python scripts/check_adapters.py
+
+      - name: Entry point modules exist
+        run: python scripts/check_entry_points.py
+
   security:
     runs-on: ubuntu-latest
     steps:

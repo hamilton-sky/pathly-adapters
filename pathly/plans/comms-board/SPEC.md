@@ -2008,7 +2008,337 @@ team flow             now enters at PLAN, pre-filled by the consult flow
 
 ---
 
-*Spec version 6.1 — UI direction revised (see [UI-DIRECTION.md](UI-DIRECTION.md)): §7
+## 26. Hybrid Retrieval — BM25 + Semantic Search
+
+> **Status:** Planned — Phase 1.5 (ship before Phase 2 while retrieval layer is simple)
+
+### 26.1 The problem with cosine-only retrieval
+
+The current retrieval in `retrieve_board_context()` uses pure cosine similarity over
+384-dim all-MiniLM-L6-v2 embeddings. Cosine is excellent at conceptual similarity
+("authentication problem" finds "auth service returns 401") but weak at exact-term
+matches — function names, file paths, error codes, PR numbers, and other identifiers
+that appear verbatim on the board.
+
+A builder agent asking about `setupWebGL` or `PATHLY_FSM_HTTP_HOST` will only retrieve
+that message if the embedding space places those tokens near the query. In practice it
+often doesn't, especially for domain-specific identifiers that are rare in the training
+corpus.
+
+### 26.2 The solution: SQLite FTS5 + Reciprocal Rank Fusion
+
+SQLite ships with **FTS5** (full-text search, BM25 scoring) as a built-in module — no
+new dependency. Add a content-table FTS5 virtual table over `comms_messages`, run both
+BM25 and cosine in parallel, and merge the ranked results with **Reciprocal Rank Fusion
+(RRF)**.
+
+```
+Query: "setupWebGL crash on startup"
+
+BM25 rank:
+  #1  "setupWebGL throws WebGL context lost on startup"    ← exact match
+  #2  "WebGL context lost after tab switch"
+  #3  "startup sequence logs show null context"
+
+Cosine rank:
+  #1  "graphics initialisation fails on cold launch"       ← semantic match
+  #2  "setupWebGL throws WebGL context lost on startup"
+  #3  "renderer fails to initialise on Windows"
+
+RRF merged:
+  #1  "setupWebGL throws WebGL context lost on startup"    ← top of both = winner
+  #2  "graphics initialisation fails on cold launch"
+  #3  "WebGL context lost after tab switch"
+  → Retrieved ALL relevant messages; neither method alone would have got them all
+```
+
+### 26.3 Schema change
+
+```sql
+-- db/migrations.py — add after comms_embeddings creation
+CREATE VIRTUAL TABLE IF NOT EXISTS comms_fts
+  USING fts5(
+    text,
+    content=comms_messages,
+    content_rowid=rowid,
+    tokenize='porter ascii'
+  );
+```
+
+FTS5 is a content-table (mirrors `comms_messages.text`) so there is no storage
+duplication. Existing rows are indexed on first query via FTS5's lazy population.
+`porter ascii` tokenizer gives basic stemming ("running" → "run").
+
+### 26.4 RRF fusion
+
+```python
+_RRF_K = 60  # standard constant; range 30–100; higher = less weight to top ranks
+
+def _rrf_score(rank_bm25: int, rank_semantic: int, k: int = _RRF_K) -> float:
+    return 1.0 / (k + rank_bm25) + 1.0 / (k + rank_semantic)
+```
+
+### 26.5 `search_by_hybrid()` in `db/queries/comms.py`
+
+```python
+def search_by_hybrid(conn, boards_scopes, query_text, query_embedding, k):
+    """
+    Run BM25 (FTS5) and cosine (vec0) in parallel; merge with RRF.
+    Falls back to semantic-only if FTS5 unavailable, recency-only if both absent.
+    """
+    # BM25 pass
+    bm25_rows = conn.execute("""
+        SELECT m.id, m.text, m.type, m.ts, -fts.rank AS bm25_rank
+        FROM comms_messages m
+        JOIN comms_fts fts ON fts.rowid = m.rowid
+        WHERE comms_fts MATCH ?
+          AND m.board IN ({boards}) AND m.scope IN ({scopes})
+          AND m.deleted_at IS NULL
+        ORDER BY fts.rank          -- rank is negative in FTS5; ORDER ASC = best first
+        LIMIT ?
+    """, [query_text, ..., k * 2]).fetchall()
+
+    # Cosine pass (existing vec_distance_cosine)
+    cosine_rows = search_by_embedding(conn, boards_scopes, query_embedding, k * 2)
+
+    # Assign ranks, compute RRF, dedupe by id, return top-k
+    scores = {}
+    for rank, row in enumerate(bm25_rows):
+        scores.setdefault(row["id"], {"row": row, "bm25": 9999, "sem": 9999})
+        scores[row["id"]]["bm25"] = rank
+    for rank, row in enumerate(cosine_rows):
+        scores.setdefault(row["id"], {"row": row, "bm25": 9999, "sem": 9999})
+        scores[row["id"]]["sem"] = rank
+    ranked = sorted(scores.values(),
+                    key=lambda x: _rrf_score(x["bm25"], x["sem"]),
+                    reverse=True)
+    return [r["row"] for r in ranked[:k]]
+```
+
+### 26.6 `POST /comms/search` and `retrieve_board_context()` updates
+
+`POST /comms/search` gains a `mode` parameter:
+
+| Value | Behaviour |
+|---|---|
+| `hybrid` (default) | BM25 + cosine merged via RRF |
+| `semantic` | cosine-only (today's behaviour) |
+| `keyword` | BM25-only (exact/stemmed term matching) |
+
+`retrieve_board_context()` in `runner/comms_context.py` switches to `hybrid` mode.
+The topic description and current task text are used as the FTS5 query string as well
+as the embedding source.
+
+### 26.7 Graceful degradation
+
+| Condition | Fallback |
+|---|---|
+| FTS5 unavailable (very rare — it ships with SQLite) | semantic-only |
+| sqlite-vec unavailable | keyword-only (BM25) |
+| Both absent | recency `ORDER BY ts DESC` |
+
+---
+
+## 27. Role-based Write Permissions
+
+> **Status:** Planned — Phase 1.5 (add before Phase 3 skill integration)
+
+### 27.1 Why write gates matter
+
+The three-tier board (feature / project / global) is only as valuable as the quality of
+its content. Today, any agent calling `POST /comms/post` can write anything to any scope.
+Nothing stops a builder from accidentally (or via a prompt injection) writing a spurious
+`decision`-type message to the `global` scope that then pollutes every future agent in
+every project.
+
+CONSULTATION.md §1.4 Q1 noted this as a convention: "Agents write to their own feature
+board only — project/global writes need human confirmation." Phase 1.5 makes it
+**enforcement**, not convention.
+
+### 27.2 Default write permission table
+
+| `from_agent` role | Feature write | Project write | Global write |
+|---|---|---|---|
+| `builder` | ✅ | ❌ | ❌ |
+| `tester` | ✅ | ✅ | ❌ |
+| `reviewer` | ✅ | ✅ | ❌ |
+| `explorer` | ✅ | ✅ | ❌ |
+| `architect` | ✅ | ✅ | ❌ |
+| `planner` | ✅ | ✅ | ❌ |
+| `designer` | ✅ | ✅ | ❌ |
+| `director` | ✅ | ✅ | ✅ |
+| `human` | ✅ | ✅ | ✅ |
+| `*` / unknown | ✅ | ❌ | ❌ |
+
+### 27.3 Implementation
+
+```python
+# http_server/blueprints/comms.py
+
+_PROJECT_WRITERS: frozenset[str] = frozenset({
+    "tester", "reviewer", "explorer", "architect",
+    "planner", "designer", "director", "human",
+})
+_GLOBAL_WRITERS: frozenset[str] = frozenset({"director", "human"})
+
+def _check_write_permission(from_agent: str, board: str) -> bool:
+    """Return True if the role is allowed to write to this board tier."""
+    if board == "feature":
+        return True                          # all agents may write feature scope
+    if board == "project":
+        return from_agent in _PROJECT_WRITERS
+    if board == "global":
+        return from_agent in _GLOBAL_WRITERS
+    return False
+```
+
+`POST /comms/post` calls `_check_write_permission(from_agent, board)` before storage.
+Returns **403 Forbidden** with a descriptive message on violation.
+
+### 27.4 Custom overrides
+
+Project-level overrides are stored in `app_settings` under the key
+`write_permissions:{project_root}`. This lets a project grant `builder` write access
+to project scope (e.g., for a monorepo with one shared project board).
+
+### 27.5 Studio surface
+
+`GET /comms/permissions?project_root=<root>` returns the resolved permission table
+(defaults merged with any project override). The Studio CommandCenter uses this to
+grey out the scope picker for write-restricted roles.
+
+---
+
+## 28. DAG Task Decomposition in BUILD
+
+> **Status:** Planned — Phase 1.5
+
+### 28.1 Why the BUILD stage is a black box today
+
+The BUILD phase runs one conversation prompt that lists everything to build. The builder
+agent has no visibility into which sub-tasks depend on each other, which can be done in
+parallel, and which are blocked. Everything is sequential by default — even work that
+could fan out.
+
+**Task Master** (and similar DAG planners) solve this with explicit `depends_on` IDs:
+a task is **ready** when all its dependencies have `status='done'`. Tasks with no
+dependencies are ready immediately and could be executed in parallel.
+
+### 28.2 The `depends_on` field
+
+Add a `depends_on` column to `comms_messages` (type `task` only; ignored for other types):
+
+```sql
+-- db/migrations.py
+ALTER TABLE comms_messages ADD COLUMN depends_on TEXT DEFAULT '[]';
+```
+
+`depends_on` is a JSON array of message IDs: `["t1", "t3"]`. An empty array `[]` means
+"no dependencies — ready immediately."
+
+### 28.3 Message schema update
+
+```json
+{
+  "id": "t2",
+  "type": "task",
+  "text": "Build the API layer — see IMPLEMENTATION_PLAN.md Phase 3",
+  "task_status": "pending",
+  "assigned_to_stage": "BUILDING",
+  "assigned_to_agent": "builder",
+  "depends_on": ["t1"]         ← new field
+}
+```
+
+### 28.4 New endpoint: `GET /comms/tasks`
+
+```
+GET /comms/tasks?feature=<name>&ready=true
+```
+
+Returns all `type='task'` messages for the feature where every ID in `depends_on` has
+`task_status='done'` (or `depends_on` is `[]`). This is the "what can I work on now?"
+query for the BUILD stage.
+
+```
+GET /comms/tasks?feature=<name>&status=pending
+```
+
+Returns all pending tasks regardless of readiness (full task list for the feature).
+
+### 28.5 New endpoint: `POST /comms/tasks/complete`
+
+```json
+{ "feature": "my-feature", "task_id": "t1", "project_root": "/path/to/project" }
+```
+
+- Sets `task_status = 'done'` on `t1`.
+- Broadcasts `COMMS_UPDATE` over SSE with the newly ready downstream tasks.
+- Idempotent: completing an already-done task returns 200 with no change.
+
+### 28.6 `get_ready_tasks()` query helper
+
+```python
+# db/queries/comms.py
+def get_ready_tasks(conn, board, scope):
+    """
+    Return task messages whose depends_on are all done.
+    Uses a Python-side filter (JSON array not queryable in SQLite without json_each).
+    """
+    all_tasks = conn.execute("""
+        SELECT * FROM comms_messages
+        WHERE board = ? AND scope = ? AND type = 'task'
+          AND task_status = 'pending' AND deleted_at IS NULL
+    """, [board, scope]).fetchall()
+
+    done_ids = {
+        row["id"] for row in conn.execute("""
+            SELECT id FROM comms_messages
+            WHERE board = ? AND scope = ? AND type = 'task'
+              AND task_status = 'done' AND deleted_at IS NULL
+        """, [board, scope]).fetchall()
+    }
+
+    return [t for t in all_tasks
+            if all(dep in done_ids for dep in json.loads(t["depends_on"] or "[]"))]
+```
+
+### 28.7 Integration with the Pathly FSM
+
+The outer FSM pipeline (PLAN → BUILD → REVIEW → …) stays linear. DAG task ordering
+operates *within* the BUILD stage:
+
+```
+PLAN stage output:
+  Planner posts tasks to feature board with depends_on links.
+  e.g.: t1 (DB schema, deps=[]), t2 (API layer, deps=[t1]),
+        t3 (auth middleware, deps=[]), t4 (integration tests, deps=[t2,t3])
+
+BUILD stage conversation prompt includes:
+  "Call GET /comms/tasks?ready=true to see what is unblocked.
+   Complete each task with POST /comms/tasks/complete before moving to the next.
+   After marking t1 done, call GET /comms/tasks?ready=true again — t2 should appear."
+
+Agent can therefore:
+  Round 1: sees [t1, t3] → works on both → marks done
+  Round 2: sees [t2]     → t2 unblocked by t1 → marks done
+  Round 3: sees [t4]     → all deps satisfied → marks done
+  Done.
+```
+
+The FSM doesn't need to know about task dependencies — it just runs the BUILD
+conversation. The agent drives the DAG loop using the HTTP API.
+
+### 28.8 Scope note
+
+This feature adds DAG ordering *within* a stage, not across stages. Cross-stage
+parallelism (e.g., running REVIEW and TEST simultaneously) is a separate concern
+governed by the FSM flow YAML and is out of scope for Phase 1.5.
+
+---
+
+*Spec version 6.2 — Phase 1.5 additions: §26 Hybrid BM25 + semantic retrieval, §27 Role-based
+write permissions, §28 DAG task decomposition in BUILD. Prior: v6.1 — UI direction revised (see [UI-DIRECTION.md](UI-DIRECTION.md)): §7
 (standalone CommsPanel tab), §16 (three-equal-panel command center), and §19 (flexible
 panel layout) superseded by a full-screen workspace — resizable left sidebar for All-Features
 navigation + full-area board sections + "Set as main feature" swap + asymmetric widths.

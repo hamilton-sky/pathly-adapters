@@ -6,6 +6,25 @@ All request bodies must be `application/json`. All responses are JSON unless oth
 
 Rate limit: 120 requests per 60-second window per IP. Exceeding it returns `429`.
 
+## Authentication
+
+All `POST` routes require the `X-Pathly-Secret` header. The secret is a 64-char hex token
+auto-generated on first run and stored at `~/.pathly/server_secret.txt`. Studio reads and
+injects it automatically.
+
+```bash
+SECRET=$(cat ~/.pathly/server_secret.txt)
+curl -X POST http://127.0.0.1:8765/next_action \
+  -H "X-Pathly-Secret: $SECRET" \
+  -H "Content-Type: application/json" \
+  -d '...'
+```
+
+`GET /events/*` endpoints are exempt — the browser `EventSource` API cannot send custom headers,
+so SSE streams are secured by loopback-only binding (`127.0.0.1`).
+
+Omitting `X-Pathly-Secret` on a POST returns `401 Unauthorized`.
+
 ---
 
 ## GET /health
@@ -59,7 +78,9 @@ The response shape is determined by the FSM `next_action` implementation. It inc
 
 **Example**
 ```bash
+SECRET=$(cat ~/.pathly/server_secret.txt)
 curl -s -X POST http://localhost:8765/next_action \
+  -H "X-Pathly-Secret: $SECRET" \
   -H "Content-Type: application/json" \
   -d '{
     "flow": "team",
@@ -105,7 +126,9 @@ The response shape is determined by the FSM `complete_stage` implementation. It 
 
 **Example**
 ```bash
+SECRET=$(cat ~/.pathly/server_secret.txt)
 curl -s -X POST http://localhost:8765/complete_stage \
+  -H "X-Pathly-Secret: $SECRET" \
   -H "Content-Type: application/json" \
   -d '{
     "flow": "team",
@@ -117,6 +140,7 @@ curl -s -X POST http://localhost:8765/complete_stage \
 With an optional decision:
 ```bash
 curl -s -X POST http://localhost:8765/complete_stage \
+  -H "X-Pathly-Secret: $SECRET" \
   -H "Content-Type: application/json" \
   -d '{
     "flow": "team",
@@ -167,7 +191,9 @@ Appends an activity record to `~/.pathly/activity.jsonl`. Used by agents to repo
 
 **Example**
 ```bash
+SECRET=$(cat ~/.pathly/server_secret.txt)
 curl -s -X POST http://localhost:8765/record_activity \
+  -H "X-Pathly-Secret: $SECRET" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "builder",

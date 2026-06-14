@@ -35,25 +35,24 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │       │   │   ├── scout.md
 │       │   │   ├── tester.md
 │       │   │   └── web-researcher.md
-│       │   ├── skills/          ← Skill logic in natural language (tool-agnostic .md)
-│       │   │   ├── team.md      ← full pipeline entry point
-│       │   │   ├── explore.md
-│       │   │   ├── build.md
-│       │   │   ├── review.md
-│       │   │   ├── storm.md
-│       │   │   ├── po.md        ← product owner consultation
-│       │   │   ├── scout-path.md
-│       │   │   ├── fsm-call.md  ← internal utility: HTTP transport to FSM server (shared)
-│       │   │   ├── commit.md    ← transition-action skill (orchestrator only)
-│       │   │   ├── archive-artifacts.md  ← transition-action skill (orchestrator only)
-│       │   │   └── ...          (29 user-facing + 2 transition-action skills total)
+│       │   ├── skills/          ← Skill logic in natural language, grouped by category
+│       │   │   ├── controls/    ← start, go, ff, back, pause, end, status
+│       │   │   ├── development/ ← build, review, test, design, debug, explore, fix
+│       │   │   ├── planning/    ← plan, po, prd-import, storm, retro
+│       │   │   ├── team/        ← team, discover, team-build, team-review, team-test, …
+│       │   │   ├── utilities/   ← archive, log, fsm-call, scout-path, reflect, commit, …
+│       │   │   ├── fix/         ← fix variants
+│       │   │   ├── custom/      ← user-defined skills
+│       │   │   ├── debug/       ← debug-specific skills
+│       │   │   └── fragments/   ← reusable prompt fragments
 │       │   ├── flows/           ← Flow YAML definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml)
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
 │           ├── claude/          ← .claude-plugin/ + _meta/*.yaml per agent/skill
 │           ├── codex/           ← .codex-plugin/ + _meta/*.yaml per agent/skill
-│           └── copilot/         ← _meta/*.yaml per agent/skill
+│           ├── copilot/         ← _meta/*.yaml per agent/skill
+│           └── antigravity/     ← _meta/*.yaml per agent/skill (Gemini models)
 │
 └── src/pathly_orchestrator/     ← FSM event-log module (internal, src-layout package)
 ```
@@ -65,9 +64,11 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 | Claude Code | `/pathly ...`, `/go ...` | `src/pathly_data/adapters/claude/_meta/` | `~/.claude/agents/`, `~/.claude/skills/` |
 | Codex | `Use Pathly ...` natural-language plugin skills | `src/pathly_data/adapters/codex/_meta/` | `~/.codex/agents/`, `~/.agents/skills/`, plugin bundle/cache |
 | Copilot | Copilot-native skill invocation | `src/pathly_data/adapters/copilot/_meta/` | VS Code agents folder |
+| Antigravity | `/pathly ...` slash commands (Gemini CLI layout) | `src/pathly_data/adapters/antigravity/_meta/` | `~/.gemini/antigravity-cli/agents/`, `~/.gemini/antigravity-cli/skills/` |
 
 Current Codex builds do not expose Pathly as `/pathly`. Use natural-language
-skill prompts in Codex.
+skill prompts in Codex. Antigravity model names (`gemini-2.5-pro`, `gemini-2.5-flash`)
+are placeholders until live model availability is verified against the installed binary.
 
 ## Skills vs Agents
 
@@ -94,9 +95,10 @@ pathly-setup
         │       into deployable agent and skill files
         │
         ├── materialize.py writes stitched files:
-        │   ├── src/pathly_data/adapters/claude/_meta/**  ──────► ~/.claude/agents/ + ~/.claude/skills/
-        │   ├── src/pathly_data/adapters/codex/_meta/**   ──────► ~/.codex/agents/ + ~/.agents/skills/
-        │   └── src/pathly_data/adapters/copilot/_meta/** ──────► Copilot workspace config
+        │   ├── src/pathly_data/adapters/claude/_meta/**       ──► ~/.claude/agents/ + ~/.claude/skills/
+        │   ├── src/pathly_data/adapters/codex/_meta/**        ──► ~/.codex/agents/ + ~/.agents/skills/
+        │   ├── src/pathly_data/adapters/copilot/_meta/**      ──► Copilot workspace config
+        │   └── src/pathly_data/adapters/antigravity/_meta/**  ──► ~/.gemini/antigravity-cli/agents/ + skills/
         │
         └── setup_command.py is the CLI entry point (registered as `pathly-setup`)
 ```
@@ -129,15 +131,16 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 | `claude` | `~/.claude/` directory exists |
 | `codex` | Codex config directory exists |
 | `copilot` | VS Code + Copilot detected |
+| `antigravity` | `~/.gemini/antigravity-cli/` directory exists |
 
 ## Cross-Tool Compatibility
 
-| Feature | Claude Code | Codex | Copilot |
-|---|---|---|---|
-| Agent behavior contracts | ✓ via ~/.claude/agents/ | ✓ via ~/.codex/agents/ | ✓ via AGENTS.md standard |
-| Skills (SKILL.md) | ✓ native | ✓ native | ✓ native (Aug 2025) |
-| Subagent spawning | Agent() tool | Named role when exposed; otherwise current-agent execution or permitted generic delegation | /fleet, /delegate |
-| Natural language activation | /go skill + director | natural language | natural language |
+| Feature | Claude Code | Codex | Copilot | Antigravity |
+|---|---|---|---|---|
+| Agent behavior contracts | ✓ via ~/.claude/agents/ | ✓ via ~/.codex/agents/ | ✓ via AGENTS.md standard | ✓ via ~/.gemini/antigravity-cli/agents/ |
+| Skills (SKILL.md) | ✓ native | ✓ native | ✓ native (Aug 2025) | ✓ via slash commands |
+| Subagent spawning | Agent() tool | Named role when exposed; otherwise current-agent execution | /fleet, /delegate | role delegation (Gemini layout) |
+| Natural language activation | /go skill + director | natural language | natural language | /pathly + director |
 
 **Key constraint:** Subagent spawning syntax is tool-specific. There is no universal standard.
 
@@ -282,3 +285,5 @@ src/pathly_data/adapters/
 |-- bmad/
 `-- generic/
 ```
+
+Note: `antigravity/` is already shipped — it is not a future item.

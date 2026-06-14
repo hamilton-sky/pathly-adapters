@@ -6,12 +6,29 @@ name: Feature Index
 > **Read this first.** Every agent working on this feature should load this file before any other plan file.
 > It maps every file in this folder so you can fetch only what you need in one read.
 
-> **Scope note:** This plan folder covers **Phase 1 — Backend core only** (DB + embeddings +
-> HTTP API + FSM injection). It delivers board context into agent prompts with **zero Studio
-> changes**, testable entirely via curl. Later phases live in their own plan folders:
-> `comms-board-studio` (Phase 2 UI), `comms-board-skills` (Phase 3), `board-storm` (Phase 5),
-> `comms-board-command-center` (Phase 4). Design docs: `SPEC.md` v6.1, `UI-DIRECTION.md`,
-> `CONSULTATION.md` v1.0, `BOARD-STORM.md` v1.1 — all in this folder.
+> **Scope note — BACKEND ONLY:**
+> This plan folder is the **backend phase**. It ends at Conv 6 (backend handoff).
+> No Studio/Electron code is touched here. Frontend work is gated on a design consultation
+> and lives in separate plan folders (see below).
+>
+> - **Phase 1** (Backend Core — DONE): DB, embeddings, HTTP API, SSE, FSM injection
+> - **Phase 1.4** (Retrieval Correctness — Conv 4 TODO): PRs 1–4 — fix superseded decisions,
+>   write-time curation, labeled governance/semantic channels, remove dead promotion code
+> - **Phase 1.5** (Retrieval Quality + Permissions — Conv 5 TODO): hybrid BM25+semantic (§26),
+>   role-based write permissions (§27). DAG tasks (§28) deferred to Phase 3 skill bundle.
+> - **Conv 6** (Backend handoff — after Conv 5): verification summary + RETRO; emits
+>   `BACKEND_COMPLETE` signal. No code changes — planning/signalling only.
+>
+> **Sequencing:** Phase 1.4 must ship before Phase 1.5 — adding hybrid search on top of broken
+> retrieval (stale decisions, noise pollution) makes things worse, not better.
+>
+> **Frontend gate:** do NOT start `comms-board-studio` until design consultation is complete.
+> When ready, open that plan folder as a new feature — it has its own conversation prompts.
+>
+> Later phases live in their own folders: `comms-board-studio` (Phase 2 UI — PENDING DESIGN),
+> `comms-board-skills` (Phase 3 — also where DAG Phase 14 lands), `board-storm` (Phase 5),
+> `comms-board-command-center` (Phase 4).  
+> Design docs: `SPEC.md` v6.2, `UI-DIRECTION.md`, `CONSULTATION.md` v1.0, `BOARD-STORM.md` v1.1.
 >
 > **UI direction (2026-06-11):** The Studio UI is a full-screen **workspace** — resizable left
 > sidebar for All-Features navigation + full-area board sections + "Set as main feature" swap.
@@ -33,7 +50,7 @@ name: Feature Index
 
 | File | Purpose |
 |---|---|
-| `SPEC.md` (v6.1) | Full comms board architecture — schema, scopes, endpoints, all 5 phases |
+| `SPEC.md` (v6.2) | Full comms board architecture — schema, scopes, endpoints, all 5 phases + §26-§28 (Phase 1.5) |
 | `UI-DIRECTION.md` | **Canonical UI design** — supersedes SPEC §7/§16/§19 (workspace + sidebar + sections) |
 | `CONSULTATION.md` (v1.0) | Architecture / PO / Designer review — **read §1.2 for the 5 build risks** |
 | `BOARD-STORM.md` (v1.1) | Phase 5 consultation mode design (out of scope for this plan) |
@@ -68,6 +85,16 @@ Files in the live repo that this feature reads or modifies.
 | `src/pathly_orchestrator/runner/comms_context.py` | Conv 3 | CREATE: `retrieve_board_context()` → markdown block |
 | `src/pathly_orchestrator/fsm_ops.py` | Conv 3 | MODIFY: call `retrieve_board_context()`, append `## Communication Board` to prompt |
 | `src/pathly_orchestrator/db/queries/app_settings.py` | Conv 3 | MODIFY: `get_board_scope()` / `set_board_scope()` (default all-true) |
+| `src/pathly_orchestrator/db/migrations.py` | Conv 4 | MODIFY: add `superseded_by` column via `_add_additive_migrations()` tuple |
+| `src/pathly_orchestrator/db/queries/comms.py` | Conv 4 | MODIFY: add `supersede_message()`, `get_active_escalations()`; delete `get_promotable_messages()` |
+| `src/pathly_orchestrator/http_server/blueprints/comms.py` | Conv 4 | MODIFY: `_EMBED_TYPES` frozenset + conditional `_embed_async`; add `POST /comms/supersede` route |
+| `src/pathly_orchestrator/runner/comms_context.py` | Conv 4 | MODIFY: restructure to `🔒 Governance` / `💡 Context` two-channel layout |
+| `src/pathly_orchestrator/db/connection.py` | Conv 5 | MODIFY: add `_FTS_AVAILABLE` flag (probe runs after `_run_migrations()`) |
+| `src/pathly_orchestrator/db/migrations.py` | Conv 5 | MODIFY: add `comms_fts` FTS5 virtual table in `_run_migrations()` |
+| `src/pathly_orchestrator/db/queries/comms.py` | Conv 5 | MODIFY: add `search_by_keyword()`, `search_by_hybrid()` |
+| `src/pathly_orchestrator/http_server/blueprints/comms.py` | Conv 5 | MODIFY: `mode` param in `/comms/search`; write-permission check + `GET /comms/permissions` |
+| `src/pathly_orchestrator/runner/comms_context.py` | Conv 5 | MODIFY: switch `retrieve_board_context()` to call `search_by_hybrid` |
+| `src/pathly_orchestrator/db/queries/app_settings.py` | Conv 5 | MODIFY: add `get_write_permissions()` / `set_write_permissions()` |
 
 > **Verify these paths exist before editing.** Glob each one. If a path is wrong, correct it before proceeding.
 
@@ -77,9 +104,12 @@ Files in the live repo that this feature reads or modifies.
 
 | Conv | Title | Stories | Status | Key files touched |
 |---|---|---|---|---|
-| 1 | Storage foundation: DB tables + embeddings | S1.1, S1.2 | TODO | `migrations.py`, `connection.py`, `db/queries/comms.py`, `runner/embeddings.py`, `pyproject.toml` |
-| 2 | HTTP API + SSE | S1.3, S1.4 | TODO | `blueprints/comms.py`, `app.py`, `sse.py`, `blueprints/streams.py` |
-| 3 | FSM injection + board_scope | S2.1, S2.2 | TODO | `runner/comms_context.py`, `fsm_ops.py`, `db/queries/app_settings.py` |
+| 1 | Storage foundation: DB tables + embeddings | S1.1, S1.2 | DONE | `migrations.py`, `connection.py`, `db/queries/comms.py`, `runner/embeddings.py`, `pyproject.toml` |
+| 2 | HTTP API + SSE | S1.3, S1.4 | DONE | `blueprints/comms.py`, `app.py`, `sse.py`, `blueprints/streams.py` |
+| 3 | FSM injection + board_scope | S2.1, S2.2 | DONE | `runner/comms_context.py`, `fsm_ops.py`, `db/queries/app_settings.py` |
+| 4 | Retrieval correctness (PRs 1–4) | S1.4a–d | TODO | `migrations.py`, `db/queries/comms.py`, `blueprints/comms.py`, `runner/comms_context.py` |
+| 5 | Hybrid search + write permissions | S3.1, S3.2 | TODO | `db/connection.py`, `migrations.py`, `db/queries/comms.py`, `blueprints/comms.py`, `runner/comms_context.py`, `db/queries/app_settings.py` |
+| **6** | **Backend handoff — RETRO + signal** | — | TODO | `PROGRESS.md` only — no source code changes |
 
 ---
 

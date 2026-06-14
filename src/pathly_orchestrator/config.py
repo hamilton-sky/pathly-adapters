@@ -7,6 +7,10 @@ import secrets as _secrets_mod
 import sys
 from dataclasses import dataclass
 
+# Addresses that are guaranteed loopback — binding to these never exposes
+# the server beyond the current user's machine.
+_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
+
 
 def _load_or_create_secret() -> str:
     """Read the shared API secret from ~/.pathly/server_secret.txt, creating it if absent."""
@@ -47,8 +51,29 @@ class Settings:
             )
             sys.exit(1)
 
+        host = os.environ.get("PATHLY_FSM_HTTP_HOST", "127.0.0.1")
+        if host not in _LOOPBACK_HOSTS:
+            expose = os.environ.get("PATHLY_EXPOSE_HOST", "").strip().lower() == "true"
+            if not expose:
+                print(
+                    f"ERROR: PATHLY_FSM_HTTP_HOST={host!r} is a non-loopback address.\n"
+                    "Binding to a non-loopback interface exposes the FSM server and its\n"
+                    "unauthenticated SSE streams (/events/*) on the network.\n"
+                    "If you intentionally want this, set PATHLY_EXPOSE_HOST=true.\n"
+                    "See docs/SECURITY.md for the trust model.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            print(
+                f"WARNING: PATHLY_FSM_HTTP_HOST={host!r} — FSM server will bind on a\n"
+                "non-loopback interface. The /events/* SSE streams have NO authentication\n"
+                "and will be reachable by anyone who can reach this address.\n"
+                "Set PATHLY_FSM_HTTP_HOST=127.0.0.1 to restrict to localhost only.",
+                file=sys.stderr,
+            )
+
         return cls(
-            host=os.environ.get("PATHLY_FSM_HTTP_HOST", "127.0.0.1"),
+            host=host,
             port=port,
             cors_origin=os.environ.get("PATHLY_CORS_ORIGIN", "*"),
             api_secret=os.environ.get("PATHLY_API_SECRET") or _load_or_create_secret(),

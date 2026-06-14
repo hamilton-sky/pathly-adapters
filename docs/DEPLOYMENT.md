@@ -24,8 +24,9 @@ Copy `.env.example` to `.env` and configure:
 
 | Variable | Default | Description |
 |---|---|---|
-| `PATHLY_FSM_HTTP_PORT` | `8765` | Port for the FSM HTTP server |
-| `PATHLY_FSM_HTTP_HOST` | `127.0.0.1` | Host to bind (use 127.0.0.1 for local-only) |
+| `PATHLY_FSM_HTTP_PORT` | `8765` | Port for the FSM HTTP server (validated 1–65535) |
+| `PATHLY_FSM_HTTP_HOST` | `127.0.0.1` | Bind address. **Must be a loopback address** (`127.0.0.1`, `::1`, `localhost`). Any other value causes a startup error unless `PATHLY_EXPOSE_HOST=true` is also set. |
+| `PATHLY_EXPOSE_HOST` | _(unset)_ | Set to `true` to allow a non-loopback `PATHLY_FSM_HTTP_HOST`. Prints a warning about unauthenticated SSE streams. Only needed when Studio and the FSM server run on different machines. |
 | `PATHLY_PROJECT_ROOT` | _(none)_ | Absolute path to your project root — **required for hooks** |
 | `PATHLY_API_SECRET` | _(auto)_ | Shared secret for `X-Pathly-Secret` auth. If unset, a 64-char hex token is auto-generated and saved to `~/.pathly/server_secret.txt` on first run. Set explicitly to pin the secret across restarts or share it with external callers. |
 | `ANTHROPIC_API_KEY` | _(none)_ | Enables feedback auto-classification (optional) |
@@ -164,7 +165,9 @@ the instance.
 
 1. Update adapter package version in `pyproject.toml`
 2. Update Studio app version in `studio/package.json` and `studio/package-lock.json` when the release includes Studio changes
-3. Update version references in `README.md`, `docs/SECURITY.md`, and `docs/PRODUCTION_READINESS.md`
-4. Commit and tag: `git tag v<version>`
-5. Push tag: `git push origin v<version>`
-6. GitHub Actions will run tests and publish to PyPI automatically
+3. Update root `package.json` version to match `pyproject.toml`
+4. Update version references in `README.md`, `docs/SECURITY.md`, `docs/PRODUCTION_READINESS.md`, and `docs/SYSTEM_REVIEW.md`
+5. Add a `CHANGELOG.md` entry describing the changes
+6. Commit and tag: `git tag v<version>`
+7. Push tag: `git push origin v<version>`
+8. GitHub Actions will run tests and publish to PyPI automatically

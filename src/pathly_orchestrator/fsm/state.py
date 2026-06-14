@@ -44,7 +44,7 @@ STATES: dict[str, list[str]] = _SCHEMA["transitions"]
 VALID_STATES: frozenset[str] = frozenset(STATES.keys())
 TRANSITIONS: dict[str, list[str]] = STATES
 
-_KNOWN_ADAPTERS: frozenset[str] = frozenset({"claude", "codex", "copilot"})
+_KNOWN_ADAPTERS: frozenset[str] = frozenset({"claude", "codex", "copilot", "antigravity"})
 
 _REQUIRED_FLOW_KEYS = {
     "storage_path",

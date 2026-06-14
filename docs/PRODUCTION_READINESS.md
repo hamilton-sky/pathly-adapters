@@ -5,19 +5,16 @@ pathly-adapters publicly as a public beta / technical preview.
 
 ## Release Position
 
-pathly-adapters is currently:
+pathly-adapters is currently at **version 2.14.1**:
 
-- Stable at adapter package metadata version 2.11.10 for the core install path
-  (`--dry-run`, `--apply`, `--uninstall`).
-- Studio app package version 2.11.11 includes the Conductor mini-terminal,
-  shared xterm registry, runtime icons, and hamburger-controlled terminal
-  instance rail.
-- Verified with full rollback on failure.
-- Supported for Claude Code through the existing install scripts.
-- Ready for Codex plugin testing through `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`.
+- Stable for the core install path (`--dry-run`, `--apply`, `--uninstall`) with
+  full rollback on failure.
+- Supported for Claude Code, Codex, Copilot, and Antigravity (Gemini CLI).
 - Copilot destination paths follow the VS Code Copilot agent spec and may
   require `--repair` after a VS Code update.
-- Not yet fully adapter-based for Cursor, Windsurf, BMAD, or generic prompts.
+- Antigravity model names (`gemini-2.5-pro`, `gemini-2.5-flash`) are
+  placeholders until verified against a live binary install.
+- Not yet adapter-based for Cursor, Windsurf, BMAD, or generic prompts.
 
 ## Claude Code Install Checks
 
@@ -59,6 +56,23 @@ Still needed:
 - Invocation syntax varies by VS Code / Copilot version — document verified
   steps after testing.
 
+## Antigravity Readiness
+
+Done:
+
+- `src/pathly_data/adapters/antigravity/` committed with `_meta/` YAML files.
+- `pathly-setup antigravity --apply` is wired in `install_cli/orchestrate.py` (`ALLOWED_HOSTS`)
+  and `install_cli/detect.py` (detects `~/.gemini/antigravity-cli/`).
+- `antigravity` added to `_KNOWN_ADAPTERS` in FSM validator (`pathly_orchestrator/fsm/state.py`).
+
+Still needed:
+
+- Verify actual Antigravity binary install path and confirm
+  `~/.gemini/antigravity-cli/` is the correct detection path.
+- Confirm model names (`gemini-2.5-pro`, `gemini-2.5-flash`) against live binary.
+- Clean-machine smoke run for Antigravity install and uninstall.
+- Document hook surface coverage for Antigravity (hooks.json equivalent, if any).
+
 ## pathly-setup Flags
 
 Required before production-ready:
@@ -84,6 +98,44 @@ Required before production-ready:
   - No command depends on the source checkout path.
 - `twine upload dist/*` succeeds for PyPI release.
 - PyPI package name `pathly-adapters` reserved.
+
+## Studio Installer Signing
+
+Required before broad distribution (not yet done — infrastructure exists, secrets not filled in):
+
+### Windows
+
+- Obtain a code-signing certificate (EV certificate recommended; without EV the
+  first-run SmartScreen warning persists until sufficient reputation is built).
+- Export as `.pfx`, base64-encode it.
+- Add two GitHub repository secrets:
+  - `WIN_CSC_LINK` — base64-encoded `.pfx`
+  - `WIN_CSC_KEY_PASSWORD` — password for the `.pfx`
+- Uncomment the two `CSC_*` lines in `.github/workflows/studio-release.yml` under
+  the "Package and publish (Windows)" step.
+- Verify the signed `.exe` shows a publisher name in the SmartScreen dialog.
+
+### macOS
+
+- Enroll in the Apple Developer Program (USD 99/year).
+- Create a "Developer ID Application" certificate in Keychain Access.
+- Export → base64-encode.
+- Create an app-specific password at `appleid.apple.com`.
+- Add five GitHub repository secrets:
+  - `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD` — certificate
+  - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` — notarization
+- Remove `CSC_IDENTITY_AUTO_DISCOVERY: false` from the macOS step in
+  `studio-release.yml`.
+- Verify the packaged `.dmg` passes `spctl --assess --type open --context context:primary-signature`.
+
+### Current status without signing
+
+Users on Windows see the **"Windows protected your PC — Unknown Publisher"**
+SmartScreen block. Users on macOS see **"cannot be opened because Apple cannot
+check it for malicious software"** and must navigate to System Settings to
+override it. Both are significant friction for first-run adoption.
+
+---
 
 ## Marketplace Manifests
 
@@ -123,11 +175,16 @@ Required before production-ready:
 
 - `pytest -q` passes.
 - GitHub Actions green on Python 3.11, 3.12, and 3.13.
+- **Studio CI green on every PR** — `npm run typecheck` (renderer + main process)
+  and `npm run test` (Vitest) must pass. Workflow: `.github/workflows/studio-ci.yml`.
 - Plugin manifests parse as valid JSON.
 - Install scripts pass dry-run or temp-home smoke tests.
 - README start commands are covered by skill existence checks.
 - Security and reliability notes are current.
 - Public known-limitations section exists in README.
+- **Windows installer is code-signed** — no "Unknown Publisher" SmartScreen block.
+- **macOS installer is signed and notarized** — passes `spctl --assess` without
+  user override. See "Studio Installer Signing" section above for steps.
 
 Recommended:
 

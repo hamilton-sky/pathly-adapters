@@ -138,3 +138,84 @@ or break global rules for a spike — without affecting other features.
 - All three scopes disabled → no board block injected, no error
 
 **Delivered by:** Phase 10 → Conversation 3
+
+---
+
+## Phase 1.5 — Retrieval Quality, Permissions, DAG Tasks
+
+---
+
+### Story 3.1: Hybrid BM25 + semantic retrieval
+**As a** Pathly agent, **I want** board searches to combine keyword (BM25) and semantic
+(cosine) ranking, **so that** exact identifiers (function names, file paths, error codes)
+are found reliably alongside conceptually similar messages.
+
+**Acceptance Criteria:**
+- [ ] `comms_fts` FTS5 virtual table exists as a content-table over `comms_messages.text`
+- [ ] `search_by_hybrid(conn, query_text, query_embedding, boards, scopes, k)` is in `db/queries/comms.py`
+- [ ] RRF score = `1/(60 + rank_bm25) + 1/(60 + rank_semantic)` merges the two ranked lists
+- [ ] `POST /comms/search` accepts a `mode` parameter: `hybrid` (default), `semantic`, `keyword`
+- [ ] `retrieve_board_context()` uses `hybrid` mode by default
+- [ ] A message containing an exact identifier (e.g. `setupWebGL`) is returned when the query
+      contains that exact identifier, even if the cosine score would not rank it top-3
+- [ ] If FTS5 is unavailable, falls back to semantic-only without error
+- [ ] If both FTS5 and sqlite-vec are unavailable, falls back to recency ordering
+
+**Edge Cases:**
+- Query contains only stop words ("the is a") → FTS5 returns empty; cosine result still returned
+- Message posted but FTS index not yet updated → still returned by cosine path
+
+**Delivered by:** Phase 11–12 → Conversation 5
+**SPEC reference:** §26
+
+---
+
+### Story 3.2: Role-based write permissions
+**As a** Pathly operator, **I want** agent roles to be limited in which board scopes they
+can write to, **so that** the project and global boards stay high-signal and are never
+accidentally polluted by feature-scoped agents.
+
+**Acceptance Criteria:**
+- [ ] `POST /comms/post` checks `from_agent` role against `_PROJECT_WRITERS` and `_GLOBAL_WRITERS` frozensets
+- [ ] Agents not in `_PROJECT_WRITERS` receive **403 Forbidden** when posting to `board='project'`
+- [ ] Only `director` and `human` can post to `board='global'`; all others receive **403**
+- [ ] `feature` scope write is unrestricted (any role may write)
+- [ ] `GET /comms/permissions?project_root=<root>` returns the resolved permission table as JSON
+- [ ] Project-level overrides can be stored in `app_settings` under `write_permissions:{project_root}`
+      and are merged with the default table at request time
+- [ ] The 403 response body includes the role, the target scope, and a hint about which roles are allowed
+
+**Edge Cases:**
+- `from_agent` is missing or empty → treated as unknown role (feature-only access)
+- `from_agent='human'` → always allowed to any scope
+- Project override grants `builder` project-write → builder succeeds for that project
+
+**Delivered by:** Phase 13 → Conversation 5
+**SPEC reference:** §27
+
+---
+
+### Story 3.3: DAG task decomposition
+**As a** builder agent, **I want** to query which tasks are currently unblocked (all
+their dependencies done), **so that** I can work in the correct dependency order within
+the BUILD stage without reading the full task list and guessing.
+
+**Acceptance Criteria:**
+- [ ] `comms_messages` has a `depends_on TEXT DEFAULT '[]'` column (JSON array of message IDs)
+- [ ] `get_ready_tasks(conn, board, scope)` returns tasks of type `task` and `task_status='pending'`
+      whose every `depends_on` ID has `task_status='done'`; tasks with `depends_on=[]` are always ready
+- [ ] `GET /comms/tasks?feature=<name>&ready=true` returns only ready tasks
+- [ ] `GET /comms/tasks?feature=<name>&status=pending` returns all pending tasks (with and without met deps)
+- [ ] `POST /comms/tasks/complete` sets `task_status='done'` and broadcasts `COMMS_UPDATE` over SSE
+- [ ] `POST /comms/tasks/complete` is idempotent: completing a done task returns 200 with no change
+- [ ] After marking task `t1` done, `GET /comms/tasks?ready=true` reflects that tasks depending
+      only on `t1` now appear as ready
+
+**Edge Cases:**
+- `depends_on` contains an ID that does not exist → that dependency is treated as not-done
+  (task stays blocked)
+- Circular dependencies (t1 depends on t2, t2 depends on t1) → neither is ever ready; no error
+- Non-task message types ignore `depends_on` (field stored but never evaluated)
+
+**Delivered by:** Phase 14 → Deferred (Phase 3 bundle)
+**SPEC reference:** §28

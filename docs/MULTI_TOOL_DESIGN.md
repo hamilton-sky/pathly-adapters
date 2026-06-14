@@ -22,7 +22,8 @@ pathly-adapters/                 ← repo root (single package)
 │       └── adapters/            ← thin tool-specific wrappers
 │           ├── claude/
 │           ├── codex/
-│           └── copilot/
+│           ├── copilot/
+│           └── antigravity/
 ├── docs/
 └── pyproject.toml
 ```
@@ -45,6 +46,7 @@ metadata, and expose the host-native invocation style.
 | Claude Code | `/pathly <request>` or `/path <request>` (slash commands) | `src/pathly_data/adapters/claude/` |
 | Codex | `Use Pathly <request>` or `Pathly <request>` (natural language) plus `pathly-fsm-call` for HTTP lifecycle steps | `src/pathly_data/adapters/codex/` |
 | Copilot | Version-dependent; agent files as custom instructions | `src/pathly_data/adapters/copilot/` |
+| Antigravity | `/pathly <request>` slash commands (Gemini CLI layout); models: `gemini-2.5-pro` / `gemini-2.5-flash` | `src/pathly_data/adapters/antigravity/` |
 
 ## Studio Surface
 
@@ -87,6 +89,6 @@ src/pathly_data/adapters/
 
 ## Release Guidance
 
-Do not describe future adapters as shipped. Current public positioning should
-remain: Pathly is a public beta candidate with Claude Code, Codex, direct skill,
-and CLI surfaces available, while additional adapters are roadmap items.
+Current public positioning: Pathly ships four adapters — Claude Code, Codex,
+Copilot, and Antigravity (Gemini CLI). Do not describe Cursor, Windsurf, BMAD,
+or generic adapters as shipped; those remain roadmap items.

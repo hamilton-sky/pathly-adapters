@@ -5,10 +5,11 @@ where files land.
 
 ## Host Entry Points
 
-Pathly has three runtime entry points:
+Pathly has four runtime entry points:
 
 - Claude Code: via the `/pathly` dispatcher (`/pathly go`, `/pathly build`, etc.) or direct skill invocations (`/go`, `/build`, `/start`, etc.)
 - Codex: `Use Pathly ...` (natural language)
+- Antigravity: `/pathly ...` slash commands (Gemini CLI layout)
 - Pathly Studio: `pathly-studio`, then use Canvas, Plan, Monitor, Conductor,
   and Terminal inside the local desktop UI.
 
@@ -20,11 +21,13 @@ flowchart TD
     B --> CC["Claude Code\n/pathly <subcommand>\nor /skill-name directly"]
     B --> CX["Codex\nUse Pathly <request>"]
     B --> CP["Copilot\nCopilot-native skill invocation"]
+    B --> AG["Antigravity\n/pathly <subcommand>"]
     B --> ST["Pathly Studio\nConductor + Canvas + Monitor"]
 
     CC --> CA[claude adapter\n~/.claude/agents/ + ~/.claude/skills/]
     CX --> XA[codex adapter\n~/.codex/agents/ + ~/.agents/skills/]
     CP --> PA[copilot adapter\n~/.vscode/extensions/pathly/agents/ + skills/]
+    AG --> AA[antigravity adapter\n~/.gemini/antigravity-cli/agents/ + skills/]
     ST --> FS[pathly-fsm-http\nproject pathly/plans/**\nwindow.pathly.terminal]
 ```
 
@@ -37,12 +40,15 @@ flowchart TD
     C --> D[Claude Code]
     C --> E[Codex]
     C --> F[Copilot]
+    C --> AG[Antigravity]
     D --> G[stitch.py\ncore/ + claude/_meta/*.yaml]
     E --> H[stitch.py\ncore/ + codex/_meta/*.yaml]
     F --> I[stitch.py\ncore/ + copilot/_meta/*.yaml]
+    AG --> J2[stitch.py\ncore/ + antigravity/_meta/*.yaml]
     G --> J[materialize.py\n→ ~/.claude/agents/\n→ ~/.claude/skills/]
     H --> K[materialize.py\n→ ~/.codex/agents/\n→ ~/.agents/skills/]
     I --> L[materialize.py\n→ VS Code agents folder]
+    J2 --> M[materialize.py\n→ ~/.gemini/antigravity-cli/agents/\n→ ~/.gemini/antigravity-cli/skills/]
 ```
 
 ## What Files Get Deployed Where
@@ -199,15 +205,16 @@ controls.
 ## pathly-setup Commands
 
 ```bash
-pathly-setup                      # detect hosts; launch interactive menu
-pathly-setup --dry-run            # preview what would be written
-pathly-setup --apply              # install into all detected hosts
-pathly-setup claude --apply       # install for Claude Code only
-pathly-setup codex --apply        # install for Codex only
-pathly-setup copilot --apply      # install for Copilot / VS Code only
-pathly-setup --repair             # overwrite Pathly-owned files
-pathly-setup --force              # overwrite all files, even non-Pathly-owned
-pathly-setup --uninstall          # remove all Pathly-owned files
+pathly-setup                          # detect hosts; launch interactive menu
+pathly-setup --dry-run                # preview what would be written
+pathly-setup --apply                  # install into all detected hosts
+pathly-setup claude --apply           # install for Claude Code only
+pathly-setup codex --apply            # install for Codex only
+pathly-setup copilot --apply          # install for Copilot / VS Code only
+pathly-setup antigravity --apply      # install for Antigravity (Gemini CLI) only
+pathly-setup --repair                 # overwrite Pathly-owned files
+pathly-setup --force                  # overwrite all files, even non-Pathly-owned
+pathly-setup --uninstall              # remove all Pathly-owned files
 ```
 
 Dry-run output shows: detected hosts, Pathly version, planned adapter writes,

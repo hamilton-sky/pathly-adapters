@@ -20,18 +20,18 @@ Internal review of pathly-adapters' current shape and release posture.
 
 ## Current Risks
 
-- pathly-adapters package metadata is at 2.11.10 for the core install path;
-  Studio app package metadata is at 2.11.11. Copilot
-  destination paths may require `--repair` after a VS Code update.
+- Current version is **2.14.1**. Copilot destination paths may require `--repair`
+  after a VS Code update. Antigravity model names are placeholders until verified
+  against a live binary.
 - Hook path validation is string-based. A hardening pass is needed to resolve
   paths and confirm writes stay inside `plans/`.
 - Manifest integrity is not verified on load — an externally edited manifest
   could misidentify non-Pathly files as Pathly-owned, causing `--uninstall` to
   delete user files.
-- End-to-end clean-machine smoke tests for Codex local marketplace install are
-  not yet complete.
+- End-to-end clean-machine smoke tests for Codex local marketplace install and
+  Antigravity install are not yet complete.
 - Cursor, Windsurf, BMAD, and generic prompt adapters are planned but not yet
-  shipped.
+  shipped (Antigravity is shipped).
 
 ## Design Decisions To Preserve
 
@@ -49,19 +49,22 @@ Internal review of pathly-adapters' current shape and release posture.
 ## Current Implementation Map
 
 ```text
-src/install_cli/detect.py        host discovery (Claude Code, Codex, Copilot)
+src/install_cli/detect.py        host discovery (Claude Code, Codex, Copilot, Antigravity)
 src/install_cli/stitch.py        core/ + _meta/*.yaml → deployable agent/skill files
 src/install_cli/materialize.py   atomic write to host config + manifest tracking
+src/install_cli/orchestrate.py   ALLOWED_HOSTS set + install orchestration
 src/install_cli/setup_command.py pathly-setup CLI (dry-run, apply, repair, force,
-                               uninstall, per-host subcommands)
+                                 uninstall, per-host subcommands)
 src/pathly_data/core/agents/                 14 host-neutral agent behavior contracts
-src/pathly_data/core/skills/                 39 skill files (29 user-facing + 2 transition-action
-                                             + 7 team sub-skills + 1 internal utility)
-src/pathly_data/core/flows/                  4 FSM flow definitions (team, debug, explore, test)
+src/pathly_data/core/skills/                 skills organized under: controls/, development/,
+                                             planning/, team/, utilities/, fix/, fix-hutk/,
+                                             custom/, debug/, fragments/, hello/, planning-hello/
+src/pathly_data/core/flows/                  5 FSM flow definitions (team, debug, explore, test, quick-fix)
 src/pathly_data/core/templates/plan/         plan file templates
 src/pathly_data/adapters/claude/_meta/       per-agent/skill YAML for Claude Code
 src/pathly_data/adapters/codex/_meta/        per-agent/skill YAML for Codex
 src/pathly_data/adapters/copilot/_meta/      per-agent/skill YAML for Copilot
+src/pathly_data/adapters/antigravity/_meta/  per-agent/skill YAML for Antigravity (Gemini CLI)
 ```
 
 ## Recommended Next Hardening

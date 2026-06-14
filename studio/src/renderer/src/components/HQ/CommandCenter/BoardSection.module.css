@@ -17,33 +17,45 @@
   padding: 0 8px 0 14px;
   border-bottom: var(--border);
   flex-shrink: 0;
+  min-width: 0;            /* allow the name to shrink instead of wrapping the row */
   background: var(--bg-mantle);
 }
 
 .bsIcon {
   display: inline-flex;
   color: var(--accent);
+  flex-shrink: 0;
 }
 
 .bsScope {
   font: 600 var(--font-size-sm)/1 var(--font-family-base);
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;          /* the board label stays intact */
 }
 
+/* The variable board name truncates to a single line; full text lives in the tooltip */
 .bsName {
   font: 500 12px/1 var(--font-family-mono);
   color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .bsSep {
   color: var(--text-disabled);
+  flex-shrink: 0;
 }
 
 .bsHeadActs {
   margin-left: auto;
   display: flex;
   gap: 2px;
+  flex-shrink: 0;
+  padding-left: 6px;
 }
 
 .bsIconbtn {

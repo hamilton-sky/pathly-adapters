@@ -3,6 +3,7 @@ import { GitBranch, Folder, Globe, X } from 'lucide-react'
 import type { BoardScope, Preset, Direction, SectionDef } from './types'
 import { SCOPES } from './constants'
 import { CommsPanel } from '../CommsPanel/CommsPanel'
+import { Tooltip } from '../../ui'
 import s from './BoardSection.module.css'
 
 export interface BoardSectionProps {
@@ -49,8 +50,10 @@ export function BoardSection(props: BoardSectionProps) {
       <div className={s.bsHead}>
         <span className={s.bsIcon}>{SCOPE_ICONS[section.scope]}</span>
         <span className={s.bsScope}>{sc.title}</span>
-        <span className={s.bsSep}>—</span>
-        <span className={s.bsName}>{getBoardName(section)}</span>
+        <span className={s.bsSep}>:</span>
+        <Tooltip label={getBoardName(section)} placement="bottom">
+          <span className={s.bsName}>{getBoardName(section)}</span>
+        </Tooltip>
         <div className={s.bsHeadActs}>
           <button
             type="button"
