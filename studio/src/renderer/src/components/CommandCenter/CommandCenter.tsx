@@ -5,9 +5,9 @@ import { useCommsStore } from '../../store/commsStore'
 import { useCommandCenterStore } from '../../store/commandCenterStore'
 import { useProjectStore } from '../../store/projectStore'
 import { useSectionResize } from './hooks/useSectionResize'
-import { CommandCenterHeader } from './CommandCenterHeader'
-import { FeatureSidebar } from './FeatureSidebar'
-import { BoardSection } from './BoardSection'
+import { CommandCenterHeader } from './CommandCenterHeader/CommandCenterHeader'
+import { FeatureSidebar } from './FeatureSidebar/FeatureSidebar'
+import { BoardSection } from './BoardSection/BoardSection'
 import s from './CommandCenter.module.css'
 
 export function CommandCenter() {
@@ -80,7 +80,7 @@ export function CommandCenter() {
                   <div
                     className={s.resize}
                     role="separator"
-                    aria-orientation={cc.direction === 'row' ? 'vertical' : 'horizontal'}
+                    {...(cc.direction === 'row' ? { 'aria-orientation': 'vertical' } : { 'aria-orientation': 'horizontal' })}
                     onMouseDown={(e) => onResize(e, cc.sections[i - 1].id, sec.id)}
                   />
                 )}

@@ -1,7 +1,7 @@
 import React from 'react'
 import { PanelLeft } from 'lucide-react'
-import type { Feature } from './types'
-import { FeatureCard } from './FeatureCard'
+import type { Feature } from '../types'
+import { FeatureCard } from '../FeatureCard/FeatureCard'
 import s from './FeatureSidebar.module.css'
 
 export interface FeatureSidebarProps {
@@ -28,7 +28,7 @@ function CollapsedRail(p: FeatureSidebarProps) {
           type="button"
           className={s.sbCollapse}
           title="Expand sidebar"
-          aria-expanded={false}
+          aria-expanded="false"
           aria-label="Expand sidebar"
           onClick={p.onToggleSidebar}
         >
@@ -75,7 +75,7 @@ export function FeatureSidebar(p: FeatureSidebarProps) {
           type="button"
           className={s.sbCollapse}
           title="Collapse sidebar"
-          aria-expanded={true}
+          aria-expanded="true"
           aria-label="Collapse sidebar"
           onClick={p.onToggleSidebar}
         >

@@ -76,10 +76,7 @@
 
 .featBody {
   padding: 0 11px 11px 22px;
-  display: none;
 }
-
-.open .featBody { display: block; }
 
 .featStage {
   display: flex;

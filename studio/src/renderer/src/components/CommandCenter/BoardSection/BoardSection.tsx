@@ -1,9 +1,9 @@
 import React from 'react'
 import { GitBranch, Folder, Globe, X } from 'lucide-react'
-import type { BoardScope, Preset, Direction, SectionDef } from './types'
-import { SCOPES } from './constants'
-import { CommsPanel } from '../HQ/CommsPanel/CommsPanel'
-import { Tooltip } from '../ui'
+import type { BoardScope, Preset, Direction, SectionDef } from '../types'
+import { SCOPES } from '../constants'
+import { CommsPanel } from '../../HQ/CommsPanel/CommsPanel'
+import { Tooltip } from '../../ui'
 import s from './BoardSection.module.css'
 
 export interface BoardSectionProps {

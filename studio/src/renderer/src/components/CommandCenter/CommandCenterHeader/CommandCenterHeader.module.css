@@ -172,15 +172,31 @@
 .iconSpacer { width: 13px; display: inline-block; }
 
 .featureTab {
-  gap: 4px;
-  padding-right: 4px;
+  gap: 0;
+  padding: 0 4px 0 0;
   cursor: pointer;
   flex-shrink: 1;   /* shrink instead of overflowing — the strip never clips the last tab */
   min-width: 0;     /* permit shrinking below content width */
 }
 
+/* Inner toggle button fills all space left of the close button */
+.tabToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 0 0 11px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 /* Inside a shrinking feature tab, only the label compresses — glyphs stay intact */
-.featureTab > svg,
+.tabToggle > svg,
 .featureTab .st,
 .featureTab .badge { flex-shrink: 0; }
 

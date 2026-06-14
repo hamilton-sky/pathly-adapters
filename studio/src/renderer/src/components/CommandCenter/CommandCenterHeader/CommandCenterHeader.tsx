@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown, Check, X } from 'lucide-react'
-import type { BoardScope, Direction, Preset, SectionDef } from './types'
-import { SCOPES } from './constants'
-import { Tooltip } from '../ui'
+import type { BoardScope, Direction, Preset, SectionDef } from '../types'
+import { SCOPES } from '../constants'
+import { Tooltip } from '../../ui'
 import s from './CommandCenterHeader.module.css'
 
 export interface CommandCenterHeaderProps {
@@ -84,7 +84,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
             type="button"
             className={s.tab}
             {...(globalOn ? { 'data-on': '' } : {})}
-            aria-pressed={globalOn}
+            {...(globalOn ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
             onClick={() => p.onToggleSection('global')}
           >
             {SCOPE_ICONS['global']}
@@ -103,7 +103,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
             type="button"
             className={s.tab}
             {...(projectOn ? { 'data-on': '' } : {})}
-            aria-pressed={projectOn}
+            {...(projectOn ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
             onClick={() => p.onToggleSection('project')}
           >
             {SCOPE_ICONS['project']}
@@ -119,36 +119,39 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
           )
           const pend = fid === p.mainFeature ? p.featurePending : 0
           return (
-            <Tooltip
+            <div
               key={fid}
-              label={fid}
-              description={isActive ? 'Showing · click to hide' : 'Hidden · click to show'}
-              placement="bottom"
+              className={`${s.tab} ${s.featureTab}`}
+              {...(isActive ? { 'data-on': '' } : {})}
             >
-              <div
-                className={`${s.tab} ${s.featureTab}`}
-                {...(isActive ? { 'data-on': '' } : {})}
-                role="button"
-                tabIndex={0}
-                onClick={() => p.onToggleFeatureSection(fid)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') p.onToggleFeatureSection(fid) }}
+              <Tooltip
+                label={fid}
+                description={isActive ? 'Showing · click to hide' : 'Hidden · click to show'}
+                placement="bottom"
               >
-                <GitBranch size={13} />
-                <span className={s.tabLabel}>{fid}</span>
-                <span className={s.st}>{isActive ? '●' : '○'}</span>
-                {pend > 0 && <span className={`${s.badge} ${s.msg}`}>{pend}</span>}
-                {!isOnly && (
-                  <button
-                    type="button"
-                    className={s.tabClose}
-                    aria-label={`Remove ${fid} tab`}
-                    onClick={(e) => { e.stopPropagation(); p.onRemoveFeatureTab(fid) }}
-                  >
-                    <X size={11} />
-                  </button>
-                )}
-              </div>
-            </Tooltip>
+                <button
+                  type="button"
+                  className={s.tabToggle}
+                  {...(isActive ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
+                  onClick={() => p.onToggleFeatureSection(fid)}
+                >
+                  <GitBranch size={13} />
+                  <span className={s.tabLabel}>{fid}</span>
+                  <span className={s.st}>{isActive ? '●' : '○'}</span>
+                  {pend > 0 && <span className={`${s.badge} ${s.msg}`}>{pend}</span>}
+                </button>
+              </Tooltip>
+              {!isOnly && (
+                <button
+                  type="button"
+                  className={s.tabClose}
+                  aria-label={`Remove ${fid} tab`}
+                  onClick={() => p.onRemoveFeatureTab(fid)}
+                >
+                  <X size={11} />
+                </button>
+              )}
+            </div>
           )
         })}
 
@@ -173,7 +176,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
               type="button"
               className={s.dirOpt}
               {...(p.direction === 'column' ? { 'data-active': '' } : {})}
-              aria-pressed={p.direction === 'column'}
+              {...(p.direction === 'column' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
               title="Stacked layout"
               onClick={() => p.direction !== 'column' && p.onToggleDirection()}
             >
@@ -183,7 +186,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
               type="button"
               className={s.dirOpt}
               {...(p.direction === 'row' ? { 'data-active': '' } : {})}
-              aria-pressed={p.direction === 'row'}
+              {...(p.direction === 'row' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
               title="Side by side layout"
               onClick={() => p.direction !== 'row' && p.onToggleDirection()}
             >
