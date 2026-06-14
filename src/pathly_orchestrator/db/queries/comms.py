@@ -138,7 +138,10 @@ def search_by_keyword(
         "AND m.deleted_at IS NULL "
         "ORDER BY rank LIMIT ?"
     )
-    rows = conn.execute(sql, [query_text] + list(boards) + list(scopes) + [k]).fetchall()
+    try:
+        rows = conn.execute(sql, [query_text] + list(boards) + list(scopes) + [k]).fetchall()
+    except sqlite3.OperationalError:
+        return []
     return [dict(r) for r in rows]
 
 

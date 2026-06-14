@@ -35,8 +35,9 @@ def client():
         yield c
 
 
-def _post_msg(client, from_agent: str, board: str, scope: str = None,
-              msg_type: str = "decision", text: str = "test message"):
+def _post_msg(client, from_agent: str, board: str, scope: str | None = None,
+              msg_type: str = "decision", text: str = "test message",
+              project_root: str | None = None):
     payload: dict = {
         "feature": "demo",
         "from": from_agent,
@@ -46,6 +47,8 @@ def _post_msg(client, from_agent: str, board: str, scope: str = None,
     }
     if scope is not None:
         payload["scope"] = scope
+    if project_root is not None:
+        payload["project_root"] = project_root
     return client.post("/comms/post", json=payload)
 
 
@@ -311,3 +314,47 @@ def test_comms_write_perm_global_writers_constant():
     """_GLOBAL_WRITERS frozenset contains only director and human."""
     from pathly_orchestrator.http_server.blueprints.comms import _GLOBAL_WRITERS
     assert _GLOBAL_WRITERS == frozenset({"director", "human"})
+
+
+# ---------------------------------------------------------------------------
+# G3: HTTP end-to-end — project-level override respected by POST /comms/post
+# ---------------------------------------------------------------------------
+
+def test_comms_write_perm_override_grants_builder_project_access(client):
+    """B1 fix: a project-level override that grants 'builder' project access is
+    enforced by comms_post(), not just stored in app_settings."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.app_settings import set_write_permissions
+
+    project_root = "C:/override-test-project"
+    conn = get_db()
+    # Grant builder write access to 'project' scope for this project
+    set_write_permissions(conn, project_root, {
+        "project": ["builder", "tester", "reviewer", "explorer",
+                    "architect", "planner", "designer", "director", "human"],
+    })
+
+    # builder -> project should now be 200, not 403
+    resp = _post_msg(client, "builder", "project", project_root=project_root)
+    assert resp.status_code == 200, (
+        f"Expected 200 after project override grants builder access; got {resp.status_code}: {resp.get_json()}"
+    )
+
+
+def test_comms_write_perm_override_blocks_previously_allowed_role(client):
+    """B1 fix: a restrictive project-level override that removes a role is also enforced."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.app_settings import set_write_permissions
+
+    project_root = "C:/restrictive-test-project"
+    conn = get_db()
+    # Restrict 'project' board to only director (removes tester who is normally allowed)
+    set_write_permissions(conn, project_root, {"project": ["director", "human"]})
+
+    resp = _post_msg(client, "tester", "project", project_root=project_root)
+    assert resp.status_code == 403, (
+        f"Expected 403 after project override removes tester; got {resp.status_code}"
+    )
+    body = resp.get_json()
+    assert "director" in body.get("allowed_roles", [])
+    assert "tester" not in body.get("allowed_roles", [])

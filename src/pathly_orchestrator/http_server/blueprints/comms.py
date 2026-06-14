@@ -20,10 +20,21 @@ _PROJECT_WRITERS: frozenset[str] = frozenset({
 _GLOBAL_WRITERS: frozenset[str] = frozenset({"director", "human"})
 
 
-def _check_write_permission(from_agent: str, board: str) -> bool:
-    """Return True when from_agent is allowed to write to the given board tier."""
+def _check_write_permission(
+    from_agent: str, board: str, perm_table: dict | None = None
+) -> bool:
+    """Return True when from_agent is allowed to write to the given board tier.
+
+    perm_table, when provided, is the resolved override table from get_write_permissions()
+    (keys: 'feature'|'project'|'global', values: list[str] or ['*']).  Falls back to the
+    module-level frozensets when perm_table is absent or missing the tier key.
+    """
     if board == "feature":
         return True
+    if perm_table is not None:
+        roles = perm_table.get(board)
+        if roles is not None:
+            return "*" in roles or from_agent in roles
     if board == "project":
         return from_agent in _PROJECT_WRITERS
     if board == "global":
@@ -40,6 +51,7 @@ def comms_post():
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import get_write_permissions as _get_write_perms
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
         from pathly_orchestrator.runner.embeddings import embed_async as _embed_async
 
@@ -74,8 +86,15 @@ def comms_post():
         if not isinstance(scope, str) or not scope.strip():
             scope = "global" if board == "global" else feature
 
-        if not _check_write_permission(from_agent, board):
-            allowed = sorted(_GLOBAL_WRITERS if board == "global" else _PROJECT_WRITERS)
+        project_root = str(data.get("project_root", "") or "").strip()
+        norm_root = _norm_project_root(project_root) if project_root else ""
+        conn = _get_db()
+        perm_table = _get_write_perms(conn, norm_root)
+
+        if not _check_write_permission(from_agent, board, perm_table=perm_table):
+            allowed = sorted(perm_table.get(board) or (
+                _GLOBAL_WRITERS if board == "global" else _PROJECT_WRITERS
+            ))
             return jsonify({
                 "error": f"Role '{from_agent}' cannot write to '{board}' scope",
                 "allowed_roles": allowed,
@@ -91,8 +110,6 @@ def comms_post():
             return jsonify({"error": "Field 'options' must be a list or null"}), 400
         if conv is not None and not isinstance(conv, int):
             return jsonify({"error": "Field 'conv' must be an integer or null"}), 400
-
-        conn = _get_db()
         message_id = _post_message(
             conn,
             board=board,
@@ -215,8 +232,11 @@ def comms_search():
             else:
                 from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
                 results = _get_messages(conn, board=board, scope=scope, limit=k)
-        else:  # hybrid
+        else:  # hybrid — fall back to recency when both BM25 and vec are absent (SPEC §26.7)
             results = _search_hybrid(conn, query, embedding, [board], [scope], k)
+            if not results:
+                from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
+                results = _get_messages(conn, board=board, scope=scope, limit=k)
 
         return jsonify(results), 200
     except Exception as exc:
