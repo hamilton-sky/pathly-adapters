@@ -23,6 +23,9 @@ extraResources:
   - from: ../src/pathly_data/core
     to: pathly-library/src/pathly_data/core
     filter: "**/*"
+  - from: resources/getting-started
+    to: getting-started
+    filter: "**/*"
 
 win:
   target:
