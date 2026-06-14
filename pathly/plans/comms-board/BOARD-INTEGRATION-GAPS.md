@@ -299,69 +299,42 @@ card layout):
 Superseded messages render with a strikethrough title and a "→ see [newer message]" link.
 This is the primary way to retire stale decisions without deleting them.
 
-**Artifact attach** — add to `CommsInput.tsx` compose bar (paperclip icon already imported
-but not wired):
+**Artifact attach** — the paperclip button already exists in `CommsInput.tsx` (line 59–67)
+with the icon rendered and `aria-label` set, but it is explicitly `disabled` with
+`title="Attach artifact (coming soon)"`. The icon does not need to be added — only the
+click handler and API call need wiring:
 
 ```
 [text input field]  [📎]  [type picker]  [Send]
                       ↑
-               opens file picker → POST /comms/attach { message_id, artifact_path }
+               currently disabled — needs:
+               1. remove disabled prop
+               2. onClick → open a file-path input (or browser file picker)
+               3. POST /comms/attach { message_id, artifact_path }
 ```
 
-Artifact attach applies to an existing message (workflow: post the message first, then attach
-the file reference). Alternatively expose it on the card itself as an "attach file" action
-after posting.
+Attach applies to an existing message: post the text message first, get back `message_id`,
+then call `/comms/attach`. The simplest UX is a two-step compose: send text → card appears →
+📎 button on the card opens a path input → calls attach.
 
 ### Build estimate
 - Search bar: ~3h (input, state, results overlay)
 - Supersede: ~2h (overflow menu, picker, visual treatment)
-- Attach: ~1h (wire paperclip, file path input, API call)
+- Attach: ~45m (remove `disabled`, add path input, wire API call — icon already done)
 - Total: ~1 Studio builder conversation
 
 ---
 
-## Gap 5 — ConfigurePhaseModal is unintegrated
+## Gap 5 — ConfigurePhaseModal ✓ ALREADY DONE
 
-### What's wrong
+**Verified 2026-06-14.** `ConfigurePhaseModal` is fully integrated into the Monitor.
 
-The per-stage agent/host/skill override modal (`ConfigurePhaseModal/`) is fully implemented —
-it fetches config, renders pickers for CLI host / agent / skill, previews the skill markdown,
-and saves via `POST /flows/stage-config`. It exists as an untracked directory with no parent
-component opening it.
+- `Monitor/index.tsx` imports it and holds `configStage` state
+- `FsmView` receives `onStageClick={(stage) => setConfigStage(stage)}` — clicking a stage
+  card opens the modal for that stage
+- Modal renders inside Monitor with `stage={configStage}` and `onClose={() => setConfigStage(null)}`
 
-### Proposed solution
-
-Wire it to the Monitor's stage header. Each stage card in the Flow view should show a ⚙ icon
-that opens the modal for that stage.
-
-**`studio/src/renderer/src/components/Monitor/`** — stage card:
-```tsx
-<StageCard stage="BUILDING">
-  <StageName />
-  <StageStatus />
-  <button onClick={() => openConfigModal('BUILDING')}>⚙</button>   {/* NEW */}
-</StageCard>
-```
-
-**`studio/src/renderer/src/components/Monitor/Monitor.tsx`** (or equivalent):
-```tsx
-const [configStage, setConfigStage] = useState<StageName | null>(null)
-
-{configStage && (
-  <ConfigurePhaseModal
-    stage={configStage}
-    feature={activeFeature}
-    onClose={() => setConfigStage(null)}
-  />
-)}
-```
-
-The modal already handles its own data fetching, saving, and reset. The parent only needs to
-provide `stage`, `feature`, and `onClose`.
-
-### Build estimate
-- ~1h: add ⚙ button to stage cards + conditional modal render
-- Modal itself: already done
+No work needed here.
 
 ---
 
@@ -371,14 +344,13 @@ provide `stage`, `feature`, and `onClose`.
 |---|---|---|---|
 | 1 | Skills post to board (reviewer + tester first) | Small (1 conv) | High — board is dark during quality phases without this |
 | 2 | Warning resolve → FSM | Small (2h) | High — warning buttons are broken without this |
-| 3 | ConfigurePhaseModal integration | Tiny (1h) | High — already built, just needs a trigger |
-| 4 | Search UI | Medium (3h) | Medium — becomes necessary around phase 3+ |
-| 5 | Explorer + debug + retro post to board | Small (1 conv) | Medium — completes the read-back loop |
-| 6 | Supersede + attach UI | Small (3h) | Medium — board accumulates stale notes without supersede |
-| 7 | Async question loop | Medium (1 conv) | Low for V1 — fire-and-check is sufficient |
+| 3 | Search UI | Medium (3h) | Medium — becomes necessary around phase 3+ |
+| 4 | Explorer + debug + retro post to board | Small (1 conv) | Medium — completes the read-back loop |
+| 5 | Supersede + attach UI | Small (3h) | Medium — board accumulates stale notes without supersede |
+| 6 | Async question loop | Medium (1 conv) | Low for V1 — fire-and-check is sufficient |
 
-Priorities 1–3 can be done in a single builder session. Priorities 4–6 are a second session.
-Priority 7 is a follow-up feature.
+Priorities 1–2 can be done in a single builder session. Priorities 3–5 are a second session.
+Priority 6 is a follow-up feature.
 
 ---
 
