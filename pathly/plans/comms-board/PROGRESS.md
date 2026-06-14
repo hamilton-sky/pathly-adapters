@@ -3,7 +3,7 @@ name: Progress
 ---
 # Comms Board — Progress
 
-## Status: Phase 1 COMPLETE · Phase 1.4 COMPLETE · Phase 1.5 COMPLETE · Frontend PENDING DESIGN
+## Status: Phase 1 COMPLETE · Phase 1.4 COMPLETE · Phase 1.5 COMPLETE · BACKEND DONE · Frontend PENDING DESIGN
 
 > **This plan is backend-only.** No Studio/Electron code is touched here.
 >
@@ -47,7 +47,7 @@ name: Progress
 | 3 | 9–10 | S2.1, S2.2 | DONE | `/next_action` output contains `## Communication Board` |
 | 4 | 1.4a–d | S1.4a, S1.4b, S1.4c, S1.4d | DONE | `python -m pytest tests/ -q -k "comms_supersede or comms_embed_curation or comms_context_channels"` |
 | 5 | 11–13 | S3.1, S3.2 | DONE | `python -m pytest tests/ -q -k "comms_hybrid or comms_search_mode or comms_write_perm"` |
-| **6** | — | — | TODO | PROGRESS.md all phases DONE; RETRO written; `BACKEND_COMPLETE` logged |
+| **6** | — | — | DONE | PROGRESS.md all phases DONE; RETRO written; `BACKEND_COMPLETE` logged |
 
 > ── **BACKEND BOUNDARY** ── Conv 6 is the last conversation in this plan. Frontend work starts in `comms-board-studio` after design consultation.
 
