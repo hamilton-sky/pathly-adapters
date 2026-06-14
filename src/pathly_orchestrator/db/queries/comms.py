@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from .. import connection as _connection_module
 from ..connection import _get_write_lock, _VEC_AVAILABLE
 
 
@@ -113,6 +114,73 @@ def search_by_embedding(
         params = list(boards) + list(scopes) + [k]
         rows = conn.execute(sql, params).fetchall()
     return [dict(r) for r in rows]
+
+
+_RRF_K = 60
+
+
+def search_by_keyword(
+    conn: sqlite3.Connection,
+    query_text: str,
+    boards: list[str],
+    scopes: list[str],
+    k: int = 6,
+) -> list[dict]:
+    """BM25 full-text search via FTS5. Returns [] when FTS unavailable or inputs empty."""
+    if not _connection_module._FTS_AVAILABLE or not boards or not scopes:
+        return []
+    board_ph = ",".join("?" * len(boards))
+    scope_ph = ",".join("?" * len(scopes))
+    sql = (
+        "SELECT m.* FROM comms_messages m "
+        "JOIN comms_fts ON comms_fts.rowid = m.rowid "
+        f"WHERE comms_fts MATCH ? AND m.board IN ({board_ph}) AND m.scope IN ({scope_ph}) "
+        "AND m.deleted_at IS NULL "
+        "ORDER BY rank LIMIT ?"
+    )
+    rows = conn.execute(sql, [query_text] + list(boards) + list(scopes) + [k]).fetchall()
+    return [dict(r) for r in rows]
+
+
+def search_by_hybrid(
+    conn: sqlite3.Connection,
+    query_text: str,
+    query_embedding: list[float] | None,
+    boards: list[str],
+    scopes: list[str],
+    k: int = 6,
+) -> list[dict]:
+    """BM25 + cosine merged via Reciprocal Rank Fusion. Falls back gracefully.
+
+    When query_embedding is None, falls back to keyword-only (then recency if
+    FTS also unavailable). When query_text is empty, falls back to semantic-only.
+    """
+    bm25_rows = search_by_keyword(conn, query_text, boards, scopes, k * 2) if query_text else []
+    sem_rows = (
+        search_by_embedding(conn, query_embedding, boards, scopes, k * 2)
+        if query_embedding is not None
+        else []
+    )
+
+    if not bm25_rows and not sem_rows:
+        return []
+
+    scores: dict[str, dict] = {}
+    for rank, row in enumerate(bm25_rows):
+        mid = row["id"]
+        scores.setdefault(mid, {"row": row, "bm25": 9999, "sem": 9999})
+        scores[mid]["bm25"] = rank
+    for rank, row in enumerate(sem_rows):
+        mid = row["id"]
+        scores.setdefault(mid, {"row": row, "bm25": 9999, "sem": 9999})
+        scores[mid]["sem"] = rank
+
+    ranked = sorted(
+        scores.values(),
+        key=lambda x: 1.0 / (_RRF_K + x["bm25"]) + 1.0 / (_RRF_K + x["sem"]),
+        reverse=True,
+    )
+    return [r["row"] for r in ranked[:k]]
 
 
 def get_pending_decisions(

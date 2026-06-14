@@ -13,6 +13,23 @@ _EMBED_TYPES: frozenset[str] = frozenset({
     "decision", "discovery", "constraint", "warning", "escalation", "artifact"
 })
 
+_PROJECT_WRITERS: frozenset[str] = frozenset({
+    "tester", "reviewer", "explorer", "architect",
+    "planner", "designer", "director", "human",
+})
+_GLOBAL_WRITERS: frozenset[str] = frozenset({"director", "human"})
+
+
+def _check_write_permission(from_agent: str, board: str) -> bool:
+    """Return True when from_agent is allowed to write to the given board tier."""
+    if board == "feature":
+        return True
+    if board == "project":
+        return from_agent in _PROJECT_WRITERS
+    if board == "global":
+        return from_agent in _GLOBAL_WRITERS
+    return False
+
 
 @bp.route("/comms/post", methods=["POST"])
 def comms_post():
@@ -56,6 +73,13 @@ def comms_post():
         scope = data.get("scope")
         if not isinstance(scope, str) or not scope.strip():
             scope = "global" if board == "global" else feature
+
+        if not _check_write_permission(from_agent, board):
+            allowed = sorted(_GLOBAL_WRITERS if board == "global" else _PROJECT_WRITERS)
+            return jsonify({
+                "error": f"Role '{from_agent}' cannot write to '{board}' scope",
+                "allowed_roles": allowed,
+            }), 403
 
         to_agent = data.get("to", "*") or "*"
         options = data.get("options")
@@ -147,11 +171,14 @@ def comms_search():
     """Semantic search across boards.
 
     Required body fields: query, feature.
-    Optional: scope (default 'feature'), k (default 5).
+    Optional: scope (default 'feature'), k (default 5),
+              mode ('hybrid'|'semantic'|'keyword', default 'hybrid').
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import search_by_embedding as _search
+        from pathly_orchestrator.db.queries.comms import search_by_hybrid as _search_hybrid
+        from pathly_orchestrator.db.queries.comms import search_by_keyword as _search_keyword
         from pathly_orchestrator.runner.embeddings import embed as _embed
 
         data = request.get_json()
@@ -173,13 +200,23 @@ def comms_search():
         if not isinstance(k, int) or k <= 0:
             k = 5
 
+        mode = data.get("mode", "hybrid")
+        if mode not in ("hybrid", "semantic", "keyword"):
+            mode = "hybrid"
+
         embedding = _embed(query)
         conn = _get_db()
-        if embedding is not None:
-            results = _search(conn, embedding=embedding, boards=[board], scopes=[scope], k=k)
-        else:
-            from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
-            results = _get_messages(conn, board=board, scope=scope, limit=k)
+
+        if mode == "keyword":
+            results = _search_keyword(conn, query, [board], [scope], k)
+        elif mode == "semantic":
+            if embedding is not None:
+                results = _search(conn, embedding=embedding, boards=[board], scopes=[scope], k=k)
+            else:
+                from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
+                results = _get_messages(conn, board=board, scope=scope, limit=k)
+        else:  # hybrid
+            results = _search_hybrid(conn, query, embedding, [board], [scope], k)
 
         return jsonify(results), 200
     except Exception as exc:
@@ -421,6 +458,28 @@ def comms_scope_set():
         return jsonify(merged), 200
     except Exception as exc:
         logging.exception("comms_scope_set error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/permissions", methods=["GET"])
+def comms_permissions():
+    """Return the resolved write-permission table for a project.
+
+    Query param: project_root (optional, defaults to empty string for global default).
+    Returns a dict mapping board tier to allowed roles and any project overrides.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import get_write_permissions as _get_perms
+
+        project_root = request.args.get("project_root", "").strip()
+        norm_root = _norm_project_root(project_root) if project_root else ""
+
+        conn = _get_db()
+        perms = _get_perms(conn, norm_root)
+        return jsonify(perms), 200
+    except Exception as exc:
+        logging.exception("comms_permissions error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

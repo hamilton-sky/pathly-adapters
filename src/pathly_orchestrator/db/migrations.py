@@ -257,6 +257,26 @@ CREATE TABLE IF NOT EXISTS comms_messages (
             conn.commit()
         except Exception:
             pass
+    try:
+        conn.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS comms_fts "
+            "USING fts5(text, content=comms_messages, content_rowid=rowid, tokenize='porter ascii')"
+        )
+        conn.executescript("""
+CREATE TRIGGER IF NOT EXISTS comms_fts_ai AFTER INSERT ON comms_messages BEGIN
+  INSERT INTO comms_fts(rowid, text) VALUES (NEW.rowid, NEW.text);
+END;
+CREATE TRIGGER IF NOT EXISTS comms_fts_au AFTER UPDATE ON comms_messages BEGIN
+  INSERT INTO comms_fts(comms_fts, rowid, text) VALUES ('delete', OLD.rowid, OLD.text);
+  INSERT INTO comms_fts(rowid, text) VALUES (NEW.rowid, NEW.text);
+END;
+CREATE TRIGGER IF NOT EXISTS comms_fts_ad AFTER DELETE ON comms_messages BEGIN
+  INSERT INTO comms_fts(comms_fts, rowid, text) VALUES ('delete', OLD.rowid, OLD.text);
+END;
+""")
+        conn.commit()
+    except Exception:
+        pass
     _add_additive_migrations(conn)
 
 

@@ -62,3 +62,48 @@ def set_board_scope(
     """Persist board_scope for a feature as JSON in app_settings."""
     key = f"board_scope:{project_root}:{feature}"
     set_setting(conn, key, json.dumps(scope_dict))
+
+
+_DEFAULT_WRITE_PERMISSIONS: dict[str, list[str]] = {
+    "feature": ["*"],
+    "project": sorted([
+        "tester", "reviewer", "explorer", "architect",
+        "planner", "designer", "director", "human",
+    ]),
+    "global": sorted(["director", "human"]),
+}
+
+
+def get_write_permissions(
+    conn: sqlite3.Connection,
+    project_root: str,
+) -> dict:
+    """Return the resolved write-permission table merged with any project overrides.
+
+    Returns a dict with keys 'feature', 'project', 'global' each mapping to a
+    list of allowed roles (or ['*'] for unrestricted). Project-level overrides
+    are merged onto the default table.
+    """
+    key = f"write_permissions:{project_root}"
+    raw = get_setting(conn, key)
+    result = {k: list(v) for k, v in _DEFAULT_WRITE_PERMISSIONS.items()}
+    if raw is not None:
+        try:
+            overrides = json.loads(raw)
+            if isinstance(overrides, dict):
+                for tier, roles in overrides.items():
+                    if tier in result and isinstance(roles, list):
+                        result[tier] = roles
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return result
+
+
+def set_write_permissions(
+    conn: sqlite3.Connection,
+    project_root: str,
+    overrides: dict,
+) -> None:
+    """Persist project-level write-permission overrides in app_settings."""
+    key = f"write_permissions:{project_root}"
+    set_setting(conn, key, json.dumps(overrides))

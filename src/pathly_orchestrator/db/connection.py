@@ -9,6 +9,7 @@ from pathlib import Path
 from .migrations import _run_migrations
 
 _VEC_AVAILABLE: bool = False          # set on first connection
+_FTS_AVAILABLE: bool = False          # set on first connection, after migrations
 _local = threading.local()             # per-thread connection storage
 _init_lock = threading.Lock()          # guards one-time initialization
 _init_once_done = False
@@ -87,7 +88,7 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
     seed, catalog refresh, flows refresh, and the WAL checkpoint thread.
     Subsequent calls return (or create) the calling thread's own connection.
     """
-    global _init_once_done, _VEC_AVAILABLE
+    global _init_once_done, _VEC_AVAILABLE, _FTS_AVAILABLE
 
     db_dir = Path.home() / ".pathly"
     db_dir.mkdir(parents=True, exist_ok=True)
@@ -115,6 +116,12 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
                             "sqlite-vec unavailable - comms board uses recency-only retrieval"
                         )
                     _run_migrations(conn, vec_available=_VEC_AVAILABLE)
+                    # Probe for FTS5 table AFTER migrations — comms_fts is created there.
+                    try:
+                        conn.execute("SELECT * FROM comms_fts LIMIT 0")
+                        _FTS_AVAILABLE = True
+                    except Exception:
+                        _FTS_AVAILABLE = False
                     _seed_if_empty(conn)
                     _refresh_catalog(conn)
                     _refresh_flows(conn)

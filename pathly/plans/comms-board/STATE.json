@@ -1,0 +1,33 @@
+{
+  "conv_start_sha": "8f40e040bb31eca265e2e3c45ed9f1e92f65fe0f",
+  "convs_total": 6,
+  "convs_done": 5,
+  "current": "BUILDING",
+  "updated_at": "2026-06-14T11:53:31Z",
+  "build_baseline": {
+    "started_at": "2026-06-14T11:59:35.350067+00:00",
+    "preexisting_dirty": [
+      "pathly/configure-phase-modal/",
+      "pathly/plans/change-explorer/DIFF-SECTION-SPEC.md",
+      "pathly/plans/comms-board/STATE.json",
+      "src/pathly_orchestrator/fsm_http_client.py",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/DraftDiffFooter/DraftDiffFooter.tsx",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/DraftDiffViewer/DraftDiffViewer.module.css",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/DraftDiffViewer/DraftDiffViewer.tsx",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/DraftEditView/",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/README.md",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/ViewToggle/ViewToggle.tsx",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/icons/Icons.tsx",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/index.ts",
+      "studio/src/renderer/src/components/Editor/DraftDiffViewer/useViewMode.ts",
+      "studio/src/renderer/src/components/Monitor/ConfigurePhaseModal/AssemblyFlowBar.tsx",
+      "studio/src/renderer/src/components/Monitor/ConfigurePhaseModal/ConfigurePhaseModal.module.css",
+      "studio/src/renderer/src/components/Monitor/ConfigurePhaseModal/ConfigurePhaseModal.tsx",
+      "studio/src/renderer/src/components/Monitor/ConfigurePhaseModal/PromptPreview.module.css",
+      "studio/src/renderer/src/components/Monitor/ConfigurePhaseModal/PromptPreview.tsx",
+      "studio/src/renderer/src/components/Monitor/ConfigurePhaseModal/components/",
+      "studio/src/renderer/src/components/Monitor/ConfigurePhaseModal/types.ts",
+      "studio/tsconfig.node.json"
+    ]
+  }
+}

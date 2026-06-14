@@ -132,6 +132,7 @@ def retrieve_board_context(
             get_active_escalations,
             get_pending_decisions,
             search_by_embedding,
+            search_by_hybrid,
         )
         from pathly_orchestrator.runner.embeddings import embed
 
@@ -192,18 +193,16 @@ def retrieve_board_context(
     for board_type, scope_val, k in enabled_boards:
         fetch_k = k + over_fetch_margin
         try:
-            if task_embedding is not None:
-                rows = search_by_embedding(
-                    conn,
-                    embedding=task_embedding,
-                    boards=[board_type],
-                    scopes=[scope_val],
-                    k=fetch_k,
-                )
-            else:
-                # Fallback: recency. When _VEC_AVAILABLE is False, search_by_embedding
-                # already degrades to recency; we fetch directly via get_messages so
-                # the recency path is exercised even when vec IS available.
+            rows = search_by_hybrid(
+                conn,
+                task_description,
+                task_embedding,
+                [board_type],
+                [scope_val],
+                fetch_k,
+            )
+            if not rows and task_embedding is None:
+                # Pure recency fallback when both FTS and embeddings are unavailable.
                 from pathly_orchestrator.db.queries.comms import get_messages
                 rows = get_messages(conn, board=board_type, scope=scope_val, limit=fetch_k)
         except Exception:
