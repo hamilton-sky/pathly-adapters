@@ -230,3 +230,31 @@ def test_comms_context_channels_governance_and_context_both_present(client, monk
     # Context section may or may not appear depending on recency path logic —
     # verify the block is non-empty at minimum
     assert block.strip() != ""
+
+
+def test_comms_context_channels_governance_does_not_starve_context(client, monkeypatch):
+    """Governance messages must not displace advisory context out of the k-cap.
+
+    On the global board (k=1), a decision posted *after* a discovery must not
+    starve the 💡 Context section. Because decisions are embedded, a naive
+    fetch-then-filter would let the newer decision fill the single slot and then
+    drop it as governance, leaving zero context. retrieve_board_context()
+    over-fetches before filtering, so the discovery survives (Phase 1.4c fix).
+    """
+    _post(client, "discovery", "Cache layer added to the API", board="global", scope="global")
+    _post(client, "decision", "Use Redis for caching", board="global", scope="global")  # newer
+
+    import pathly_orchestrator.runner.embeddings as _emb_mod
+    monkeypatch.setattr(_emb_mod, "embed", lambda text: None)  # recency path
+
+    from pathly_orchestrator.runner.comms_context import retrieve_board_context
+    block = retrieve_board_context(
+        topic="demo",
+        project_root="C:/proj",
+        task_description="work on caching",
+        board_scope={"feature": False, "project": False, "global": True},
+    )
+
+    assert "Use Redis for caching" in block, "governance decision should appear"
+    assert "💡 Context" in block, "context section should not be starved by the decision"
+    assert "Cache layer added to the API" in block, "advisory discovery should survive over-fetch"

@@ -140,45 +140,14 @@ def retrieve_board_context(
         logger.debug("comms_context: could not open DB — returning empty block")
         return ""
 
-    # --- Semantic (or recency) search for each enabled board ----------------
-    task_embedding: list[float] | None = None
-    if task_description and task_description.strip():
-        try:
-            task_embedding = embed(task_description)
-        except Exception:
-            task_embedding = None
-
-    retrieved: list[dict] = []
-    seen_ids: set[str] = set()
-
-    for board_type, scope_val, k in enabled_boards:
-        try:
-            if task_embedding is not None:
-                rows = search_by_embedding(
-                    conn,
-                    embedding=task_embedding,
-                    boards=[board_type],
-                    scopes=[scope_val],
-                    k=k,
-                )
-            else:
-                # Fallback: recency — reuse search_by_embedding without a real
-                # embedding by passing an empty list; the function's recency path
-                # activates when _VEC_AVAILABLE is False.  If vec IS available,
-                # we fetch by recency directly via get_messages.
-                from pathly_orchestrator.db.queries.comms import get_messages
-                rows = get_messages(conn, board=board_type, scope=scope_val, limit=k)
-        except Exception:
-            rows = []
-
-        for row in rows:
-            row_id = row.get("id", "")
-            if row_id and row_id not in seen_ids:
-                seen_ids.add(row_id)
-                retrieved.append(row)
-
-    # --- Always include pending decisions and active escalations (governance) ---
+    # --- Governance first: pending decisions + active escalations -----------
     # SPEC convention: board = tier, scope = identifier.
+    # Computed *before* the semantic search so governance messages can be
+    # excluded from the context pool before the per-board k-cap is applied.
+    # Decisions and escalations are embedded (they are in _EMBED_TYPES), so if
+    # filtering happened after a fixed k-fetch they would consume the tight
+    # semantic slots (k=3/2/1) and then be discarded, starving the 💡 Context
+    # channel (Phase 1.4c). Over-fetching below restores the channel separation.
     all_boards = [b for b, _, _ in enabled_boards]
     all_scopes = [s for _, s, _ in enabled_boards]
 
@@ -195,21 +164,63 @@ def retrieve_board_context(
 
     governance_ids = {m.get("id", "") for m in decisions} | {m.get("id", "") for m in escalations}
 
-    # --- Partition semantic results into context (excluding governance msgs) -
-    context_msgs: list[dict] = []
-
-    for msg in retrieved:
-        msg_id = msg.get("id", "")
-        if msg_id in governance_ids:
-            continue
-        msg_type = msg.get("type", "")
-        # Escalations are in the governance channel — exclude from context pool.
-        if msg_type == "escalation":
-            continue
-        # Superseded messages must not surface anywhere — they have been replaced.
+    def _is_context(msg: dict) -> bool:
+        """A semantic hit qualifies as advisory context only when it is not a
+        governance message, not an escalation, and not superseded."""
+        if msg.get("id", "") in governance_ids:
+            return False
+        if msg.get("type", "") == "escalation":
+            return False
         if msg.get("superseded_by"):
-            continue
-        context_msgs.append(msg)
+            return False
+        return True
+
+    # --- Semantic (or recency) search for each enabled board ----------------
+    # Over-fetch, then filter down to the per-board budget k: governance,
+    # escalation, and superseded rows must not consume context slots.
+    task_embedding: list[float] | None = None
+    if task_description and task_description.strip():
+        try:
+            task_embedding = embed(task_description)
+        except Exception:
+            task_embedding = None
+
+    context_msgs: list[dict] = []
+    seen_ids: set[str] = set()
+    over_fetch_margin = len(governance_ids) + 4
+
+    for board_type, scope_val, k in enabled_boards:
+        fetch_k = k + over_fetch_margin
+        try:
+            if task_embedding is not None:
+                rows = search_by_embedding(
+                    conn,
+                    embedding=task_embedding,
+                    boards=[board_type],
+                    scopes=[scope_val],
+                    k=fetch_k,
+                )
+            else:
+                # Fallback: recency. When _VEC_AVAILABLE is False, search_by_embedding
+                # already degrades to recency; we fetch directly via get_messages so
+                # the recency path is exercised even when vec IS available.
+                from pathly_orchestrator.db.queries.comms import get_messages
+                rows = get_messages(conn, board=board_type, scope=scope_val, limit=fetch_k)
+        except Exception:
+            rows = []
+
+        kept = 0
+        for row in rows:
+            row_id = row.get("id", "")
+            if not row_id or row_id in seen_ids:
+                continue
+            if not _is_context(row):
+                continue
+            seen_ids.add(row_id)
+            context_msgs.append(row)
+            kept += 1
+            if kept >= k:
+                break
 
     # Nothing to show
     if not decisions and not escalations and not context_msgs:
