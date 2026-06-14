@@ -175,12 +175,21 @@
   gap: 4px;
   padding-right: 4px;
   cursor: pointer;
+  flex-shrink: 1;   /* shrink instead of overflowing — the strip never clips the last tab */
+  min-width: 0;     /* permit shrinking below content width */
 }
+
+/* Inside a shrinking feature tab, only the label compresses — glyphs stay intact */
+.featureTab > svg,
+.featureTab .st,
+.featureTab .badge { flex-shrink: 0; }
 
 .tabLabel {
   overflow: hidden;
+  text-overflow: ellipsis;   /* long titles end in "…" instead of corrupting the layout */
   white-space: nowrap;
   max-width: 130px;
+  min-width: 0;
   transition: max-width 180ms ease, opacity 180ms ease, margin 180ms ease;
   opacity: 1;
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown, Check, X } from 'lucide-react'
 import type { BoardScope, Direction, Preset, SectionDef } from './types'
 import { SCOPES } from './constants'
+import { Tooltip } from '../../ui'
 import s from './CommandCenterHeader.module.css'
 
 export interface CommandCenterHeaderProps {
@@ -74,34 +75,42 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
         {...(compact ? { 'data-compact': '' } : {})}
       >
         {/* Global tab — first */}
-        <button
-          key="global"
-          type="button"
-          className={s.tab}
-          title={`Toggle the ${SCOPES['global'].label} board`}
-          {...(globalOn ? { 'data-on': '' } : {})}
-          aria-pressed={globalOn}
-          onClick={() => p.onToggleSection('global')}
+        <Tooltip
+          label={`${SCOPES['global'].label} board`}
+          description={globalOn ? 'Showing · click to hide' : 'Hidden · click to show'}
+          placement="bottom"
         >
-          {SCOPE_ICONS['global']}
-          <span className={s.tabLabel}>{SCOPES['global'].label}</span>
-          <span className={s.st}>{globalOn ? '●' : '○'}</span>
-        </button>
+          <button
+            type="button"
+            className={s.tab}
+            {...(globalOn ? { 'data-on': '' } : {})}
+            aria-pressed={globalOn}
+            onClick={() => p.onToggleSection('global')}
+          >
+            {SCOPE_ICONS['global']}
+            <span className={s.tabLabel}>{SCOPES['global'].label}</span>
+            <span className={s.st}>{globalOn ? '●' : '○'}</span>
+          </button>
+        </Tooltip>
 
         {/* Project tab — second */}
-        <button
-          key="project"
-          type="button"
-          className={s.tab}
-          title={`Toggle the ${SCOPES['project'].label} board`}
-          {...(projectOn ? { 'data-on': '' } : {})}
-          aria-pressed={projectOn}
-          onClick={() => p.onToggleSection('project')}
+        <Tooltip
+          label={`${SCOPES['project'].label} board`}
+          description={projectOn ? 'Showing · click to hide' : 'Hidden · click to show'}
+          placement="bottom"
         >
-          {SCOPE_ICONS['project']}
-          <span className={s.tabLabel}>{SCOPES['project'].label}</span>
-          <span className={s.st}>{projectOn ? '●' : '○'}</span>
-        </button>
+          <button
+            type="button"
+            className={s.tab}
+            {...(projectOn ? { 'data-on': '' } : {})}
+            aria-pressed={projectOn}
+            onClick={() => p.onToggleSection('project')}
+          >
+            {SCOPE_ICONS['project']}
+            <span className={s.tabLabel}>{SCOPES['project'].label}</span>
+            <span className={s.st}>{projectOn ? '●' : '○'}</span>
+          </button>
+        </Tooltip>
 
         {/* Feature tabs — one per featureTabs entry */}
         {p.featureTabs.map((fid) => {
@@ -110,45 +119,50 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
           )
           const pend = fid === p.mainFeature ? p.featurePending : 0
           return (
-            <div
+            <Tooltip
               key={fid}
-              className={`${s.tab} ${s.featureTab}`}
-              {...(isActive ? { 'data-on': '' } : {})}
-              role="button"
-              tabIndex={0}
-              title={isActive ? `Hide ${fid} panel` : `Show ${fid} panel`}
-              onClick={() => p.onToggleFeatureSection(fid)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') p.onToggleFeatureSection(fid) }}
+              label={fid}
+              description={isActive ? 'Showing · click to hide' : 'Hidden · click to show'}
+              placement="bottom"
             >
-              <GitBranch size={13} />
-              <span className={s.tabLabel}>{fid}</span>
-              <span className={s.st}>{isActive ? '●' : '○'}</span>
-              {pend > 0 && <span className={`${s.badge} ${s.msg}`}>{pend}</span>}
-              {!isOnly && (
-                <button
-                  type="button"
-                  className={s.tabClose}
-                  title={`Remove ${fid} tab`}
-                  aria-label={`Remove ${fid} tab`}
-                  onClick={(e) => { e.stopPropagation(); p.onRemoveFeatureTab(fid) }}
-                >
-                  <X size={11} />
-                </button>
-              )}
-            </div>
+              <div
+                className={`${s.tab} ${s.featureTab}`}
+                {...(isActive ? { 'data-on': '' } : {})}
+                role="button"
+                tabIndex={0}
+                onClick={() => p.onToggleFeatureSection(fid)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') p.onToggleFeatureSection(fid) }}
+              >
+                <GitBranch size={13} />
+                <span className={s.tabLabel}>{fid}</span>
+                <span className={s.st}>{isActive ? '●' : '○'}</span>
+                {pend > 0 && <span className={`${s.badge} ${s.msg}`}>{pend}</span>}
+                {!isOnly && (
+                  <button
+                    type="button"
+                    className={s.tabClose}
+                    aria-label={`Remove ${fid} tab`}
+                    onClick={(e) => { e.stopPropagation(); p.onRemoveFeatureTab(fid) }}
+                  >
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+            </Tooltip>
           )
         })}
 
         {/* + Add button — only for project/global panels */}
         {canAdd && (
-          <button
-            type="button"
-            className={`${s.tab} ${s.add}`}
-            title="Add a board section"
-            onClick={p.onAddSection}
-          >
-            <Plus size={13} /><span className={s.tabLabel}>Add</span>
-          </button>
+          <Tooltip label="Add a board section" placement="bottom">
+            <button
+              type="button"
+              className={`${s.tab} ${s.add}`}
+              onClick={p.onAddSection}
+            >
+              <Plus size={13} /><span className={s.tabLabel}>Add</span>
+            </button>
+          </Tooltip>
         )}
       </div>
 
