@@ -62,7 +62,7 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 | director | sonnet | routes intent, chooses rigor |
 | architect | opus | technical design |
 | planner | sonnet | user stories, conversation breakdown |
-| po | sonnet | interactive requirements / scope discussion |
+| po | opus | interactive requirements / scope discussion |
 | builder | sonnet | implementation |
 | reviewer | sonnet | adversarial review → REVIEW_FAILURES.md |
 | tester | sonnet | acceptance criteria → TEST_FAILURES.md |
@@ -121,4 +121,7 @@ pathly-setup claude --apply --repair  # update already-installed files (fragment
 ## Telemetry
 
 Stop hook (`src/pathly_hooks/stop_telemetry.py`) fires after every Claude Code session.
-Appends token usage to the feature's `02-TOKEN-USAGE.md` pipeline walkthrough file.
+It reads the session usage payload (tokens, cost) from stdin, finds the most recently
+active feature in the central SQLite DB (`~/.pathly/pathly.db`), and appends a
+`BILLING_UPDATE` event (patching the last `AGENT_DONE` with real cost) so Studio can
+display API-accurate costs. It always exits 0 — telemetry failure never blocks the user.

@@ -22,7 +22,7 @@ def main() -> None:
     parser.add_argument(
         "host",
         nargs="?",
-        help="Target host (claude, codex, copilot). Defaults to all detected.",
+        help="Target host (claude, codex, copilot, antigravity). Defaults to all detected.",
     )
     parser.add_argument(
         "--dry-run",
@@ -59,7 +59,7 @@ def main() -> None:
             sys.exit(1)
     if not hosts:
         print(
-            "No supported hosts detected. Install Claude Code, Codex, or VS Code + Copilot first."
+            "No supported hosts detected. Install Claude Code, Codex, VS Code + Copilot, or Antigravity CLI first."
         )
         sys.exit(1)
 

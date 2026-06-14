@@ -39,15 +39,16 @@ core/
                   pipeline-walkthrough/   01-PIPELINE-FLOW, 02-TOKEN-USAGE, 03-ARTIFACT-MAP
 
   flows/        flow YAML files read by the FSM:
-                  team.flow.yaml      full pipeline (STORM→PLAN→DESIGN→BUILD→REVIEW→TEST→RETRO→DONE)
+                  team.flow.yaml      full pipeline (STORMING→PLANNING→DESIGNING→BUILDING→REVIEWING→TESTING→RETRO→DONE)
                   debug.flow.yaml     debug flow
                   explore.flow.yaml   exploration flow
                   test.flow.yaml      test-only flow
                   quick-fix.flow.yaml nano/lite fast path
 
   design/       UI/UX design subsystem — powers `pathly-design` command:
-                  data/   colors.csv, fonts.csv, styles.csv, typography.csv,
-                          ux-guidelines.csv, charts.csv, products.csv,
+                  data/   colors.csv, google-fonts.csv, styles.csv, typography.csv,
+                          ux-guidelines.csv, charts.csv, products.csv, icons.csv,
+                          landing.csv, app-interface.csv, react-performance.csv, … (14 CSVs)
                           stacks/  (react, nextjs, vue, svelte, swiftui, flutter, …)
                   scripts/  design_system.py, core.py, search.py
                   cli.py

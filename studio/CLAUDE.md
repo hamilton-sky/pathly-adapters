@@ -23,9 +23,13 @@ node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json
 # Main process
 node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json
 
-# Both (npm script)
+# Renderer only (npm script — runs tsconfig.web.json)
 npm run typecheck
 ```
+
+> `npm run typecheck` checks **only the renderer** (`tsc --noEmit -p tsconfig.web.json`).
+> There is no script that covers the main process — run the `tsconfig.node.json` command
+> above explicitly to typecheck `src/main/`.
 
 `tsconfig.web.json` is the renderer config. `tsconfig.node.json` is for the Electron main process. They are separate — passing the wrong one gives misleading errors.
 
@@ -79,7 +83,7 @@ This guarantees the new server always starts, even against old server versions t
 | `runnerStore` | `store/runnerStore.ts` | pipeline status, stage, adapter, cost, error — driven by SSE |
 | `terminalStore` | `store/terminalStore.ts` | terminal tabs registry; `addTab` registers, `openTab` reveals panel |
 
-`RunnerStatus` union: `'idle' | 'running' | 'paused' | 'blocked' | 'error' | 'done' | 'aborted'`
+`RunnerStatus` union: `'idle' | 'running' | 'paused' | 'blocked' | 'error' | 'done' | 'aborted' | 'finalizing'`
 
 ---
 

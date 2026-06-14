@@ -4,7 +4,7 @@ Python package that implements the Pathly finite-state machine. Runs as both an 
 
 ## State machine
 
-Features advance through: `STORM -> PLAN -> DESIGN -> BUILD -> REVIEW -> TEST -> RETRO -> DONE`
+Features advance through: `STORMING -> PLANNING -> DESIGNING -> BUILDING -> REVIEWING -> TESTING -> RETRO -> DONE` (the literal state identifiers in `core/flows/team.flow.yaml`; the `-ING` suffix matters — `current_state` is e.g. `"BUILDING"`, not `"BUILD"`).
 
 Each transition is driven by events written to the central SQLite DB (`~/.pathly/pathly.db`). The orchestrator reads `STATE.json` (filesystem snapshot) and queries the DB to determine the next action.
 
@@ -36,12 +36,41 @@ POST /runner/start                   ← Studio FlowControlBar: start a new pipe
 POST /runner/pause                   ← pause running pipeline
 POST /runner/resume                  ← resume paused pipeline
 POST /runner/advance                 ← skip past current block
+POST /runner/decision                ← supply a continue/block/escalate decision to a waiting run
+POST /runner/agent-answer            ← answer an agent's mid-run human question
+POST /runner/reroute                 ← reroute the run to a different stage/adapter
 POST /runner/retry                   ← retry blocked stage
 POST /runner/abort                   ← abort run completely
+POST /runner/event                   ← inject an arbitrary runner event
+GET  /runner/status                  ← current runner state snapshot
 POST /runner/terminal/result         ← PTY exit callback: { run_id, topic, exit_code, stdout_tail, wall_seconds, user_initiated } — enriched with AGENT_DONE.summary from central DB; stdout used only for session_id + cost_usd
 POST /runner/terminal/started        ← PTY started confirmation: { run_id, topic, tab_id }
 GET  /events/runner?topic=<topic>    ← SSE stream of runner events for Studio
-POST /shutdown                       ← graceful server shutdown (used by Electron on restart)
+POST /shutdown                       ← graceful server shutdown (health blueprint; used by Electron on restart)
+```
+
+### Comms board endpoints (multi-agent message board)
+
+The comms blueprint (`blueprints/comms.py`) backs the Studio comms board — agents and
+humans post messages, ask/answer questions, decompose DAG tasks, and supersede stale notes.
+
+```
+POST /comms/post            ← post a message (embedding computed for hybrid search)
+GET  /comms                 ← list board messages (scoped)
+POST /comms/search          ← hybrid (semantic + keyword) search
+POST /comms/acknowledge     ← mark a message acknowledged
+POST /comms/answer          ← answer a posted question
+GET  /comms/tasks           ← list DAG tasks
+POST /comms/tasks/complete  ← mark a task complete
+POST /comms/attach          ← attach an artifact to a message
+GET  /comms/trash           ← list trashed messages
+POST /comms/restore         ← restore a trashed message
+POST /comms/supersede       ← mark a message superseded_by another
+GET  /comms/scope           ← read the active board scope
+POST /comms/scope           ← set the active board scope
+GET  /comms/permissions     ← role-based write permissions
+POST /comms/delete          ← soft-delete a message
+GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
 
 ### SSE events (GET /events/runner)
@@ -92,12 +121,16 @@ pathly_orchestrator/
       fsm_state.py         # write_state, read_state
       runner_state.py      # write_runner_state, read_runner_state, mark_stale_runners
       flow_defs.py / skill_defs.py / agent_defs.py / invocations.py / overrides.py / feedback_items.py
+      otel_spans.py / run_history.py / stage_configs.py / catalog_items.py / trends.py / app_settings.py
+      comms.py             # comms-board messages, tasks, scope, permissions (comms_messages table)
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
     output.py              # parse_result, _extract_json_payload
     events.py              # read_last_agent_done, _patch_last_agent_done, tail_agent_done
     history.py             # build_pipeline_history_block
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
+    embeddings.py          # warm()/embed() — local embedding model for comms hybrid search
+    comms_context.py       # assembles board context injected into agent prompts
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses
@@ -112,15 +145,19 @@ pathly_orchestrator/
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()
     feedback.py            # _feedback_watcher, _process_feedback_file
-    blueprints/
+    blueprints/            # registered in app.py:36-46
       health.py            # GET /health, GET /status, POST /shutdown
       fsm.py               # POST /next_action, POST /complete_stage
-      runner.py            # all 12 /runner/* routes
-      telemetry.py         # POST /record_activity, POST /record_phase
-      skills.py            # /skills/catalog|parse|preview|export
-      menu.py              # GET /menu/<name>, GET /metrics
+      runner.py            # 13 /runner/* routes (start, pause, resume, advance, decision,
+                           #   agent-answer, reroute, retry, abort, event, status, terminal/started, terminal/result)
+      telemetry.py         # POST /record_activity|/record_phase|/record_phase_summary, GET /telemetry/trends|/telemetry/pricing
+      skills.py            # /flows/* (list, graph, CRUD), /catalog/* (item + category CRUD), /skills/catalog|parse|preview|save|export
+      flows.py             # GET/POST/DELETE /flows/stage-config (per-stage agent/model overrides)
+      menu.py              # GET /menu/<name>, GET /metrics, GET /metrics/json
+      db_api.py            # /db/* read API: stats, features, features/<f>/{events,agents,otel,runs}, stats/trends, query, settings
+      comms.py             # 15 /comms/* routes — message board (post, search, tasks, scope, supersede, …); see "Comms board endpoints" above
       chat.py              # POST /chat
-      streams.py           # GET /events/menu|runner|history|stream
+      streams.py           # GET /events/menu|runner|history|stream|comms
 ```
 
 **Layer rules:**
