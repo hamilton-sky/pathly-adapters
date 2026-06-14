@@ -105,11 +105,17 @@ def comms_post():
         reply_to = data.get("reply_to")
         stage = data.get("stage")
         conv = data.get("conv")
+        depends_on = data.get("depends_on")
 
         if options is not None and not isinstance(options, list):
             return jsonify({"error": "Field 'options' must be a list or null"}), 400
         if conv is not None and not isinstance(conv, int):
             return jsonify({"error": "Field 'conv' must be an integer or null"}), 400
+        if depends_on is not None and (
+            not isinstance(depends_on, list)
+            or not all(isinstance(d, str) for d in depends_on)
+        ):
+            return jsonify({"error": "Field 'depends_on' must be a list of strings or null"}), 400
         message_id = _post_message(
             conn,
             board=board,
@@ -122,6 +128,7 @@ def comms_post():
             reply_to=reply_to,
             stage=stage,
             conv=conv,
+            depends_on=depends_on,
         )
 
         if msg_type in _EMBED_TYPES:

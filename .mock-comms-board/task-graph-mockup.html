@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Comms Board — TaskGraph Mockup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0d0d0f;
+      color: #e0e0e0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Studio shell ─────────────────────────────────────────── */
+    .studio {
+      width: 960px;
+      height: 640px;
+      background: #141416;
+      border: 1px solid #2a2a2e;
+      border-radius: 10px;
+      display: flex;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+
+    /* ── Left sidebar ─────────────────────────────────────────── */
+    .sidebar {
+      width: 44px;
+      background: #0f0f11;
+      border-right: 1px solid #1e1e22;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 0;
+      gap: 6px;
+    }
+    .sidebar-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #555;
+      cursor: pointer;
+    }
+    .sidebar-icon.active { background: #1e1e28; color: #7c6cf0; }
+
+    /* ── Main area ────────────────────────────────────────────── */
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    /* ── Panel header ─────────────────────────────────────────── */
+    .panel-header {
+      height: 44px;
+      border-bottom: 1px solid #1e1e22;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .board-tier {
+      display: flex;
+      gap: 2px;
+      background: #1a1a1e;
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .tier-btn {
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #666;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+    }
+    .tier-btn.active {
+      background: #2a2a36;
+      color: #a89cf0;
+    }
+    .scope-label {
+      font-size: 11px;
+      color: #444;
+      margin-left: 4px;
+    }
+    .scope-value {
+      font-size: 11px;
+      color: #7c6cf0;
+      font-weight: 500;
+    }
+    .header-spacer { flex: 1; }
+    .header-action {
+      font-size: 11px;
+      color: #444;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #252528;
+    }
+    .header-action:hover { color: #999; border-color: #3a3a3e; }
+
+    /* ── Content tabs ─────────────────────────────────────────── */
+    .tab-bar {
+      height: 36px;
+      border-bottom: 1px solid #1e1e22;
+      display: flex;
+      align-items: flex-end;
+      padding: 0 12px;
+      gap: 0;
+      flex-shrink: 0;
+    }
+    .tab {
+      padding: 0 14px 8px;
+      font-size: 12px;
+      color: #555;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    .tab.active {
+      color: #a89cf0;
+      border-bottom-color: #7c6cf0;
+    }
+    .tab-count {
+      margin-left: 5px;
+      font-size: 10px;
+      background: #2a2a36;
+      color: #7c6cf0;
+      border-radius: 8px;
+      padding: 1px 5px;
+    }
+
+    /* ── Panel body ───────────────────────────────────────────── */
+    .panel-body { flex: 1; overflow: hidden; display: flex; min-height: 0; }
+
+    /* ══════════════════════════════════════════════════════════
+       MESSAGES VIEW
+    ═══════════════════════════════════════════════════════════ */
+    .messages-view {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .msg {
+      background: #1a1a1e;
+      border: 1px solid #252528;
+      border-radius: 7px;
+      padding: 8px 10px;
+    }
+    .msg-header { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+    .msg-role {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+      color: #7c6cf0;
+    }
+    .msg-type {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: #252528;
+      color: #666;
+    }
+    .msg-type.decision { background: #1e2a1e; color: #5a9; }
+    .msg-type.task { background: #1e1e2e; color: #7c6cf0; }
+    .msg-type.warning { background: #2a1e1e; color: #c96; }
+    .msg-time { font-size: 10px; color: #3a3a3e; margin-left: auto; }
+    .msg-text { font-size: 12px; color: #c0c0c0; line-height: 1.4; }
+
+    /* ══════════════════════════════════════════════════════════
+       TASK GRAPH VIEW
+    ═══════════════════════════════════════════════════════════ */
+    .tasks-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .tasks-toolbar {
+      height: 34px;
+      border-bottom: 1px solid #1a1a1e;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .tasks-toolbar-label { font-size: 11px; color: #444; }
+    .legend-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; margin-right: 3px;
+    }
+    .legend-item { font-size: 10px; color: #555; display: flex; align-items: center; }
+
+    .graph-canvas {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+      background:
+        radial-gradient(ellipse at 20% 30%, rgba(124,108,240,.04) 0%, transparent 60%),
+        #0f0f11;
+    }
+
+    /* SVG dag */
+    .dag-svg {
+      display: block;
+      margin: 20px auto;
+    }
+
+    /* Node boxes */
+    .node {
+      cursor: pointer;
+      transition: filter .15s;
+    }
+    .node:hover { filter: brightness(1.2); }
+
+    .node-rect {
+      rx: 6; ry: 6;
+      stroke-width: 1.5;
+    }
+    .node-rect.done   { fill: #141e14; stroke: #3a7a4a; }
+    .node-rect.active { fill: #1a1a28; stroke: #7c6cf0; }
+    .node-rect.ready  { fill: #1a1e2a; stroke: #5a7ac0; }
+    .node-rect.blocked{ fill: #1a1414; stroke: #3a3030; }
+
+    .node-phase {
+      font-size: 9px;
+      fill: #555;
+      font-family: monospace;
+    }
+    .node-title {
+      font-size: 11px;
+      font-weight: 600;
+      fill: #ddd;
+    }
+    .node-sub {
+      font-size: 10px;
+      fill: #666;
+    }
+    .node-status {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    .node-status.done   { fill: #4a9; }
+    .node-status.active { fill: #a89cf0; }
+    .node-status.ready  { fill: #6a9; }
+    .node-status.blocked{ fill: #553; }
+
+    /* edges */
+    .edge {
+      fill: none;
+      stroke-width: 1.5;
+      marker-end: url(#arrow);
+    }
+    .edge.done    { stroke: #2a4a2a; stroke-dasharray: none; }
+    .edge.pending { stroke: #2a2a3a; stroke-dasharray: 4 3; }
+
+    /* status pill overlay */
+    .status-pill {
+      rx: 8; ry: 8;
+    }
+    .status-pill.done   { fill: #1e3a24; }
+    .status-pill.active { fill: #2a2040; }
+    .status-pill.ready  { fill: #1a2a3a; }
+    .status-pill.blocked{ fill: #1e1a14; }
+  </style>
+</head>
+<body>
+<div class="studio">
+
+  <!-- Left sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-icon">⬡</div>
+    <div class="sidebar-icon active">◈</div>
+    <div class="sidebar-icon">⊞</div>
+    <div class="sidebar-icon">⌥</div>
+    <div style="flex:1"></div>
+    <div class="sidebar-icon">⚙</div>
+  </div>
+
+  <!-- Main panel -->
+  <div class="main">
+
+    <!-- Header: board tier + scope -->
+    <div class="panel-header">
+      <div class="board-tier">
+        <button class="tier-btn active">Feature</button>
+        <button class="tier-btn">Project</button>
+        <button class="tier-btn">Global</button>
+      </div>
+      <span class="scope-label">scope:</span>
+      <span class="scope-value">comms-board</span>
+      <div class="header-spacer"></div>
+      <div class="header-action">+ Post</div>
+      <div class="header-action">⟳ Refresh</div>
+    </div>
+
+    <!-- Messages | Tasks tab bar -->
+    <div class="tab-bar">
+      <div class="tab" id="tab-messages" onclick="switchTab('messages')">
+        Messages <span class="tab-count">7</span>
+      </div>
+      <div class="tab active" id="tab-tasks" onclick="switchTab('tasks')">
+        Tasks <span class="tab-count">6</span>
+      </div>
+    </div>
+
+    <!-- Body: toggled by tab -->
+    <div class="panel-body">
+
+      <!-- ── MESSAGES VIEW (hidden by default in mockup) ── -->
+      <div class="messages-view" id="view-messages" style="display:none">
+        <div class="msg">
+          <div class="msg-header">
+            <span class="msg-role">planner</span>
+            <span class="msg-type decision">decision</span>
+            <span class="msg-time">14:02</span>
+          </div>
+          <div class="msg-text">Feature comms-board is ready for building. 6 phases posted to the task DAG. Phase 1 (DB schema) is unblocked.</div>
+        </div>
+        <div class="msg">
+          <div class="msg-header">
+            <span class="msg-role">builder</span>
+            <span class="msg-type task">task</span>
+            <span class="msg-time">14:08</span>
+          </div>
+          <div class="msg-text">Phase 1 complete — comms_messages table + FTS5 virtual table created. Phase 2 unblocked.</div>
+        </div>
+        <div class="msg">
+          <div class="msg-header">
+            <span class="msg-role">reviewer</span>
+            <span class="msg-type warning">warning</span>
+            <span class="msg-time">14:31</span>
+          </div>
+          <div class="msg-text">B1: comms_post() ignores project-level write-permission overrides. Blocker — must fix before Conv 6.</div>
+        </div>
+        <div class="msg">
+          <div class="msg-header">
+            <span class="msg-role">builder</span>
+            <span class="msg-type decision">decision</span>
+            <span class="msg-time">14:45</span>
+          </div>
+          <div class="msg-text">B1 fixed: perm_table now fetched from DB in comms_post() and passed to _check_write_permission().</div>
+        </div>
+      </div>
+
+      <!-- ── TASK GRAPH VIEW ── -->
+      <div class="tasks-view" id="view-tasks">
+
+        <div class="tasks-toolbar">
+          <span class="tasks-toolbar-label">Phase DAG · comms-board</span>
+          <span style="flex:1"></span>
+          <span class="legend-item"><span class="legend-dot" style="background:#4a9"></span>Done</span>
+          &nbsp;
+          <span class="legend-item"><span class="legend-dot" style="background:#7c6cf0"></span>Active</span>
+          &nbsp;
+          <span class="legend-item"><span class="legend-dot" style="background:#5a7ac0"></span>Ready</span>
+          &nbsp;
+          <span class="legend-item"><span class="legend-dot" style="background:#3a3030"></span>Blocked</span>
+        </div>
+
+        <div class="graph-canvas">
+          <!--
+            Layout (left → right, slight vertical spread):
+            [P1 DB Schema] ──► [P2 HTTP Routes] ──► [P4 Write Perms]
+                               [P3 Embeddings]  ──► [P5 Hybrid Search] ──► [P6 DAG Tasks]
+          -->
+          <svg class="dag-svg" width="860" height="380" viewBox="0 0 860 380">
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8"
+                      refX="7" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#3a3a4a"/>
+              </marker>
+              <marker id="arrow-done" markerWidth="8" markerHeight="8"
+                      refX="7" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#2a5a3a"/>
+              </marker>
+            </defs>
+
+            <!-- ── EDGES ── -->
+            <!-- P1 → P2  (done) -->
+            <path class="edge done" marker-end="url(#arrow-done)"
+                  d="M168,90 C220,90 230,100 280,100"/>
+            <!-- P1 → P3  (done) -->
+            <path class="edge done" marker-end="url(#arrow-done)"
+                  d="M168,90 C230,90 240,210 280,210"/>
+            <!-- P2 → P4  (done) -->
+            <path class="edge done" marker-end="url(#arrow-done)"
+                  d="M448,100 C500,100 510,110 560,110"/>
+            <!-- P3 → P5  (active edge) -->
+            <path class="edge pending" marker-end="url(#arrow)"
+                  d="M448,210 C500,210 510,220 560,220"/>
+            <!-- P4 → (nothing for now, P6 depends on P5 too) -->
+            <!-- P5 → P6  (pending) -->
+            <path class="edge pending" marker-end="url(#arrow)"
+                  d="M728,215 C760,215 770,250 780,265"/>
+            <!-- P4 → P6 -->
+            <path class="edge pending" marker-end="url(#arrow)"
+                  d="M728,110 C760,110 770,240 780,265"/>
+
+            <!-- ════════════════ NODES ════════════════ -->
+
+            <!-- P1: DB Schema (DONE) -->
+            <g class="node" transform="translate(20,60)">
+              <rect class="node-rect done" width="148" height="60"/>
+              <text class="node-phase" x="10" y="16">Phase 1</text>
+              <text class="node-title" x="10" y="30">DB Schema</text>
+              <text class="node-sub"   x="10" y="43">comms_messages + FTS5</text>
+              <text class="node-status done" x="10" y="56">✓ done</text>
+            </g>
+
+            <!-- P2: HTTP Routes (DONE) -->
+            <g class="node" transform="translate(280,70)">
+              <rect class="node-rect done" width="168" height="60"/>
+              <text class="node-phase" x="10" y="16">Phase 2</text>
+              <text class="node-title" x="10" y="30">HTTP Routes</text>
+              <text class="node-sub"   x="10" y="43">POST /comms/post, GET /comms</text>
+              <text class="node-status done" x="10" y="56">✓ done</text>
+            </g>
+
+            <!-- P3: Embeddings (DONE) -->
+            <g class="node" transform="translate(280,180)">
+              <rect class="node-rect done" width="168" height="60"/>
+              <text class="node-phase" x="10" y="16">Phase 3</text>
+              <text class="node-title" x="10" y="30">Semantic Embeddings</text>
+              <text class="node-sub"   x="10" y="43">sqlite-vec + embed_async</text>
+              <text class="node-status done" x="10" y="56">✓ done</text>
+            </g>
+
+            <!-- P4: Write Permissions (ACTIVE) -->
+            <g class="node" transform="translate(560,80)">
+              <rect class="node-rect active" width="168" height="60"
+                    stroke-dasharray="none"/>
+              <text class="node-phase" x="10" y="16">Phase 4</text>
+              <text class="node-title" x="10" y="30">Write Permissions</text>
+              <text class="node-sub"   x="10" y="43">role-based board access</text>
+              <text class="node-status active" x="10" y="56">⬤ in progress</text>
+            </g>
+
+            <!-- P5: Hybrid Search (READY) -->
+            <g class="node" transform="translate(560,190)">
+              <rect class="node-rect ready" width="168" height="60"/>
+              <text class="node-phase" x="10" y="16">Phase 5</text>
+              <text class="node-title" x="10" y="30">Hybrid Search</text>
+              <text class="node-sub"   x="10" y="43">BM25 + cosine RRF</text>
+              <text class="node-status ready" x="10" y="56">● ready</text>
+            </g>
+
+            <!-- P6: DAG Tasks (BLOCKED) -->
+            <g class="node" transform="translate(756,250)">
+              <rect class="node-rect blocked" width="82" height="60"/>
+              <text class="node-phase" x="8" y="16">Phase 6</text>
+              <text class="node-title" x="8" y="30">DAG Tasks</text>
+              <text class="node-sub"   x="8" y="43">depends_on</text>
+              <text class="node-status blocked" x="8" y="56">⊘ waiting</text>
+            </g>
+
+          </svg>
+        </div>
+      </div><!-- /tasks-view -->
+
+    </div><!-- /panel-body -->
+  </div><!-- /main -->
+</div><!-- /studio -->
+
+<script>
+  function switchTab(which) {
+    document.getElementById('view-messages').style.display = which === 'messages' ? 'flex' : 'none';
+    document.getElementById('view-tasks').style.display   = which === 'tasks'    ? 'flex' : 'none';
+
+    document.getElementById('tab-messages').classList.toggle('active', which === 'messages');
+    document.getElementById('tab-tasks').classList.toggle('active',    which === 'tasks');
+  }
+  // Start on Tasks tab (already set in HTML)
+</script>
+</body>
+</html>

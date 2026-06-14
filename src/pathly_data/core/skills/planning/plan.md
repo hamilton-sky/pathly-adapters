@@ -263,7 +263,49 @@ Keep decomposition small enough for builder reliability:
 - Verify commands use correct project commands (standard/strict only).
 - If `rigor = strict`, every acceptance criterion has an explicit verification mapping and rollback note.
 
-## Step 6: Report
+## Step 6: Post Tasks to Comms Board
+
+After all plan files are verified, seed the comms board DAG so the builder can poll
+`GET /comms/tasks?ready=true` and Studio can visualize task progress.
+
+**Idempotency guard — skip if tasks already exist:**
+```
+curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE"
+```
+If the response contains any messages with `"type": "task"` for this feature's scope, skip
+this entire step — the tasks are already seeded (e.g. from a previous planning run).
+
+**Post each phase in order** (Phase 1 first). Track the `message_id` returned by each call
+so later phases can reference their dependencies.
+
+For each phase in `IMPLEMENTATION_PLAN.md`:
+1. Extract the phase number `N`, title, and one-line description.
+2. Read the `Depends on:` field — note which phase numbers it depends on (e.g. `Phase 1, Phase 2`).
+   Use `[]` when the phase says `Depends on: nothing`.
+3. Resolve dependencies: replace each named phase number with the `message_id` you recorded
+   when that phase was posted (your local map: `phase_N → message_id`).
+4. POST to the comms board:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "planner",
+    "type": "task",
+    "text": "Phase N: <title> — <one-line description>",
+    "board": "feature",
+    "stage": "BUILDING",
+    "depends_on": ["<dep_message_id>"]
+  }'
+```
+
+5. Record the `"message_id"` from the response as `phase_N_id` in your local map.
+
+If the comms server is unreachable (connection refused or non-200 response), skip this step
+silently — plan files are the authoritative source of truth and the DAG is advisory.
+
+## Step 7: Report
 
 ```text
 ## Plans folder created: pathly/plans/$FEATURE/

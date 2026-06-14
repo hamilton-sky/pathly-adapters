@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Comms Board — Command Center (throwaway mock)</title>
+<style>
+  :root{
+    --bg:#0d1117; --bg2:#11161d; --panel:#161b22; --panel2:#1c232c;
+    --border:#2a313c; --border2:#374151; --text:#e6edf3; --muted:#8b949e;
+    --accent:#58a6ff; --accent-dim:#1f6feb; --green:#3fb950; --amber:#d29922;
+    --red:#f85149; --purple:#bc8cff; --chip:#21262d;
+    --feature:#58a6ff; --project:#bc8cff; --global:#3fb950;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:14px/1.45 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overflow:hidden;
+  }
+  /* ---------- top bar ---------- */
+  .topbar{
+    height:46px; display:flex; align-items:center; gap:14px;
+    padding:0 16px; background:var(--bg2); border-bottom:1px solid var(--border);
+  }
+  .brand{font-weight:600; letter-spacing:.3px; display:flex; align-items:center; gap:8px;}
+  .brand .diamond{color:var(--accent);}
+  .topbar .spacer{flex:1;}
+  .pill{
+    background:var(--panel2); border:1px solid var(--border2); color:var(--text);
+    border-radius:7px; padding:6px 12px; cursor:pointer; font-size:13px;
+  }
+  .pill:hover{border-color:var(--accent);}
+  .exit{color:var(--muted);}
+  /* ---------- header tabs ---------- */
+  .tabsrow{
+    height:44px; display:flex; align-items:center; gap:8px;
+    padding:0 14px; background:var(--bg2); border-bottom:1px solid var(--border);
+  }
+  .tab{
+    display:flex; align-items:center; gap:7px; padding:6px 13px; border-radius:8px;
+    background:var(--chip); border:1px solid var(--border); cursor:pointer; font-size:13px;
+    user-select:none;
+  }
+  .tab .dot{width:8px;height:8px;border-radius:50%;background:var(--border2);}
+  .tab.on{border-color:var(--accent);}
+  .tab.on .dot{background:var(--accent);}
+  .tab[data-board="project"].on{border-color:var(--project);} .tab[data-board="project"].on .dot{background:var(--project);}
+  .tab[data-board="global"].on{border-color:var(--global);} .tab[data-board="global"].on .dot{background:var(--global);}
+  .tab.add{color:var(--muted); border-style:dashed;}
+  .tabsrow .spacer{flex:1;}
+  .legend{font-size:11px;color:var(--muted);}
+  /* ---------- workspace ---------- */
+  .workspace{display:flex; height:calc(100vh - 90px);}
+  /* ---------- sidebar ---------- */
+  .sidebar{
+    width:248px; min-width:248px; background:var(--panel); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; transition:width .18s, min-width .18s; overflow:hidden;
+  }
+  .sidebar.collapsed{width:52px; min-width:52px;}
+  .side-head{
+    height:38px; display:flex; align-items:center; gap:8px; padding:0 12px;
+    border-bottom:1px solid var(--border); color:var(--muted); font-size:12px;
+    text-transform:uppercase; letter-spacing:.6px; white-space:nowrap;
+  }
+  .side-toggle{margin-left:auto; cursor:pointer; color:var(--muted); font-size:15px;}
+  .side-list{overflow-y:auto; padding:8px;}
+  .fcard{
+    border:1px solid var(--border); border-radius:9px; margin-bottom:8px; overflow:hidden;
+    background:var(--panel2);
+  }
+  .fcard-head{
+    display:flex; align-items:center; gap:8px; padding:9px 10px; cursor:pointer; white-space:nowrap;
+  }
+  .fcard-head:hover{background:#222a34;}
+  .fcard .emoji{font-size:15px;}
+  .fcard .fname{font-weight:600; font-size:13px; flex:1; overflow:hidden; text-overflow:ellipsis;}
+  .fcard .state{font-size:10px; color:var(--muted); background:var(--chip); padding:2px 6px; border-radius:5px;}
+  .badge{font-size:10px; padding:1px 6px; border-radius:9px; font-weight:600;}
+  .badge.msg{background:rgba(88,166,255,.15); color:var(--accent);}
+  .badge.blk{background:rgba(248,81,73,.15); color:var(--red);}
+  .fcard-body{padding:0 10px 10px; font-size:12px; color:var(--muted); display:none;}
+  .fcard.open .fcard-body{display:block;}
+  .fcard.main{border-color:var(--accent);}
+  .fcard-body .acts{display:flex; gap:6px; margin-top:8px;}
+  .minibtn{font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid var(--border2);
+    background:var(--chip); color:var(--text); cursor:pointer;}
+  .minibtn.bridge{border-color:var(--accent); color:var(--accent);}
+  .minibtn:hover{background:#2a323d;}
+  .sidebar.collapsed .fname,.sidebar.collapsed .state,.sidebar.collapsed .fcard-body,
+  .sidebar.collapsed .side-head span{display:none;}
+  .sidebar.collapsed .fcard-head{justify-content:center; padding:9px 4px;}
+  /* ---------- board sections ---------- */
+  .sections{flex:1; display:flex; min-width:0;}
+  .section{
+    flex:1; min-width:280px; display:flex; flex-direction:column; border-right:1px solid var(--border);
+    min-height:0;
+  }
+  .section:last-child{border-right:none;}
+  .section.feature{flex:0 0 50%;}
+  .section.project{flex:0 0 30%;}
+  .section.global{flex:0 0 20%;}
+  .sec-head{
+    display:flex; align-items:center; gap:9px; padding:11px 14px; border-bottom:1px solid var(--border);
+    background:var(--bg2);
+  }
+  .sec-head .sicon{font-size:17px;}
+  .sec-head .stitle{font-weight:600;}
+  .sec-head .sscope{font-size:11px; color:var(--muted); margin-left:auto;}
+  .feature .sec-head{box-shadow:inset 3px 0 0 var(--feature);}
+  .project .sec-head{box-shadow:inset 3px 0 0 var(--project);}
+  .global .sec-head{box-shadow:inset 3px 0 0 var(--global);}
+  .thread{flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px; min-height:0;}
+  /* ---------- messages ---------- */
+  .msg{display:flex; flex-direction:column; gap:4px; animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(6px);} to{opacity:1;}}
+  .meta{font-size:11px; color:var(--muted); display:flex; gap:7px; align-items:center;}
+  .who{font-weight:600; color:var(--text);}
+  .bubble{
+    border:1px solid var(--border); border-radius:10px; padding:9px 12px; background:var(--panel);
+    font-size:13px;
+  }
+  .pinned{border-color:var(--amber); background:rgba(210,153,34,.08);}
+  .pinned .tag{color:var(--amber); font-weight:600; font-size:11px;}
+  .nudge{border-color:var(--accent); background:rgba(88,166,255,.08);}
+  .status{border-color:var(--border2); color:var(--muted);}
+  .warning{border-color:var(--amber); background:rgba(210,153,34,.10);}
+  .escalation{border-left:3px solid var(--red); background:rgba(248,81,73,.10); border-color:var(--red);}
+  .tag-row{font-size:11px; font-weight:600; margin-bottom:3px; text-transform:uppercase; letter-spacing:.4px;}
+  .tag-decision{color:var(--amber);} .tag-question{color:var(--accent);}
+  .tag-warning{color:var(--amber);} .tag-escalation{color:var(--red);}
+  .tag-discovery{color:var(--purple);}
+  /* question card */
+  .qcard .opt{
+    display:flex; align-items:center; gap:9px; padding:7px 9px; border:1px solid var(--border);
+    border-radius:7px; margin-top:6px; cursor:pointer;
+  }
+  .qcard .opt:hover{border-color:var(--accent);}
+  .qcard .opt.sel{border-color:var(--accent); background:rgba(88,166,255,.12);}
+  .qcard .opt .radio{width:13px;height:13px;border-radius:50%;border:2px solid var(--border2);}
+  .qcard .opt.sel .radio{border-color:var(--accent); background:var(--accent);}
+  .qcard .opt .hint{margin-left:auto; font-size:11px; color:var(--muted);}
+  .qcard .answerbar{display:flex; align-items:center; gap:9px; margin-top:9px;}
+  .qcard .answerbar .pending{color:var(--amber); font-size:11px;}
+  .btn{
+    background:var(--accent-dim); color:#fff; border:none; border-radius:7px; padding:6px 14px;
+    cursor:pointer; font-size:13px; font-weight:500;
+  }
+  .btn:hover{background:var(--accent);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+  .answered{color:var(--green); font-size:12px; font-weight:600;}
+  /* ---------- artifacts ---------- */
+  .arts{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .art-thumb{
+    width:84px; height:84px; border-radius:9px; overflow:hidden; border:1px solid var(--border2);
+    position:relative; cursor:pointer; background:var(--chip); flex:0 0 auto;
+  }
+  .art-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .art-thumb .cap{
+    position:absolute; left:0; right:0; bottom:0; font-size:10px; padding:2px 5px;
+    background:linear-gradient(transparent,rgba(0,0,0,.8)); color:#fff; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  .art-thumb:hover{border-color:var(--accent);}
+  .art-file{
+    display:flex; align-items:center; gap:9px; padding:8px 11px; border:1px solid var(--border2);
+    border-radius:9px; background:var(--chip); cursor:pointer; max-width:240px;
+  }
+  .art-file:hover{border-color:var(--accent);}
+  .art-file .ficon{
+    width:34px; height:34px; border-radius:7px; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:#fff; flex:0 0 auto;
+  }
+  .ficon.pdf{background:#d1422f;} .ficon.doc{background:#2b579a;} .ficon.zip{background:#7a5901;}
+  .ficon.csv{background:#1d7a44;} .ficon.gen{background:#475569;} .ficon.link{background:#0e7490;}
+  .art-file .fmeta{overflow:hidden;}
+  .art-file .fmeta .fn{font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .art-file .fmeta .fs{font-size:10px; color:var(--muted);}
+  /* ---------- compose ---------- */
+  .compose{border-top:1px solid var(--border); padding:10px 14px; background:var(--bg2);}
+  .reads{font-size:11px; color:var(--muted); margin-bottom:8px; display:flex; gap:14px; align-items:center;}
+  .reads label{display:flex; gap:5px; align-items:center; cursor:pointer;}
+  .tray{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
+  .tray:empty{display:none;}
+  .tray .art-thumb,.tray .art-file{position:relative;}
+  .tray .rm{
+    position:absolute; top:-6px; right:-6px; width:18px;height:18px; border-radius:50%;
+    background:var(--red); color:#fff; font-size:12px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; border:2px solid var(--bg2); z-index:2;
+  }
+  .composer{display:flex; gap:9px; align-items:flex-end;}
+  .typesel{
+    background:var(--chip); border:1px solid var(--border2); color:var(--text); border-radius:8px;
+    padding:9px 10px; font-size:13px; cursor:pointer;
+  }
+  .attach{
+    width:40px; height:40px; border-radius:8px; border:1px solid var(--border2); background:var(--chip);
+    color:var(--muted); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .attach:hover{border-color:var(--accent); color:var(--accent);}
+  .msgbox{
+    flex:1; resize:none; background:var(--chip); border:1px solid var(--border2); color:var(--text);
+    border-radius:8px; padding:10px 12px; font:inherit; min-height:40px; max-height:120px;
+  }
+  .msgbox:focus{outline:none; border-color:var(--accent);}
+  /* ---------- lightbox ---------- */
+  .lightbox{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); display:none; align-items:center; justify-content:center;
+    z-index:50; cursor:zoom-out;
+  }
+  .lightbox.on{display:flex;}
+  .lightbox img{max-width:88vw; max-height:88vh; border-radius:10px; box-shadow:0 10px 60px rgba(0,0,0,.6);}
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--panel2); border:1px solid var(--accent); color:var(--text); padding:9px 16px;
+    border-radius:9px; font-size:13px; opacity:0; transition:.25s; z-index:60; pointer-events:none;
+  }
+  .toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
+  /* hidden scope sections by default (project/global shown via preset) */
+  .section.hidden{display:none;}
+  /* recommend banner */
+  .rec{
+    margin:0; padding:7px 14px; background:rgba(188,140,255,.08); border-bottom:1px solid var(--border);
+    font-size:11px; color:var(--purple); display:flex; gap:8px; align-items:center;
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="diamond">◈</span> COMMAND CENTER</div>
+    <div class="spacer"></div>
+    <div class="pill" id="presetBtn">⊞ Presets: <b id="presetName">Focus</b> ▾</div>
+    <div class="pill" id="simBtn">⚡ Simulate agent reply</div>
+    <div class="pill exit">Exit ×</div>
+  </div>
+
+  <div class="tabsrow">
+    <div class="tab on" data-board="feature"><span class="dot"></span>🎯 Feature board</div>
+    <div class="tab" data-board="project"><span class="dot"></span>📁 Project</div>
+    <div class="tab" data-board="global"><span class="dot"></span>🌐 Global</div>
+    <div class="tab add">+ Add</div>
+    <div class="spacer"></div>
+    <div class="legend">throwaway mock · live SSE simulated</div>
+  </div>
+
+  <div class="workspace">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="side-head"><span>All Features</span><span class="side-toggle" id="sideToggle">⟨⟩</span></div>
+      <div class="side-list">
+        <div class="fcard main open" data-feat="send-to-agent-diff">
+          <div class="fcard-head"><span class="emoji">🎯</span><span class="fname">send-to-agent-diff</span><span class="state">BUILDING</span><span class="badge msg">💬1</span></div>
+          <div class="fcard-body">
+            builder: "Awaiting scroll-sync decision…"
+            <div class="acts">
+              <button class="minibtn bridge">Set as main ↗</button>
+              <button class="minibtn">Pause ⏸</button>
+            </div>
+          </div>
+        </div>
+        <div class="fcard" data-feat="comms-board">
+          <div class="fcard-head"><span class="emoji">📨</span><span class="fname">comms-board</span><span class="state">REVIEWING</span><span class="badge blk">⚠1</span></div>
+          <div class="fcard-body">
+            reviewer: "1 blocking finding open."
+            <div class="acts">
+              <button class="minibtn bridge">Set as main ↗</button>
+              <button class="minibtn">Pause ⏸</button>
+            </div>
+          </div>
+        </div>
+        <div class="fcard" data-feat="event-timeline">
+          <div class="fcard-head"><span class="emoji">📅</span><span class="fname">event-timeline</span><span class="state">PLANNING</span></div>
+          <div class="fcard-body">
+            planner: "Drafting conversations…"
+            <div class="acts"><button class="minibtn bridge">Set as main ↗</button></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===== BOARD SECTIONS ===== -->
+    <div class="sections" id="sections">
+      <!-- FEATURE -->
+      <section class="section feature" data-board="feature">
+        <div class="sec-head"><span class="sicon">🎯</span><span class="stitle">FEATURE BOARD — <span id="mainFeat">send-to-agent-diff</span></span><span class="sscope">feature scope</span></div>
+        <div class="rec">💡 Recommendation: images render as 84px <b>thumbnails</b> (click to enlarge); docs/zip as <b>file chips</b> with type badge; links as chips. Keeps the thread scannable.</div>
+        <div class="thread" id="thread">
+          <!-- pinned decision -->
+          <div class="msg">
+            <div class="meta"><span class="who">👤 human</span><span>· REVIEWING · 2h ago</span></div>
+            <div class="bubble pinned"><div class="tag">📌 DECISION · pinned</div>Skip rename detection — that is v2 scope.</div>
+          </div>
+          <!-- discovery with image artifacts -->
+          <div class="msg">
+            <div class="meta"><span class="who">🤖 builder</span><span>· BUILDING · 1h ago</span></div>
+            <div class="bubble">
+              <div class="tag-row tag-discovery">discovery</div>
+              Current diff gutter overlaps the line numbers at narrow widths — screenshots attached.
+              <div class="arts">
+                <div class="art-thumb" data-img="https://picsum.photos/seed/diff1/300/300"><img src="https://picsum.photos/seed/diff1/180/180" alt=""><span class="cap">overlap-1.png</span></div>
+                <div class="art-thumb" data-img="https://picsum.photos/seed/diff2/300/300"><img src="https://picsum.photos/seed/diff2/180/180" alt=""><span class="cap">overlap-2.png</span></div>
+                <div class="art-file"><div class="ficon pdf">PDF</div><div class="fmeta"><div class="fn">layout-spec.pdf</div><div class="fs">240 KB</div></div></div>
+              </div>
+            </div>
+          </div>
+          <!-- agent question card -->
+          <div class="msg" id="qmsg">
+            <div class="meta"><span class="who">🤖 builder</span><span>· BUILDING · 10:45</span></div>
+            <div class="bubble qcard" id="qcard">
+              <div class="tag-row tag-question">❓ question</div>
+              Scroll sync approach for the side-by-side diff?
+              <div class="opt" data-opt="scroll-snap"><span class="radio"></span><span>CSS scroll-snap</span><span class="hint">simple, native</span></div>
+              <div class="opt" data-opt="observer"><span class="radio"></span><span>JS IntersectionObserver</span><span class="hint">more control</span></div>
+              <div class="answerbar">
+                <button class="btn" id="answerBtn" disabled>Answer</button>
+                <span class="pending">⏳ awaiting human</span>
+              </div>
+            </div>
+          </div>
+          <!-- escalation -->
+          <div class="msg">
+            <div class="meta"><span class="who">🤖 reviewer</span><span>· REVIEWING · 22m ago</span></div>
+            <div class="bubble escalation"><div class="tag-row tag-escalation">🚨 escalation · human input required</div>Cannot proceed: target file path in story S4 does not exist. Need a corrected path.</div>
+          </div>
+        </div>
+
+        <!-- compose -->
+        <div class="compose">
+          <div class="reads">Reads:
+            <label><input type="checkbox" checked> ☑ Feature</label>
+            <label><input type="checkbox" checked> ☑ Project</label>
+            <label><input type="checkbox" checked> ☑ Global</label>
+          </div>
+          <div class="tray" id="tray"></div>
+          <div class="composer">
+            <select class="typesel" id="typeSel">
+              <option value="nudge">nudge</option>
+              <option value="decision">decision</option>
+              <option value="status">status</option>
+              <option value="warning">warning</option>
+              <option value="discovery">discovery</option>
+            </select>
+            <button class="attach" id="attachBtn" title="Attach image / file / more">📎</button>
+            <input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.csv,.zip,.txt,.md" style="display:none">
+            <textarea class="msgbox" id="msgbox" placeholder="Type a message…  (Enter to send, Shift+Enter for newline)"></textarea>
+            <button class="btn" id="sendBtn">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROJECT (hidden until Board preset) -->
+      <section class="section project hidden" data-board="project">
+        <div class="sec-head"><span class="sicon">📁</span><span class="stitle">PROJECT BOARD</span><span class="sscope">project scope</span></div>
+        <div class="thread">
+          <div class="msg"><div class="meta"><span class="who">👤 human</span><span>· 1d ago</span></div><div class="bubble pinned"><div class="tag">📌 DECISION</div>All new endpoints require the X-Pathly-Secret header.</div></div>
+          <div class="msg"><div class="meta"><span class="who">🤖 architect</span><span>· 3h ago</span></div><div class="bubble"><div class="tag-row tag-discovery">discovery</div>sqlite-vec recency fallback confirmed working on CI runners.</div></div>
+        </div>
+      </section>
+
+      <!-- GLOBAL (hidden until Board preset) -->
+      <section class="section global hidden" data-board="global">
+        <div class="sec-head"><span class="sicon">🌐</span><span class="stitle">GLOBAL</span><span class="sscope">org scope</span></div>
+        <div class="thread">
+          <div class="msg"><div class="meta"><span class="who">👤 director</span><span>· 4d ago</span></div><div class="bubble pinned"><div class="tag">📌 DECISION</div>Default model for builders is sonnet; opus reserved for architect.</div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="lightbox" id="lightbox"><img id="lightboxImg" src="" alt=""></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const toast = (m)=>{const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),1900);};
+
+/* ---- sidebar collapse + accordion ---- */
+$('#sideToggle').onclick = ()=>$('#sidebar').classList.toggle('collapsed');
+document.querySelectorAll('.fcard-head').forEach(h=>{
+  h.onclick = ()=>{
+    const card=h.parentElement;
+    if($('#sidebar').classList.contains('collapsed')){$('#sidebar').classList.remove('collapsed');return;}
+    document.querySelectorAll('.fcard').forEach(c=>{if(c!==card)c.classList.remove('open');});
+    card.classList.toggle('open');
+  };
+});
+/* ---- set as main feature (bridge) ---- */
+document.querySelectorAll('.minibtn.bridge').forEach(b=>{
+  b.onclick=(e)=>{
+    e.stopPropagation();
+    const feat=b.closest('.fcard').dataset.feat;
+    $('#mainFeat').textContent=feat;
+    document.querySelectorAll('.fcard').forEach(c=>c.classList.remove('main'));
+    b.closest('.fcard').classList.add('main');
+    toast('Feature board → '+feat);
+  };
+});
+
+/* ---- board tabs toggle visibility ---- */
+document.querySelectorAll('.tab[data-board]').forEach(tab=>{
+  tab.onclick=()=>{
+    tab.classList.toggle('on');
+    const sec=document.querySelector('.section[data-board="'+tab.dataset.board+'"]');
+    if(sec) sec.classList.toggle('hidden', !tab.classList.contains('on'));
+  };
+});
+
+/* ---- presets ---- */
+const presets=['Focus','Board view'];let pi=0;
+$('#presetBtn').onclick=()=>{
+  pi=(pi+1)%presets.length; const name=presets[pi]; $('#presetName').textContent=name;
+  const showAll = name==='Board view';
+  ['project','global'].forEach(b=>{
+    document.querySelector('.section[data-board="'+b+'"]').classList.toggle('hidden',!showAll);
+    document.querySelector('.tab[data-board="'+b+'"]').classList.toggle('on',showAll);
+  });
+  toast('Preset: '+name);
+};
+
+/* ---- question card answer flow ---- */
+let chosen=null;
+document.querySelectorAll('#qcard .opt').forEach(o=>{
+  o.onclick=()=>{
+    document.querySelectorAll('#qcard .opt').forEach(x=>x.classList.remove('sel'));
+    o.classList.add('sel'); chosen=o.dataset.opt; $('#answerBtn').disabled=false;
+  };
+});
+$('#answerBtn').onclick=()=>{
+  const label = chosen==='scroll-snap'?'CSS scroll-snap':'JS IntersectionObserver';
+  $('#qcard').innerHTML='<div class="tag-row tag-question">❓ question · answered</div>'+
+    'Scroll sync approach for the side-by-side diff?<br><span class="answered">✓ Answered: '+label+'</span>';
+  addMsg({who:'👤 you',type:'nudge',text:'Use '+label+'. Keep it simple.'});
+  toast('POST /comms/answer · agent unblocked');
+};
+
+/* ---- artifact attach ---- */
+let pending=[]; // {kind:'img'|'file', name, size, url, ext}
+$('#attachBtn').onclick=()=>$('#fileInput').click();
+$('#fileInput').onchange=(e)=>{
+  [...e.target.files].forEach(f=>{
+    const isImg=f.type.startsWith('image/');
+    const ext=(f.name.split('.').pop()||'').toLowerCase();
+    pending.push({kind:isImg?'img':'file', name:f.name, size:fmtSize(f.size), url:isImg?URL.createObjectURL(f):null, ext});
+  });
+  renderTray(); e.target.value='';
+};
+function fmtSize(b){return b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(1)+' MB';}
+function ficonClass(ext){return ({pdf:'pdf',doc:'doc',docx:'doc',zip:'zip',csv:'csv'})[ext]||'gen';}
+function renderTray(){
+  const tray=$('#tray'); tray.innerHTML='';
+  pending.forEach((a,i)=>{
+    const wrap=document.createElement('div');
+    if(a.kind==='img'){
+      wrap.className='art-thumb'; wrap.innerHTML='<img src="'+a.url+'"><span class="cap">'+a.name+'</span>';
+    }else{
+      const cls=ficonClass(a.ext); wrap.className='art-file';
+      wrap.innerHTML='<div class="ficon '+cls+'">'+(a.ext||'').slice(0,3).toUpperCase()+'</div><div class="fmeta"><div class="fn">'+a.name+'</div><div class="fs">'+a.size+'</div></div>';
+    }
+    const rm=document.createElement('span'); rm.className='rm'; rm.textContent='×';
+    rm.onclick=()=>{pending.splice(i,1);renderTray();};
+    wrap.appendChild(rm); tray.appendChild(wrap);
+  });
+}
+
+/* ---- send message ---- */
+function artsHTML(arts){
+  if(!arts||!arts.length)return '';
+  let h='<div class="arts">';
+  arts.forEach(a=>{
+    if(a.kind==='img') h+='<div class="art-thumb" data-img="'+a.url+'"><img src="'+a.url+'"><span class="cap">'+a.name+'</span></div>';
+    else h+='<div class="art-file"><div class="ficon '+ficonClass(a.ext)+'">'+(a.ext||'').slice(0,3).toUpperCase()+'</div><div class="fmeta"><div class="fn">'+a.name+'</div><div class="fs">'+a.size+'</div></div></div>';
+  });
+  return h+'</div>';
+}
+function addMsg({who,type,text,arts}){
+  const m=document.createElement('div'); m.className='msg';
+  const bubbleCls = type==='nudge'?'nudge':type==='status'?'status':type==='warning'?'warning':type==='decision'?'pinned':'';
+  const tagMap={decision:'📌 DECISION',warning:'⚠ warning',discovery:'discovery',status:'status',nudge:''};
+  const tag = type!=='nudge'?'<div class="tag-row tag-'+(type==='decision'?'decision':type)+'">'+(tagMap[type]||type)+'</div>':'';
+  m.innerHTML='<div class="meta"><span class="who">'+who+'</span><span>· just now</span></div>'+
+    '<div class="bubble '+bubbleCls+'">'+tag+escapeHtml(text)+artsHTML(arts)+'</div>';
+  $('#thread').appendChild(m); $('#thread').scrollTop=$('#thread').scrollHeight;
+  bindLightbox();
+}
+function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+$('#sendBtn').onclick=send;
+$('#msgbox').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+function send(){
+  const text=$('#msgbox').value.trim();
+  if(!text && !pending.length){toast('Nothing to send');return;}
+  const type=$('#typeSel').value;
+  addMsg({who:'👤 you',type,text:text||'(attachment)',arts:pending.slice()});
+  toast('POST /comms/post · '+type+(pending.length?' + '+pending.length+' artifact(s)':'')+' → SSE broadcast');
+  $('#msgbox').value=''; pending=[]; renderTray();
+}
+
+/* ---- simulate incoming agent SSE ---- */
+const replies=[
+  {who:'🤖 builder',type:'status',text:'Applied scroll-snap to DiffViewer; running typecheck.'},
+  {who:'🤖 builder',type:'discovery',text:'Found a related util already in scrollSync.ts — reusing it.'},
+  {who:'🤖 reviewer',type:'warning',text:'CommsInput drops focus after send — minor UX nit.'},
+];let ri=0;
+$('#simBtn').onclick=()=>{addMsg(replies[ri%replies.length]); ri++; toast('COMMS_UPDATE received over /events/comms');};
+
+/* ---- lightbox ---- */
+function bindLightbox(){
+  document.querySelectorAll('.art-thumb[data-img]').forEach(t=>{
+    t.onclick=()=>{$('#lightboxImg').src=t.dataset.img; $('#lightbox').classList.add('on');};
+  });
+}
+$('#lightbox').onclick=()=>$('#lightbox').classList.remove('on');
+bindLightbox();
+</script>
+</body>
+</html>

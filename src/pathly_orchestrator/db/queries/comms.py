@@ -27,14 +27,15 @@ def post_message(
     reply_to: str | None = None,
     stage: str | None = None,
     conv: int | None = None,
+    depends_on: list[str] | None = None,
 ) -> str:
     """Insert a new message into comms_messages. Returns the new message_id."""
     message_id = str(uuid.uuid4())
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -48,6 +49,7 @@ def post_message(
                 stage,
                 conv,
                 _now(),
+                json.dumps(depends_on) if depends_on is not None else None,
             ),
         )
         conn.commit()
