@@ -307,6 +307,78 @@ def comms_answer():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/tasks", methods=["GET"])
+def comms_tasks_get():
+    """Fetch task messages for a feature.
+
+    Query params: feature (required), ready=true (only unblocked tasks)
+    or status=pending (all pending tasks regardless of readiness).
+    Default when neither flag is set: all pending tasks.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
+        from pathly_orchestrator.db.queries.comms import get_ready_tasks as _get_ready_tasks
+
+        feature = request.args.get("feature", "").strip()
+        if not feature:
+            return jsonify({"error": "Query parameter 'feature' is required"}), 400
+
+        board = (request.args.get("board") or "feature").strip() or "feature"
+        if board not in ("feature", "project", "global"):
+            board = "feature"
+        scope = (request.args.get("scope") or feature).strip() or feature
+
+        conn = _get_db()
+        ready_flag = request.args.get("ready", "").strip().lower()
+        if ready_flag == "true":
+            tasks = _get_ready_tasks(conn, boards=[board], scopes=[scope])
+        else:
+            tasks = _get_messages(conn, board=board, scope=scope, type="task", status="pending")
+        return jsonify(tasks), 200
+    except Exception as exc:
+        logging.exception("comms_tasks_get error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/tasks/complete", methods=["POST"])
+def comms_tasks_complete():
+    """Mark a task as done and broadcast newly-unblocked tasks.
+
+    Required body fields: message_id.
+    Optional: feature (used for the broadcast scope).
+    Idempotent: completing an already-done task returns 200 with no change.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import complete_task as _complete_task
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        newly_ready = _complete_task(conn, message_id=message_id)
+
+        scope = data.get("feature") or data.get("scope") or ""
+        for nrid in newly_ready:
+            _broadcast_comms(scope, {
+                "type": "COMMS_UPDATE",
+                "message_id": nrid,
+                "event": "task_unblocked",
+                "feature": scope,
+            })
+
+        return jsonify({"ok": True, "newly_ready": newly_ready}), 200
+    except Exception as exc:
+        logging.exception("comms_tasks_complete error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/attach", methods=["POST"])
 def comms_attach():
     """Attach a file or URL artifact to a message. (Not implemented in this phase.)"""

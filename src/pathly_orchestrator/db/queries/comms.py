@@ -365,6 +365,93 @@ def purge_expired_trash(
         return cur.rowcount
 
 
+def get_ready_tasks(
+    conn: sqlite3.Connection,
+    boards: list[str],
+    scopes: list[str],
+) -> list[dict]:
+    """Return task messages where every depends_on ID has task_status='done'.
+    A task with depends_on=NULL or depends_on='[]' is always ready if pending."""
+    if not boards or not scopes:
+        return []
+    board_ph = ",".join("?" * len(boards))
+    scope_ph = ",".join("?" * len(scopes))
+    pending_sql = (
+        "SELECT * FROM comms_messages "
+        f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
+        "AND type='task' AND task_status='pending' AND deleted_at IS NULL"
+    )
+    pending_rows = conn.execute(
+        pending_sql, list(boards) + list(scopes)
+    ).fetchall()
+
+    done_sql = (
+        "SELECT id FROM comms_messages "
+        f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
+        "AND type='task' AND task_status='done' AND deleted_at IS NULL"
+    )
+    done_ids = {
+        r["id"]
+        for r in conn.execute(done_sql, list(boards) + list(scopes)).fetchall()
+    }
+
+    ready = []
+    for row in pending_rows:
+        deps = json.loads(row["depends_on"] or "[]")
+        if all(dep in done_ids for dep in deps):
+            ready.append(dict(row))
+    return ready
+
+
+def complete_task(
+    conn: sqlite3.Connection,
+    message_id: str,
+) -> list[str]:
+    """Set task_status='done' on message_id. Returns list of message IDs that
+    became newly ready (all their deps now done). Idempotent: completing an
+    already-done task returns [] with no DB write."""
+    row = conn.execute(
+        "SELECT board, scope, task_status FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+        (message_id,),
+    ).fetchone()
+    if row is None:
+        return []
+    if row["task_status"] == "done":
+        return []
+
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET task_status='done' WHERE id=?",
+            (message_id,),
+        )
+        conn.commit()
+
+    board = row["board"]
+    scope = row["scope"]
+
+    done_ids = {
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM comms_messages "
+            "WHERE board=? AND scope=? AND type='task' AND task_status='done' AND deleted_at IS NULL",
+            (board, scope),
+        ).fetchall()
+    }
+
+    candidate_rows = conn.execute(
+        "SELECT id, depends_on FROM comms_messages "
+        "WHERE board=? AND scope=? AND type='task' AND task_status='pending' AND deleted_at IS NULL",
+        (board, scope),
+    ).fetchall()
+
+    newly_ready = []
+    for candidate in candidate_rows:
+        deps = json.loads(candidate["depends_on"] or "[]")
+        if deps and message_id in deps and all(dep in done_ids for dep in deps):
+            newly_ready.append(candidate["id"])
+    return newly_ready
+
+
 def soft_delete_message(conn: sqlite3.Connection, message_id: str) -> str:
     """Retract a message by soft-deleting it — but only while no agent has read it.
 

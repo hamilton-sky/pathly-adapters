@@ -304,6 +304,8 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("flow_definitions",    "config_json",          "TEXT"),
         # Phase 1.4a (comms-board): supersede stale decisions
         ("comms_messages",      "superseded_by",         "TEXT"),
+        # Phase 14 (comms-board-skills): DAG task decomposition
+        ("comms_messages",      "depends_on",            "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")
