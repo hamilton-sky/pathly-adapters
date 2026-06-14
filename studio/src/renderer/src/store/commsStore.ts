@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Boards, Feature, Message, BoardScope, MessageType, FeatureStatus, Stage } from '../components/HQ/CommandCenter/types'
+import type { Boards, Feature, Message, BoardScope, MessageType, FeatureStatus, Stage } from '../components/CommandCenter/types'
 import {
   fetchBoard,
   apiPost,

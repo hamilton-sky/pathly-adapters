@@ -1,6 +1,6 @@
 import React from 'react'
 import { Check, History, FileText, Search, Eye } from 'lucide-react'
-import type { Message } from '../CommandCenter/types'
+import type { Message } from '../../CommandCenter/types'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import s from './CommsMsgCard.module.css'
 

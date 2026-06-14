@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { Send, Paperclip } from 'lucide-react'
-import type { BoardScope, MessageType } from '../CommandCenter/types'
+import type { BoardScope, MessageType } from '../../CommandCenter/types'
 import { TypePicker } from './TypePicker'
 import s from './CommsInput.module.css'
 

@@ -1,4 +1,4 @@
-import type { Message, Feature, FeatureStatus, BoardScope, MessageType, Stage, QuestionOption, AgentId } from '../components/HQ/CommandCenter/types'
+import type { Message, Feature, FeatureStatus, BoardScope, MessageType, Stage, QuestionOption, AgentId } from '../components/CommandCenter/types'
 import { readFile, listDir } from '../services/pathlyApi'
 
 import { apiFetch } from '../lib/config'

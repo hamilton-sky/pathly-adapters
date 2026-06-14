@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Check } from 'lucide-react'
-import type { BoardScope, MessageType } from '../CommandCenter/types'
+import type { BoardScope, MessageType } from '../../CommandCenter/types'
 import { CommsMsgList } from './CommsMsgList'
 import { CommsInput } from './CommsInput'
 import { useCommsPanel } from './hooks/useCommsPanel'

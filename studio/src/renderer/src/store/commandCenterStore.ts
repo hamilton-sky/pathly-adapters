@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { CommandCenterState, Direction, SectionDef } from '../components/HQ/CommandCenter/types'
-import { MAX_SECTIONS } from '../components/HQ/CommandCenter/types'
+import type { CommandCenterState, Direction, SectionDef } from '../components/CommandCenter/types'
+import { MAX_SECTIONS } from '../components/CommandCenter/types'
 
 const mkFeature = (fid: string): SectionDef => ({ id: fid, scope: 'feature', featureId: fid })
 const GLOBAL_SEC: SectionDef = { id: 'global', scope: 'global' }

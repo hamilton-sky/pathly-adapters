@@ -1,6 +1,6 @@
 import React from 'react'
-import type { AgentId } from '../CommandCenter/types'
-import { AGENTS } from '../CommandCenter/constants'
+import type { AgentId } from '../../CommandCenter/types'
+import { AGENTS } from '../../CommandCenter/constants'
 import {
   SquareTerminal, Search, GitBranch, CircleCheck, History, Circle,
 } from 'lucide-react'

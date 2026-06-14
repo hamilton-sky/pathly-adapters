@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { BoardScope, MessageType } from '../../CommandCenter/types'
+import type { BoardScope, MessageType } from '../../../CommandCenter/types'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useProjectStore } from '../../../../store/projectStore'
 import { PATHLY_API_BASE } from '../../../../lib/config'
