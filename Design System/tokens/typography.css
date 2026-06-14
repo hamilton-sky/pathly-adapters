@@ -1,0 +1,42 @@
+/* ─── Typography tokens ─────────────────────────────────────────
+   Pathly is a dense developer tool. Base UI text is 13px; the
+   scale tops out at 16px for panel titles. Numbers, IDs, costs,
+   timestamps and code always render in Geist Mono.               */
+
+:root {
+  /* Families */
+  --font-family-base: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-family-mono: 'Geist Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* 5-stop type scale (px — fixed, this is a chrome-dense UI) */
+  --font-size-xs:   10px;   /* micro labels, badge counts            */
+  --font-size-sm:   11px;   /* section labels, buttons, metadata     */
+  --font-size-base: 13px;   /* default body / UI text                */
+  --font-size-md:   14px;   /* emphasised body, card titles          */
+  --font-size-lg:   16px;   /* panel titles                          */
+
+  /* Display sizes — only for marketing, slides, big metrics */
+  --font-size-xl:   22px;
+  --font-size-2xl:  32px;
+  --font-size-3xl:  44px;
+
+  /* Weight anchors */
+  --font-weight-normal:   400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+
+  /* Line heights */
+  --line-tight:   1.2;  /* @kind other */
+  --line-snug:    1.35; /* @kind other */
+  --line-normal:  1.5;  /* @kind other */
+
+  /* Named pattern: the uppercase section label used everywhere
+     (WORKSPACE, STATE MACHINE · 9 TRANSITIONS, COST PER INVOCATION) */
+  --type-label-size:    var(--font-size-sm);
+  --type-label-weight:  var(--font-weight-semibold);
+  --type-label-spacing: 0.06em;
+
+  /* Mono metric: numbers in tables, costs, token counts */
+  --type-metric-family: var(--font-family-mono);
+}

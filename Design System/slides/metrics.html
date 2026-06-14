@@ -1,0 +1,34 @@
+<!-- @dsCard group="Slides" viewport="1280x720" name="Metrics slide" subtitle="Big mono numbers on dark" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html,body { margin:0; }
+  .slide { width:1280px; height:720px; box-sizing:border-box; background:var(--bg-mantle); color:var(--text-primary);
+    font-family:var(--font-family-base); padding:84px 110px; display:flex; flex-direction:column; }
+  .kicker { font-size:18px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent); margin:0 0 18px; }
+  h2 { font-size:54px; font-weight:700; letter-spacing:-0.02em; margin:0 0 64px; max-width:880px; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:28px; }
+  .cell { border-left:3px solid var(--accent); padding:6px 0 6px 26px; }
+  .cell:nth-child(2){ border-left-color:var(--green); }
+  .cell:nth-child(3){ border-left-color:var(--purple); }
+  .cell:nth-child(4){ border-left-color:var(--orange); }
+  .cell:nth-child(5){ border-left-color:var(--runtime); }
+  .cell:nth-child(6){ border-left-color:var(--yellow); }
+  .num { font-family:var(--font-family-mono); font-size:62px; font-weight:500; line-height:1; letter-spacing:-0.02em; }
+  .num.cost { color:var(--green); }
+  .cap { font-size:20px; color:var(--text-secondary); margin-top:14px; }
+</style></head>
+<body>
+  <div class="slide">
+    <p class="kicker">One run, fully accounted</p>
+    <h2>Token &amp; cost telemetry on every conversation.</h2>
+    <div class="grid">
+      <div class="cell"><div class="num">3</div><div class="cap">CLI hosts, one install</div></div>
+      <div class="cell"><div class="num cost">$3.64</div><div class="cap">Cost per feature, itemized</div></div>
+      <div class="cell"><div class="num">290,749</div><div class="cap">Tokens, builder → retro</div></div>
+      <div class="cell"><div class="num">9</div><div class="cap">State transitions, timestamped</div></div>
+      <div class="cell"><div class="num">8</div><div class="cap">Agent invocations tracked</div></div>
+      <div class="cell"><div class="num">100%</div><div class="cap">Local — your keys, your machine</div></div>
+    </div>
+  </div>
+</body></html>

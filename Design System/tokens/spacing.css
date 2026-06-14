@@ -1,0 +1,47 @@
+/* ─── Spacing, radii, borders, shadows, motion ─────────────────
+   Pathly's spacing is tight and on a 4px base. Radii are small
+   (5px is the workhorse). Shadows are used sparingly — only for
+   floating surfaces (modals, dropdowns, popouts).                */
+
+:root {
+  /* 4px spacing scale */
+  --space-0:  0;
+  --space-1:  2px;
+  --space-2:  4px;
+  --space-3:  6px;
+  --space-4:  8px;
+  --space-5:  10px;
+  --space-6:  12px;
+  --space-7:  14px;
+  --space-8:  16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-16: 32px;
+  --space-20: 40px;
+  --space-24: 48px;
+
+  /* Radii — small and functional */
+  --radius-xs:   3px;   /* badges, chips, scrollbar thumbs   */
+  --radius-sm:   4px;   /* badges, small tags                */
+  --radius-md:   5px;   /* buttons, inputs — the workhorse   */
+  --radius-lg:   8px;   /* cards                             */
+  --radius-xl:   12px;  /* modals, panels, large surfaces    */
+  --radius-full: 999px; /* pills, progress tracks            */
+
+  /* Motion */
+  --transition-base: 150ms ease-out;   /* @kind other */
+  --transition-fast: 100ms ease-out;   /* @kind other */
+  --transition-snappy: 120ms ease-out; /* @kind other */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+
+  /* Elevation — floating surfaces only, tuned for dark UI */
+  --shadow-sm:   0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md:   0 4px 12px rgba(0, 0, 0, 0.30);
+  --shadow-lg:   0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  /* Layout rails */
+  --sidebar-width: 248px;
+  --topbar-height: 44px;
+  --terminal-height: 240px;
+}
