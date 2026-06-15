@@ -727,6 +727,100 @@ def comms_permissions():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/agent-context", methods=["POST"])
+def comms_agent_context():
+    """Return board context in BOARD-INFO mode (no flow state, no embeddings).
+
+    Required body fields: board, scope.
+    Returns 200 {mode, has_flow, board, scope, board_context, decisions, escalations,
+    message_count} or 400 when scope is missing.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import (
+            get_active_escalations as _get_escalations,
+            get_messages as _get_messages,
+            get_pending_decisions as _get_decisions,
+        )
+        from pathly_orchestrator.supervisor.board_run import _format_board_info
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        board = data.get("board")
+        scope = data.get("scope")
+
+        if not isinstance(scope, str) or not scope.strip():
+            return jsonify({"error": "Field 'scope' is required"}), 400
+        if not isinstance(board, str) or not board.strip():
+            board = "feature"
+
+        conn = _get_db()
+        decisions = _get_decisions(conn, boards=[board], scopes=[scope])
+        escalations = _get_escalations(conn, boards=[board], scopes=[scope])
+        recent = _get_messages(conn, board=board, scope=scope, limit=20)
+
+        board_context = _format_board_info(decisions, escalations, recent)
+
+        return jsonify({
+            "mode": "board-info",
+            "has_flow": False,
+            "board": board,
+            "scope": scope,
+            "board_context": board_context,
+            "decisions": decisions,
+            "escalations": escalations,
+            "message_count": len(recent),
+        }), 200
+    except Exception as exc:
+        logging.exception("comms_agent_context error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/run", methods=["POST"])
+def comms_run():
+    """Spawn a single-agent board run (US4).
+
+    Required body fields: board, scope, mode ("single-agent"|"evaluator").
+    Optional: instructions, project_root.
+    Returns 200 with start_board_run result, or 409 when the board is busy.
+    """
+    try:
+        from pathly_orchestrator.supervisor.board_run import start_board_run
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        board = data.get("board", "feature")
+        scope = data.get("scope")
+        mode = data.get("mode", "single-agent")
+        instructions = data.get("instructions", "") or ""
+        project_root = data.get("project_root", "") or ""
+
+        if not isinstance(scope, str) or not scope.strip():
+            return jsonify({"error": "Field 'scope' is required"}), 400
+        if not isinstance(board, str) or board not in ("feature", "project", "global"):
+            board = "feature"
+
+        result = start_board_run(
+            board,
+            scope,
+            mode,
+            instructions,
+            project_root=project_root,
+        )
+
+        if not result.get("ok"):
+            return jsonify({"ok": False, "error": result.get("error", "board_busy")}), 409
+
+        return jsonify(result), 200
+    except Exception as exc:
+        logging.exception("comms_run error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/delete", methods=["POST"])
 def comms_delete():
     """Retract (soft-delete) a message — only while no agent has read it.

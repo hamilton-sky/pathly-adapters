@@ -19,8 +19,13 @@ from .terminal import _run_stage_via_terminal, _agent_done_watcher, _reconciliat
 from .interactions import _await_agent_question
 from .orchestrator import _loop, _resolve_stage_supervised
 from .api import start_run, pause_run, resume_run, abort_run, supply_decision, supply_agent_answer, reroute_run
+from . import board_lock, board_run
+from .board_run import start_board_run
 
 __all__ = [
+    "board_lock",
+    "board_run",
+    "start_board_run",
     "RunnerState",
     "OpenSession",
     "VALID_STATUSES",
