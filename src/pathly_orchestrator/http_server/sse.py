@@ -36,6 +36,18 @@ _menu_lock = threading.Lock()
 _runner_clients: dict[str, list[queue.Queue]] = {}
 _runner_lock = threading.Lock()
 
+# Spawn SSE client registry — TOPIC-INDEPENDENT. A single flat list of subscriber
+# queues. Studio mounts exactly one always-on subscriber here so terminal
+# lifecycle events (open/kill) are delivered no matter which board/topic is
+# active. This is the one place that controls opening and killing PTYs; the
+# per-topic _runner_clients channel carries everything else (stage/cost/menu).
+_spawn_clients: list[queue.Queue] = []
+_spawn_lock = threading.Lock()
+
+# Terminal-lifecycle event types that must reach the global spawn channel
+# regardless of topic.
+_SPAWN_EVENT_TYPES = frozenset({"TERMINAL_SPAWN", "TERMINAL_KILL", "TERMINAL_SIGNAL"})
+
 # Comms SSE client registry. Keyed by scope; each value is a list of per-client queues.
 _comms_clients: dict[str, list[queue.Queue]] = {}
 _comms_lock = threading.Lock()
@@ -124,8 +136,32 @@ def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
         _bus.unsubscribe(bus_key, _on_new_event)
 
 
+def _broadcast_spawn(payload: dict) -> None:
+    """Broadcast a terminal-lifecycle event to ALL /events/spawn clients.
+
+    Topic-independent: every connected spawn subscriber receives it. Used so the
+    single central terminal listener in Studio opens/kills PTYs no matter which
+    board the run was started from.
+    """
+    raw = json.dumps(payload)
+    with _spawn_lock:
+        dead = [q for q in _spawn_clients if q.full()]
+        for q in dead:
+            _spawn_clients.remove(q)
+        for q in _spawn_clients:
+            try:
+                q.put_nowait(raw)
+            except queue.Full:
+                pass
+
+
 def _broadcast_runner(topic: str, payload: dict) -> None:
-    """Broadcast a runner event to all /events/runner clients subscribed to *topic*."""
+    """Broadcast a runner event to all /events/runner clients subscribed to *topic*.
+
+    Terminal-lifecycle events (open/kill) are ALSO mirrored to the topic-independent
+    /events/spawn channel, so the PTY opens/closes even when the run's topic is not
+    the board the user is currently viewing.
+    """
     raw = json.dumps(payload)
     with _runner_lock:
         clients = _runner_clients.get(topic, [])
@@ -137,6 +173,8 @@ def _broadcast_runner(topic: str, payload: dict) -> None:
                 q.put_nowait(raw)
             except queue.Full:
                 pass
+    if payload.get("type") in _SPAWN_EVENT_TYPES:
+        _broadcast_spawn(payload)
 
 
 def _broadcast_comms(scope: str, payload: dict) -> None:

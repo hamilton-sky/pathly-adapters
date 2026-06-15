@@ -20,6 +20,8 @@ from ..sse import (
     _menu_lock,
     _runner_clients,
     _runner_lock,
+    _spawn_clients,
+    _spawn_lock,
     _comms_clients,
     _comms_lock,
 )
@@ -98,6 +100,44 @@ def runner_events_endpoint():
                 clients = _runner_clients.get(topic, [])
                 if q in clients:
                     clients.remove(q)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@bp.route("/events/spawn", methods=["GET"])
+def spawn_events_endpoint():
+    """SSE endpoint: topic-INDEPENDENT terminal lifecycle stream.
+
+    Studio mounts exactly one always-on subscriber here. It is the single place
+    that opens and kills PTYs, so a run started from any board (feature, project,
+    global, or one that isn't currently being viewed) still gets its terminal.
+
+    Event types: connected, TERMINAL_SPAWN, TERMINAL_KILL, TERMINAL_SIGNAL.
+    No query params — every connected client receives every terminal event.
+    """
+    from flask import Response, stream_with_context
+
+    q: queue.Queue = queue.Queue(maxsize=50)
+    with _spawn_lock:
+        _spawn_clients.append(q)
+
+    def generate():
+        try:
+            yield 'data: {"type":"connected"}\n\n'
+            while True:
+                try:
+                    data = q.get(timeout=25)
+                    yield f"data: {data}\n\n"
+                except queue.Empty:
+                    yield ": keepalive\n\n"
+        finally:
+            with _spawn_lock:
+                if q in _spawn_clients:
+                    _spawn_clients.remove(q)
 
     return Response(
         stream_with_context(generate()),

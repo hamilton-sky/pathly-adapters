@@ -275,42 +275,8 @@ export function useHQ() {
               useToastStore.getState().push(`Runner warning: ${(data.reason as string) ?? 'unknown'}`, 'info', { category: 'runner_state' })
             } else if (data.type === 'RUNNER_ERROR') {
               setRunnerState({ errorMessage: data.message as string, status: 'error' })
-            } else if (data.type === 'TERMINAL_SPAWN') {
-              const tab_id = data.tab_id as string
-              const run_id = data.run_id as string
-              const adapter = data.adapter as string
-              const label = (data.label as string | undefined) ?? adapter
-              const cwd = (data.cwd as string | undefined) ?? useRunnerStore.getState().projectRoot ?? ''
-              const prompt = (data.prompt as string | undefined) ?? ''
-              const stage = (data.stage as string | undefined) ?? ''
-              const isInteractive = !!(data.interactive as boolean | undefined)
-              useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'])
-              useTerminalStore.getState().openTab(tab_id)
-              useTerminalStore.setState((s) => ({
-                tabs: s.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
-              }))
-              useRunnerStore.getState().attachTerminalToStage(tab_id, 'terminal')
-              if (prompt) useRunnerStore.getState().recordStagePrompt(prompt)
-              const argv = Array.isArray(data.argv) ? (data.argv as string[]) : undefined
-              const initialInput = isInteractive && prompt ? prompt : undefined
-              void window.pathly.terminal.registerRunner(tab_id, activeTopic ?? '', run_id, label)
-                .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv, initialInput))
-                .then(() => {
-                  apiFetch('/runner/terminal/started', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tab_id, run_id, topic: activeTopic, pid: 0 }),
-                  }).catch(() => { /* non-blocking */ })
-                })
-                .catch(() => { /* spawn failure — PTY unavailable */ })
             } else if (data.type === 'TERMINAL_AGENT_DONE') {
               setRunnerState({ status: 'finalizing' })
-            } else if (data.type === 'TERMINAL_SIGNAL') {
-              const signal = data.signal as string
-              if (signal === 'term') {
-                const tabId = (data.tab_id as string | undefined) ?? useRunnerStore.getState().activeRunnerTabId
-                if (tabId) void window.pathly.terminal.kill(tabId).catch(() => { /* PTY may already be gone */ })
-              }
             } else if (data.type === 'STAGE_RESULT') {
               // Server-side enriched result — reliable fallback when PTY stdout
               // parsing misses the final JSON (e.g. long builds, buffer overflow).
@@ -378,6 +344,88 @@ export function useHQ() {
       es?.close()    // now accessible — closes the live connection on unmount
     }
   }, [activeTopic])
+
+  // Central terminal lifecycle — the ONE place that opens and kills PTYs.
+  // Topic-independent: subscribes to /events/spawn for the app's lifetime, so a
+  // run started from any board (feature, project, global, or a topic that isn't
+  // currently active) still gets its terminal. Mounted once; never torn down on
+  // topic change, so there is no subscribe/broadcast race.
+  useEffect(() => {
+    let es: EventSource | null = null
+    let retry = 0
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
+
+    const openTerminal = (data: Record<string, unknown>): void => {
+      const tab_id = data.tab_id as string
+      const run_id = data.run_id as string
+      const topic = (data.topic as string | undefined) ?? ''   // from the event, NOT the active UI
+      const adapter = data.adapter as string
+      const label = (data.label as string | undefined) ?? adapter
+      const cwd = (data.cwd as string | undefined) ?? useRunnerStore.getState().projectRoot ?? ''
+      const prompt = (data.prompt as string | undefined) ?? ''
+      const isInteractive = !!(data.interactive as boolean | undefined)
+      if (useTerminalStore.getState().tabs.some((t) => t.id === tab_id)) return   // idempotent — never double-open
+      useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'])
+      useTerminalStore.getState().openTab(tab_id)
+      useTerminalStore.setState((st) => ({
+        tabs: st.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
+      }))
+      useRunnerStore.getState().attachTerminalToStage(tab_id, 'terminal')
+      if (prompt) useRunnerStore.getState().recordStagePrompt(prompt)
+      const argv = Array.isArray(data.argv) ? (data.argv as string[]) : undefined
+      const initialInput = isInteractive && prompt ? prompt : undefined
+      void window.pathly.terminal.registerRunner(tab_id, topic, run_id, label)
+        .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv, initialInput))
+        .then(() => {
+          apiFetch('/runner/terminal/started', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tab_id, run_id, topic, pid: 0 }),
+          }).catch(() => { /* non-blocking */ })
+        })
+        .catch(() => { /* spawn failure — PTY unavailable */ })
+    }
+
+    const killTerminal = (tabId: string | undefined): void => {
+      const id = tabId ?? useRunnerStore.getState().activeRunnerTabId
+      if (!id) return
+      void window.pathly.terminal.kill(id).catch(() => { /* PTY may already be gone */ })
+      xtermRegistry.dispose(id)
+      useTerminalStore.getState().closeTab(id)
+    }
+
+    const connect = (): void => {
+      try {
+        es = new EventSource('http://127.0.0.1:8765/events/spawn')
+        es.onopen = () => { retry = 0 }
+        es.onmessage = (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data as string) as Record<string, unknown> & { type: string }
+            if (data.type === 'TERMINAL_SPAWN') {
+              openTerminal(data)
+            } else if (data.type === 'TERMINAL_KILL') {
+              killTerminal(data.tab_id as string | undefined)
+            } else if (data.type === 'TERMINAL_SIGNAL' && data.signal === 'term') {
+              killTerminal(data.tab_id as string | undefined)
+            }
+          } catch { /* ignore parse errors */ }
+        }
+        es.onerror = () => {
+          es?.close()
+          es = null
+          const delay = Math.min(3000 * Math.pow(2, retry), 30000)
+          retry += 1
+          reconnectTimeout = setTimeout(connect, delay)
+        }
+      } catch { /* EventSource not available — silently skip */ }
+    }
+
+    connect()
+    return () => {
+      if (reconnectTimeout !== null) clearTimeout(reconnectTimeout)
+      es?.close()
+    }
+  }, [])
 
   useEffect(() => {
     const unsub = window.pathly.terminal.onStageResult((tabId, data) => {
