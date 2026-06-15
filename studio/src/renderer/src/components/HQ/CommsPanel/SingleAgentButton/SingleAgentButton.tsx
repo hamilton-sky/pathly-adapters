@@ -80,7 +80,10 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   const agentOptions = agentCatalog.length ? agentCatalog.map((i) => i.name) : [...AGENTS]
   const skillOptions = skillCatalog.length ? skillCatalog.map((i) => i.name) : [...SKILLS]
 
-  const canSend = !running && message.trim().length > 0
+  // A run needs something to act on: a typed message, a skill (which encodes the
+  // task), or a system prompt (a directive). The agent/engine alone is just a
+  // role — not enough on its own. Any one of the three enables Send.
+  const canSend = !running && (message.trim().length > 0 || skill !== '' || sysName !== '')
 
   function send(): void {
     if (!canSend) return
@@ -141,11 +144,11 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
             </header>
 
             <div className={s.body}>
-              <label className={s.label} htmlFor="sa-message">Message</label>
+              <label className={s.label} htmlFor="sa-message">Message <span className={s.optional}>· optional if you pick a skill or system prompt</span></label>
               <textarea
                 id="sa-message"
                 className={s.textarea}
-                placeholder="What should the agent do? This is posted to the board and sent to the agent."
+                placeholder="What should the agent do? Posted to the board and sent to the agent. Optional if a skill or system prompt is set."
                 value={message}
                 onChange={(e) => setMessage(e.currentTarget.value)}
                 onKeyDown={(e) => {
@@ -217,7 +220,9 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
                 className={s.btnRun}
                 onClick={send}
                 disabled={!canSend}
-                title={running ? 'An agent is already running on this board' : undefined}
+                title={running
+                  ? 'An agent is already running on this board'
+                  : (!canSend ? 'Add a message, or pick a skill or system prompt' : undefined)}
               >
                 <Send size={12} /> Send to agent
               </button>

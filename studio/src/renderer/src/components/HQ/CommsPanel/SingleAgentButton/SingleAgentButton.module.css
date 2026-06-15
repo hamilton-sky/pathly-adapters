@@ -135,6 +135,14 @@
   letter-spacing: 0.04em;
 }
 
+.optional {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  opacity: 0.7;
+  font-weight: 400;
+}
+
 .textarea {
   width: 100%;
   min-height: 120px;
