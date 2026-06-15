@@ -164,6 +164,12 @@ comms_artifacts
   supersedes    TEXT FK → comms_artifacts.id  -- artifacts evolve
 ```
 
+The artifact's **board / scope** (global / project / feature id) are NOT stored on
+the row — they come from the owning message via `message_id` (which already has
+`board` + `scope`). The card shows them through that join; duplicating them on the
+artifact would risk drift. Index `message_id` for the per-task file-set lookup that
+the serial-DAG prompt builder (§B3.5b) does.
+
 **Step 1 — filtered view (uses current single-artifact columns):**
 - Per-board **Tickets ⇄ Artifacts** toggle. Search bar is context-aware
   (messages when Tickets, artifacts when Artifacts).
