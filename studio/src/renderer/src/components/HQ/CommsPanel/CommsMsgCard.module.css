@@ -34,9 +34,18 @@
 .msgStage[data-stage='DONE']      { color: var(--state-done); }
 
 .msgTime {
-  margin-left: auto;
   font-family: var(--font-family-mono);
   font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Ticket footer: stage + time, bottom-right of the card. */
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .msgDel {
@@ -260,6 +269,13 @@
 .msg[data-superseded] .msgCard {
   text-decoration: line-through;
   opacity: 0.55;
+}
+
+/* …but not the identity header, footer, or action icons — only the body text. */
+.msg[data-superseded] .cardHead,
+.msg[data-superseded] .cardFoot,
+.msg[data-superseded] .cardActions {
+  text-decoration: none;
 }
 
 /* Superseded banner inside the card body */

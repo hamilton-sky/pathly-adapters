@@ -29,23 +29,16 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
       data-msg={m.id}
       {...(m.supersededBy ? { 'data-superseded': '' } : {})}
     >
-      <div className={s.msgMeta}>
-        <Avatar from={m.from} />
-        <span className={s.msgAuthor}>{agent.label}</span>
-        {m.stage && (
-          <span className={s.msgStage} data-stage={m.stage}>{m.stage}</span>
-        )}
-        {m.ack && (
-          <span className={s.msgAck}>
-            <Check size={11} />acknowledged
-          </span>
-        )}
-        <span className={s.msgTime}>{m.time} ago</span>
-      </div>
-
       <div className={s.msgCard} data-type={m.type}>
         <div className={s.cardHead}>
+          <Avatar from={m.from} />
+          <span className={s.msgAuthor}>{agent.label}</span>
           <MessageTypeBadge type={m.type} />
+          {m.ack && (
+            <span className={s.msgAck}>
+              <Check size={11} />acknowledged
+            </span>
+          )}
           <span className={s.cardActions}>
             {onSupersede && !m.supersededBy && (
               <SupersedeMenu
@@ -68,6 +61,12 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
           </span>
         </div>
         <CardBody message={m} onAnswer={onAnswer} onResolve={onResolve} />
+        <div className={s.cardFoot}>
+          {m.stage && (
+            <span className={s.msgStage} data-stage={m.stage}>{m.stage}</span>
+          )}
+          <span className={s.msgTime}>{m.time} ago</span>
+        </div>
         {confirming && (
           <ConfirmModal
             title="Delete this message?"
