@@ -33,14 +33,16 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
 
   const boardKey = scope === 'feature' ? mainFeature : scope
 
-  // Start: post whatever's in the board input (if any) as the task, then run the
-  // single agent — it acts on that latest board message and replies on the board.
+  // Send to agent: the message comes from the modal (NOT the board input box).
+  // Post it to the board as a nudge so there's a record, then run the configured
+  // agent on it — passing the text as instructions so the agent gets it directly.
   const handleRunAgent = (cfg: {
-    agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string
+    agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; message?: string
   }): void => {
-    const t = composeText.trim()
-    if (t) { post(type, t); setComposeText('') }
-    runSingleAgent(cfg)
+    const { message, ...config } = cfg
+    const t = (message ?? '').trim()
+    if (t) post('nudge', t)
+    runSingleAgent({ ...config, instructions: t || undefined })
   }
   // Independent per-panel reads — only used for project/global panels.
   // Feature panel reads are authoritative from feature.scope.

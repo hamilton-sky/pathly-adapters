@@ -1,6 +1,6 @@
 import { useState, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Settings, Square, X } from 'lucide-react'
+import { Settings, Square, X, Send } from 'lucide-react'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useStore } from '../../../../store'
 import { AGENTS, SKILLS } from '../../../Monitor/ConfigurePhaseModal/configurePhaseModalData'
@@ -14,6 +14,8 @@ export interface SingleAgentConfig {
   interactive?: boolean
   /** Which CLI to spawn. */
   adapter?: string
+  /** The prompt typed in the modal — posted to the board and sent to the agent. */
+  message?: string
 }
 
 // Engines that can run a board agent (have a headless command on the backend).
@@ -25,14 +27,14 @@ const ENGINES: { value: string; label: string }[] = [
 interface Props {
   /** Board key: feature id, 'project', or 'global'. */
   boardKey: string
-  /** Post the board input (if any) then run the agent on it. Owned by the panel. */
+  /** Post the modal message to the board, then run the configured agent on it. */
   onRun: (cfg: SingleAgentConfig) => void
 }
 
 type RunState = 'idle' | 'running' | 'busy' | 'done'
 
 const RUN_HINT: Record<RunState, string> = {
-  idle: 'Start',
+  idle: 'Agent',
   running: 'Running…',
   busy: 'Board busy',
   done: 'Done',
@@ -48,10 +50,13 @@ const SYSTEM_PROMPTS: { name: string; prompt: string }[] = [
 ]
 
 /**
- * C2 — single-agent control: a connected [▶ Start │ ⚙ │ ⏹ Stop] on the board's
- * Reads row. The ⚙ modal is config only (Agent · Skill · System prompt · Mode);
- * the TASK is whatever the human types in the board message box — Start posts it
- * (via the panel's onRun) then runs the agent on it.
+ * Single-agent control on the board's Reads row: [⚙ Agent │ ⏹ Stop].
+ *
+ * The ⚙ button opens a compose dialog that holds BOTH the configuration
+ * (engine · agent · skill · system prompt · mode) and the message box. Clicking
+ * "Send to agent" posts the message to the board AND runs the configured agent
+ * on it. The board's own input box is unrelated — it just adds a board note and
+ * never triggers an agent.
  */
 export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
@@ -60,6 +65,7 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   const [skill, setSkill] = useState<string>('')
   const [sysName, setSysName] = useState<string>('')   // '' = none
   const [interactive, setInteractive] = useState(false)
+  const [message, setMessage] = useState<string>('')
 
   const stopBoard = useCommsStore((st) => st.stopBoard)
   const boardRunState = useCommsStore((st) => st.boardRunState)
@@ -74,10 +80,21 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   const agentOptions = agentCatalog.length ? agentCatalog.map((i) => i.name) : [...AGENTS]
   const skillOptions = skillCatalog.length ? skillCatalog.map((i) => i.name) : [...SKILLS]
 
-  function start(): void {
-    if (running) return
+  const canSend = !running && message.trim().length > 0
+
+  function send(): void {
+    if (!canSend) return
     const sys = SYSTEM_PROMPTS.find((p) => p.name === sysName)?.prompt
-    onRun({ adapter: engine, agent: agent || undefined, skill: skill || undefined, systemPrompt: sys, interactive })
+    onRun({
+      adapter: engine,
+      agent: agent || undefined,
+      skill: skill || undefined,
+      systemPrompt: sys,
+      interactive,
+      message: message.trim(),
+    })
+    setMessage('')
+    setOpen(false)
   }
 
   function backdrop(e: MouseEvent<HTMLDivElement>): void {
@@ -91,23 +108,13 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
           type="button"
           className={s.startBtn}
           data-state={runState !== 'idle' ? runState : undefined}
-          title="Post the board input and run one agent on it"
-          aria-label="Run one agent on this board"
-          disabled={running}
-          onClick={start}
-        >
-          <Play size={10} />
-          <span className={s.startLabel}>{RUN_HINT[runState]}</span>
-        </button>
-        <button
-          type="button"
-          className={s.gearBtn}
-          title="Configure the agent (agent · skill · system prompt · mode)"
-          aria-label="Configure the agent"
+          title="Configure and send a message to one agent"
+          aria-label="Configure and run one agent on this board"
           {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
           onClick={() => setOpen(true)}
         >
           <Settings size={11} />
+          <span className={s.startLabel}>{RUN_HINT[runState]}</span>
         </button>
         <button
           type="button"
@@ -123,10 +130,10 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
 
       {open && createPortal(
         <div className={s.backdrop} onClick={backdrop}>
-          <div className={s.modal} role="dialog" aria-modal="true" aria-label="Configure single agent">
+          <div className={s.modal} role="dialog" aria-modal="true" aria-label="Send a message to an agent">
             <header className={s.header}>
-              <Settings size={15} />
-              <span className={s.title}>Single agent</span>
+              <Settings size={15} className={s.headerIcon} />
+              <span className={s.title}>Send to an agent</span>
               <span className={s.spacer} />
               <button type="button" className={s.closeBtn} onClick={() => setOpen(false)} aria-label="Close">
                 <X size={14} />
@@ -134,6 +141,18 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
             </header>
 
             <div className={s.body}>
+              <label className={s.label} htmlFor="sa-message">Message</label>
+              <textarea
+                id="sa-message"
+                className={s.textarea}
+                placeholder="What should the agent do? This is posted to the board and sent to the agent."
+                value={message}
+                onChange={(e) => setMessage(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send() }
+                }}
+              />
+
               <label className={s.label} htmlFor="sa-engine">Engine</label>
               <select id="sa-engine" className={s.select} value={engine} onChange={(e) => setEngine(e.currentTarget.value)}>
                 {ENGINES.map((en) => <option key={en.value} value={en.value}>{en.label}</option>)}
@@ -186,20 +205,21 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
                   : 'One-shot: runs the prompt and exits when done.'}
               </p>
               <p className={s.modeHint}>
-                The task is what you type in the board message box. Start posts it, then runs the agent on it.
+                Sending posts your message to the board and runs the agent on it. The board’s own input box just adds a note — it doesn’t call an agent.
               </p>
             </div>
 
             <footer className={s.footer}>
               <span className={s.spacer} />
-              <button type="button" className={s.btnQuiet} onClick={() => setOpen(false)}>Done</button>
+              <button type="button" className={s.btnQuiet} onClick={() => setOpen(false)}>Cancel</button>
               <button
                 type="button"
                 className={s.btnRun}
-                onClick={() => { setOpen(false); start() }}
-                disabled={running}
+                onClick={send}
+                disabled={!canSend}
+                title={running ? 'An agent is already running on this board' : undefined}
               >
-                <Play size={12} /> Start
+                <Send size={12} /> Send to agent
               </button>
             </footer>
           </div>

@@ -65,7 +65,7 @@ export interface CommsState {
 
   // C2 — single-agent run state keyed by board (e.g. feature id, 'project', 'global')
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
-  runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string }) => void
+  runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string }) => void
   stopBoard: (key: string) => void
 }
 

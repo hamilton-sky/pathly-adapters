@@ -333,6 +333,8 @@ export interface RunBoardOpts {
   interactive?: boolean
   /** Which CLI to spawn: 'claude' | 'codex' | 'antigravity'. */
   adapter?: string
+  /** The agent's task — sent directly so it doesn't depend on board-post timing. */
+  instructions?: string
 }
 
 export async function apiRunBoard(
@@ -349,6 +351,7 @@ export async function apiRunBoard(
     if (opts.systemPrompt) body.system_prompt = opts.systemPrompt
     if (opts.interactive) body.interactive = true
     if (opts.adapter) body.adapter = opts.adapter
+    if (opts.instructions) body.instructions = opts.instructions
     const r = await apiFetch('/comms/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
