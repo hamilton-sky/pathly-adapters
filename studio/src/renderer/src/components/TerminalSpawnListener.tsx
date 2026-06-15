@@ -29,10 +29,13 @@ export function TerminalSpawnListener(): null {
       const topic = (data.topic as string | undefined) ?? ''   // from the event, NOT the active UI
       const adapter = data.adapter as string
       const label = (data.label as string | undefined) ?? adapter
-      const cwd = (data.cwd as string | undefined) ?? useRunnerStore.getState().projectRoot ?? ''
+      // Use || (not ??) so an empty-string cwd falls back to the project root — an
+      // empty cwd makes node-pty fail silently and the run times out.
+      const cwd = (data.cwd as string | undefined) || useRunnerStore.getState().projectRoot || ''
       const prompt = (data.prompt as string | undefined) ?? ''
       const isInteractive = !!(data.interactive as boolean | undefined)
       if (useTerminalStore.getState().tabs.some((t) => t.id === tab_id)) return   // idempotent — never double-open
+      if (!cwd) console.warn('[spawn] no working directory for', tab_id, '— PTY may fail to start')
       useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'])
       useTerminalStore.getState().openTab(tab_id)
       useTerminalStore.setState((st) => ({
@@ -49,9 +52,9 @@ export function TerminalSpawnListener(): null {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tab_id, run_id, topic, pid: 0 }),
-          }).catch(() => { /* non-blocking */ })
+          }).catch((err) => console.error('[spawn] /runner/terminal/started failed', err))
         })
-        .catch(() => { /* spawn failure — PTY unavailable */ })
+        .catch((err) => console.error('[spawn] PTY spawn failed for', tab_id, 'cwd=', cwd, err))
     }
 
     const killTerminal = (tabId: string | undefined): void => {

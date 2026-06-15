@@ -300,8 +300,10 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     if (isFeature) useProjectStore.getState().setActiveTopic(key)
     const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
     const params = scopeToParams(scope, key)
-    const projectRoot = isFeature ? undefined
-      : useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    // Always send the project root — it's the PTY's working directory. Sending
+    // undefined for feature boards meant the agent spawned with an empty cwd, which
+    // fails the PTY silently (no 'started' callback → terminal_spawn_timeout).
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
 
     apiRunBoard(params.board, params.scope, 'single-agent', { ...opts, projectRoot })
       .then((res) => {
