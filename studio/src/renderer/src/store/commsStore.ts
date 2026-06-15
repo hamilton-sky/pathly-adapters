@@ -239,13 +239,15 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   },
 
   deleteMessage: (key, messageId) => {
+    // Any board message can be removed (agent posts, status lines, read messages).
+    // Removes it from store state immediately and force soft-deletes server-side
+    // (recoverable from trash).
     set((s) => {
       const arr = s.boards[key] || []
-      const m = arr.find((x) => x.id === messageId)
-      if (!m || m.from !== 'you' || m.readByAgent) return s
+      if (!arr.some((x) => x.id === messageId)) return s
       return { boards: { ...s.boards, [key]: arr.filter((x) => x.id !== messageId) } }
     })
-    apiDelete(messageId).catch(() => { /* best-effort */ })
+    apiDelete(messageId, true).catch(() => { /* best-effort */ })
   },
 
   searchResults: null,

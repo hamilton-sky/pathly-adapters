@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Star, MessageSquare, Trash2 } from 'lucide-react'
 import type { BoardScope, Message } from '../../CommandCenter/types'
 import { AGENTS } from '../../CommandCenter/constants'
 import { CommsMsgCard } from './CommsMsgCard'
+import { ConfirmModal } from '../../shared/ConfirmModal/ConfirmModal'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import s from './CommsMsgList.module.css'
 
@@ -20,6 +21,9 @@ export interface CommsMsgListProps {
 
 // Pinned decisions tray + the message thread.
 export function CommsMsgList({ scope, messages, searchResults, searchTerm, flashId, onAnswer, onResolve, onDelete, onSupersede }: CommsMsgListProps) {
+  // Pinned-message delete confirmation (cards manage their own confirm state).
+  const [confirmPinId, setConfirmPinId] = useState<string | null>(null)
+
   // Search overlay — replaces the normal thread when active.
   if (searchResults) {
     return (
@@ -60,13 +64,13 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
                   <span className={s.pinScope}>{scope} scope</span>
                 </div>
               </div>
-              {m.from === 'you' && !m.readByAgent && onDelete && (
+              {onDelete && (
                 <button
                   type="button"
                   className={s.pinDel}
-                  title="Delete — not yet read by any agent"
+                  title="Remove from board"
                   aria-label="Delete message"
-                  onClick={() => onDelete(m.id)}
+                  onClick={() => setConfirmPinId(m.id)}
                 >
                   <Trash2 size={12} />
                 </button>
@@ -95,6 +99,15 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
             <p>No messages on this board yet.</p>
           </div>
         )}
+
+      {confirmPinId && (
+        <ConfirmModal
+          title="Remove this pinned message?"
+          message="It will be removed from the board and its memory."
+          onCancel={() => setConfirmPinId(null)}
+          onConfirm={() => { const id = confirmPinId; setConfirmPinId(null); onDelete?.(id) }}
+        />
+      )}
     </div>
   )
 }

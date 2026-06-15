@@ -21,7 +21,7 @@ export interface CommsMsgCardProps {
 
 export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSupersede, siblings }: CommsMsgCardProps) {
   const agent = AGENTS[m.from]
-  const canDelete = m.from === 'you' && !m.readByAgent && !!onDelete
+  const canDelete = !!onDelete   // every message can be removed from the board
   const [confirming, setConfirming] = useState(false)
   return (
     <div
@@ -45,7 +45,7 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
           <button
             type="button"
             className={s.msgDel}
-            title="Delete — not yet read by any agent"
+            title="Remove from board"
             aria-label="Delete message"
             onClick={() => setConfirming(true)}
           >

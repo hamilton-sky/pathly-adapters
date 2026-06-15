@@ -586,12 +586,17 @@ def reclaim_stale_claims(conn: sqlite3.Connection, board: str, scope: str) -> li
     return ids
 
 
-def soft_delete_message(conn: sqlite3.Connection, message_id: str) -> str:
-    """Retract a message by soft-deleting it — but only while no agent has read it.
+def soft_delete_message(conn: sqlite3.Connection, message_id: str, force: bool = False) -> str:
+    """Retract a message by soft-deleting it.
 
-    A human reading their own message (``read_by`` containing only ``human``/``you``)
-    does not lock it; any other reader does. Returns one of:
-    ``"deleted"`` · ``"locked"`` (already read by an agent) · ``"not_found"``.
+    By default a message is retractable only while no agent has read it (a human
+    reading their own message does not lock it; any other reader does). Pass
+    ``force=True`` to let the human remove ANY board message regardless of who has
+    read it — used by the board UI so every message has a delete option. The
+    delete is soft (``status='trashed'``), so it stays recoverable from trash.
+
+    Returns one of: ``"deleted"`` · ``"locked"`` (read-locked, force not set) ·
+    ``"not_found"``.
     """
     row = conn.execute(
         "SELECT read_by FROM comms_messages WHERE id=? AND deleted_at IS NULL",
@@ -603,7 +608,7 @@ def soft_delete_message(conn: sqlite3.Connection, message_id: str) -> str:
         read_by = json.loads(row["read_by"] or "[]")
     except (json.JSONDecodeError, TypeError):
         read_by = []
-    if any(reader not in ("human", "you") for reader in read_by):
+    if not force and any(reader not in ("human", "you") for reader in read_by):
         return "locked"
     with _get_write_lock(conn):
         conn.execute(

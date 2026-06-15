@@ -212,12 +212,12 @@ export async function apiToggleScope(
   }
 }
 
-export async function apiDelete(messageId: string): Promise<boolean> {
+export async function apiDelete(messageId: string, force = false): Promise<boolean> {
   try {
     const r = await apiFetch(`/comms/delete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message_id: messageId }),
+      body: JSON.stringify({ message_id: messageId, force }),
     })
     return r.ok
   } catch {

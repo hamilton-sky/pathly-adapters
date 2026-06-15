@@ -939,8 +939,12 @@ def comms_delete():
         if not isinstance(message_id, str) or not message_id.strip():
             return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
 
+        # force=True lets the human remove any board message (incl. agent posts and
+        # already-read messages). Still a soft delete — recoverable from trash.
+        force = bool(data.get("force", False))
+
         conn = _get_db()
-        result = _soft_delete(conn, message_id)
+        result = _soft_delete(conn, message_id, force=force)
         if result == "not_found":
             return jsonify({"ok": False, "error": "Message not found"}), 404
         if result == "locked":
