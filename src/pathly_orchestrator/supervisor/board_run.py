@@ -103,6 +103,8 @@ def start_board_run(
     project_root: str = "",
     model: str = "claude-sonnet-4-6",
     adapter: str = "claude",
+    agent: str = "",
+    skill: str = "",
     broadcast_fn=None,
     spawn_fn: Callable | None = None,
 ) -> dict:
@@ -151,6 +153,13 @@ def start_board_run(
     try:
         context = _build_context(board=board, scope=scope)
         prompt_parts: list[str] = []
+        header_bits: list[str] = []
+        if agent:
+            header_bits.append(f"Agent role: {agent}")
+        if skill:
+            header_bits.append(f"Skill: {skill}")
+        if header_bits:
+            prompt_parts.append(" · ".join(header_bits))
         if instructions:
             prompt_parts.append(instructions.strip())
         if context:

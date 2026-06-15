@@ -798,6 +798,8 @@ def comms_run():
         mode = data.get("mode", "single-agent")
         instructions = data.get("instructions", "") or ""
         project_root = data.get("project_root", "") or ""
+        agent = data.get("agent", "") or ""
+        skill = data.get("skill", "") or ""
 
         if not isinstance(scope, str) or not scope.strip():
             return jsonify({"error": "Field 'scope' is required"}), 400
@@ -810,6 +812,8 @@ def comms_run():
             mode,
             instructions,
             project_root=project_root,
+            agent=agent if isinstance(agent, str) else "",
+            skill=skill if isinstance(skill, str) else "",
         )
 
         if not result.get("ok"):

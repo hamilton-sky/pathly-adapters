@@ -308,6 +308,47 @@ export async function apiAttach(
   }
 }
 
+// ── C2: single-agent run ─────────────────────────────────────────────
+
+export interface RunBoardResult {
+  ok: true
+  run_id: string
+  mode: string
+  result: unknown
+}
+
+export interface RunBoardBusy {
+  ok: false
+  error: 'board_busy'
+}
+
+export type RunBoardResponse = RunBoardResult | RunBoardBusy
+
+export async function apiRunBoard(
+  board: string,
+  scope: string,
+  mode: string,
+  instructions: string,
+  projectRoot?: string,
+  agent?: string,
+  skill?: string,
+): Promise<RunBoardResponse | null> {
+  try {
+    const body: Record<string, unknown> = { board, scope, mode, instructions }
+    if (projectRoot !== undefined) body.project_root = projectRoot
+    if (agent) body.agent = agent
+    if (skill) body.skill = skill
+    const r = await apiFetch('/comms/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return await r.json() as RunBoardResponse
+  } catch {
+    return null
+  }
+}
+
 // ── Feature list + per-feature enrichment from STATE.json ─────────────
 
 interface FeatureState {

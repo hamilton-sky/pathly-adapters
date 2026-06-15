@@ -4,6 +4,7 @@ import type { BoardScope, MessageType } from '../../CommandCenter/types'
 import { CommsMsgList } from './CommsMsgList'
 import { CommsInput } from './CommsInput'
 import { SearchBar } from './SearchBar/SearchBar'
+import { SingleAgentButton } from './SingleAgentButton/SingleAgentButton'
 import { useCommsPanel } from './hooks/useCommsPanel'
 import s from './CommsPanel.module.css'
 
@@ -79,6 +80,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
               </button>
             )
           })}
+          <SingleAgentButton boardKey={scope === 'feature' ? mainFeature : scope} />
         </div>
         <CommsInput
           scope={scope}

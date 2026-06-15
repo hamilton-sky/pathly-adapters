@@ -17,9 +17,11 @@ import {
   apiSearch,
   apiSupersede,
   apiAttach,
+  apiRunBoard,
 } from './commsApi'
 import { listDirs } from '../services/pathlyApi'
 import { useRunnerStore } from './runnerStore'
+import { useProjectStore } from './projectStore'
 
 function isPending(m: Message): boolean {
   return (m.type === 'question' && m.status === 'pending')
@@ -59,6 +61,10 @@ export interface CommsState {
   clearSearch: () => void
   supersede: (key: string, oldId: string, newId: string) => void
   attach: (key: string, messageId: string, path: string, atype?: Message['atype']) => void
+
+  // C2 — single-agent run state keyed by board (e.g. feature id, 'project', 'global')
+  boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
+  runSingleAgent: (key: string, instructions: string, agent?: string, skill?: string) => void
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -273,5 +279,37 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       return { boards: { ...s.boards, [key]: arr } }
     })
     void apiAttach(messageId, path, atype)
+  },
+
+  boardRunState: {},
+
+  runSingleAgent: (key, instructions, agent, skill) => {
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
+
+    const isFeature = key !== 'project' && key !== 'global'
+    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
+    const params = scopeToParams(scope, key)
+    const projectRoot = isFeature ? undefined
+      : useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+
+    apiRunBoard(params.board, params.scope, 'single-agent', instructions, projectRoot, agent, skill)
+      .then((res) => {
+        if (res === null) {
+          set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+          return
+        }
+        if (!res.ok && res.error === 'board_busy') {
+          set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } }))
+          return
+        }
+        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'done' } }))
+        // Reset to idle after a short display window
+        window.setTimeout(() => {
+          set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+        }, 3000)
+      })
+      .catch(() => {
+        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+      })
   },
 }))
