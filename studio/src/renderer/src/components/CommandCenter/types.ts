@@ -25,7 +25,9 @@ export interface QuestionOption {
 export interface Message {
   id: string
   type: MessageType
-  from: AgentId
+  /** Raw agent role from the server — 'you' for the human, or any agent name
+   *  (builder, explorer, evaluator, system, …). Not limited to AgentId. */
+  from: string
   text: string
   stage?: Stage | null
   time: string

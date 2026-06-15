@@ -1,6 +1,5 @@
 import React from 'react'
-import type { AgentId } from '../../CommandCenter/types'
-import { AGENTS } from '../../CommandCenter/constants'
+import { agentMeta } from '../../CommandCenter/constants'
 import {
   SquareTerminal, Search, GitBranch, CircleCheck, History, Circle,
 } from 'lucide-react'
@@ -17,11 +16,11 @@ const ICONS: Record<string, React.ReactNode> = {
 
 // Agent avatar — gradient "YOU" chip for the human, a stage-coloured lucide
 // glyph for each agent role. Color comes from data-agent CSS selector; no inline style.
-export function Avatar({ from }: { from: AgentId }) {
+export function Avatar({ from }: { from: string }) {
   if (from === 'you') {
     return <span className={`${s.avatar} ${s.you}`}>YOU</span>
   }
-  const a = AGENTS[from]
+  const a = agentMeta(from)
   const icon = a.icon ? (ICONS[a.icon] ?? <Circle size={13} />) : <Circle size={13} />
   return (
     <span className={s.avatar} data-agent={from}>

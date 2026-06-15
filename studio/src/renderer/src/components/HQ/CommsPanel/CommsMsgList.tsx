@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Star, MessageSquare, Trash2 } from 'lucide-react'
 import type { BoardScope, Message } from '../../CommandCenter/types'
-import { AGENTS } from '../../CommandCenter/constants'
+import { agentMeta } from '../../CommandCenter/constants'
 import { CommsMsgCard } from './CommsMsgCard'
 import { ConfirmModal } from '../../shared/ConfirmModal/ConfirmModal'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
@@ -60,7 +60,7 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
               <div className={s.pinBody}>
                 <MarkdownRenderer content={m.text} className={s.pinTxt} />
                 <div className={s.pinMeta}>
-                  {AGENTS[m.from].label}{m.stage ? ` · ${m.stage}` : ''} · {m.time} ago ·{' '}
+                  {agentMeta(m.from).label}{m.stage ? ` · ${m.stage}` : ''} · {m.time} ago ·{' '}
                   <span className={s.pinScope}>{scope} scope</span>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
 import type { Message } from '../../CommandCenter/types'
-import { AGENTS } from '../../CommandCenter/constants'
+import { agentMeta } from '../../CommandCenter/constants'
 import { Avatar } from './Avatar'
 import { MessageTypeBadge } from './MessageTypeBadge'
 import { CardBody } from './CardBody'
@@ -20,7 +20,7 @@ export interface CommsMsgCardProps {
 }
 
 export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSupersede, siblings }: CommsMsgCardProps) {
-  const agent = AGENTS[m.from]
+  const agent = agentMeta(m.from)
   const canDelete = !!onDelete   // every message can be removed from the board
   const [confirming, setConfirming] = useState(false)
   return (
@@ -32,7 +32,8 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
       <div className={s.msgCard} data-type={m.type}>
         <div className={s.cardHead}>
           <Avatar from={m.from} />
-          <span className={s.msgAuthor}>{agent.label}</span>
+          {/* 'you' is already shown by the avatar chip — don't repeat the label. */}
+          {m.from !== 'you' && <span className={s.msgAuthor}>{agent.label}</span>}
           <MessageTypeBadge type={m.type} />
           {m.ack && (
             <span className={s.msgAck}>

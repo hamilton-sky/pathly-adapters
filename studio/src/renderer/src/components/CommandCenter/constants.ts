@@ -18,6 +18,16 @@ export const AGENTS: Record<AgentId, AgentMeta> = {
   retro:     { label: 'retro',     color: 'var(--state-retro)',     icon: 'history' },
 }
 
+// Identity for ANY agent role — not just the six known ones. Board runs can use
+// any agent (explorer, evaluator, …) or post lifecycle messages as 'system', so
+// unknown roles get a generic glyph and their real name as the label (rather than
+// being collapsed to 'builder').
+export function agentMeta(from: string): AgentMeta {
+  const known = (AGENTS as Record<string, AgentMeta>)[from]
+  if (known) return known
+  return { label: from, color: 'var(--text-muted)', icon: 'square-terminal' }
+}
+
 export const STAGE_COLOR: Record<Stage, string> = {
   PLANNING:  'var(--state-planning)',
   BUILDING:  'var(--state-building)',

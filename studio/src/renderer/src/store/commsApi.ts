@@ -3,8 +3,6 @@ import { readFile, listDir } from '../services/pathlyApi'
 
 import { apiFetch } from '../lib/config'
 
-const KNOWN_AGENT_IDS = new Set<string>(['you', 'builder', 'reviewer', 'architect', 'tester', 'retro'])
-
 // ── Relative-time helper ─────────────────────────────────────────────
 
 export function relativeTime(isoTs: string): string {
@@ -51,10 +49,11 @@ interface BackendOption {
   description?: string
 }
 
-function toAgentId(raw: string): AgentId {
-  if (raw === 'human') return 'you'
-  if (KNOWN_AGENT_IDS.has(raw)) return raw as AgentId
-  return 'builder'
+// Map the server's from_agent to the display identity. 'human' becomes 'you';
+// every other role is preserved as-is (explorer, evaluator, system, …) so the
+// card shows who actually posted instead of collapsing unknowns to 'builder'.
+function toAgentId(raw: string): string {
+  return raw === 'human' ? 'you' : raw
 }
 
 function parseJsonArray(raw: string | null): string[] {
