@@ -1,4 +1,4 @@
-import { PATHLY_API_BASE } from './config'
+import { PATHLY_API_BASE, apiFetch } from './config'
 import { getStudioSchema } from './studioSchema'
 import { StudioElement } from '../types/studio'
 
@@ -56,11 +56,11 @@ export async function buildPathlyContext(projectPath?: string, topic?: string): 
   try {
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 750)
-    let url = projectPath
-      ? `${PATHLY_API_BASE}/status?project_root=${encodeURIComponent(projectPath)}`
-      : `${PATHLY_API_BASE}/status`
-    if (topic) url += `&topic=${encodeURIComponent(topic)}`
-    const res = await fetch(url, { signal: controller.signal })
+    let path = projectPath
+      ? `/status?project_root=${encodeURIComponent(projectPath)}`
+      : `/status`
+    if (topic) path += `&topic=${encodeURIComponent(topic)}`
+    const res = await apiFetch(path, { signal: controller.signal })
     window.clearTimeout(timeout)
     const data = await res.json() as { current_state?: string; feature?: string; menu?: PathlyMenu | null }
     const value = {
