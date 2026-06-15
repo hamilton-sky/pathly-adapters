@@ -66,6 +66,8 @@ export interface CommsState {
   // C2 — single-agent run state keyed by board (e.g. feature id, 'project', 'global')
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
   runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string }) => void
+  /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
+  markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
 }
 
@@ -311,15 +313,25 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
           set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } }))
           return
         }
-        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'done' } }))
-        // Reset to idle after a short display window
-        window.setTimeout(() => {
-          set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
-        }, 3000)
+        // /comms/run returns 'started' immediately (the run is async). Stay 'running'
+        // so the control stays green and Stop is enabled while the agent CLI is open.
+        // The run clears when the board_run 'done'/'stopped' phase arrives over the
+        // comms SSE → markBoardRunPhase. (No auto-flip to done on the start ack.)
       })
       .catch(() => {
         set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
       })
+  },
+
+  markBoardRunPhase: (key, phase) => {
+    if (phase === 'running') {
+      set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
+    } else if (phase === 'done' || phase === 'stopped') {
+      set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'done' } }))
+      window.setTimeout(() => {
+        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+      }, 3000)
+    }
   },
 
   stopBoard: (key) => {

@@ -200,12 +200,22 @@ def start_board_run(
     if instructions:
         prompt_parts.append("## Task\n\n" + instructions.strip())
     # The board IS the conversation: the task is the latest human message; reply there.
+    # This run is headless — the terminal does not stream — so the agent must narrate
+    # its progress to the board or the human is blind. These POSTs are how the human
+    # follows along; they are not a user-facing skill.
+    _from = agent or "agent"
     prompt_parts.append(
         "## Working from the board\n\n"
         "Your task is the most recent message from the human on this board (shown in "
-        "the context below). Carry it out, then post your reply to the board "
-        "(POST http://127.0.0.1:8765/comms/post with type=status) so the human sees "
-        "the outcome without reading your terminal."
+        "the context below). Carry it out.\n\n"
+        "IMPORTANT — this run is headless, so the human CANNOT see your terminal. Keep "
+        "them in the loop by posting brief progress to the board as you go. POST to "
+        "http://127.0.0.1:8765/comms/post with a JSON body:\n"
+        f'  {{"feature": "{scope}", "from": "{_from}", "board": "{board}", "scope": "{scope}", '
+        '"type": "status", "text": "<one or two sentences>"}\n'
+        "Post (1) a short note when you START (what you are about to do), (2) a line at "
+        "each KEY STEP or finding, and (3) your final RESULT when done. Keep each post "
+        "to one or two sentences — the board is the human's window into this run."
     )
     if context:
         prompt_parts.append(context)

@@ -824,28 +824,33 @@ def comms_run():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
 
-        def _board_post(text: str) -> None:
+        def _board_post(text: str, phase: str | None = None) -> None:
             try:
                 conn = _get_db()
                 mid = _post_message(conn, board=board, scope=scope,
                                     from_agent="system", type="status", text=text)
-                _broadcast_comms(scope, {
+                payload = {
                     "type": "COMMS_UPDATE", "event": "board_run",
                     "message_id": mid, "board": board, "scope": scope,
-                })
+                }
+                # phase lets Studio keep the agent control 'running' until the run
+                # actually ends (vs. flipping to done on the async start ack).
+                if phase:
+                    payload["phase"] = phase
+                _broadcast_comms(scope, payload)
             except Exception:
                 logging.debug("board_run lifecycle post failed", exc_info=True)
 
         label = (agent if isinstance(agent, str) and agent else mode)
 
         def _on_start(_run_id: str) -> None:
-            _board_post(f"🤖 {label} started on this board…")
+            _board_post(f"🤖 {label} started on this board…", phase="running")
 
         def _on_done(_run_id: str, res) -> None:
             summary = ""
             if isinstance(res, dict):
                 summary = str(res.get("result") or res.get("summary") or "done")
-            _board_post(f"✅ {label} finished — {summary[:300]}")
+            _board_post(f"✅ {label} finished — {summary[:300]}", phase="done")
 
         result = start_board_run(
             board,
@@ -920,7 +925,8 @@ def comms_run_stop():
             mid = _post_message(conn, board=board, scope=scope, from_agent="system",
                                 type="status", text="⏹ run stopped by user")
             _broadcast_comms(scope, {"type": "COMMS_UPDATE", "event": "board_run",
-                                     "message_id": mid, "board": board, "scope": scope})
+                                     "message_id": mid, "board": board, "scope": scope,
+                                     "phase": "stopped"})
         except Exception:
             pass
 

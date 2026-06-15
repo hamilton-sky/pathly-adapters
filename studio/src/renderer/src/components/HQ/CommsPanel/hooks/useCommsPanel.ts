@@ -35,8 +35,13 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
       es = new EventSource(`${PATHLY_API_BASE}/events/comms?scope=${encodeURIComponent(key)}`)
       es.onmessage = (e: MessageEvent) => {
         try {
-          const data = JSON.parse(e.data as string) as { type: string }
+          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string }
           if (data.type === 'COMMS_UPDATE') {
+            // Drive the agent control's run state from the run lifecycle so it stays
+            // green (and Stop stays enabled) until the agent actually finishes.
+            if (data.event === 'board_run' && data.phase) {
+              useCommsStore.getState().markBoardRunPhase(key, data.phase)
+            }
             loadRef.current()
           }
         } catch { /* ignore parse errors */ }
