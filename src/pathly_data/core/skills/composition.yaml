@@ -97,6 +97,10 @@ skills:
       - completion-report
       - scout-choreography
 
+  planning/evaluate:
+    fragments:
+      - comms-post
+
   planning/plan:
     fragments:
       - completion-report
