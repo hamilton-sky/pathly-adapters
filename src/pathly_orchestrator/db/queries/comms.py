@@ -31,11 +31,14 @@ def post_message(
 ) -> str:
     """Insert a new message into comms_messages. Returns the new message_id."""
     message_id = str(uuid.uuid4())
+    # A task enters the DAG frontier as 'pending' so get_ready_tasks() (which
+    # filters task_status='pending') can pick it up. Non-task messages leave it NULL.
+    task_status = "pending" if type == "task" else None
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -50,6 +53,7 @@ def post_message(
                 conv,
                 _now(),
                 json.dumps(depends_on) if depends_on is not None else None,
+                task_status,
             ),
         )
         conn.commit()
