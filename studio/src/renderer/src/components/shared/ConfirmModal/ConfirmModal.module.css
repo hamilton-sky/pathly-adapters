@@ -1,0 +1,59 @@
+/* Generic confirmation modal — shared by the sidebar delete flow and the
+   comms board. Portal-rendered to document.body, so position:fixed escapes
+   any overflow:hidden scroll container. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.box {
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 22px 26px 18px;
+  min-width: 280px;
+  max-width: 360px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+.title {
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  margin: 0 0 6px;
+}
+.sub {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  margin: 0 0 18px;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.cancel {
+  background: var(--bg-surface0);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: 5px 14px;
+  transition: background 0.12s;
+}
+.cancel:hover { background: var(--bg-base); }
+.confirm {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+  color: var(--red);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  padding: 5px 14px;
+  transition: background 0.12s;
+}
+.confirm:hover { background: rgba(239, 68, 68, 0.28); }

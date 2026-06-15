@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
 import type { Message } from '../../CommandCenter/types'
 import { AGENTS } from '../../CommandCenter/constants'
@@ -6,6 +6,7 @@ import { Avatar } from './Avatar'
 import { MessageTypeBadge } from './MessageTypeBadge'
 import { CardBody } from './CardBody'
 import { SupersedeMenu } from './SupersedeMenu/SupersedeMenu'
+import { ConfirmModal } from '../../shared/ConfirmModal/ConfirmModal'
 import s from './CommsMsgCard.module.css'
 
 export interface CommsMsgCardProps {
@@ -21,6 +22,7 @@ export interface CommsMsgCardProps {
 export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSupersede, siblings }: CommsMsgCardProps) {
   const agent = AGENTS[m.from]
   const canDelete = m.from === 'you' && !m.readByAgent && !!onDelete
+  const [confirming, setConfirming] = useState(false)
   return (
     <div
       className={`${s.msg}${flash ? ` ${s.flash}` : ''}`}
@@ -45,10 +47,18 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
             className={s.msgDel}
             title="Delete — not yet read by any agent"
             aria-label="Delete message"
-            onClick={() => onDelete?.(m.id)}
+            onClick={() => setConfirming(true)}
           >
             <Trash2 size={12} />
           </button>
+        )}
+        {confirming && (
+          <ConfirmModal
+            title="Delete this message?"
+            message="It will be removed from the board and its memory."
+            onCancel={() => setConfirming(false)}
+            onConfirm={() => { setConfirming(false); onDelete?.(m.id) }}
+          />
         )}
         {onSupersede && !m.supersededBy && (
           <SupersedeMenu
