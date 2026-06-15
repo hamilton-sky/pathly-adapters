@@ -10,7 +10,7 @@ export interface AgentMeta {
 }
 
 export const AGENTS: Record<AgentId, AgentMeta> = {
-  you:       { label: 'you',       color: 'var(--brand-gradient)',  icon: null },
+  you:       { label: 'you',       color: 'var(--brand-gradient)',  icon: 'user' },
   builder:   { label: 'builder',   color: 'var(--state-building)',  icon: 'square-terminal' },
   reviewer:  { label: 'reviewer',  color: 'var(--state-reviewing)', icon: 'search' },
   architect: { label: 'architect', color: 'var(--state-planning)',  icon: 'git-branch' },

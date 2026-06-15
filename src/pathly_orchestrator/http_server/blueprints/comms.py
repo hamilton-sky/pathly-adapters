@@ -106,6 +106,10 @@ def comms_post():
         stage = data.get("stage")
         conv = data.get("conv")
         depends_on = data.get("depends_on")
+        # Artifact link — lets an agent post a type=artifact message that points at
+        # the file it created, so the board can open it in the editor.
+        artifact_path = (data.get("artifact_path") or None)
+        artifact_type = (data.get("artifact_type") or None)
 
         if options is not None and not isinstance(options, list):
             return jsonify({"error": "Field 'options' must be a list or null"}), 400
@@ -129,6 +133,8 @@ def comms_post():
             stage=stage,
             conv=conv,
             depends_on=depends_on,
+            artifact_path=artifact_path if isinstance(artifact_path, str) else None,
+            artifact_type=artifact_type if isinstance(artifact_type, str) else None,
         )
 
         if msg_type in _EMBED_TYPES:

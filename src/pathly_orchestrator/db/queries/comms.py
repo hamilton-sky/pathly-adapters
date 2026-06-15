@@ -28,6 +28,8 @@ def post_message(
     stage: str | None = None,
     conv: int | None = None,
     depends_on: list[str] | None = None,
+    artifact_path: str | None = None,
+    artifact_type: str | None = None,
 ) -> str:
     """Insert a new message into comms_messages. Returns the new message_id."""
     message_id = str(uuid.uuid4())
@@ -37,8 +39,8 @@ def post_message(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -54,6 +56,8 @@ def post_message(
                 _now(),
                 json.dumps(depends_on) if depends_on is not None else None,
                 task_status,
+                artifact_path,
+                artifact_type,
             ),
         )
         conn.commit()

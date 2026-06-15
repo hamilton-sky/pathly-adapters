@@ -215,7 +215,14 @@ def start_board_run(
         '"type": "status", "text": "<one or two sentences>"}\n'
         "Post (1) a short note when you START (what you are about to do), (2) a line at "
         "each KEY STEP or finding, and (3) your final RESULT when done. Keep each post "
-        "to one or two sentences — the board is the human's window into this run."
+        "to one or two sentences — the board is the human's window into this run.\n\n"
+        "If you CREATE A FILE (an artifact), post it as an artifact AND link the path so "
+        "the human can open it from the board — include artifact_path (and artifact_type "
+        'like "md" or "code"):\n'
+        f'  {{"feature": "{scope}", "from": "{_from}", "board": "{board}", "scope": "{scope}", '
+        '"type": "artifact", "text": "<one-line summary of the file>", '
+        '"artifact_path": "<relative or absolute path to the file you wrote>", '
+        '"artifact_type": "md"}'
     )
     if context:
         prompt_parts.append(context)
