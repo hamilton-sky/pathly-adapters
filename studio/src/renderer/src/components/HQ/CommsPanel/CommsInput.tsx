@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import { useRef } from 'react'
 import { Send, Paperclip } from 'lucide-react'
 import type { BoardScope, Message, MessageType } from '../../CommandCenter/types'
 import { TypePicker } from './TypePicker'
@@ -11,6 +11,9 @@ export interface CommsInputProps {
   onTypeChange: (t: MessageType) => void
   onSend: (text: string) => void
   onAttachPath?: (path: string, atype?: Message['atype']) => void
+  /** Compose text is owned by the panel so Start can post it before running. */
+  value: string
+  onChange: (v: string) => void
 }
 
 const PLACEHOLDER: Record<BoardScope, (f: string) => string> = {
@@ -31,16 +34,14 @@ function inferAtype(name: string): 'md' | 'code' | 'pdf' | 'image' | 'json' {
 // Compose box: textarea + toolbar (type-picker · attach · send).
 // TypePicker drop-up opens above the toolbar — composeBox must NOT use
 // overflow:hidden or it will clip the menu.
-export function CommsInput({ scope, mainFeature, type, onTypeChange, onSend, onAttachPath }: CommsInputProps) {
-  const [text, setText] = useState('')
+export function CommsInput({ scope, mainFeature, type, onTypeChange, onSend, onAttachPath, value, onChange }: CommsInputProps) {
   const ta = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const send = () => {
-    const t = text.trim()
+    const t = value.trim()
     if (!t) return
     onSend(t)
-    setText('')
     if (ta.current) ta.current.style.height = 'auto'
   }
 
@@ -56,8 +57,8 @@ export function CommsInput({ scope, mainFeature, type, onTypeChange, onSend, onA
         className={s.textarea}
         rows={1}
         placeholder={PLACEHOLDER[scope](mainFeature)}
-        value={text}
-        onChange={(e) => { setText(e.target.value); grow(e.target) }}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); grow(e.target) }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault()
@@ -89,7 +90,7 @@ export function CommsInput({ scope, mainFeature, type, onTypeChange, onSend, onA
         <button
           type="button"
           className={s.sendBtn}
-          disabled={!text.trim()}
+          disabled={!value.trim()}
           onClick={send}
           title="Send (Ctrl+Enter)"
           aria-label="Send message"

@@ -91,6 +91,12 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
     [store, key],
   )
 
+  const runSingleAgent = useCallback(
+    (opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean }) =>
+      store.runSingleAgent(key, opts),
+    [store, key],
+  )
+
   const searchResults = store.searchResults
   const searchTerm = store.searchTerm
   const runSearch = useCallback((q: string) => { void store.runSearch(key, q) }, [store, key])
@@ -98,7 +104,7 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
 
   return {
     messages, feature, pendingCount, flashId, post, answer, resolve,
-    toggleScope, del, supersede, attach,
+    toggleScope, del, supersede, attach, runSingleAgent,
     searchResults, searchTerm, runSearch, clearSearch,
   }
 }

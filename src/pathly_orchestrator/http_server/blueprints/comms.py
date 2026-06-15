@@ -800,6 +800,7 @@ def comms_run():
         project_root = data.get("project_root", "") or ""
         agent = data.get("agent", "") or ""
         skill = data.get("skill", "") or ""
+        system_prompt = data.get("system_prompt", "") or ""
         interactive = bool(data.get("interactive", False))
 
         if not isinstance(scope, str) or not scope.strip():
@@ -845,6 +846,7 @@ def comms_run():
             project_root=project_root,
             agent=agent if isinstance(agent, str) else "",
             skill=skill if isinstance(skill, str) else "",
+            system_prompt=system_prompt if isinstance(system_prompt, str) else "",
             interactive=interactive,
             broadcast_fn=_broadcast_runner,   # so TERMINAL_SPAWN reaches Studio
             on_start=_on_start,

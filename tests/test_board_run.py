@@ -367,3 +367,20 @@ def test_comms_run_stop_frees_lock(client):
 def test_comms_run_stop_missing_scope_returns_400(client):
     r = client.post("/comms/run/stop", json={"board": "feature"})
     assert r.status_code == 400
+
+
+def test_system_prompt_and_board_framing_in_prompt():
+    """system_prompt is injected as system instructions, and the prompt frames the task
+    as 'the latest board message' (the board is the conversation, not the argv)."""
+    from pathly_orchestrator.supervisor.board_run import start_board_run
+
+    cap: dict = {}
+    start_board_run(
+        "feature", "tpl", "single-agent", "",
+        system_prompt="You are a terse code reviewer.",
+        spawn_fn=lambda **k: cap.update(prompt=k["prompt"]) or {"result": "ok"},
+        block=True,
+    )
+    p = cap["prompt"]
+    assert "You are a terse code reviewer." in p          # system prompt → system instructions
+    assert "most recent message from the human on this board" in p  # board-as-task framing

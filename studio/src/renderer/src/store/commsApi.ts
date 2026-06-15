@@ -324,22 +324,28 @@ export interface RunBoardBusy {
 
 export type RunBoardResponse = RunBoardResult | RunBoardBusy
 
+export interface RunBoardOpts {
+  projectRoot?: string
+  agent?: string
+  skill?: string
+  /** Preset system-prompt text (the "System prompt" selector). */
+  systemPrompt?: string
+  interactive?: boolean
+}
+
 export async function apiRunBoard(
   board: string,
   scope: string,
   mode: string,
-  instructions: string,
-  projectRoot?: string,
-  agent?: string,
-  skill?: string,
-  interactive?: boolean,
+  opts: RunBoardOpts = {},
 ): Promise<RunBoardResponse | null> {
   try {
-    const body: Record<string, unknown> = { board, scope, mode, instructions }
-    if (projectRoot !== undefined) body.project_root = projectRoot
-    if (agent) body.agent = agent
-    if (skill) body.skill = skill
-    if (interactive) body.interactive = true
+    const body: Record<string, unknown> = { board, scope, mode }
+    if (opts.projectRoot !== undefined) body.project_root = opts.projectRoot
+    if (opts.agent) body.agent = opts.agent
+    if (opts.skill) body.skill = opts.skill
+    if (opts.systemPrompt) body.system_prompt = opts.systemPrompt
+    if (opts.interactive) body.interactive = true
     const r = await apiFetch('/comms/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

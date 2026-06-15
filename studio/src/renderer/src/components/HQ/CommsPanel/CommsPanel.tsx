@@ -26,9 +26,22 @@ const LOCAL_DEFAULTS: Record<BoardScope, Record<BoardScope, boolean>> = {
 export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeature: string }) {
   const {
     messages, feature, flashId, post, answer, resolve, toggleScope, del,
-    supersede, attach, searchResults, searchTerm, runSearch, clearSearch,
+    supersede, attach, runSingleAgent, searchResults, searchTerm, runSearch, clearSearch,
   } = useCommsPanel(scope, mainFeature)
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
+  const [composeText, setComposeText] = useState('')
+
+  const boardKey = scope === 'feature' ? mainFeature : scope
+
+  // Start: post whatever's in the board input (if any) as the task, then run the
+  // single agent — it acts on that latest board message and replies on the board.
+  const handleRunAgent = (cfg: {
+    agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean
+  }): void => {
+    const t = composeText.trim()
+    if (t) { post(type, t); setComposeText('') }
+    runSingleAgent(cfg)
+  }
   // Independent per-panel reads — only used for project/global panels.
   // Feature panel reads are authoritative from feature.scope.
   const [localReads, setLocalReads] = useState<Record<BoardScope, boolean>>(LOCAL_DEFAULTS[scope])
@@ -80,14 +93,16 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
               </button>
             )
           })}
-          <SingleAgentButton boardKey={scope === 'feature' ? mainFeature : scope} />
+          <SingleAgentButton boardKey={boardKey} onRun={handleRunAgent} />
         </div>
         <CommsInput
           scope={scope}
           mainFeature={mainFeature}
           type={type}
           onTypeChange={setType}
-          onSend={(text) => post(type, text)}
+          value={composeText}
+          onChange={setComposeText}
+          onSend={(text) => { post(type, text); setComposeText('') }}
           onAttachPath={(path, atype) => {
             const mine = [...messages].reverse().find((m) => m.from === 'you')
             if (mine) attach(mine.id, path, atype)

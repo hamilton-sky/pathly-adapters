@@ -65,7 +65,7 @@ export interface CommsState {
 
   // C2 — single-agent run state keyed by board (e.g. feature id, 'project', 'global')
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
-  runSingleAgent: (key: string, instructions: string, agent?: string, skill?: string, interactive?: boolean) => void
+  runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean }) => void
   stopBoard: (key: string) => void
 }
 
@@ -285,7 +285,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   boardRunState: {},
 
-  runSingleAgent: (key, instructions, agent, skill, interactive) => {
+  runSingleAgent: (key, opts) => {
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
 
     const isFeature = key !== 'project' && key !== 'global'
@@ -294,7 +294,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     const projectRoot = isFeature ? undefined
       : useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
 
-    apiRunBoard(params.board, params.scope, 'single-agent', instructions, projectRoot, agent, skill, interactive)
+    apiRunBoard(params.board, params.scope, 'single-agent', { ...opts, projectRoot })
       .then((res) => {
         if (res === null) {
           set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))

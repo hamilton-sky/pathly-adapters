@@ -131,6 +131,7 @@ def start_board_run(
     adapter: str = "claude",
     agent: str = "",
     skill: str = "",
+    system_prompt: str = "",
     interactive: bool = False,
     broadcast_fn=None,
     spawn_fn: Callable | None = None,
@@ -192,18 +193,22 @@ def start_board_run(
     skill_body = _compose_skill_body(skill, adapter)
     if skill_body:
         prompt_parts.append(skill_body)
+    if system_prompt:
+        prompt_parts.append("## System instructions\n\n" + system_prompt.strip())
     if agent:
         prompt_parts.append(f"You are acting as the **{agent}** agent for this board.")
     if instructions:
         prompt_parts.append("## Task\n\n" + instructions.strip())
+    # The board IS the conversation: the task is the latest human message; reply there.
+    prompt_parts.append(
+        "## Working from the board\n\n"
+        "Your task is the most recent message from the human on this board (shown in "
+        "the context below). Carry it out, then post your reply to the board "
+        "(POST http://127.0.0.1:8765/comms/post with type=status) so the human sees "
+        "the outcome without reading your terminal."
+    )
     if context:
         prompt_parts.append(context)
-    # Keep the human in the loop — the board must not go dark during the run.
-    prompt_parts.append(
-        "When you finish, post a short status summary of what you did to this board "
-        "(POST http://127.0.0.1:8765/comms/post with type=status) so the human can "
-        "see the outcome without reading your terminal."
-    )
     prompt = "\n\n".join(prompt_parts)
 
     effective_spawn = spawn_fn if spawn_fn is not None else _default_spawn

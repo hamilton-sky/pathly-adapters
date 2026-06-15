@@ -7,9 +7,18 @@ import { AGENTS, SKILLS } from '../../../Monitor/ConfigurePhaseModal/configurePh
 import { useAgentCatalog, useSkillCatalog } from '../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
 import s from './SingleAgentButton.module.css'
 
+export interface SingleAgentConfig {
+  agent?: string
+  skill?: string
+  systemPrompt?: string
+  interactive?: boolean
+}
+
 interface Props {
   /** Board key: feature id, 'project', or 'global'. */
   boardKey: string
+  /** Post the board input (if any) then run the agent on it. Owned by the panel. */
+  onRun: (cfg: SingleAgentConfig) => void
 }
 
 type RunState = 'idle' | 'running' | 'busy' | 'done'
@@ -21,47 +30,45 @@ const RUN_HINT: Record<RunState, string> = {
   done: 'Done',
 }
 
-const EMPTY_WARN = 'Add instructions, or pick an agent or skill'
+// Fixed starter system-prompt presets (user-editable presets are a follow-up).
+const SYSTEM_PROMPTS: { name: string; prompt: string }[] = [
+  { name: 'Summarizer', prompt: 'Summarize the request concisely. Be terse and factual.' },
+  { name: 'Code reviewer', prompt: 'Review the referenced code for bugs, security issues, and edge cases. Report findings only — do not edit files.' },
+  { name: 'Researcher', prompt: 'Research the topic, cite sources, and report what you found and what is uncertain.' },
+  { name: 'Explainer', prompt: 'Explain clearly and simply, with a short concrete example.' },
+  { name: 'Planner', prompt: 'Break the request into a short ordered list of concrete steps.' },
+]
 
 /**
- * C2 — single-agent control: a connected Start ▸ ⚙ segmented button above the
- * board input. Start spawns one agent on this board (POST /comms/run). Agent and
- * skill are both optional ("— none —"); Start with nothing set warns the user.
+ * C2 — single-agent control: a connected [▶ Start │ ⚙ │ ⏹ Stop] on the board's
+ * Reads row. The ⚙ modal is config only (Agent · Skill · System prompt · Mode);
+ * the TASK is whatever the human types in the board message box — Start posts it
+ * (via the panel's onRun) then runs the agent on it.
  */
-export function SingleAgentButton({ boardKey }: Props): JSX.Element {
+export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
-  const [agent, setAgent] = useState<string>('')   // '' = none
-  const [skill, setSkill] = useState<string>('')   // '' = none
-  const [instructions, setInstructions] = useState('')
+  const [agent, setAgent] = useState<string>('')
+  const [skill, setSkill] = useState<string>('')
+  const [sysName, setSysName] = useState<string>('')   // '' = none
   const [interactive, setInteractive] = useState(false)
-  const [warn, setWarn] = useState<string | null>(null)
 
-  const runSingleAgent = useCommsStore((st) => st.runSingleAgent)
   const stopBoard = useCommsStore((st) => st.stopBoard)
   const boardRunState = useCommsStore((st) => st.boardRunState)
   const runState: RunState = (boardRunState[boardKey] as RunState | undefined) ?? 'idle'
   const running = runState === 'running'
   const active = runState === 'running' || runState === 'busy'
 
-  // Full agent/skill lists from the real core/ dirs (falls back to the common
-  // quick-pick lists until the catalog has loaded).
+  // Full agent/skill lists from the real core/ dirs (fall back to common picks).
   const projectPath = useStore((st) => st.projectPath)
   const agentCatalog = useAgentCatalog(projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
   const agentOptions = agentCatalog.length ? agentCatalog.map((i) => i.name) : [...AGENTS]
   const skillOptions = skillCatalog.length ? skillCatalog.map((i) => i.name) : [...SKILLS]
 
-  /** Returns true if the run was started, false if blocked (running or empty). */
-  function start(): boolean {
-    if (running) return false
-    if (!instructions.trim() && !agent && !skill) {
-      setWarn(EMPTY_WARN)
-      window.setTimeout(() => setWarn(null), 3500)
-      return false
-    }
-    setWarn(null)
-    runSingleAgent(boardKey, instructions, agent || undefined, skill || undefined, interactive)
-    return true
+  function start(): void {
+    if (running) return
+    const sys = SYSTEM_PROMPTS.find((p) => p.name === sysName)?.prompt
+    onRun({ agent: agent || undefined, skill: skill || undefined, systemPrompt: sys, interactive })
   }
 
   function backdrop(e: MouseEvent<HTMLDivElement>): void {
@@ -75,10 +82,10 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
           type="button"
           className={s.startBtn}
           data-state={runState !== 'idle' ? runState : undefined}
-          title="Run one agent on this board"
+          title="Post the board input and run one agent on it"
           aria-label="Run one agent on this board"
           disabled={running}
-          onClick={() => { start() }}
+          onClick={start}
         >
           <Play size={10} />
           <span className={s.startLabel}>{RUN_HINT[runState]}</span>
@@ -86,8 +93,8 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
         <button
           type="button"
           className={s.gearBtn}
-          title="Configure the agent prompt"
-          aria-label="Configure the agent prompt"
+          title="Configure the agent (agent · skill · system prompt · mode)"
+          aria-label="Configure the agent"
           {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
           onClick={() => setOpen(true)}
         >
@@ -104,14 +111,13 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
           <Square size={9} />
         </button>
       </div>
-      {warn && <span className={s.warn} role="alert">{warn}</span>}
 
       {open && createPortal(
         <div className={s.backdrop} onClick={backdrop}>
           <div className={s.modal} role="dialog" aria-modal="true" aria-label="Configure single agent">
             <header className={s.header}>
               <Settings size={15} />
-              <span className={s.title}>Single agent — prompt</span>
+              <span className={s.title}>Single agent</span>
               <span className={s.spacer} />
               <button type="button" className={s.closeBtn} onClick={() => setOpen(false)} aria-label="Close">
                 <X size={14} />
@@ -119,26 +125,22 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
             </header>
 
             <div className={s.body}>
-              <label className={s.label} htmlFor="sa-agent">Agent (optional)</label>
-              <select
-                id="sa-agent"
-                className={s.select}
-                value={agent}
-                onChange={(e) => setAgent(e.currentTarget.value)}
-              >
+              <label className={s.label} htmlFor="sa-agent">Agent</label>
+              <select id="sa-agent" className={s.select} value={agent} onChange={(e) => setAgent(e.currentTarget.value)}>
                 <option value="">— none —</option>
                 {agentOptions.map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
 
-              <label className={s.label} htmlFor="sa-skill">Skill (optional)</label>
-              <select
-                id="sa-skill"
-                className={s.select}
-                value={skill}
-                onChange={(e) => setSkill(e.currentTarget.value)}
-              >
+              <label className={s.label} htmlFor="sa-skill">Skill</label>
+              <select id="sa-skill" className={s.select} value={skill} onChange={(e) => setSkill(e.currentTarget.value)}>
                 <option value="">— none —</option>
                 {skillOptions.map((sk) => <option key={sk} value={sk}>{sk}</option>)}
+              </select>
+
+              <label className={s.label} htmlFor="sa-sys">System prompt</label>
+              <select id="sa-sys" className={s.select} value={sysName} onChange={(e) => setSysName(e.currentTarget.value)}>
+                <option value="">— none —</option>
+                {SYSTEM_PROMPTS.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
               </select>
 
               <span className={s.label}>Mode</span>
@@ -169,16 +171,9 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
                   ? 'Opens a live session and types the prompt for you — stays open for follow-ups.'
                   : 'One-shot: runs the prompt and exits when done.'}
               </p>
-
-              <label className={s.label} htmlFor="sa-instr">System prompt / instructions</label>
-              <textarea
-                id="sa-instr"
-                className={s.textarea}
-                value={instructions}
-                onChange={(e) => setInstructions(e.currentTarget.value)}
-                placeholder="What should this agent do with the board's context?"
-              />
-              {warn && <span className={s.warn} role="alert">{warn}</span>}
+              <p className={s.modeHint}>
+                The task is what you type in the board message box. Start posts it, then runs the agent on it.
+              </p>
             </div>
 
             <footer className={s.footer}>
@@ -187,7 +182,7 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
               <button
                 type="button"
                 className={s.btnRun}
-                onClick={() => { if (start()) setOpen(false) }}
+                onClick={() => { setOpen(false); start() }}
                 disabled={running}
               >
                 <Play size={12} /> Start
