@@ -92,7 +92,7 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
   )
 
   const runSingleAgent = useCallback(
-    (opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean }) =>
+    (opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string }) =>
       store.runSingleAgent(key, opts),
     [store, key],
   )

@@ -36,7 +36,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // Start: post whatever's in the board input (if any) as the task, then run the
   // single agent — it acts on that latest board message and replies on the board.
   const handleRunAgent = (cfg: {
-    agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean
+    agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string
   }): void => {
     const t = composeText.trim()
     if (t) { post(type, t); setComposeText('') }

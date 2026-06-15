@@ -803,6 +803,15 @@ def comms_run():
         system_prompt = data.get("system_prompt", "") or ""
         interactive = bool(data.get("interactive", False))
 
+        # Engine (CLI) to spawn. Only adapters with a headless command can run a
+        # board agent; anything else falls back to claude. Each engine has its own
+        # default model so codex isn't handed a claude model string.
+        _DEFAULT_MODEL = {"claude": "claude-sonnet-4-6", "codex": "gpt-5.4"}
+        adapter = (data.get("adapter", "") or "claude").strip().lower()
+        if adapter not in _DEFAULT_MODEL:
+            adapter = "claude"
+        model = (data.get("model", "") or _DEFAULT_MODEL[adapter])
+
         if not isinstance(scope, str) or not scope.strip():
             return jsonify({"error": "Field 'scope' is required"}), 400
         if not isinstance(board, str) or board not in ("feature", "project", "global"):
@@ -844,6 +853,8 @@ def comms_run():
             mode,
             instructions,
             project_root=project_root,
+            adapter=adapter,
+            model=model,
             agent=agent if isinstance(agent, str) else "",
             skill=skill if isinstance(skill, str) else "",
             system_prompt=system_prompt if isinstance(system_prompt, str) else "",

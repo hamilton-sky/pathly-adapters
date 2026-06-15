@@ -12,7 +12,15 @@ export interface SingleAgentConfig {
   skill?: string
   systemPrompt?: string
   interactive?: boolean
+  /** Which CLI to spawn. */
+  adapter?: string
 }
+
+// Engines that can run a board agent (have a headless command on the backend).
+const ENGINES: { value: string; label: string }[] = [
+  { value: 'claude', label: 'Claude' },
+  { value: 'codex', label: 'Codex' },
+]
 
 interface Props {
   /** Board key: feature id, 'project', or 'global'. */
@@ -47,6 +55,7 @@ const SYSTEM_PROMPTS: { name: string; prompt: string }[] = [
  */
 export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
+  const [engine, setEngine] = useState<string>('claude')
   const [agent, setAgent] = useState<string>('')
   const [skill, setSkill] = useState<string>('')
   const [sysName, setSysName] = useState<string>('')   // '' = none
@@ -68,7 +77,7 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   function start(): void {
     if (running) return
     const sys = SYSTEM_PROMPTS.find((p) => p.name === sysName)?.prompt
-    onRun({ agent: agent || undefined, skill: skill || undefined, systemPrompt: sys, interactive })
+    onRun({ adapter: engine, agent: agent || undefined, skill: skill || undefined, systemPrompt: sys, interactive })
   }
 
   function backdrop(e: MouseEvent<HTMLDivElement>): void {
@@ -125,6 +134,11 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
             </header>
 
             <div className={s.body}>
+              <label className={s.label} htmlFor="sa-engine">Engine</label>
+              <select id="sa-engine" className={s.select} value={engine} onChange={(e) => setEngine(e.currentTarget.value)}>
+                {ENGINES.map((en) => <option key={en.value} value={en.value}>{en.label}</option>)}
+              </select>
+
               <label className={s.label} htmlFor="sa-agent">Agent</label>
               <select id="sa-agent" className={s.select} value={agent} onChange={(e) => setAgent(e.currentTarget.value)}>
                 <option value="">— none —</option>

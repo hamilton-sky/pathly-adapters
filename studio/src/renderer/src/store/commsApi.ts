@@ -331,6 +331,8 @@ export interface RunBoardOpts {
   /** Preset system-prompt text (the "System prompt" selector). */
   systemPrompt?: string
   interactive?: boolean
+  /** Which CLI to spawn: 'claude' | 'codex' | 'antigravity'. */
+  adapter?: string
 }
 
 export async function apiRunBoard(
@@ -346,6 +348,7 @@ export async function apiRunBoard(
     if (opts.skill) body.skill = opts.skill
     if (opts.systemPrompt) body.system_prompt = opts.systemPrompt
     if (opts.interactive) body.interactive = true
+    if (opts.adapter) body.adapter = opts.adapter
     const r = await apiFetch('/comms/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
