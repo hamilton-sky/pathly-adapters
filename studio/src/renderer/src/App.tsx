@@ -21,6 +21,7 @@ import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
 import { HQ } from './components/HQ'
 import { CommandCenter } from './components/CommandCenter/CommandCenter'
+import { TerminalSpawnListener } from './components/TerminalSpawnListener'
 import { Toaster } from './components/Toaster'
 import { themes } from './theme'
 import appStyles from './App.module.css'
@@ -277,6 +278,8 @@ function MainApp(): JSX.Element | null {
         )}
       </div>
       <PanelErrorBoundary><Terminal /></PanelErrorBoundary>
+      {/* App-level: opens/kills PTYs for any run, independent of the chat panel. */}
+      <TerminalSpawnListener />
     </div>
   )
 }
