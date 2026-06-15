@@ -95,6 +95,7 @@ def test_start_board_run_ok_and_lock_released(client):
         "feature", "f1", "single-agent",
         instructions="Analyse the board",
         spawn_fn=fake,
+        block=True,
     )
 
     assert result["ok"] is True
@@ -165,7 +166,7 @@ def test_start_board_run_lock_released_on_spawn_exception():
         raise RuntimeError("spawn failed")
 
     with pytest.raises(RuntimeError):
-        start_board_run("feature", "f1", "single-agent", spawn_fn=boom)
+        start_board_run("feature", "f1", "single-agent", spawn_fn=boom, block=True)
 
     assert not board_lock.is_locked("feature", "f1")
 
@@ -260,7 +261,7 @@ def test_default_spawn_calls_terminal_with_runnerstate(monkeypatch):
 
     out = board_run.start_board_run(
         "feature", "wire", "single-agent", "do X",
-        project_root="/tmp", spawn_fn=None,
+        project_root="/tmp", spawn_fn=None, block=True,
     )
     assert out["ok"] is True
     assert isinstance(captured["state"], RunnerState)
@@ -268,3 +269,47 @@ def test_default_spawn_calls_terminal_with_runnerstate(monkeypatch):
     assert captured["adapter"] == "claude"
     assert "do X" in captured["instructions"]
     assert board_lock.is_locked("feature", "wire") is False  # released
+
+
+def test_lifecycle_callbacks_fire_in_order():
+    """on_start fires before the spawn, on_done fires after with the result —
+    this is how the board shows 'started…' then 'done — summary' (not blind)."""
+    from pathly_orchestrator.supervisor.board_run import start_board_run
+
+    events: list = []
+    start_board_run(
+        "feature", "lc", "single-agent", "x",
+        spawn_fn=lambda **k: {"result": "did the thing"},
+        on_start=lambda rid: events.append(("start", rid)),
+        on_done=lambda rid, res: events.append(("done", res.get("result"))),
+        block=True,
+    )
+    assert [e[0] for e in events] == ["start", "done"]
+    assert events[1][1] == "did the thing"
+    assert not board_lock.is_locked("feature", "lc")
+
+
+def test_async_run_returns_started_immediately():
+    """Without block=True the run is async: returns status='started' at once and
+    holds the lock until the background spawn completes."""
+    from pathly_orchestrator.supervisor.board_run import start_board_run
+
+    release = threading.Event()
+    started = threading.Event()
+
+    def slow_spawn(**k):
+        started.set()
+        release.wait(timeout=5)
+        return {"result": "ok"}
+
+    out = start_board_run("feature", "async1", "single-agent", "x", spawn_fn=slow_spawn)
+    assert out["ok"] is True and out.get("status") == "started"
+    assert started.wait(timeout=5)               # background thread is running
+    assert board_lock.is_locked("feature", "async1")  # still held mid-run
+    release.set()
+    # lock frees once the background thread finishes
+    for _ in range(50):
+        if not board_lock.is_locked("feature", "async1"):
+            break
+        import time as _t; _t.sleep(0.05)
+    assert not board_lock.is_locked("feature", "async1")

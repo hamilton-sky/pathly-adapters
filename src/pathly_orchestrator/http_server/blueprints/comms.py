@@ -806,6 +806,36 @@ def comms_run():
         if not isinstance(board, str) or board not in ("feature", "project", "global"):
             board = "feature"
 
+        # Lifecycle posts so the human is never blind: a "started" message when the
+        # run begins and a "done" summary when it ends, both streamed live to the
+        # board via _broadcast_comms. Defined here (http layer) and injected into
+        # board_run so the supervisor never imports http_server.
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+
+        def _board_post(text: str) -> None:
+            try:
+                conn = _get_db()
+                mid = _post_message(conn, board=board, scope=scope,
+                                    from_agent="system", type="status", text=text)
+                _broadcast_comms(scope, {
+                    "type": "COMMS_UPDATE", "event": "board_run",
+                    "message_id": mid, "board": board, "scope": scope,
+                })
+            except Exception:
+                logging.debug("board_run lifecycle post failed", exc_info=True)
+
+        label = (agent if isinstance(agent, str) and agent else mode)
+
+        def _on_start(_run_id: str) -> None:
+            _board_post(f"🤖 {label} started on this board…")
+
+        def _on_done(_run_id: str, res) -> None:
+            summary = ""
+            if isinstance(res, dict):
+                summary = str(res.get("result") or res.get("summary") or "done")
+            _board_post(f"✅ {label} finished — {summary[:300]}")
+
         result = start_board_run(
             board,
             scope,
@@ -814,6 +844,8 @@ def comms_run():
             project_root=project_root,
             agent=agent if isinstance(agent, str) else "",
             skill=skill if isinstance(skill, str) else "",
+            on_start=_on_start,
+            on_done=_on_done,
         )
 
         if not result.get("ok"):

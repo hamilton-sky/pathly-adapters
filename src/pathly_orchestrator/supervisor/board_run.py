@@ -6,8 +6,9 @@ so tests can pass a fake without touching the real PTY machinery.
 """
 from __future__ import annotations
 
+import threading
 import uuid
-from typing import Callable
+from typing import Callable, Optional
 
 
 def _format_board_info(
@@ -94,6 +95,27 @@ def _default_spawn(
     return _run_stage_via_terminal(state, prompt, adapter, model, run_id, broadcast_fn)
 
 
+def _compose_skill_body(skill: str, adapter: str) -> str:
+    """Compose the chosen skill into its full prompt body (runner-mode delivery —
+    assembled in Python and injected via argv; the CLI reads nothing from disk).
+    Returns '' on any failure so a board run is never blocked by a bad skill name."""
+    if not skill:
+        return ""
+    try:
+        from pathly_orchestrator.skills.compose import compose_skill
+        return compose_skill(skill, adapter or "claude")
+    except Exception:
+        return ""
+
+
+def _safe_call(fn: Callable, *args) -> None:
+    """Invoke a lifecycle callback best-effort; a bad callback never breaks a run."""
+    try:
+        fn(*args)
+    except Exception:
+        pass
+
+
 def start_board_run(
     board: str,
     scope: str,
@@ -107,6 +129,9 @@ def start_board_run(
     skill: str = "",
     broadcast_fn=None,
     spawn_fn: Callable | None = None,
+    on_start: Optional[Callable] = None,
+    on_done: Optional[Callable] = None,
+    block: bool = False,
 ) -> dict:
     """Acquire the board lock and spawn a single-agent run.
 
@@ -143,6 +168,7 @@ def start_board_run(
 
     run_id = str(uuid.uuid4())
 
+    # Lock is acquired synchronously so the caller can answer 409 immediately.
     if not board_lock.acquire(board, scope, run_id):
         return {
             "ok": False,
@@ -150,39 +176,65 @@ def start_board_run(
             "holder": board_lock.holder(board, scope),
         }
 
-    try:
-        context = _build_context(board=board, scope=scope)
-        prompt_parts: list[str] = []
-        header_bits: list[str] = []
-        if agent:
-            header_bits.append(f"Agent role: {agent}")
-        if skill:
-            header_bits.append(f"Skill: {skill}")
-        if header_bits:
-            prompt_parts.append(" · ".join(header_bits))
-        if instructions:
-            prompt_parts.append(instructions.strip())
-        if context:
-            prompt_parts.append(context)
-        prompt = "\n\n".join(prompt_parts)
+    # Evaluator mode defaults to the evaluator agent + evaluate skill (E1/E2).
+    if mode == "evaluator":
+        agent = agent or "evaluator"
+        skill = skill or "planning/evaluate"
 
-        effective_spawn = spawn_fn if spawn_fn is not None else _default_spawn
+    context = _build_context(board=board, scope=scope)
+    prompt_parts: list[str] = []
+    # The composed skill body is the agent's behavior contract for this run.
+    skill_body = _compose_skill_body(skill, adapter)
+    if skill_body:
+        prompt_parts.append(skill_body)
+    if agent:
+        prompt_parts.append(f"You are acting as the **{agent}** agent for this board.")
+    if instructions:
+        prompt_parts.append("## Task\n\n" + instructions.strip())
+    if context:
+        prompt_parts.append(context)
+    # Keep the human in the loop — the board must not go dark during the run.
+    prompt_parts.append(
+        "When you finish, post a short status summary of what you did to this board "
+        "(POST http://127.0.0.1:8765/comms/post with type=status) so the human can "
+        "see the outcome without reading your terminal."
+    )
+    prompt = "\n\n".join(prompt_parts)
 
-        result = effective_spawn(
-            board=board,
-            scope=scope,
-            mode=mode,
-            prompt=prompt,
-            run_id=run_id,
-            project_root=project_root,
-            model=model,
-            adapter=adapter,
-            broadcast_fn=broadcast_fn,
-        )
+    effective_spawn = spawn_fn if spawn_fn is not None else _default_spawn
 
+    def _work() -> dict:
+        # on_start / on_done let the caller (HTTP layer) post lifecycle messages to
+        # the board without board_run importing http_server (layer rule).
+        try:
+            if on_start is not None:
+                _safe_call(on_start, run_id)
+            result = effective_spawn(
+                board=board,
+                scope=scope,
+                mode=mode,
+                prompt=prompt,
+                run_id=run_id,
+                project_root=project_root,
+                model=model,
+                adapter=adapter,
+                broadcast_fn=broadcast_fn,
+            )
+            if on_done is not None:
+                _safe_call(on_done, run_id, result)
+            return result if isinstance(result, dict) else {"result": result}
+        finally:
+            board_lock.release(board, scope, run_id)
+
+    if block:
+        # Synchronous path — used by tests so they can assert on the result.
+        result = _work()
         return {"ok": True, "run_id": run_id, "mode": mode, "result": result}
-    finally:
-        board_lock.release(board, scope, run_id)
+
+    # Async path (production): spawn the agent in the background and return at once
+    # so the Start button never hangs; progress streams onto the board.
+    threading.Thread(target=_work, daemon=True, name=f"board-run-{run_id[:8]}").start()
+    return {"ok": True, "run_id": run_id, "mode": mode, "status": "started"}
 
 
 def _build_context(*, board: str, scope: str) -> str:
