@@ -332,12 +332,14 @@ export async function apiRunBoard(
   projectRoot?: string,
   agent?: string,
   skill?: string,
+  interactive?: boolean,
 ): Promise<RunBoardResponse | null> {
   try {
     const body: Record<string, unknown> = { board, scope, mode, instructions }
     if (projectRoot !== undefined) body.project_root = projectRoot
     if (agent) body.agent = agent
     if (skill) body.skill = skill
+    if (interactive) body.interactive = true
     const r = await apiFetch('/comms/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -346,6 +348,20 @@ export async function apiRunBoard(
     return await r.json() as RunBoardResponse
   } catch {
     return null
+  }
+}
+
+/** Stop the agent currently running on a board. */
+export async function apiStopBoard(board: string, scope: string): Promise<boolean> {
+  try {
+    const r = await apiFetch('/comms/run/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board, scope }),
+    })
+    return r.ok
+  } catch {
+    return false
   }
 }
 

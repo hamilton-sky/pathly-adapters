@@ -5,7 +5,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from ..sse import _broadcast_comms
+from ..sse import _broadcast_comms, _broadcast_runner
 
 bp = Blueprint("comms", __name__)
 
@@ -800,6 +800,7 @@ def comms_run():
         project_root = data.get("project_root", "") or ""
         agent = data.get("agent", "") or ""
         skill = data.get("skill", "") or ""
+        interactive = bool(data.get("interactive", False))
 
         if not isinstance(scope, str) or not scope.strip():
             return jsonify({"error": "Field 'scope' is required"}), 400
@@ -844,6 +845,8 @@ def comms_run():
             project_root=project_root,
             agent=agent if isinstance(agent, str) else "",
             skill=skill if isinstance(skill, str) else "",
+            interactive=interactive,
+            broadcast_fn=_broadcast_runner,   # so TERMINAL_SPAWN reaches Studio
             on_start=_on_start,
             on_done=_on_done,
         )
@@ -854,6 +857,63 @@ def comms_run():
         return jsonify(result), 200
     except Exception as exc:
         logging.exception("comms_run error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/run/stop", methods=["POST"])
+def comms_run_stop():
+    """Stop the agent currently running on a board.
+
+    Required body: {board, scope}. Kills the agent's PTY (TERMINAL_KILL), unblocks
+    the waiting run so its lock is freed, releases the board lock, and posts a
+    'stopped' status. Idempotent: stopped=false when nothing is running.
+    """
+    try:
+        from pathly_orchestrator.supervisor import board_lock, get_run
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+
+        data = request.get_json() or {}
+        board = data.get("board", "feature")
+        scope = data.get("scope")
+        if not isinstance(scope, str) or not scope.strip():
+            return jsonify({"error": "Field 'scope' is required"}), 400
+        if not isinstance(board, str) or board not in ("feature", "project", "global"):
+            board = "feature"
+
+        run_id = board_lock.holder(board, scope)
+        if not run_id:
+            return jsonify({"ok": True, "stopped": False, "reason": "not_running"}), 200
+
+        # 1. Kill the visible PTY tab in Studio.
+        tab_id = f"runner-{run_id[-10:]}"
+        try:
+            _broadcast_runner(scope, {"type": "TERMINAL_KILL", "tab_id": tab_id, "run_id": run_id})
+        except Exception:
+            pass
+        # 2. Unblock the waiting run (its finally then releases the lock).
+        try:
+            run = get_run(run_id)
+            if run is not None:
+                run.mark_pty_result({"exit_code": 0, "result": {"result": "stopped by user"}})
+        except Exception:
+            pass
+        # 3. Belt-and-suspenders — free the board lock immediately.
+        board_lock.release(board, scope, run_id)
+
+        # 4. Tell the board it was stopped (streamed live).
+        try:
+            conn = _get_db()
+            mid = _post_message(conn, board=board, scope=scope, from_agent="system",
+                                type="status", text="⏹ run stopped by user")
+            _broadcast_comms(scope, {"type": "COMMS_UPDATE", "event": "board_run",
+                                     "message_id": mid, "board": board, "scope": scope})
+        except Exception:
+            pass
+
+        return jsonify({"ok": True, "stopped": True, "run_id": run_id}), 200
+    except Exception as exc:
+        logging.exception("comms_run_stop error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

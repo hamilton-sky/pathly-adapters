@@ -313,3 +313,57 @@ def test_async_run_returns_started_immediately():
             break
         import time as _t; _t.sleep(0.05)
     assert not board_lock.is_locked("feature", "async1")
+
+
+def test_interactive_flag_flows_to_spawn():
+    """interactive=True reaches the spawn (which selects the REPL + inject path)."""
+    from pathly_orchestrator.supervisor.board_run import start_board_run
+
+    cap: dict = {}
+    start_board_run(
+        "feature", "ix", "single-agent", "x",
+        spawn_fn=lambda **k: cap.update(k) or {"result": "ok"},
+        interactive=True, block=True,
+    )
+    assert cap.get("interactive") is True
+
+
+def test_default_spawn_interactive_sets_runnerstate(monkeypatch):
+    """_default_spawn(interactive=True) builds a RunnerState with interactive=True,
+    so terminal.py uses resolve_interactive_argv (bare REPL) + the prompt inject."""
+    import pathly_orchestrator.supervisor.terminal as _term
+    from pathly_orchestrator.supervisor import board_run
+    from pathly_orchestrator.supervisor.state import RunnerState
+
+    cap: dict = {}
+    monkeypatch.setattr(
+        _term, "_run_stage_via_terminal",
+        lambda state, *a, **k: cap.update(state=state) or {"result": "ok"},
+    )
+    board_run.start_board_run(
+        "feature", "ix2", "single-agent", "x",
+        project_root="/tmp", spawn_fn=None, interactive=True, block=True,
+    )
+    assert isinstance(cap["state"], RunnerState)
+    assert cap["state"].interactive is True
+
+
+def test_comms_run_stop_frees_lock(client):
+    """POST /comms/run/stop releases the board lock and reports stopped=true;
+    stopping an idle board is idempotent (stopped=false)."""
+    board_lock.acquire("feature", "stopme", "rid-1")
+    assert board_lock.is_locked("feature", "stopme")
+
+    r = client.post("/comms/run/stop", json={"board": "feature", "scope": "stopme"})
+    assert r.status_code == 200
+    body = json.loads(r.data)
+    assert body["ok"] is True and body["stopped"] is True
+    assert not board_lock.is_locked("feature", "stopme")
+
+    r2 = client.post("/comms/run/stop", json={"board": "feature", "scope": "stopme"})
+    assert json.loads(r2.data)["stopped"] is False
+
+
+def test_comms_run_stop_missing_scope_returns_400(client):
+    r = client.post("/comms/run/stop", json={"board": "feature"})
+    assert r.status_code == 400

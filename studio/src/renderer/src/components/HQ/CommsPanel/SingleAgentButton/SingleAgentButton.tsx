@@ -1,6 +1,6 @@
 import { useState, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Settings, X } from 'lucide-react'
+import { Play, Settings, Square, X } from 'lucide-react'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useStore } from '../../../../store'
 import { AGENTS, SKILLS } from '../../../Monitor/ConfigurePhaseModal/configurePhaseModalData'
@@ -33,12 +33,15 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
   const [agent, setAgent] = useState<string>('')   // '' = none
   const [skill, setSkill] = useState<string>('')   // '' = none
   const [instructions, setInstructions] = useState('')
+  const [interactive, setInteractive] = useState(false)
   const [warn, setWarn] = useState<string | null>(null)
 
   const runSingleAgent = useCommsStore((st) => st.runSingleAgent)
+  const stopBoard = useCommsStore((st) => st.stopBoard)
   const boardRunState = useCommsStore((st) => st.boardRunState)
   const runState: RunState = (boardRunState[boardKey] as RunState | undefined) ?? 'idle'
   const running = runState === 'running'
+  const active = runState === 'running' || runState === 'busy'
 
   // Full agent/skill lists from the real core/ dirs (falls back to the common
   // quick-pick lists until the catalog has loaded).
@@ -57,7 +60,7 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
       return false
     }
     setWarn(null)
-    runSingleAgent(boardKey, instructions, agent || undefined, skill || undefined)
+    runSingleAgent(boardKey, instructions, agent || undefined, skill || undefined, interactive)
     return true
   }
 
@@ -89,6 +92,16 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
           onClick={() => setOpen(true)}
         >
           <Settings size={11} />
+        </button>
+        <button
+          type="button"
+          className={s.stopBtn}
+          title="Stop the running agent"
+          aria-label="Stop the running agent"
+          disabled={!active}
+          onClick={() => stopBoard(boardKey)}
+        >
+          <Square size={9} />
         </button>
       </div>
       {warn && <span className={s.warn} role="alert">{warn}</span>}
@@ -127,6 +140,35 @@ export function SingleAgentButton({ boardKey }: Props): JSX.Element {
                 <option value="">— none —</option>
                 {skillOptions.map((sk) => <option key={sk} value={sk}>{sk}</option>)}
               </select>
+
+              <span className={s.label}>Mode</span>
+              <div className={s.modeRow} role="radiogroup" aria-label="Run mode">
+                <button
+                  type="button"
+                  className={s.modeBtn}
+                  {...(!interactive ? { 'data-on': '' } : {})}
+                  {...(!interactive ? { 'aria-checked': 'true' } : { 'aria-checked': 'false' })}
+                  role="radio"
+                  onClick={() => setInteractive(false)}
+                >
+                  Headless
+                </button>
+                <button
+                  type="button"
+                  className={s.modeBtn}
+                  {...(interactive ? { 'data-on': '' } : {})}
+                  {...(interactive ? { 'aria-checked': 'true' } : { 'aria-checked': 'false' })}
+                  role="radio"
+                  onClick={() => setInteractive(true)}
+                >
+                  Interactive
+                </button>
+              </div>
+              <p className={s.modeHint}>
+                {interactive
+                  ? 'Opens a live session and types the prompt for you — stays open for follow-ups.'
+                  : 'One-shot: runs the prompt and exits when done.'}
+              </p>
 
               <label className={s.label} htmlFor="sa-instr">System prompt / instructions</label>
               <textarea

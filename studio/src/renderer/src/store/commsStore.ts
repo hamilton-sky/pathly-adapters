@@ -18,6 +18,7 @@ import {
   apiSupersede,
   apiAttach,
   apiRunBoard,
+  apiStopBoard,
 } from './commsApi'
 import { listDirs } from '../services/pathlyApi'
 import { useRunnerStore } from './runnerStore'
@@ -64,7 +65,8 @@ export interface CommsState {
 
   // C2 — single-agent run state keyed by board (e.g. feature id, 'project', 'global')
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
-  runSingleAgent: (key: string, instructions: string, agent?: string, skill?: string) => void
+  runSingleAgent: (key: string, instructions: string, agent?: string, skill?: string, interactive?: boolean) => void
+  stopBoard: (key: string) => void
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -283,7 +285,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   boardRunState: {},
 
-  runSingleAgent: (key, instructions, agent, skill) => {
+  runSingleAgent: (key, instructions, agent, skill, interactive) => {
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
 
     const isFeature = key !== 'project' && key !== 'global'
@@ -292,7 +294,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     const projectRoot = isFeature ? undefined
       : useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
 
-    apiRunBoard(params.board, params.scope, 'single-agent', instructions, projectRoot, agent, skill)
+    apiRunBoard(params.board, params.scope, 'single-agent', instructions, projectRoot, agent, skill, interactive)
       .then((res) => {
         if (res === null) {
           set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
@@ -311,5 +313,13 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       .catch(() => {
         set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
       })
+  },
+
+  stopBoard: (key) => {
+    const isFeature = key !== 'project' && key !== 'global'
+    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
+    const params = scopeToParams(scope, key)
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+    void apiStopBoard(params.board, params.scope)
   },
 }))

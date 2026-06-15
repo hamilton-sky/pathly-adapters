@@ -68,6 +68,7 @@ def _default_spawn(
     model: str,
     adapter: str,
     broadcast_fn=None,
+    interactive: bool = False,
 ) -> dict:
     """Default spawn_fn: thin wrapper around supervisor.terminal._run_stage_via_terminal.
 
@@ -90,8 +91,11 @@ def _default_spawn(
         run_id=run_id,
         current_state=(mode or "board-run"),
         current_adapter=adapter,
-        interactive=False,
+        interactive=interactive,
     )
+    # Interactive: spawn the bare REPL and let terminal.ts inject the prompt once the
+    # '> ' readline prompt is ready (it stays open for further instructions).
+    # Headless: the prompt is delivered via -p argv and the agent exits when done.
     return _run_stage_via_terminal(state, prompt, adapter, model, run_id, broadcast_fn)
 
 
@@ -127,6 +131,7 @@ def start_board_run(
     adapter: str = "claude",
     agent: str = "",
     skill: str = "",
+    interactive: bool = False,
     broadcast_fn=None,
     spawn_fn: Callable | None = None,
     on_start: Optional[Callable] = None,
@@ -219,6 +224,7 @@ def start_board_run(
                 model=model,
                 adapter=adapter,
                 broadcast_fn=broadcast_fn,
+                interactive=interactive,
             )
             if on_done is not None:
                 _safe_call(on_done, run_id, result)
@@ -231,9 +237,18 @@ def start_board_run(
         result = _work()
         return {"ok": True, "run_id": run_id, "mode": mode, "result": result}
 
+    def _runner() -> None:
+        # Async failure must still reach the board (so the human isn't blind) — the
+        # lock is already freed by _work's finally; surface the error via on_done.
+        try:
+            _work()
+        except Exception as exc:  # noqa: BLE001
+            if on_done is not None:
+                _safe_call(on_done, run_id, {"result": f"error: {exc}", "error": str(exc)})
+
     # Async path (production): spawn the agent in the background and return at once
     # so the Start button never hangs; progress streams onto the board.
-    threading.Thread(target=_work, daemon=True, name=f"board-run-{run_id[:8]}").start()
+    threading.Thread(target=_runner, daemon=True, name=f"board-run-{run_id[:8]}").start()
     return {"ok": True, "run_id": run_id, "mode": mode, "status": "started"}
 
 
