@@ -12,6 +12,10 @@ from .queries.feedback_items import write_feedback_item, read_feedback_items, re
 from .queries.stage_configs import upsert_stage_config, read_stage_config, delete_stage_config
 from .queries.catalog_items import upsert_catalog_item, read_all_catalog_items, rebuild_catalog, read_catalog_item_by_path
 from .queries.app_settings import get_board_scope, set_board_scope
+from .queries.comms import (
+    complete_task, get_ready_tasks,
+    claim_task, fail_task, reclaim_stale_claims,
+)
 
 __all__ = [
     "get_db",
@@ -27,4 +31,6 @@ __all__ = [
     "upsert_stage_config", "read_stage_config", "delete_stage_config",
     "upsert_catalog_item", "read_all_catalog_items", "rebuild_catalog", "read_catalog_item_by_path",
     "get_board_scope", "set_board_scope",
+    "complete_task", "get_ready_tasks",
+    "claim_task", "fail_task", "reclaim_stale_claims",
 ]

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 import threading
 from pathlib import Path
@@ -90,9 +91,9 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
     """
     global _init_once_done, _VEC_AVAILABLE, _FTS_AVAILABLE
 
-    db_dir = Path.home() / ".pathly"
+    db_dir = Path(os.environ.get("PATHLY_DB_DIR", str(Path.home() / ".pathly")))
     db_dir.mkdir(parents=True, exist_ok=True)
-    db_path = str(db_dir / "pathly.db")
+    db_path = os.environ.get("PATHLY_DB_PATH") or str(db_dir / "pathly.db")
 
     # Create this thread's connection if it doesn't have one yet.
     if not hasattr(_local, "conn") or _local.conn is None:

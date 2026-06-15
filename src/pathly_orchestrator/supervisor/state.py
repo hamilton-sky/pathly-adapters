@@ -70,6 +70,11 @@ class RunnerState:
     trace_id: str = ""   # 32-char hex, set once at run start
     span_id: str = ""    # 16-char hex, set per stage invocation
 
+    # Runtime-config seam (§5, DAG scheduler) — populated by start_run; carried
+    # into TaskWorkspace.env so workers inherit the shared DB path and FSM port.
+    db_path: str = ""    # resolved DB file path; "" means use get_db() default
+    fsm_port: int = 8765  # FSM HTTP port (mirrors PATHLY_FSM_HTTP_PORT default)
+
     # Active terminal tab id — set while a terminal-mode stage is in flight
     active_tab_id: str = ""
 

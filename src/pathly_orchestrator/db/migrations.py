@@ -306,6 +306,13 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("comms_messages",      "superseded_by",         "TEXT"),
         # Phase 14 (comms-board-skills): DAG task decomposition
         ("comms_messages",      "depends_on",            "TEXT"),
+        # P2 scheduler: lane partition + claim/fail lifecycle
+        ("comms_messages",      "lane",                  "TEXT"),
+        ("comms_messages",      "claimed_at",            "TEXT"),
+        ("comms_messages",      "claimed_by",            "TEXT"),
+        ("comms_messages",      "failed_at",             "TEXT"),
+        ("comms_messages",      "fail_reason",           "TEXT"),
+        ("comms_messages",      "attempts",              "INTEGER DEFAULT 0"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

@@ -484,6 +484,104 @@ def complete_task(
     return newly_ready
 
 
+def claim_task(conn: sqlite3.Connection, message_id: str, run_id: str) -> bool:
+    """Atomically transition pending → in_progress.
+
+    Returns True if this caller won the claim, False if the task was already
+    claimed, done, or failed. The WHERE clause is the compare-and-set: only one
+    concurrent caller can flip a pending row.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    with _get_write_lock(conn):
+        cur = conn.execute(
+            "UPDATE comms_messages "
+            "SET task_status='in_progress', claimed_at=?, claimed_by=?, "
+            "    attempts=COALESCE(attempts, 0)+1 "
+            "WHERE id=? AND task_status='pending' AND deleted_at IS NULL",
+            (now, run_id, message_id),
+        )
+        conn.commit()
+    return cur.rowcount == 1
+
+
+def fail_task(conn: sqlite3.Connection, message_id: str, reason: str = "") -> list[str]:
+    """Mark a task failed and BFS-cascade transitive dependents to 'blocked'.
+
+    Returns the list of blocked dependent IDs. Idempotent: a task already
+    'failed' returns [] with no DB write.
+    """
+    row = conn.execute(
+        "SELECT board, scope, task_status FROM comms_messages "
+        "WHERE id=? AND deleted_at IS NULL",
+        (message_id,),
+    ).fetchone()
+    if row is None or row["task_status"] == "failed":
+        return []
+    board, scope = row["board"], row["scope"]
+    now = datetime.now(timezone.utc).isoformat()
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET task_status='failed', failed_at=?, fail_reason=? "
+            "WHERE id=?",
+            (now, reason[:500], message_id),
+        )
+        conn.commit()
+
+    all_pending = conn.execute(
+        "SELECT id, depends_on FROM comms_messages "
+        "WHERE board=? AND scope=? AND type='task' "
+        "AND task_status IN ('pending','in_progress') AND deleted_at IS NULL",
+        (board, scope),
+    ).fetchall()
+    dep_index = {r["id"]: json.loads(r["depends_on"] or "[]") for r in all_pending}
+    blocked: list[str] = []
+    frontier: set[str] = {message_id}
+    with _get_write_lock(conn):
+        changed = True
+        while changed:
+            changed = False
+            for tid, deps in list(dep_index.items()):
+                if tid in blocked:
+                    continue
+                if frontier & set(deps):
+                    conn.execute(
+                        "UPDATE comms_messages SET task_status='blocked' WHERE id=?",
+                        (tid,),
+                    )
+                    blocked.append(tid)
+                    frontier.add(tid)
+                    changed = True
+        conn.commit()
+    return blocked
+
+
+def reclaim_stale_claims(conn: sqlite3.Connection, board: str, scope: str) -> list[str]:
+    """On scheduler startup, revert in_progress tasks back to pending.
+
+    Called once per run resume so orphaned in_progress rows (left by a
+    crashed scheduler process) re-enter the frontier. Returns the IDs
+    that were reverted.
+    """
+    rows = conn.execute(
+        "SELECT id FROM comms_messages "
+        "WHERE board=? AND scope=? AND type='task' AND task_status='in_progress' "
+        "AND deleted_at IS NULL",
+        (board, scope),
+    ).fetchall()
+    ids = [r["id"] for r in rows]
+    if not ids:
+        return []
+    ph = ",".join("?" * len(ids))
+    with _get_write_lock(conn):
+        conn.execute(
+            f"UPDATE comms_messages SET task_status='pending', claimed_by=NULL "
+            f"WHERE id IN ({ph})",
+            ids,
+        )
+        conn.commit()
+    return ids
+
+
 def soft_delete_message(conn: sqlite3.Connection, message_id: str) -> str:
     """Retract a message by soft-deleting it — but only while no agent has read it.
 
