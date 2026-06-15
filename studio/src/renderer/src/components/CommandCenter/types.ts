@@ -41,6 +41,9 @@ export interface Message {
   answer?: string
   resolution?: string
   artifact?: string
+  /** Full path of the attached artifact (maps to comms_messages.artifact_path) —
+   *  used to open it in the editor. `artifact` is just the basename for display. */
+  artifactPath?: string
   atype?: 'md' | 'code' | 'pdf' | 'image' | 'json' | 'url' | 'snippet'
   /** Set when this message has been superseded by a newer one (maps to
    *  comms_messages.superseded_by; surfaced as a struck-through card). */

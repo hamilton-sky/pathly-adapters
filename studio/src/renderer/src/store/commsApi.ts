@@ -108,6 +108,7 @@ export function rowToMessage(row: CommsRow): Message {
 
   if (row.type === 'artifact' && row.artifact_path) {
     m.artifact = basename(row.artifact_path)
+    m.artifactPath = row.artifact_path
     if (row.artifact_type) m.atype = row.artifact_type as Message['atype']
   }
 

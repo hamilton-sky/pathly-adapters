@@ -8,7 +8,12 @@
   justify-content: center;
   color: #fff;
   font: 600 9px/1 var(--font-family-mono);
+  /* Default fill for agents without a dedicated color (explorer, evaluator, …)
+     and for system messages, so every avatar is a filled chip, not a blank box. */
+  background: var(--text-muted);
 }
+
+.avatar[data-agent='system'] { background: var(--text-disabled); }
 
 .you {
   background: var(--brand-gradient);

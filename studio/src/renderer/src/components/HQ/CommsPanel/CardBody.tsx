@@ -1,8 +1,17 @@
 import React from 'react'
-import { Check, History, FileText, Search, Eye } from 'lucide-react'
+import { Check, History, FileText, Search, Eye, SquarePen } from 'lucide-react'
 import type { Message } from '../../CommandCenter/types'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
+import { useUiStore } from '../../../store/uiStore'
+import { useProjectStore } from '../../../store/projectStore'
 import s from './CommsMsgCard.module.css'
+
+// Open an artifact file in the markdown editor panel.
+function openArtifactInEditor(path: string): void {
+  const name = path.split(/[/\\]/).pop() ?? path
+  useProjectStore.getState().setSelectedItem({ name, path, type: 'plan' })
+  useUiStore.getState().setActivePanel('editor')
+}
 
 export interface CardBodyProps {
   message: Message
@@ -22,6 +31,16 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
         <div className={s.art}>
           <span className={s.artIco}><FileText size={15} /></span>
           <span className={s.artName}>{m.artifact}</span>
+          {m.artifactPath && (
+            <button
+              type="button"
+              className={s.artOpen}
+              title="Open this artifact in the editor"
+              onClick={() => openArtifactInEditor(m.artifactPath as string)}
+            >
+              <SquarePen size={11} /> Open in editor
+            </button>
+          )}
         </div>
         <div className={s.artExcerpt}><MarkdownRenderer content={m.text} /></div>
         <div className={s.artQ}><Search size={11} />agents can query this by content</div>

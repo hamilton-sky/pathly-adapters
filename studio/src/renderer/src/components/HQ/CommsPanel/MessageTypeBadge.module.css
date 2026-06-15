@@ -3,7 +3,6 @@
   align-items: center;
   gap: 5px;
   width: fit-content;
-  margin-bottom: 8px;
   font: 600 10px/1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
