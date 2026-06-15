@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GitCompare } from 'lucide-react'
+import { GitCompare, Replace } from 'lucide-react'
 import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
@@ -11,6 +11,8 @@ import { ConfigForm } from './ConfigForm'
 import { MarkdownEditor } from './MarkdownEditor'
 import type { MarkdownEditorHandle } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
+import { FindReplaceBar } from './FindReplaceBar/FindReplaceBar'
+import { useFindReplace } from './useFindReplace'
 import { CommentsPanel } from './CommentsPanel/CommentsPanel'
 import { CommentsPanelRail } from './CommentsPanel/CommentsPanelRail/CommentsPanelRail'
 import { CommentablePreview } from './CommentablePreview/CommentablePreview'
@@ -139,6 +141,9 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     : effectivePath
       ? effectivePath.replace(/\\/g, '/').split('/').slice(-2).join(' › ').replace('.md', '')
       : ''
+
+  const findEnabled = tab === 'edit' || tab === 'split'
+  const find = useFindReplace(markdownEditorRef, findEnabled, effectivePath)
 
   useEffect(() => {
     if (!effectivePath) return
@@ -351,6 +356,19 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
               </Tooltip>
             )
           })}
+          {findEnabled && (
+            <Tooltip label="Find & replace" shortcut="Ctrl+F" placement="bottom">
+              <button
+                type="button"
+                className={find.open ? styles.iconTabActive : styles.iconTab}
+                onClick={() => find.toggle('find')}
+                aria-label="Find and replace"
+                {...(find.open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+              >
+                <Replace size={14} />
+              </button>
+            </Tooltip>
+          )}
         </div>
         {!embedded && <span className={styles.breadcrumb}>{breadcrumb}</span>}
         {!embedded && (
@@ -397,6 +415,21 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
       )}
 
       <div className={styles.editorArea}>
+        {findEnabled && find.open && (
+          <FindReplaceBar
+            mode={find.mode}
+            query={find.query}
+            replaceText={find.replaceText}
+            info={find.info}
+            onQueryChange={find.onQueryChange}
+            onReplaceChange={find.onReplaceChange}
+            onNext={find.next}
+            onPrev={find.prev}
+            onReplaceOne={find.replaceOne}
+            onReplaceAll={find.replaceAll}
+            onClose={find.close}
+          />
+        )}
         {tab === 'edit' && (
           <div className={styles.full}>
             <MarkdownEditor ref={markdownEditorRef} value={body} onChange={handleBodyChange} />

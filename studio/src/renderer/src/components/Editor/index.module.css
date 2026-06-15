@@ -54,6 +54,34 @@
   font-weight: 700;
 }
 
+.iconTab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: 4px;
+  transition: background 0.12s, color 0.12s;
+}
+.iconTab:hover { background: var(--bg-surface0); color: var(--text-secondary); }
+
+.iconTabActive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface0);
+  border: none;
+  border-radius: 5px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: 4px;
+}
+
 .breadcrumb {
   flex: 1;
   font-size: 12px;
@@ -114,9 +142,11 @@
 
 /* ── Content area ── */
 .editorArea {
+  position: relative;
   flex: 1;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
 }
 
 .full {
