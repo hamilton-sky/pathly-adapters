@@ -41,17 +41,33 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
           </span>
         )}
         <span className={s.msgTime}>{m.time} ago</span>
-        {canDelete && (
-          <button
-            type="button"
-            className={s.msgDel}
-            title="Remove from board"
-            aria-label="Delete message"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 size={12} />
-          </button>
-        )}
+      </div>
+
+      <div className={s.msgCard} data-type={m.type}>
+        <div className={s.cardHead}>
+          <MessageTypeBadge type={m.type} />
+          <span className={s.cardActions}>
+            {onSupersede && !m.supersededBy && (
+              <SupersedeMenu
+                message={m}
+                candidates={siblings ?? []}
+                onSupersede={onSupersede}
+              />
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                className={s.msgDel}
+                title="Remove from board"
+                aria-label="Delete message"
+                onClick={() => setConfirming(true)}
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </span>
+        </div>
+        <CardBody message={m} onAnswer={onAnswer} onResolve={onResolve} />
         {confirming && (
           <ConfirmModal
             title="Delete this message?"
@@ -60,18 +76,6 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
             onConfirm={() => { setConfirming(false); onDelete?.(m.id) }}
           />
         )}
-        {onSupersede && !m.supersededBy && (
-          <SupersedeMenu
-            message={m}
-            candidates={siblings ?? []}
-            onSupersede={onSupersede}
-          />
-        )}
-      </div>
-
-      <div className={s.msgCard} data-type={m.type}>
-        <MessageTypeBadge type={m.type} />
-        <CardBody message={m} onAnswer={onAnswer} onResolve={onResolve} />
       </div>
     </div>
   )

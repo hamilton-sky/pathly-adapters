@@ -51,11 +51,10 @@
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  flex-shrink: 0;
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 
-.msg:hover .msgDel { opacity: 1; }
 .msgDel:hover { color: var(--red); background: var(--red-bg); }
 
 .msgAck {
@@ -67,10 +66,28 @@
 
 /* Notebook-cell style card */
 .msgCard {
+  position: relative;
   border: var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg-surface0);
   padding: 11px 14px;
+}
+
+/* Ticket-style header inside the card: type badge on the left, actions on the right. */
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cardActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  text-decoration: none;   /* keep action icons un-struck on superseded cards */
 }
 
 /* Alert cards get a full tint — no side bar */
