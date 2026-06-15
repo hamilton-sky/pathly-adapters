@@ -386,6 +386,89 @@ def comms_tasks_complete():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/tasks/claim", methods=["POST"])
+def comms_tasks_claim():
+    """Atomically claim a pending task (pending → in_progress).
+
+    Required body fields: message_id, run_id.
+    Returns 200 {"claimed": bool} — True if this caller won the claim,
+    False if the task was already claimed, done, or failed.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import claim_task as _claim_task
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        run_id = data.get("run_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+        if not isinstance(run_id, str) or not run_id.strip():
+            return jsonify({"error": "Field 'run_id' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        claimed = _claim_task(conn, message_id=message_id, run_id=run_id)
+        return jsonify({"claimed": claimed}), 200
+    except Exception as exc:
+        logging.exception("comms_tasks_claim error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/tasks/fail", methods=["POST"])
+def comms_tasks_fail():
+    """Mark a task failed and cascade-block transitive dependents.
+
+    Required body fields: message_id.
+    Optional: reason (short error text).
+    Returns 200 {"ok": true, "blocked": [...ids]}.
+    Broadcasts COMMS_UPDATE task_failed for the failed task and task_blocked
+    for each cascade-blocked dependent, scoped to the message's scope.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import fail_task as _fail_task
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+
+        reason = data.get("reason") or ""
+
+        conn = _get_db()
+
+        row = conn.execute(
+            "SELECT scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            (message_id,),
+        ).fetchone()
+        scope = row["scope"] if row is not None else ""
+
+        blocked = _fail_task(conn, message_id=message_id, reason=reason)
+
+        _broadcast_comms(scope, {
+            "type": "COMMS_UPDATE",
+            "event": "task_failed",
+            "message_id": message_id,
+        })
+        for bid in blocked:
+            _broadcast_comms(scope, {
+                "type": "COMMS_UPDATE",
+                "event": "task_blocked",
+                "message_id": bid,
+            })
+
+        return jsonify({"ok": True, "blocked": blocked}), 200
+    except Exception as exc:
+        logging.exception("comms_tasks_fail error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/attach", methods=["POST"])
 def comms_attach():
     """Attach a file or URL artifact to an existing message.
