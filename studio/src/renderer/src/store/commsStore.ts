@@ -289,6 +289,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
 
     const isFeature = key !== 'project' && key !== 'global'
+    // Align Studio's runner SSE subscription with this board's topic so the agent's
+    // terminal actually opens: useHQ subscribes to events/runner?topic=activeTopic,
+    // and the board run broadcasts TERMINAL_SPAWN to topic=<feature>. Feature boards
+    // only — global/project use a topic the feature-centric activeTopic can't match.
+    if (isFeature) useProjectStore.getState().setActiveTopic(key)
     const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
     const params = scopeToParams(scope, key)
     const projectRoot = isFeature ? undefined
