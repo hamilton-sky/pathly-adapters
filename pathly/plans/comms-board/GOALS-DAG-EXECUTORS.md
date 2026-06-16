@@ -20,10 +20,10 @@ BOARD (feature workspace) ── holds MANY goals
 │     └─ task DAG: T1 → T2 → T3   ▶ run with: TEAM flow
 │
 ├─ GOAL 2  "fix flaky tests"      decomposed by: SINGLE PLANNER agent
-│     └─ task DAG: A, B(needs A)  ▶ run with: LOOP (one agent, engine-2)
+│     └─ task DAG: A, B(needs A)  ▶ run with: LOOP (fresh agent per task)
 │
 └─ GOAL 3  "rename config keys"   no decomposition
-      └─ one task                 ▶ run with: SINGLE agent (one shot)
+      └─ one task                 ▶ run with: SINGLE (one agent, whole goal)
 ```
 
 ## 2. Two ways to decompose a goal (chosen per goal)
@@ -39,14 +39,19 @@ edges among themselves. **The planner is the keystone:** its job is to emit
 
 ## 3. Three ways to execute (the `executor` choice)
 
-| Mode | Binds to | What runs |
-|---|---|---|
-| **single** | a **task** | one agent, one shot, ad-hoc (today's SingleAgentButton, aimed at a task) |
-| **loop** | a **goal** | one agent chews that goal's whole task-DAG, ready task at a time (engine-2) |
-| **team** | a **goal** | the trimmed team flow (builder → reviewer → tester) runs on the goal |
+Refined 2026-06-17. The axis is **agent topology per goal** — one agent / looped
+fresh agents / a team-of-roles — a clean progression of isolation + rigor + cost.
 
-`executor` is stored on the **goal**; `single` is an ad-hoc action on a task and
-isn't stored.
+| Mode | Owns the frontier | What runs |
+|---|---|---|
+| **single** | the **agent** (self-loop) | ONE agent runs the *whole goal* in one context; after each task it calls the board HTTP for the next ready task and continues until the DAG is drained. Cheapest; one long context; no review. |
+| **loop** | the **supervisor** | a **fresh** agent per ready task (or batch); when it finishes, the supervisor respawns the next — new context each task. This is the **P2 supervisor-owned frontier loop**; flipping `k>1` (P3) fans it out to N concurrent agents. |
+| **team** | the **FSM flow** | the trimmed team flow (builder → reviewer → tester) runs on the goal — heaviest, with review/test gates. |
+
+`executor` is stored on the **goal** message for **all three** modes. The per-task
+**Run** action (run one task with one ad-hoc agent) is a separate UI affordance — it
+is **NOT** the `single` executor and isn't stored. (Earlier drafts called the ad-hoc
+one-task run "single"; `single` now means *one agent, the whole goal*.)
 
 ## 4. Schema (additions to `comms_messages`)
 

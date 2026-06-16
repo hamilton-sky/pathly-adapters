@@ -30,6 +30,13 @@ action additionally needs the **Phase-1 dispatcher endpoint**. So Phase 2 splits
 
 ## 1. Verified component map (the real canvas)
 
+> **Location truth (2026-06-17):** the board content (search · message list · compose) lives in
+> `HQ/CommsPanel/CommsPanel.tsx` but is **rendered by the Command Center** — `CommandCenter/BoardSection/
+> BoardSection.tsx` does `<CommsPanel scope=… />`. The `HQ/` folder name is a leftover; there is no separate
+> live "HQ" view. **Planned cleanup (own step, a rename refactor like SkillNotebook→MarkdownNotebook):
+> relocate `HQ/CommsPanel/` → `CommandCenter/Board/`.** All NEW goal/task/view components in this spec land
+> in that board module (paths below say `Board/…`; until the relocation they physically sit in `HQ/CommsPanel/`).
+
 | Real file (verified) | Role today |
 |---|---|
 | `HQ/CommsPanel/CommsMsgCard.tsx` | renders a board message (Avatar + `MessageTypeBadge` + actions; body via `CardBody`) |
@@ -43,22 +50,50 @@ action additionally needs the **Phase-1 dispatcher endpoint**. So Phase 2 splits
 
 ## 2. What we tie: executor → goal / task
 
-- **`executor` is a GOAL-level property** — stored on the `type='goal'` message (planner seeds it as
-  `single`; user-overridable). **The goal header owns the executor choice.** This is the single place
-  a user "ties an executor to a goal."
-- **Run on the GOAL** runs the goal's whole DAG via its executor: `loop` = one agent chews ready-task-
-  at-a-time; `team` = the trimmed BUILD→REVIEW→TEST→RETRO flow on the goal.
-- **Run on a TASK** is the ad-hoc `single` path — nothing stored — reusing today's `runSingleAgent`
-  aimed at one task. Shown **only when the goal's executor is `single`**; for `loop`/`team` the
-  goal-level Run owns execution.
+`executor` is a **GOAL-level** property — stored on the `type='goal'` message (planner seeds it as
+`single`; user-overridable) for **all three** modes. **The goal header owns the executor choice** — this
+is the single place a user "ties an executor to a goal." **Run on the GOAL** runs its whole DAG via its
+executor (see [GOALS-DAG-EXECUTORS.md](../GOALS-DAG-EXECUTORS.md) §3 for the refined semantics):
+
+| Executor | Owns the frontier | What runs |
+|---|---|---|
+| **single** | the **agent** (self-loop) | ONE agent runs the whole goal in one context; after each task it calls the board HTTP for the next ready task and continues until the DAG drains |
+| **loop** | the **supervisor** | a **fresh** agent per ready task (or batch); supervisor respawns the next — new context each task (the P2 frontier loop; `k>1` fan-out at P3) |
+| **team** | the **FSM flow** | trimmed builder → reviewer → tester on the goal |
+
+The per-task **Run** button (run one task with one ad-hoc agent) is a **separate affordance** — it is NOT
+the `single` executor and isn't stored. Show it on a TaskCard regardless of the goal's executor (it's an
+escape hatch to nudge a single ready task by hand).
 
 ---
 
 ## 3. Screens (ASCII, grounded in the real components)
 
-### Screen 1 — Board with goals as groupings (in `CommsMsgList`)
-Goals become collapsible group headers; their tasks nest beneath in `depends_on` topological order.
-All other message types stay in the flat thread, unchanged.
+### Screen 0 — board becomes a 3-VIEW surface (the view switcher)
+The board no longer mixes goals/tasks into the message thread. A **full-width search** keeps its row;
+**underneath it** a new **view-switcher** row toggles the board's content between **Messages · Goals & Tasks
+· Artifacts**. (Chosen layout: full-width search + a dedicated toggle row — degrades better than a 50/50
+split at the ≤200px panel widths the Command Center allows. Segmented control sits LEFT in the standard
+Studio toolbar grammar; the RIGHT slot is an action area, empty now, for per-view actions like "+ New goal".)
+
+```
+┌─ PROJECT BOARD : pathly-adapters ───────────────────── [x] ┐  BoardSection header (unchanged)
+│  🔍 Search this board…………………………………………………………… │  SearchBar — FULL width
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │ [≡ Messages] [◧ Goals & Tasks] [▣ Artifacts]    (+…) │  │  BoardViewToggle (NEW) — segmented LEFT,
+│  └─────────────────────────────────────────────────────┘  │  action slot RIGHT
+│   …content of the selected view (Screen 1 / thread / artifacts)… │
+│  Reads:[✓Project][✓Global]   [⚙Agent]   [compose…][DECISION▾][➤] │  foot — unchanged
+└────────────────────────────────────────────────────────────┘
+```
+- **Messages** = today's `CommsMsgList`, but goals/tasks are FILTERED OUT (they live in their own view).
+- **Goals & Tasks** = Screen 1 below (goal groups + DAG + executor + Run). **All goal/executor controls live here.**
+- **Artifacts** = `type='artifact'` messages as a filtered card list (reuses the existing artifact card).
+- View state is local to `CommsPanel` (`boardView: 'messages'|'goals'|'artifacts'`, default `'messages'`).
+
+### Screen 1 — the "Goals & Tasks" view (goal groupings + task DAG)
+Goals are collapsible group headers; their tasks nest beneath in `depends_on` topological order. This is a
+view, NOT the message thread — only goals + tasks render here.
 
 ```
 ┌─ Feature Board: comms-board ─────────────────────────────────┐
@@ -137,19 +172,25 @@ SSE (`task_unblocked`/`task_failed`/`task_blocked` already broadcast by `/comms/
 
 ## 4. Component change map
 
+> Paths shown as `Board/…` = the relocated board module (today `HQ/CommsPanel/…` until the rename lands).
+
 | File | Change | What |
 |---|---|---|
 | `CommandCenter/types.ts` `MessageType` | MODIFY | add `'goal'` (`'task'` already present) |
 | `CommandCenter/types.ts` `Message` | MODIFY | add `goalId?`, `executor?:'single'\|'loop'\|'team'`, `taskStatus?:'pending'\|'in_progress'\|'done'\|'blocked'\|'failed'`, `dependsOn?:string[]` |
 | `commsApi.ts` mapper | MODIFY | map the new (already `SELECT *`-returned) columns onto `Message` |
-| `HQ/CommsPanel/CommsMsgList` | MODIFY | group `type='task'` under parent `type='goal'` (`goalId`); flat for the rest |
-| `HQ/CommsPanel/CardBody.tsx` | MINOR | defensive `goal`/`task` branches (handled by GoalGroup; prevents double-render) |
-| `HQ/CommsPanel/GoalGroup/GoalGroupHeader.tsx` | **NEW** | executor segmented + Engine select + Run/Stop + rollup chip |
-| `HQ/CommsPanel/GoalGroup/TaskCard.tsx` | **NEW** | status dot + `depends_on` badges + artifact link + per-task Run (single only) |
-| `HQ/CommsPanel/GoalGroup/GoalGroup.tsx` | **NEW** | header + topo-ordered TaskCard list |
+| `Board/CommsPanel.tsx` | MODIFY | add `boardView` state (`messages\|goals\|artifacts`, default `messages`); render the `BoardViewToggle` under the full-width `SearchBar`; switch content on `boardView` |
+| `Board/BoardViewToggle/BoardViewToggle.tsx` | **NEW** | segmented Messages/Goals&Tasks/Artifacts (LEFT) + a right action slot; `data-*` variant pattern |
+| `Board/CommsMsgList` | MODIFY | **Messages view: filter OUT `type='goal'`/`'task'`** (they render only in the Goals view) |
+| `Board/GoalsView/GoalsView.tsx` | **NEW** | the Goals&Tasks view: list `GoalGroup`s for the scope (group tasks under goals by `goalId`) |
+| `Board/GoalsView/GoalGroup.tsx` | **NEW** | header + topo-ordered TaskCard list |
+| `Board/GoalsView/GoalGroupHeader.tsx` | **NEW** | executor segmented + Engine select + Run/Stop + rollup chip |
+| `Board/GoalsView/TaskCard.tsx` | **NEW** | status dot + `depends_on` badges + artifact link + per-task ad-hoc Run |
+| `Board/ArtifactsView/ArtifactsView.tsx` | **NEW** | filtered `type='artifact'` card list (reuse existing artifact card) |
 | `store/commsStore.ts` | MODIFY | `goalRunState: Record<goalId,…>`; `runGoal(goalId,executor,engine,boardKey)`; `stopGoal(goalId)` — mirror `boardRunState`/`runSingleAgent`/`stopBoard` |
 | `MessageTypeBadge.tsx` | MODIFY | render `'goal'` (accent) + `'task'` (muted) |
-| `SingleAgentButton.tsx` | **NO CHANGE** | continues to serve ad-hoc single-task runs |
+| `CommandCenter/FeatureCard/FeatureCard.tsx` | **REDESIGN** | strip the team-flow run controls (Play/Pause/Status). Becomes a nav item: name + **goal count** + `[open ▸]`. Execution moved to the board's Goals&Tasks view, per-goal. (Keep Archive + Set-main.) |
+| `Board/SingleAgentButton.tsx` | **NO CHANGE** | the board-footer ad-hoc agent run stays |
 
 **Accessibility:** status dots never colour-only (pair `aria-label="Task status: ready"`); GoalGroupHeader
 `role="region"` + label; progress via `<progress>` (no inline style); every button `type="button"`;
@@ -180,8 +221,11 @@ P1-A  dispatcher: read goal.executor → route single/loop/team; ADD goal_id fil
 P1-B  serial one-at-a-time gate.                                                                                       [dep P1-A]
 P1-C  (carry-fix) goal-aware idempotency + partial-seed reseed in plan.md guard.                                      [dep 0b-3]
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+P2-0  (cleanup, independent) relocate HQ/CommsPanel → CommandCenter/Board (rename refactor). Do early or anytime.
 P2-A  types.ts + commsApi mapper (the already-returned columns).                                                      [dep 0b-1]
-P2-B  read-only render: GoalGroup/Header/TaskCard, grouping, status dots, depends_on badges, live SSE.                [dep P2-A]
+P2-T  BoardViewToggle + CommsPanel boardView state; Messages view filters out goal/task; Artifacts view.             [indep]
+P2-B  read-only Goals&Tasks view: GoalsView/GoalGroup/Header/TaskCard, status dots, depends_on badges, live SSE.   [dep P2-A,P2-T]
+P2-S  FeatureCard redesign — strip run controls; name + goal count + open.                                            [dep P2-A]
 P2-C  executor selector + Engine on goal header; PATCH /comms/goal/executor.                                          [dep P2-B]
 P2-D  Run Goal + Run task → commsStore.runGoal/stopGoal → P1 dispatcher.                                   [dep P1-A AND P2-C]
 ```
