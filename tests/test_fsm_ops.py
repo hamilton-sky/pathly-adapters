@@ -598,3 +598,33 @@ def test_load_flow_from_rows(flow_name, expected_first_state):
         f"Keys in original not in assembled: {set(original) - set(assembled)}. "
         f"Keys in assembled not in original: {set(assembled) - set(original)}."
     )
+
+
+# ── _resolve_storage_path tests ──────────────────────────────────────────────
+
+def test_resolve_storage_path_prefers_new_style(tmp_path):
+    """New-style pathly/<topic>/ is returned when that directory exists."""
+    topic = "my-feature"
+    new_dir = tmp_path / "pathly" / topic
+    new_dir.mkdir(parents=True)
+    flow = {**ROUTING_FLOW, "storage_path": "pathly/plans/{topic}/"}
+    result = fsm_ops._resolve_storage_path(flow, str(tmp_path), topic)
+    assert result == new_dir
+
+
+def test_resolve_storage_path_falls_back_to_plans(tmp_path):
+    """Falls back to pathly/plans/<topic>/ when new-style dir does not exist."""
+    topic = "legacy-feature"
+    flow = {**ROUTING_FLOW, "storage_path": "pathly/plans/{topic}/"}
+    result = fsm_ops._resolve_storage_path(flow, str(tmp_path), topic)
+    assert result == tmp_path / "pathly" / "plans" / topic
+
+
+def test_resolve_storage_path_legacy_not_shadowed_by_missing_new_style(tmp_path):
+    """New-style dir that does NOT exist does not shadow legacy path."""
+    topic = "comms-board"
+    legacy_dir = tmp_path / "pathly" / "plans" / topic
+    legacy_dir.mkdir(parents=True)
+    flow = {**ROUTING_FLOW, "storage_path": "pathly/plans/{topic}/"}
+    result = fsm_ops._resolve_storage_path(flow, str(tmp_path), topic)
+    assert result == legacy_dir

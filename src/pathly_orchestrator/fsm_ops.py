@@ -96,6 +96,12 @@ def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
 
 
 def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> Path:
+    # Prefer pathly/<topic>/ (new-style feature root) when that directory exists.
+    # Fall back to the flow's storage_path template (e.g. pathly/plans/<topic>/)
+    # so existing features created at the old path keep working untouched.
+    new_style = Path(project_root) / "pathly" / topic
+    if new_style.is_dir():
+        return new_style
     template = flow_config["storage_path"]
     relative = template.format(topic=topic)
     return Path(project_root) / relative

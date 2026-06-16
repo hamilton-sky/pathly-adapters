@@ -95,12 +95,25 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   loadFeatures: async (projectPath: string) => {
     try {
+      // Legacy features live under pathly/plans/<id>/
       const plansDir = `${projectPath}/pathly/plans`
-      const names = await listDirs(plansDir).catch(() => [] as string[])
-      const filtered = names.filter((n) => n !== '.archive')
+      const legacyNames = await listDirs(plansDir).catch(() => [] as string[])
+      const legacyIds = legacyNames.filter((n) => n !== '.archive')
+
+      // New-style features live directly under pathly/<id>/
+      // Exclude reserved names so we don't pick up "plans" or hidden dirs.
+      const RESERVED = new Set(['plans', '.archive'])
+      const pathlyDir = `${projectPath}/pathly`
+      const topLevelNames = await listDirs(pathlyDir).catch(() => [] as string[])
+      const newStyleIds = topLevelNames.filter((n) => !RESERVED.has(n))
+
+      // Merge: new-style takes precedence; legacy ids not already covered are appended.
+      const seen = new Set(newStyleIds)
+      const allIds = [...newStyleIds, ...legacyIds.filter((id) => !seen.has(id))]
+
       // Enrich each feature from its STATE.json (stage + conv) and feedback/ (blocked).
       const features: Feature[] = await Promise.all(
-        filtered.map(async (id) => {
+        allIds.map(async (id) => {
           const [state, blocked, last] = await Promise.all([
             fetchFeatureState(projectPath, id),
             featureBlocked(projectPath, id),

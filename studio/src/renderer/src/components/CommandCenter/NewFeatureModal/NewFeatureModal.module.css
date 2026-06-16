@@ -1,0 +1,127 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.box {
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 22px 26px 20px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.heading {
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  margin: 0 0 18px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+.req { color: var(--red); margin-left: 2px; }
+
+.opt {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.input,
+.textarea,
+.select {
+  background: var(--bg-surface0);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font: 13px/1.4 var(--font-family-base);
+  padding: 7px 10px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.12s;
+  min-width: 0;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 64px;
+}
+
+.select {
+  cursor: pointer;
+  appearance: none;
+}
+
+.slug {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin: 2px 0 4px;
+}
+
+.slug code {
+  color: var(--accent);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cancel {
+  background: var(--bg-surface0);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: 6px 14px;
+  transition: background 0.12s;
+}
+
+.cancel:hover { background: var(--bg-base); }
+
+.create {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  padding: 6px 16px;
+  transition: background 0.12s, opacity 0.12s;
+}
+
+.create:hover:not(:disabled) { background: var(--accent-border); }
+.create:disabled { opacity: 0.4; cursor: not-allowed; }

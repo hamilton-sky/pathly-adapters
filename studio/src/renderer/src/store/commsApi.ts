@@ -450,10 +450,26 @@ const BLOCKER_FILES = new Set([
   'HUMAN_QUESTIONS.md', 'IMPL_QUESTIONS.md', 'DESIGN_QUESTIONS.md',
 ])
 
+/** Resolve the storage path for a feature: new-style pathly/<id>/ wins if it exists,
+ *  otherwise falls back to pathly/plans/<id>/. Mirrors _resolve_storage_path in fsm_ops.py. */
+async function resolveFeaturePath(projectPath: string, featureId: string): Promise<string> {
+  const newStyle = `${projectPath}/pathly/${featureId}`
+  // listDir on the dir itself returns [] when the dir doesn't exist, but we need to know
+  // if the dir exists. Writing a .keep file ensures the new-style dir exists, so we check
+  // for that sentinel. If absent, fall through to the legacy path.
+  const sentinel = await readFile(`${newStyle}/.keep`)
+  if (sentinel !== null) return newStyle
+  // Also accept new-style dirs that have any files already (e.g. STATE.json written by FSM)
+  const anyFile = await readFile(`${newStyle}/STATE.json`)
+  if (anyFile !== null) return newStyle
+  return `${projectPath}/pathly/plans/${featureId}`
+}
+
 /** Read a feature's STATE.json (filesystem) — current stage + conversation count. */
 export async function fetchFeatureState(projectPath: string, featureId: string): Promise<FeatureState | null> {
   try {
-    const raw = await readFile(`${projectPath}/pathly/plans/${featureId}/STATE.json`)
+    const base = await resolveFeaturePath(projectPath, featureId)
+    const raw = await readFile(`${base}/STATE.json`)
     if (!raw) return null
     return JSON.parse(raw) as FeatureState
   } catch {
@@ -464,7 +480,8 @@ export async function fetchFeatureState(projectPath: string, featureId: string):
 /** A feature is blocked when its feedback/ folder holds an open failure/question file. */
 export async function featureBlocked(projectPath: string, featureId: string): Promise<boolean> {
   try {
-    const files = await listDir(`${projectPath}/pathly/plans/${featureId}/feedback`).catch(() => [] as string[])
+    const base = await resolveFeaturePath(projectPath, featureId)
+    const files = await listDir(`${base}/feedback`).catch(() => [] as string[])
     return files.some((f) => BLOCKER_FILES.has(f))
   } catch {
     return false
@@ -486,7 +503,8 @@ function summarize(agent: string | undefined, summary: string): string {
 /** Latest AGENT_DONE summary from a feature's EVENTS.jsonl — the card's "last activity" line. */
 export async function fetchLastSummary(projectPath: string, featureId: string): Promise<string> {
   try {
-    const raw = await readFile(`${projectPath}/pathly/plans/${featureId}/EVENTS.jsonl`)
+    const base = await resolveFeaturePath(projectPath, featureId)
+    const raw = await readFile(`${base}/EVENTS.jsonl`)
     if (!raw) return ''
     const lines = raw.split('\n')
     for (let i = lines.length - 1; i >= 0; i--) {

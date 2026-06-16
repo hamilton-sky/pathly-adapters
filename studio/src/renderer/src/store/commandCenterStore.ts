@@ -30,6 +30,7 @@ export interface CommandCenterActions {
   toggleDirection: () => void
   setMainFeature: (fid: string) => void
   openFeatureFromRail: (fid: string) => void
+  openNewFeature: (fid: string) => void
   toggleOpenFeature: (fid: string) => void
   toggleSidebar: () => void
   setSize: (id: string, px: number) => void
@@ -135,6 +136,41 @@ export const useCommandCenterStore = create<CommandCenterStore>()(
           const newSections = !inSections && s.sections.length < MAX_SECTIONS
             ? [...s.sections, mkFeature(fid)] : s.sections
           return { ...s, mainFeature: fid, openFeature: fid, sidebarCollapsed: false, featureTabs: newTabs, sections: newSections }
+        })
+      },
+
+      openNewFeature: (fid) => {
+        set((s) => {
+          // If already tracked, just surface it.
+          if (s.featureTabs.includes(fid)) {
+            const inSections = s.sections.some((sec) => sec.scope === 'feature' && sec.featureId === fid)
+            const newSections = !inSections && s.sections.length < MAX_SECTIONS
+              ? [...s.sections, mkFeature(fid)] : s.sections
+            return { ...s, mainFeature: fid, openFeature: fid, sections: newSections }
+          }
+
+          // At cap: evict the right-most feature tab to make room for the new one.
+          let tabs = s.featureTabs
+          let sections = s.sections
+          if (tabs.length >= MAX_SECTIONS) {
+            const evict = tabs[tabs.length - 1]
+            tabs = tabs.slice(0, -1)
+            sections = sections.filter((sec) => !(sec.scope === 'feature' && sec.featureId === evict))
+          }
+
+          const newTabs = [...tabs, fid]
+          const newSections = sections.length < MAX_SECTIONS
+            ? [...sections, mkFeature(fid)] : sections
+
+          return {
+            ...s,
+            featureTabs: newTabs,
+            sections: newSections,
+            mainFeature: fid,
+            openFeature: fid,
+            preset: 'custom',
+            sizes: {},
+          }
         })
       },
 

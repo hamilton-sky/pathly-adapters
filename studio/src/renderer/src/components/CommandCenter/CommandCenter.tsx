@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import { MAX_SECTIONS } from './types'
 import { useCommsStore } from '../../store/commsStore'
@@ -8,6 +8,8 @@ import { useSectionResize } from './hooks/useSectionResize'
 import { CommandCenterHeader } from './CommandCenterHeader/CommandCenterHeader'
 import { FeatureSidebar } from './FeatureSidebar/FeatureSidebar'
 import { BoardSection } from './BoardSection/BoardSection'
+import { NewFeatureModal } from './NewFeatureModal/NewFeatureModal'
+import type { DefaultExecutor } from './NewFeatureModal/NewFeatureModal'
 import s from './CommandCenter.module.css'
 
 export function CommandCenter() {
@@ -16,6 +18,29 @@ export function CommandCenter() {
   const projectPath = useProjectStore((s) => s.projectPath)
   const activeTopic = useProjectStore((s) => s.activeTopic)
   const onResize = useSectionResize(cc.direction, cc.setSize)
+
+  const [showNewFeature, setShowNewFeature] = useState(false)
+
+  const handleCreate = useCallback(async (topic: string, description: string, _executor: DefaultExecutor) => {
+    setShowNewFeature(false)
+    if (!projectPath) return
+
+    // 1. Create the feature root at pathly/<topic>/ by writing a .keep sentinel file.
+    //    fs.write calls mkdirSync(..., { recursive: true }) in the main process.
+    await window.pathly.fs.write(`${projectPath}/pathly/${topic}/.keep`, '')
+
+    // 2. Reload the feature list so the new folder shows up in the sidebar.
+    await store.loadFeatures(projectPath)
+
+    // 3. Open the new feature's board. If already at cap, evict the right-most
+    //    feature-scoped tab to make room (global/project tabs are preserved).
+    cc.openNewFeature(topic)
+
+    // 4. Post the description as the first board message if one was given.
+    if (description) {
+      store.post(topic, 'nudge', description, null)
+    }
+  }, [projectPath, store, cc])
 
   useEffect(() => {
     if (projectPath) void store.loadFeatures(projectPath)
@@ -46,7 +71,15 @@ export function CommandCenter() {
         onAddSection={cc.addAnySection}
         onToggleDirection={cc.toggleDirection}
         onApplyPreset={cc.applyPreset}
+        onNewFeature={() => setShowNewFeature(true)}
       />
+
+      {showNewFeature && (
+        <NewFeatureModal
+          onCancel={() => setShowNewFeature(false)}
+          onCreate={handleCreate}
+        />
+      )}
 
       <div className={s.body}>
         <FeatureSidebar

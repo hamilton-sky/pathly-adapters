@@ -171,6 +171,9 @@
 
 .iconSpacer { width: 13px; display: inline-block; }
 
+.newFeature { color: var(--accent); border-color: var(--accent-border); }
+.newFeature:hover { background: var(--accent-bg); }
+
 .featureTab {
   gap: 0;
   padding: 0 4px 0 0;

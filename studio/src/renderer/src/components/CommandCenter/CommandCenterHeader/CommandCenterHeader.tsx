@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown, Check, X } from 'lucide-react'
+import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown, Check, X, Sparkles } from 'lucide-react'
 import type { BoardScope, Direction, Preset, SectionDef } from '../types'
 import { SCOPES } from '../constants'
 import { Tooltip } from '../../ui'
@@ -19,6 +19,7 @@ export interface CommandCenterHeaderProps {
   onAddSection: () => void
   onToggleDirection: () => void
   onApplyPreset: (preset: 'board' | 'pipeline' | 'focus') => void
+  onNewFeature: () => void
 }
 
 const SCOPE_ICONS: Record<BoardScope, React.ReactNode> = {
@@ -33,7 +34,7 @@ const PRESET_ITEMS: Array<{ id: 'board' | 'pipeline' | 'focus'; name: string; de
   { id: 'focus',    name: 'Focus',         desc: 'Feature board, full width' },
 ]
 
-export function CommandCenterHeader(p: CommandCenterHeaderProps) {
+export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
   const [menu, setMenu] = useState(false)
   const headRef = useRef<HTMLDivElement>(null)
   const [compact, setCompact] = useState(false)
@@ -170,6 +171,18 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps) {
       </div>
 
       <div className={s.headRight}>
+        <Tooltip label="New feature" description="Create a feature folder and open its board" placement="bottom">
+          <button
+            type="button"
+            className={`${s.ctl} ${s.newFeature}`}
+            aria-label="New feature"
+            onClick={p.onNewFeature}
+          >
+            <Sparkles size={13} />
+            <span className={s.tabLabel}>New feature</span>
+          </button>
+        </Tooltip>
+
         {p.sections.length >= 2 && (
           <div className={s.dirPill}>
             <button
