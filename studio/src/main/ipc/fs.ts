@@ -110,6 +110,13 @@ export function registerFsHandlers(): void {
     return destPath
   })
 
+  ipcMain.handle('fs:move', async (_event, srcPath: string, destPath: string): Promise<void> => {
+    if (!isPathSafe(srcPath)) throw new Error('Source path outside home directory is not allowed')
+    if (!isPathSafe(destPath)) throw new Error('Destination path outside home directory is not allowed')
+    fs.mkdirSync(path.dirname(destPath), { recursive: true })
+    fs.renameSync(srcPath, destPath)
+  })
+
   ipcMain.handle('fs:userHome', async (): Promise<string> => {
     return path.join(app.getPath('home'), '.pathly')
   })

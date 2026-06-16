@@ -1,5 +1,5 @@
 import React from 'react'
-import { ChevronDown, ChevronUp, History, MessageSquare, Play, SkipForward, Pause, ExternalLink, Check, Columns2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, History, MessageSquare, Play, SkipForward, Pause, ExternalLink, Check, Columns2, Archive } from 'lucide-react'
 import type { Feature } from '../types'
 import s from './FeatureCard.module.css'
 
@@ -14,9 +14,10 @@ export interface FeatureCardProps {
   onSetMain: (id: string) => void
   onOpenBoard: (id: string) => void
   onStatus: (id: string, status: 'running' | 'idle', stage?: 'BUILDING' | 'TESTING') => void
+  onArchive: (id: string) => void
 }
 
-export function FeatureCard({ feature: f, open, isMain, pending, boardOpen, atCap, onToggle, onSetMain, onOpenBoard, onStatus }: FeatureCardProps) {
+export function FeatureCard({ feature: f, open, isMain, pending, boardOpen, atCap, onToggle, onSetMain, onOpenBoard, onStatus, onArchive }: FeatureCardProps) {
   return (
     <div
       className={`${s.feat}${open ? ` ${s.open}` : ''}${isMain ? ` ${s.main}` : ''}`}
@@ -82,6 +83,15 @@ export function FeatureCard({ feature: f, open, isMain, pending, boardOpen, atCa
                 <Pause size={12} />Pause
               </button>
             )}
+            <button
+              type="button"
+              className={`${s.featAct} ${s.archiveAct}`}
+              aria-label={`Archive ${f.id}`}
+              title="Move to .archive/ (recoverable)"
+              onClick={() => onArchive(f.id)}
+            >
+              <Archive size={12} />Archive
+            </button>
           </div>
         </div>
       )}

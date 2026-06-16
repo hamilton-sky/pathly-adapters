@@ -18,6 +18,7 @@ export interface FeatureSidebarProps {
   onRailOpen: (id: string) => void
   onOpenBoard: (id: string) => void
   onStatus: (id: string, status: 'running' | 'idle', stage?: 'BUILDING' | 'TESTING') => void
+  onArchive: (id: string) => void
 }
 
 function CollapsedRail(p: FeatureSidebarProps) {
@@ -96,6 +97,7 @@ export function FeatureSidebar(p: FeatureSidebarProps) {
             onSetMain={p.onSetMain}
             onOpenBoard={p.onOpenBoard}
             onStatus={p.onStatus}
+            onArchive={p.onArchive}
           />
         ))}
       </div>

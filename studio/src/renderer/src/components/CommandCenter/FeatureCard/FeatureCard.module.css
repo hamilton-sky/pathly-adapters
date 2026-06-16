@@ -147,6 +147,9 @@
 .warn { color: var(--orange); border-color: var(--orange-border); }
 .warn:hover { background: var(--orange-bg); }
 
+.archiveAct { color: var(--text-muted); }
+.archiveAct:hover { color: var(--orange); border-color: var(--orange-border); background: var(--orange-bg); }
+
 .featAct:disabled { opacity: 0.38; cursor: not-allowed; }
 .featAct:disabled:hover { color: var(--text-secondary); border-color: var(--border-color); background: var(--bg-base); }
 

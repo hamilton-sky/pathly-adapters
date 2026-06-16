@@ -110,6 +110,7 @@ declare global {
         listDirs: (dir: string) => Promise<string[]>
         delete: (path: string) => Promise<void>
         moveToParent: (filePath: string) => Promise<string>
+        move: (src: string, dest: string) => Promise<void>
         pickFolder: () => Promise<string | null>
         userHome: () => Promise<string>
         appRoot: () => Promise<string>

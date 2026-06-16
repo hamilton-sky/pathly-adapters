@@ -10,6 +10,7 @@ import { FeatureSidebar } from './FeatureSidebar/FeatureSidebar'
 import { BoardSection } from './BoardSection/BoardSection'
 import { NewFeatureModal } from './NewFeatureModal/NewFeatureModal'
 import type { DefaultExecutor } from './NewFeatureModal/NewFeatureModal'
+import { ConfirmModal } from '../shared/ConfirmModal/ConfirmModal'
 import s from './CommandCenter.module.css'
 
 export function CommandCenter() {
@@ -20,6 +21,37 @@ export function CommandCenter() {
   const onResize = useSectionResize(cc.direction, cc.setSize)
 
   const [showNewFeature, setShowNewFeature] = useState(false)
+  const [archivePending, setArchivePending] = useState<string | null>(null)
+
+  const handleArchiveRequest = useCallback((id: string) => {
+    setArchivePending(id)
+  }, [])
+
+  const handleArchiveConfirm = useCallback(async () => {
+    const topic = archivePending
+    setArchivePending(null)
+    if (!topic || !projectPath) return
+
+    // Detect whether this is a new-style (pathly/<topic>/) or legacy (pathly/plans/<topic>/) feature.
+    // Mirror the resolveFeaturePath logic: check for .keep sentinel, then STATE.json.
+    const newStyleBase = `${projectPath}/pathly/${topic}`
+    const keep = await window.pathly.fs.read(`${newStyleBase}/.keep`)
+    const stateJson = keep === null ? await window.pathly.fs.read(`${newStyleBase}/STATE.json`) : null
+    const isNewStyle = keep !== null || stateJson !== null
+
+    const src = isNewStyle
+      ? `${projectPath}/pathly/${topic}`
+      : `${projectPath}/pathly/plans/${topic}`
+    const dest = isNewStyle
+      ? `${projectPath}/pathly/.archive/${topic}`
+      : `${projectPath}/pathly/plans/.archive/${topic}`
+
+    await window.pathly.fs.move(src, dest)
+    await store.loadFeatures(projectPath)
+
+    // Evict the feature's tab and section from the board.
+    cc.removeFeatureTab(topic)
+  }, [archivePending, projectPath, store, cc])
 
   const handleCreate = useCallback(async (topic: string, description: string, _executor: DefaultExecutor) => {
     setShowNewFeature(false)
@@ -81,6 +113,16 @@ export function CommandCenter() {
         />
       )}
 
+      {archivePending && (
+        <ConfirmModal
+          title={<>Archive <b>{archivePending}</b>?</>}
+          message="Moves the feature folder to .archive/ — recoverable by moving it back."
+          confirmLabel="Archive"
+          onCancel={() => setArchivePending(null)}
+          onConfirm={handleArchiveConfirm}
+        />
+      )}
+
       <div className={s.body}>
         <FeatureSidebar
           features={store.features}
@@ -96,6 +138,7 @@ export function CommandCenter() {
           onRailOpen={cc.openFeatureFromRail}
           onOpenBoard={cc.addFeatureSection}
           onStatus={store.setFeatureStatus}
+          onArchive={handleArchiveRequest}
         />
 
         {cc.sections.length === 0 ? (
