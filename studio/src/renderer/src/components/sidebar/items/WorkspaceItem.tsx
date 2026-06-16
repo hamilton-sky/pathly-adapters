@@ -128,7 +128,7 @@ export function WorkspaceItem({
                   anchor={menuButtonRef.current.getBoundingClientRect()}
                   onClose={() => setMenuOpen(false)}
                 >
-                  {activePanel === 'skill-notebook' && item.name.endsWith('.md') && onSplitIntoCells && (
+                  {activePanel === 'notebook' && item.name.endsWith('.md') && onSplitIntoCells && (
                     <>
                       <button type="button" className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onSplitIntoCells) }}>
                         <Plus size={12} />

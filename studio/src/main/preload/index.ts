@@ -111,6 +111,8 @@ contextBridge.exposeInMainWorld('pathly', {
     moveToParent: (filePath: string): Promise<string> => ipcRenderer.invoke('fs:moveToParent', filePath),
     move: (src: string, dest: string): Promise<void> => ipcRenderer.invoke('fs:move', src, dest),
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('fs:pickFolder'),
+    saveDialog: (defaultPath: string, content: string, intoDownloads?: boolean): Promise<string | null> =>
+      ipcRenderer.invoke('fs:saveDialog', defaultPath, content, intoDownloads),
     userHome: (): Promise<string> => ipcRenderer.invoke('fs:userHome'),
     appRoot: (): Promise<string> => ipcRenderer.invoke('fs:appRoot')
   },

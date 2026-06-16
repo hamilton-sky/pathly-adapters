@@ -1,16 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
-  ArrowLeft, Undo2, Redo2, Database, Download, FileCode, BookOpen, GitCompare,
+  ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen, GitCompare,
   Scissors, ScanText, FileSearch, SlidersHorizontal,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
-import { useSkillNotebookStore, BodyCell } from '../../../store/skillNotebookStore'
+import { useNotebookStore, BodyCell } from '../../../store/notebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import { useNotebookAgentActions } from './hooks/useNotebookAgentActions'
 import { apiFetch } from '../../../lib/config'
 import { buildSplitPrompt, buildAnalyzePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
+import ExportMenu from './ExportMenu/ExportMenu'
 import styles from './NotebookHeader.module.css'
 
 export type NotebookViewMode = 'cells' | 'editor'
@@ -21,11 +22,11 @@ interface Props {
 }
 
 export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
-  const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved } = useSkillNotebookStore()
+  const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved } = useNotebookStore()
 
-  const skillNotebookPath         = useUiStore(s => s.skillNotebookPath)
-  const setSkillNotebookPath      = useUiStore(s => s.setSkillNotebookPath)
-  const setSkillNotebookViewMode  = useUiStore(s => s.setSkillNotebookViewMode)
+  const notebookPath         = useUiStore(s => s.notebookPath)
+  const setNotebookPath      = useUiStore(s => s.setNotebookPath)
+  const setNotebookViewMode  = useUiStore(s => s.setNotebookViewMode)
   const dirtyItems                = useUiStore(s => s.dirtyItems)
   const notebookDraftPath         = useUiStore(s => s.notebookDraftPath)
   const requestNotebookSave       = useUiStore(s => s.requestNotebookSave)
@@ -44,7 +45,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const [analyzeOncePrompt, setAnalyzeOncePrompt] = useState<string | null>(null)
 
   const { handleSplit, handleAnalyze, splitState, analyzeState } = useNotebookAgentActions(
-    skillNotebookPath,
+    notebookPath,
     splitOncePrompt,
     analyzeOncePrompt,
     () => setSplitOncePrompt(null),
@@ -68,18 +69,20 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const canRedo = viewMode === 'cells' ? historyIndex < history.length - 1 : true
 
   const isCellsDirty = historyIndex !== savedHistoryIndex
-  const isSourceDirty = skillNotebookPath ? dirtyItems.has(skillNotebookPath) : false
+  const isSourceDirty = notebookPath ? dirtyItems.has(notebookPath) : false
 
-  const pathParts = skillNotebookPath ? skillNotebookPath.replace(/\\/g, '/').split('/') : []
+  const normPath = notebookPath ? notebookPath.replace(/\\/g, '/') : ''
+  const pathParts = normPath ? normPath.split('/') : []
   const skillName = pathParts[pathParts.length - 1]?.replace('.md', '') ?? ''
-  const category  = pathParts[pathParts.length - 2] ?? ''
+  // Only skills/agents can be installed to adapter dirs; the rest of Export applies to any md.
+  const isSkillOrAgent = normPath.includes('/skills/') || normPath.includes('/agents/')
 
   const handleExport = async () => {
     const fragmentOrder = cells
       .filter(c => c.type === 'fragment')
       .map(c => (c as any).fragmentName as string)
-    const skillKey = skillNotebookPath
-      ? skillNotebookPath.replace(/\\/g, '/').replace(/^.*core\/skills\//, '').replace('.md', '')
+    const skillKey = notebookPath
+      ? notebookPath.replace(/\\/g, '/').replace(/^.*core\/skills\//, '').replace('.md', '')
       : 'unknown'
     try {
       const res = await apiFetch('/skills/export', {
@@ -100,7 +103,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
       const res = await apiFetch('/skills/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skill_path: skillNotebookPath, body_cells: bodyCells }),
+        body: JSON.stringify({ skill_path: notebookPath, body_cells: bodyCells }),
       })
       if (res.ok) {
         markCellsSaved()
@@ -123,18 +126,16 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const handleRedo = () => { if (viewMode === 'cells') { redo() } else { requestNotebookRedo() } }
 
   const handleReviewDraft = () => {
-    if (viewMode !== 'editor') setSkillNotebookViewMode('editor')
+    if (viewMode !== 'editor') setNotebookViewMode('editor')
     requestNotebookOpenDraft()
   }
-
-  const exportLabel = exportState === 'success' ? 'Exported' : exportState === 'error' ? 'Error' : 'Export Skill'
 
   return (
     <div ref={headerRef} className={styles.headerRoot} data-compact={isCompact}>
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => setSkillNotebookPath(null)}
+        onClick={() => setNotebookPath(null)}
         aria-label="Back"
       >
         <ArrowLeft size={16} />
@@ -142,7 +143,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
 
       <div className={styles.breadcrumb}>
         <span className={styles.breadcrumbText}>
-          Skills › {category} › <span className={styles.breadcrumbCurrent}>{skillName}</span>
+          <span className={styles.breadcrumbCurrent}>{skillName}</span>
         </span>
       </div>
 
@@ -210,9 +211,9 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             type="button"
             className={styles.agentPillMain}
             data-state={splitState}
-            disabled={splitState === 'running' || !skillNotebookPath}
+            disabled={splitState === 'running' || !notebookPath}
             onClick={() => void handleSplit()}
-            aria-label="Split skill into sections"
+            aria-label="Split document into sections"
           >
             <Scissors size={13} />
             <span className={styles.btnLabel}>
@@ -225,18 +226,18 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             type="button"
             className={styles.agentPillSettings}
             data-state={splitState}
-            disabled={!skillNotebookPath}
+            disabled={!notebookPath}
             onClick={() => setSplitPeekOpen(v => !v)}
             aria-label="Edit split prompt"
           >
             <SlidersHorizontal size={11} />
           </button>
         </Tooltip>
-        {splitPeekOpen && skillNotebookPath && (
+        {splitPeekOpen && notebookPath && (
           <PromptPeekModal
             title="PROMPT — Split"
             fileName={skillName + '.md'}
-            defaultPrompt={buildSplitPrompt(skillNotebookPath)}
+            defaultPrompt={buildSplitPrompt(notebookPath)}
             storageKey={STORAGE_KEY_SPLIT}
             onClose={() => setSplitPeekOpen(false)}
             onUseOnce={(p) => { setSplitOncePrompt(p); setSplitPeekOpen(false) }}
@@ -256,9 +257,9 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             type="button"
             className={styles.agentPillMain}
             data-state={analyzeState}
-            disabled={analyzeState === 'running' || !skillNotebookPath}
+            disabled={analyzeState === 'running' || !notebookPath}
             onClick={() => void handleAnalyze()}
-            aria-label="Analyze skill"
+            aria-label="Analyze document"
           >
             <ScanText size={13} />
             <span className={styles.btnLabel}>
@@ -271,18 +272,18 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             type="button"
             className={styles.agentPillSettings}
             data-state={analyzeState}
-            disabled={!skillNotebookPath}
+            disabled={!notebookPath}
             onClick={() => setAnalyzePeekOpen(v => !v)}
             aria-label="Edit analyze prompt"
           >
             <SlidersHorizontal size={11} />
           </button>
         </Tooltip>
-        {analyzePeekOpen && skillNotebookPath && (
+        {analyzePeekOpen && notebookPath && (
           <PromptPeekModal
             title="PROMPT — Analyze"
             fileName={skillName + '.md'}
-            defaultPrompt={buildAnalyzePrompt(skillNotebookPath)}
+            defaultPrompt={buildAnalyzePrompt(notebookPath)}
             storageKey={STORAGE_KEY_ANALYZE}
             onClose={() => setAnalyzePeekOpen(false)}
             onUseOnce={(p) => { setAnalyzeOncePrompt(p); setAnalyzePeekOpen(false) }}
@@ -332,7 +333,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
 
       {/* Save — both modes, different handlers */}
       {viewMode === 'cells' ? (
-        <Tooltip label="Save skill" shortcut="Ctrl+S" placement="bottom">
+        <Tooltip label="Save" shortcut="Ctrl+S" placement="bottom">
           <button
             type="button"
             className={styles.saveBtn}
@@ -363,20 +364,14 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         </Tooltip>
       )}
 
-      {/* Export Skill — far right */}
-      <Tooltip label={exportLabel} placement="bottom">
-        <button
-          type="button"
-          className={styles.exportBtn}
-          data-state={exportState}
-          onClick={handleExport}
-          disabled={exportState !== 'idle'}
-          aria-label={exportLabel}
-        >
-          <Download size={14} />
-          <span className={styles.btnLabel}>{exportLabel}</span>
-        </button>
-      </Tooltip>
+      {/* Export ▾ — far right. Save-as / Download / Copy for any md; Install for skills. */}
+      <ExportMenu
+        path={notebookPath}
+        isSkillOrAgent={isSkillOrAgent}
+        installState={exportState}
+        onInstallSkill={handleExport}
+        compact={isCompact}
+      />
     </div>
   )
 }

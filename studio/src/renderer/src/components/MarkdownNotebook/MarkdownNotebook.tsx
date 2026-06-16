@@ -2,7 +2,7 @@ import React from 'react'
 import { Sparkles, ChevronsUp, Plus, Copy, Undo2, PanelRightOpen } from 'lucide-react'
 import { Tooltip } from '../ui'
 import { useUiStore } from '../../store/uiStore'
-import styles from './SkillNotebook.module.css'
+import styles from './MarkdownNotebook.module.css'
 import NotebookHeader, { NotebookViewMode } from './NotebookHeader/NotebookHeader'
 import NotebookCanvas from './NotebookCanvas/NotebookCanvas'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
@@ -11,15 +11,15 @@ import AnalysisPanel from './AnalysisPanel/AnalysisPanel'
 import { Editor } from '../Editor'
 import { usePreviewResize } from './usePreviewResize'
 
-export default function SkillNotebookPanel() {
-  const skillNotebookPath = useUiStore((s) => s.skillNotebookPath)
-  const viewMode = useUiStore((s) => s.skillNotebookViewMode)
-  const setViewMode = useUiStore((s) => s.setSkillNotebookViewMode)
+export default function MarkdownNotebookPanel() {
+  const notebookPath = useUiStore((s) => s.notebookPath)
+  const viewMode = useUiStore((s) => s.notebookViewMode)
+  const setViewMode = useUiStore((s) => s.setNotebookViewMode)
   const previewOpen = useUiStore((s) => s.notebookPreviewOpen)
   const togglePreview = useUiStore((s) => s.toggleNotebookPreview)
   const preview = usePreviewResize()
 
-  if (!skillNotebookPath) {
+  if (!notebookPath) {
     return <NotebookLanding />
   }
 
@@ -34,7 +34,7 @@ export default function SkillNotebookPanel() {
       {viewMode === 'editor' ? (
         /* Source view — Editor in embedded mode; NotebookHeader owns the action bar */
         <div className={styles.editorWrapper}>
-          <Editor path={skillNotebookPath} embedded />
+          <Editor path={notebookPath} embedded />
         </div>
       ) : (
         /* Notebook cells + live preview panel */

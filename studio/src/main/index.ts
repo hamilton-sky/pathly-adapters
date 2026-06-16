@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu, globalShortcut } from 'electron'
-import { join, extname } from 'path'
+import { join, extname, basename } from 'path'
 import { createServer } from 'http'
-import { createReadStream, statSync } from 'fs'
+import { createReadStream, statSync, writeFileSync } from 'fs'
 import { registerFsHandlers } from './ipc/fs'
 import { registerWatcherHandlers } from './ipc/watcher'
 import { registerFsmHandlers } from './ipc/fsm'
@@ -225,6 +225,26 @@ function registerIpcHandlers(win: BrowserWindow): void {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return result.filePaths[0] ?? null
   })
+
+  // Native "Save as…" / "Download a copy" — show a save dialog and write `content`
+  // to the chosen path. `intoDownloads` defaults the dialog to the Downloads folder
+  // (Download a copy); otherwise it defaults to `defaultPath` (Save as…). Returns the
+  // written path, or null if the user cancelled.
+  ipcMain.handle(
+    'fs:saveDialog',
+    async (_event, defaultPath: string, content: string, intoDownloads?: boolean): Promise<string | null> => {
+      const finalDefault = intoDownloads
+        ? join(app.getPath('downloads'), basename(defaultPath))
+        : defaultPath
+      const { canceled, filePath } = await dialog.showSaveDialog(win, {
+        defaultPath: finalDefault,
+        filters: [{ name: 'Markdown', extensions: ['md'] }, { name: 'All Files', extensions: ['*'] }],
+      })
+      if (canceled || !filePath) return null
+      writeFileSync(filePath, content, 'utf-8')
+      return filePath
+    },
+  )
 
   ipcMain.handle('shell:openWindow', async (_event, projectPath: string) => {
     createWindow(projectPath)

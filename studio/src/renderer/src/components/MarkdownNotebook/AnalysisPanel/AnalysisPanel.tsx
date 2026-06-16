@@ -9,8 +9,8 @@ export default function AnalysisPanel() {
   const setAnalysisPath = useUiStore((s) => s.setNotebookAnalysisPath)
   const panelOpen       = useUiStore((s) => s.notebookAnalysisPanelOpen)
   const setPanelOpen    = useUiStore((s) => s.setNotebookAnalysisPanelOpen)
-  const setSkillNotebookPath     = useUiStore((s) => s.setSkillNotebookPath)
-  const setSkillNotebookViewMode = useUiStore((s) => s.setSkillNotebookViewMode)
+  const setNotebookPath     = useUiStore((s) => s.setNotebookPath)
+  const setNotebookViewMode = useUiStore((s) => s.setNotebookViewMode)
 
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,8 +32,8 @@ export default function AnalysisPanel() {
 
   function handleOpenInEditor() {
     if (!analysisPath) return
-    setSkillNotebookPath(analysisPath)
-    setSkillNotebookViewMode('editor')
+    setNotebookPath(analysisPath)
+    setNotebookViewMode('editor')
     setPanelOpen(false)
   }
 

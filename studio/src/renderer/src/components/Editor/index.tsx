@@ -3,7 +3,7 @@ import { GitCompare, Replace } from 'lucide-react'
 import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
-import { useSkillNotebookStore } from '../../store/skillNotebookStore'
+import { useNotebookStore } from '../../store/notebookStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
 import type { FrontmatterValues } from '../../types'
 import { Tooltip } from '../ui'
@@ -92,7 +92,7 @@ function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
 
 export function Editor({ path: pathOverride, embedded }: { path?: string | null; embedded?: boolean } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
-  const resetLastAppliedPath = useSkillNotebookStore((s) => s.resetLastAppliedPath)
+  const resetLastAppliedPath = useNotebookStore((s) => s.resetLastAppliedPath)
   const setNotebookDraftPath  = useUiStore(s => s.setNotebookDraftPath)
   const notebookSaveRequested = useUiStore(s => s.notebookSaveRequested)
   const notebookOpenDraftReq  = useUiStore(s => s.notebookOpenDraftRequested)

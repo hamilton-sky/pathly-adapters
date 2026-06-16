@@ -59,12 +59,12 @@ export function PanelNav({ compact }: PanelNavProps): JSX.Element {
           {!compact && <span className={styles.navBtnLabel}>DB Explorer</span>}
         </button>
       </Tooltip>
-      <Tooltip label="Skill notebook" shortcut="Ctrl+4" placement="bottom">
+      <Tooltip label="Markdown notebook" shortcut="Ctrl+4" placement="bottom">
         <button
           type="button"
           data-testid="topbar-panel-notebook"
-          className={`${styles.navBtn} ${activePanel === "skill-notebook" ? styles.navBtnActive : ""}`}
-          onClick={() => setActivePanel("skill-notebook")}
+          className={`${styles.navBtn} ${activePanel === "notebook" ? styles.navBtnActive : ""}`}
+          onClick={() => setActivePanel("notebook")}
         >
           <BookOpen size={15} />
           {!compact && <span className={styles.navBtnLabel}>Notebook</span>}

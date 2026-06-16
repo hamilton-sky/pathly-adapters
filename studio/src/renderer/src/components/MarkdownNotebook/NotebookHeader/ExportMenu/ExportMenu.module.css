@@ -1,0 +1,88 @@
+.wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 10px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-md);
+  color: #fff;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: opacity var(--transition-fast);
+}
+
+.trigger:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.label {
+  white-space: nowrap;
+}
+
+.chev {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* Drop-DOWN menu — opens below the trigger, right-aligned to the header edge */
+.menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 50;
+  min-width: 196px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 12px 7px 9px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.item:hover {
+  background-color: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
+.item[data-state='success'] { color: var(--green); }
+.item[data-state='error']   { color: var(--red); }
+
+.divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-color);
+}

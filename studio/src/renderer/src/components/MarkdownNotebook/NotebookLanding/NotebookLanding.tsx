@@ -6,7 +6,7 @@ const FEATURES = [
   {
     icon: BookOpen,
     title: 'Visual editor',
-    body: 'Drag and reorder sections, edit cells inline, preview the assembled skill live.',
+    body: 'Drag and reorder sections, edit cells inline, preview the assembled document live.',
   },
   {
     icon: FileCode,
@@ -16,7 +16,7 @@ const FEATURES = [
   {
     icon: GitCompare,
     title: 'Draft review',
-    body: 'When an agent edits a skill, compare changes inline and accept or discard.',
+    body: 'When an agent edits a document, compare changes inline and accept or discard.',
   },
 ] as const
 
@@ -31,8 +31,8 @@ export default function NotebookLanding() {
           <BookOpen size={30} />
         </div>
         <div className={styles.heroText}>
-          <h2 className={styles.title}>Skill Notebook</h2>
-          <p className={styles.subtitle}>Your workspace for reading and editing skill files</p>
+          <h2 className={styles.title}>Markdown Notebook</h2>
+          <p className={styles.subtitle}>Your workspace for reading and editing any markdown file</p>
         </div>
       </div>
 

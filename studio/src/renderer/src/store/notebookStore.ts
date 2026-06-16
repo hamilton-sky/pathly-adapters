@@ -22,7 +22,7 @@ export interface FragmentCell {
 
 export type NotebookCell = BodyCell | FragmentCell
 
-interface SkillNotebookState {
+interface NotebookState {
   cells: NotebookCell[]
   history: NotebookCell[][]
   historyIndex: number
@@ -55,7 +55,7 @@ interface SkillNotebookState {
   splitBodyCell: (cellId: string, newCells: Array<{ heading: string; content: string }>) => void
 }
 
-export const useSkillNotebookStore = create<SkillNotebookState>((set, get) => ({
+export const useNotebookStore = create<NotebookState>((set, get) => ({
   cells: [],
   history: [],
   historyIndex: -1,

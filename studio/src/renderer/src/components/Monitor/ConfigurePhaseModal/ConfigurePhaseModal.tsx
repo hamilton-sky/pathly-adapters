@@ -59,7 +59,7 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   const projectPath          = useStore((s) => s.projectPath)
   const activeTopic          = useStore((s) => s.activeTopic)
   const setActivePanel       = useStore((s) => s.setActivePanel)
-  const setSkillNotebookPath = useUiStore((s) => s.setSkillNotebookPath)
+  const setNotebookPath = useUiStore((s) => s.setNotebookPath)
 
   const agentCatalog = useAgentCatalog(projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
@@ -141,8 +141,8 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
 
   function handleOpenInNotebook(): void {
     const relPath = SKILL_FILE_PATHS[skill] ?? skill
-    setSkillNotebookPath(`${projectPath}/src/pathly_data/core/skills/${relPath}.md`)
-    setActivePanel('skill-notebook')
+    setNotebookPath(`${projectPath}/src/pathly_data/core/skills/${relPath}.md`)
+    setActivePanel('notebook')
     onClose()
   }
 

@@ -25,7 +25,7 @@ function loadLastUsedFlowPath(): string | null {
 
 export interface UiState {
   sidebarCollapsed: boolean
-  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer' | 'command-center'
+  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'notebook' | 'db-explorer' | 'command-center'
   dirtyItems: Set<string>
   theme: ThemeName
   preferredDark: ThemeName
@@ -37,8 +37,8 @@ export interface UiState {
   lastUsedFlowPath: string | null
   chatOpen: boolean
   skillsPanelOpen: boolean
-  skillNotebookPath: string | null
-  skillNotebookViewMode: 'cells' | 'editor'
+  notebookPath: string | null
+  notebookViewMode: 'cells' | 'editor'
   notebookPreviewOpen: boolean
   /** Draft path known to the embedded source editor — null when no draft exists */
   notebookDraftPath: string | null
@@ -55,7 +55,7 @@ export interface UiState {
   /** Increment to request the embedded source editor to redo */
   notebookRedoRequested: number
   setSidebarCollapsed: (v: boolean) => void
-  setSkillNotebookViewMode: (mode: 'cells' | 'editor') => void
+  setNotebookViewMode: (mode: 'cells' | 'editor') => void
   toggleNotebookPreview: () => void
   setNotebookDraftPath: (p: string | null) => void
   setNotebookAnalysisPath: (p: string | null) => void
@@ -63,8 +63,8 @@ export interface UiState {
   requestNotebookOpenDraft: () => void
   requestNotebookUndo: () => void
   requestNotebookRedo: () => void
-  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer' | 'command-center') => void
-  setSkillNotebookPath: (path: string | null) => void
+  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'notebook' | 'db-explorer' | 'command-center') => void
+  setNotebookPath: (path: string | null) => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void
   setTheme: (t: ThemeName) => void
@@ -95,8 +95,8 @@ export const useUiStore = create<UiState>()(
       lastUsedFlowPath: loadLastUsedFlowPath(),
       chatOpen: false,
       skillsPanelOpen: true,
-      skillNotebookPath: null,
-      skillNotebookViewMode: 'cells',
+      notebookPath: null,
+      notebookViewMode: 'cells',
       notebookPreviewOpen: true,
       notebookDraftPath: null,
       notebookAnalysisPath: null,
@@ -115,8 +115,8 @@ export const useUiStore = create<UiState>()(
       requestNotebookUndo: () => set((s) => ({ notebookUndoRequested: s.notebookUndoRequested + 1 })),
       requestNotebookRedo: () => set((s) => ({ notebookRedoRequested: s.notebookRedoRequested + 1 })),
       setActivePanel: (p) => set({ activePanel: p }),
-      setSkillNotebookPath: (path) => set({ skillNotebookPath: path }),
-      setSkillNotebookViewMode: (mode) => set({ skillNotebookViewMode: mode }),
+      setNotebookPath: (path) => set({ notebookPath: path }),
+      setNotebookViewMode: (mode) => set({ notebookViewMode: mode }),
       markDirty: (path) => set((s) => ({ dirtyItems: new Set([...s.dirtyItems, path]) })),
       clearDirty: (path) =>
         set((s) => {

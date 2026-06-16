@@ -112,6 +112,7 @@ declare global {
         moveToParent: (filePath: string) => Promise<string>
         move: (src: string, dest: string) => Promise<void>
         pickFolder: () => Promise<string | null>
+        saveDialog: (defaultPath: string, content: string, intoDownloads?: boolean) => Promise<string | null>
         userHome: () => Promise<string>
         appRoot: () => Promise<string>
       }

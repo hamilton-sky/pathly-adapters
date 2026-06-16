@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { Tooltip } from '../../ui'
-import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
+import { useNotebookStore } from '../../../store/notebookStore'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './NotebookCanvas.module.css'
 import BodyCell from '../BodyCell/BodyCell'
@@ -9,22 +9,22 @@ import FragmentCell from '../FragmentCell/FragmentCell'
 import InsertZone from '../InsertZone/InsertZone'
 
 export default function NotebookCanvas() {
-  const { cells, insertFragment, insertBodyCell, moveCell, removeCell, revertBodyCell, undo, redo } = useSkillNotebookStore()
-  const skillNotebookPath = useUiStore(s => s.skillNotebookPath)
-  const setSkillNotebookPath = useUiStore(s => s.setSkillNotebookPath)
-  const setSkillNotebookViewMode = useUiStore(s => s.setSkillNotebookViewMode)
-  const loadSkill = useSkillNotebookStore(s => s.loadSkill)
+  const { cells, insertFragment, insertBodyCell, moveCell, removeCell, revertBodyCell, undo, redo } = useNotebookStore()
+  const notebookPath = useUiStore(s => s.notebookPath)
+  const setNotebookPath = useUiStore(s => s.setNotebookPath)
+  const setNotebookViewMode = useUiStore(s => s.setNotebookViewMode)
+  const loadSkill = useNotebookStore(s => s.loadSkill)
 
   const [activeZone, setActiveZone] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [newCellId, setNewCellId] = useState<string | null>(null)
 
-  const pathParts = skillNotebookPath ? skillNotebookPath.replace(/\\/g, '/').split('/') : []
+  const pathParts = notebookPath ? notebookPath.replace(/\\/g, '/').split('/') : []
   const skillName = pathParts[pathParts.length - 1]?.replace('.md', '') ?? ''
 
   useEffect(() => {
-    if (skillNotebookPath) loadSkill(skillNotebookPath)
-  }, [skillNotebookPath])
+    if (notebookPath) loadSkill(notebookPath)
+  }, [notebookPath])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -37,18 +37,18 @@ export default function NotebookCanvas() {
 
   const handleOpenFragment = useCallback(async (path: string | undefined, name: string) => {
     if (path) {
-      setSkillNotebookPath(path)
-      setSkillNotebookViewMode('editor')
+      setNotebookPath(path)
+      setNotebookViewMode('editor')
       return
     }
     const { apiFetch } = await import('../../../lib/config')
     const res = await apiFetch('/catalog/all').then(r => r.json()).catch(() => null)
     const found = res?.fragments?.find((f: { name: string; path: string }) => f.name === name)
     if (found?.path) {
-      setSkillNotebookPath(found.path)
-      setSkillNotebookViewMode('editor')
+      setNotebookPath(found.path)
+      setNotebookViewMode('editor')
     }
-  }, [setSkillNotebookPath, setSkillNotebookViewMode])
+  }, [setNotebookPath, setNotebookViewMode])
 
   function handleInsertZoneDrop(afterCellId: string | null, e: React.DragEvent) {
     const fragmentName = e.dataTransfer.getData('fragment-name')

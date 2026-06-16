@@ -2,7 +2,7 @@
 import { ChevronUp, ChevronDown, MoreHorizontal, Copy, Diamond, Trash2 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import styles from './FragmentCell.module.css'
-import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
+import { useNotebookStore } from '../../../store/notebookStore'
 
 interface Props {
   id: string
@@ -28,7 +28,7 @@ export default function FragmentCell({
   isNew = false, isFirst = false, isLast = false,
   onMoveUp, onMoveDown,
 }: Props) {
-  const removeCell = useSkillNotebookStore(s => s.removeCell)
+  const removeCell = useNotebookStore(s => s.removeCell)
   const [showNew, setShowNew]   = useState(isNew)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)

@@ -15,7 +15,7 @@ async function pollForFile(path: string): Promise<boolean> {
 }
 
 export function useNotebookAgentActions(
-  skillNotebookPath: string | null,
+  notebookPath: string | null,
   splitOncePrompt: string | null,
   analyzeOncePrompt: string | null,
   onSplitOnceUsed: () => void,
@@ -25,17 +25,17 @@ export function useNotebookAgentActions(
   const openTab = useTerminalStore((s) => s.openTab)
   const setNotebookDraftPath     = useUiStore((s) => s.setNotebookDraftPath)
   const setNotebookAnalysisPath  = useUiStore((s) => s.setNotebookAnalysisPath)
-  const setSkillNotebookViewMode = useUiStore((s) => s.setSkillNotebookViewMode)
+  const setNotebookViewMode = useUiStore((s) => s.setNotebookViewMode)
 
   const [splitState,   setSplitState]   = useState<ActionState>('idle')
   const [analyzeState, setAnalyzeState] = useState<ActionState>('idle')
 
   const handleSplit = useCallback(async () => {
-    if (!skillNotebookPath || splitState === 'running') return
+    if (!notebookPath || splitState === 'running') return
     setSplitState('running')
     onSplitOnceUsed()
-    const draftPath = skillNotebookPath + '.draft'
-    const norm = skillNotebookPath.replace(/\\/g, '/')
+    const draftPath = notebookPath + '.draft'
+    const norm = notebookPath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `split-${Date.now().toString(36)}`
     addTab(tabId, `Split · ${fileName}`)
@@ -46,7 +46,7 @@ export function useNotebookAgentActions(
       void pollForFile(draftPath).then((found) => {
         if (found) {
           setNotebookDraftPath(draftPath)
-          setSkillNotebookViewMode('editor')
+          setNotebookViewMode('editor')
           setSplitState('success')
           setTimeout(() => setSplitState('idle'), 3000)
         } else {
@@ -55,18 +55,18 @@ export function useNotebookAgentActions(
         }
       })
     })
-    const prompt = splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, skillNotebookPath)
-    await window.pathly.terminal.spawn(tabId, getSpawnCwd(skillNotebookPath), undefined, [
+    const prompt = splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, notebookPath)
+    await window.pathly.terminal.spawn(tabId, getSpawnCwd(notebookPath), undefined, [
       'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
     ])
-  }, [skillNotebookPath, splitState, splitOncePrompt, onSplitOnceUsed, addTab, openTab, setNotebookDraftPath, setSkillNotebookViewMode])
+  }, [notebookPath, splitState, splitOncePrompt, onSplitOnceUsed, addTab, openTab, setNotebookDraftPath, setNotebookViewMode])
 
   const handleAnalyze = useCallback(async () => {
-    if (!skillNotebookPath || analyzeState === 'running') return
+    if (!notebookPath || analyzeState === 'running') return
     setAnalyzeState('running')
     onAnalyzeOnceUsed()
-    const analysisPath = skillNotebookPath + '.analysis'
-    const norm = skillNotebookPath.replace(/\\/g, '/')
+    const analysisPath = notebookPath + '.analysis'
+    const norm = notebookPath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `analyze-${Date.now().toString(36)}`
     addTab(tabId, `Analyze · ${fileName}`)
@@ -85,11 +85,11 @@ export function useNotebookAgentActions(
         }
       })
     })
-    const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, skillNotebookPath)
-    await window.pathly.terminal.spawn(tabId, getSpawnCwd(skillNotebookPath), undefined, [
+    const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, notebookPath)
+    await window.pathly.terminal.spawn(tabId, getSpawnCwd(notebookPath), undefined, [
       'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
     ])
-  }, [skillNotebookPath, analyzeState, analyzeOncePrompt, onAnalyzeOnceUsed, addTab, openTab, setNotebookAnalysisPath])
+  }, [notebookPath, analyzeState, analyzeOncePrompt, onAnalyzeOnceUsed, addTab, openTab, setNotebookAnalysisPath])
 
   return { handleSplit, handleAnalyze, splitState, analyzeState }
 }

@@ -12,7 +12,7 @@ import { WorkspacePanel } from './panels/WorkspacePanel'
 import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
 import SkillSplitModal from '../shared/SkillSplitModal/SkillSplitModal'
 import type { CatalogGroup, CatalogItemData } from '../shared/LibraryCatalog/useCatalogData'
-import { useSkillNotebookStore } from '../../store/skillNotebookStore'
+import { useNotebookStore } from '../../store/notebookStore'
 import { useSidebarResize } from './shell/useSidebarResize'
 import { useWindowWidth } from './shell/useWindowWidth'
 import { TabBar } from './shell/TabBar'
@@ -63,17 +63,17 @@ export function Sidebar(): JSX.Element | null {
     selectedItem,
     setSelectedItem,
     setActivePanel,
-    setSkillNotebookPath,
-    skillNotebookViewMode,
-    setSkillNotebookViewMode,
+    setNotebookPath,
+    notebookViewMode,
+    setNotebookViewMode,
     dirtyItems,
     activePanel,
     setLastUsedFlowPath,
   } = useStore()
 
-  const insertFragment = useSkillNotebookStore((s) => s.insertFragment)
-  const insertBodyCell = useSkillNotebookStore((s) => s.insertBodyCell)
-  const notebookCells  = useSkillNotebookStore((s) => s.cells)
+  const insertFragment = useNotebookStore((s) => s.insertFragment)
+  const insertBodyCell = useNotebookStore((s) => s.insertBodyCell)
+  const notebookCells  = useNotebookStore((s) => s.cells)
 
   const { sections, setSections, loadItems, customWorkspaceSections } = useProjectFiles()
   const { planFolders, setPlanFolders, loadPlanFiles } = usePlanFiles()
@@ -196,8 +196,8 @@ export function Sidebar(): JSX.Element | null {
       setActivePanel('flow')
       setLastUsedFlowPath(item.path)
     } else if (item.path.endsWith('.md')) {
-      setActivePanel('skill-notebook')
-      setSkillNotebookPath(item.path)
+      setActivePanel('notebook')
+      setNotebookPath(item.path)
     } else {
       setActivePanel('editor')
     }
@@ -592,9 +592,9 @@ export function Sidebar(): JSX.Element | null {
       <div className={styles.treeContainer}>
         {libraryOpen && (
           <LibraryCatalog
-            context={activePanelUi === 'skill-notebook' ? 'notebook' : 'canvas'}
+            context={activePanelUi === 'notebook' ? 'notebook' : 'canvas'}
             pathlyRoot={pathlyRoot}
-            onOpenSkill={(path) => { setSkillNotebookPath(path); setActivePanel('skill-notebook') }}
+            onOpenSkill={(path) => { setNotebookPath(path); setActivePanel('notebook') }}
             onOpenFlow={(pathOrName) => {
               const filename = pathOrName.replace(/\\/g, '/').split('/').pop() ?? pathOrName
               const name = filename.replace(/\.flow\.yaml$/i, '')
@@ -603,7 +603,7 @@ export function Sidebar(): JSX.Element | null {
               setLastUsedFlowPath(pathOrName)
             }}
             onInsertCell={(item) => {
-              if (skillNotebookViewMode !== 'cells') setSkillNotebookViewMode('cells')
+              if (notebookViewMode !== 'cells') setNotebookViewMode('cells')
               const lastCell = notebookCells[notebookCells.length - 1]
               if (item.itemType === 'fragment') {
                 insertFragment(item.name, lastCell?.id ?? null)
@@ -741,13 +741,13 @@ export function Sidebar(): JSX.Element | null {
           onClose={() => setSplitModalItem(null)}
           onInsertOne={(raw) => {
             setSplitModalItem(null)
-            if (skillNotebookViewMode !== 'cells') setSkillNotebookViewMode('cells')
+            if (notebookViewMode !== 'cells') setNotebookViewMode('cells')
             const lastCell = notebookCells[notebookCells.length - 1]
             insertBodyCell(splitModalItem.name, raw, lastCell?.id ?? null)
           }}
           onConfirm={(cells) => {
             setSplitModalItem(null)
-            if (skillNotebookViewMode !== 'cells') setSkillNotebookViewMode('cells')
+            if (notebookViewMode !== 'cells') setNotebookViewMode('cells')
             let lastId = notebookCells[notebookCells.length - 1]?.id ?? null
             for (const cell of cells) {
               lastId = insertBodyCell(cell.heading, cell.content, lastId)

@@ -14,7 +14,7 @@ import { TopBar } from './components/topbar'
 import { Monitor } from './components/Monitor'
 import { PlanBoard } from './components/PlanBoard'
 import { Settings } from './components/Settings'
-import SkillNotebookPanel from './components/SkillNotebook/SkillNotebook'
+import MarkdownNotebookPanel from './components/MarkdownNotebook/MarkdownNotebook'
 import { DBExplorer } from './components/DBExplorer/DBExplorer'
 import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
@@ -56,7 +56,7 @@ function MainPanel(): JSX.Element {
     )
   if (activePanel === 'monitor') return <Monitor />
   if (activePanel === 'settings') return <Settings />
-  if (activePanel === 'skill-notebook') return <SkillNotebookPanel />
+  if (activePanel === 'notebook') return <MarkdownNotebookPanel />
   if (activePanel === 'db-explorer') return <DBExplorer />
   if (activePanel === 'command-center') return <CommandCenter />
   return (
@@ -201,11 +201,11 @@ function MainApp(): JSX.Element | null {
         if (!useTerminalStore.getState().open) useTerminalStore.getState().toggle()
         return
       }
-      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'skill-notebook', 'db-explorer', 'command-center'])
+      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'notebook', 'db-explorer', 'command-center'])
       if (!allowed.has(panelName)) {
         throw new Error(`Unknown panel: ${panelName}`)
       }
-      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'skill-notebook' | 'db-explorer' | 'command-center')
+      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'notebook' | 'db-explorer' | 'command-center')
     }
     return () => {
       delete bridge.__pathlyNavigate
@@ -213,11 +213,11 @@ function MainApp(): JSX.Element | null {
   }, [setActivePanel])
 
   useEffect(() => {
-    const PANEL_KEYS: Record<string, 'command-center' | 'monitor' | 'db-explorer' | 'skill-notebook' | 'flow'> = {
+    const PANEL_KEYS: Record<string, 'command-center' | 'monitor' | 'db-explorer' | 'notebook' | 'flow'> = {
       '1': 'command-center',
       '2': 'monitor',
       '3': 'db-explorer',
-      '4': 'skill-notebook',
+      '4': 'notebook',
       '5': 'flow',
     }
     const handler = (e: KeyboardEvent) => {

@@ -6,7 +6,7 @@ import {
 import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../../shared/MarkdownRenderer/MarkdownRenderer'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
-import { useSkillNotebookStore } from '../../../store/skillNotebookStore'
+import { useNotebookStore } from '../../../store/notebookStore'
 import styles from './BodyCell.module.css'
 
 type CellMode = 'view' | 'edit' | 'split'
@@ -31,9 +31,9 @@ export default function BodyCell({
   isSystem = false, isFirst = false, isLast = false,
   onMoveUp, onMoveDown, onRemove, onRevert,
 }: Props) {
-  const updateBodyCell = useSkillNotebookStore(s => s.updateBodyCell)
-  const insertBodyCell = useSkillNotebookStore(s => s.insertBodyCell)
-  const splitBodyCell  = useSkillNotebookStore(s => s.splitBodyCell)
+  const updateBodyCell = useNotebookStore(s => s.updateBodyCell)
+  const insertBodyCell = useNotebookStore(s => s.insertBodyCell)
+  const splitBodyCell  = useNotebookStore(s => s.splitBodyCell)
 
   const [cellMode, setCellMode]         = useState<CellMode>('view')
   const [draft, setDraft]               = useState(content)
