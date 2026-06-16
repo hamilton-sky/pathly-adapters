@@ -42,3 +42,22 @@ def read_state(
     if row is None:
         return None
     return json.loads(row["state_json"])
+
+
+def read_all_states(conn: sqlite3.Connection, project_root: str) -> list[dict]:
+    """Return every feature for *project_root* with its state dict + updated_at,
+    newest first. Lets callers enumerate features from the authoritative DB
+    instead of globbing ``*/STATE.json`` on disk."""
+    rows = conn.execute(
+        "SELECT feature, state_json, updated_at FROM fsm_state "
+        "WHERE project_root=? ORDER BY updated_at DESC",
+        (_norm(project_root),),
+    ).fetchall()
+    out: list[dict] = []
+    for r in rows:
+        try:
+            state = json.loads(r["state_json"])
+        except (json.JSONDecodeError, TypeError):
+            state = {}
+        out.append({"feature": r["feature"], "state": state, "updated_at": r["updated_at"]})
+    return out

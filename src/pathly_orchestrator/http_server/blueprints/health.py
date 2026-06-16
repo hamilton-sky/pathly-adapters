@@ -84,24 +84,17 @@ def status_endpoint():
             if best_state is not None:
                 best_state_dir = topic_dir
     else:
-        # Find the most recently updated STATE.json across all features.
-        best_mtime: float = -1.0
+        # Most-recently-updated feature, read from the authoritative fsm_state DB
+        # (no STATE.json glob — the DB is the source of truth for enumeration too).
         try:
-            for state_file in plans_dir.glob("*/STATE.json"):
-                if not state_file.resolve().is_relative_to(resolved_root):
-                    continue
-                try:
-                    mtime = state_file.stat().st_mtime
-                    if mtime > best_mtime:
-                        candidate = read_state(str(state_file.parent))
-                        if candidate is not None:
-                            best_mtime = mtime
-                            best_state = candidate
-                            best_state_dir = state_file.parent
-                except Exception:
-                    logger.debug("status: error reading %s", state_file, exc_info=True)
+            from pathly_orchestrator.db.connection import get_db as _get_db
+            from pathly_orchestrator.db.queries.fsm_state import read_all_states as _read_all
+            rows = _read_all(_get_db(project_root), project_root)
+            if rows:
+                best_state = rows[0]["state"]
+                best_state_dir = plans_dir / rows[0]["feature"]
         except Exception:
-            logger.debug("status: error scanning plans dir", exc_info=True)
+            logger.debug("status: error reading fsm_state", exc_info=True)
             return jsonify({"current_state": "unknown"}), 200
 
     if best_state is None:
