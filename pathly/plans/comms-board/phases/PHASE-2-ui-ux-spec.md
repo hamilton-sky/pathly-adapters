@@ -250,52 +250,8 @@ Only `P2-D` joins the two tracks. Phase 3 flips `k>1` by lane (across-goal first
 
 ---
 
-## Appendix — revised Phase-0b implementation prompt (use this, not the original)
+## Appendix — the Phase-0b build prompt has moved
 
-> Corrections vs. the original: (1) `executor` removed from the task JSON — **goal-only**; (2) emit the *exact*
-> canonical JSON incl. `conv` (int); (3) scope-honest headline + explicit NON-GOALS; (4) negative-path + back-compat
-> test required; (5) explicit goal-first idempotency; (6) propagation covers `plan.md` **and** `planner.md`.
-
-```
-You're on feat/comms-board-dag-serial. Build Phase 0b — the keystone that makes the planner emit a
-machine-readable task DAG onto the comms board (the data substrate the P1 dispatcher and P2 UI will
-later drive). Read PHASE-0b-planner-dag-wiring.md and GOALS-DAG-EXECUTORS.md first.
-
-OUT OF SCOPE: no Run button, no executor selector, no goal/task rendering, no dispatcher — frontend is
-Phase 2. The two-flow split (consultation + trimmed-team YAML in core/flows/) is a SEPARATE follow-on.
-No schema migration (columns exist from 0a). No templates.
-
-STEP 1 — write path (code, verify in isolation, do FIRST). Land both files atomically.
-  File A — http_server/blueprints/comms.py (comms_post route, ~line 140): after the depends_on read,
-    add goal_id = data.get("goal_id") and executor = data.get("executor"); after the depends_on
-    validation, add type-guards returning 400 if present and not a string (comment: executor is any
-    string — the {single,loop,team} enum is enforced downstream by the Phase-1 dispatcher); pass
-    goal_id=…, executor=… into _post_message(...); add them to the docstring "Optional:" line.
-  File B — db/queries/comms.py (post_message, ~line 18): add keyword params after artifact_type:
-    goal_id: str | None = None, executor: str | None = None; add the two INSERT columns + placeholders
-    + values. (None-defaults keep back-compat.)
-  Verify: POST a type='task' with goal_id+executor AND a type='goal' with executor → GET both back →
-    confirm persist. Then ADD tests/test_comms_goal_executor.py (mirror test_comms_dag.py): (1) round-trip
-    non-null; (2) goal_id non-string → 400; (3) task with NO goal_id/executor → 200 + NULL columns
-    (back-compat). Run: python -m pytest tests/test_comms_*.py -q.
-
-STEP 2 — planner → DAG (skill). File: core/skills/planning/plan.md, Step 6 (~lines 266-306).
-  BEFORE the phase loop, insert a goal-first block: extend the idempotency guard to skip if a type='goal'
-    OR any type='task' already exists for this scope; else POST one goal {from:"planner", type:"goal",
-    text:"Goal: <feature>", board:"feature", scope:"$FEATURE", executor:"single"} and capture its
-    message_id as $GOAL_ID.
-  Then per phase, in order, POST type='task' with the EXACT canonical JSON (record each returned
-    message_id into a phase_N→id map for depends_on): keys feature, from, type, text, board, scope,
-    stage:"BUILDING", conv (int — optional, never a string), depends_on, goal_id:"$GOAL_ID",
-    artifact_path, artifact_type:"plan_artifact". executor is NOT on the task.
-  Keep the fail-silent-on-connection-refused branch. Optional: add to core/agents/planning/planner.md:
-    "Before returning, you MUST execute plan.md Step 6 to seed the comms-board task DAG."
-  Propagate (mandatory, covers plan.md AND planner.md): pathly-setup claude --apply --repair ; python -m build.
-
-DONE-STATE (manual check): GET /comms/tasks?feature=$FEATURE → one type='goal' + N type='task', all
-  goal_id == the goal's message_id, depends_on edges acyclic (roots []), executor on the goal only.
-
-KNOWN FOLLOW-UPS (flag, NOT 0b): get_ready_tasks is board+scope only (the P1 dispatcher must add a
-  goal_id filter); the idempotency guard is goal-blind (partial-seed can't self-heal); executor is
-  stored but unread until the P1 dispatcher. Next phase after 0b = the P1 dispatcher.
-```
+The corrected, ready-to-run **Phase-0b build prompt** now lives in its natural home —
+[PHASE-0b-planner-dag-wiring.md](PHASE-0b-planner-dag-wiring.md) → "▶ Ready-to-run build prompt".
+Hand that to the new build session. (This Phase-2 spec is the *frontend* phase; 0b is backend+skill.)
