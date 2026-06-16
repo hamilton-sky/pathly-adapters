@@ -59,11 +59,18 @@ Per-phase POST, in phase order, recording each returned `message_id` into a loca
   "board": "feature", "scope": "$FEATURE", "stage": "BUILDING",
   "conv": <int>,
   "depends_on": ["<phase_K_message_id>"],
-  "goal_id": "$GOAL_ID", "executor": "single",
+  "goal_id": "$GOAL_ID",
   "artifact_path": "pathly/plans/$FEATURE/IMPLEMENTATION_PLAN.md",
   "artifact_type": "plan_artifact"
 }
 ```
+> **CORRECTION (2026-06-17):** `executor` is **NOT** on the task. Per
+> [GOALS-DAG-EXECUTORS.md](../GOALS-DAG-EXECUTORS.md) §3, `executor` is stored on the
+> **goal message only** (`single` is an ad-hoc action on a task and isn't stored). An
+> earlier draft of this block carried `"executor":"single"` on the task — that was a typo;
+> do not propagate it. The DB column exists on the row and is harmlessly NULL for tasks.
+> (Also: `conv` is optional but, if present, MUST be a JSON **integer** literal — the route
+> 400s on a string.)
 Keep the existing **idempotency guard** (`GET /comms/tasks?feature=$FEATURE` → skip if
 tasks exist) and **fail-silent on connection refused** (plan files are authoritative).
 
