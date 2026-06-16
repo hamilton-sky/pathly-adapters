@@ -1,17 +1,8 @@
-import React from 'react'
-import { Check, History, FileText, Search, Eye, SquarePen } from 'lucide-react'
+import React, { useState } from 'react'
+import { Check, History, FileText, Search, Eye, ChevronRight } from 'lucide-react'
 import type { Message } from '../../CommandCenter/types'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
-import { useUiStore } from '../../../store/uiStore'
-import { useProjectStore } from '../../../store/projectStore'
 import s from './CommsMsgCard.module.css'
-
-// Open an artifact file in the markdown editor panel.
-function openArtifactInEditor(path: string): void {
-  const name = path.split(/[/\\]/).pop() ?? path
-  useProjectStore.getState().setSelectedItem({ name, path, type: 'plan' })
-  useUiStore.getState().setActivePanel('editor')
-}
 
 export interface CardBodyProps {
   message: Message
@@ -20,6 +11,7 @@ export interface CardBodyProps {
 }
 
 export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
+  const [expanded, setExpanded] = useState(false)
   const supersededBanner = m.supersededBy
     ? <div className={s.supersededNote}>superseded — see newer message</div>
     : null
@@ -28,22 +20,25 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
     return (
       <>
         {supersededBanner}
-        <div className={s.art}>
+        <button
+          type="button"
+          className={s.artHead}
+          onClick={() => setExpanded((e) => !e)}
+          {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+          aria-label={expanded ? 'Hide artifact summary' : 'Show artifact summary'}
+        >
           <span className={s.artIco}><FileText size={15} /></span>
           <span className={s.artName}>{m.artifact}</span>
-          {m.artifactPath && (
-            <button
-              type="button"
-              className={s.artOpen}
-              title="Open this artifact in the editor"
-              onClick={() => openArtifactInEditor(m.artifactPath as string)}
-            >
-              <SquarePen size={11} /> Open in editor
-            </button>
-          )}
-        </div>
-        <div className={s.artExcerpt}><MarkdownRenderer content={m.text} /></div>
-        <div className={s.artQ}><Search size={11} />agents can query this by content</div>
+          <span className={s.artChevron} {...(expanded ? { 'data-open': '' } : {})}>
+            <ChevronRight size={14} />
+          </span>
+        </button>
+        {expanded && (
+          <>
+            <div className={s.artExcerpt}><MarkdownRenderer content={m.text} /></div>
+            <div className={s.artQ}><Search size={11} />agents can query this by content</div>
+          </>
+        )}
       </>
     )
   }

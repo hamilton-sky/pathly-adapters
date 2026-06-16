@@ -228,6 +228,31 @@
   gap: 9px;
 }
 
+/* Clickable artifact header — toggles the summary open/closed. */
+.artHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.artChevron {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.artHead:hover .artChevron { color: var(--text-secondary); }
+.artChevron[data-open] { transform: rotate(90deg); }
+
 .artIco {
   width: 30px;
   height: 30px;
@@ -247,25 +272,28 @@
 }
 
 .artOpen {
-  margin-left: auto;
+  /* Footer item: sits at the bottom-left of the card; margin-right:auto pushes
+     the stage + timestamp to the right edge. No wasted vertical space. */
+  margin-right: auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex-shrink: 0;
-  padding: 4px 9px;
-  border: var(--border);
+  padding: 4px 11px;
+  border: 1px solid var(--accent-border);
   border-radius: var(--radius-md);
-  background: var(--bg-base);
-  color: var(--text-secondary);
-  font: 500 11px/1 var(--font-family-base);
+  background: var(--accent-bg);
+  color: var(--accent);
+  font: 600 11px/1 var(--font-family-base);
   cursor: pointer;
-  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .artOpen:hover {
   color: var(--text-primary);
-  border-color: var(--accent-border);
-  background: var(--bg-surface1);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .artExcerpt {

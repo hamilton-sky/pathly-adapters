@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, Trash2 } from 'lucide-react'
+import { Check, Trash2, Info } from 'lucide-react'
 import type { Message } from '../../CommandCenter/types'
 import { agentMeta } from '../../CommandCenter/constants'
 import { Avatar } from './Avatar'
@@ -7,6 +7,8 @@ import { MessageTypeBadge } from './MessageTypeBadge'
 import { CardBody } from './CardBody'
 import { SupersedeMenu } from './SupersedeMenu/SupersedeMenu'
 import { ConfirmModal } from '../../shared/ConfirmModal/ConfirmModal'
+import { ArtifactModal } from './ArtifactModal/ArtifactModal'
+import { Tooltip } from '../../ui'
 import s from './CommsMsgCard.module.css'
 
 export interface CommsMsgCardProps {
@@ -23,6 +25,7 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
   const agent = agentMeta(m.from)
   const canDelete = !!onDelete   // every message can be removed from the board
   const [confirming, setConfirming] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
   return (
     <div
       className={`${s.msg}${flash ? ` ${s.flash}` : ''}`}
@@ -63,6 +66,18 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
         </div>
         <CardBody message={m} onAnswer={onAnswer} onResolve={onResolve} />
         <div className={s.cardFoot}>
+          {m.type === 'artifact' && (
+            <Tooltip label="Artifact details — metadata, preview, open in editor" placement="top">
+              <button
+                type="button"
+                className={s.artOpen}
+                aria-label="Show artifact details"
+                onClick={() => setShowDetails(true)}
+              >
+                <Info size={11} /> Details
+              </button>
+            </Tooltip>
+          )}
           {m.stage && (
             <span className={s.msgStage} data-stage={m.stage}>{m.stage}</span>
           )}
@@ -75,6 +90,9 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
             onCancel={() => setConfirming(false)}
             onConfirm={() => { setConfirming(false); onDelete?.(m.id) }}
           />
+        )}
+        {showDetails && (
+          <ArtifactModal message={m} onClose={() => setShowDetails(false)} />
         )}
       </div>
     </div>
