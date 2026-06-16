@@ -29,6 +29,7 @@ export default function FragmentCell({
   onMoveUp, onMoveDown,
 }: Props) {
   const removeCell = useNotebookStore(s => s.removeCell)
+  const duplicateCell = useNotebookStore(s => s.duplicateCell)
   const [showNew, setShowNew]   = useState(isNew)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -86,7 +87,7 @@ export default function FragmentCell({
             </Tooltip>
             {menuOpen && (
               <div className={styles.menu} role="menu">
-                <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
+                <button type="button" className={styles.menuItem} role="menuitem" onClick={() => { duplicateCell(id); setMenuOpen(false) }}>
                   <Copy size={15} className={styles.menuIcon} />Duplicate<span className={styles.menuKbd}>⌘D</span>
                 </button>
                 <button type="button" className={styles.menuItem} role="menuitem" disabled={isFirst} onClick={() => { onMoveUp?.(); setMenuOpen(false) }}>

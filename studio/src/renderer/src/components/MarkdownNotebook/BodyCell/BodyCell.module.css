@@ -202,6 +202,34 @@
   min-height: 80px;
 }
 
+/* ── INLINE FORMAT TOOLBAR (edit / split mode) ── */
+.fmtBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.fmtBtn {
+  width: 28px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.fmtBtn:hover {
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
 .toggle {
   background: none;
   border: none;

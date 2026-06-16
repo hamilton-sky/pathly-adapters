@@ -6,6 +6,7 @@ import {
 import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../../shared/MarkdownRenderer/MarkdownRenderer'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
+import { applyInlineFormat, type InlineFormat } from '../../shared/markdownInline'
 import { useNotebookStore } from '../../../store/notebookStore'
 import styles from './BodyCell.module.css'
 
@@ -34,6 +35,7 @@ export default function BodyCell({
   const updateBodyCell = useNotebookStore(s => s.updateBodyCell)
   const insertBodyCell = useNotebookStore(s => s.insertBodyCell)
   const splitBodyCell  = useNotebookStore(s => s.splitBodyCell)
+  const duplicateCell  = useNotebookStore(s => s.duplicateCell)
 
   const [cellMode, setCellMode]         = useState<CellMode>('view')
   const [draft, setDraft]               = useState(content)
@@ -45,6 +47,7 @@ export default function BodyCell({
 
   const bodyRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const isEditing = cellMode === 'edit' || cellMode === 'split'
   const isLong    = content.split('\n').length > 6
@@ -68,6 +71,24 @@ export default function BodyCell({
   function handleEditClick() { setDraft(content); setHeadingDraft(displayTitle); setCellMode('edit') }
   function handleSplitClick() { setDraft(content); setHeadingDraft(displayTitle); setCellMode(cellMode === 'split' ? 'view' : 'split') }
 
+  function applyFormat(format: InlineFormat) {
+    const ta = textareaRef.current
+    if (!ta) return
+    const next = applyInlineFormat(format, draft, ta.selectionStart, ta.selectionEnd)
+    setDraft(next.text)
+    // Restore the selection after React re-renders the textarea value
+    requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(next.selStart, next.selEnd) })
+  }
+
+  function handleEditorKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { commitEdit(); return }
+    if (!(e.metaKey || e.ctrlKey)) return
+    const k = e.key.toLowerCase()
+    if (k === 'b')          { e.preventDefault(); applyFormat('bold') }
+    else if (k === 'i')     { e.preventDefault(); applyFormat('italic') }
+    else if (e.key === '`') { e.preventDefault(); applyFormat('code') }
+  }
+
   const handleMouseUp = useCallback(() => {
     if (cellMode !== 'view') return
     const sel = window.getSelection()
@@ -85,6 +106,26 @@ export default function BodyCell({
     setSelBar(null)
     window.getSelection()?.removeAllRanges()
   }
+
+  const formatBar = (
+    <div className={styles.fmtBar}>
+      <Tooltip label="Bold" shortcut="Ctrl+B" placement="top">
+        <button type="button" className={styles.fmtBtn} aria-label="Bold" onMouseDown={e => e.preventDefault()} onClick={() => applyFormat('bold')}>
+          <Bold size={13} />
+        </button>
+      </Tooltip>
+      <Tooltip label="Italic" shortcut="Ctrl+I" placement="top">
+        <button type="button" className={styles.fmtBtn} aria-label="Italic" onMouseDown={e => e.preventDefault()} onClick={() => applyFormat('italic')}>
+          <Italic size={13} />
+        </button>
+      </Tooltip>
+      <Tooltip label="Wrap in code" shortcut="Ctrl+`" placement="top">
+        <button type="button" className={styles.fmtBtn} aria-label="Wrap in code" onMouseDown={e => e.preventDefault()} onClick={() => applyFormat('code')}>
+          <Code size={13} />
+        </button>
+      </Tooltip>
+    </div>
+  )
 
   return (
     <div
@@ -147,7 +188,7 @@ export default function BodyCell({
           </Tooltip>
           {menuOpen && (
             <div className={styles.menu} role="menu">
-              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
+              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => { duplicateCell(id); setMenuOpen(false) }}>
                 <Copy size={15} className={styles.menuIcon} />Duplicate<span className={styles.menuKbd}>⌘D</span>
               </button>
               <button type="button" className={styles.menuItem} role="menuitem" disabled={isFirst} onClick={() => { onMoveUp?.(); setMenuOpen(false) }}>
@@ -195,12 +236,14 @@ export default function BodyCell({
       {cellMode === 'split' ? (
         <div className={styles.splitBody}>
           <div className={styles.splitEdit}>
+            {formatBar}
             <textarea
+              ref={textareaRef}
               className={styles.editor}
               value={draft}
               aria-label="Cell content editor"
               onChange={e => setDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commitEdit() }}
+              onKeyDown={handleEditorKeyDown}
               autoFocus
             />
           </div>
@@ -212,15 +255,19 @@ export default function BodyCell({
       ) : (
         <div className={styles.cellBody} ref={bodyRef} onMouseUp={handleMouseUp}>
           {cellMode === 'edit' ? (
-            <textarea
-              className={styles.editor}
-              value={draft}
-              aria-label="Cell content editor"
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commitEdit() }}
-              autoFocus
-              rows={Math.max(4, draft.split('\n').length + 1)}
-            />
+            <>
+              {formatBar}
+              <textarea
+                ref={textareaRef}
+                className={styles.editor}
+                value={draft}
+                aria-label="Cell content editor"
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                autoFocus
+                rows={Math.max(4, draft.split('\n').length + 1)}
+              />
+            </>
           ) : (
             <>
               <MarkdownRenderer content={preview} />
@@ -240,19 +287,6 @@ export default function BodyCell({
               <button type="button" className={styles.selBtn} onClick={handleNewCellFromSelection}>
                 <Sparkles size={12} /><span>New cell from selection</span>
               </button>
-              <span className={styles.selDivider} />
-              <Tooltip label="Insert as fragment" placement="top">
-                <button type="button" className={styles.selBtnIcon} aria-label="Insert as fragment" onClick={() => setSelBar(null)}><Diamond size={12} /></button>
-              </Tooltip>
-              <Tooltip label="Wrap in code" placement="top">
-                <button type="button" className={styles.selBtnIcon} aria-label="Wrap in code" onClick={() => setSelBar(null)}><Code size={12} /></button>
-              </Tooltip>
-              <Tooltip label="Bold" placement="top">
-                <button type="button" className={styles.selBtnIcon} aria-label="Bold" onClick={() => setSelBar(null)}><Bold size={12} /></button>
-              </Tooltip>
-              <Tooltip label="Italic" placement="top">
-                <button type="button" className={styles.selBtnIcon} aria-label="Italic" onClick={() => setSelBar(null)}><Italic size={12} /></button>
-              </Tooltip>
             </div>
           )}
         </div>

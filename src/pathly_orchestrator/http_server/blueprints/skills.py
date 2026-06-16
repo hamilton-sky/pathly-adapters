@@ -637,7 +637,7 @@ def skills_parse():
     try:
         import uuid as _uuid
         import yaml as _yaml
-        from pathly_orchestrator.skill_parser import parse_skill_body
+        from pathly_orchestrator.skill_parser import parse_skill_document
 
         data = request.get_json()
         if not data:
@@ -647,7 +647,9 @@ def skills_parse():
         if not isinstance(skill_path, str) or not skill_path.strip():
             return jsonify({"error": "Field 'skill_path' must be a non-empty string"}), 400
 
-        cells = parse_skill_body(skill_path)
+        document = parse_skill_document(skill_path)
+        cells = document["body_cells"]
+        frontmatter = document["frontmatter"]
 
         # Derive composition_key from path: strip leading dirs down to team/build form
         # Normalize slashes and strip any known prefix to arrive at skill name
@@ -701,7 +703,7 @@ def skills_parse():
             except OSError:
                 pass
 
-        return jsonify({"body_cells": cells, "fragment_cells": fragment_cells, "composition_key": composition_key}), 200
+        return jsonify({"body_cells": cells, "fragment_cells": fragment_cells, "composition_key": composition_key, "frontmatter": frontmatter}), 200
     except FileNotFoundError as e:
         return jsonify({"error": str(e), "type": "FileNotFoundError"}), 404
     except Exception as e:
@@ -724,6 +726,7 @@ def skills_preview():
     try:
         from pathly_orchestrator.compose import compose_skill
         from pathly_orchestrator.fsm_ops import _inject_prompt_vars
+        from pathly_orchestrator.skill_parser import serialize_skill_document
 
         data = request.get_json()
         if not data:
@@ -734,20 +737,12 @@ def skills_preview():
         body_cells_raw = data.get("body_cells", [])
         feature_path = data.get("feature_path", "")
 
-        # Build skill body text from live editor body cells (preferred over disk read)
+        # Build skill body text from live editor body cells (preferred over disk read).
+        # Frontmatter is metadata, not part of the composed prompt → omit it here.
+        # Same serializer as /skills/save, so the preview matches what gets written.
         body_cells_text = ""
         if body_cells_raw:
-            parts_bc = []
-            for bc in body_cells_raw:
-                if not isinstance(bc, dict):
-                    continue
-                heading = (bc.get("heading") or "").strip()
-                content = (bc.get("content") or "").strip()
-                if heading:
-                    parts_bc.append(f"## {heading}\n\n{content}" if content else f"## {heading}")
-                elif content:
-                    parts_bc.append(content)
-            body_cells_text = "\n\n".join(parts_bc)
+            body_cells_text = serialize_skill_document("", body_cells_raw).rstrip("\n")
 
         if not skill and not body_cells_text:
             return jsonify({"error": "Provide 'skill' key or 'body_cells'"}), 400
@@ -829,6 +824,7 @@ def skills_save():
     try:
         from pathly_orchestrator.db import get_db
         from pathly_orchestrator.db.queries.skill_defs import upsert_skill_definition
+        from pathly_orchestrator.skill_parser import serialize_skill_document
 
         data = request.get_json()
         if not data:
@@ -836,24 +832,18 @@ def skills_save():
 
         skill_path = data.get("skill_path", "")
         body_cells = data.get("body_cells", [])
+        frontmatter = data.get("frontmatter", "")
 
         if not isinstance(skill_path, str) or not skill_path.strip():
             return jsonify({"error": "Field 'skill_path' must be a non-empty string"}), 400
         if not isinstance(body_cells, list):
             return jsonify({"error": "Field 'body_cells' must be a list"}), 400
+        if not isinstance(frontmatter, str):
+            frontmatter = ""
 
-        # Reconstruct markdown from body cells
-        parts = []
-        for bc in body_cells:
-            if not isinstance(bc, dict):
-                continue
-            heading = (bc.get("heading") or "").strip()
-            content = (bc.get("content") or "").strip()
-            if heading:
-                parts.append(f"## {heading}\n\n{content}" if content else f"## {heading}")
-            elif content:
-                parts.append(content)
-        markdown = "\n\n".join(parts) + "\n" if parts else ""
+        # Reconstruct markdown — frontmatter preserved byte-for-byte, heading levels
+        # honored. Shared serializer keeps save and preview in lockstep.
+        markdown = serialize_skill_document(frontmatter, body_cells)
 
         # Write to disk (create parent dir if it was deleted)
         Path(skill_path).parent.mkdir(parents=True, exist_ok=True)

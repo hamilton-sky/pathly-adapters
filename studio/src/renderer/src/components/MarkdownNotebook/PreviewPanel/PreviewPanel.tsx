@@ -26,7 +26,7 @@ export default function PreviewPanel() {
 
       const bodyCells = cells
         .filter(c => c.type === 'body')
-        .map(c => ({ heading: (c as any).heading ?? '', content: (c as any).content ?? '' }))
+        .map(c => ({ heading: (c as any).heading ?? '', headingLevel: (c as any).headingLevel ?? 2, content: (c as any).content ?? '' }))
 
       const fragmentCells = cells
         .filter(c => c.type === 'fragment')

@@ -24,7 +24,7 @@ interface Props {
 }
 
 export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
-  const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved, insertBodyCell } = useNotebookStore()
+  const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved, insertBodyCell, frontmatterRaw } = useNotebookStore()
 
   const notebookPath         = useUiStore(s => s.notebookPath)
   const setNotebookPath      = useUiStore(s => s.setNotebookPath)
@@ -101,12 +101,16 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const handleCellsSave = async () => {
     const bodyCells = cells
       .filter(c => c.type === 'body')
-      .map(c => ({ heading: (c as BodyCell).heading, content: (c as BodyCell).content }))
+      .map(c => ({
+        heading: (c as BodyCell).heading,
+        headingLevel: (c as BodyCell).headingLevel ?? 2,
+        content: (c as BodyCell).content,
+      }))
     try {
       const res = await apiFetch('/skills/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skill_path: notebookPath, body_cells: bodyCells }),
+        body: JSON.stringify({ skill_path: notebookPath, body_cells: bodyCells, frontmatter: frontmatterRaw }),
       })
       if (res.ok) {
         markCellsSaved()

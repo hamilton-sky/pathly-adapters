@@ -4,6 +4,9 @@ from pathly_orchestrator.skills.catalog import (
 )
 from pathly_orchestrator.skills.parser import (
     parse_skill_body,
+    parse_skill_document,
+    serialize_skill_document,
+    split_frontmatter,
 )
 from pathly_orchestrator.skills.compose import (
     _KNOWN_CAPABILITIES,
@@ -27,6 +30,9 @@ __all__ = [
     "read_fragment_catalog",
     "_parse_frontmatter",
     "parse_skill_body",
+    "parse_skill_document",
+    "serialize_skill_document",
+    "split_frontmatter",
     "_KNOWN_CAPABILITIES",
     "_KNOWN_ADAPTERS",
     "_skills_root",

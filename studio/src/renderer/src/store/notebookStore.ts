@@ -4,6 +4,8 @@ export interface BodyCell {
   id: string
   type: 'body'
   heading: string
+  /** markdown heading level (# count). 0 = preamble/no heading. Preserved on save. */
+  headingLevel?: number
   content: string
   /** true = loaded from the original skill file; cannot be deleted, only reverted */
   isSystem?: boolean
@@ -30,6 +32,8 @@ interface NotebookState {
   savedHistoryIndex: number
   featurePath: string | null
   compositionKey: string
+  /** Verbatim YAML frontmatter block from the loaded file — preserved byte-for-byte on save */
+  frontmatterRaw: string
   /** Path of the last skill successfully loaded into the store — used to skip redundant reloads */
   lastAppliedPath: string | null
   previewSections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>
@@ -49,6 +53,7 @@ interface NotebookState {
   insertFragment: (fragmentName: string, afterCellId: string | null, path?: string) => string
   insertBodyCell: (heading: string, content: string, afterCellId: string | null) => string
   removeCell: (cellId: string) => void
+  duplicateCell: (cellId: string) => void
   moveCell: (cellId: string, afterCellId: string | null) => void
   updateBodyCell: (cellId: string, content: string, heading?: string) => void
   revertBodyCell: (cellId: string) => void
@@ -63,6 +68,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
   featurePath: null,
   lastAppliedPath: null,
   compositionKey: '',
+  frontmatterRaw: '',
   previewSections: [],
   previewTokens: 0,
   previewLoading: false,
@@ -102,14 +108,16 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
         body: JSON.stringify({ skill_path: skillPath }),
       })
       const data = await res.json() as {
-        body_cells: Array<{ id: string; heading: string; content: string }>
+        body_cells: Array<{ id: string; heading: string; headingLevel?: number; content: string }>
         fragment_cells?: Array<{ id: string; fragmentName: string; category: string; description: string }>
         composition_key: string
+        frontmatter?: string
       }
       const bodyCells: BodyCell[] = data.body_cells.map(bc => ({
         id: bc.id,
         type: 'body',
         heading: bc.heading,
+        headingLevel: bc.headingLevel ?? 2,
         content: bc.content,
         isSystem: true,
         originalContent: bc.content,
@@ -121,7 +129,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
         category: fc.category,
         description: fc.description,
       }))
-      set({ compositionKey: data.composition_key ?? '', lastAppliedPath: skillPath })
+      set({ compositionKey: data.composition_key ?? '', frontmatterRaw: data.frontmatter ?? '', lastAppliedPath: skillPath })
       get().pushCells([...bodyCells, ...fragmentCells])
       // Mark the just-loaded state as clean so the Save button starts as "Saved"
       get().markCellsSaved()
@@ -135,6 +143,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
       id: crypto.randomUUID(),
       type: 'body',
       heading,
+      headingLevel: 2,
       content,
       isSystem: false,
       originalContent: '',
@@ -179,6 +188,19 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
     const newCells = state.cells.filter(c => c.id !== cellId)
     get().pushCells(newCells)
   },
+  duplicateCell: (cellId: string) => {
+    const state = get()
+    const idx = state.cells.findIndex(c => c.id === cellId)
+    if (idx === -1) return
+    const cell = state.cells[idx]
+    // A duplicate is always an editable, user-owned copy (never a system cell)
+    const clone: NotebookCell = cell.type === 'body'
+      ? { ...cell, id: crypto.randomUUID(), isSystem: false, originalContent: '' }
+      : { ...cell, id: crypto.randomUUID() }
+    const next = [...state.cells]
+    next.splice(idx + 1, 0, clone)
+    get().pushCells(next)
+  },
   moveCell: (cellId: string, afterCellId: string | null) => {
     const state = get()
     const cell = state.cells.find(c => c.id === cellId)
@@ -221,6 +243,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
       id: crypto.randomUUID(),
       type: 'body',
       heading: nc.heading,
+      headingLevel: 2,
       content: nc.content,
       isSystem: false,
       originalContent: '',
