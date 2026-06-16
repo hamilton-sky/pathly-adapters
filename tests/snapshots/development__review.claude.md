@@ -101,10 +101,11 @@ If violations found: list each one. Do NOT auto-fix. Report only.
 
 1. Update `pathly/plans/<feature>/PROGRESS.md` — in the Conversation Breakdown table, find the row for conversation `<N>` and change its Status cell from `TODO` to `DONE`.
 2. Check PROGRESS.md: if all conversation rows are now `DONE`, next state = `"TESTING"`; otherwise next state = `"BUILDING"`.
-3. Write `pathly/plans/<feature>/STATE.json`:
-   ```json
-   {"current": "<next_state>", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
+3. Report completion to the FSM:
+   ```bash
+   pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>
    ```
+   (The FSM computes the next state from transition_rules: if all conversation rows in PROGRESS.md are DONE, next = TESTING; otherwise next = BUILDING. The FSM writes STATE.json as the authoritative mirror.)
 4. Invoke the `log-agent-done` skill with:
    ```json
    {"agent":"reviewer","feature":"<feature>","conversation":<N>,"result":"PASS"}
@@ -113,7 +114,11 @@ If violations found: list each one. Do NOT auto-fix. Report only.
 **On FAIL:**
 
 1. Write violations to `pathly/plans/<feature>/feedback/REVIEW_FAILURES.md`.
-2. Write `pathly/plans/<feature>/STATE.json` with `"current": "REVIEW_FAILED"`.
+2. Report completion to the FSM:
+   ```bash
+   pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>
+   ```
+   (The FSM reads REVIEW_FAILURES.md and routes via transition_rules to REVIEW_FAILED. The FSM writes STATE.json as the authoritative mirror.)
 3. Do NOT update PROGRESS.md — the conversation is not DONE until violations are resolved.
 
 ## Live progress logging

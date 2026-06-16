@@ -140,8 +140,8 @@ Reply 'done' to proceed to retro.
 
 If autoFlow: log human response "auto-advance".
 
-**Write-or-delete transition artifact:**
-- If tests still failing after fix loop: TEST_FAILURES.md already exists — keep it.
+**Completion + Transition:**
+- If tests still failing after fix loop: TEST_FAILURES.md already exists — keep it as the feedback signal. The FSM will halt based on transition_rules.
 - If all tests pass: delete `<storage_path>/feedback/TEST_FAILURES.md` if it exists.
 
 ## Record completion
@@ -149,7 +149,12 @@ If autoFlow: log human response "auto-advance".
 After the tester passes, run the Completion report with `agent: tester`, `conversation: 0`,
 `result: PASS`, using `TEST_START` from Phase 0.
 
-Return. Orchestrator determines next state from transition_rules.
+Then report completion to the FSM:
+```
+pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>
+```
+
+The FSM reads transition_rules and the feedback artifact presence to determine the next state and write STATE.json.
 
 ## Live progress logging
 

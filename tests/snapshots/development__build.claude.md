@@ -188,16 +188,19 @@ If `PATHLY_PROJECT_ROOT` is set in the environment, omit `project_root` from the
 
 ## Exit contract
 
-Write `pathly/plans/<feature>/STATE.json`:
-```json
-{"current": "REVIEWING", "feature": "<feature>", "rigor": "<rigor>", "updated_at": "<iso-timestamp>"}
+After successful verification, report completion to the FSM:
+
+```bash
+pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>
 ```
+
+The FSM computes the next state (REVIEWING) from transition_rules and writes `STATE.json` automatically.
 
 Then run the Completion report with `agent: builder`, `result: DONE`, using `BUILD_START` from Step 4.5.
 
 **Auto-chain (fast/auto mode only):** If auto-flow mode is active and verification passed, after `log-agent-done` completes invoke the `review` skill with `<feature> <N>` (e.g. `pathly-observability 2`). If verification failed, do NOT chain — stop and report.
 
-In non-auto mode: do not invoke any other skill. The orchestrator reads STATE.json and decides what comes next.
+In non-auto mode: do not invoke any other skill. The orchestrator reads the FSM state (via DB) and decides what comes next.
 
 ## Edge Cases
 
