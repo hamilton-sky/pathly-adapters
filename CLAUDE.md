@@ -77,6 +77,12 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 
 ---
 
+## Comms board (orchestration substrate)
+
+A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). It is evolving into the **Board → Goals → per-goal Task-DAG → pluggable-executors** model (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`). Design + roadmap live in `pathly/plans/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
+
+---
+
 ## Feature plans
 
 ```

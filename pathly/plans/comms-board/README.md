@@ -9,11 +9,13 @@ executors). Active design lives at the top level; per-phase working docs in
 
 | Doc | What it covers |
 |---|---|
+| [ROADMAP.md](ROADMAP.md) | **Live phase tracker** — phases + statuses, multi-adapter routing (P1-rider), deferred items |
 | [GOALS-DAG-EXECUTORS.md](GOALS-DAG-EXECUTORS.md) | **Current model** — Board→Goals→Task-DAG, 2 decomposers, 3 executors, schema, phase plan |
 | [DAG-SCHEDULER-ARCHITECTURE.md](DAG-SCHEDULER-ARCHITECTURE.md) | P2/P3 roadmap — supervisor-owned frontier loop, lane-parallel, worktree fan-in |
 | [BOARD-COMPLETION-SPEC.md](BOARD-COMPLETION-SPEC.md) | Gap-and-plan for the full single-agent + flow-of-agents board |
 | [BOARD-RUNTIME-SPEC.md](BOARD-RUNTIME-SPEC.md) | Board-runtime product spec — user stories + locked decisions |
 | [TASKGRAPH-DESIGN.md](TASKGRAPH-DESIGN.md) | DAG task-graph design |
+| [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md) | _Later / separate_ — fleet dashboard framing; overlaps `../parallel-fleet-part-2/` |
 
 `STATE.json` / `EVENTS.jsonl` are the feature's FSM state — left in place.
 

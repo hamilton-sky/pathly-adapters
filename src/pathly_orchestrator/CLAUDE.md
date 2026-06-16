@@ -6,7 +6,11 @@ Python package that implements the Pathly finite-state machine. Runs as both an 
 
 Features advance through: `STORMING -> PLANNING -> DESIGNING -> BUILDING -> REVIEWING -> TESTING -> RETRO -> DONE` (the literal state identifiers in `core/flows/team.flow.yaml`; the `-ING` suffix matters — `current_state` is e.g. `"BUILDING"`, not `"BUILD"`).
 
-Each transition is driven by events written to the central SQLite DB (`~/.pathly/pathly.db`). The orchestrator reads `STATE.json` (filesystem snapshot) and queries the DB to determine the next action.
+Each transition is driven by events written to the central SQLite DB (`~/.pathly/pathly.db`).
+
+**State & flow storage — the DB is authoritative:**
+- **FSM state** lives in the `fsm_state` table (source of truth). `STATE.json` in `pathly/plans/<feature>/` is a **synchronized mirror** written after every transition (`eventlog.write_state` writes the DB first, then the file atomically). `next_action`/`complete_stage` read the DB and only fall back to `STATE.json` when the DB has no row. The file is still read *directly* by the scope gate (`build_baseline`), Studio feature-discovery, and the CLI — a mirror, not redundant; removing it would need a migration, not a delete.
+- **Flows** load **DB-first at runtime** (`_load_flow`): `flow_nodes`/`flow_edges` → `flow_yaml` blob → packaged `.flow.yaml`. The `core/flows/*.flow.yaml` files are the **version-controlled seed**, re-synced into the DB on every server start (`_refresh_flows`). The filesystem read is a seed + resilience fallback (DB-unavailable / `project_root=None` CLI), not live config.
 
 ## HTTP endpoints
 
@@ -98,6 +102,7 @@ Every `/next_action` response includes the following top-level fields:
 | `agent_hint.role` | `"worker"` or `"explorer"` | host-neutral delegation signal |
 | `agent_hint.instructions` | string | full prompt for the next agent |
 | `codex_subagent` | legacy object | **frozen** - present for backward compat only; new adapters must read `agent_hint` |
+| `preferred_adapter` | adapter name string | per-stage adapter from the flow's `adapter_map` (or a `stage_configs` override); the host spawns this CLI for the stage |
 
 **`decision` field:**
 - `continue` - adapter may automate the next step without human involvement
@@ -123,7 +128,7 @@ pathly_orchestrator/
       runner_state.py      # write_runner_state, read_runner_state, mark_stale_runners
       flow_defs.py / skill_defs.py / agent_defs.py / invocations.py / overrides.py / feedback_items.py
       otel_spans.py / run_history.py / stage_configs.py / catalog_items.py / trends.py / app_settings.py
-      comms.py             # comms-board messages, tasks, scope, permissions (comms_messages table)
+      comms.py             # comms_messages (board) + comms_artifacts (per-task artifact metadata); goal_id/executor columns back the Goals->Task-DAG model
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
     output.py              # parse_result, _extract_json_payload
