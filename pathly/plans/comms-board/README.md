@@ -23,7 +23,8 @@ Per-phase working docs for the Goals/DAG build land here as we go.
 
 | Phase | Doc | Status |
 |---|---|---|
-| 0 — Goals + executor schema | [phases/PHASE-0-goals-schema.md](phases/PHASE-0-goals-schema.md) | 0a ✅ · 0b 🔄 |
+| 0a — Goals + executor schema | [phases/PHASE-0-goals-schema.md](phases/PHASE-0-goals-schema.md) | ✅ |
+| 0b — Planner → task DAG | [phases/PHASE-0b-planner-dag-wiring.md](phases/PHASE-0b-planner-dag-wiring.md) | 🔜 ready to build |
 | 1 — dispatcher (serial) | _coming_ | — |
 | 2 — UI (executor selector) | _coming_ | — |
 | 3 — parallel (k>1 by lane) | _coming_ | — |
