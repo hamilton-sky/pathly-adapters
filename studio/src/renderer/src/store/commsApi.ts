@@ -335,6 +335,8 @@ export interface RunBoardOpts {
   adapter?: string
   /** The agent's task — sent directly so it doesn't depend on board-post timing. */
   instructions?: string
+  /** Headless board-progress verbosity: 'quiet' | 'normal' | 'verbose'. */
+  progress?: string
 }
 
 export async function apiRunBoard(
@@ -352,6 +354,7 @@ export async function apiRunBoard(
     if (opts.interactive) body.interactive = true
     if (opts.adapter) body.adapter = opts.adapter
     if (opts.instructions) body.instructions = opts.instructions
+    if (opts.progress) body.progress = opts.progress
     const r = await apiFetch('/comms/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

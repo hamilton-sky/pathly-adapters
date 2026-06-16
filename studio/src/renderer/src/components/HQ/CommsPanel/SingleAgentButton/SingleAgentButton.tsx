@@ -14,6 +14,8 @@ export interface SingleAgentConfig {
   interactive?: boolean
   /** Which CLI to spawn. */
   adapter?: string
+  /** How often a headless agent posts progress to the board. */
+  progress?: string
   /** The prompt typed in the modal — posted to the board and sent to the agent. */
   message?: string
 }
@@ -22,6 +24,14 @@ export interface SingleAgentConfig {
 const ENGINES: { value: string; label: string }[] = [
   { value: 'claude', label: 'Claude' },
   { value: 'codex', label: 'Codex' },
+]
+
+// How chatty a headless run is on the board. Headless-only: in interactive mode
+// the human watches the live terminal, so board narration is redundant.
+const PROGRESS_LEVELS: { value: string; label: string }[] = [
+  { value: 'quiet', label: 'Quiet — start + result only' },
+  { value: 'normal', label: 'Normal — key steps' },
+  { value: 'verbose', label: 'Verbose — every step' },
 ]
 
 interface Props {
@@ -65,6 +75,7 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   const [skill, setSkill] = useState<string>('')
   const [sysName, setSysName] = useState<string>('')   // '' = none
   const [interactive, setInteractive] = useState(false)
+  const [progress, setProgress] = useState<string>('normal')
   const [message, setMessage] = useState<string>('')
 
   const stopBoard = useCommsStore((st) => st.stopBoard)
@@ -94,6 +105,8 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
       skill: skill || undefined,
       systemPrompt: sys,
       interactive,
+      // Progress cadence only applies headless — interactive shows the terminal.
+      progress: interactive ? undefined : progress,
       message: message.trim(),
     })
     setMessage('')
@@ -207,6 +220,15 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
                   ? 'Opens a live session and types the prompt for you — stays open for follow-ups.'
                   : 'One-shot: runs the prompt and exits when done.'}
               </p>
+
+              {!interactive && (
+                <>
+                  <label className={s.label} htmlFor="sa-progress">Board updates <span className={s.optional}>· how often the agent posts progress</span></label>
+                  <select id="sa-progress" className={s.select} value={progress} onChange={(e) => setProgress(e.currentTarget.value)}>
+                    {PROGRESS_LEVELS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </>
+              )}
               <p className={s.modeHint}>
                 Sending posts your message to the board and runs the agent on it. The board’s own input box just adds a note — it doesn’t call an agent.
               </p>

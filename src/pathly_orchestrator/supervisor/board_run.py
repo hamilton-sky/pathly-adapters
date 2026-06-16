@@ -120,6 +120,27 @@ def _safe_call(fn: Callable, *args) -> None:
         pass
 
 
+# How chatty the headless agent is on the board, chosen per-run from the Studio
+# run modal. Only the cadence sentence changes — the POST mechanics below it are
+# identical for every level. Unknown values fall back to "normal".
+_PROGRESS_CADENCE = {
+    "quiet": (
+        "Post exactly TWO updates: (1) a one-line note when you START (what you "
+        "are about to do), and (2) your final RESULT when done. Do NOT post "
+        "intermediate progress."
+    ),
+    "normal": (
+        "Post (1) a short note when you START (what you are about to do), (2) a "
+        "line at each KEY STEP or finding, and (3) your final RESULT when done."
+    ),
+    "verbose": (
+        "Post frequently so the human can follow every move: (1) a note when you "
+        "START, (2) a line for EACH step — every file you read or write, every "
+        "command you run, every finding — and (3) your final RESULT when done."
+    ),
+}
+
+
 def start_board_run(
     board: str,
     scope: str,
@@ -133,6 +154,7 @@ def start_board_run(
     skill: str = "",
     system_prompt: str = "",
     interactive: bool = False,
+    progress: str = "normal",
     broadcast_fn=None,
     spawn_fn: Callable | None = None,
     on_start: Optional[Callable] = None,
@@ -157,6 +179,10 @@ def start_board_run(
         Model ID passed to the spawn function.
     adapter:
         Adapter name (e.g. "claude").
+    progress:
+        How chatty the headless agent is on the board — "quiet" (start + result
+        only), "normal" (start + key steps + result), or "verbose" (a line per
+        step). Unknown values fall back to "normal".
     broadcast_fn:
         Optional SSE broadcast callable; forwarded to spawn_fn.
     spawn_fn:
@@ -204,6 +230,7 @@ def start_board_run(
     # its progress to the board or the human is blind. These POSTs are how the human
     # follows along; they are not a user-facing skill.
     _from = agent or "agent"
+    cadence = _PROGRESS_CADENCE.get(progress, _PROGRESS_CADENCE["normal"])
     prompt_parts.append(
         "## Working from the board\n\n"
         "Your task is the most recent message from the human on this board (shown in "
@@ -213,9 +240,8 @@ def start_board_run(
         "http://127.0.0.1:8765/comms/post with a JSON body:\n"
         f'  {{"feature": "{scope}", "from": "{_from}", "board": "{board}", "scope": "{scope}", '
         '"type": "status", "text": "<one or two sentences>"}\n'
-        "Post (1) a short note when you START (what you are about to do), (2) a line at "
-        "each KEY STEP or finding, and (3) your final RESULT when done. Keep each post "
-        "to one or two sentences — the board is the human's window into this run.\n\n"
+        f"{cadence} Keep each post to one or two sentences — the board is the human's "
+        "window into this run.\n\n"
         "If you CREATE A FILE (an artifact), post it as an artifact AND link the path so "
         "the human can open it from the board — include artifact_path (and artifact_type "
         'like "md" or "code"):\n'

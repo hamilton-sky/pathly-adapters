@@ -809,6 +809,12 @@ def comms_run():
         system_prompt = data.get("system_prompt", "") or ""
         interactive = bool(data.get("interactive", False))
 
+        # Board-progress verbosity for headless runs — how many updates the agent
+        # posts as it works. Anything unrecognized falls back to "normal".
+        progress = (data.get("progress", "") or "normal").strip().lower()
+        if progress not in ("quiet", "normal", "verbose"):
+            progress = "normal"
+
         # Engine (CLI) to spawn. Only adapters with a headless command can run a
         # board agent; anything else falls back to claude. Each engine has its own
         # default model so codex isn't handed a claude model string.
@@ -870,6 +876,7 @@ def comms_run():
             skill=skill if isinstance(skill, str) else "",
             system_prompt=system_prompt if isinstance(system_prompt, str) else "",
             interactive=interactive,
+            progress=progress,
             broadcast_fn=_broadcast_runner,   # so TERMINAL_SPAWN reaches Studio
             on_start=_on_start,
             on_done=_on_done,
