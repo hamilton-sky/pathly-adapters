@@ -1,0 +1,109 @@
+.splitPill {
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Zone A — primary AI Split (mirrors .agentPillMain) */
+.splitPill .splitMain {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-right: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.splitPill .splitMain:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.splitPill .splitMain:disabled { opacity: 0.45; cursor: not-allowed; }
+.splitPill .splitMain[data-state='running'] { border-color: var(--yellow); color: var(--yellow); cursor: wait; }
+.splitPill .splitMain[data-state='success'] { border-color: var(--green); color: var(--green); }
+.splitPill .splitMain[data-state='error']   { border-color: var(--red); color: var(--red); }
+
+/* Zone B — caret / mode switcher (middle, square) */
+.splitPill .splitCaret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+.splitPill .splitCaret:hover:not(:disabled) { background: var(--bg-surface1); color: var(--text-secondary); }
+.splitPill .splitCaret:disabled { opacity: 0.35; cursor: not-allowed; }
+.splitPill .splitCaret[data-state='running'] { border-color: var(--yellow); }
+.splitPill .splitCaret[data-state='success'] { border-color: var(--green); }
+.splitPill .splitCaret[data-state='error']   { border-color: var(--red); }
+
+/* Zone C — prompt gear (AI only; mirrors .agentPillSettings) */
+.splitPill .splitGear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+.splitPill .splitGear:hover:not(:disabled) { background: var(--bg-surface1); color: var(--text-secondary); }
+.splitPill .splitGear:disabled { opacity: 0.35; cursor: not-allowed; }
+.splitPill .splitGear[data-state='running'] { border-color: var(--yellow); }
+.splitPill .splitGear[data-state='success'] { border-color: var(--green); }
+.splitPill .splitGear[data-state='error']   { border-color: var(--red); }
+
+.label { white-space: nowrap; }
+
+/* Drop-down menu — opens below, left-aligned (the pill sits mid-toolbar) */
+.menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 50;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 12px 7px 9px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+.item:hover { background-color: var(--bg-surface1); color: var(--text-primary); }
+.divider { height: 1px; margin: 4px 6px; background: var(--border-color); }

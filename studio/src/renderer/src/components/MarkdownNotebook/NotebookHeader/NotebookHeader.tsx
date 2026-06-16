@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen, GitCompare,
-  Scissors, ScanText, FileSearch, SlidersHorizontal,
+  ScanText, FileSearch, SlidersHorizontal,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useNotebookStore, BodyCell } from '../../../store/notebookStore'
@@ -12,6 +12,8 @@ import { apiFetch } from '../../../lib/config'
 import { buildSplitPrompt, buildAnalyzePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import ExportMenu from './ExportMenu/ExportMenu'
+import SplitPill from './SplitPill/SplitPill'
+import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
 import styles from './NotebookHeader.module.css'
 
 export type NotebookViewMode = 'cells' | 'editor'
@@ -22,7 +24,7 @@ interface Props {
 }
 
 export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
-  const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved } = useNotebookStore()
+  const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved, insertBodyCell } = useNotebookStore()
 
   const notebookPath         = useUiStore(s => s.notebookPath)
   const setNotebookPath      = useUiStore(s => s.setNotebookPath)
@@ -40,6 +42,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const [exportState, setExportState] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveState,   setSaveState]   = useState<'idle' | 'success' | 'error'>('idle')
   const [splitPeekOpen,    setSplitPeekOpen]    = useState(false)
+  const [splitCellsOpen,   setSplitCellsOpen]   = useState(false)
   const [analyzePeekOpen,  setAnalyzePeekOpen]  = useState(false)
   const [splitOncePrompt,  setSplitOncePrompt]  = useState<string | null>(null)
   const [analyzeOncePrompt, setAnalyzeOncePrompt] = useState<string | null>(null)
@@ -199,51 +202,25 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         </button>
       </Tooltip>
 
-      {/* Split pill */}
-      <div className={styles.agentPill}>
-        <Tooltip
-          label={splitState === 'running'
-            ? `Reorganizing "${skillName}" into sections…`
-            : `AI will reorganize "${skillName}" into clean ## sections — delivers a diff you review and accept`}
-          placement="bottom"
-        >
-          <button
-            type="button"
-            className={styles.agentPillMain}
-            data-state={splitState}
-            disabled={splitState === 'running' || !notebookPath}
-            onClick={() => void handleSplit()}
-            aria-label="Split document into sections"
-          >
-            <Scissors size={13} />
-            <span className={styles.btnLabel}>
-              {splitState === 'running' ? 'Splitting…' : splitState === 'success' ? 'Split!' : splitState === 'error' ? 'Error' : 'Split'}
-            </span>
-          </button>
-        </Tooltip>
-        <Tooltip label="View or edit the prompt sent to Claude" placement="bottom">
-          <button
-            type="button"
-            className={styles.agentPillSettings}
-            data-state={splitState}
-            disabled={!notebookPath}
-            onClick={() => setSplitPeekOpen(v => !v)}
-            aria-label="Edit split prompt"
-          >
-            <SlidersHorizontal size={11} />
-          </button>
-        </Tooltip>
-        {splitPeekOpen && notebookPath && (
-          <PromptPeekModal
-            title="PROMPT — Split"
-            fileName={skillName + '.md'}
-            defaultPrompt={buildSplitPrompt(notebookPath)}
-            storageKey={STORAGE_KEY_SPLIT}
-            onClose={() => setSplitPeekOpen(false)}
-            onUseOnce={(p) => { setSplitOncePrompt(p); setSplitPeekOpen(false) }}
-          />
-        )}
-      </div>
+      {/* Split — split-button: AI Split (primary) + caret menu (AI vs deterministic) + prompt gear */}
+      <SplitPill
+        state={splitState}
+        hasPath={!!notebookPath}
+        onAiSplit={() => void handleSplit()}
+        onSplitIntoCells={() => setSplitCellsOpen(true)}
+        onTogglePrompt={() => setSplitPeekOpen(v => !v)}
+        compact={isCompact}
+      />
+      {splitPeekOpen && notebookPath && (
+        <PromptPeekModal
+          title="PROMPT — AI Split"
+          fileName={skillName + '.md'}
+          defaultPrompt={buildSplitPrompt(notebookPath)}
+          storageKey={STORAGE_KEY_SPLIT}
+          onClose={() => setSplitPeekOpen(false)}
+          onUseOnce={(p) => { setSplitOncePrompt(p); setSplitPeekOpen(false) }}
+        />
+      )}
 
       {/* Analyze pill */}
       <div className={styles.agentPill}>
@@ -259,11 +236,11 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             data-state={analyzeState}
             disabled={analyzeState === 'running' || !notebookPath}
             onClick={() => void handleAnalyze()}
-            aria-label="Analyze document"
+            aria-label="AI Analyze document for quality"
           >
             <ScanText size={13} />
             <span className={styles.btnLabel}>
-              {analyzeState === 'running' ? 'Analyzing…' : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'Analyze'}
+              {analyzeState === 'running' ? 'Analyzing…' : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'AI Analyze'}
             </span>
           </button>
         </Tooltip>
@@ -281,7 +258,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         </Tooltip>
         {analyzePeekOpen && notebookPath && (
           <PromptPeekModal
-            title="PROMPT — Analyze"
+            title="PROMPT — AI Analyze"
             fileName={skillName + '.md'}
             defaultPrompt={buildAnalyzePrompt(notebookPath)}
             storageKey={STORAGE_KEY_ANALYZE}
@@ -372,6 +349,27 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         onInstallSkill={handleExport}
         compact={isCompact}
       />
+
+      {/* Deterministic "Split into cells" — parses the open file into editable cells. */}
+      {splitCellsOpen && notebookPath && (
+        <SkillSplitModal
+          filePath={notebookPath}
+          fileName={skillName + '.md'}
+          onClose={() => setSplitCellsOpen(false)}
+          onInsertOne={(raw) => {
+            setSplitCellsOpen(false)
+            if (viewMode !== 'cells') setNotebookViewMode('cells')
+            const lastId = cells[cells.length - 1]?.id ?? null
+            insertBodyCell(skillName, raw, lastId)
+          }}
+          onConfirm={(proposed) => {
+            setSplitCellsOpen(false)
+            if (viewMode !== 'cells') setNotebookViewMode('cells')
+            let lastId = cells[cells.length - 1]?.id ?? null
+            for (const c of proposed) lastId = insertBodyCell(c.heading, c.content, lastId)
+          }}
+        />
+      )}
     </div>
   )
 }
