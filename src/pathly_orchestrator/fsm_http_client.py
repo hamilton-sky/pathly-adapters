@@ -23,6 +23,12 @@ _RECORD_ACTIVITY_PATH = "/record_activity"
 _RECORD_PHASE_PATH = "/record_phase"
 
 
+class _ServerUnreachable(RuntimeError):
+    """The FSM HTTP server can't be reached or started. Callers degrade to running
+    fsm_ops in-process so the pipeline keeps moving when the server is down. (A real
+    HTTP error response — 4xx/5xx — is NOT this; it surfaces normally.)"""
+
+
 def _base_url(host: str, port: int) -> str:
     return f"http://{host}:{port}"
 
@@ -72,7 +78,7 @@ def _request_raw(
         detail = body or exc.reason
         raise RuntimeError(f"fsm-call error ({exc.code}): {detail}") from exc
     except URLError as exc:
-        raise RuntimeError(f"fsm-call error: {exc.reason}") from exc
+        raise _ServerUnreachable(f"fsm-call: server unreachable: {exc.reason}") from exc
 
 
 def _request_json(
@@ -137,7 +143,7 @@ def _start_server(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None
         )
         pid_path.write_text(str(proc.pid))
     except OSError as exc:
-        raise RuntimeError(
+        raise _ServerUnreachable(
             "FSM server unavailable. Start it with:\n"
             "  pathly-fsm-http\n"
             "(Run in a separate terminal, then retry.)"
@@ -154,9 +160,17 @@ def ensure_server_running(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT)
             return
         time.sleep(0.25)
 
-    raise RuntimeError(
+    raise _ServerUnreachable(
         "FSM server did not start within 7.5 s — run `pathly-fsm-http` to diagnose."
     )
+
+
+def _inprocess(fn_name: str, payload: dict) -> dict:
+    """Graceful degradation: run the FSM in-process via fsm_ops when the HTTP
+    server is unreachable. fsm_ops reads the fsm_state DB and falls back to the
+    STATE.json mirror, so next-action / complete-stage still work with no server."""
+    from pathly_orchestrator import fsm_ops
+    return getattr(fsm_ops, fn_name)(payload)
 
 
 def next_action(
@@ -165,8 +179,11 @@ def next_action(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
 ) -> dict:
-    ensure_server_running(host=host, port=port)
-    return _request_json("POST", _NEXT_ACTION_PATH, payload, host=host, port=port)
+    try:
+        ensure_server_running(host=host, port=port)
+        return _request_json("POST", _NEXT_ACTION_PATH, payload, host=host, port=port)
+    except _ServerUnreachable:
+        return _inprocess("next_action", payload)
 
 
 def complete_stage(
@@ -175,8 +192,11 @@ def complete_stage(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
 ) -> dict:
-    ensure_server_running(host=host, port=port)
-    return _request_json("POST", _COMPLETE_STAGE_PATH, payload, host=host, port=port)
+    try:
+        ensure_server_running(host=host, port=port)
+        return _request_json("POST", _COMPLETE_STAGE_PATH, payload, host=host, port=port)
+    except _ServerUnreachable:
+        return _inprocess("complete_stage", payload)
 
 
 def record_activity(
@@ -217,33 +237,36 @@ def _add_common_net_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _main_next_action(args: argparse.Namespace) -> int:
-    ensure_server_running(host=args.host, port=args.port)
     payload = {
         "flow": args.flow,
         "topic": args.topic,
         "project_root": args.project_root,
     }
-    raw = _request_raw("POST", _NEXT_ACTION_PATH, payload, host=args.host, port=args.port)
+    try:
+        ensure_server_running(host=args.host, port=args.port)
+        raw = _request_raw("POST", _NEXT_ACTION_PATH, payload, host=args.host, port=args.port)
+    except _ServerUnreachable:
+        # Degrade to in-process FSM so the pipeline isn't blocked by a down server.
+        print(json.dumps(_inprocess("next_action", payload)))
+        return 0
     print(raw)
     return 0
 
 
 def _main_complete_stage(args: argparse.Namespace) -> int:
-    ensure_server_running(host=args.host, port=args.port)
-    payload = {
+    payload = _filter_none({
         "flow": args.flow,
         "topic": args.topic,
         "project_root": args.project_root,
         "decision": args.decision,
         "resolved_files": args.resolved_file or None,
-    }
-    raw = _request_raw(
-        "POST",
-        _COMPLETE_STAGE_PATH,
-        _filter_none(payload),
-        host=args.host,
-        port=args.port,
-    )
+    })
+    try:
+        ensure_server_running(host=args.host, port=args.port)
+        raw = _request_raw("POST", _COMPLETE_STAGE_PATH, payload, host=args.host, port=args.port)
+    except _ServerUnreachable:
+        print(json.dumps(_inprocess("complete_stage", payload)))
+        return 0
     print(raw)
     return 0
 

@@ -53,7 +53,25 @@ Before entering the FSM loop:
 
 ## FSM loop
 
-Every step:
+**Primary path — call the FSM; it owns state + transitions.** Ask the FSM what to do
+next and report completion back to it. The FSM (authoritative `fsm_state` DB) decides
+the next state, runs gates / `transition_rules`, and writes both the DB and the
+`STATE.json` mirror. You do **not** compute transitions or write `STATE.json` yourself.
+
+1. `pathly-fsm-call next-action --flow <flow> --topic <topic> --project-root <root>`
+   → returns the next action: `agent` / `agent_hint.instructions`, `decision`, `preferred_adapter`.
+2. Spawn the mapped agent with those instructions (one agent at a time).
+3. After it returns, report completion:
+   `pathly-fsm-call complete-stage --flow <flow> --topic <topic> --project-root <root> [--decision <d>] [--resolved-file <f> …]`
+   → the FSM computes and persists the next state. Repeat until `current_state` is `DONE`.
+
+`pathly-fsm-call` **degrades gracefully**: if the FSM server is unreachable it runs the
+FSM in-process (reading the DB, falling back to the `STATE.json` mirror), so the loop
+keeps working server-down. On this path you never read or write `STATE.json`.
+
+**Last-resort fallback — only if `pathly-fsm-call` itself is unavailable** (e.g. the
+Pathly Python package isn't installed in this host). Only then, drive the loop from the
+filesystem:
 
 1. Read `<storage_path>/STATE.json` if present.
 2. Read `<storage_path>/EVENTS.jsonl` if present.
@@ -63,8 +81,10 @@ Every step:
 6. Apply exactly one event.
 7. Emit exactly one next action.
 
-`STATE.json` is a checkpoint. The filesystem is the source of truth. If they
-disagree, recover from disk.
+On this fallback path `STATE.json` is the checkpoint and the filesystem is the source of
+truth; if they disagree, recover from disk. (The sections below — Subagent routing,
+Transition rules, transition_actions — describe this **fallback** mechanics; on the
+primary path the FSM performs them for you.)
 
 ## Subagent routing
 

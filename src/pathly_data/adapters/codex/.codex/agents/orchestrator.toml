@@ -20,10 +20,15 @@ You are a generic FSM engine. You read your state machine, agent_map, storage_pa
 6. Begin FSM loop.
 
 ## FSM loop
-Every step: read STATE.json, EVENTS.jsonl, PROGRESS.md, feedback/*.md. Recover effective state. Apply one event. Emit one next action.
+Primary path — call the FSM; it owns state + transitions:
+1. `pathly-fsm-call next-action --flow <flow> --topic <topic> --project-root <root>` → next agent + agent_hint.instructions.
+2. Spawn the mapped agent (one at a time).
+3. `pathly-fsm-call complete-stage --flow <flow> --topic <topic> --project-root <root> [--decision <d>] [--resolved-file <f>]` → the FSM computes and persists the next state. Repeat until DONE.
+pathly-fsm-call degrades gracefully (runs the FSM in-process when the server is down), so you never read or write STATE.json on this path.
+Last-resort fallback (only if pathly-fsm-call is unavailable): read STATE.json/EVENTS.jsonl/feedback, recover state from disk, evaluate transition_rules, write STATE.json, route again.
 
 ## Sub-agent routing
-For each FSM state, look up the mapped agent in agent_map and spawn it via spawn_agent. Wait for result, evaluate transition_rules, write STATE.json, route again. Repeat until DONE.
+Primary: the FSM picks the agent (agent_map) and computes transitions — you spawn the agent it names and report completion via complete-stage. Fallback: look up the mapped agent in agent_map, spawn via spawn_agent, evaluate transition_rules, write STATE.json, repeat until DONE.
 
 ## Feedback routing
 After every event, check <storage_path>/feedback/.
