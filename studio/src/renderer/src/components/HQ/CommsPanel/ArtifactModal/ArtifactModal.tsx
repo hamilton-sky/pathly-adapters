@@ -16,6 +16,15 @@ interface Props {
 
 const PREVIEW_LINES = 24
 
+/** Resolve a possibly-relative artifact path to absolute against the project root.
+ *  Agents post project-relative paths, but fs:read does NOT resolve them, so the
+ *  preview would fail. Already-absolute paths (drive / posix / UNC) pass through. */
+function resolveArtifactPath(p: string, root: string | null | undefined): string {
+  if (/^([a-zA-Z]:[\\/]|\/|\\\\)/.test(p)) return p
+  const base = (root ?? '').replace(/[\\/]+$/, '')
+  return base ? `${base}/${p.replace(/^[\\/]+/, '')}` : p
+}
+
 /**
  * Artifact details modal — metadata for the artifact message plus a live preview
  * read from the file, and an "Open in editor" action. Stored fields (stored
@@ -29,15 +38,17 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
   const [content, setContent] = useState<string | null>(null)
   const [loadErr, setLoadErr] = useState(false)
   const [meta, setMeta] = useState<ArtifactRow | null>(null)
+  const projectPath = useProjectStore((st) => st.projectPath)
+  const absPath = m.artifactPath ? resolveArtifactPath(m.artifactPath, projectPath) : null
 
   useEffect(() => {
     let alive = true
-    if (!m.artifactPath) { setLoadErr(true); return }
-    readFile(m.artifactPath)
+    if (!absPath) { setLoadErr(true); return }
+    readFile(absPath)
       .then((txt) => { if (alive) { if (txt == null) setLoadErr(true); else setContent(txt) } })
       .catch(() => { if (alive) setLoadErr(true) })
     return () => { alive = false }
-  }, [m.artifactPath])
+  }, [absPath])
 
   // Pull stored metadata from the comms_artifacts table (newest row wins).
   useEffect(() => {
@@ -63,9 +74,9 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
     : tokenEst != null ? `~${tokenEst.toLocaleString()}` : loadErr ? '—' : '…'
 
   function openInEditor(): void {
-    if (!m.artifactPath) return
-    const name = m.artifactPath.split(/[/\\]/).pop() ?? m.artifactPath
-    useProjectStore.getState().setSelectedItem({ name, path: m.artifactPath, type: 'plan' })
+    if (!absPath) return
+    const name = absPath.split(/[/\\]/).pop() ?? absPath
+    useProjectStore.getState().setSelectedItem({ name, path: absPath, type: 'plan' })
     useUiStore.getState().setActivePanel('editor')
     onClose()
   }

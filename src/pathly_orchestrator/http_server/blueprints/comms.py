@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from flask import Blueprint, jsonify, request
 
@@ -40,6 +41,37 @@ def _check_write_permission(
     if board == "global":
         return from_agent in _GLOBAL_WRITERS
     return False
+
+
+# A path-like token: one or more "<segment>/" parts then a "<name>.<ext>". Requires
+# a separator so it won't match prose like "e.g." or "v2.3".
+_PATH_RE = re.compile(r"(?:[\w.\-]+[/\\])+[\w.\-]+\.[A-Za-z0-9]{1,8}")
+
+_EXT_ARTIFACT_TYPE: dict[str, str] = {
+    "md": "md", "markdown": "md", "txt": "md",
+    "py": "code", "ts": "code", "tsx": "code", "js": "code", "jsx": "code",
+    "go": "code", "rs": "code", "java": "code", "rb": "code", "c": "code",
+    "h": "code", "cpp": "code", "css": "code", "html": "code", "sh": "code",
+    "yaml": "code", "yml": "code", "toml": "code",
+    "json": "json", "pdf": "pdf",
+    "png": "image", "jpg": "image", "jpeg": "image", "gif": "image", "svg": "image",
+}
+
+
+def _extract_artifact_path(text: str) -> str | None:
+    """Recover a file path mentioned in prose when an agent omitted the structured
+    artifact_path field (e.g. Codex writes "... at path/to/file.md" but leaves
+    artifact_path empty). Returns the first path-like token, or None."""
+    if not text:
+        return None
+    match = _PATH_RE.search(text)
+    return match.group(0) if match else None
+
+
+def _guess_artifact_type(path: str) -> str | None:
+    """Map a file extension to an artifact_type bucket; None when unrecognized."""
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    return _EXT_ARTIFACT_TYPE.get(ext)
 
 
 @bp.route("/comms/post", methods=["POST"])
@@ -110,6 +142,15 @@ def comms_post():
         # the file it created, so the board can open it in the editor.
         artifact_path = (data.get("artifact_path") or None)
         artifact_type = (data.get("artifact_type") or None)
+        # Fallback: some agents (notably Codex) put the path only in the message
+        # text instead of the artifact_path field. Recover it so the artifact card
+        # still gets a path, preview, editor button, and a comms_artifacts row.
+        if msg_type == "artifact" and not (isinstance(artifact_path, str) and artifact_path.strip()):
+            recovered = _extract_artifact_path(text)
+            if recovered:
+                artifact_path = recovered
+                if not artifact_type:
+                    artifact_type = _guess_artifact_type(recovered)
 
         if options is not None and not isinstance(options, list):
             return jsonify({"error": "Field 'options' must be a list or null"}), 400
@@ -913,13 +954,13 @@ def comms_run():
         label = (agent if isinstance(agent, str) and agent else mode)
 
         def _on_start(_run_id: str) -> None:
-            _board_post(f"🤖 {label} started on this board…", phase="running")
+            _board_post(f"🤖 {label} started on this board… (via {adapter})", phase="running")
 
         def _on_done(_run_id: str, res) -> None:
             summary = ""
             if isinstance(res, dict):
                 summary = str(res.get("result") or res.get("summary") or "done")
-            _board_post(f"✅ {label} finished — {summary[:300]}", phase="done")
+            _board_post(f"✅ {label} finished via {adapter} — {summary[:280]}", phase="done")
 
         result = start_board_run(
             board,
