@@ -583,14 +583,25 @@ def run_gates(
                 return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "scope_gate":
             scope_file = gate["scope_file"]
-            state_file = storage_path / "STATE.json"
+            # build_baseline is read DB-first — the fsm_state table is authoritative.
+            # STATE.json is a synchronized mirror, kept only as a cold-DB fallback, so
+            # the gate can never act on a file that has diverged from the DB.
             build_baseline: dict | None = None
-            if state_file.exists():
-                try:
-                    state_doc = json.loads(state_file.read_text(encoding="utf-8"))
-                    build_baseline = state_doc.get("build_baseline")
-                except (json.JSONDecodeError, OSError):
-                    pass
+            try:
+                from pathly_orchestrator.eventlog import read_state as _read_state_db
+                _state_doc = _read_state_db(str(storage_path))
+                if _state_doc:
+                    build_baseline = _state_doc.get("build_baseline")
+            except Exception:
+                build_baseline = None
+            if build_baseline is None:  # cold-DB fallback to the mirror file
+                state_file = storage_path / "STATE.json"
+                if state_file.exists():
+                    try:
+                        state_doc = json.loads(state_file.read_text(encoding="utf-8"))
+                        build_baseline = state_doc.get("build_baseline")
+                    except (json.JSONDecodeError, OSError):
+                        pass
             if build_baseline is None:
                 append_event(
                     storage_path,
