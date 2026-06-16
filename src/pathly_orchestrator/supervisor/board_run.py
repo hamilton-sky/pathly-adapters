@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import threading
 import uuid
+from pathlib import Path
 from typing import Callable, Optional
 
 
@@ -231,6 +232,20 @@ def start_board_run(
     # follows along; they are not a user-facing skill.
     _from = agent or "agent"
     cadence = _PROGRESS_CADENCE.get(progress, _PROGRESS_CADENCE["normal"])
+    # Where the agent should write files: the feature's resolved working directory —
+    # pathly/<scope>/ (new-style root) if it exists, else legacy pathly/plans/<scope>/.
+    # Mirrors fsm_ops._resolve_storage_path so a board agent writes exactly where the
+    # FSM resolves this feature. Only meaningful for feature boards.
+    where_line = ""
+    if board == "feature" and project_root:
+        _root = Path(project_root)
+        _feat = _root / "pathly" / scope
+        if not _feat.is_dir():
+            _feat = _root / "pathly" / "plans" / scope
+        where_line = (
+            f"Write any files you create under `{_feat.as_posix()}/` — this feature's "
+            "working directory (where its plan, artifacts, and state live).\n\n"
+        )
     prompt_parts.append(
         "## Working from the board\n\n"
         "Your task is the most recent message from the human on this board (shown in "
@@ -242,6 +257,7 @@ def start_board_run(
         '"type": "status", "text": "<one or two sentences>"}\n'
         f"{cadence} Keep each post to one or two sentences — the board is the human's "
         "window into this run.\n\n"
+        f"{where_line}"
         "If you CREATE A FILE (an artifact), post it as an artifact AND link the path so "
         "the human can open it from the board — include artifact_path (and artifact_type "
         'like "md" or "code"):\n'
