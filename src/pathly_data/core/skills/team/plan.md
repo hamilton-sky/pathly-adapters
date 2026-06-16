@@ -16,7 +16,8 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 
 ## FSM operations
 
-**Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
+**Transition state to X:** Call `pathly-fsm-call complete-stage --flow <flow> --topic <topic> --project-root <project_root>`.
+The FSM computes the next state from transition_rules — the skill no longer decides or writes STATE.json.
 Log via: `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'STATE_TRANSITION','to':'X','ts':'<iso-timestamp>'})"`.
 
 Every logged event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
@@ -104,14 +105,15 @@ STORM_SEED.md written (or skipped).
 Ready to plan? Reply 'yes' to continue, or 'no' to stop here.
 ```
 - Proceed signal ('yes', 'go', 'continue', 'done', numeric): log human response with reply value. Advance.
-- Stop signal ('no', 'stop'): log human response "stop". Write STATE.json with current state. Halt.
+- Stop signal ('no', 'stop'): log human response "stop". Halt without advancing to next stage.
 - Unrecognised: re-prompt without logging.
 
 If autoFlow: log human response "auto-advance".
 
 log-phase PHASE_DONE storm
 
-Transition state → PLANNING. Fall through to Stage 2.
+Call `pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>` to advance to PLANNING.
+Fall through to Stage 2.
 
 ---
 
@@ -216,11 +218,11 @@ Review USER_STORIES.md and CONVERSATION_PROMPTS.md.
 Reply 'go' to start implementation, or 'stop' to pause here.
 ```
 - Proceed: log human response with reply value. Advance.
-- Stop: log human response "stop". Write STATE.json with current state. Halt.
+- Stop: log human response "stop". Halt without advancing to next stage.
 
 If autoFlow: log human response "auto-advance".
 
-Transition state → BUILDING.
+Call `pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>` to advance to BUILDING.
 
 Run the Completion report with `agent: planner`, `result: DONE`, `conversation: 0`, using `PLAN_START` from Stage 2. Set `summary` to: `"planner created <N> files for <FEATURE> (<rigor> rigor)"` where N is the count of files written.
 

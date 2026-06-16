@@ -9,7 +9,7 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 
 Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
 Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
-State snapshots are written to `pathly/plans/<feature>/STATE.json`.
+State snapshots are mirrored to `pathly/plans/<feature>/STATE.json` by the FSM server after each transition.
 
 - **Log event:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type': 'FILE_CREATED', 'file': 'DESIGN.md', 'ts': '<iso-timestamp>'})"`
 - **Never** append `STATE_TRANSITION` events — the FSM writes all state transitions after your AGENT_DONE.
@@ -100,10 +100,12 @@ python3 -c "from pathly_orchestrator.eventlog import append_event as _ae; ts=__i
 
 Run the Completion report with `agent: designer`, `result: DONE`, `conversation: 0`, using `DESIGN_START`.
 
-Write `pathly/plans/<feature>/STATE.json`:
-```json
-{"state": "DESIGNING", "artifact": "DESIGN.md", "feature": "<feature>"}
+Report completion to the FSM:
+```bash
+pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>
 ```
+
+The FSM reads its transition_rules (DESIGNING → next state per the team flow definition), updates the central DB, and mirrors the new state to `pathly/plans/<feature>/STATE.json`. The skill no longer writes STATE.json directly.
 
 Print:
 ```

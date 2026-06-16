@@ -32,6 +32,14 @@ the read-only info panel before writing PAUSED status. Do NOT call next_action.
 
 Write `status: PAUSED` to that feature's `PROGRESS.md`.
 
+Then report the pause to the FSM (it will persist the paused state):
+
+```
+pathly-fsm-call complete-stage --flow pause --topic <feature-name> --project-root <project_root>
+```
+
+Where `<feature-name>` is the folder name discovered in Step 1, and `<project_root>` is the current working directory.
+
 Print:
 
 ```

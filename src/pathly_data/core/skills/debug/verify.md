@@ -27,11 +27,11 @@ log-phase PHASE_START verify
 
 If verification passes:
 - Write `<feature_path>/VERIFY.md` containing exactly `RESULT: PASS` on the first line.
-- Transition state → DONE.
+- Call `pathly-fsm-call complete-stage --flow debug --topic $TOPIC --project-root $PROJECT_ROOT`; the FSM computes the next state and writes STATE.json.
 
 If verification fails:
 - Write `<feature_path>/feedback/VERIFY_FAILURES.md` with a clear description of what still fails.
-- Transition state → ROOT_CAUSE_FOUND so the fix can be reattempted.
+- Call `pathly-fsm-call complete-stage --flow debug --topic $TOPIC --project-root $PROJECT_ROOT` with the feedback file present; the FSM gates on its existence and routes via transition_rules.
 
 log-phase PHASE_DONE verify
 
@@ -40,5 +40,5 @@ log-phase PHASE_DONE verify
 State transitions are written to the central DB via the FSM server.
 Every event must include `"ts": "<iso-timestamp>"` using current ISO-8601 UTC time.
 
-- **Transition state to X:** Write `<feature_path>/STATE.json` `{"current": "X"}`.
-  Call `pathly-fsm-call record-activity` to log the event to the central DB.
+- **Transition state to X:** Call `pathly-fsm-call complete-stage --flow <flow> --topic <topic> --project-root <project_root>`.
+  The FSM computes the next state from transition_rules and writes `<feature_path>/STATE.json` as a mirror of the DB state.

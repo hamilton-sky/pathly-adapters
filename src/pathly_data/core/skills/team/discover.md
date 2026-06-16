@@ -11,8 +11,8 @@ Parse `$ARGUMENTS`: first non-keyword word = `FEATURE`, `lite|standard|strict` =
 
 ## FSM operations
 
-**Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
-Log via: `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'STATE_TRANSITION','to':'X','ts':'<iso-timestamp>'})"`.
+**Transition state to X:** Call `pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>`.
+The FSM computes the next state from transition_rules and persists it to the DB and STATE.json mirror.
 
 Every logged event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
 
@@ -69,7 +69,7 @@ Reply with 1, 2, 3, 4, or 5:
 
 ## Path 1 — Quick storm
 
-Transition state → STORMING.
+Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 Route to `team/plan [FEATURE] [rigor] [autoFlow] storm`.
 
 ---
@@ -77,7 +77,7 @@ Route to `team/plan [FEATURE] [rigor] [autoFlow] storm`.
 ## Path 2 — Skip discovery
 
 Print: `Skipping discovery. Starting planning...`
-Transition state → PLANNING.
+Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 Route to `team/plan [FEATURE] [rigor] [autoFlow]`.
 
 ---
@@ -103,11 +103,11 @@ Reply with A, B, or C:
 ```
 Wait for reply.
 
-**A** → Transition state → BUILDING.
+**A** → Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 Print: `Skipping discovery. Starting implementation from PRD plan.`
 Route back to `team [FEATURE] [rigor] [autoFlow]`.
 
-**B** → Transition state → PO_DISCUSSING. **Spawn** `po`:
+**B** → Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`. **Spawn** `po`:
 ```
 Run PO mode for the feature: [feature name]
 A PRD has already been imported. Read pathly/plans/[feature]/USER_STORIES.md as the baseline.
@@ -115,10 +115,10 @@ Focus only on gaps: missing edge cases, unclear acceptance criteria, unstated co
 The user will type "stop notes" when satisfied to write pathly/plans/[feature]/PO_NOTES.md.
 Remind them of this at the start.
 ```
-After PO completes: transition state → BUILDING.
+After PO completes: call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 Route back to `team [FEATURE] [rigor] [autoFlow]`.
 
-**C** → Transition state → STORMING.
+**C** → Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 Print: `Plan files ready. Starting architect storm for technical design.`
 Route to `team/plan [FEATURE] [rigor] [autoFlow] storm`.
 
@@ -126,7 +126,7 @@ Route to `team/plan [FEATURE] [rigor] [autoFlow] storm`.
 
 ## Path 4 — Explore first
 
-Transition state → EXPLORING.
+Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 
 Route to `explore [FEATURE]`.
 
@@ -147,21 +147,21 @@ What next?
 Reply with A, B, or C:
 ```
 
-**A** → Transition state → PLANNING.
+**A** → Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 Route to `team/plan [FEATURE] [rigor] [autoFlow]`.
 (`team/plan` reads `pathly/explorations/[FEATURE]/CONCLUSIONS.md` automatically — no extra injection needed.)
 
 **B** → Route back to `team [FEATURE] nano`. (Orchestrator will run nano mode.)
 
 **C** → Print: `Pipeline paused after explore. Resume with team [feature] build when ready.`
-Transition state → IDLE. Stop.
+Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`. Stop.
 
 ---
 
 ## Path 5 — Full discovery (PO → Storm → Plan)
 
 **Phase 1 — PO Discussion:**
-Transition state → PO_DISCUSSING.
+Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 
 **Spawn** `po`:
 ```
@@ -170,7 +170,7 @@ Probe requirements interactively — problem, users, MVP scope, out-of-scope, co
 The user will type "stop notes" when satisfied to write pathly/plans/[feature]/PO_NOTES.md.
 Remind them of this at the start.
 ```
-After PO completes: transition state → PO_PAUSED.
+After PO completes: call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 
 If not autoFlow — pause:
 ```
@@ -178,12 +178,12 @@ If not autoFlow — pause:
 Requirements captured in pathly/plans/[feature]/PO_NOTES.md.
 Ready for architect storm? Reply 'yes' to continue, or 'no' to stop here.
 ```
-On 'no': log human response "stop". Write STATE.json with current state. Halt.
+On 'no': log human response "stop". Halt.
 On 'yes': log human response with reply value. Advance.
 If autoFlow: log human response "auto-advance".
 
 **Phase 2 — Architect Storm:**
-Transition state → STORMING.
+Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 Route to `team/plan [FEATURE] [rigor] [autoFlow] storm`.
 (plan.md Stage 1 runs the full analyze → research → storm cycle, reading PO_NOTES.md automatically.)
 
@@ -195,18 +195,16 @@ STORM_SEED.md written. Ready to plan? Reply 'yes' to continue, or 'no' to stop h
 On 'no': halt.
 
 **Phase 3 — Hand off to plan:**
-Transition state → PLANNING.
+Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
 Route to `team/plan [FEATURE] [rigor] [autoFlow]`.
 
 ---
 
-## State recovery — stale STATE.json
+## State recovery — resume in-progress feature
 
-Before printing the discovery menu, read `pathly/plans/<feature>/STATE.json`.
-If STATE.json is missing or unreadable, query the central DB for the last STATE_TRANSITION event:
-`python3 -c "from pathly_orchestrator.db import get_db; import json; conn=get_db(); row=conn.execute(\"SELECT payload FROM fsm_events WHERE feature=? AND event_type='STATE_TRANSITION' ORDER BY seq DESC LIMIT 1\",('<feature>',)).fetchone(); print(json.loads(row[0] or '{}').get('to','') if row else '')"`
+Before printing the discovery menu, call `pathly-fsm-call next-action --flow team --topic <feature> --project-root <project_root>` to recover the authoritative state from the FSM/DB. The FSM is the source of truth; STATE.json is a mirror written by the FSM.
 
-If the last DB state does not match `STATE.json["current"]`, the state file is stale. Correct it silently, then **bypass the discovery menu entirely** and route directly to the team skill for the true state:
+If the recovered state is not IDLE or a discovery state, **bypass the discovery menu entirely** and route directly to the team skill for the true state:
 
 | True state (from DB) | Route to |
 |---|---|

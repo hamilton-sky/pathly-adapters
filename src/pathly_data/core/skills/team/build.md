@@ -22,7 +22,7 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 
 Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
 Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
-State snapshots are written to `pathly/plans/<feature>/STATE.json`.
+State snapshots are written to `pathly/plans/<feature>/STATE.json` by the FSM after each transition.
 
 - **Log event:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type': 'FILE_CREATED', 'file': '<filename>', 'ts': '<iso-timestamp>'})"`
 - **Log retry:** Same pattern with `{'type': 'RETRY', 'key': 'conv-N:FILE.md', 'ts': '<iso-timestamp>'}`.

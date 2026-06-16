@@ -6,10 +6,8 @@ Parse `$ARGUMENTS`: `FEATURE`.
 
 ## FSM operations
 
-- **Transition state to X:** Write `pathly/plans/<feature>/STATE.json` `{"current": "X"}`.
-  Log via: `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'STATE_TRANSITION','to':'X','ts':'<iso-timestamp>'})"`.
-
-Every logged event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
+- **Report stage completion to the FSM:** `pathly-fsm-call complete-stage --flow team --topic <FEATURE> --project-root <project_root>`
+  The FSM computes the next state from transition_rules and writes the DB and STATE.json mirror itself. The skill does not pick a target state or write STATE.json.
 
 ## Subagents
 
@@ -67,7 +65,7 @@ Use today's date for `{{DATE}}`, `git branch --show-current` for `{{BRANCH}}`,
 first HUMAN_RESPONSE value for `{{USER_INTENT}}` (or "not recorded").
 If no DB events exist for the feature, write all three files with placeholders → "not recorded".
 
-- Transition state → DONE.
+- Report completion to the FSM: `pathly-fsm-call complete-stage --flow team --topic <FEATURE> --project-root <project_root>` (FSM computes DONE via transition_rules).
 
 Print:
 ```
