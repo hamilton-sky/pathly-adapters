@@ -77,13 +77,17 @@ python -m build
 ```
 (The `comms.py` Python changes do NOT go through adapters.)
 
-## Decision needed — `goal_id` semantics (resolve before Step 2)
+## Decision (LOCKED 2026-06-16) — `goal_id` = a real `type='goal'` message id
 
-Migration design (`migrations.py`): a **goal is `type='goal'`** (existing `type` column);
-tasks carry `goal_id` = the goal message's id. **Recommended:** post one
-`{type:"goal", text:"Goal: <feature>", executor:"single", ...}` first, capture its
-`message_id` as `$GOAL_ID`, then stamp each task with it. (The recon's shortcut of
-`goal_id:"$FEATURE"` works as an opaque key but breaks the goal-message linkage.)
+Use a **real goal message**, matching the schema design (NOT the `$FEATURE` shortcut).
+The planner MUST:
+1. Post one goal message **first**:
+   `{feature:"$FEATURE", from:"planner", type:"goal", text:"Goal: <feature>", board:"feature", scope:"$FEATURE", executor:"single"}`
+   → capture the returned `message_id` as `$GOAL_ID`.
+2. Stamp every phase task with `goal_id:"$GOAL_ID"`.
+
+Why: preserves the goal-message linkage for future `WHERE goal_id = <goal id>` joins and
+per-goal grouping on the board. (The `$FEATURE` opaque-key shortcut was rejected.)
 
 ## Verified facts / gotchas (don't relearn these)
 
@@ -106,6 +110,5 @@ hard-codes `STORMING` — check `fsm_ops.py:_load_flow` / `recover_state`.
 
 ## Build order
 1. Step 1 (accept goal_id/executor) — verify with a POST + read-back.
-2. Resolve goal_id semantics decision.
-3. Step 2 (plan.md Step 6 + propagation).
-4. Then the two-flow split (consultation + trimmed team).
+2. Step 2 (plan.md Step 6 + propagation) — `goal_id` = real goal-message id (LOCKED, see above).
+3. Then the two-flow split (consultation + trimmed team).
