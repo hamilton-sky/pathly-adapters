@@ -266,14 +266,37 @@ Keep decomposition small enough for builder reliability:
 ## Step 6: Post Tasks to Comms Board
 
 After all plan files are verified, seed the comms board DAG so the builder can poll
-`GET /comms/tasks?ready=true` and Studio can visualize task progress.
+`GET /comms/tasks?ready=true` and Studio can visualize task progress. The DAG hangs off
+a **goal message** (`type=goal`): you post the goal first, then stamp every phase task
+with `goal_id` pointing at it.
 
-**Idempotency guard — skip if tasks already exist:**
+**Idempotency guard — skip if this DAG already exists.** Check for BOTH an existing goal
+and existing tasks for this feature's scope:
 ```
 curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE"
+curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
 ```
-If the response contains any messages with `"type": "task"` for this feature's scope, skip
-this entire step — the tasks are already seeded (e.g. from a previous planning run).
+If **either** response contains any messages, skip this entire step — the DAG is already
+seeded (e.g. from a previous planning run).
+
+**Post the goal first.** One `type=goal` message; capture its returned `message_id` as
+`$GOAL_ID`. `executor` is set on the **goal only** (`single` = one agent runs the whole
+goal; the `{single,loop,team}` choice is consumed later by the dispatcher, not here):
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "planner",
+    "type": "goal",
+    "text": "Goal: $FEATURE",
+    "board": "feature",
+    "scope": "$FEATURE",
+    "executor": "single"
+  }'
+```
+Record the response `"message_id"` as `$GOAL_ID`.
 
 **Post each phase in order** (Phase 1 first). Track the `message_id` returned by each call
 so later phases can reference their dependencies.
@@ -284,7 +307,10 @@ For each phase in `IMPLEMENTATION_PLAN.md`:
    Use `[]` when the phase says `Depends on: nothing`.
 3. Resolve dependencies: replace each named phase number with the `message_id` you recorded
    when that phase was posted (your local map: `phase_N → message_id`).
-4. POST to the comms board:
+4. POST the task with `goal_id:"$GOAL_ID"`. Emit this EXACT shape. `executor` is **NOT**
+   on the task (it lives on the goal). `conv` is the conversation number from the plan and
+   MUST be a JSON **integer** — omit the key entirely rather than send a string (the route
+   400s on a string `conv`):
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
@@ -295,8 +321,13 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "type": "task",
     "text": "Phase N: <title> — <one-line description>",
     "board": "feature",
+    "scope": "$FEATURE",
     "stage": "BUILDING",
-    "depends_on": ["<dep_message_id>"]
+    "conv": <int>,
+    "depends_on": ["<phase_K_message_id>"],
+    "goal_id": "$GOAL_ID",
+    "artifact_path": "pathly/plans/$FEATURE/IMPLEMENTATION_PLAN.md",
+    "artifact_type": "plan_artifact"
   }'
 ```
 

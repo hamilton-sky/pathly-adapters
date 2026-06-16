@@ -30,8 +30,15 @@ def post_message(
     depends_on: list[str] | None = None,
     artifact_path: str | None = None,
     artifact_type: str | None = None,
+    goal_id: str | None = None,
+    executor: str | None = None,
 ) -> str:
-    """Insert a new message into comms_messages. Returns the new message_id."""
+    """Insert a new message into comms_messages. Returns the new message_id.
+
+    goal_id ties a task to its goal message; executor ('single'|'loop'|'team')
+    is set on the goal message only. Both default to None so existing callers
+    keep their behavior (the columns are harmlessly NULL).
+    """
     message_id = str(uuid.uuid4())
     # A task enters the DAG frontier as 'pending' so get_ready_tasks() (which
     # filters task_status='pending') can pick it up. Non-task messages leave it NULL.
@@ -39,8 +46,8 @@ def post_message(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -58,6 +65,8 @@ def post_message(
                 task_status,
                 artifact_path,
                 artifact_type,
+                goal_id,
+                executor,
             ),
         )
         conn.commit()

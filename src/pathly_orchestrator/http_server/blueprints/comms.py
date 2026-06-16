@@ -79,7 +79,8 @@ def comms_post():
     """Post a message to a board.
 
     Required body fields: feature, from, type, text.
-    Optional: scope (default 'feature'), to, options, reply_to, stage, conv.
+    Optional: scope (default 'feature'), to, options, reply_to, stage, conv,
+    depends_on, artifact_path, artifact_type, goal_id, executor.
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
@@ -138,6 +139,10 @@ def comms_post():
         stage = data.get("stage")
         conv = data.get("conv")
         depends_on = data.get("depends_on")
+        # Goals → task-DAG: goal_id ties a task to its goal message; executor
+        # lives on the goal. Both are plain TEXT columns (Phase 0a migration).
+        goal_id = data.get("goal_id")
+        executor = data.get("executor")
         # Artifact link — lets an agent post a type=artifact message that points at
         # the file it created, so the board can open it in the editor.
         artifact_path = (data.get("artifact_path") or None)
@@ -161,6 +166,12 @@ def comms_post():
             or not all(isinstance(d, str) for d in depends_on)
         ):
             return jsonify({"error": "Field 'depends_on' must be a list of strings or null"}), 400
+        # executor is accepted as any string here — the {single,loop,team} enum is
+        # enforced downstream by the Phase-1 dispatcher, not at the write path.
+        if goal_id is not None and not isinstance(goal_id, str):
+            return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
+        if executor is not None and not isinstance(executor, str):
+            return jsonify({"error": "Field 'executor' must be a string or null"}), 400
         message_id = _post_message(
             conn,
             board=board,
@@ -176,6 +187,8 @@ def comms_post():
             depends_on=depends_on,
             artifact_path=artifact_path if isinstance(artifact_path, str) else None,
             artifact_type=artifact_type if isinstance(artifact_type, str) else None,
+            goal_id=goal_id,
+            executor=executor,
         )
 
         # An artifact message also gets a comms_artifacts row (the metadata
