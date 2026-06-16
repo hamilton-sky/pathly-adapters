@@ -117,6 +117,36 @@ export function rowToMessage(row: CommsRow): Message {
   return m
 }
 
+// ── comms_artifacts side-table ───────────────────────────────────────
+
+/** A stored artifact row (one per file produced on a board, many-per-task). */
+export interface ArtifactRow {
+  id: string
+  message_id: string
+  path: string
+  type: string | null
+  title: string | null
+  summary: string | null
+  token_count: number | null
+  created_at: string
+  created_by: string | null
+  last_edit_at: string | null
+  last_edit_by: string | null
+  version: number | null
+  supersedes: string | null
+}
+
+/** Fetch the artifacts linked to a message. Returns [] on any failure. */
+export async function fetchArtifacts(messageId: string): Promise<ArtifactRow[]> {
+  try {
+    const r = await apiFetch(`/comms/artifacts?message_id=${encodeURIComponent(messageId)}`)
+    const data = (await r.json()) as { ok?: boolean; artifacts?: ArtifactRow[] }
+    return Array.isArray(data.artifacts) ? data.artifacts : []
+  } catch {
+    return []
+  }
+}
+
 // ── boardKey convention ──────────────────────────────────────────────
 
 export function scopeToParams(scope: BoardScope, key: string): { board: string; scope: string } {

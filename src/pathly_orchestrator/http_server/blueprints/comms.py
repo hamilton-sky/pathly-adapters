@@ -137,6 +137,23 @@ def comms_post():
             artifact_type=artifact_type if isinstance(artifact_type, str) else None,
         )
 
+        # An artifact message also gets a comms_artifacts row (the metadata
+        # substrate: many-per-task, version/edit history). Best-effort — a board
+        # post must never fail because the artifact side-table hiccupped.
+        if msg_type == "artifact" and isinstance(artifact_path, str) and artifact_path.strip():
+            try:
+                from pathly_orchestrator.db.queries.comms import insert_artifact as _insert_artifact
+                _insert_artifact(
+                    conn,
+                    message_id=message_id,
+                    path=artifact_path,
+                    type=artifact_type if isinstance(artifact_type, str) else None,
+                    summary=text,
+                    created_by=from_agent,
+                )
+            except Exception:
+                logging.debug("comms_artifacts insert (post) failed", exc_info=True)
+
         if msg_type in _EMBED_TYPES:
             _embed_async(message_id, text)
 
@@ -512,7 +529,7 @@ def comms_attach():
 
         conn = _get_db()
         row = conn.execute(
-            "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            "SELECT board, scope, from_agent, text FROM comms_messages WHERE id=? AND deleted_at IS NULL",
             (message_id,),
         ).fetchone()
         if row is None:
@@ -528,6 +545,22 @@ def comms_attach():
         if result == "not_found":
             return jsonify({"ok": False, "error": "Message not found"}), 404
 
+        # Mirror a file artifact into comms_artifacts (URL-only attaches aren't
+        # files, so they're skipped). Best-effort — never fail the attach on it.
+        if has_path:
+            try:
+                from pathly_orchestrator.db.queries.comms import insert_artifact as _insert_artifact
+                _insert_artifact(
+                    conn,
+                    message_id=message_id,
+                    path=artifact_path,
+                    type=artifact_type if isinstance(artifact_type, str) else None,
+                    summary=row["text"],
+                    created_by=row["from_agent"],
+                )
+            except Exception:
+                logging.debug("comms_artifacts insert (attach) failed", exc_info=True)
+
         _broadcast_comms(row["scope"], {
             "type": "COMMS_UPDATE",
             "message_id": message_id,
@@ -540,6 +573,30 @@ def comms_attach():
         return jsonify({"ok": True, "message_id": message_id}), 200
     except Exception as exc:
         logging.exception("comms_attach error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/artifacts", methods=["GET"])
+def comms_artifacts():
+    """List the artifacts linked to a message (comms_artifacts side-table).
+
+    Query param: message_id (required). Returns 200 {ok, artifacts:[...]} —
+    newest first, possibly empty. GET, so unauthenticated like the other reads.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import (
+            list_artifacts_for_message as _list_artifacts,
+        )
+
+        message_id = request.args.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Query param 'message_id' is required"}), 400
+
+        conn = _get_db()
+        return jsonify({"ok": True, "artifacts": _list_artifacts(conn, message_id)}), 200
+    except Exception as exc:
+        logging.exception("comms_artifacts error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

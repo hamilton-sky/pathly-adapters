@@ -63,6 +63,7 @@ POST /comms/answer          ← answer a posted question
 GET  /comms/tasks           ← list DAG tasks
 POST /comms/tasks/complete  ← mark a task complete
 POST /comms/attach          ← attach an artifact to a message
+GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifacts table)
 GET  /comms/trash           ← list trashed messages
 POST /comms/restore         ← restore a trashed message
 POST /comms/supersede       ← mark a message superseded_by another
@@ -155,7 +156,7 @@ pathly_orchestrator/
       flows.py             # GET/POST/DELETE /flows/stage-config (per-stage agent/model overrides)
       menu.py              # GET /menu/<name>, GET /metrics, GET /metrics/json
       db_api.py            # /db/* read API: stats, features, features/<f>/{events,agents,otel,runs}, stats/trends, query, settings
-      comms.py             # 15 /comms/* routes — message board (post, search, tasks, scope, supersede, …); see "Comms board endpoints" above
+      comms.py             # 16 /comms/* routes — message board (post, search, tasks, scope, supersede, artifacts, …); see "Comms board endpoints" above
       chat.py              # POST /chat
       streams.py           # GET /events/menu|runner|history|stream|comms
 ```

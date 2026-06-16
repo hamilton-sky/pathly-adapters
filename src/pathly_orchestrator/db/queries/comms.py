@@ -286,6 +286,53 @@ def attach_artifact_to_message(
     return "ok"
 
 
+def insert_artifact(
+    conn: sqlite3.Connection,
+    message_id: str,
+    path: str,
+    type: str | None = None,
+    title: str | None = None,
+    summary: str | None = None,
+    token_count: int | None = None,
+    created_by: str | None = None,
+) -> str:
+    """Insert a comms_artifacts row for an artifact message. Returns the row id.
+
+    Idempotent per (message_id, path): if a row already exists for this message
+    and path, returns its id without inserting, so re-posts and back-fills never
+    duplicate. ``version`` defaults to 1 and ``last_edit_*`` / ``supersedes``
+    stay NULL — the hooks that populate them (editor-save, versioning) are a
+    deferred follow-up.
+    """
+    existing = conn.execute(
+        "SELECT id FROM comms_artifacts WHERE message_id=? AND path=?",
+        (message_id, path),
+    ).fetchone()
+    if existing is not None:
+        return existing["id"]
+    artifact_id = str(uuid.uuid4())
+    if title is None and path:
+        title = path.replace("\\", "/").rsplit("/", 1)[-1]
+    with _get_write_lock(conn):
+        conn.execute(
+            "INSERT INTO comms_artifacts "
+            "(id, message_id, path, type, title, summary, token_count, created_at, created_by, version) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+            (artifact_id, message_id, path, type, title, summary, token_count, _now(), created_by),
+        )
+        conn.commit()
+    return artifact_id
+
+
+def list_artifacts_for_message(conn: sqlite3.Connection, message_id: str) -> list[dict]:
+    """Return every artifact linked to a message, newest first (many-per-task)."""
+    rows = conn.execute(
+        "SELECT * FROM comms_artifacts WHERE message_id=? ORDER BY created_at DESC",
+        (message_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def acknowledge_message(
     conn: sqlite3.Connection,
     message_id: str,

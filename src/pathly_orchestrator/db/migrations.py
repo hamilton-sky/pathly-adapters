@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+import uuid
 
 
 def _run_migrations(conn: sqlite3.Connection, vec_available: bool = False) -> None:
@@ -242,6 +243,29 @@ CREATE TABLE IF NOT EXISTS comms_messages (
     assigned_to_agent TEXT,
     embedding_model   TEXT
 );
+
+-- One row per artifact produced on a board (many-per-task). board/scope are
+-- derived through the message FK. version / last_edit_* / supersedes columns
+-- exist now but stay at defaults — the editor-save + versioning hooks that
+-- populate them are a deferred follow-up.
+CREATE TABLE IF NOT EXISTS comms_artifacts (
+    id            TEXT PRIMARY KEY,
+    message_id    TEXT NOT NULL,
+    path          TEXT NOT NULL,
+    type          TEXT,
+    title         TEXT,
+    summary       TEXT,
+    token_count   INTEGER,
+    created_at    TEXT NOT NULL,
+    created_by    TEXT,
+    last_edit_at  TEXT,
+    last_edit_by  TEXT,
+    version       INTEGER DEFAULT 1,
+    supersedes    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_comms_artifacts_msg  ON comms_artifacts(message_id);
+CREATE INDEX IF NOT EXISTS idx_comms_artifacts_path ON comms_artifacts(path);
 """)
     conn.commit()
     if vec_available:
@@ -278,6 +302,41 @@ END;
     except Exception:
         pass
     _add_additive_migrations(conn)
+    _backfill_comms_artifacts(conn)
+
+
+def _backfill_comms_artifacts(conn: sqlite3.Connection) -> None:
+    """One-time, idempotent back-fill of comms_artifacts from existing artifact
+    messages.
+
+    For every non-deleted ``type='artifact'`` message that has an
+    ``artifact_path`` but no comms_artifacts row yet, insert one. token_count is
+    left NULL (the DB layer never touches the filesystem — the modal computes
+    size/tokens live, and post-time wiring fills it for new artifacts). Safe to
+    run on every startup: the LEFT JOIN ... a.id IS NULL guard skips rows that
+    already have an artifact. Positional row access so it works regardless of
+    row_factory.
+    """
+    try:
+        rows = conn.execute(
+            "SELECT m.id, m.from_agent, m.text, m.artifact_path, m.artifact_type, m.ts "
+            "FROM comms_messages m "
+            "LEFT JOIN comms_artifacts a ON a.message_id = m.id "
+            "WHERE m.type='artifact' AND m.artifact_path IS NOT NULL "
+            "AND m.deleted_at IS NULL AND a.id IS NULL"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return
+    for r in rows:
+        mid, from_agent, text, path, atype, ts = r[0], r[1], r[2], r[3], r[4], r[5]
+        title = path.replace("\\", "/").rsplit("/", 1)[-1] if path else None
+        conn.execute(
+            "INSERT INTO comms_artifacts "
+            "(id, message_id, path, type, title, summary, token_count, created_at, created_by, version) "
+            "VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, 1)",
+            (str(uuid.uuid4()), mid, path, atype, title, text, ts, from_agent),
+        )
+    conn.commit()
 
 
 def _add_additive_migrations(conn: sqlite3.Connection) -> None:
