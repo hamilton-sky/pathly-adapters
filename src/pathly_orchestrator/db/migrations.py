@@ -372,6 +372,11 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("comms_messages",      "failed_at",             "TEXT"),
         ("comms_messages",      "fail_reason",           "TEXT"),
         ("comms_messages",      "attempts",              "INTEGER DEFAULT 0"),
+        # comms-board-dag-serial: Board -> Goals -> per-goal task-DAG.
+        # goal_id ties a task to its goal; executor ('single'|'loop'|'team') is
+        # set on the goal message. A goal is type='goal' (existing type column).
+        ("comms_messages",      "goal_id",               "TEXT"),
+        ("comms_messages",      "executor",              "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")
