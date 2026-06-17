@@ -111,6 +111,8 @@ declare global {
         delete: (path: string) => Promise<void>
         moveToParent: (filePath: string) => Promise<string>
         move: (src: string, dest: string) => Promise<void>
+        copy: (src: string, dest: string) => Promise<void>
+        pathForFile: (file: File) => string
         pickFolder: () => Promise<string | null>
         saveDialog: (defaultPath: string, content: string, intoDownloads?: boolean) => Promise<string | null>
         userHome: () => Promise<string>

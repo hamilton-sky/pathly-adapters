@@ -12,7 +12,7 @@ import { EvaluateBoardButton } from './GoalsView/EvaluateBoardButton'
 import { ArtifactsView } from './ArtifactsView/ArtifactsView'
 import { useCommsPanel } from './hooks/useCommsPanel'
 import { useStore } from '../../../store'
-import { apiStartFlow } from '../../../store/commsApi'
+import { apiStartFlow, apiPostArtifact, resolveFeaturePath, scopeToParams } from '../../../store/commsApi'
 import s from './CommsPanel.module.css'
 
 // Which chips each panel type shows, and their default on/off state.
@@ -30,10 +30,20 @@ const LOCAL_DEFAULTS: Record<BoardScope, Record<BoardScope, boolean>> = {
   global:  { feature: false, project: false, global: true },
 }
 
+// Guess an artifact's display type from its extension (for the card icon/preview).
+function inferAtype(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  if (ext === 'md') return 'md'
+  if (ext === 'pdf') return 'pdf'
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return 'image'
+  if (ext === 'json') return 'json'
+  return 'code'
+}
+
 export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeature: string }) {
   const {
     messages, feature, flashId, post, answer, resolve, toggleScope, del, editMessage,
-    supersede, attach, runSingleAgent, searchResults, searchTerm, runSearch, clearSearch,
+    supersede, attach, runSingleAgent, searchResults, searchTerm, runSearch, clearSearch, reload,
   } = useCommsPanel(scope, mainFeature)
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
   const [composeText, setComposeText] = useState('')
@@ -59,6 +69,32 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   const handleRunFlow = (flow: string, opts: { interactive: boolean }): void => {
     const projectRoot = projectPath.replace(/\\/g, '/').replace(/\/$/, '')
     void apiStartFlow(boardKey, flow, { projectRoot, interactive: opts.interactive })
+  }
+
+  // Drop files onto the Artifacts view → copy each into the feature's artifacts/
+  // dir (binary-safe, in-place reference would break if the original moves) → post
+  // it as an artifact card. The dropped files then become board content the
+  // evaluator can read. Feature boards copy into the feature; project/global into a
+  // shared uploads dir.
+  const handleDropFiles = async (files: File[]): Promise<void> => {
+    const projectRoot = projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    if (!projectRoot || !files.length) return
+    const params = scopeToParams(scope, boardKey)
+    const base = scope === 'feature'
+      ? await resolveFeaturePath(projectRoot, boardKey)
+      : `${projectRoot}/pathly/.uploads/${boardKey}`
+    let posted = 0
+    for (const file of files) {
+      const src = window.pathly.fs.pathForFile(file)
+      if (!src) continue
+      const dest = `${base}/artifacts/${file.name}`
+      try {
+        await window.pathly.fs.copy(src, dest)
+        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${file.name}`, dest, inferAtype(file.name))
+        if (id) posted += 1
+      } catch { /* skip a file that fails to copy/post */ }
+    }
+    if (posted) reload()
   }
   // Independent per-panel reads — only used for project/global panels.
   // Feature panel reads are authoritative from feature.scope.
@@ -108,7 +144,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
         />
       )}
       {boardView === 'artifacts' && (
-        <ArtifactsView messages={messages} onDelete={del} onSupersede={supersede} />
+        <ArtifactsView messages={messages} onDelete={del} onSupersede={supersede} onDropFiles={handleDropFiles} />
       )}
 
       <div className={s.foot}>

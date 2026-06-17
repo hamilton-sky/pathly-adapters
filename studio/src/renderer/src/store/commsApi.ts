@@ -204,6 +204,37 @@ export async function apiPost(
   }
 }
 
+/**
+ * Post a type='artifact' message that points at a file path, so it renders as an
+ * artifact card AND the backend creates its comms_artifacts metadata row. Returns
+ * the new message id, or null on failure.
+ */
+export async function apiPostArtifact(
+  feature: string,
+  board: string,
+  scope: string,
+  text: string,
+  artifactPath: string,
+  artifactType?: string,
+): Promise<string | null> {
+  try {
+    const r = await apiFetch(`/comms/post`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        feature, from: 'human', type: 'artifact', text, board, scope,
+        artifact_path: artifactPath,
+        ...(artifactType ? { artifact_type: artifactType } : {}),
+      }),
+    })
+    if (!r.ok) return null
+    const json = await r.json() as { message_id?: string }
+    return json.message_id ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function apiAnswer(
   questionId: string,
   answer: string,
@@ -597,7 +628,7 @@ const BLOCKER_FILES = new Set([
 
 /** Resolve the storage path for a feature: new-style pathly/<id>/ wins if it exists,
  *  otherwise falls back to pathly/plans/<id>/. Mirrors _resolve_storage_path in fsm_ops.py. */
-async function resolveFeaturePath(projectPath: string, featureId: string): Promise<string> {
+export async function resolveFeaturePath(projectPath: string, featureId: string): Promise<string> {
   const newStyle = `${projectPath}/pathly/${featureId}`
   // listDir on the dir itself returns [] when the dir doesn't exist, but we need to know
   // if the dir exists. Writing a .keep file ensures the new-style dir exists, so we check

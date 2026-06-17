@@ -127,9 +127,11 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
   const runSearch = useCallback((q: string) => { void store.runSearch(key, q) }, [store, key])
   const clearSearch = useCallback(() => store.clearSearch(), [store])
 
+  const reload = useCallback(() => { void store.loadBoard(scope, key, projectRoot) }, [store, scope, key, projectRoot])
+
   return {
     messages, feature, pendingCount, flashId, post, answer, resolve,
     toggleScope, del, editMessage, supersede, attach, runSingleAgent, runGoal, stopGoal,
-    searchResults, searchTerm, runSearch, clearSearch,
+    searchResults, searchTerm, runSearch, clearSearch, reload,
   }
 }

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // Mirrored in studio/src/renderer/src/types/global.d.ts — keep in sync
 interface DbStats {
@@ -110,6 +110,10 @@ contextBridge.exposeInMainWorld('pathly', {
     delete: (path: string): Promise<void> => ipcRenderer.invoke('fs:delete', path),
     moveToParent: (filePath: string): Promise<string> => ipcRenderer.invoke('fs:moveToParent', filePath),
     move: (src: string, dest: string): Promise<void> => ipcRenderer.invoke('fs:move', src, dest),
+    copy: (src: string, dest: string): Promise<void> => ipcRenderer.invoke('fs:copy', src, dest),
+    // Resolve a dropped File's absolute path (File.path was removed in modern
+    // Electron). Synchronous — webUtils runs in the preload.
+    pathForFile: (file: File): string => webUtils.getPathForFile(file),
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('fs:pickFolder'),
     saveDialog: (defaultPath: string, content: string, intoDownloads?: boolean): Promise<string | null> =>
       ipcRenderer.invoke('fs:saveDialog', defaultPath, content, intoDownloads),

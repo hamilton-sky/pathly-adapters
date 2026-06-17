@@ -117,6 +117,16 @@ export function registerFsHandlers(): void {
     fs.renameSync(srcPath, destPath)
   })
 
+  // Copy a file (e.g. a dropped document) into a feature's artifacts/ dir. Source
+  // must be readable (under home or the packaged library); destination must be in
+  // home. Binary-safe — copyFileSync, not a utf-8 read/write.
+  ipcMain.handle('fs:copy', async (_event, srcPath: string, destPath: string): Promise<void> => {
+    if (!isReadablePathSafe(srcPath)) throw new Error('Source path outside allowed directories is not allowed')
+    if (!isPathSafe(destPath)) throw new Error('Destination path outside home directory is not allowed')
+    fs.mkdirSync(path.dirname(destPath), { recursive: true })
+    fs.copyFileSync(srcPath, destPath)
+  })
+
   ipcMain.handle('fs:userHome', async (): Promise<string> => {
     return path.join(app.getPath('home'), '.pathly')
   })
