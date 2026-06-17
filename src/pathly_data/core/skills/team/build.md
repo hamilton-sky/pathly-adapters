@@ -41,6 +41,35 @@ State snapshots are written to `pathly/plans/<feature>/STATE.json` by the FSM af
 
 log-phase PHASE_START build
 
+### Phase 0 — Board task DAG (preferred)
+
+Before reading PROGRESS.md, check whether this feature has a board task DAG:
+```
+curl -s "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]"
+```
+**If the response is a non-empty list of ready tasks, BUILD FROM THE BOARD** — the DAG is
+the authoritative work list (it supersedes PROGRESS.md / CONVERSATION_PROMPTS.md). Drain it:
+
+1. Pick a ready task. Claim it: `POST /comms/tasks/claim {"message_id":"<id>","run_id":"build"}`.
+   If `claimed` is false, another worker took it — re-fetch and pick another.
+2. **Spawn** `builder` with `phase: implement`, passing the task's `text` as the
+   instructions (it is a self-contained builder prompt — what to build · Files · Done when)
+   and reading its `artifact_path` for plan context. Execute that one task. Verify.
+   - Requirement ambiguity → write `feedback/IMPL_QUESTIONS.md` (routed to planner).
+   - Technical blocker → write `feedback/DESIGN_QUESTIONS.md` (routed to architect).
+3. On success: `POST /comms/tasks/complete {"message_id":"<id>","feature":"[feature]"}`.
+   On unrecoverable failure: `POST /comms/tasks/fail {"message_id":"<id>","reason":"<short>"}`.
+4. Re-fetch ready tasks (step 0). Repeat until the ready list is empty.
+
+When the DAG is drained, skip the conversation flow below — go straight to **Phase 3.5
+(Write VERIFY.md)** and transition to review.
+
+**If the response is empty OR the server is unreachable (connection refused), FALL BACK**
+to the conversation-based build below (unchanged) — this keeps features that have no board
+DAG (older plans) working exactly as before.
+
+### Conversation fallback
+
 Read `pathly/plans/[feature]/PROGRESS.md`. Find the first conversation row with status TODO. This is Conv N.
 
 ### Phase 1 — Analyze
