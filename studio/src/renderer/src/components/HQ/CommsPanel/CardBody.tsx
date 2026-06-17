@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { Check, History, FileText, Search, Eye, ChevronRight } from 'lucide-react'
 import type { Message } from '../../CommandCenter/types'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
-import { GoalRunButton } from './GoalRunButton/GoalRunButton'
 import s from './CommsMsgCard.module.css'
 
 export interface CardBodyProps {
@@ -108,18 +107,9 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
     )
   }
 
-  if (m.type === 'goal') {
-    return (
-      <>
-        {supersededBanner}
-        <MarkdownRenderer content={m.text} className={s.msgText} />
-        <GoalRunButton
-          goalId={m.id}
-          defaultExecutor={m.executor ?? 'single'}
-        />
-      </>
-    )
-  }
+  // Goals and tasks no longer render in the message thread — they live in the
+  // dedicated "Goals & Tasks" board view (GoalsView). The Messages view filters
+  // them out, so CardBody never receives them here.
 
   return (
     <>

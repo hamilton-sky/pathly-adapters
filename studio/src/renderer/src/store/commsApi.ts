@@ -43,6 +43,8 @@ export interface CommsRow {
   superseded_by?: string | null
   goal_id?: string | null
   executor?: string | null
+  task_status?: string | null
+  depends_on?: string | null
 }
 
 interface BackendOption {
@@ -117,6 +119,9 @@ export function rowToMessage(row: CommsRow): Message {
   if (row.superseded_by) m.supersededBy = row.superseded_by
   if (row.goal_id) m.goal_id = row.goal_id
   if (row.executor) m.executor = row.executor as Message['executor']
+  if (row.task_status) m.taskStatus = row.task_status as Message['taskStatus']
+  const deps = parseJsonArray(row.depends_on ?? null)
+  if (deps.length > 0) m.dependsOn = deps
 
   return m
 }

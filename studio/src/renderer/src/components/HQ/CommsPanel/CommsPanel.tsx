@@ -5,6 +5,9 @@ import { CommsMsgList } from './CommsMsgList'
 import { CommsInput } from './CommsInput'
 import { SearchBar } from './SearchBar/SearchBar'
 import { SingleAgentButton } from './SingleAgentButton/SingleAgentButton'
+import { BoardViewToggle, type BoardView } from './BoardViewToggle/BoardViewToggle'
+import { GoalsView } from './GoalsView/GoalsView'
+import { ArtifactsView } from './ArtifactsView/ArtifactsView'
 import { useCommsPanel } from './hooks/useCommsPanel'
 import s from './CommsPanel.module.css'
 
@@ -30,6 +33,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   } = useCommsPanel(scope, mainFeature)
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
   const [composeText, setComposeText] = useState('')
+  const [boardView, setBoardView] = useState<BoardView>('messages')
 
   const boardKey = scope === 'feature' ? mainFeature : scope
 
@@ -64,17 +68,25 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   return (
     <>
       <SearchBar value={searchTerm} onSearch={runSearch} onClear={clearSearch} />
-      <CommsMsgList
-        scope={scope}
-        messages={messages}
-        searchResults={searchResults}
-        searchTerm={searchTerm}
-        flashId={flashId}
-        onAnswer={answer}
-        onResolve={resolve}
-        onDelete={del}
-        onSupersede={supersede}
-      />
+      <BoardViewToggle view={boardView} onChange={setBoardView} />
+
+      {boardView === 'messages' && (
+        <CommsMsgList
+          scope={scope}
+          messages={messages}
+          searchResults={searchResults}
+          searchTerm={searchTerm}
+          flashId={flashId}
+          onAnswer={answer}
+          onResolve={resolve}
+          onDelete={del}
+          onSupersede={supersede}
+        />
+      )}
+      {boardView === 'goals' && <GoalsView messages={messages} />}
+      {boardView === 'artifacts' && (
+        <ArtifactsView messages={messages} onDelete={del} onSupersede={supersede} />
+      )}
 
       <div className={s.foot}>
         <div className={s.scopeRow}>

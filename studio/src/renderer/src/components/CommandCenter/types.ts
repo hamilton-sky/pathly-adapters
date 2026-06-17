@@ -55,6 +55,10 @@ export interface Message {
   goal_id?: string
   /** Executor type — set on goal messages (single | loop | team). */
   executor?: 'single' | 'loop' | 'team'
+  /** Task lifecycle status — set on task messages (maps to comms_messages.task_status). */
+  taskStatus?: 'pending' | 'in_progress' | 'done' | 'blocked' | 'failed'
+  /** Dependency task ids — set on task messages (maps to comms_messages.depends_on JSON). */
+  dependsOn?: string[]
 }
 
 export interface Feature {

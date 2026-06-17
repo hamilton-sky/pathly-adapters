@@ -7,19 +7,6 @@ import { ConfirmModal } from '../../shared/ConfirmModal/ConfirmModal'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import s from './CommsMsgList.module.css'
 
-// Build a map from goal_id → child task messages.
-function buildGoalTaskMap(messages: Message[]): Map<string, Message[]> {
-  const map = new Map<string, Message[]>()
-  for (const m of messages) {
-    if (m.type === 'task' && m.goal_id) {
-      const arr = map.get(m.goal_id) ?? []
-      arr.push(m)
-      map.set(m.goal_id, arr)
-    }
-  }
-  return map
-}
-
 export interface CommsMsgListProps {
   scope: BoardScope
   messages: Message[]
@@ -61,13 +48,11 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
   }
 
   const pins = messages.filter((m) => m.pinned)
-  // Tasks that belong to a goal are rendered as children of the goal card — exclude them
-  // from the top-level thread so they don't appear twice.
-  const goalTaskMap = buildGoalTaskMap(messages)
-  const claimedTaskIds = new Set(
-    [...goalTaskMap.values()].flatMap((tasks) => tasks.map((t) => t.id)),
+  // Goals and tasks live in the dedicated "Goals & Tasks" board view, not the
+  // message thread — filter them out here so the Messages view stays a clean log.
+  const thread = messages.filter(
+    (m) => !m.pinned && m.type !== 'goal' && m.type !== 'task',
   )
-  const thread = messages.filter((m) => !m.pinned && !claimedTaskIds.has(m.id))
 
   return (
     <div className={s.thread}>
@@ -101,33 +86,16 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
 
       {thread.length > 0
         ? thread.map((m) => (
-          <React.Fragment key={m.id}>
-            <CommsMsgCard
-              message={m}
-              flash={flashId === m.id}
-              onAnswer={onAnswer}
-              onResolve={onResolve}
-              onDelete={onDelete}
-              onSupersede={onSupersede}
-              siblings={messages}
-            />
-            {m.type === 'goal' && goalTaskMap.has(m.id) && (
-              <div className={s.taskGroup}>
-                {(goalTaskMap.get(m.id) ?? []).map((t) => (
-                  <CommsMsgCard
-                    key={t.id}
-                    message={t}
-                    flash={flashId === t.id}
-                    onAnswer={onAnswer}
-                    onResolve={onResolve}
-                    onDelete={onDelete}
-                    onSupersede={onSupersede}
-                    siblings={messages}
-                  />
-                ))}
-              </div>
-            )}
-          </React.Fragment>
+          <CommsMsgCard
+            key={m.id}
+            message={m}
+            flash={flashId === m.id}
+            onAnswer={onAnswer}
+            onResolve={onResolve}
+            onDelete={onDelete}
+            onSupersede={onSupersede}
+            siblings={messages}
+          />
         ))
         : (
           <div className={s.empty}>
