@@ -413,10 +413,14 @@ def comms_tasks_get():
             board = "feature"
         scope = (request.args.get("scope") or feature).strip() or feature
 
+        # goal_id scopes the frontier to one goal's DAG (the single/loop executors
+        # poll with it so they drain only their own goal). Applies to ready=true.
+        goal_id = request.args.get("goal_id") or None
+
         conn = _get_db()
         ready_flag = request.args.get("ready", "").strip().lower()
         if ready_flag == "true":
-            tasks = _get_ready_tasks(conn, boards=[board], scopes=[scope])
+            tasks = _get_ready_tasks(conn, boards=[board], scopes=[scope], goal_id=goal_id)
         else:
             tasks = _get_messages(conn, board=board, scope=scope, type="task", status="pending")
         return jsonify(tasks), 200
@@ -1057,6 +1061,96 @@ def comms_run_stop():
         return jsonify({"ok": True, "stopped": True, "run_id": run_id}), 200
     except Exception as exc:
         logging.exception("comms_run_stop error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/goals/run", methods=["POST"])
+def comms_goals_run():
+    """Dispatch a goal's task-DAG to its executor (Phase 1, serial).
+
+    Required body: goal_id. Optional: adapter, model, project_root.
+    Reads `executor` from the goal message and routes single|loop|team.
+    Returns 200 {ok, run_id, executor, ...} | 400 bad input / not a goal |
+    404 goal not found | 409 board busy | 501 executor not implemented (team).
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        goal_id = data.get("goal_id", "")
+        if not isinstance(goal_id, str) or not goal_id.strip():
+            return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
+
+        adapter = (data.get("adapter", "") or "claude")
+        model = (data.get("model", "") or "")
+        project_root = (data.get("project_root", "") or "")
+
+        # Resolve board/scope for the lifecycle posts (start_goal_run re-reads the
+        # goal authoritatively; this is only for the human-facing status posts).
+        conn = _get_db()
+        goal = conn.execute(
+            "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            (goal_id,),
+        ).fetchone()
+        board = goal["board"] if goal is not None else "feature"
+        scope = goal["scope"] if goal is not None else ""
+
+        def _board_post(text: str, phase: str | None = None) -> None:
+            try:
+                c = _get_db()
+                mid = _post_message(c, board=board, scope=scope, from_agent="system",
+                                    type="status", text=text)
+                payload = {"type": "COMMS_UPDATE", "event": "goal_run",
+                           "message_id": mid, "board": board, "scope": scope}
+                if phase:
+                    payload["phase"] = phase
+                _broadcast_comms(scope, payload)
+            except Exception:
+                logging.debug("goal_run lifecycle post failed", exc_info=True)
+
+        def _on_start(_run_id: str) -> None:
+            _board_post("▶ goal run started — dispatching executor…", phase="running")
+
+        def _on_done(_run_id: str, res) -> None:
+            summary = ""
+            if isinstance(res, dict):
+                ex = res.get("executor", "")
+                done = res.get("completed")
+                summary = f"executor={ex}"
+                if isinstance(done, list):
+                    summary += f", completed={len(done)}"
+            _board_post(f"✅ goal run finished — {summary}", phase="done")
+
+        result = start_goal_run(
+            goal_id,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            broadcast_fn=_broadcast_runner,        # worker terminals → runner stream
+            event_broadcast_fn=_broadcast_comms,   # task-state events → comms stream
+            on_start=_on_start,
+            on_done=_on_done,
+        )
+
+        if result.get("ok"):
+            return jsonify(result), 200
+        # board_busy may arrive as a reason (loop) or an error (single via board_run).
+        reason = result.get("reason") or result.get("error") or ""
+        status = {
+            "not_found": 404,
+            "not_goal": 400,
+            "board_busy": 409,
+            "not_implemented": 501,
+            "unknown_executor": 400,
+        }.get(reason, 400)
+        return jsonify(result), status
+    except Exception as exc:
+        logging.exception("comms_goals_run error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

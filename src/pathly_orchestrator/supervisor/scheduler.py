@@ -35,6 +35,8 @@ def scheduler_loop(
     broadcast_fn: Optional[Callable] = None,
     spawn_fn: Optional[Callable] = None,
     abort_check: Optional[Callable[[], bool]] = None,
+    goal_id: Optional[str] = None,
+    event_broadcast_fn: Optional[Callable] = None,
 ) -> dict:
     """Run the DAG frontier loop until all tasks are done, failed/blocked, or aborted.
 
@@ -50,14 +52,24 @@ def scheduler_loop(
     isolation:
         An Isolation impl (LaneIsolation). Provides acquire()/release()/max_concurrency().
     broadcast_fn:
-        Optional SSE broadcast callable: broadcast_fn(event_type: str, payload: dict).
-        Called best-effort; exceptions are swallowed.
+        Optional SSE callable forwarded UNCHANGED to each worker's
+        _run_stage_via_terminal, which calls it as broadcast_fn(topic, payload)
+        on the RUNNER stream (TERMINAL_SPAWN etc.). Called best-effort.
     spawn_fn:
         Callable(state, instructions, adapter, model, run_id, broadcast_fn) -> dict.
         Defaults to supervisor.terminal._run_stage_via_terminal (lazy import) when None.
         In tests, inject a fake that records timestamps and returns immediately.
     abort_check:
         Optional callable() -> bool. If it returns True the loop exits early.
+    goal_id:
+        When given, the frontier is scoped to this goal's tasks only (passed to
+        get_ready_tasks). The Phase-1 dispatcher uses this so a goal's loop drains
+        only its own DAG. None = board+scope behavior (every task in the scope).
+    event_broadcast_fn:
+        Optional SSE callable for the scheduler's OWN task-state events, called as
+        event_broadcast_fn(scope, payload) on the COMMS stream — a DIFFERENT channel
+        than broadcast_fn (which feeds the worker's runner-stream terminals). None =
+        no task-state broadcasts (correctness is unaffected; this is board UI only).
 
     Returns
     -------
@@ -126,7 +138,7 @@ def scheduler_loop(
             logger.info("scheduler: abort signalled, exiting loop for %s/%s", board, scope)
             break
 
-        ready = get_ready_tasks(conn, boards=[board], scopes=[scope])
+        ready = get_ready_tasks(conn, boards=[board], scopes=[scope], goal_id=goal_id)
 
         # Determine which ready tasks can be scheduled now.
         ready_lanes = {t.get("lane") or t["id"] for t in ready}
@@ -148,7 +160,7 @@ def scheduler_loop(
                 # Another scheduler instance (or a race) claimed it first.
                 continue
 
-            _broadcast(broadcast_fn, "TASK_CLAIMED", {"task_id": task_id, "lane": lane, "board": board, "scope": scope})
+            _broadcast(event_broadcast_fn, scope, "task_claimed", {"task_id": task_id, "lane": lane, "board": board})
 
             ws = isolation.acquire(task, state)
             workspaces[task_id] = ws
@@ -196,11 +208,11 @@ def scheduler_loop(
             blocked_ids = fail_task(conn, task_id, reason=reason)
             result_failed.append(task_id)
             result_blocked.extend(blocked_ids)
-            _broadcast(broadcast_fn, "TASK_FAILED", {"task_id": task_id, "lane": lane, "reason": reason, "blocked": blocked_ids})
+            _broadcast(event_broadcast_fn, scope, "task_failed", {"task_id": task_id, "lane": lane, "reason": reason, "blocked": blocked_ids})
         else:
             complete_task(conn, task_id)
             result_completed.append(task_id)
-            _broadcast(broadcast_fn, "TASK_DONE", {"task_id": task_id, "lane": lane})
+            _broadcast(event_broadcast_fn, scope, "task_done", {"task_id": task_id, "lane": lane})
 
         # Release the SAME workspace lease we acquired for this task.
         if ws is not None:
@@ -216,11 +228,16 @@ def scheduler_loop(
     }
 
 
-def _broadcast(broadcast_fn: Optional[Callable], event_type: str, payload: dict) -> None:
-    """Call broadcast_fn best-effort; never raise."""
+def _broadcast(broadcast_fn: Optional[Callable], scope: str, event: str, payload: dict) -> None:
+    """Emit a scheduler task-state event on the COMMS stream, best-effort.
+
+    Wraps the payload as a COMMS_UPDATE so Studio's board (which already listens
+    for task_unblocked/task_failed) picks up task_claimed/task_done/task_failed
+    with no new event channel. Signature mirrors the comms broadcast helpers:
+    broadcast_fn(scope, payload). Never raises."""
     if broadcast_fn is None:
         return
     try:
-        broadcast_fn(event_type, payload)
+        broadcast_fn(scope, {"type": "COMMS_UPDATE", "event": event, **payload})
     except Exception:
         pass

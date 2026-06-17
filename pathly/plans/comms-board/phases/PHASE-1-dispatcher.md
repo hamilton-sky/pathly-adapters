@@ -2,7 +2,18 @@
 
 **Branch:** `feat/comms-board-dag-serial`
 **Master design:** [../GOALS-DAG-EXECUTORS.md](../GOALS-DAG-EXECUTORS.md) §3 · **Scheduler design:** [../DAG-SCHEDULER-ARCHITECTURE.md](../DAG-SCHEDULER-ARCHITECTURE.md) · **Prev:** [PHASE-0b-planner-dag-wiring.md](PHASE-0b-planner-dag-wiring.md)
-**Status:** spec — grounded against source (all file:line claims verified 2026-06-17).
+**Status:** building — `single` + `loop` + route + skill landed 2026-06-17; `team` gated.
+
+> **Implementation status (2026-06-17)**
+> - ✅ Step 1 — `get_ready_tasks(goal_id=…)` frontier filter (+ test).
+> - ✅ `scheduler_loop` threads `goal_id`; task-state events split onto a `event_broadcast_fn`
+>   (comms stream) so they don't collide with the worker's runner-stream `broadcast_fn`.
+> - ✅ `SerialIsolation` (one worker) in `supervisor/isolation.py`.
+> - ✅ `supervisor/goal_run.py` `start_goal_run` — routes single/loop/team.
+> - ✅ `POST /comms/goals/run` + `goal_id` query param on `GET /comms/tasks`.
+> - ✅ `core/skills/development/drain-dag.md` (the `single` agent self-loop).
+> - ✅ `tests/test_comms_goals_run.py` (routing + execution via injected fakes).
+> - ⛔ `team` returns 501 until the two-flow split.
 
 > Goal of P1: when a **goal** is run, read its `executor` and route the goal's
 > task-DAG to one of `single` / `loop` / `team`. **Ship serial** (one task at a
