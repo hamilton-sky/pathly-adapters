@@ -188,7 +188,7 @@
   color: var(--red);
 }
 
-/* ── Agent pill (main action + settings icon) ── */
+/* ── Agent pill (main action + settings/stop icon joined) ── */
 .agentPill {
   display: inline-flex;
   position: relative;
@@ -454,6 +454,10 @@
   display: none;
 }
 
+.headerRoot[data-compact='true'] .agentPillMain {
+  padding: 4px 7px;
+}
+
 .headerRoot[data-compact='true'] .agentBtn,
 .headerRoot[data-compact='true'] .draftBtn {
   padding: 4px 7px;
@@ -463,9 +467,6 @@
   padding: 4px 7px;
 }
 
-.headerRoot[data-compact='true'] .agentPillMain {
-  padding: 4px 7px;
-}
 
 .headerRoot[data-compact='true'] .saveBtn {
   padding: 4px 7px;
