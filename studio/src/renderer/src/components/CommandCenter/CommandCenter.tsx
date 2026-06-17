@@ -8,7 +8,6 @@ import { useSectionResize } from './hooks/useSectionResize'
 import { CommandCenterHeader } from './CommandCenterHeader/CommandCenterHeader'
 import { FeatureSidebar } from './FeatureSidebar/FeatureSidebar'
 import { BoardSection } from './BoardSection/BoardSection'
-import { NewFeatureModal } from './NewFeatureModal/NewFeatureModal'
 import { ConfirmModal } from '../shared/ConfirmModal/ConfirmModal'
 import s from './CommandCenter.module.css'
 
@@ -19,7 +18,6 @@ export function CommandCenter() {
   const activeTopic = useProjectStore((s) => s.activeTopic)
   const onResize = useSectionResize(cc.direction, cc.setSize)
 
-  const [showNewFeature, setShowNewFeature] = useState(false)
   const [archivePending, setArchivePending] = useState<string | null>(null)
 
   const handleArchiveRequest = useCallback((id: string) => {
@@ -53,7 +51,6 @@ export function CommandCenter() {
   }, [archivePending, projectPath, store, cc])
 
   const handleCreate = useCallback(async (topic: string, description: string) => {
-    setShowNewFeature(false)
     if (!projectPath) return
 
     // 1. Create the feature root at pathly/<topic>/ by writing a .keep sentinel file.
@@ -102,15 +99,8 @@ export function CommandCenter() {
         onAddSection={cc.addAnySection}
         onToggleDirection={cc.toggleDirection}
         onApplyPreset={cc.applyPreset}
-        onNewFeature={() => setShowNewFeature(true)}
+        onCreateFeature={handleCreate}
       />
-
-      {showNewFeature && (
-        <NewFeatureModal
-          onCancel={() => setShowNewFeature(false)}
-          onCreate={handleCreate}
-        />
-      )}
 
       {archivePending && (
         <ConfirmModal

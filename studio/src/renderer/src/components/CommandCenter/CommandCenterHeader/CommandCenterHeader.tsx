@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown, Check, X, Sparkles } from 'lucide-react'
 import type { BoardScope, Direction, Preset, SectionDef } from '../types'
 import { SCOPES } from '../constants'
-import { Tooltip } from '../../ui'
+import { Tooltip, CreatePopover, slugify } from '../../ui'
 import s from './CommandCenterHeader.module.css'
 
 export interface CommandCenterHeaderProps {
@@ -19,7 +19,7 @@ export interface CommandCenterHeaderProps {
   onAddSection: () => void
   onToggleDirection: () => void
   onApplyPreset: (preset: 'board' | 'pipeline' | 'focus') => void
-  onNewFeature: () => void
+  onCreateFeature: (topic: string, description: string) => void
 }
 
 const SCOPE_ICONS: Record<BoardScope, React.ReactNode> = {
@@ -38,6 +38,8 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
   const [menu, setMenu] = useState(false)
   const headRef = useRef<HTMLDivElement>(null)
   const [compact, setCompact] = useState(false)
+  const newFeatureBtnRef = useRef<HTMLButtonElement>(null)
+  const [showNewFeature, setShowNewFeature] = useState(false)
 
   const checkCompact = useCallback(() => {
     const el = headRef.current
@@ -173,15 +175,30 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
       <div className={s.headRight}>
         <Tooltip label="New feature" description="Create a feature folder and open its board" placement="bottom">
           <button
+            ref={newFeatureBtnRef}
             type="button"
             className={`${s.ctl} ${s.newFeature}`}
             aria-label="New feature"
-            onClick={p.onNewFeature}
+            {...(showNewFeature ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+            onClick={() => setShowNewFeature(true)}
           >
             <Sparkles size={13} />
             <span className={s.tabLabel}>New feature</span>
           </button>
         </Tooltip>
+        {showNewFeature && (
+          <CreatePopover
+            anchorEl={newFeatureBtnRef.current}
+            heading="New feature"
+            titleLabel="Title"
+            titlePlaceholder="e.g. RTK token killer"
+            descLabel="Description"
+            descPlaceholder="What is this feature about?"
+            showSlug
+            onSubmit={(title, desc) => { p.onCreateFeature(slugify(title), desc); setShowNewFeature(false) }}
+            onClose={() => setShowNewFeature(false)}
+          />
+        )}
 
         {p.sections.length >= 2 && (
           <div className={s.dirPill}>
