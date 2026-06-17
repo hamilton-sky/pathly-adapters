@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
 import { getApiSecret } from '@main/apiConfig'
+import { execFile } from 'child_process'
 import { join } from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -203,6 +204,20 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
     args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', tmpScript],
     tempScript: tmpScript,
   }
+}
+
+/** Force-terminate a PTY and its child process tree.
+ *  On Windows the runner shell is `powershell.exe -File …ps1`, which spawns the
+ *  real engine (`claude`/`codex`) as a child. node-pty's kill() only ends the
+ *  PowerShell host, leaving the engine running — `taskkill /T` reaps the tree. */
+function killPtyTree(p: import('node-pty').IPty): void {
+  if (process.platform === 'win32' && p.pid) {
+    try {
+      execFile('taskkill', ['/PID', String(p.pid), '/T', '/F'], () => { /* ignore */ })
+      return
+    } catch { /* fall through to node-pty kill */ }
+  }
+  try { p.kill() } catch { /* ignore */ }
 }
 
 export function killAllPtys(): void {
@@ -421,7 +436,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       if (runnerTabMeta.has(tabId)) {
         ptyKilledByRunner.add(tabId)
       }
-      p.kill()
+      killPtyTree(p)
       activePtys.delete(tabId)
       ptyOwners.delete(tabId)
       ptyWindows.delete(tabId)

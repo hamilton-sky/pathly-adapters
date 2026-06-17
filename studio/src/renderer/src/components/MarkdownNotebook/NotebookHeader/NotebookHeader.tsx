@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen, GitCompare,
-  ScanText, FileSearch, SlidersHorizontal,
+  ScanText, FileSearch, SlidersHorizontal, Square,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useNotebookStore, BodyCell } from '../../../store/notebookStore'
@@ -54,7 +54,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const handleSplitCli   = (next: NotebookCli) => { setSplitCli(next);   saveNotebookCli(CLI_KEY_SPLIT, next) }
   const handleAnalyzeCli = (next: NotebookCli) => { setAnalyzeCli(next); saveNotebookCli(CLI_KEY_ANALYZE, next) }
 
-  const { handleSplit, handleAnalyze, splitState, analyzeState, splitProgress, analyzeProgress } = useNotebookAgentActions(
+  const { handleSplit, handleAnalyze, stopSplit, stopAnalyze, splitState, analyzeState, splitProgress, analyzeProgress } = useNotebookAgentActions(
     notebookPath,
     splitOncePrompt,
     analyzeOncePrompt,
@@ -221,6 +221,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         progress={splitProgress}
         hasPath={!!notebookPath}
         onAiSplit={() => void handleSplit()}
+        onStop={() => stopSplit()}
         onSplitIntoCells={() => setSplitCellsOpen(true)}
         onTogglePrompt={() => setSplitPeekOpen(v => !v)}
         compact={isCompact}
@@ -262,18 +263,31 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             </span>
           </button>
         </Tooltip>
-        <Tooltip label="View or edit the prompt sent to the AI engine" placement="bottom">
-          <button
-            type="button"
-            className={styles.agentPillSettings}
-            data-state={analyzeState}
-            disabled={!notebookPath}
-            onClick={() => setAnalyzePeekOpen(v => !v)}
-            aria-label="Edit analyze prompt"
-          >
-            <SlidersHorizontal size={11} />
-          </button>
-        </Tooltip>
+        {analyzeState === 'running' ? (
+          <Tooltip label="Stop the running engine" placement="bottom">
+            <button
+              type="button"
+              className={styles.agentPillStop}
+              onClick={() => stopAnalyze()}
+              aria-label="Stop analyze"
+            >
+              <Square size={11} />
+            </button>
+          </Tooltip>
+        ) : (
+          <Tooltip label="View or edit the prompt sent to the AI engine" placement="bottom">
+            <button
+              type="button"
+              className={styles.agentPillSettings}
+              data-state={analyzeState}
+              disabled={!notebookPath}
+              onClick={() => setAnalyzePeekOpen(v => !v)}
+              aria-label="Edit analyze prompt"
+            >
+              <SlidersHorizontal size={11} />
+            </button>
+          </Tooltip>
+        )}
         {analyzePeekOpen && notebookPath && (
           <PromptPeekModal
             title="PROMPT — AI Analyze"

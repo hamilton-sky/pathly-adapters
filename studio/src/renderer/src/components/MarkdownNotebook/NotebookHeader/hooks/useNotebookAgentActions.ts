@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useTerminalStore } from '../../../../store/terminalStore'
 import { useUiStore } from '../../../../store/uiStore'
 import { useToastStore } from '../../../../store/toastStore'
@@ -40,6 +40,12 @@ export function useNotebookAgentActions(
   const [splitProgress,   setSplitProgress]   = useState<ActionProgress | null>(null)
   const [analyzeProgress, setAnalyzeProgress] = useState<ActionProgress | null>(null)
 
+  // Active PTY tab per action, and whether the current exit was a user-initiated stop.
+  const splitTabRef       = useRef<string | null>(null)
+  const analyzeTabRef     = useRef<string | null>(null)
+  const splitStoppingRef   = useRef(false)
+  const analyzeStoppingRef = useRef(false)
+
   const handleSplit = useCallback(async () => {
     if (!notebookPath || splitState === 'running') return
     setSplitState('running')
@@ -48,6 +54,7 @@ export function useNotebookAgentActions(
     const norm = notebookPath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `split-${Date.now().toString(36)}`
+    splitTabRef.current = tabId
     addTab(tabId, `Split · ${fileName}`)
     openTab(tabId)
     toast(`AI Split started · ${fileName} (${cliLabel(splitCli)})`, 'info', 'phase_summary')
@@ -57,6 +64,13 @@ export function useNotebookAgentActions(
       unsubscribe()
       stopProgress()
       setSplitProgress(null)
+      splitTabRef.current = null
+      if (splitStoppingRef.current) {
+        splitStoppingRef.current = false
+        setSplitState('idle')
+        toast(`AI Split stopped · ${fileName}`, 'info', 'phase_summary')
+        return
+      }
       void pollForFile(draftPath).then((found) => {
         if (found) {
           setNotebookDraftPath(draftPath)
@@ -92,6 +106,7 @@ export function useNotebookAgentActions(
     const norm = notebookPath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `analyze-${Date.now().toString(36)}`
+    analyzeTabRef.current = tabId
     addTab(tabId, `Analyze · ${fileName}`)
     openTab(tabId)
     toast(`AI Analyze started · ${fileName} (${cliLabel(analyzeCli)})`, 'info', 'phase_summary')
@@ -101,6 +116,13 @@ export function useNotebookAgentActions(
       unsubscribe()
       stopProgress()
       setAnalyzeProgress(null)
+      analyzeTabRef.current = null
+      if (analyzeStoppingRef.current) {
+        analyzeStoppingRef.current = false
+        setAnalyzeState('idle')
+        toast(`AI Analyze stopped · ${fileName}`, 'info', 'phase_summary')
+        return
+      }
       void pollForFile(analysisPath).then((found) => {
         if (found) {
           setNotebookAnalysisPath(analysisPath)
@@ -127,5 +149,19 @@ export function useNotebookAgentActions(
     }
   }, [notebookPath, analyzeState, analyzeOncePrompt, onAnalyzeOnceUsed, addTab, openTab, setNotebookAnalysisPath, analyzeCli])
 
-  return { handleSplit, handleAnalyze, splitState, analyzeState, splitProgress, analyzeProgress }
+  const stopSplit = useCallback(() => {
+    const tab = splitTabRef.current
+    if (!tab) return
+    splitStoppingRef.current = true
+    void window.pathly.terminal.kill(tab)
+  }, [])
+
+  const stopAnalyze = useCallback(() => {
+    const tab = analyzeTabRef.current
+    if (!tab) return
+    analyzeStoppingRef.current = true
+    void window.pathly.terminal.kill(tab)
+  }, [])
+
+  return { handleSplit, handleAnalyze, stopSplit, stopAnalyze, splitState, analyzeState, splitProgress, analyzeProgress }
 }

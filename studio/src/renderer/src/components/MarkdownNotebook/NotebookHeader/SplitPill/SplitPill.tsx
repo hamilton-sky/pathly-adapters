@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Wand2, Scissors, ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { Wand2, Scissors, ChevronDown, SlidersHorizontal, Square } from 'lucide-react'
 import { Tooltip } from '../../../ui'
 import { ActionProgress, fmtElapsed } from '../notebookProgress'
 import styles from './SplitPill.module.css'
@@ -15,6 +15,8 @@ interface Props {
   hasPath: boolean
   /** Run the AI Split (LLM reorganizes into ## sections → diff to review). */
   onAiSplit: () => void
+  /** Stop the running engine. */
+  onStop: () => void
   /** Run the deterministic "Split into cells" (parse structure, no LLM). */
   onSplitIntoCells: () => void
   /** Toggle the AI-Split prompt-peek modal. */
@@ -27,7 +29,7 @@ interface Props {
 // (AI Split vs deterministic Split into cells) + the prompt gear (AI only).
 // The two modes use distinct icons — Wand2 (generative) vs Scissors (structural) —
 // so they stay unambiguous in compact mode where the text label is hidden.
-export default function SplitPill({ state, progress, hasPath, onAiSplit, onSplitIntoCells, onTogglePrompt, compact }: Props) {
+export default function SplitPill({ state, progress, hasPath, onAiSplit, onStop, onSplitIntoCells, onTogglePrompt, compact }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -70,33 +72,48 @@ export default function SplitPill({ state, progress, hasPath, onAiSplit, onSplit
         </button>
       </Tooltip>
 
-      <Tooltip label="Choose split mode" placement="bottom">
-        <button
-          type="button"
-          className={styles.splitCaret}
-          data-state={state}
-          disabled={!hasPath}
-          aria-haspopup="menu"
-          {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-          aria-label="Choose split mode"
-          onClick={() => setOpen((o) => !o)}
-        >
-          <ChevronDown size={11} />
-        </button>
-      </Tooltip>
+      {state === 'running' ? (
+        <Tooltip label="Stop the running engine" placement="bottom">
+          <button
+            type="button"
+            className={styles.splitStop}
+            onClick={onStop}
+            aria-label="Stop split"
+          >
+            <Square size={11} />
+          </button>
+        </Tooltip>
+      ) : (
+        <>
+          <Tooltip label="Choose split mode" placement="bottom">
+            <button
+              type="button"
+              className={styles.splitCaret}
+              data-state={state}
+              disabled={!hasPath}
+              aria-haspopup="menu"
+              {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+              aria-label="Choose split mode"
+              onClick={() => setOpen((o) => !o)}
+            >
+              <ChevronDown size={11} />
+            </button>
+          </Tooltip>
 
-      <Tooltip label="View or edit the AI Split prompt" placement="bottom">
-        <button
-          type="button"
-          className={styles.splitGear}
-          data-state={state}
-          disabled={!hasPath}
-          onClick={onTogglePrompt}
-          aria-label="Edit AI Split prompt"
-        >
-          <SlidersHorizontal size={11} />
-        </button>
-      </Tooltip>
+          <Tooltip label="View or edit the AI Split prompt" placement="bottom">
+            <button
+              type="button"
+              className={styles.splitGear}
+              data-state={state}
+              disabled={!hasPath}
+              onClick={onTogglePrompt}
+              aria-label="Edit AI Split prompt"
+            >
+              <SlidersHorizontal size={11} />
+            </button>
+          </Tooltip>
+        </>
+      )}
 
       {open && (
         <div className={styles.menu} role="menu">
