@@ -212,13 +212,6 @@
 
   --text-disabled: #94A3B8;
 
-  /* --- Comment color swatch overrides for light theme ------------- */
-  --comment-yellow-swatch: #D97706;
-  --comment-green-swatch:  #047857;
-  --comment-blue-swatch:   #1D4ED8;
-  --comment-purple-swatch: #7C3AED;
-  --comment-orange-swatch: #C2410C;
-
   /* --- Heatmap intensity levels (light) --------------------------- */
   --heatmap-level-0: #E2E8F0;
   --heatmap-level-1: rgba(4, 120, 87, 0.18);
@@ -605,4 +598,30 @@
   --runner-bg-active: rgba(99, 102, 168, 0.20);
 
   --text-disabled: #94A3B8;
+}
+
+/* --- Comment swatches: darker, higher-contrast set for every light --
+   theme. Dark themes keep the bright pastels from :root, which already
+   read as "light" against dark backgrounds. ----------------------- */
+[data-theme="light"],
+[data-theme="solarized-light"],
+[data-theme="latte"],
+[data-theme="paper"],
+[data-theme="rose-pine-dawn"],
+[data-theme="mint"] {
+  /* The dot */
+  --comment-yellow-swatch: #D97706;
+  --comment-green-swatch:  #047857;
+  --comment-blue-swatch:   #1D4ED8;
+  --comment-purple-swatch: #7C3AED;
+  --comment-orange-swatch: #C2410C;
+
+  /* The accent: drives the "Add comment" button fill, modal glow border,
+     and in-text highlight line. Solid (not the pale 0.50 pastel) so the
+     button reads as a filled control with legible white text. */
+  --comment-yellow-border: #B45309;
+  --comment-green-border:  #047857;
+  --comment-blue-border:   #1D4ED8;
+  --comment-purple-border: #7C3AED;
+  --comment-orange-border: #C2410C;
 }
