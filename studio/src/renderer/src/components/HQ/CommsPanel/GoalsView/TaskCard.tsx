@@ -1,6 +1,7 @@
 import { FileText } from 'lucide-react'
 import type { Message } from '../../../CommandCenter/types'
 import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
+import { RunPill } from '../../../shared/RunPill/RunPill'
 import s from './GoalsView.module.css'
 
 type TaskStatus = NonNullable<Message['taskStatus']>
@@ -37,7 +38,12 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
         aria-label={`Task status: ${STATUS_LABEL[status]}`}
       />
       <div className={s.taskMain}>
-        <MarkdownRenderer content={t.text} className={s.taskText} />
+        <div className={s.taskRow}>
+          <MarkdownRenderer content={t.text} className={s.taskText} />
+          {status === 'in_progress' && (
+            <RunPill size="sm" state="running" idleLabel="In progress" disabled />
+          )}
+        </div>
         {t.artifactPath && (
           <div className={s.taskArtifact}>
             <FileText size={11} />

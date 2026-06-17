@@ -28,6 +28,7 @@ import {
 import { listDirs } from '../services/pathlyApi'
 import { useRunnerStore } from './runnerStore'
 import { useProjectStore } from './projectStore'
+import { useToastStore } from './toastStore'
 
 function isPending(m: Message): boolean {
   return (m.type === 'question' && m.status === 'pending')
@@ -72,15 +73,19 @@ export interface CommsState {
 
   // C2 — single-agent run state keyed by board (e.g. feature id, 'project', 'global')
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
+  /** Epoch ms when the board run started — drives the elapsed clock in RunPill. */
+  boardRunStart: Record<string, number>
   runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string; progress?: string }) => void
   /** Run the evaluator on a board: classify its content and propose concrete tasks. */
-  runEvaluator: (key: string) => void
+  runEvaluator: (key: string, opts?: { adapter?: string }) => void
   /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
   markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
 
   // Goal DAG run state keyed by goal message id
   goalRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
+  /** Epoch ms when the goal run started — drives the elapsed clock in RunPill. */
+  goalRunStart: Record<string, number>
   runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
   /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
   decomposeGoal: (goal_id: string, mode: DecomposeMode) => void
@@ -330,9 +335,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   },
 
   boardRunState: {},
+  boardRunStart: {},
 
   runSingleAgent: (key, opts) => {
-    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
+    const now = Date.now()
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
 
     const isFeature = key !== 'project' && key !== 'global'
     // Align Studio's runner SSE subscription with this board's topic so the agent's
@@ -367,8 +374,9 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       })
   },
 
-  runEvaluator: (key) => {
-    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
+  runEvaluator: (key, opts = {}) => {
+    const now = Date.now()
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
 
     const isFeature = key !== 'project' && key !== 'global'
     if (isFeature) useProjectStore.getState().setActiveTopic(key)
@@ -376,7 +384,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     const params = scopeToParams(scope, key)
     const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
 
-    apiRunBoard(params.board, params.scope, 'evaluator', { projectRoot })
+    apiRunBoard(params.board, params.scope, 'evaluator', { projectRoot, ...opts })
       .then((res) => {
         if (res === null) {
           set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
@@ -394,11 +402,21 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   markBoardRunPhase: (key, phase) => {
     if (phase === 'running') {
-      set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
+      const now = Date.now()
+      set((s) => ({
+        boardRunState: { ...s.boardRunState, [key]: 'running' },
+        // Only set start time if not already running (SSE may re-emit 'running')
+        boardRunStart: s.boardRunStart[key] ? s.boardRunStart : { ...s.boardRunStart, [key]: now },
+      }))
     } else if (phase === 'done' || phase === 'stopped') {
+      useToastStore.getState().push(
+        phase === 'done' ? 'Agent done' : 'Agent stopped',
+        phase === 'done' ? 'success' : 'info',
+        { category: phase === 'done' ? 'agent_done' : 'runner_state' },
+      )
       set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'done' } }))
       window.setTimeout(() => {
-        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' }, boardRunStart: { ...s.boardRunStart, [key]: 0 } }))
       }, 3000)
     }
   },
@@ -412,9 +430,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   },
 
   goalRunState: {},
+  goalRunStart: {},
 
   runGoal: (goal_id, executor, opts = {}) => {
-    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' } }))
+    const now = Date.now()
+    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' }, goalRunStart: { ...s.goalRunStart, [goal_id]: now } }))
 
     apiRunGoal(goal_id, executor, opts)
       .then((res) => {
@@ -440,11 +460,20 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   markGoalRunPhase: (goal_id, phase) => {
     if (phase === 'running') {
-      set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' } }))
+      const now = Date.now()
+      set((s) => ({
+        goalRunState: { ...s.goalRunState, [goal_id]: 'running' },
+        goalRunStart: s.goalRunStart[goal_id] ? s.goalRunStart : { ...s.goalRunStart, [goal_id]: now },
+      }))
     } else if (phase === 'done' || phase === 'stopped') {
+      useToastStore.getState().push(
+        phase === 'done' ? 'Goal run complete' : 'Goal run stopped',
+        phase === 'done' ? 'success' : 'info',
+        { category: phase === 'done' ? 'agent_done' : 'runner_state' },
+      )
       set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'done' } }))
       window.setTimeout(() => {
-        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' }, goalRunStart: { ...s.goalRunStart, [goal_id]: 0 } }))
       }, 3000)
     }
   },

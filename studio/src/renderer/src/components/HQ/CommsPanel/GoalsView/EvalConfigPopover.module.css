@@ -1,0 +1,246 @@
+.popover {
+  position: fixed;
+  top: var(--pop-top);
+  left: var(--pop-left);
+  width: 290px;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.heading {
+  font: 600 11px/1 var(--font-family-base);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 10px 12px 8px;
+  border-bottom: var(--border);
+}
+
+/* ── Section (agent / skill / extra) ── */
+.section {
+  padding: 8px 12px;
+  border-bottom: var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sectionLabel {
+  font: 600 9px/1 var(--font-family-base);
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.optional {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ── Native select dropdown ── */
+.select {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+  font: 400 12px/1 var(--font-family-base);
+  cursor: pointer;
+  appearance: auto;
+  transition: border-color var(--transition-fast);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--accent-border, var(--accent));
+}
+
+/* ── Prompt preview banner (per-selection) ── */
+.banner {
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  overflow: hidden;
+}
+
+.bannerHeader {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 4px;
+}
+
+.bannerToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: 500 11px/1 var(--font-family-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex: 1;
+  text-align: left;
+}
+
+.bannerToggle:hover { color: var(--text-primary); }
+
+.bannerToggle svg { transition: transform 150ms ease; }
+.chevronOpen { transform: rotate(90deg); }
+
+.notebookLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: 400 10px/1 var(--font-family-base);
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.notebookLink:hover { opacity: 1; }
+
+.bannerBody {
+  border-top: var(--border);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+/* Compact markdown — overrides the shared MarkdownRenderer sizes for the tight popover */
+.previewMd {
+  padding: 6px 10px;
+}
+
+.previewMd :global(h1),
+.previewMd :global(h2) {
+  font-size: 11px;
+  margin: 4px 0 3px;
+}
+
+.previewMd :global(h3),
+.previewMd :global(h4),
+.previewMd :global(h5),
+.previewMd :global(h6) {
+  font-size: 10.5px;
+  margin: 3px 0 2px;
+}
+
+.previewMd :global(p) {
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 2px 0 4px;
+}
+
+.previewMd :global(ul),
+.previewMd :global(ol) {
+  padding-left: 14px;
+  margin: 2px 0 4px;
+}
+
+.previewMd :global(li) {
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 1px 0;
+}
+
+.previewMd :global(pre) {
+  margin: 4px 0 6px;
+  padding: 6px 8px;
+}
+
+.previewMd :global(pre code) {
+  font-size: 10px;
+}
+
+.previewMd :global(code) {
+  font-size: 10.5px;
+}
+
+.previewMd :global(hr) {
+  margin: 6px 0;
+}
+
+.previewMd :global(blockquote) {
+  margin: 4px 0;
+  padding-left: 8px;
+}
+
+.previewEmpty {
+  display: block;
+  padding: 8px 10px;
+  font: 400 11px/1.4 var(--font-family-base);
+  color: var(--text-muted);
+}
+
+/* ── Extra instructions textarea ── */
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+  font: 400 12px/1.5 var(--font-family-base);
+  resize: vertical;
+  min-height: 56px;
+  transition: border-color var(--transition-fast);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent-border, var(--accent));
+}
+
+.textarea::placeholder { color: var(--text-muted); }
+
+/* ── Footer ── */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+.spacer { flex: 1; }
+
+.resetBtn {
+  padding: 4px 10px;
+  font: 500 11px/1 var(--font-family-base);
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.resetBtn:hover { color: var(--text-secondary); border-color: var(--border-hover, currentColor); }
+
+.runBtn {
+  padding: 4px 12px;
+  font: 600 11px/1 var(--font-family-base);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--accent-fg, #fff);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.runBtn:hover:not(:disabled) { opacity: 0.85; }
+.runBtn:disabled { opacity: 0.45; cursor: not-allowed; }

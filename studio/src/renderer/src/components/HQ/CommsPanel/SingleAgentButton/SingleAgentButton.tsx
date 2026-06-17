@@ -2,6 +2,7 @@ import { useState, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Settings, Square, X, Bot, GitBranch } from 'lucide-react'
 import { useCommsStore } from '../../../../store/commsStore'
+import { useElapsedProgress, fmtElapsed } from '../../../shared/RunPill/progress'
 import { AgentForm, type SingleAgentConfig } from './AgentForm'
 import { FlowForm } from './FlowForm'
 import s from './SingleAgentButton.module.css'
@@ -20,13 +21,6 @@ interface Props {
 type RunState = 'idle' | 'running' | 'busy' | 'done'
 type Mode = 'agent' | 'flow'
 
-const RUN_HINT: Record<RunState, string> = {
-  idle: 'Run',
-  running: 'Running…',
-  busy: 'Board busy',
-  done: 'Done',
-}
-
 /**
  * Run control on the board's Reads row: [⚙ Run │ ⏹ Stop].
  *
@@ -42,9 +36,17 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
 
   const stopBoard = useCommsStore((st) => st.stopBoard)
   const boardRunState = useCommsStore((st) => st.boardRunState)
+  const boardRunStart = useCommsStore((st) => st.boardRunStart)
   const runState: RunState = (boardRunState[boardKey] as RunState | undefined) ?? 'idle'
   const running = runState === 'running'
   const active = runState === 'running' || runState === 'busy'
+  const progress = useElapsedProgress(boardRunStart[boardKey] || undefined)
+
+  const startLabel =
+    runState === 'running' ? (progress != null ? `Running… ${fmtElapsed(progress.elapsedS)}` : 'Running…')
+    : runState === 'busy' ? 'Board busy'
+    : runState === 'done' ? 'Done'
+    : 'Run'
 
   function backdrop(e: MouseEvent<HTMLDivElement>): void {
     if (e.target === e.currentTarget) setOpen(false)
@@ -64,7 +66,7 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
           onClick={() => setOpen(true)}
         >
           <Settings size={11} />
-          <span className={s.startLabel}>{RUN_HINT[runState]}</span>
+          <span className={s.startLabel}>{startLabel}</span>
         </button>
         <button
           type="button"

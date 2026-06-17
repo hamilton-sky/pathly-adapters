@@ -127,6 +127,14 @@
   flex: 1;
 }
 
+/* Text + optional in-progress RunPill side-by-side */
+.taskRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
 .taskText {
   font-size: 12px;
   color: var(--text-primary);
@@ -213,37 +221,82 @@
   text-overflow: ellipsis;
 }
 
-/* Secondary action next to New goal — the evaluator starting point. Neutral by
-   default (New goal stays the accent primary), accent on hover. */
+/* Two-zone evaluator: [✦ Evaluate… 0:03][⚙] */
+.evalRoot {
+  display: inline-flex;
+  align-items: stretch;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-surface0);
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast);
+}
+
 .evalBtn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 28px;
   padding: 0 10px;
-  border: var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface0);
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
   font: 500 12px/1 var(--font-family-base);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.evalBtn:hover:not(:disabled) { color: var(--accent); background: var(--accent-bg); }
+.evalBtn:disabled { opacity: 0.6; cursor: default; }
+
+.evalBtn[data-state='running'] { color: var(--amber, #e5c07b); }
+.evalBtn[data-state='done']    { color: var(--green, #98c379); }
+
+/* When running/done, the outer container's border inherits the state color. */
+.evalRoot:has(.evalBtn[data-state='running']) { border-color: var(--amber, #e5c07b); }
+.evalRoot:has(.evalBtn[data-state='done'])    { border-color: var(--green, #98c379); }
+
+/* Gear icon — right zone (idle) */
+.evalGear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  border: none;
+  border-left: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
   flex-shrink: 0;
 }
 
-.evalBtn:hover:not(:disabled) {
-  color: var(--accent);
-  border-color: var(--accent-border);
+.evalGear:hover { color: var(--text-secondary); background: var(--bg-surface1); }
+.evalGear[aria-expanded='true'] { color: var(--accent); background: var(--accent-bg); }
+
+/* Stop button — replaces gear while running */
+.evalStop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  border: none;
+  border-left: 1px solid var(--amber, #e5c07b);
+  background: transparent;
+  color: var(--red, #e06c75);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
 }
 
-.evalBtn:disabled { opacity: 0.6; cursor: default; }
+.evalStop:hover { background: var(--red, #e06c75); color: var(--bg-mantle); border-color: var(--red, #e06c75); }
 
-/* Collapse to icon-only when the board view-toggle row (the size container in
-   BoardViewToggle) is narrow — keeps the accessible name via the tooltip. */
+/* Collapse to icon-only when narrow */
 @container (max-width: 400px) {
   .newGoalLabel { display: none; }
-  .newGoalBtn,
-  .evalBtn { gap: 0; padding: 0 8px; }
+  .newGoalBtn   { gap: 0; padding: 0 8px; }
+  .evalBtn      { gap: 0; padding: 0 8px; }
 }
 
 /* ── Editable goal title ────────────────────────────────── */
