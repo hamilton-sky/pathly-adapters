@@ -96,6 +96,20 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
     }
     if (posted) reload()
   }
+
+  // Files dragged from the workspace tree are already in the project — reference
+  // their existing path as an artifact (no copy needed).
+  const handleDropPaths = async (items: { path: string; name: string }[]): Promise<void> => {
+    if (!items.length) return
+    const params = scopeToParams(scope, boardKey)
+    let posted = 0
+    for (const it of items) {
+      const path = it.path.replace(/\\/g, '/')
+      const id = await apiPostArtifact(boardKey, params.board, params.scope, `Added ${it.name}`, path, inferAtype(it.name))
+      if (id) posted += 1
+    }
+    if (posted) reload()
+  }
   // Independent per-panel reads — only used for project/global panels.
   // Feature panel reads are authoritative from feature.scope.
   const [localReads, setLocalReads] = useState<Record<BoardScope, boolean>>(LOCAL_DEFAULTS[scope])
@@ -144,7 +158,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
         />
       )}
       {boardView === 'artifacts' && (
-        <ArtifactsView messages={messages} onDelete={del} onSupersede={supersede} onDropFiles={handleDropFiles} />
+        <ArtifactsView messages={messages} onDelete={del} onSupersede={supersede} onDropFiles={handleDropFiles} onDropPaths={handleDropPaths} />
       )}
 
       <div className={s.foot}>

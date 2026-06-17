@@ -1,6 +1,7 @@
 import { useState, type DragEvent } from 'react'
 import { FileText, Upload } from 'lucide-react'
 import type { Message } from '../../../CommandCenter/types'
+import { PATHLY_DRAG_MIME } from '../../../../types'
 import { CommsMsgCard } from '../CommsMsgCard'
 import s from './ArtifactsView.module.css'
 
@@ -8,27 +9,42 @@ interface Props {
   messages: Message[]
   onDelete?: (messageId: string) => void
   onSupersede?: (oldId: string, newId: string) => void
-  /** Files dropped onto the view — copied into the feature and posted as artifacts. */
+  /** OS files dropped from Explorer/Finder — copied into the feature, posted as artifacts. */
   onDropFiles?: (files: File[]) => void
+  /** Project files dragged from the workspace tree — referenced in place (no copy). */
+  onDropPaths?: (items: { path: string; name: string }[]) => void
 }
 
 // The "Artifacts" board view: type='artifact' messages as a filtered card list,
-// reusing the existing artifact card. Dropping files anywhere on the view copies
-// them into the feature's artifacts/ and posts them as artifact cards — board
-// content the evaluator can then read.
-export function ArtifactsView({ messages, onDelete, onSupersede, onDropFiles }: Props): JSX.Element {
+// reusing the existing artifact card. Dropping content posts it as an artifact
+// card — board content the evaluator can then read. Two drag sources:
+//   • OS files (from Explorer/Finder) → copied into the feature's artifacts/.
+//   • Workspace-tree files (internal drag, PATHLY_DRAG_MIME) → referenced in place.
+export function ArtifactsView({ messages, onDelete, onSupersede, onDropFiles, onDropPaths }: Props): JSX.Element {
   const artifacts = messages.filter((m) => m.type === 'artifact')
   const [dragOver, setDragOver] = useState(false)
+  const canDrop = Boolean(onDropFiles || onDropPaths)
 
   function handleDrop(e: DragEvent<HTMLDivElement>): void {
-    if (!onDropFiles) return
+    if (!canDrop) return
     e.preventDefault()
     setDragOver(false)
+    // Internal drag from the workspace tree carries a path, not a File object.
+    const internal = e.dataTransfer.getData(PATHLY_DRAG_MIME)
+    if (internal && onDropPaths) {
+      try {
+        const p = JSON.parse(internal) as { type?: string; sourcePath?: string; name?: string }
+        if (p.type === 'file' && p.sourcePath) {
+          onDropPaths([{ path: p.sourcePath, name: p.name ?? p.sourcePath.split(/[/\\]/).pop() ?? 'file' }])
+          return
+        }
+      } catch { /* not our payload — fall through to OS files */ }
+    }
     const files = Array.from(e.dataTransfer.files)
-    if (files.length) onDropFiles(files)
+    if (files.length && onDropFiles) onDropFiles(files)
   }
   function handleDragOver(e: DragEvent<HTMLDivElement>): void {
-    if (!onDropFiles) return
+    if (!canDrop) return
     e.preventDefault()
     setDragOver(true)
   }
@@ -62,7 +78,7 @@ export function ArtifactsView({ messages, onDelete, onSupersede, onDropFiles }: 
           />
         ))
       )}
-      {dragOver && onDropFiles && (
+      {dragOver && canDrop && (
         <div className={s.dropOverlay}>
           <Upload size={26} />
           <span>Drop to add as artifacts</span>
