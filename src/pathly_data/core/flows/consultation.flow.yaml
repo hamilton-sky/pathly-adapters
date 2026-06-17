@@ -1,0 +1,79 @@
+version: 1
+flow: consultation
+storage_path: pathly/plans/{topic}/
+# Consultation flow — the HEAVY decomposer (GOALS-DAG-EXECUTORS §2, §6).
+# PO → architect → researcher → designer → planner fills the board with the goal's
+# knowledge artifacts AND the task DAG (the planner is the terminal stage; its
+# plan.md Step 6 seeds type=goal + type=task messages). A human review gate follows.
+# The light alternative is a single planner run (just the DAG, fast).
+states:
+  - PO_DISCUSSING
+  - ARCHITECTING
+  - RESEARCHING
+  - DESIGNING
+  - PLANNING
+  - DONE
+transitions:
+  PO_DISCUSSING:
+    - ARCHITECTING
+  ARCHITECTING:
+    - RESEARCHING
+  RESEARCHING:
+    - DESIGNING
+  DESIGNING:
+    - PLANNING
+  PLANNING:
+    - DONE
+  DONE: []
+agent_map:
+  PO_DISCUSSING: planning/po
+  ARCHITECTING: team/architect
+  RESEARCHING: team/research
+  DESIGNING: team/design
+  PLANNING: team/plan
+role_map:
+  PO_DISCUSSING: po
+  ARCHITECTING: architect
+  RESEARCHING: web-researcher
+  DESIGNING: designer
+  PLANNING: planner
+feedback_routing:
+  HUMAN_QUESTIONS: human
+  BLOCKED_ON_HUMAN: human
+  ARCH_QUESTION: architect
+  PO_QUESTIONS: po
+  DESIGN_QUESTIONS: designer
+  IMPL_QUESTIONS: planner
+# Each stage advances on its default edge once its artifact is written; the stage
+# skill calls `pathly-fsm-call complete-stage` to move on. Optional content gates
+# below keep a stage from advancing until its primary artifact exists.
+transition_rules:
+  PO_DISCUSSING:
+    on_content:
+      - file: PO_NOTES.md
+        contains: '#'
+        next: ARCHITECTING
+    default: PO_DISCUSSING
+  ARCHITECTING:
+    default: RESEARCHING
+  RESEARCHING:
+    default: DESIGNING
+  DESIGNING:
+    on_content:
+      - file: DESIGN.md
+        contains: '## Design System Output'
+        next: PLANNING
+    default: DESIGNING
+  PLANNING:
+    on_content:
+      - file: IMPLEMENTATION_PLAN.md
+        contains: '## Phase'
+        next: DONE
+    default: PLANNING
+transition_actions:
+  PLANNING->DONE:
+    - skill: archive-artifacts
+scope_gate:
+  exempt_prefixes: []
+gates: {}
+_comments: []

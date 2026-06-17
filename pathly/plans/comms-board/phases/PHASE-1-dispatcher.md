@@ -18,11 +18,16 @@
 > - ✅ **P2 board UI** (Studio): goal cards group their tasks; per-goal executor
 >   selector + Run button → `/comms/goals/run`; `goal_run` SSE drives run state.
 >   Typecheck green. (`team` shows "not available yet".)
-> - ⛔ `team` returns 501 until the two-flow split — **de-risked:** a fresh FSM run
->   starts at the flow's FIRST state (`fsm/engine.py:31`), and `_refresh_flows`
->   auto-seeds any new `core/flows/*.flow.yaml`, so a trimmed-team flow (BUILDING
->   first) is safe to add. The remaining open question is semantic: how a team run
->   consumes the goal's DAG vs. its plan artifacts — that's the two-flow split's job.
+> - ✅ `team` executor wired: `_run_team` launches the **`team-build`** FSM flow
+>   (build→review→test→retro) via `start_run`, scoped to the goal; refuses when a
+>   board-lock or pipeline run is already active (serial). Two-flow split shipped:
+>   `core/flows/team-build.flow.yaml` (feedback routes to architect/po/designer/
+>   planner) + `core/flows/consultation.flow.yaml` (PO→architect→researcher→
+>   designer→planner) + new `team/architect` + `team/research` stage skills.
+>   **v1 constraint:** `team` consumes the goal's plan artifacts, so it suits
+>   fully-decomposed goals; a running FSM server must restart to pick up the new
+>   flows (`_refresh_flows` re-seeds on start). on_done (board "finished" post) is
+>   left to the pipeline's RUN_COMPLETE SSE since `start_run` is async.
 > - ▸ Follow-up: a goal **stop** endpoint (the UI Stop button is optimistic; the loop
 >   holds the board lock so `/comms/run/stop` on the same scope would actually halt it).
 

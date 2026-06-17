@@ -19,6 +19,7 @@ import uuid
 from typing import Callable, Optional
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
+_TEAM_FLOW = "team-build"  # the trimmed team flow (build→review→test→retro)
 
 
 def _safe_call(fn: Optional[Callable], *args) -> None:
@@ -44,6 +45,7 @@ def start_goal_run(
     on_start: Optional[Callable] = None,
     on_done: Optional[Callable] = None,
     spawn_fn: Optional[Callable] = None,
+    start_fn: Optional[Callable] = None,
     block: bool = False,
 ) -> dict:
     """Read the goal's executor and dispatch its DAG. Returns a dict with `ok` and,
@@ -94,11 +96,12 @@ def start_goal_run(
             on_start=on_start, on_done=on_done, spawn_fn=spawn_fn, block=block,
         )
     if executor == "team":
-        return {
-            "ok": False, "reason": "not_implemented",
-            "error": "executor 'team' is not available until the two-flow split "
-                     "(trimmed team flow) lands — Phase-1 follow-on",
-        }
+        return _run_team(
+            goal_id, board, scope,
+            project_root=project_root, adapter=adapter, model=model,
+            broadcast_fn=broadcast_fn, on_start=on_start, on_done=on_done,
+            start_fn=start_fn,
+        )
     return {
         "ok": False, "reason": "unknown_executor",
         "error": f"unknown executor {executor!r} (expected single|loop|team)",
@@ -201,3 +204,52 @@ def _run_loop(
 
     threading.Thread(target=_runner, daemon=True, name=f"goal-loop-{run_id[:8]}").start()
     return {"ok": True, "run_id": run_id, "executor": "loop", "status": "started"}
+
+
+def _run_team(
+    goal_id: str, board: str, scope: str, *,
+    project_root: str, adapter: str, model: str,
+    broadcast_fn, on_start, on_done, start_fn,
+) -> dict:
+    """team executor: run the trimmed team-build FSM flow (build→review→test→retro)
+    on the goal's scope, reusing the supervisor pipeline (start_run → visible PTY
+    stages). Serial: refuses if any run (board-lock or pipeline) is already active for
+    the scope. start_run is async, so on_done (the board 'finished' post) is left to
+    the pipeline's own RUN_COMPLETE SSE — we only fire on_start here.
+
+    NOTE: the team executor consumes the goal's plan artifacts (the consultation flow
+    or a full planner run produced them). A DAG-only goal with no plan files is better
+    run with single/loop. The 'team-build' flow is seeded into the DB by _refresh_flows
+    on server start — a server that predates it must restart to pick it up.
+    """
+    from pathly_orchestrator.supervisor import board_lock
+    from pathly_orchestrator.supervisor.registry import get_state
+
+    # A single/loop run holds the board lock; an FSM pipeline run lives in the registry.
+    if board_lock.holder(board, scope) is not None:
+        return {"ok": False, "reason": "board_busy", "error": "board is busy (a run holds the lock)"}
+    existing = get_state(scope)
+    if existing is not None and existing.status in ("running", "paused", "awaiting_decision"):
+        return {
+            "ok": False, "reason": "board_busy",
+            "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
+        }
+
+    _start = start_fn
+    if _start is None:
+        from pathly_orchestrator.supervisor.api import start_run as _start
+
+    try:
+        state = _start(
+            topic=scope,
+            flow=_TEAM_FLOW,
+            project_root=project_root or "",
+            model=model or _DEFAULT_MODEL,
+            broadcast_fn=broadcast_fn,
+        )
+    except ValueError as exc:  # start_run guards against a duplicate active topic
+        return {"ok": False, "reason": "board_busy", "error": str(exc)}
+
+    run_id = getattr(state, "run_id", "") or ""
+    _safe_call(on_start, run_id)
+    return {"ok": True, "run_id": run_id, "executor": "team", "goal_id": goal_id, "status": "started"}

@@ -145,16 +145,45 @@ def test_dispatch_executor_override_wins_and_persists():
     assert row["executor"] == "loop", "override should persist onto the goal"
 
 
-def test_dispatch_team_not_implemented():
-    """executor='team' is gated until the two-flow split."""
+def test_dispatch_team_routes_to_team_build_flow():
+    """executor='team' launches the team-build FSM flow via start_run."""
+    import types
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_run import start_goal_run
 
     conn = get_db()
     goal = _make_goal(conn, "gr_team", executor="team")
-    result = start_goal_run(goal, block=True)
-    assert result["ok"] is False
-    assert result["reason"] == "not_implemented"
+
+    captured = {}
+
+    def fake_start(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="team-run-1")
+
+    result = start_goal_run(goal, project_root="/x", start_fn=fake_start, block=True)
+    assert result["ok"] is True
+    assert result["executor"] == "team"
+    assert result["run_id"] == "team-run-1"
+    assert captured["flow"] == "team-build", "team executor must run the trimmed team-build flow"
+    assert captured["topic"] == "gr_team"
+
+
+def test_dispatch_team_board_busy():
+    """team refuses when a run already holds the board lock (serial)."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor import board_lock
+    from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+    conn = get_db()
+    scope = "gr_team_busy"
+    goal = _make_goal(conn, scope, executor="team")
+    board_lock.acquire("feature", scope, "someone-else")
+    try:
+        result = start_goal_run(goal, start_fn=lambda **k: None, block=True)
+        assert result["ok"] is False
+        assert result["reason"] == "board_busy"
+    finally:
+        board_lock.release("feature", scope, "someone-else")
 
 
 def test_dispatch_goal_not_found():
@@ -193,13 +222,22 @@ def test_http_goals_run_not_found(client):
     assert json.loads(r.data)["reason"] == "not_found"
 
 
-def test_http_goals_run_team_gated(client):
+def test_http_goals_run_team(client, monkeypatch):
+    """POST a team goal → 200; start_run is stubbed so no real pipeline spawns."""
+    import types
     from pathly_orchestrator.db.connection import get_db
+    import pathly_orchestrator.supervisor.api as _api
+
     conn = get_db()
     goal = _make_goal(conn, "gr_http_team", executor="team")
+    monkeypatch.setattr(_api, "start_run",
+                        lambda **kw: types.SimpleNamespace(run_id="r-http-team"))
+
     r = client.post("/comms/goals/run", json={"goal_id": goal})
-    assert r.status_code == 501
-    assert json.loads(r.data)["reason"] == "not_implemented"
+    assert r.status_code == 200, r.data
+    body = json.loads(r.data)
+    assert body["ok"] is True
+    assert body["executor"] == "team"
 
 
 def test_http_goals_run_non_goal(client):
