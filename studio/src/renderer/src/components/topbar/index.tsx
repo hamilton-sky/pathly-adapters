@@ -69,17 +69,14 @@ export function TopBar(): JSX.Element {
         </div>
 
         <div className={styles.right}>
-          <div className={styles.cliMonitorWrap}>
+          <div className={styles.cliMonitorWrap} data-active={hasRunningEngine || undefined}>
             <IconButton
               onClick={toggleCliMonitor}
               title="CLI Engines"
               description="Monitor and stop active CLI processes"
               placement="bottom"
             >
-              <Activity
-                size={14}
-                style={hasRunningEngine ? { color: 'var(--amber, #e5c07b)' } : undefined}
-              />
+              <Activity size={14} />
             </IconButton>
             {hasRunningEngine && <span className={styles.cliDot} aria-hidden="true" />}
           </div>

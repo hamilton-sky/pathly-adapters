@@ -126,6 +126,10 @@
   flex-shrink: 0;
 }
 
+.cliMonitorWrap[data-active] svg {
+  color: var(--amber, #e5c07b);
+}
+
 .cliDot {
   position: absolute;
   top: 2px;

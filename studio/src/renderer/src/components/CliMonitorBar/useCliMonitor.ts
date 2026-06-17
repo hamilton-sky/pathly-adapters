@@ -64,20 +64,18 @@ export function useCliMonitor() {
   const startedAtRef = useRef<Record<string, number>>({})
   const [elapsed, setElapsed] = useState<Record<string, number>>({})
 
-  // Sync startedAt map with running tabs
+  // Sync startedAt map when the set of running tabs changes
   useEffect(() => {
     const ids = new Set(runningTabs.map((t) => t.id))
-    // Add new tabs
     for (const tab of runningTabs) {
       if (!startedAtRef.current[tab.id]) {
         startedAtRef.current[tab.id] = tab.startedAt ?? Date.now()
       }
     }
-    // Remove finished tabs
     for (const id of Object.keys(startedAtRef.current)) {
       if (!ids.has(id)) delete startedAtRef.current[id]
     }
-  })
+  }, [runningTabs.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tick every second while any engine is running
   useEffect(() => {
