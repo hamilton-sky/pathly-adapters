@@ -14,6 +14,12 @@ export interface FlowNode {
   terminal?: boolean
 }
 
+/** A labelled paragraph in a flow's collapsible "About this flow" section. */
+export interface FlowDetail {
+  label: string
+  text: string
+}
+
 export interface FlowDef {
   /** Value sent to /runner/start as `flow`. */
   key: string
@@ -22,6 +28,8 @@ export interface FlowDef {
   nodes: FlowNode[]
   /** Optional note about the flow's feedback loops. */
   loops?: string
+  /** Richer guidance shown in the expandable "About this flow" disclosure. */
+  details: FlowDetail[]
 }
 
 const DONE: FlowNode = { state: 'DONE', role: 'done', agent: '', terminal: true }
@@ -38,6 +46,11 @@ export const BOARD_FLOWS: FlowDef[] = [
       DONE,
     ],
     loops: 'VERIFYING bounces back to FIXING until tests pass.',
+    details: [
+      { label: 'When to use', text: 'A small, well-scoped change you already understand — a typo, a one-line bug, a quick tweak. Skips design and adversarial review to stay fast.' },
+      { label: 'Produces', text: 'The fix committed on the current branch, plus a quick test pass to confirm it holds.' },
+      { label: 'Good to know', text: 'No planning or design artifacts are written. If VERIFYING fails it loops straight back to FIXING.' },
+    ],
   },
   {
     key: 'debug',
@@ -52,6 +65,11 @@ export const BOARD_FLOWS: FlowDef[] = [
       DONE,
     ],
     loops: 'VERIFYING returns to FIXING if the fix does not hold.',
+    details: [
+      { label: 'When to use', text: "A bug whose cause you don't yet know. Spends real effort reproducing and locating the root cause before touching any code." },
+      { label: 'Produces', text: 'A reproduction, a root-cause note, the fix, and a verification pass — committed as it goes.' },
+      { label: 'Good to know', text: 'ROOT_CAUSE_FOUND routes the work to the right fixer. VERIFYING loops back to FIXING until the fix holds.' },
+    ],
   },
   {
     key: 'explore',
@@ -63,6 +81,11 @@ export const BOARD_FLOWS: FlowDef[] = [
       { state: 'TRACING', role: 'explorer', agent: 'explorer' },
       { state: 'CONCLUDING', role: 'explorer', agent: 'explorer' },
       DONE,
+    ],
+    details: [
+      { label: 'When to use', text: 'A structural question about the codebase — how does X work, is it safe to change Y — when you want understanding, not edits.' },
+      { label: 'Produces', text: 'A written exploration (framing → traces → conclusions). It edits no source files.' },
+      { label: 'Good to know', text: 'Read-only end to end. A good first step before planning a risky change.' },
     ],
   },
   {
@@ -78,6 +101,11 @@ export const BOARD_FLOWS: FlowDef[] = [
       DONE,
     ],
     loops: 'REVIEWING and TESTING loop back to BUILDING on failures.',
+    details: [
+      { label: 'When to use', text: "A feature you want built and verified, but that doesn't need a design pass or a retrospective. Lighter than the full team flow." },
+      { label: 'Produces', text: 'An implementation plan, the built feature, an adversarial review, and a test pass — committed per stage.' },
+      { label: 'Good to know', text: 'REVIEWING and TESTING loop back to BUILDING on failures until both pass.' },
+    ],
   },
   {
     key: 'team',
@@ -94,5 +122,10 @@ export const BOARD_FLOWS: FlowDef[] = [
       DONE,
     ],
     loops: 'REVIEWING and TESTING loop back to BUILDING until the gate passes.',
+    details: [
+      { label: 'When to use', text: 'A full feature from scratch — the complete pipeline. Use when the work needs design, review, tests, and a retrospective.' },
+      { label: 'Produces', text: 'Stories, plan, design system, implementation, review, tests, and a retro — each stage gated and committed.' },
+      { label: 'Good to know', text: 'The heaviest flow. REVIEWING/TESTING loop back to BUILDING until the verify and scope gates pass.' },
+    ],
   },
 ]

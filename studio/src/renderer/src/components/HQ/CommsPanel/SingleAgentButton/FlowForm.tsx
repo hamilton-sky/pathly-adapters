@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Play } from 'lucide-react'
 import { BOARD_FLOWS } from './flowCatalog'
 import { FlowDiagram } from './FlowDiagram/FlowDiagram'
+import { FlowAbout } from './FlowAbout/FlowAbout'
 import s from './SingleAgentButton.module.css'
 
 interface Props {
@@ -32,6 +33,7 @@ export function FlowForm({ running, onRunFlow, onClose }: Props): JSX.Element {
         </select>
 
         <FlowDiagram flow={flow} />
+        <FlowAbout flow={flow} />
 
         <span className={s.label}>Mode</span>
         <div className={s.modeRow} role="radiogroup" aria-label="Run mode">
