@@ -55,8 +55,11 @@
 }
 
 .actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-left: auto;
-  margin-right: 10px;      /* pull per-view actions (New goal) in from the edge */
+  margin-right: 10px;      /* pull per-view actions (Evaluate / New goal) in from the edge */
   min-width: 0;
 }
 

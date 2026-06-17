@@ -213,11 +213,37 @@
   text-overflow: ellipsis;
 }
 
+/* Secondary action next to New goal — the evaluator starting point. Neutral by
+   default (New goal stays the accent primary), accent on hover. */
+.evalBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface0);
+  color: var(--text-secondary);
+  font: 500 12px/1 var(--font-family-base);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.evalBtn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.evalBtn:disabled { opacity: 0.6; cursor: default; }
+
 /* Collapse to icon-only when the board view-toggle row (the size container in
    BoardViewToggle) is narrow — keeps the accessible name via the tooltip. */
 @container (max-width: 400px) {
   .newGoalLabel { display: none; }
-  .newGoalBtn { gap: 0; padding: 0 8px; }
+  .newGoalBtn,
+  .evalBtn { gap: 0; padding: 0 8px; }
 }
 
 /* ── Editable goal title ────────────────────────────────── */

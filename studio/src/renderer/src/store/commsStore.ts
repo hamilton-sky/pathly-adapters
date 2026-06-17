@@ -73,6 +73,8 @@ export interface CommsState {
   // C2 — single-agent run state keyed by board (e.g. feature id, 'project', 'global')
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
   runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string; progress?: string }) => void
+  /** Run the evaluator on a board: classify its content and propose concrete tasks. */
+  runEvaluator: (key: string) => void
   /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
   markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
@@ -359,6 +361,31 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         // so the control stays green and Stop is enabled while the agent CLI is open.
         // The run clears when the board_run 'done'/'stopped' phase arrives over the
         // comms SSE → markBoardRunPhase. (No auto-flip to done on the start ack.)
+      })
+      .catch(() => {
+        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+      })
+  },
+
+  runEvaluator: (key) => {
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
+
+    const isFeature = key !== 'project' && key !== 'global'
+    if (isFeature) useProjectStore.getState().setActiveTopic(key)
+    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
+    const params = scopeToParams(scope, key)
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+
+    apiRunBoard(params.board, params.scope, 'evaluator', { projectRoot })
+      .then((res) => {
+        if (res === null) {
+          set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+          return
+        }
+        if (!res.ok && res.error === 'board_busy') {
+          set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } }))
+        }
+        // Otherwise stays 'running' until the board_run 'done' phase arrives via SSE.
       })
       .catch(() => {
         set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))

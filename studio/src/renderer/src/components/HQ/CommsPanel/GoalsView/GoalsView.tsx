@@ -35,7 +35,7 @@ export function GoalsView({ messages, onEditGoal }: Props): JSX.Element {
     return (
       <div className={s.empty}>
         <Target size={22} />
-        <p>No goals on this board yet. Use <strong>+ New goal</strong> in the top right, or let the planner seed a goal and its task DAG.</p>
+        <p>No goals on this board yet. Use <strong>+ New goal</strong>, or <strong>Evaluate</strong> to analyze what's on this board into tasks, or let the planner seed a DAG.</p>
       </div>
     )
   }

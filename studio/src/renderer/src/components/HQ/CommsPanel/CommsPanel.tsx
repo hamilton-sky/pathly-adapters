@@ -8,6 +8,7 @@ import { SingleAgentButton } from './SingleAgentButton/SingleAgentButton'
 import { BoardViewToggle, type BoardView } from './BoardViewToggle/BoardViewToggle'
 import { GoalsView } from './GoalsView/GoalsView'
 import { NewGoalButton } from './GoalsView/NewGoalButton'
+import { EvaluateBoardButton } from './GoalsView/EvaluateBoardButton'
 import { ArtifactsView } from './ArtifactsView/ArtifactsView'
 import { useCommsPanel } from './hooks/useCommsPanel'
 import { useStore } from '../../../store'
@@ -83,7 +84,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
         view={boardView}
         onChange={setBoardView}
         rightAction={boardView === 'goals'
-          ? <NewGoalButton onCreate={(text) => post('goal', text)} />
+          ? <><EvaluateBoardButton boardKey={boardKey} /><NewGoalButton onCreate={(text) => post('goal', text)} /></>
           : undefined}
       />
 
