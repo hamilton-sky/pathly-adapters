@@ -2,7 +2,13 @@
 
 **Branch:** `feat/comms-board-dag-serial`
 **Model:** [../GOALS-DAG-EXECUTORS.md](../GOALS-DAG-EXECUTORS.md) · **0b wiring:** [PHASE-0b-planner-dag-wiring.md](PHASE-0b-planner-dag-wiring.md)
-**Status:** spec (not built). Produced by the 4-lens panel (architect · planner · PO · designer), 2026-06-17.
+**Status:** partially built (2026-06-17). ✅ **P2-A** (types + mapper: goal_id/executor/taskStatus/dependsOn),
+✅ **P2-T** (BoardViewToggle + boardView state; Messages view filters out goal/task), ✅ **P2-B** (read-only
+Goals&Tasks view: GoalsView/GoalGroup/GoalGroupHeader/TaskCard — status dots, depends_on badges, rollup),
+✅ Artifacts view, ✅ **P2-C/P2-D** (executor selector + Run via GoalRunButton → `/comms/goals/run` with the
+executor override persisting the pick — no separate PATCH route needed). Renderer typecheck green.
+**Deferred:** P2-0 (HQ/CommsPanel→Board rename refactor), P2-S (FeatureCard redesign), per-task ad-hoc Run
+(no backend route), artifact "open" inside TaskCard (Details lives on the artifact card), goal **stop** endpoint.
 
 > **What this answers:** how the Board→Goals→Task-DAG→executors model changes the *current*
 > Studio Command Center — what components we need, **how a user ties an executor to a goal/task**,
