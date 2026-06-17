@@ -33,31 +33,32 @@ export function GoalsView({ messages, onCreateGoal, onEditGoal }: Props): JSX.El
     }
   }
 
-  if (goals.length === 0 && ungrouped.length === 0) {
-    return (
-      <div className={s.empty}>
-        <Target size={22} />
-        <p>No goals on this board yet. Add one below, or let the planner seed a goal and its task DAG.</p>
-        <NewGoalButton onCreate={onCreateGoal} />
-      </div>
-    )
-  }
+  const isEmpty = goals.length === 0 && ungrouped.length === 0
 
   return (
     <div className={s.view}>
       <div className={s.viewHeader}>
         <NewGoalButton onCreate={onCreateGoal} />
       </div>
-      {goals.map((g) => (
-        <GoalGroup key={g.id} goal={g} tasks={tasksByGoal.get(g.id) ?? []} siblings={messages} onEditGoal={onEditGoal} />
-      ))}
-      {ungrouped.length > 0 && (
-        <div className={s.ungrouped}>
-          <div className={s.ungroupedHead}>Ungrouped tasks</div>
-          {orderByDeps(ungrouped).map((t) => (
-            <TaskCard key={t.id} task={t} siblings={messages} />
-          ))}
+      {isEmpty ? (
+        <div className={s.empty}>
+          <Target size={22} />
+          <p>No goals on this board yet. Use <strong>+ New goal</strong> in the top right, or let the planner seed a goal and its task DAG.</p>
         </div>
+      ) : (
+        <>
+          {goals.map((g) => (
+            <GoalGroup key={g.id} goal={g} tasks={tasksByGoal.get(g.id) ?? []} siblings={messages} onEditGoal={onEditGoal} />
+          ))}
+          {ungrouped.length > 0 && (
+            <div className={s.ungrouped}>
+              <div className={s.ungroupedHead}>Ungrouped tasks</div>
+              {orderByDeps(ungrouped).map((t) => (
+                <TaskCard key={t.id} task={t} siblings={messages} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -183,31 +183,35 @@
   padding: 2px 0;
 }
 
-/* ── New goal control (view header + empty state) ───────── */
+/* ── New goal control (top-right of the view) ───────────── */
+/* Matches the header's "New feature" button (.ctl .newFeature): squared
+   corners, accent text + border. */
 .viewHeader {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   min-width: 0;
 }
 
 .newGoalBtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
   border: var(--border);
-  border-radius: var(--radius-full, 999px);
+  border-color: var(--accent-border);
+  border-radius: var(--radius-md);
   background: var(--bg-surface0);
-  color: var(--text-secondary);
-  font: 500 11px/1 var(--font-family-base);
+  color: var(--accent);
+  font: 500 12px/1 var(--font-family-base);
   cursor: pointer;
-  transition: all var(--transition-fast);
-  min-width: 0;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .newGoalBtn:hover {
-  color: var(--accent);
-  border-color: var(--accent-border, var(--accent));
+  background: var(--accent-bg);
 }
 
 /* ── Editable goal title ────────────────────────────────── */
