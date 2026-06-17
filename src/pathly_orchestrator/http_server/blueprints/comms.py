@@ -1161,6 +1161,81 @@ def comms_goals_run():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/goals/decompose", methods=["POST"])
+def comms_goals_decompose():
+    """Decompose a goal into a task DAG — the analyze→tasks bridge.
+
+    Required body: goal_id. Optional: mode ("planner"|"consultation", default planner),
+    adapter, model, project_root. Returns 200 {ok, run_id, mode, ...} | 400 bad input /
+    not a goal / unknown mode | 404 goal not found | 409 already decomposed / board busy.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        goal_id = data.get("goal_id", "")
+        if not isinstance(goal_id, str) or not goal_id.strip():
+            return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
+        mode = (data.get("mode", "") or "planner")
+        if not isinstance(mode, str):
+            return jsonify({"error": "Field 'mode' must be a string"}), 400
+        adapter = (data.get("adapter", "") or "claude")
+        model = (data.get("model", "") or "")
+        project_root = (data.get("project_root", "") or "")
+
+        conn = _get_db()
+        goal = conn.execute(
+            "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            (goal_id,),
+        ).fetchone()
+        board = goal["board"] if goal is not None else "feature"
+        scope = goal["scope"] if goal is not None else ""
+
+        def _board_post(text: str, phase: str | None = None) -> None:
+            try:
+                c = _get_db()
+                mid = _post_message(c, board=board, scope=scope, from_agent="system",
+                                    type="status", text=text)
+                payload = {"type": "COMMS_UPDATE", "event": "goal_decompose",
+                           "message_id": mid, "board": board, "scope": scope}
+                if phase:
+                    payload["phase"] = phase
+                _broadcast_comms(scope, payload)
+            except Exception:
+                logging.debug("goal_decompose lifecycle post failed", exc_info=True)
+
+        def _on_start(_run_id: str) -> None:
+            _board_post(f"🧩 decomposing goal via {mode}…", phase="running")
+
+        def _on_done(_run_id: str, res) -> None:
+            _board_post("✅ decomposition finished — task DAG seeded", phase="done")
+
+        result = start_goal_decompose(
+            goal_id, mode=mode, project_root=project_root, adapter=adapter, model=model,
+            broadcast_fn=_broadcast_runner, on_start=_on_start, on_done=_on_done,
+        )
+
+        if result.get("ok"):
+            return jsonify(result), 200
+        reason = result.get("reason") or result.get("error") or ""
+        status = {
+            "not_found": 404,
+            "not_goal": 400,
+            "unknown_mode": 400,
+            "already_decomposed": 409,
+            "board_busy": 409,
+        }.get(reason, 400)
+        return jsonify(result), status
+    except Exception as exc:
+        logging.exception("comms_goals_decompose error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/delete", methods=["POST"])
 def comms_delete():
     """Retract (soft-delete) a message — only while no agent has read it.

@@ -266,3 +266,108 @@ def test_http_tasks_ready_goal_id_filter(client):
     ids = {m["id"] for m in json.loads(r.data)}
     assert t1 in ids
     assert t2 not in ids
+
+
+# ---------------------------------------------------------------------------
+# Decompose bridge — goal → task DAG (planner | consultation)
+# ---------------------------------------------------------------------------
+
+def test_decompose_planner_routes_to_board_run():
+    """mode='planner' runs the planner on the goal's scope to seed the DAG."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
+
+    conn = get_db()
+    scope = "dec_planner"
+    goal = _make_goal(conn, scope)
+    seen = {}
+
+    def fake_board_spawn(**kw):
+        seen.update(kw)
+        return {"result": "seeded"}
+
+    result = start_goal_decompose(goal, mode="planner", project_root="", spawn_fn=fake_board_spawn, block=True)
+    assert result["ok"] is True
+    assert result["mode"] == "planner"
+    # the directive tells the planner the goal already exists and to stamp tasks with it
+    assert goal in seen["prompt"]
+    assert "task" in seen["prompt"].lower()
+
+
+def test_decompose_consultation_routes_to_consultation_flow():
+    """mode='consultation' launches the consultation FSM flow."""
+    import types
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
+
+    conn = get_db()
+    goal = _make_goal(conn, "dec_consult")
+    captured = {}
+
+    def fake_start(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="cons-1")
+
+    result = start_goal_decompose(goal, mode="consultation", project_root="/x", start_fn=fake_start)
+    assert result["ok"] is True
+    assert result["mode"] == "consultation"
+    assert captured["flow"] == "consultation"
+
+
+def test_decompose_already_decomposed():
+    """Refuse to decompose a goal that already has tasks."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
+
+    conn = get_db()
+    scope = "dec_already"
+    goal = _make_goal(conn, scope)
+    _make_task(conn, scope, "existing task", goal)
+    result = start_goal_decompose(goal, mode="planner", block=True)
+    assert result["ok"] is False
+    assert result["reason"] == "already_decomposed"
+
+
+def test_decompose_unknown_mode():
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
+
+    conn = get_db()
+    goal = _make_goal(conn, "dec_badmode")
+    result = start_goal_decompose(goal, mode="magic", block=True)
+    assert result["ok"] is False
+    assert result["reason"] == "unknown_mode"
+
+
+def test_decompose_not_a_goal():
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
+
+    conn = get_db()
+    scope = "dec_nongoal"
+    goal = _make_goal(conn, scope)
+    task = _make_task(conn, scope, "a task", goal)
+    result = start_goal_decompose(task, mode="planner", block=True)
+    assert result["ok"] is False
+    assert result["reason"] == "not_goal"
+
+
+def test_http_decompose_missing_goal_id(client):
+    r = client.post("/comms/goals/decompose", json={})
+    assert r.status_code == 400
+
+
+def test_http_decompose_not_found(client):
+    r = client.post("/comms/goals/decompose", json={"goal_id": "nope"})
+    assert r.status_code == 404
+
+
+def test_http_decompose_already(client):
+    from pathly_orchestrator.db.connection import get_db
+    conn = get_db()
+    scope = "dec_http_already"
+    goal = _make_goal(conn, scope)
+    _make_task(conn, scope, "t", goal)
+    r = client.post("/comms/goals/decompose", json={"goal_id": goal})
+    assert r.status_code == 409
+    assert json.loads(r.data)["reason"] == "already_decomposed"
