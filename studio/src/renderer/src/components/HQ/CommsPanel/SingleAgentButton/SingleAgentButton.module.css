@@ -121,31 +121,37 @@
 }
 
 /* ── Agent / Flow mode tabs (top of the run modal) ── */
+/* Segmented control: the row owns the outer border + radius + overflow; each tab
+   is borderless with a single divider between them, so both stay exactly equal
+   width and the active tab is marked by fill only (matches .modeRow below). */
 .tabRow {
   display: flex;
-  gap: 0;
-  padding: 12px 16px 0;
-  min-width: 0;
+  margin: 12px 16px 0;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-surface0);
 }
 
 .tab {
+  flex: 1;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  flex: 1;
-  min-width: 0;
   padding: 8px 10px;
-  border: var(--border);
-  background: var(--bg-surface0);
+  border: none;
+  background: transparent;
   color: var(--text-muted);
   font: 500 12px/1 var(--font-family-base);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
-.tab:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
-.tab:last-child  { border-radius: 0 var(--radius-md) var(--radius-md) 0; border-left: none; }
+.tab + .tab {
+  border-left: var(--border);
+}
 
 .tab:hover {
   color: var(--text-secondary);
@@ -155,7 +161,6 @@
 .tab[data-on] {
   color: var(--accent);
   background: var(--accent-bg);
-  border-color: var(--accent-border);
 }
 
 /* ── Modal body ── */
