@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Wand2, Scissors, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { Tooltip } from '../../../ui'
+import { ActionProgress, fmtElapsed } from '../notebookProgress'
 import styles from './SplitPill.module.css'
 
 type SplitState = 'idle' | 'running' | 'success' | 'error'
@@ -8,6 +9,8 @@ type SplitState = 'idle' | 'running' | 'success' | 'error'
 interface Props {
   /** Live state of the AI Split action (drives the pill's colour/label). */
   state: SplitState
+  /** Live progress while running — elapsed timer + latest output line. */
+  progress?: ActionProgress | null
   /** Whether a document is open — gates every zone. */
   hasPath: boolean
   /** Run the AI Split (LLM reorganizes into ## sections → diff to review). */
@@ -24,7 +27,7 @@ interface Props {
 // (AI Split vs deterministic Split into cells) + the prompt gear (AI only).
 // The two modes use distinct icons — Wand2 (generative) vs Scissors (structural) —
 // so they stay unambiguous in compact mode where the text label is hidden.
-export default function SplitPill({ state, hasPath, onAiSplit, onSplitIntoCells, onTogglePrompt, compact }: Props) {
+export default function SplitPill({ state, progress, hasPath, onAiSplit, onSplitIntoCells, onTogglePrompt, compact }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -43,13 +46,14 @@ export default function SplitPill({ state, hasPath, onAiSplit, onSplitIntoCells,
   }, [open])
 
   const label =
-    state === 'running' ? 'Splitting…' : state === 'success' ? 'AI Split!' : state === 'error' ? 'Error' : 'AI Split'
+    state === 'running' ? (progress ? `Splitting… ${fmtElapsed(progress.elapsedS)}` : 'Splitting…')
+    : state === 'success' ? 'AI Split!' : state === 'error' ? 'Error' : 'AI Split'
 
   return (
     <div className={styles.splitPill} ref={ref}>
       <Tooltip
         label={state === 'running'
-          ? 'Reorganizing the document into sections…'
+          ? (progress?.detail || 'Reorganizing the document into sections…')
           : 'AI reorganizes the document into clean ## sections — delivers a diff you review and accept'}
         placement="bottom"
       >

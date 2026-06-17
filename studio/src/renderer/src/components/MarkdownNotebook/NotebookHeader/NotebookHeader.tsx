@@ -13,6 +13,8 @@ import { buildSplitPrompt, buildAnalyzePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_AN
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import ExportMenu from './ExportMenu/ExportMenu'
 import SplitPill from './SplitPill/SplitPill'
+import { loadNotebookCli, saveNotebookCli, NotebookCli, CLI_KEY_SPLIT, CLI_KEY_ANALYZE } from './notebookCli'
+import { fmtElapsed } from './notebookProgress'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
 import styles from './NotebookHeader.module.css'
 
@@ -46,13 +48,20 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const [analyzePeekOpen,  setAnalyzePeekOpen]  = useState(false)
   const [splitOncePrompt,  setSplitOncePrompt]  = useState<string | null>(null)
   const [analyzeOncePrompt, setAnalyzeOncePrompt] = useState<string | null>(null)
+  const [splitCli,   setSplitCli]   = useState<NotebookCli>(() => loadNotebookCli(CLI_KEY_SPLIT))
+  const [analyzeCli, setAnalyzeCli] = useState<NotebookCli>(() => loadNotebookCli(CLI_KEY_ANALYZE))
 
-  const { handleSplit, handleAnalyze, splitState, analyzeState } = useNotebookAgentActions(
+  const handleSplitCli   = (next: NotebookCli) => { setSplitCli(next);   saveNotebookCli(CLI_KEY_SPLIT, next) }
+  const handleAnalyzeCli = (next: NotebookCli) => { setAnalyzeCli(next); saveNotebookCli(CLI_KEY_ANALYZE, next) }
+
+  const { handleSplit, handleAnalyze, splitState, analyzeState, splitProgress, analyzeProgress } = useNotebookAgentActions(
     notebookPath,
     splitOncePrompt,
     analyzeOncePrompt,
     () => setSplitOncePrompt(null),
     () => setAnalyzeOncePrompt(null),
+    splitCli,
+    analyzeCli,
   )
 
   const headerRef = useRef<HTMLDivElement>(null)
@@ -209,6 +218,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
       {/* Split — split-button: AI Split (primary) + caret menu (AI vs deterministic) + prompt gear */}
       <SplitPill
         state={splitState}
+        progress={splitProgress}
         hasPath={!!notebookPath}
         onAiSplit={() => void handleSplit()}
         onSplitIntoCells={() => setSplitCellsOpen(true)}
@@ -221,6 +231,8 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
           fileName={skillName + '.md'}
           defaultPrompt={buildSplitPrompt(notebookPath)}
           storageKey={STORAGE_KEY_SPLIT}
+          cli={splitCli}
+          onCliChange={handleSplitCli}
           onClose={() => setSplitPeekOpen(false)}
           onUseOnce={(p) => { setSplitOncePrompt(p); setSplitPeekOpen(false) }}
         />
@@ -230,7 +242,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
       <div className={styles.agentPill}>
         <Tooltip
           label={analyzeState === 'running'
-            ? `Auditing "${skillName}" for quality issues…`
+            ? (analyzeProgress?.detail || `Auditing "${skillName}" for quality issues…`)
             : `AI will audit "${skillName}" for clarity, gaps, and redundancies — opens a quality report in a side panel`}
           placement="bottom"
         >
@@ -244,11 +256,13 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
           >
             <ScanText size={13} />
             <span className={styles.btnLabel}>
-              {analyzeState === 'running' ? 'Analyzing…' : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'AI Analyze'}
+              {analyzeState === 'running'
+                ? (analyzeProgress ? `Analyzing… ${fmtElapsed(analyzeProgress.elapsedS)}` : 'Analyzing…')
+                : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'AI Analyze'}
             </span>
           </button>
         </Tooltip>
-        <Tooltip label="View or edit the prompt sent to Claude" placement="bottom">
+        <Tooltip label="View or edit the prompt sent to the AI engine" placement="bottom">
           <button
             type="button"
             className={styles.agentPillSettings}
@@ -266,6 +280,8 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
             fileName={skillName + '.md'}
             defaultPrompt={buildAnalyzePrompt(notebookPath)}
             storageKey={STORAGE_KEY_ANALYZE}
+            cli={analyzeCli}
+            onCliChange={handleAnalyzeCli}
             onClose={() => setAnalyzePeekOpen(false)}
             onUseOnce={(p) => { setAnalyzeOncePrompt(p); setAnalyzePeekOpen(false) }}
           />
