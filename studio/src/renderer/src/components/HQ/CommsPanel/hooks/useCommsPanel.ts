@@ -90,6 +90,11 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
     [store, key],
   )
 
+  const editMessage = useCallback(
+    (mid: string, text: string) => store.editMessage(key, mid, text),
+    [store, key],
+  )
+
   const supersede = useCallback(
     (oldId: string, newId: string) => store.supersede(key, oldId, newId),
     [store, key],
@@ -124,7 +129,7 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
 
   return {
     messages, feature, pendingCount, flashId, post, answer, resolve,
-    toggleScope, del, supersede, attach, runSingleAgent, runGoal, stopGoal,
+    toggleScope, del, editMessage, supersede, attach, runSingleAgent, runGoal, stopGoal,
     searchResults, searchTerm, runSearch, clearSearch,
   }
 }

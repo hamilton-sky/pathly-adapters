@@ -1,8 +1,8 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Message } from '../../../CommandCenter/types'
-import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import { GoalRunButton } from '../GoalRunButton/GoalRunButton'
 import { GoalDecomposeButton } from '../GoalDecomposeButton/GoalDecomposeButton'
+import { EditableGoalTitle } from './EditableGoalTitle'
 import { computeRollup } from './goalsViewUtils'
 import s from './GoalsView.module.css'
 
@@ -11,12 +11,13 @@ interface Props {
   tasks: Message[]
   open: boolean
   onToggle: () => void
+  onEditGoal: (goalId: string, text: string) => void
 }
 
 // Goal header: collapse toggle + goal text + a task rollup chip + the executor
 // selector / Run control (reused from GoalRunButton — the selector value is sent
 // as the executor override on Run, which persists it onto the goal).
-export function GoalGroupHeader({ goal, tasks, open, onToggle }: Props): JSX.Element {
+export function GoalGroupHeader({ goal, tasks, open, onToggle, onEditGoal }: Props): JSX.Element {
   const r = computeRollup(tasks)
   return (
     <div className={s.header}>
@@ -30,7 +31,7 @@ export function GoalGroupHeader({ goal, tasks, open, onToggle }: Props): JSX.Ele
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
       <div className={s.headerMain}>
-        <MarkdownRenderer content={goal.text} className={s.goalText} />
+        <EditableGoalTitle text={goal.text} onSave={(t) => onEditGoal(goal.id, t)} />
         <div className={s.rollup}>
           {r.total} task{r.total !== 1 ? 's' : ''} · {r.done} done · {r.ready} ready
           {r.failed > 0 ? ` · ${r.failed} blocked` : ''}

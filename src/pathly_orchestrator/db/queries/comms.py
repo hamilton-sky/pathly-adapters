@@ -697,3 +697,27 @@ def soft_delete_message(conn: sqlite3.Connection, message_id: str, force: bool =
         )
         conn.commit()
     return "deleted"
+
+
+def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) -> str:
+    """Edit a message's text in place — used by the board UI to rename a goal.
+
+    The edit is in place so the message id is preserved and a goal keeps its task
+    links (tasks reference the goal by id). Embeddings are not recomputed here;
+    hybrid search reflects the new text on the next reindex.
+
+    Returns ``"updated"`` or ``"not_found"``.
+    """
+    row = conn.execute(
+        "SELECT id FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+        (message_id,),
+    ).fetchone()
+    if row is None:
+        return "not_found"
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET text=? WHERE id=?",
+            (text, message_id),
+        )
+        conn.commit()
+    return "updated"

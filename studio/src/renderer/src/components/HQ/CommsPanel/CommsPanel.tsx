@@ -30,7 +30,7 @@ const LOCAL_DEFAULTS: Record<BoardScope, Record<BoardScope, boolean>> = {
 
 export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeature: string }) {
   const {
-    messages, feature, flashId, post, answer, resolve, toggleScope, del,
+    messages, feature, flashId, post, answer, resolve, toggleScope, del, editMessage,
     supersede, attach, runSingleAgent, searchResults, searchTerm, runSearch, clearSearch,
   } = useCommsPanel(scope, mainFeature)
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
@@ -93,7 +93,13 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
           onSupersede={supersede}
         />
       )}
-      {boardView === 'goals' && <GoalsView messages={messages} />}
+      {boardView === 'goals' && (
+        <GoalsView
+          messages={messages}
+          onCreateGoal={(text) => post('goal', text)}
+          onEditGoal={(goalId, text) => editMessage(goalId, text)}
+        />
+      )}
       {boardView === 'artifacts' && (
         <ArtifactsView messages={messages} onDelete={del} onSupersede={supersede} />
       )}

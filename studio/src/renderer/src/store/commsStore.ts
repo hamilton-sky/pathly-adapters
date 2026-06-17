@@ -7,6 +7,7 @@ import {
   apiAcknowledge,
   apiToggleScope,
   apiDelete,
+  apiEditMessage,
   scopeToParams,
   buildFeature,
   fetchFeatureState,
@@ -58,6 +59,8 @@ export interface CommsState {
   toggleScope: (featureId: string, scope: BoardScope, projectRoot: string) => void
   /** Remove any board message (force soft-delete; recoverable from trash). */
   deleteMessage: (key: string, messageId: string) => void
+  /** Edit a message's text in place (e.g. rename a goal). */
+  editMessage: (key: string, messageId: string, text: string) => void
 
   // GAP 4 — management actions + transient search overlay state.
   searchResults: Message[] | null
@@ -276,6 +279,17 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       return { boards: { ...s.boards, [key]: arr.filter((x) => x.id !== messageId) } }
     })
     apiDelete(messageId, true).catch(() => { /* best-effort */ })
+  },
+
+  editMessage: (key, messageId, text) => {
+    // Optimistic in-place text update; the board reload reconciles. The id is
+    // preserved server-side so a goal keeps its task links.
+    set((s) => {
+      const arr = s.boards[key] || []
+      if (!arr.some((x) => x.id === messageId)) return s
+      return { boards: { ...s.boards, [key]: arr.map((x) => x.id === messageId ? { ...x, text } : x) } }
+    })
+    apiEditMessage(messageId, text).catch(() => { /* best-effort */ })
   },
 
   searchResults: null,

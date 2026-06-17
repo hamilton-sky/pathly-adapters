@@ -1,30 +1,25 @@
 import { useRef, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useFocusTrap } from '../../../hooks/useFocusTrap'
-import s from './NewFeatureModal.module.css'
+import { useFocusTrap } from '../../../../hooks/useFocusTrap'
+import s from '../../../CommandCenter/NewFeatureModal/NewFeatureModal.module.css'
 
-export interface NewFeatureModalProps {
+export interface NewGoalModalProps {
   onCancel: () => void
-  onCreate: (topic: string, description: string) => void
+  onCreate: (text: string) => void
 }
 
-function slugify(raw: string): string {
-  return raw
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-export function NewFeatureModal({ onCancel, onCreate }: NewFeatureModalProps) {
+// Create-goal dialog — same shell as the New feature modal (Title + optional
+// Description), minus the slug/executor. Submitting posts a type='goal' message;
+// the goal then offers Decompose → Run. Title is the goal statement; a description,
+// if given, is appended as a second paragraph.
+export function NewGoalModal({ onCancel, onCreate }: NewGoalModalProps) {
   const boxRef = useRef<HTMLDivElement>(null)
   useFocusTrap(boxRef)
 
   const [title, setTitle] = useState('')
   const [desc, setDesc]   = useState('')
 
-  const topic = slugify(title)
-  const canCreate = topic.length > 0
+  const canCreate = title.trim().length > 0
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
@@ -37,7 +32,8 @@ export function NewFeatureModal({ onCancel, onCreate }: NewFeatureModalProps) {
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault()
     if (!canCreate) return
-    onCreate(topic, desc.trim())
+    const d = desc.trim()
+    onCreate(d ? `${title.trim()}\n\n${d}` : title.trim())
   }
 
   return createPortal(
@@ -49,31 +45,28 @@ export function NewFeatureModal({ onCancel, onCreate }: NewFeatureModalProps) {
         ref={boxRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="new-feature-title"
+        aria-labelledby="new-goal-title"
         className={s.box}
       >
-        <p id="new-feature-title" className={s.heading}>New feature</p>
+        <p id="new-goal-title" className={s.heading}>New goal</p>
 
         <form onSubmit={handleSubmit} className={s.form}>
-          <label className={s.label} htmlFor="nf-title">Title <span className={s.req}>*</span></label>
+          <label className={s.label} htmlFor="ng-title">Goal <span className={s.req}>*</span></label>
           <input
-            id="nf-title"
+            id="ng-title"
             type="text"
             className={s.input}
-            placeholder="e.g. RTK token killer"
+            placeholder="e.g. Add OAuth login"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             autoComplete="off"
           />
-          {title.length > 0 && (
-            <p className={s.slug}>ID: <code>{topic || '…'}</code></p>
-          )}
 
-          <label className={s.label} htmlFor="nf-desc">Description <span className={s.opt}>(optional)</span></label>
+          <label className={s.label} htmlFor="ng-desc">Details <span className={s.opt}>(optional)</span></label>
           <textarea
-            id="nf-desc"
+            id="ng-desc"
             className={s.textarea}
-            placeholder="What is this feature about?"
+            placeholder="Any context the planner should know before decomposing?"
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             rows={3}

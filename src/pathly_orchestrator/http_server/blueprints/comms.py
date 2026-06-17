@@ -1243,6 +1243,40 @@ def comms_goals_decompose():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/edit", methods=["POST"])
+def comms_edit():
+    """Edit a message's text in place — used by the board UI to rename a goal.
+
+    Required body fields: message_id, text. The id is preserved so a goal keeps
+    its task links. Returns 200 {ok:true} on success, 404 if the message does not
+    exist.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import update_message_text as _update_text
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+
+        text = data.get("text", "")
+        if not isinstance(text, str) or not text.strip():
+            return jsonify({"error": "Field 'text' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        result = _update_text(conn, message_id, text.strip())
+        if result == "not_found":
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("comms_edit error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/delete", methods=["POST"])
 def comms_delete():
     """Retract (soft-delete) a message — only while no agent has read it.

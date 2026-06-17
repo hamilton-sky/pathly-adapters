@@ -9,7 +9,6 @@ import { CommandCenterHeader } from './CommandCenterHeader/CommandCenterHeader'
 import { FeatureSidebar } from './FeatureSidebar/FeatureSidebar'
 import { BoardSection } from './BoardSection/BoardSection'
 import { NewFeatureModal } from './NewFeatureModal/NewFeatureModal'
-import type { DefaultExecutor } from './NewFeatureModal/NewFeatureModal'
 import { ConfirmModal } from '../shared/ConfirmModal/ConfirmModal'
 import s from './CommandCenter.module.css'
 
@@ -53,7 +52,7 @@ export function CommandCenter() {
     cc.removeFeatureTab(topic)
   }, [archivePending, projectPath, store, cc])
 
-  const handleCreate = useCallback(async (topic: string, description: string, _executor: DefaultExecutor) => {
+  const handleCreate = useCallback(async (topic: string, description: string) => {
     setShowNewFeature(false)
     if (!projectPath) return
 

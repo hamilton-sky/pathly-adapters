@@ -264,6 +264,20 @@ export async function apiDelete(messageId: string, force = false): Promise<boole
   }
 }
 
+/** Edit a message's text in place (board UI — rename a goal). Returns true on 2xx. */
+export async function apiEditMessage(messageId: string, text: string): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/comms/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId, text }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 // ── GAP 2: resolve → FSM decision gate ───────────────────────────────
 export async function apiRunnerDecision(topic: string, decision: string): Promise<boolean> {
   try {
