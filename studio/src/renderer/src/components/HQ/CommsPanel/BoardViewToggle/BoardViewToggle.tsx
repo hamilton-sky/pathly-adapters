@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { MessageSquare, ListTree, FileText } from 'lucide-react'
 import s from './BoardViewToggle.module.css'
 
@@ -12,11 +13,13 @@ const VIEWS: Array<{ id: BoardView; label: string; icon: JSX.Element }> = [
 interface Props {
   view: BoardView
   onChange: (v: BoardView) => void
+  /** Per-view action rendered right-aligned in the toggle row (e.g. "+ New goal"). */
+  rightAction?: ReactNode
 }
 
 // Segmented control under the search bar that switches the board's content
 // between the message thread, the goal/task DAG, and the artifact list.
-export function BoardViewToggle({ view, onChange }: Props): JSX.Element {
+export function BoardViewToggle({ view, onChange, rightAction }: Props): JSX.Element {
   return (
     <div className={s.row}>
       <div className={s.seg} role="tablist" aria-label="Board view">
@@ -35,8 +38,8 @@ export function BoardViewToggle({ view, onChange }: Props): JSX.Element {
           </button>
         ))}
       </div>
-      {/* Right action slot — per-view actions (e.g. "+ New goal") land here later. */}
-      <div className={s.actions} />
+      {/* Right action slot — per-view actions (e.g. "+ New goal"). */}
+      <div className={s.actions}>{rightAction}</div>
     </div>
   )
 }

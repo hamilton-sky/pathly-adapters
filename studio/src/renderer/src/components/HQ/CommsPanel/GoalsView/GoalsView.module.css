@@ -183,16 +183,9 @@
   padding: 2px 0;
 }
 
-/* ── New goal control (top-right of the view) ───────────── */
+/* ── New goal control (lives in the board view-toggle row, top right) ──── */
 /* Matches the header's "New feature" button (.ctl .newFeature): squared
    corners, accent text + border. */
-.viewHeader {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
 .newGoalBtn {
   display: inline-flex;
   align-items: center;

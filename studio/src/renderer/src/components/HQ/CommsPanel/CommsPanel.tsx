@@ -7,6 +7,7 @@ import { SearchBar } from './SearchBar/SearchBar'
 import { SingleAgentButton } from './SingleAgentButton/SingleAgentButton'
 import { BoardViewToggle, type BoardView } from './BoardViewToggle/BoardViewToggle'
 import { GoalsView } from './GoalsView/GoalsView'
+import { NewGoalButton } from './GoalsView/NewGoalButton'
 import { ArtifactsView } from './ArtifactsView/ArtifactsView'
 import { useCommsPanel } from './hooks/useCommsPanel'
 import { useStore } from '../../../store'
@@ -78,7 +79,13 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   return (
     <>
       <SearchBar value={searchTerm} onSearch={runSearch} onClear={clearSearch} />
-      <BoardViewToggle view={boardView} onChange={setBoardView} />
+      <BoardViewToggle
+        view={boardView}
+        onChange={setBoardView}
+        rightAction={boardView === 'goals'
+          ? <NewGoalButton onCreate={(text) => post('goal', text)} />
+          : undefined}
+      />
 
       {boardView === 'messages' && (
         <CommsMsgList
@@ -96,7 +103,6 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
       {boardView === 'goals' && (
         <GoalsView
           messages={messages}
-          onCreateGoal={(text) => post('goal', text)}
           onEditGoal={(goalId, text) => editMessage(goalId, text)}
         />
       )}
