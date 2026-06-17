@@ -465,30 +465,37 @@ def get_ready_tasks(
     conn: sqlite3.Connection,
     boards: list[str],
     scopes: list[str],
+    goal_id: str | None = None,
 ) -> list[dict]:
     """Return task messages where every depends_on ID has task_status='done'.
-    A task with depends_on=NULL or depends_on='[]' is always ready if pending."""
+    A task with depends_on=NULL or depends_on='[]' is always ready if pending.
+
+    When goal_id is given, the frontier is scoped to that goal's tasks only — the
+    Phase-1 dispatcher uses this so one goal's loop drains only its own DAG (a
+    scope may hold several goals). None-default keeps the board+scope behavior."""
     if not boards or not scopes:
         return []
     board_ph = ",".join("?" * len(boards))
     scope_ph = ",".join("?" * len(scopes))
+    goal_clause = " AND goal_id=?" if goal_id is not None else ""
+    goal_param = [goal_id] if goal_id is not None else []
     pending_sql = (
         "SELECT * FROM comms_messages "
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
-        "AND type='task' AND task_status='pending' AND deleted_at IS NULL"
+        f"AND type='task' AND task_status='pending' AND deleted_at IS NULL{goal_clause}"
     )
     pending_rows = conn.execute(
-        pending_sql, list(boards) + list(scopes)
+        pending_sql, list(boards) + list(scopes) + goal_param
     ).fetchall()
 
     done_sql = (
         "SELECT id FROM comms_messages "
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
-        "AND type='task' AND task_status='done' AND deleted_at IS NULL"
+        f"AND type='task' AND task_status='done' AND deleted_at IS NULL{goal_clause}"
     )
     done_ids = {
         r["id"]
-        for r in conn.execute(done_sql, list(boards) + list(scopes)).fetchall()
+        for r in conn.execute(done_sql, list(boards) + list(scopes) + goal_param).fetchall()
     }
 
     ready = []

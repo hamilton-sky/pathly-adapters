@@ -125,3 +125,34 @@ def test_task_without_goal_fields_is_back_compat(client):
     assert row["executor"] is None
     # The DAG frontier still picks it up — unchanged by the new columns.
     assert row["task_status"] == "pending"
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 — get_ready_tasks goal_id filter (one scope, two goals)
+# ---------------------------------------------------------------------------
+
+def test_get_ready_tasks_filters_by_goal():
+    """With two goals sharing a scope, the frontier is per-goal when goal_id is given."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms import get_ready_tasks, post_message
+
+    conn = get_db()
+    scope = "ge_two_goals"
+    g1 = post_message(conn, board="feature", scope=scope, from_agent="planner",
+                      type="goal", text="Goal 1", executor="single")
+    g2 = post_message(conn, board="feature", scope=scope, from_agent="planner",
+                      type="goal", text="Goal 2", executor="loop")
+    t1 = post_message(conn, board="feature", scope=scope, from_agent="planner",
+                      type="task", text="g1 task", goal_id=g1)
+    t2 = post_message(conn, board="feature", scope=scope, from_agent="planner",
+                      type="task", text="g2 task", goal_id=g2)
+
+    # Unfiltered: both tasks are ready (board+scope behavior, unchanged).
+    all_ready = {r["id"] for r in get_ready_tasks(conn, boards=["feature"], scopes=[scope])}
+    assert {t1, t2} <= all_ready
+
+    # Filtered to goal 1: only goal 1's task.
+    g1_ready = {r["id"] for r in
+                get_ready_tasks(conn, boards=["feature"], scopes=[scope], goal_id=g1)}
+    assert t1 in g1_ready
+    assert t2 not in g1_ready
