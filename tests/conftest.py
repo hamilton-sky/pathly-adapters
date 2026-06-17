@@ -58,3 +58,28 @@ def _isolate_db(tmp_path, monkeypatch):
     with _conn_mod._write_locks_meta:
         _conn_mod._write_locks.clear()
     _conn_mod._init_once_done = False
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Clear the module-level per-IP rate-limit counters around each test.
+
+    `middleware._rate_counters` is a global deque keyed by client IP and is NOT
+    reset between tests; rate limiting is on by default (PATHLY_FF_RATE_LIMITING
+    defaults True). A large test group (e.g. all tests/test_comms_*) therefore
+    accumulates >120 requests per IP inside the 60s window and every later request
+    429s — which made write_perm/tasks_claim_fail pass alone but fail in the group.
+    Clearing per test fixes that; the dedicated rate-limit tests in test_http_server
+    still trip the limit because they make their own 120+ requests after this reset.
+    """
+    def _clear():
+        try:
+            from pathly_orchestrator.http_server import middleware as _mw
+            with _mw._rate_lock:
+                _mw._rate_counters.clear()
+        except Exception:
+            pass
+
+    _clear()
+    yield
+    _clear()
