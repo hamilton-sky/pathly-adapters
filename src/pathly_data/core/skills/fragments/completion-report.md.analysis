@@ -1,0 +1,65 @@
+## Summary
+
+`completion-report.md` is a reusable prompt fragment that instructs a stage agent how to compute and write an `AGENT_DONE` event — covering wall-time, token aggregation, cost estimation, HTTP-first event write with DB/JSONL fallback, and activity-log posting — before returning control to the orchestrator.
+
+---
+
+## Strengths
+
+- **Clear numbered flow.** Five sequential steps with concrete bash/Python commands leave little room for ordering mistakes.
+- **Resilient write chain.** HTTP → DB → JSONL fallback is well-implemented; agents in offline or degraded environments will still record the event.
+- **Explicit "do not invoke a skill" guard** on step 4 prevents a common mis-invocation pattern.
+- **Placeholder legend** at the end (lines 105–113) gives agents a quick reference without requiring them to re-read the body.
+- **schema_version: 1** in the event body makes future migrations tractable.
+
+---
+
+## Gaps & Ambiguities
+
+- **`BUILD_START` is undefined.** Step 1 references `BUILD_START` but never explains where the agent gets this value. Is it an environment variable, a value the agent must record at the top of the skill, or something the runner injects? Without this the wall-time computation always fails silently.
+
+- **Cost formula is a known underestimate and will drift.** The 80/20 input/output split is a coarse heuristic, and the pricing table will go stale as Anthropic changes rates. More critically, the stop-telemetry hook (`stop_telemetry.py`) patches this field with the real API cost after the session ends — meaning the `cost_usd` emitted here is always preliminary. The fragment never says this, so downstream readers (Studio, dashboards) may treat the in-event value as authoritative. **This is the root cause of the telemetry cost mismatch the user noted** — the formula does not produce the correct cost; the patched value from the stop hook is the correct one.
+
+- **`<usage>` block format is unspecified.** Step 2 tells the agent to parse `subagent_tokens:` and `tool_uses:` lines from `<usage>` blocks, but the exact structure of those blocks is never shown. Agents parsing from memory will produce inconsistent results across models.
+
+- **`duration_ms = 0 if absent`** is mentioned in step 2 but `duration_ms` never appears in the event schema — the schema uses `wall_seconds`. This ghost field creates confusion.
+
+- **`CONV_N = 0` convention is unexplained.** The instruction "0 for non-build stages" is an implicit convention not documented elsewhere in the fragment.
+
+- **`<feature>` placeholder behaviour outside runner mode.** The fragment notes the runner pre-substitutes `<feature>`, but if this fragment is rendered in interactive mode (e.g., `/pathly build` typed by the user), the literal string `<feature>` lands in the command and the write silently targets the wrong path.
+
+---
+
+## Redundancies
+
+- **Double JSONL write.** The fallback block (lines 69–80) already writes to `EVENTS.jsonl` when the DB is unreachable. The unconditional `# Always dual-write` block (lines 82–87) writes to the same file regardless of HTTP/DB success, producing duplicate entries when the primary path succeeds.
+
+- **Placeholder legend restates steps 1–3.** `TOTAL_TOKENS`, `TOOL_USES`, `COST_USD`, and `WALL_SECONDS` are already fully explained inline. The legend adds value only for `AGENT_ROLE`, `MODEL_ID`, and `SUMMARY_SENTENCE`; the rest is restatement.
+
+- **Steps 4 and 5 report the same data to two endpoints** with no explanation of the difference. Agents may skip step 5 assuming step 4 covered it, or execute both and wonder about the duplication.
+
+---
+
+## Suggested Improvements
+
+1. **(High) Add a prominent cost-accuracy notice.** Insert a callout after the pricing table: "This estimate will be overwritten by the stop-telemetry hook with the real API cost — treat `cost_usd` here as a placeholder, not an accurate figure." This directly fixes the telemetry display mismatch in Studio.
+
+2. **(High) Define `BUILD_START`.** Add a line at the very top of the fragment: "Record `BUILD_START=$(python3 -c "import time; print(int(time.time()))")` before any subagent work begins." Without this, step 1 is broken for every invocation.
+
+3. **(Medium) Show a minimal `<usage>` block example.** Add a 4-line example of what a subagent tool result looks like (with `subagent_tokens:` and `tool_uses:` lines) so parsers are consistent.
+
+4. **(Medium) Remove the unconditional dual-write block (lines 82–87).** The fallback already handles JSONL. The dual-write creates duplicates and contradicts the "DB-primary" comment on the fallback. If a backup copy is desired, the comment should explain the intent (audit log vs. authoritative log).
+
+5. **(Medium) Clarify or deduplicate steps 4 and 5.** Add one sentence explaining what `record-activity` does differently from `/runner/event` (e.g., "step 5 records to the activity feed visible in Studio HQ; step 4 records to the FSM event log that gates state transitions — both are required").
+
+6. **(Low) Remove `duration_ms` mention** from step 2 or replace it with `wall_seconds` to match the actual schema.
+
+7. **(Low) Guard `<feature>` in interactive mode.** Add a note: "If `<feature>` appears literally in the rendered prompt, abort and ask the runner to re-inject the feature name before proceeding."
+
+---
+
+## Token Estimate
+
+The fragment renders to approximately **650–750 tokens** (body prose + pricing table + Python block + bash block + placeholder legend). This is on the heavy side for a reporting step — the Python block alone accounts for ~300 tokens. Given that this fragment is appended to every stage skill that calls it, the cost is recurring and cumulative. A reasonable target would be ~350–400 tokens: the pricing table and placeholder legend could be trimmed to inline references, and the Python block could be reduced by removing the comments (which are agent-facing prose, not executable guards).
+
+**Critical token-accuracy note:** The `cost_usd` computed by the formula in this fragment is *not* the value Pathly uses for telemetry display. The stop-telemetry hook (`src/pathly_hooks/stop_telemetry.py`) fires after the Claude Code session ends, reads real usage from the session payload, and patches the `AGENT_DONE` event with the actual API cost. The in-fragment estimate will systematically deviate from the real cost because (a) the 80/20 split rarely matches the true input/output ratio for code-generation tasks (which skew output-heavy), and (b) the hardcoded rates lag Anthropic pricing changes. Studio should always prefer the patched value; the fragment's value is only useful before the stop hook fires.
