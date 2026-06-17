@@ -207,6 +207,19 @@
   background: var(--accent-bg);
 }
 
+.newGoalLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapse to icon-only when the board view-toggle row (the size container in
+   BoardViewToggle) is narrow — keeps the accessible name via the tooltip. */
+@container (max-width: 400px) {
+  .newGoalLabel { display: none; }
+  .newGoalBtn { gap: 0; padding: 0 8px; }
+}
+
 /* ── Editable goal title ────────────────────────────────── */
 .titleView {
   display: flex;

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Pencil, Check, X } from 'lucide-react'
+import { Tooltip } from '../../../ui'
 import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import s from './GoalsView.module.css'
 
@@ -42,15 +43,16 @@ export function EditableGoalTitle({ text, onSave }: Props): JSX.Element {
   return (
     <div className={s.titleView}>
       <MarkdownRenderer content={text} className={s.goalText} />
-      <button
-        type="button"
-        className={s.titleEditBtn}
-        onClick={() => { setDraft(text); setEditing(true) }}
-        aria-label="Edit goal title"
-        title="Edit goal title"
-      >
-        <Pencil size={12} />
-      </button>
+      <Tooltip label="Edit goal" placement="top">
+        <button
+          type="button"
+          className={s.titleEditBtn}
+          onClick={() => { setDraft(text); setEditing(true) }}
+          aria-label="Edit goal title"
+        >
+          <Pencil size={12} />
+        </button>
+      </Tooltip>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { MessageSquare, ListTree, FileText } from 'lucide-react'
+import { Tooltip } from '../../../ui'
 import s from './BoardViewToggle.module.css'
 
 export type BoardView = 'messages' | 'goals' | 'artifacts'
@@ -24,18 +25,19 @@ export function BoardViewToggle({ view, onChange, rightAction }: Props): JSX.Ele
     <div className={s.row}>
       <div className={s.seg} role="tablist" aria-label="Board view">
         {VIEWS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            role="tab"
-            className={s.segBtn}
-            {...(view === v.id ? { 'data-on': '' } : {})}
-            {...(view === v.id ? { 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
-            onClick={() => onChange(v.id)}
-          >
-            {v.icon}
-            <span className={s.segLabel}>{v.label}</span>
-          </button>
+          <Tooltip key={v.id} label={v.label} placement="bottom">
+            <button
+              type="button"
+              role="tab"
+              className={s.segBtn}
+              {...(view === v.id ? { 'data-on': '' } : {})}
+              {...(view === v.id ? { 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
+              onClick={() => onChange(v.id)}
+            >
+              {v.icon}
+              <span className={s.segLabel}>{v.label}</span>
+            </button>
+          </Tooltip>
         ))}
       </div>
       {/* Right action slot — per-view actions (e.g. "+ New goal"). */}

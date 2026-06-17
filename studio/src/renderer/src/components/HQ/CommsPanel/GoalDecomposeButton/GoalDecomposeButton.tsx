@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Boxes } from 'lucide-react'
+import { Tooltip } from '../../../ui'
 import { useCommsStore } from '../../../../store/commsStore'
 import type { DecomposeMode } from '../../../../store/commsApi'
 import s from './GoalDecomposeButton.module.css'
@@ -45,17 +46,19 @@ export function GoalDecomposeButton({ goalId }: Props): JSX.Element {
           <option key={m} value={m}>{MODE_LABELS[m]}</option>
         ))}
       </select>
-      <button
-        type="button"
-        className={s.btn}
-        data-state={runState !== 'idle' ? runState : undefined}
-        disabled={runState === 'running'}
-        aria-label={`Decompose goal with the ${mode}`}
-        onClick={() => decomposeGoal(goalId, mode)}
-      >
-        <Boxes size={11} />
-        <span className={s.label}>{LABEL[runState]}</span>
-      </button>
+      <Tooltip label="Decompose goal" description="Turn this goal into a task DAG the executors can run" placement="top">
+        <button
+          type="button"
+          className={s.btn}
+          data-state={runState !== 'idle' ? runState : undefined}
+          disabled={runState === 'running'}
+          aria-label={`Decompose goal with the ${mode}`}
+          onClick={() => decomposeGoal(goalId, mode)}
+        >
+          <Boxes size={11} />
+          <span className={s.label}>{LABEL[runState]}</span>
+        </button>
+      </Tooltip>
     </div>
   )
 }

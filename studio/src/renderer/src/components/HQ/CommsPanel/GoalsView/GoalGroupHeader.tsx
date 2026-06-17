@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Message } from '../../../CommandCenter/types'
+import { Tooltip } from '../../../ui'
 import { GoalRunButton } from '../GoalRunButton/GoalRunButton'
 import { GoalDecomposeButton } from '../GoalDecomposeButton/GoalDecomposeButton'
 import { EditableGoalTitle } from './EditableGoalTitle'
@@ -21,15 +22,17 @@ export function GoalGroupHeader({ goal, tasks, open, onToggle, onEditGoal }: Pro
   const r = computeRollup(tasks)
   return (
     <div className={s.header}>
-      <button
-        type="button"
-        className={s.collapse}
-        onClick={onToggle}
-        {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-        aria-label={open ? 'Collapse goal' : 'Expand goal'}
-      >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-      </button>
+      <Tooltip label={open ? 'Collapse goal' : 'Expand goal'} placement="top">
+        <button
+          type="button"
+          className={s.collapse}
+          onClick={onToggle}
+          {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+          aria-label={open ? 'Collapse goal' : 'Expand goal'}
+        >
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+      </Tooltip>
       <div className={s.headerMain}>
         <EditableGoalTitle text={goal.text} onSave={(t) => onEditGoal(goal.id, t)} />
         <div className={s.rollup}>
