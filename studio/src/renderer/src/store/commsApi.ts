@@ -419,6 +419,48 @@ export async function apiStopBoard(board: string, scope: string): Promise<boolea
   }
 }
 
+// ── Board-scoped flow run (footer launcher → /runner/start) ──────────
+
+export interface StartFlowOpts {
+  projectRoot?: string
+  interactive?: boolean
+  maxIterations?: number
+  maxCostUsd?: number
+  model?: string
+}
+
+/**
+ * Launch a board-scoped pipeline run — a flow that does NOT depend on a goal/DAG
+ * (debug, quick-fix, explore, test, team). `topic` is the board's feature/scope.
+ * Body mirrors the FlowControlBar Start button so stages spawn as terminals the
+ * same way. Returns { ok, busy } — busy=true when a run for that topic is active.
+ */
+export async function apiStartFlow(
+  topic: string,
+  flow: string,
+  opts: StartFlowOpts = {},
+): Promise<{ ok: boolean; busy?: boolean }> {
+  try {
+    const r = await apiFetch('/runner/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic,
+        flow,
+        project_root: opts.projectRoot ?? '',
+        max_iterations: opts.maxIterations ?? 50,
+        max_cost_usd: opts.maxCostUsd ?? 10,
+        interactive: opts.interactive ?? true,
+        ...(opts.model ? { model: opts.model } : {}),
+      }),
+    })
+    if (r.status === 409) return { ok: false, busy: true }
+    return { ok: r.ok }
+  } catch {
+    return { ok: false }
+  }
+}
+
 // ── Goal DAG run ─────────────────────────────────────────────────────
 
 export interface RunGoalResult {

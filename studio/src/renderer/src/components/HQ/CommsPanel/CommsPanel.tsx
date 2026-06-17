@@ -9,6 +9,8 @@ import { BoardViewToggle, type BoardView } from './BoardViewToggle/BoardViewTogg
 import { GoalsView } from './GoalsView/GoalsView'
 import { ArtifactsView } from './ArtifactsView/ArtifactsView'
 import { useCommsPanel } from './hooks/useCommsPanel'
+import { useStore } from '../../../store'
+import { apiStartFlow } from '../../../store/commsApi'
 import s from './CommsPanel.module.css'
 
 // Which chips each panel type shows, and their default on/off state.
@@ -34,6 +36,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
   const [composeText, setComposeText] = useState('')
   const [boardView, setBoardView] = useState<BoardView>('messages')
+  const projectPath = useStore((st) => st.projectPath)
 
   const boardKey = scope === 'feature' ? mainFeature : scope
 
@@ -47,6 +50,13 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
     const t = (message ?? '').trim()
     if (t) post('nudge', t)
     runSingleAgent({ ...config, instructions: t || undefined })
+  }
+
+  // Run a board-scoped flow (not tied to a goal/DAG) on this board's topic. The
+  // runner spawns each stage as a terminal — same path as the Start button.
+  const handleRunFlow = (flow: string, opts: { interactive: boolean }): void => {
+    const projectRoot = projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    void apiStartFlow(boardKey, flow, { projectRoot, interactive: opts.interactive })
   }
   // Independent per-panel reads — only used for project/global panels.
   // Feature panel reads are authoritative from feature.scope.
@@ -107,7 +117,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
               </button>
             )
           })}
-          <SingleAgentButton boardKey={boardKey} onRun={handleRunAgent} />
+          <SingleAgentButton boardKey={boardKey} onRun={handleRunAgent} onRunFlow={handleRunFlow} />
         </div>
         <CommsInput
           scope={scope}

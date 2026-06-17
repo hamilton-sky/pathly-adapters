@@ -1,82 +1,44 @@
 import { useState, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Settings, Square, X, Send } from 'lucide-react'
+import { Settings, Square, X, Bot, GitBranch } from 'lucide-react'
 import { useCommsStore } from '../../../../store/commsStore'
-import { useStore } from '../../../../store'
-import { AGENTS, SKILLS } from '../../../Monitor/ConfigurePhaseModal/configurePhaseModalData'
-import { useAgentCatalog, useSkillCatalog } from '../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
+import { AgentForm, type SingleAgentConfig } from './AgentForm'
+import { FlowForm } from './FlowForm'
 import s from './SingleAgentButton.module.css'
 
-export interface SingleAgentConfig {
-  agent?: string
-  skill?: string
-  systemPrompt?: string
-  interactive?: boolean
-  /** Which CLI to spawn. */
-  adapter?: string
-  /** How often a headless agent posts progress to the board. */
-  progress?: string
-  /** The prompt typed in the modal — posted to the board and sent to the agent. */
-  message?: string
-}
-
-// Engines that can run a board agent (have a headless command on the backend).
-const ENGINES: { value: string; label: string }[] = [
-  { value: 'claude', label: 'Claude' },
-  { value: 'codex', label: 'Codex' },
-]
-
-// How chatty a headless run is on the board. Headless-only: in interactive mode
-// the human watches the live terminal, so board narration is redundant.
-const PROGRESS_LEVELS: { value: string; label: string }[] = [
-  { value: 'quiet', label: 'Quiet — start + result only' },
-  { value: 'normal', label: 'Normal — key steps' },
-  { value: 'verbose', label: 'Verbose — every step' },
-]
+export type { SingleAgentConfig }
 
 interface Props {
   /** Board key: feature id, 'project', or 'global'. */
   boardKey: string
   /** Post the modal message to the board, then run the configured agent on it. */
   onRun: (cfg: SingleAgentConfig) => void
+  /** Launch a board-scoped flow (debug, quick-fix, explore, test, team) on this board. */
+  onRunFlow: (flow: string, opts: { interactive: boolean }) => void
 }
 
 type RunState = 'idle' | 'running' | 'busy' | 'done'
+type Mode = 'agent' | 'flow'
 
 const RUN_HINT: Record<RunState, string> = {
-  idle: 'Agent',
+  idle: 'Run',
   running: 'Running…',
   busy: 'Board busy',
   done: 'Done',
 }
 
-// Fixed starter system-prompt presets (user-editable presets are a follow-up).
-const SYSTEM_PROMPTS: { name: string; prompt: string }[] = [
-  { name: 'Summarizer', prompt: 'Summarize the request concisely. Be terse and factual.' },
-  { name: 'Code reviewer', prompt: 'Review the referenced code for bugs, security issues, and edge cases. Report findings only — do not edit files.' },
-  { name: 'Researcher', prompt: 'Research the topic, cite sources, and report what you found and what is uncertain.' },
-  { name: 'Explainer', prompt: 'Explain clearly and simply, with a short concrete example.' },
-  { name: 'Planner', prompt: 'Break the request into a short ordered list of concrete steps.' },
-]
-
 /**
- * Single-agent control on the board's Reads row: [⚙ Agent │ ⏹ Stop].
+ * Run control on the board's Reads row: [⚙ Run │ ⏹ Stop].
  *
- * The ⚙ button opens a compose dialog that holds BOTH the configuration
- * (engine · agent · skill · system prompt · mode) and the message box. Clicking
- * "Send to agent" posts the message to the board AND runs the configured agent
- * on it. The board's own input box is unrelated — it just adds a board note and
- * never triggers an agent.
+ * The ⚙ button opens a dialog with two modes:
+ *  - Single agent — configure + send one prompt to one agent (board-scoped /comms/run).
+ *  - Flow — pick a board-scoped flow, preview it, and run the whole pipeline (/runner/start).
+ *
+ * Neither depends on a goal or task DAG — that's the goal card's Decompose/Run.
  */
-export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
+export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
-  const [engine, setEngine] = useState<string>('claude')
-  const [agent, setAgent] = useState<string>('')
-  const [skill, setSkill] = useState<string>('')
-  const [sysName, setSysName] = useState<string>('')   // '' = none
-  const [interactive, setInteractive] = useState(false)
-  const [progress, setProgress] = useState<string>('normal')
-  const [message, setMessage] = useState<string>('')
+  const [mode, setMode] = useState<Mode>('agent')
 
   const stopBoard = useCommsStore((st) => st.stopBoard)
   const boardRunState = useCommsStore((st) => st.boardRunState)
@@ -84,38 +46,10 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
   const running = runState === 'running'
   const active = runState === 'running' || runState === 'busy'
 
-  // Full agent/skill lists from the real core/ dirs (fall back to common picks).
-  const projectPath = useStore((st) => st.projectPath)
-  const agentCatalog = useAgentCatalog(projectPath)
-  const skillCatalog = useSkillCatalog(projectPath)
-  const agentOptions = agentCatalog.length ? agentCatalog.map((i) => i.name) : [...AGENTS]
-  const skillOptions = skillCatalog.length ? skillCatalog.map((i) => i.name) : [...SKILLS]
-
-  // A run needs something to act on: a typed message, a skill (which encodes the
-  // task), or a system prompt (a directive). The agent/engine alone is just a
-  // role — not enough on its own. Any one of the three enables Send.
-  const canSend = !running && (message.trim().length > 0 || skill !== '' || sysName !== '')
-
-  function send(): void {
-    if (!canSend) return
-    const sys = SYSTEM_PROMPTS.find((p) => p.name === sysName)?.prompt
-    onRun({
-      adapter: engine,
-      agent: agent || undefined,
-      skill: skill || undefined,
-      systemPrompt: sys,
-      interactive,
-      // Progress cadence only applies headless — interactive shows the terminal.
-      progress: interactive ? undefined : progress,
-      message: message.trim(),
-    })
-    setMessage('')
-    setOpen(false)
-  }
-
   function backdrop(e: MouseEvent<HTMLDivElement>): void {
     if (e.target === e.currentTarget) setOpen(false)
   }
+  const close = (): void => setOpen(false)
 
   return (
     <div className={s.row}>
@@ -124,8 +58,8 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
           type="button"
           className={s.startBtn}
           data-state={runState !== 'idle' ? runState : undefined}
-          title="Configure and send a message to one agent"
-          aria-label="Configure and run one agent on this board"
+          title="Run an agent or a flow on this board"
+          aria-label="Run an agent or a flow on this board"
           {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
           onClick={() => setOpen(true)}
         >
@@ -146,109 +80,40 @@ export function SingleAgentButton({ boardKey, onRun }: Props): JSX.Element {
 
       {open && createPortal(
         <div className={s.backdrop} onClick={backdrop}>
-          <div className={s.modal} role="dialog" aria-modal="true" aria-label="Send a message to an agent">
+          <div className={s.modal} role="dialog" aria-modal="true" aria-label="Run on this board">
             <header className={s.header}>
               <Settings size={15} className={s.headerIcon} />
-              <span className={s.title}>Send to an agent</span>
+              <span className={s.title}>Run on this board</span>
               <span className={s.spacer} />
-              <button type="button" className={s.closeBtn} onClick={() => setOpen(false)} aria-label="Close">
+              <button type="button" className={s.closeBtn} onClick={close} aria-label="Close">
                 <X size={14} />
               </button>
             </header>
 
-            <div className={s.body}>
-              <label className={s.label} htmlFor="sa-message">Message <span className={s.optional}>· optional if you pick a skill or system prompt</span></label>
-              <textarea
-                id="sa-message"
-                className={s.textarea}
-                placeholder="What should the agent do? Posted to the board and sent to the agent. Optional if a skill or system prompt is set."
-                value={message}
-                onChange={(e) => setMessage(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send() }
-                }}
-              />
-
-              <label className={s.label} htmlFor="sa-engine">Engine</label>
-              <select id="sa-engine" className={s.select} value={engine} onChange={(e) => setEngine(e.currentTarget.value)}>
-                {ENGINES.map((en) => <option key={en.value} value={en.value}>{en.label}</option>)}
-              </select>
-
-              <label className={s.label} htmlFor="sa-agent">Agent</label>
-              <select id="sa-agent" className={s.select} value={agent} onChange={(e) => setAgent(e.currentTarget.value)}>
-                <option value="">— none —</option>
-                {agentOptions.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-
-              <label className={s.label} htmlFor="sa-skill">Skill</label>
-              <select id="sa-skill" className={s.select} value={skill} onChange={(e) => setSkill(e.currentTarget.value)}>
-                <option value="">— none —</option>
-                {skillOptions.map((sk) => <option key={sk} value={sk}>{sk}</option>)}
-              </select>
-
-              <label className={s.label} htmlFor="sa-sys">System prompt</label>
-              <select id="sa-sys" className={s.select} value={sysName} onChange={(e) => setSysName(e.currentTarget.value)}>
-                <option value="">— none —</option>
-                {SYSTEM_PROMPTS.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
-              </select>
-
-              <span className={s.label}>Mode</span>
-              <div className={s.modeRow} role="radiogroup" aria-label="Run mode">
-                <button
-                  type="button"
-                  className={s.modeBtn}
-                  {...(!interactive ? { 'data-on': '' } : {})}
-                  {...(!interactive ? { 'aria-checked': 'true' } : { 'aria-checked': 'false' })}
-                  role="radio"
-                  onClick={() => setInteractive(false)}
-                >
-                  Headless
-                </button>
-                <button
-                  type="button"
-                  className={s.modeBtn}
-                  {...(interactive ? { 'data-on': '' } : {})}
-                  {...(interactive ? { 'aria-checked': 'true' } : { 'aria-checked': 'false' })}
-                  role="radio"
-                  onClick={() => setInteractive(true)}
-                >
-                  Interactive
-                </button>
-              </div>
-              <p className={s.modeHint}>
-                {interactive
-                  ? 'Opens a live session and types the prompt for you — stays open for follow-ups.'
-                  : 'One-shot: runs the prompt and exits when done.'}
-              </p>
-
-              {!interactive && (
-                <>
-                  <label className={s.label} htmlFor="sa-progress">Board updates <span className={s.optional}>· how often the agent posts progress</span></label>
-                  <select id="sa-progress" className={s.select} value={progress} onChange={(e) => setProgress(e.currentTarget.value)}>
-                    {PROGRESS_LEVELS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </select>
-                </>
-              )}
-              <p className={s.modeHint}>
-                Sending posts your message to the board and runs the agent on it. The board’s own input box just adds a note — it doesn’t call an agent.
-              </p>
-            </div>
-
-            <footer className={s.footer}>
-              <span className={s.spacer} />
-              <button type="button" className={s.btnQuiet} onClick={() => setOpen(false)}>Cancel</button>
+            <div className={s.tabRow} role="tablist" aria-label="Run mode">
               <button
                 type="button"
-                className={s.btnRun}
-                onClick={send}
-                disabled={!canSend}
-                title={running
-                  ? 'An agent is already running on this board'
-                  : (!canSend ? 'Add a message, or pick a skill or system prompt' : undefined)}
+                className={s.tab}
+                role="tab"
+                {...(mode === 'agent' ? { 'data-on': '', 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
+                onClick={() => setMode('agent')}
               >
-                <Send size={12} /> Send to agent
+                <Bot size={13} /> Single agent
               </button>
-            </footer>
+              <button
+                type="button"
+                className={s.tab}
+                role="tab"
+                {...(mode === 'flow' ? { 'data-on': '', 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
+                onClick={() => setMode('flow')}
+              >
+                <GitBranch size={13} /> Flow
+              </button>
+            </div>
+
+            {mode === 'agent'
+              ? <AgentForm running={running} onRun={onRun} onClose={close} />
+              : <FlowForm running={running} onRunFlow={onRunFlow} onClose={close} />}
           </div>
         </div>,
         document.body,
