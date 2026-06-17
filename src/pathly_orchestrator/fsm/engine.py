@@ -210,32 +210,66 @@ def evaluate_transition_rules(
     raise ValueError(f"No default transition defined for state: {current_state!r}")
 
 
-# 3-tier feedback escalation. A failure file routes up the chain as the same loop
-# keeps failing: the more it's retried, the more likely the root cause is upstream
-# (the plan/design/criteria), not the local fix.
-#   attempts 1–2: the file's OWNER (feedback_routing[file]) — e.g. the builder.
-#   attempt 3:    the upstream SPECIALIST (escalation_routing[file]) — planner/architect/po.
-#   attempt 4+:   the HUMAN.
-# Files with no escalation_routing entry (clarification requests, human files) never
-# tier — they always go to their owner. A flow without escalation_routing is unchanged.
-_ESCALATE_AT_ATTEMPT = 3
+# Feedback escalation. A failure file routes UP the chain as the same loop keeps
+# failing — the more it's retried, the more likely the root cause is upstream (the
+# plan/design/criteria), not the local fix. The flow's `escalation_routing` sets both
+# WHO handles each tier and WHEN it kicks in; below the first tier the OWNER handles
+# it; beyond the last tier the HUMAN does. A file with no escalation_routing entry
+# never tiers (clarification/human files); a flow with no escalation_routing is unchanged.
+_ESCALATE_AT_ATTEMPT = 3  # default attempt for a single-target (string) escalation
+
+
+def _normalize_tiers(spec) -> list[tuple[int, str]]:
+    """Normalize an escalation_routing value into sorted (attempt, role) tiers. Forms:
+      • "planner"                       → [(3, planner)]               (round 3, then human)
+      • ["planner", "architect"]        → [(3, planner), (4, architect)] (one per round from 3)
+      • [{at: 3, to: planner}, {at: 5, to: architect}]                 (explicit thresholds)
+    'after' is accepted as an alias for 'at', 'agent' for 'to'.
+    """
+    if isinstance(spec, str):
+        return [(_ESCALATE_AT_ATTEMPT, spec)]
+    tiers: list[tuple[int, str]] = []
+    if isinstance(spec, list):
+        for i, item in enumerate(spec):
+            if isinstance(item, str):
+                tiers.append((_ESCALATE_AT_ATTEMPT + i, item))
+            elif isinstance(item, dict):
+                at = item.get("at", item.get("after"))
+                to = item.get("to", item.get("agent"))
+                if isinstance(at, int) and isinstance(to, str):
+                    tiers.append((at, to))
+    tiers.sort(key=lambda t: t[0])
+    return tiers
 
 
 def _resolve_feedback_target(
     filename: str, base_agent: str, retry_count: int, escalation_routing: dict
 ) -> str:
-    """Map (feedback file, retry count) → the role that should handle it now."""
+    """Map (feedback file, retry count) → the role that should handle it now, per the
+    flow's escalation_routing tiers. Below the first tier → the owner; at/after each
+    tier's attempt → that tier's role; beyond the last tier → the human."""
     stem = filename[:-3] if filename.endswith(".md") else filename
     esc = escalation_routing or {}
-    specialist = esc.get(stem) or esc.get(filename)
-    if specialist is None:
+    spec = esc.get(stem)
+    if spec is None:
+        spec = esc.get(filename)
+    if spec is None:
+        return base_agent
+    tiers = _normalize_tiers(spec)
+    if not tiers:
         return base_agent
     attempt = (retry_count or 0) + 1
-    if attempt > _ESCALATE_AT_ATTEMPT:
+    if attempt < tiers[0][0]:
+        return base_agent
+    if attempt > tiers[-1][0]:
         return "human"
-    if attempt == _ESCALATE_AT_ATTEMPT:
-        return specialist
-    return base_agent
+    target = base_agent
+    for at, to in tiers:
+        if attempt >= at:
+            target = to
+        else:
+            break
+    return target
 
 
 def _read_retry_counts(storage_path: Path) -> dict[str, int]:

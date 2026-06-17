@@ -41,6 +41,32 @@ def test_no_escalation_routing_is_backward_compatible():
     assert _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 9, {}) == "builder"
 
 
+# ── rich tiers: flow author sets WHO and WHEN ────────────────────────────────
+
+def test_rich_list_of_roles_one_per_round():
+    """['planner','architect'] → round 3 planner, round 4 architect, round 5+ human."""
+    esc = {"REVIEW_FAILURES": ["planner", "architect"]}
+    assert _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 1, esc) == "builder"
+    assert _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 2, esc) == "planner"
+    assert _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 3, esc) == "architect"
+    assert _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 4, esc) == "human"
+
+
+def test_rich_explicit_thresholds():
+    """[{at:2,to:reviewer},{at:4,to:po}] — custom WHEN per tier."""
+    esc = {"TEST_FAILURES": [{"at": 2, "to": "reviewer"}, {"at": 4, "to": "po"}]}
+    assert _resolve_feedback_target("TEST_FAILURES.md", "builder", 0, esc) == "builder"   # attempt 1 < 2
+    assert _resolve_feedback_target("TEST_FAILURES.md", "builder", 1, esc) == "reviewer"  # attempt 2
+    assert _resolve_feedback_target("TEST_FAILURES.md", "builder", 2, esc) == "reviewer"  # attempt 3
+    assert _resolve_feedback_target("TEST_FAILURES.md", "builder", 3, esc) == "po"         # attempt 4
+    assert _resolve_feedback_target("TEST_FAILURES.md", "builder", 4, esc) == "human"      # attempt 5 > 4
+
+
+def test_after_and_agent_aliases():
+    esc = {"REVIEW_FAILURES": [{"after": 3, "agent": "architect"}]}
+    assert _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 2, esc) == "architect"
+
+
 # ── route_feedback integration ───────────────────────────────────────────────
 
 def test_route_feedback_escalates_with_injected_counts(tmp_path):
