@@ -73,6 +73,19 @@ def post_message(
     return message_id
 
 
+def set_goal_executor(conn: sqlite3.Connection, message_id: str, executor: str) -> None:
+    """Persist the chosen executor on a goal message (UI selector override).
+
+    Lets the board reflect the user's pick after a reload — the dispatcher reads
+    executor from the goal row, so persisting keeps that authoritative."""
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET executor=? WHERE id=? AND type='goal'",
+            (executor, message_id),
+        )
+        conn.commit()
+
+
 def get_messages(
     conn: sqlite3.Connection,
     board: str,

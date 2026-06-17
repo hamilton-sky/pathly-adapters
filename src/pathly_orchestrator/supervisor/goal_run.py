@@ -34,6 +34,7 @@ def _safe_call(fn: Optional[Callable], *args) -> None:
 def start_goal_run(
     goal_id: str,
     *,
+    executor_override: str | None = None,
     project_root: str = "",
     adapter: str = "claude",
     model: str = "",
@@ -47,8 +48,12 @@ def start_goal_run(
 ) -> dict:
     """Read the goal's executor and dispatch its DAG. Returns a dict with `ok` and,
     on failure, a `reason` the HTTP layer maps to a status code
-    (not_found→404, not_goal→400, board_busy→409, not_implemented→501)."""
+    (not_found→404, not_goal→400, board_busy→409, not_implemented→501).
+
+    executor_override (the UI selector) wins over the goal's stored executor and is
+    persisted back onto the goal so the board reflects the pick after a reload."""
     from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms import set_goal_executor
 
     conn = get_db()
     row = conn.execute(
@@ -67,7 +72,12 @@ def start_goal_run(
     board = row["board"] or "feature"
     scope = row["scope"] or ""
     goal_text = row["text"] or ""
-    executor = (row["executor"] or "single").strip().lower()
+    if executor_override and executor_override.strip():
+        executor = executor_override.strip().lower()
+        if executor != (row["executor"] or ""):
+            set_goal_executor(conn, goal_id, executor)  # persist the UI pick
+    else:
+        executor = (row["executor"] or "single").strip().lower()
 
     if executor == "single":
         return _run_single(

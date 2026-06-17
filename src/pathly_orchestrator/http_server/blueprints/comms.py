@@ -1086,6 +1086,12 @@ def comms_goals_run():
         if not isinstance(goal_id, str) or not goal_id.strip():
             return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
 
+        # executor override (the UI selector) — optional; wins over the goal's stored
+        # executor and is persisted by start_goal_run. Enum is routed downstream.
+        executor_override = data.get("executor")
+        if executor_override is not None and not isinstance(executor_override, str):
+            return jsonify({"error": "Field 'executor' must be a string or null"}), 400
+
         adapter = (data.get("adapter", "") or "claude")
         model = (data.get("model", "") or "")
         project_root = (data.get("project_root", "") or "")
@@ -1128,6 +1134,7 @@ def comms_goals_run():
 
         result = start_goal_run(
             goal_id,
+            executor_override=executor_override,
             project_root=project_root,
             adapter=adapter,
             model=model,

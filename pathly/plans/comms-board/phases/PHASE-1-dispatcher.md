@@ -13,7 +13,18 @@
 > - ✅ `POST /comms/goals/run` + `goal_id` query param on `GET /comms/tasks`.
 > - ✅ `core/skills/development/drain-dag.md` (the `single` agent self-loop).
 > - ✅ `tests/test_comms_goals_run.py` (routing + execution via injected fakes).
-> - ⛔ `team` returns 501 until the two-flow split.
+> - ✅ Executor **override**: `/comms/goals/run` accepts `executor`; `start_goal_run`
+>   persists the UI pick onto the goal (`set_goal_executor`).
+> - ✅ **P2 board UI** (Studio): goal cards group their tasks; per-goal executor
+>   selector + Run button → `/comms/goals/run`; `goal_run` SSE drives run state.
+>   Typecheck green. (`team` shows "not available yet".)
+> - ⛔ `team` returns 501 until the two-flow split — **de-risked:** a fresh FSM run
+>   starts at the flow's FIRST state (`fsm/engine.py:31`), and `_refresh_flows`
+>   auto-seeds any new `core/flows/*.flow.yaml`, so a trimmed-team flow (BUILDING
+>   first) is safe to add. The remaining open question is semantic: how a team run
+>   consumes the goal's DAG vs. its plan artifacts — that's the two-flow split's job.
+> - ▸ Follow-up: a goal **stop** endpoint (the UI Stop button is optimistic; the loop
+>   holds the board lock so `/comms/run/stop` on the same scope would actually halt it).
 
 > Goal of P1: when a **goal** is run, read its `executor` and route the goal's
 > task-DAG to one of `single` / `loop` / `team`. **Ship serial** (one task at a

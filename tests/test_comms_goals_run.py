@@ -119,6 +119,32 @@ def test_dispatch_loop_scopes_to_goal():
     assert t2 not in ran, "goal 2's task must not run under goal 1's loop"
 
 
+def test_dispatch_executor_override_wins_and_persists():
+    """executor_override beats the goal's stored executor and is persisted back."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+    conn = get_db()
+    scope = "gr_override"
+    goal = _make_goal(conn, scope, executor="single")  # stored as single
+    t = _make_task(conn, scope, "task-A", goal)
+
+    ran = []
+
+    def fake_sched_spawn(state, instructions, adapter, model, run_id, broadcast_fn):
+        ran.append(run_id)
+        return {"ok": True}
+
+    # Override to loop → runs the scheduler (not board_run) and persists 'loop'.
+    result = start_goal_run(goal, executor_override="loop", spawn_fn=fake_sched_spawn, block=True)
+    assert result["ok"] is True
+    assert result["executor"] == "loop"
+    assert set(result["result"]["completed"]) == {t}
+
+    row = conn.execute("SELECT executor FROM comms_messages WHERE id=?", (goal,)).fetchone()
+    assert row["executor"] == "loop", "override should persist onto the goal"
+
+
 def test_dispatch_team_not_implemented():
     """executor='team' is gated until the two-flow split."""
     from pathly_orchestrator.db.connection import get_db
