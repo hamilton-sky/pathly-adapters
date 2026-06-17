@@ -163,7 +163,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
         view={boardView}
         onChange={setBoardView}
         rightAction={boardView === 'goals' || boardView === 'artifacts'
-          ? <><EvaluateBoardButton boardKey={boardKey} />{boardView === 'goals' && <NewGoalButton onCreate={(text) => post('goal', text)} />}</>
+          ? <>{boardView === 'goals' && <NewGoalButton onCreate={(text) => post('goal', text)} />}<EvaluateBoardButton boardKey={boardKey} /></>
           : undefined}
       />
 
