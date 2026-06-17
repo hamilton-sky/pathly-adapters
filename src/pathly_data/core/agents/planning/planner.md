@@ -15,6 +15,8 @@ Done when: All nine plan files exist in pathly/plans/<feature>/ and PROGRESS.md 
 
 Before returning, you MUST execute plan.md Step 6 to seed the comms-board task DAG
 (post one `type=goal` message, then one `type=task` per phase stamped with `goal_id`).
+Each task's `text` must be a **self-contained builder prompt** (what to build · Files ·
+Done when) — the board-DAG executor runs it without any CONVERSATION_PROMPTS.md file.
 
 ## Before planning: check active lessons
 
