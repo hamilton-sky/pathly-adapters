@@ -1,0 +1,75 @@
+.pill {
+  display: inline-flex;
+  align-items: stretch;
+  border: var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--bg-surface0);
+  flex-shrink: 0;
+}
+
+.run {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 11px/1 var(--font-family-base);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.run:hover:not(:disabled) {
+  color: var(--text-secondary);
+  background: var(--bg-surface1);
+}
+
+/* Disabled: default cursor when running (status display); not-allowed when blocked. */
+.run:disabled { cursor: default; }
+
+/* State colors */
+.run[data-state='running'] { color: var(--amber, #e5c07b); }
+.run[data-state='busy']    { color: var(--text-muted); opacity: 0.7; }
+.run[data-state='done']    { color: var(--green, #98c379); }
+.run[data-state='error']   { color: var(--red, #e06c75); }
+
+/* Small variant (TaskCard) */
+.pill[data-size='sm'] .run {
+  height: 18px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.label { min-width: 0; }
+
+/* Stop button — shares the pill border/background */
+.stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  border: none;
+  border-left: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.stop:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stop:not(:disabled) {
+  color: var(--red, #e06c75);
+}
+
+.stop:not(:disabled):hover {
+  background: color-mix(in srgb, var(--red, #e06c75) 14%, transparent);
+}

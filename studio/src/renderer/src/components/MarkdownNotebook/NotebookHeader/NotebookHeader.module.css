@@ -188,7 +188,7 @@
   color: var(--red);
 }
 
-/* ── Agent pill (main action + settings icon) ── */
+/* ── Agent pill (main action + settings/stop icon joined) ── */
 .agentPill {
   display: inline-flex;
   position: relative;
@@ -270,6 +270,30 @@
 
 .agentPillSettings[data-state='success'] { border-color: var(--green); }
 .agentPillSettings[data-state='error']   { border-color: var(--red); }
+
+/* Stop button — replaces the gear while the engine is running. */
+.agentPillStop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-color: var(--yellow);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--red);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.agentPillStop svg { fill: currentColor; }
+
+.agentPillStop:hover {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--bg-mantle);
+}
 
 .draftBtn {
   display: inline-flex;
@@ -430,6 +454,10 @@
   display: none;
 }
 
+.headerRoot[data-compact='true'] .agentPillMain {
+  padding: 4px 7px;
+}
+
 .headerRoot[data-compact='true'] .agentBtn,
 .headerRoot[data-compact='true'] .draftBtn {
   padding: 4px 7px;
@@ -439,9 +467,6 @@
   padding: 4px 7px;
 }
 
-.headerRoot[data-compact='true'] .agentPillMain {
-  padding: 4px 7px;
-}
 
 .headerRoot[data-compact='true'] .saveBtn {
   padding: 4px 7px;

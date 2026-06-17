@@ -274,3 +274,43 @@ def retrieve_board_context(
             lines.append(f"  • {text}  [{header}]")
 
     return "\n".join(lines) + "\n"
+
+
+def board_context_for(
+    board: str,
+    scope: str,
+    project_root: str,
+    task_description: str = "",
+) -> str:
+    """Scope-aware board context for ANY execution surface.
+
+    Single-agent, loop-executor, and ``/comms/run`` agents call this so they see
+    the SAME governance + memory the FSM/team path already injects. It resolves
+    the user's per-feature "Reads" selection (the ``board_scope`` toggle set from
+    Studio) and delegates to :func:`retrieve_board_context`:
+
+    * Feature board → the stored toggle is honoured (turning a tier off here drops
+      it from every agent's prompt).
+    * Project / global board run → only that tier (plus global) is pulled, since
+      there is no feature topic.
+
+    Returns ``''`` on any failure so callers never break the prompt.
+    """
+    bscope: dict[str, bool] | None
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.app_settings import get_board_scope
+
+        if board == "feature":
+            bscope = get_board_scope(get_db(), project_root or "", scope)
+        else:
+            bscope = {"feature": False, "project": board == "project", "global": True}
+    except Exception:
+        bscope = None
+
+    return retrieve_board_context(
+        topic=scope if board == "feature" else "",
+        project_root=project_root or "",
+        task_description=task_description or "",
+        board_scope=bscope,
+    )

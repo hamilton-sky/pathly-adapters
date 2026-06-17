@@ -30,8 +30,15 @@ def post_message(
     depends_on: list[str] | None = None,
     artifact_path: str | None = None,
     artifact_type: str | None = None,
+    goal_id: str | None = None,
+    executor: str | None = None,
 ) -> str:
-    """Insert a new message into comms_messages. Returns the new message_id."""
+    """Insert a new message into comms_messages. Returns the new message_id.
+
+    goal_id ties a task to its goal message; executor ('single'|'loop'|'team')
+    is set on the goal message only. Both default to None so existing callers
+    keep their behavior (the columns are harmlessly NULL).
+    """
     message_id = str(uuid.uuid4())
     # A task enters the DAG frontier as 'pending' so get_ready_tasks() (which
     # filters task_status='pending') can pick it up. Non-task messages leave it NULL.
@@ -39,8 +46,8 @@ def post_message(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -58,10 +65,25 @@ def post_message(
                 task_status,
                 artifact_path,
                 artifact_type,
+                goal_id,
+                executor,
             ),
         )
         conn.commit()
     return message_id
+
+
+def set_goal_executor(conn: sqlite3.Connection, message_id: str, executor: str) -> None:
+    """Persist the chosen executor on a goal message (UI selector override).
+
+    Lets the board reflect the user's pick after a reload — the dispatcher reads
+    executor from the goal row, so persisting keeps that authoritative."""
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET executor=? WHERE id=? AND type='goal'",
+            (executor, message_id),
+        )
+        conn.commit()
 
 
 def get_messages(
@@ -456,30 +478,37 @@ def get_ready_tasks(
     conn: sqlite3.Connection,
     boards: list[str],
     scopes: list[str],
+    goal_id: str | None = None,
 ) -> list[dict]:
     """Return task messages where every depends_on ID has task_status='done'.
-    A task with depends_on=NULL or depends_on='[]' is always ready if pending."""
+    A task with depends_on=NULL or depends_on='[]' is always ready if pending.
+
+    When goal_id is given, the frontier is scoped to that goal's tasks only — the
+    Phase-1 dispatcher uses this so one goal's loop drains only its own DAG (a
+    scope may hold several goals). None-default keeps the board+scope behavior."""
     if not boards or not scopes:
         return []
     board_ph = ",".join("?" * len(boards))
     scope_ph = ",".join("?" * len(scopes))
+    goal_clause = " AND goal_id=?" if goal_id is not None else ""
+    goal_param = [goal_id] if goal_id is not None else []
     pending_sql = (
         "SELECT * FROM comms_messages "
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
-        "AND type='task' AND task_status='pending' AND deleted_at IS NULL"
+        f"AND type='task' AND task_status='pending' AND deleted_at IS NULL{goal_clause}"
     )
     pending_rows = conn.execute(
-        pending_sql, list(boards) + list(scopes)
+        pending_sql, list(boards) + list(scopes) + goal_param
     ).fetchall()
 
     done_sql = (
         "SELECT id FROM comms_messages "
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
-        "AND type='task' AND task_status='done' AND deleted_at IS NULL"
+        f"AND type='task' AND task_status='done' AND deleted_at IS NULL{goal_clause}"
     )
     done_ids = {
         r["id"]
-        for r in conn.execute(done_sql, list(boards) + list(scopes)).fetchall()
+        for r in conn.execute(done_sql, list(boards) + list(scopes) + goal_param).fetchall()
     }
 
     ready = []
@@ -668,3 +697,27 @@ def soft_delete_message(conn: sqlite3.Connection, message_id: str, force: bool =
         )
         conn.commit()
     return "deleted"
+
+
+def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) -> str:
+    """Edit a message's text in place — used by the board UI to rename a goal.
+
+    The edit is in place so the message id is preserved and a goal keeps its task
+    links (tasks reference the goal by id). Embeddings are not recomputed here;
+    hybrid search reflects the new text on the next reindex.
+
+    Returns ``"updated"`` or ``"not_found"``.
+    """
+    row = conn.execute(
+        "SELECT id FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+        (message_id,),
+    ).fetchone()
+    if row is None:
+        return "not_found"
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET text=? WHERE id=?",
+            (text, message_id),
+        )
+        conn.commit()
+    return "updated"

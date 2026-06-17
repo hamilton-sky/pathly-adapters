@@ -41,6 +41,10 @@ export interface CommsRow {
   artifact_type: string | null
   artifact_url: string | null
   superseded_by?: string | null
+  goal_id?: string | null
+  executor?: string | null
+  task_status?: string | null
+  depends_on?: string | null
 }
 
 interface BackendOption {
@@ -113,6 +117,11 @@ export function rowToMessage(row: CommsRow): Message {
   }
 
   if (row.superseded_by) m.supersededBy = row.superseded_by
+  if (row.goal_id) m.goal_id = row.goal_id
+  if (row.executor) m.executor = row.executor as Message['executor']
+  if (row.task_status) m.taskStatus = row.task_status as Message['taskStatus']
+  const deps = parseJsonArray(row.depends_on ?? null)
+  if (deps.length > 0) m.dependsOn = deps
 
   return m
 }
@@ -195,6 +204,37 @@ export async function apiPost(
   }
 }
 
+/**
+ * Post a type='artifact' message that points at a file path, so it renders as an
+ * artifact card AND the backend creates its comms_artifacts metadata row. Returns
+ * the new message id, or null on failure.
+ */
+export async function apiPostArtifact(
+  feature: string,
+  board: string,
+  scope: string,
+  text: string,
+  artifactPath: string,
+  artifactType?: string,
+): Promise<string | null> {
+  try {
+    const r = await apiFetch(`/comms/post`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        feature, from: 'human', type: 'artifact', text, board, scope,
+        artifact_path: artifactPath,
+        ...(artifactType ? { artifact_type: artifactType } : {}),
+      }),
+    })
+    if (!r.ok) return null
+    const json = await r.json() as { message_id?: string }
+    return json.message_id ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function apiAnswer(
   questionId: string,
   answer: string,
@@ -248,6 +288,20 @@ export async function apiDelete(messageId: string, force = false): Promise<boole
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message_id: messageId, force }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+/** Edit a message's text in place (board UI — rename a goal). Returns true on 2xx. */
+export async function apiEditMessage(messageId: string, text: string): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/comms/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId, text }),
     })
     return r.ok
   } catch {
@@ -410,6 +464,128 @@ export async function apiStopBoard(board: string, scope: string): Promise<boolea
   }
 }
 
+// ── Board-scoped flow run (footer launcher → /runner/start) ──────────
+
+export interface StartFlowOpts {
+  projectRoot?: string
+  interactive?: boolean
+  maxIterations?: number
+  maxCostUsd?: number
+  model?: string
+}
+
+/**
+ * Launch a board-scoped pipeline run — a flow that does NOT depend on a goal/DAG
+ * (debug, quick-fix, explore, test, team). `topic` is the board's feature/scope.
+ * Body mirrors the FlowControlBar Start button so stages spawn as terminals the
+ * same way. Returns { ok, busy } — busy=true when a run for that topic is active.
+ */
+export async function apiStartFlow(
+  topic: string,
+  flow: string,
+  opts: StartFlowOpts = {},
+): Promise<{ ok: boolean; busy?: boolean }> {
+  try {
+    const r = await apiFetch('/runner/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic,
+        flow,
+        project_root: opts.projectRoot ?? '',
+        max_iterations: opts.maxIterations ?? 50,
+        max_cost_usd: opts.maxCostUsd ?? 10,
+        interactive: opts.interactive ?? true,
+        ...(opts.model ? { model: opts.model } : {}),
+      }),
+    })
+    if (r.status === 409) return { ok: false, busy: true }
+    return { ok: r.ok }
+  } catch {
+    return { ok: false }
+  }
+}
+
+// ── Goal DAG run ─────────────────────────────────────────────────────
+
+export interface RunGoalResult {
+  ok: true
+  run_id: string
+  executor: string
+}
+
+export interface RunGoalBusy {
+  ok: false
+  error: 'board_busy'
+  reason?: string
+}
+
+export interface RunGoalTeamUnavailable {
+  ok: false
+  error: 'not_implemented'
+}
+
+export type RunGoalResponse = RunGoalResult | RunGoalBusy | RunGoalTeamUnavailable
+
+export interface RunGoalOpts {
+  adapter?: string
+  model?: string
+  flow?: string
+}
+
+export type DecomposeMode = 'planner' | 'consultation'
+
+// Decompose a goal into a task DAG (planner = fast, consultation = deep). Returns the
+// parsed {ok, reason} so the caller can distinguish board_busy / already_decomposed.
+export async function apiDecomposeGoal(
+  goal_id: string,
+  mode: DecomposeMode,
+  opts: { adapter?: string } = {},
+): Promise<{ ok: boolean; reason?: string } | null> {
+  try {
+    const body: Record<string, unknown> = { goal_id, mode }
+    if (opts.adapter) body.adapter = opts.adapter
+    const r = await apiFetch('/comms/goals/decompose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const json = (await r.json().catch(() => null)) as { ok?: boolean; reason?: string } | null
+    if (json && typeof json.ok === 'boolean') return { ok: json.ok, reason: json.reason }
+    return { ok: r.ok }
+  } catch {
+    return null
+  }
+}
+
+export async function apiRunGoal(
+  goal_id: string,
+  executor?: string,
+  opts: RunGoalOpts = {},
+): Promise<RunGoalResponse | null> {
+  try {
+    const body: Record<string, unknown> = { goal_id }
+    if (executor) body.executor = executor
+    if (opts.adapter) body.adapter = opts.adapter
+    if (opts.model) body.model = opts.model
+    if (opts.flow) body.flow = opts.flow
+    const r = await apiFetch('/comms/goals/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (r.status === 409) {
+      return { ok: false, error: 'board_busy' }
+    }
+    if (r.status === 501) {
+      return { ok: false, error: 'not_implemented' }
+    }
+    return await r.json() as RunGoalResponse
+  } catch {
+    return null
+  }
+}
+
 // ── Feature list + per-feature enrichment from STATE.json ─────────────
 
 interface FeatureState {
@@ -452,7 +628,7 @@ const BLOCKER_FILES = new Set([
 
 /** Resolve the storage path for a feature: new-style pathly/<id>/ wins if it exists,
  *  otherwise falls back to pathly/plans/<id>/. Mirrors _resolve_storage_path in fsm_ops.py. */
-async function resolveFeaturePath(projectPath: string, featureId: string): Promise<string> {
+export async function resolveFeaturePath(projectPath: string, featureId: string): Promise<string> {
   const newStyle = `${projectPath}/pathly/${featureId}`
   // listDir on the dir itself returns [] when the dir doesn't exist, but we need to know
   // if the dir exists. Writing a .keep file ensures the new-style dir exists, so we check

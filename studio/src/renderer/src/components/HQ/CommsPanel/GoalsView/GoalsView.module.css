@@ -1,0 +1,364 @@
+.view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 0 8px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 12px;
+  min-height: 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty p {
+  font-size: 12px;
+  max-width: 32ch;
+}
+
+/* ── Goal group ─────────────────────────────────────────── */
+.group {
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface0);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 9px 11px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.collapse {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.collapse:hover { color: var(--text-primary); }
+
+.headerMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.goalText {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.rollup {
+  font: 10.5px/1.3 var(--font-family-mono, monospace);
+  color: var(--text-muted);
+}
+
+/* ── Task list ──────────────────────────────────────────── */
+.tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 10px 10px 14px;
+  min-width: 0;
+}
+
+.noTasks {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 0 6px;
+}
+
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 9px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface1);
+  min-width: 0;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+
+.dot[data-status='pending']     { background: var(--text-muted); }
+.dot[data-status='in_progress'] { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.dot[data-status='done']        { background: var(--green, #4caf50); }
+.dot[data-status='blocked']     { background: var(--yellow, #d8a657); }
+.dot[data-status='failed']      { background: var(--red, #e05a5a); }
+
+.taskMain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Text + optional in-progress RunPill side-by-side */
+.taskRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.taskText {
+  font-size: 12px;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.taskArtifact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.artName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deps {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.depBadge {
+  font: 9px/1 var(--font-family-mono, monospace);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface2, var(--bg-surface0));
+  color: var(--text-muted);
+}
+
+.depBadge[data-status='done']   { color: var(--green, #4caf50); }
+.depBadge[data-status='failed'],
+.depBadge[data-status='blocked']{ color: var(--red, #e05a5a); }
+
+/* ── Ungrouped tasks ────────────────────────────────────── */
+.ungrouped {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ungroupedHead {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 2px 0;
+}
+
+/* ── New goal control (lives in the board view-toggle row, top right) ──── */
+/* Matches the header's "New feature" button (.ctl .newFeature): squared
+   corners, accent text + border. */
+.newGoalBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: var(--border);
+  border-color: var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface0);
+  color: var(--accent);
+  font: 500 12px/1 var(--font-family-base);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.newGoalBtn:hover {
+  background: var(--accent-bg);
+}
+
+.newGoalLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Two-zone evaluator: [✦ Evaluate… 0:03][⚙] */
+.evalRoot {
+  display: inline-flex;
+  align-items: stretch;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-surface0);
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast);
+}
+
+.evalBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 12px/1 var(--font-family-base);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.evalBtn:hover:not(:disabled) { color: var(--accent); background: var(--accent-bg); }
+.evalBtn:disabled { opacity: 0.6; cursor: default; }
+
+.evalBtn[data-state='running'] { color: var(--amber, #e5c07b); }
+.evalBtn[data-state='done']    { color: var(--green, #98c379); }
+
+/* When running/done, the outer container's border inherits the state color. */
+.evalRoot:has(.evalBtn[data-state='running']) { border-color: var(--amber, #e5c07b); }
+.evalRoot:has(.evalBtn[data-state='done'])    { border-color: var(--green, #98c379); }
+
+/* Gear icon — right zone (idle) */
+.evalGear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  border: none;
+  border-left: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.evalGear:hover { color: var(--text-secondary); background: var(--bg-surface1); }
+.evalGear[aria-expanded='true'] { color: var(--accent); background: var(--accent-bg); }
+
+/* Stop button — replaces gear while running */
+.evalStop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  border: none;
+  border-left: 1px solid var(--amber, #e5c07b);
+  background: transparent;
+  color: var(--red, #e06c75);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.evalStop:hover { background: var(--red, #e06c75); color: var(--bg-mantle); border-color: var(--red, #e06c75); }
+
+/* Collapse to icon-only when narrow */
+@container (max-width: 400px) {
+  .newGoalLabel { display: none; }
+  .newGoalBtn   { gap: 0; padding: 0 8px; }
+  .evalBtn      { gap: 0; padding: 0 8px; }
+}
+
+/* ── Editable goal title ────────────────────────────────── */
+.titleView {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.titleEditBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.titleView:hover .titleEditBtn { opacity: 1; }
+.titleEditBtn:hover { color: var(--accent); }
+
+.titleEdit {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.titleInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+  font: 600 13px/1.4 var(--font-family-base);
+}
+
+.titleInput:focus {
+  outline: none;
+  border-color: var(--accent-border, var(--accent));
+}
+
+.titleIconBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface0);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.titleIconBtn:hover { color: var(--accent); border-color: var(--accent-border, var(--accent)); }

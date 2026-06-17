@@ -1,5 +1,9 @@
 .foot {
   flex-shrink: 0;
+  /* Pin the compose footer to the bottom of the panel in EVERY board view —
+     absorbs free space when the active view's content is short/empty, so the
+     input never floats up into the middle (margin is a no-op when content fills). */
+  margin-top: auto;
   border-top: var(--border);
   padding: 8px 12px 10px;
   background: var(--bg-mantle);

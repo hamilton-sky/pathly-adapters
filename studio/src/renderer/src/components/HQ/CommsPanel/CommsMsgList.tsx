@@ -48,7 +48,11 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
   }
 
   const pins = messages.filter((m) => m.pinned)
-  const thread = messages.filter((m) => !m.pinned)
+  // Goals and tasks live in the dedicated "Goals & Tasks" board view, not the
+  // message thread — filter them out here so the Messages view stays a clean log.
+  const thread = messages.filter(
+    (m) => !m.pinned && m.type !== 'goal' && m.type !== 'task',
+  )
 
   return (
     <div className={s.thread}>

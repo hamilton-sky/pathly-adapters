@@ -3,12 +3,19 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 import yaml
 from flask import Blueprint, jsonify, request
 
 bp = Blueprint("skills", __name__)
+
+# A composition skill key is a core-relative path: word segments joined by single
+# forward slashes (e.g. "team/build", "development/review"). Anything else — an
+# absolute path, a drive letter, backslashes, a ".md" file path — is rejected so a
+# stray UI value can never inject a bogus key into the hand-maintained manifest.
+_SKILL_KEY_RE = re.compile(r"[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*")
 
 
 @bp.route("/flows/", methods=["GET"])
@@ -894,24 +901,47 @@ def skills_export():
         fragment_order = data.get("fragment_order", [])
         if not isinstance(skill, str) or not skill.strip():
             return jsonify({"error": "Field 'skill' must be a non-empty string"}), 400
-        if not isinstance(fragment_order, list):
-            return jsonify({"error": "Field 'fragment_order' must be a list"}), 400
+        if not isinstance(fragment_order, list) or not all(isinstance(x, str) for x in fragment_order):
+            return jsonify({"error": "Field 'fragment_order' must be a list of strings"}), 400
+        # Reject path-like / absolute skill names so a stray UI value (e.g. an
+        # absolute path to a plans artifact) can never inject a bogus key into the
+        # hand-maintained manifest. A skill key is "category/name" (e.g. team/build).
+        if not _SKILL_KEY_RE.fullmatch(skill):
+            return jsonify({
+                "error": "Field 'skill' must be a skill name like 'team/build', not a path"
+            }), 400
 
         # Locate the composition.yaml file on disk (importlib resources path)
         skills_resource = _res_files("pathly_data").joinpath("core/skills")
         composition_path = _Path(str(skills_resource)) / "composition.yaml"
 
-        with open(composition_path, encoding="utf-8") as f:
-            manifest = yaml.safe_load(f) or {}
+        # Round-trip with ruamel.yaml so the manifest's header/inline documentation
+        # comments survive the edit. Fall back to PyYAML (lossy — drops comments)
+        # only when ruamel isn't installed.
+        try:
+            from ruamel.yaml import YAML  # type: ignore
 
-        if "skills" not in manifest or manifest["skills"] is None:
-            manifest["skills"] = {}
-        if skill not in manifest["skills"] or manifest["skills"][skill] is None:
-            manifest["skills"][skill] = {}
-        manifest["skills"][skill]["fragments"] = fragment_order
-
-        with open(composition_path, "w", encoding="utf-8") as f:
-            yaml.dump(manifest, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            _ry = YAML()
+            _ry.preserve_quotes = True
+            with open(composition_path, encoding="utf-8") as f:
+                manifest = _ry.load(f) or {}
+            if manifest.get("skills") is None:
+                manifest["skills"] = {}
+            if manifest["skills"].get(skill) is None:
+                manifest["skills"][skill] = {}
+            manifest["skills"][skill]["fragments"] = fragment_order
+            with open(composition_path, "w", encoding="utf-8") as f:
+                _ry.dump(manifest, f)
+        except ImportError:
+            with open(composition_path, encoding="utf-8") as f:
+                manifest = yaml.safe_load(f) or {}
+            if "skills" not in manifest or manifest["skills"] is None:
+                manifest["skills"] = {}
+            if skill not in manifest["skills"] or manifest["skills"][skill] is None:
+                manifest["skills"][skill] = {}
+            manifest["skills"][skill]["fragments"] = fragment_order
+            with open(composition_path, "w", encoding="utf-8") as f:
+                yaml.dump(manifest, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
         return jsonify({"ok": True}), 200
     except Exception as e:

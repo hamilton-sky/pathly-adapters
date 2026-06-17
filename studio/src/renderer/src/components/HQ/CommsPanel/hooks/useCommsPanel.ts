@@ -35,12 +35,16 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
       es = new EventSource(`${PATHLY_API_BASE}/events/comms?scope=${encodeURIComponent(key)}`)
       es.onmessage = (e: MessageEvent) => {
         try {
-          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string }
+          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string; goal_id?: string }
           if (data.type === 'COMMS_UPDATE') {
             // Drive the agent control's run state from the run lifecycle so it stays
             // green (and Stop stays enabled) until the agent actually finishes.
             if (data.event === 'board_run' && data.phase) {
               useCommsStore.getState().markBoardRunPhase(key, data.phase)
+            }
+            if ((data.event === 'goal_run' || data.event === 'goal_decompose')
+                && data.phase && data.goal_id) {
+              useCommsStore.getState().markGoalRunPhase(data.goal_id, data.phase)
             }
             loadRef.current()
           }
@@ -86,6 +90,11 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
     [store, key],
   )
 
+  const editMessage = useCallback(
+    (mid: string, text: string) => store.editMessage(key, mid, text),
+    [store, key],
+  )
+
   const supersede = useCallback(
     (oldId: string, newId: string) => store.supersede(key, oldId, newId),
     [store, key],
@@ -102,14 +111,27 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
     [store, key],
   )
 
+  const runGoal = useCallback(
+    (goal_id: string, executor?: string, opts?: { adapter?: string; model?: string }) =>
+      store.runGoal(goal_id, executor, opts),
+    [store],
+  )
+
+  const stopGoal = useCallback(
+    (goal_id: string) => store.stopGoal(goal_id),
+    [store],
+  )
+
   const searchResults = store.searchResults
   const searchTerm = store.searchTerm
   const runSearch = useCallback((q: string) => { void store.runSearch(key, q) }, [store, key])
   const clearSearch = useCallback(() => store.clearSearch(), [store])
 
+  const reload = useCallback(() => { void store.loadBoard(scope, key, projectRoot) }, [store, scope, key, projectRoot])
+
   return {
     messages, feature, pendingCount, flashId, post, answer, resolve,
-    toggleScope, del, supersede, attach, runSingleAgent,
-    searchResults, searchTerm, runSearch, clearSearch,
+    toggleScope, del, editMessage, supersede, attach, runSingleAgent, runGoal, stopGoal,
+    searchResults, searchTerm, runSearch, clearSearch, reload,
   }
 }

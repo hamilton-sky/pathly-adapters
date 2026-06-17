@@ -79,7 +79,8 @@ def comms_post():
     """Post a message to a board.
 
     Required body fields: feature, from, type, text.
-    Optional: scope (default 'feature'), to, options, reply_to, stage, conv.
+    Optional: scope (default 'feature'), to, options, reply_to, stage, conv,
+    depends_on, artifact_path, artifact_type, goal_id, executor.
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
@@ -138,6 +139,10 @@ def comms_post():
         stage = data.get("stage")
         conv = data.get("conv")
         depends_on = data.get("depends_on")
+        # Goals → task-DAG: goal_id ties a task to its goal message; executor
+        # lives on the goal. Both are plain TEXT columns (Phase 0a migration).
+        goal_id = data.get("goal_id")
+        executor = data.get("executor")
         # Artifact link — lets an agent post a type=artifact message that points at
         # the file it created, so the board can open it in the editor.
         artifact_path = (data.get("artifact_path") or None)
@@ -161,6 +166,12 @@ def comms_post():
             or not all(isinstance(d, str) for d in depends_on)
         ):
             return jsonify({"error": "Field 'depends_on' must be a list of strings or null"}), 400
+        # executor is accepted as any string here — the {single,loop,team} enum is
+        # enforced downstream by the Phase-1 dispatcher, not at the write path.
+        if goal_id is not None and not isinstance(goal_id, str):
+            return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
+        if executor is not None and not isinstance(executor, str):
+            return jsonify({"error": "Field 'executor' must be a string or null"}), 400
         message_id = _post_message(
             conn,
             board=board,
@@ -176,6 +187,8 @@ def comms_post():
             depends_on=depends_on,
             artifact_path=artifact_path if isinstance(artifact_path, str) else None,
             artifact_type=artifact_type if isinstance(artifact_type, str) else None,
+            goal_id=goal_id,
+            executor=executor,
         )
 
         # An artifact message also gets a comms_artifacts row (the metadata
@@ -400,10 +413,14 @@ def comms_tasks_get():
             board = "feature"
         scope = (request.args.get("scope") or feature).strip() or feature
 
+        # goal_id scopes the frontier to one goal's DAG (the single/loop executors
+        # poll with it so they drain only their own goal). Applies to ready=true.
+        goal_id = request.args.get("goal_id") or None
+
         conn = _get_db()
         ready_flag = request.args.get("ready", "").strip().lower()
         if ready_flag == "true":
-            tasks = _get_ready_tasks(conn, boards=[board], scopes=[scope])
+            tasks = _get_ready_tasks(conn, boards=[board], scopes=[scope], goal_id=goal_id)
         else:
             tasks = _get_messages(conn, board=board, scope=scope, type="task", status="pending")
         return jsonify(tasks), 200
@@ -1044,6 +1061,218 @@ def comms_run_stop():
         return jsonify({"ok": True, "stopped": True, "run_id": run_id}), 200
     except Exception as exc:
         logging.exception("comms_run_stop error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/goals/run", methods=["POST"])
+def comms_goals_run():
+    """Dispatch a goal's task-DAG to its executor (Phase 1, serial).
+
+    Required body: goal_id. Optional: adapter, model, project_root.
+    Reads `executor` from the goal message and routes single|loop|team.
+    Returns 200 {ok, run_id, executor, ...} | 400 bad input / not a goal /
+    unknown executor or flow | 404 goal not found | 409 board busy.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        goal_id = data.get("goal_id", "")
+        if not isinstance(goal_id, str) or not goal_id.strip():
+            return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
+
+        # executor override (the UI selector) — optional; wins over the goal's stored
+        # executor and is persisted by start_goal_run. Enum is routed downstream.
+        executor_override = data.get("executor")
+        if executor_override is not None and not isinstance(executor_override, str):
+            return jsonify({"error": "Field 'executor' must be a string or null"}), 400
+        # flow: for executor='team', which FSM flow to run on the goal (team-build,
+        # debug, quick-fix, or any seeded/custom flow). Default team-build downstream.
+        flow_override = data.get("flow")
+        if flow_override is not None and not isinstance(flow_override, str):
+            return jsonify({"error": "Field 'flow' must be a string or null"}), 400
+
+        adapter = (data.get("adapter", "") or "claude")
+        model = (data.get("model", "") or "")
+        project_root = (data.get("project_root", "") or "")
+
+        # Resolve board/scope for the lifecycle posts (start_goal_run re-reads the
+        # goal authoritatively; this is only for the human-facing status posts).
+        conn = _get_db()
+        goal = conn.execute(
+            "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            (goal_id,),
+        ).fetchone()
+        board = goal["board"] if goal is not None else "feature"
+        scope = goal["scope"] if goal is not None else ""
+
+        def _board_post(text: str, phase: str | None = None) -> None:
+            try:
+                c = _get_db()
+                mid = _post_message(c, board=board, scope=scope, from_agent="system",
+                                    type="status", text=text)
+                payload = {"type": "COMMS_UPDATE", "event": "goal_run", "goal_id": goal_id,
+                           "message_id": mid, "board": board, "scope": scope}
+                if phase:
+                    payload["phase"] = phase
+                _broadcast_comms(scope, payload)
+            except Exception:
+                logging.debug("goal_run lifecycle post failed", exc_info=True)
+
+        def _on_start(_run_id: str) -> None:
+            _board_post("▶ goal run started — dispatching executor…", phase="running")
+
+        def _on_done(_run_id: str, res) -> None:
+            summary = ""
+            if isinstance(res, dict):
+                ex = res.get("executor", "")
+                done = res.get("completed")
+                summary = f"executor={ex}"
+                if isinstance(done, list):
+                    summary += f", completed={len(done)}"
+            _board_post(f"✅ goal run finished — {summary}", phase="done")
+
+        result = start_goal_run(
+            goal_id,
+            executor_override=executor_override,
+            flow_override=flow_override,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            broadcast_fn=_broadcast_runner,        # worker terminals → runner stream
+            event_broadcast_fn=_broadcast_comms,   # task-state events → comms stream
+            on_start=_on_start,
+            on_done=_on_done,
+        )
+
+        if result.get("ok"):
+            return jsonify(result), 200
+        # board_busy may arrive as a reason (loop) or an error (single via board_run).
+        reason = result.get("reason") or result.get("error") or ""
+        status = {
+            "not_found": 404,
+            "not_goal": 400,
+            "board_busy": 409,
+            "unknown_executor": 400,
+            "unknown_flow": 400,
+        }.get(reason, 400)
+        return jsonify(result), status
+    except Exception as exc:
+        logging.exception("comms_goals_run error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/goals/decompose", methods=["POST"])
+def comms_goals_decompose():
+    """Decompose a goal into a task DAG — the analyze→tasks bridge.
+
+    Required body: goal_id. Optional: mode ("planner"|"consultation", default planner),
+    adapter, model, project_root. Returns 200 {ok, run_id, mode, ...} | 400 bad input /
+    not a goal / unknown mode | 404 goal not found | 409 already decomposed / board busy.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        goal_id = data.get("goal_id", "")
+        if not isinstance(goal_id, str) or not goal_id.strip():
+            return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
+        mode = (data.get("mode", "") or "planner")
+        if not isinstance(mode, str):
+            return jsonify({"error": "Field 'mode' must be a string"}), 400
+        adapter = (data.get("adapter", "") or "claude")
+        model = (data.get("model", "") or "")
+        project_root = (data.get("project_root", "") or "")
+
+        conn = _get_db()
+        goal = conn.execute(
+            "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            (goal_id,),
+        ).fetchone()
+        board = goal["board"] if goal is not None else "feature"
+        scope = goal["scope"] if goal is not None else ""
+
+        def _board_post(text: str, phase: str | None = None) -> None:
+            try:
+                c = _get_db()
+                mid = _post_message(c, board=board, scope=scope, from_agent="system",
+                                    type="status", text=text)
+                payload = {"type": "COMMS_UPDATE", "event": "goal_decompose", "goal_id": goal_id,
+                           "message_id": mid, "board": board, "scope": scope}
+                if phase:
+                    payload["phase"] = phase
+                _broadcast_comms(scope, payload)
+            except Exception:
+                logging.debug("goal_decompose lifecycle post failed", exc_info=True)
+
+        def _on_start(_run_id: str) -> None:
+            _board_post(f"🧩 decomposing goal via {mode}…", phase="running")
+
+        def _on_done(_run_id: str, res) -> None:
+            _board_post("✅ decomposition finished — task DAG seeded", phase="done")
+
+        result = start_goal_decompose(
+            goal_id, mode=mode, project_root=project_root, adapter=adapter, model=model,
+            broadcast_fn=_broadcast_runner, on_start=_on_start, on_done=_on_done,
+        )
+
+        if result.get("ok"):
+            return jsonify(result), 200
+        reason = result.get("reason") or result.get("error") or ""
+        status = {
+            "not_found": 404,
+            "not_goal": 400,
+            "unknown_mode": 400,
+            "already_decomposed": 409,
+            "board_busy": 409,
+        }.get(reason, 400)
+        return jsonify(result), status
+    except Exception as exc:
+        logging.exception("comms_goals_decompose error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/edit", methods=["POST"])
+def comms_edit():
+    """Edit a message's text in place — used by the board UI to rename a goal.
+
+    Required body fields: message_id, text. The id is preserved so a goal keeps
+    its task links. Returns 200 {ok:true} on success, 404 if the message does not
+    exist.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import update_message_text as _update_text
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+
+        text = data.get("text", "")
+        if not isinstance(text, str) or not text.strip():
+            return jsonify({"error": "Field 'text' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        result = _update_text(conn, message_id, text.strip())
+        if result == "not_found":
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("comms_edit error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

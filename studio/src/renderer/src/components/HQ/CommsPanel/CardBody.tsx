@@ -107,6 +107,10 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
     )
   }
 
+  // Goals and tasks no longer render in the message thread — they live in the
+  // dedicated "Goals & Tasks" board view (GoalsView). The Messages view filters
+  // them out, so CardBody never receives them here.
+
   return (
     <>
       {supersededBanner}

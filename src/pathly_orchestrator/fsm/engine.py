@@ -210,14 +210,99 @@ def evaluate_transition_rules(
     raise ValueError(f"No default transition defined for state: {current_state!r}")
 
 
-def route_feedback(flow: dict, storage_path: Path) -> dict | None:
+# Feedback escalation. A failure file routes UP the chain as the same loop keeps
+# failing — the more it's retried, the more likely the root cause is upstream (the
+# plan/design/criteria), not the local fix. The flow's `escalation_routing` sets both
+# WHO handles each tier and WHEN it kicks in; below the first tier the OWNER handles
+# it; beyond the last tier the HUMAN does. A file with no escalation_routing entry
+# never tiers (clarification/human files); a flow with no escalation_routing is unchanged.
+_ESCALATE_AT_ATTEMPT = 3  # default attempt for a single-target (string) escalation
+
+
+def _normalize_tiers(spec) -> list[tuple[int, str]]:
+    """Normalize an escalation_routing value into sorted (attempt, role) tiers. Forms:
+      • "planner"                       → [(3, planner)]               (round 3, then human)
+      • ["planner", "architect"]        → [(3, planner), (4, architect)] (one per round from 3)
+      • [{at: 3, to: planner}, {at: 5, to: architect}]                 (explicit thresholds)
+    'after' is accepted as an alias for 'at', 'agent' for 'to'.
+    """
+    if isinstance(spec, str):
+        return [(_ESCALATE_AT_ATTEMPT, spec)]
+    tiers: list[tuple[int, str]] = []
+    if isinstance(spec, list):
+        for i, item in enumerate(spec):
+            if isinstance(item, str):
+                tiers.append((_ESCALATE_AT_ATTEMPT + i, item))
+            elif isinstance(item, dict):
+                at = item.get("at", item.get("after"))
+                to = item.get("to", item.get("agent"))
+                if isinstance(at, int) and isinstance(to, str):
+                    tiers.append((at, to))
+    tiers.sort(key=lambda t: t[0])
+    return tiers
+
+
+def _resolve_feedback_target(
+    filename: str, base_agent: str, retry_count: int, escalation_routing: dict
+) -> str:
+    """Map (feedback file, retry count) → the role that should handle it now, per the
+    flow's escalation_routing tiers. Below the first tier → the owner; at/after each
+    tier's attempt → that tier's role; beyond the last tier → the human."""
+    stem = filename[:-3] if filename.endswith(".md") else filename
+    esc = escalation_routing or {}
+    spec = esc.get(stem)
+    if spec is None:
+        spec = esc.get(filename)
+    if spec is None:
+        return base_agent
+    tiers = _normalize_tiers(spec)
+    if not tiers:
+        return base_agent
+    attempt = (retry_count or 0) + 1
+    if attempt < tiers[0][0]:
+        return base_agent
+    if attempt > tiers[-1][0]:
+        return "human"
+    target = base_agent
+    for at, to in tiers:
+        if attempt >= at:
+            target = to
+        else:
+            break
+    return target
+
+
+def _read_retry_counts(storage_path: Path) -> dict[str, int]:
+    """{FILENAME.md: max retry count} parsed from STATE.json's retry_count_by_key
+    (whose keys are 'conv-N:FILENAME.md'). Best-effort — {} on any error."""
+    import json as _json
+    out: dict[str, int] = {}
+    try:
+        raw = _json.loads((storage_path / "STATE.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return out
+    for key, count in (raw.get("retry_count_by_key") or {}).items():
+        fname = key.split(":", 1)[1] if ":" in key else key
+        try:
+            out[fname] = max(out.get(fname, 0), int(count or 0))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def route_feedback(
+    flow: dict, storage_path: Path, *, retry_counts: dict | None = None
+) -> dict | None:
     """
     Read *.md files in storage_path/feedback/.
     Apply priority order from flow["feedback_routing"] (dict, ordered by insertion):
       Keys earlier in the dict have higher priority.
     Return {"file": filename_with_ext, "target_agent": agent_name} for highest-priority match.
-    If file is HUMAN_QUESTIONS.md or BLOCKED_ON_HUMAN.md, also include
-      "instructions": <file contents>.
+    The target is then run through the 3-tier escalation ladder
+    (_resolve_feedback_target) using flow["escalation_routing"] + the file's retry count
+    (read from STATE.json, or injected via retry_counts for tests).
+    If the resolved target is "human" (or the file is HUMAN_QUESTIONS.md /
+    BLOCKED_ON_HUMAN.md), also include "instructions": <file contents>.
     Return None if feedback/ is empty or does not exist.
 
     Side-effect: syncs found/resolved files to the feedback_items DB table so
@@ -258,15 +343,20 @@ def route_feedback(flow: dict, storage_path: Path) -> dict | None:
         return None
 
     feedback_routing = flow.get("feedback_routing", {})
+    escalation_routing = flow.get("escalation_routing", {})
     human_files = {"HUMAN_QUESTIONS.md", "BLOCKED_ON_HUMAN.md"}
+    counts = retry_counts if retry_counts is not None else _read_retry_counts(storage_path)
 
     known_filenames: set[str] = set()
     for stem, agent in feedback_routing.items():
         filename = stem if stem.endswith(".md") else f"{stem}.md"
         known_filenames.add(filename)
         if filename in md_files:
-            result = {"file": filename, "target_agent": agent}
-            if filename in human_files:
+            target = _resolve_feedback_target(
+                filename, agent, counts.get(filename, 0), escalation_routing
+            )
+            result = {"file": filename, "target_agent": target}
+            if target == "human" or filename in human_files:
                 try:
                     result["instructions"] = (feedback_dir / filename).read_text(
                         encoding="utf-8"

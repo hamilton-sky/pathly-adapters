@@ -9,8 +9,8 @@ Model: [GOALS-DAG-EXECUTORS.md](GOALS-DAG-EXECUTORS.md). Per-phase specs: [phase
 |---|---|---|---|
 | 0a | goals + executor schema (`goal_id`/`executor` cols; goal = `type='goal'`) | ✅ done | [phases/PHASE-0-goals-schema.md](phases/PHASE-0-goals-schema.md) |
 | 0b | planner → task DAG (emit `type=task`; accept `goal_id`/`executor`) | 🔜 ready | [phases/PHASE-0b-planner-dag-wiring.md](phases/PHASE-0b-planner-dag-wiring.md) |
-| two-flow split | consultation flow (PO→arch→design→planner) + trim `team`→build-onward | 🔜 spec'd | PHASE-0b §follow-on |
-| P1 | **dispatcher** — route task/goal → `single`\|`loop`\|`team` (serial) | 🔭 next | _coming_ |
+| two-flow split | consultation flow (PO→arch→research→design→planner) + trimmed `team-build` flow (build→review→test→retro, feedback routes to specialists) | ✅ flows built | `core/flows/{consultation,team-build}.flow.yaml` |
+| P1 | **dispatcher** — route task/goal → `single`\|`loop`\|`team` (serial) | 🔭 next | [phases/PHASE-1-dispatcher.md](phases/PHASE-1-dispatcher.md) |
 | P2 | board UI — goals as groupings, executor+adapter selector, Run actions | 🔭 | _coming_ |
 | P3 | parallel — across-goal → lanes → worktree fan-in + **consolidation** | 🔭 | see `../parallel-fleet-part-1/`, `-part-2/` |
 

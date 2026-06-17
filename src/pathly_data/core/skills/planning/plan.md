@@ -172,9 +172,16 @@ In strict, add risk, rollback, approval, and verification mapping sections.
 
 Read `{{TEMPLATES_DIR}}/plan/PROGRESS.template.md` for the exact file structure.
 
-### 4e. CONVERSATION_PROMPTS.md
+### 4e. CONVERSATION_PROMPTS.md (legacy — superseded by board-DAG task text)
 
-This is the key file: verbatim prompts for each builder conversation. Max 4 conversations per folder.
+> **Legacy.** In the board-DAG model the **task `text` posted in Step 6 is the builder
+> prompt** (self-contained, per task). `CONVERSATION_PROMPTS.md` is retained only for the
+> older `build` skill path that still reads it; the board-native executors
+> (`single`/`loop`) never open it. When the build path is reworked to consume board tasks,
+> this file goes away. Generate it for back-compat, but the per-task Step-6 text is
+> authoritative.
+
+Verbatim prompts for each builder conversation. Max 4 conversations per folder.
 Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for the exact file structure.
 
 Each prompt must be self-contained. Start every prompt with:
@@ -266,25 +273,72 @@ Keep decomposition small enough for builder reliability:
 ## Step 6: Post Tasks to Comms Board
 
 After all plan files are verified, seed the comms board DAG so the builder can poll
-`GET /comms/tasks?ready=true` and Studio can visualize task progress.
+`GET /comms/tasks?ready=true` and Studio can visualize task progress. The DAG hangs off
+a **goal message** (`type=goal`): you post the goal first, then stamp every phase task
+with `goal_id` pointing at it.
 
-**Idempotency guard — skip if tasks already exist:**
+**Idempotency guard — skip if this DAG already exists.** Check for BOTH an existing goal
+and existing tasks for this feature's scope:
 ```
 curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE"
+curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
 ```
-If the response contains any messages with `"type": "task"` for this feature's scope, skip
-this entire step — the tasks are already seeded (e.g. from a previous planning run).
+If **either** response contains any messages, skip this entire step — the DAG is already
+seeded (e.g. from a previous planning run).
+
+**Post the goal first.** One `type=goal` message; capture its returned `message_id` as
+`$GOAL_ID`. `executor` is set on the **goal only** (`single` = one agent runs the whole
+goal; the `{single,loop,team}` choice is consumed later by the dispatcher, not here):
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "planner",
+    "type": "goal",
+    "text": "Goal: $FEATURE",
+    "board": "feature",
+    "scope": "$FEATURE",
+    "executor": "single"
+  }'
+```
+Record the response `"message_id"` as `$GOAL_ID`.
 
 **Post each phase in order** (Phase 1 first). Track the `message_id` returned by each call
 so later phases can reference their dependencies.
 
+**The task `text` IS the builder prompt** — in the board-DAG model each task is the unit of
+work (replacing the per-conversation prompts of the legacy `CONVERSATION_PROMPTS.md`). An
+executor agent runs a task seeing ONLY its `text` plus the file at `artifact_path` — so the
+text must be **self-contained**: what to build, which files, and when it's done. Do not rely
+on the agent reading a separate conversation-prompts file.
+
 For each phase in `IMPLEMENTATION_PLAN.md`:
-1. Extract the phase number `N`, title, and one-line description.
+1. Extract the phase number `N`, title, the `Purpose:` (what to build), the `File:` field,
+   and the `Done when:` field (all required on every phase per Task Decomposition Rules).
 2. Read the `Depends on:` field — note which phase numbers it depends on (e.g. `Phase 1, Phase 2`).
    Use `[]` when the phase says `Depends on: nothing`.
 3. Resolve dependencies: replace each named phase number with the `message_id` you recorded
    when that phase was posted (your local map: `phase_N → message_id`).
-4. POST to the comms board:
+4. **Compose the self-contained task `text`** (a single JSON string; use `\n` for line breaks),
+   following this shape — keep it tight, no line numbers or exact test counts (Team-Safe rules):
+   ```
+   Phase N: <title>
+
+   <Purpose — 1–2 sentences on what to build and why>
+
+   Files: <the phase's File: value>
+   Done when: <the phase's Done when: value>
+
+   Read pathly/plans/$FEATURE/FEATURE_INDEX.md first to orient and verify paths. Do NOT touch
+   files outside this phase's scope. If verification fails and the fix needs out-of-scope
+   changes, stop and report; if fundamentally broken, git checkout the affected files and retry.
+   ```
+5. POST the task with `goal_id:"$GOAL_ID"` and that composed `text`. Emit this EXACT shape.
+   `executor` is **NOT** on the task (it lives on the goal). `conv` is the conversation number
+   from the plan and MUST be a JSON **integer** — omit the key entirely rather than send a
+   string (the route 400s on a string `conv`):
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
@@ -293,14 +347,19 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "feature": "$FEATURE",
     "from": "planner",
     "type": "task",
-    "text": "Phase N: <title> — <one-line description>",
+    "text": "Phase N: <title>\n\n<purpose>\n\nFiles: <file>\nDone when: <done-when>\n\nRead pathly/plans/$FEATURE/FEATURE_INDEX.md first…",
     "board": "feature",
+    "scope": "$FEATURE",
     "stage": "BUILDING",
-    "depends_on": ["<dep_message_id>"]
+    "conv": <int>,
+    "depends_on": ["<phase_K_message_id>"],
+    "goal_id": "$GOAL_ID",
+    "artifact_path": "pathly/plans/$FEATURE/IMPLEMENTATION_PLAN.md",
+    "artifact_type": "plan_artifact"
   }'
 ```
 
-5. Record the `"message_id"` from the response as `phase_N_id` in your local map.
+6. Record the `"message_id"` from the response as `phase_N_id` in your local map.
 
 If the comms server is unreachable (connection refused or non-200 response), skip this step
 silently — plan files are the authoritative source of truth and the DAG is advisory.

@@ -65,6 +65,26 @@ class LaneIsolation:
         return max(1, len(ready_lanes))  # one worker per active lane
 
 
+class SerialIsolation:
+    """Lane isolation pinned to ONE worker at a time — the Phase-1 "ship serial"
+    executor. Delegates workspace acquire/release to an inner LaneIsolation but
+    forces max_concurrency to 1 regardless of how many lanes are ready, so the
+    frontier drains one task at a time. Flipping to parallel (P3) is just swapping
+    this back to LaneIsolation (across-goal) or WorktreeIsolation (within-goal)."""
+
+    def __init__(self) -> None:
+        self._inner = LaneIsolation()
+
+    def acquire(self, task: dict, state) -> TaskWorkspace:
+        return self._inner.acquire(task, state)
+
+    def release(self, ws: TaskWorkspace, *, success: bool) -> None:
+        self._inner.release(ws, success=success)
+
+    def max_concurrency(self, ready_lanes: set[str]) -> int:
+        return 1
+
+
 class WorktreeIsolation:
     """Per-task git worktree + private DB + private port.
 

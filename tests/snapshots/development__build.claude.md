@@ -119,16 +119,26 @@ Report to the user before starting:
 
 Run: `python -c "import time; print(int(time.time()))"` and note the printed integer as `BUILD_START`.
 
-## Step 4.6: DAG task loop (comms board)
+## Step 4.6: Board task DAG (preferred work source)
 
-If the comms board is active for this feature:
-1. Call `GET http://127.0.0.1:8765/comms/tasks?feature=<feature>&ready=true`
-2. If tasks are returned, implement them in order (they are already unblocked)
-3. After completing each task, call `POST http://127.0.0.1:8765/comms/tasks/complete` with body `{"message_id": "<task_id>", "feature": "<feature>"}`
-4. Poll `GET /comms/tasks?feature=<feature>&ready=true` again — new tasks may have unlocked
-5. Continue until no ready tasks remain, then proceed to Step 5 as normal
+If this feature has a board task DAG, it is the **authoritative** work list — drain it
+**instead of** the conversation prompt (the DAG supersedes `CONVERSATION_PROMPTS.md`):
 
-If the endpoint returns an empty list or is unreachable, skip to Step 5 directly. The DAG loop supplements the conversation prompt — it does not replace it. If no task messages exist on the board, the builder works exactly as before.
+1. `GET http://127.0.0.1:8765/comms/tasks?feature=<feature>&scope=<feature>&ready=true`
+2. **If the list is non-empty, drain it** (do NOT also run Step 5's conversation prompt):
+   a. Pick a ready task and claim it:
+      `POST /comms/tasks/claim` with `{"message_id":"<id>","run_id":"build"}`.
+      If `claimed` is false another worker took it — re-fetch and pick another.
+   b. Implement that task from its `text` (a self-contained builder prompt — what to
+      build · Files · Done when) plus its `artifact_path` for plan context. Verify-before-edit
+      (Step 5.0), stay strictly in the task's scope, no silent refactoring.
+   c. On success: `POST /comms/tasks/complete` with `{"message_id":"<id>","feature":"<feature>"}`.
+      On unrecoverable failure: `POST /comms/tasks/fail` with `{"message_id":"<id>","reason":"<short>"}`.
+   d. Re-fetch (step 1). Repeat until the ready list is empty, then **skip Steps 5–6 and go
+      to Step 7**.
+3. **If the list is empty or the endpoint is unreachable**, fall through to Step 5 and build
+   the conversation prompt read in Step 3 — the legacy path, unchanged. Features with no board
+   DAG (older plans) work exactly as before.
 
 ## Step 5: Implement
 

@@ -92,8 +92,9 @@ def _make_fake_spawn(
     sleep_s:
         How long to sleep to simulate work (enables overlap detection).
     fail_for:
-        Set of task text values (the ``instructions`` arg) to raise for.
-        The scheduler passes task["text"] as the instructions arg.
+        Set of task text values to raise for. The scheduler passes task["text"]
+        as the instructions arg, then appends the scope-aware board context after
+        a blank line — so the task text is the segment before the first "\n\n".
     """
     fail_for = fail_for or set()
     lock = threading.Lock()
@@ -108,8 +109,9 @@ def _make_fake_spawn(
         end = time.monotonic()
         with lock:
             records[task_id]["end"] = end
-        if instructions in fail_for:
-            raise RuntimeError(f"Intentional failure for task: {instructions!r}")
+        task_text = instructions.split("\n\n", 1)[0]
+        if task_text in fail_for:
+            raise RuntimeError(f"Intentional failure for task: {task_text!r}")
         return {"ok": True}
 
     return _spawn

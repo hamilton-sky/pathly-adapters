@@ -6,7 +6,7 @@ export type BoardScope = 'feature' | 'project' | 'global'
 
 export type MessageType =
   | 'nudge' | 'decision' | 'question' | 'answer' | 'status'
-  | 'discovery' | 'warning' | 'escalation' | 'task' | 'artifact'
+  | 'discovery' | 'warning' | 'escalation' | 'task' | 'artifact' | 'goal'
 
 export type Stage =
   | 'PLANNING' | 'BUILDING' | 'REVIEWING' | 'TESTING' | 'RETRO' | 'DONE'
@@ -51,6 +51,14 @@ export interface Message {
   /** True once any agent has read this message. Maps to a non-empty read_by
    *  (SPEC §5). Your own messages can be retracted only while this is false. */
   readByAgent?: boolean
+  /** Goal id — set on task messages to link them to their parent goal. */
+  goal_id?: string
+  /** Executor type — set on goal messages (single | loop | team). */
+  executor?: 'single' | 'loop' | 'team'
+  /** Task lifecycle status — set on task messages (maps to comms_messages.task_status). */
+  taskStatus?: 'pending' | 'in_progress' | 'done' | 'blocked' | 'failed'
+  /** Dependency task ids — set on task messages (maps to comms_messages.depends_on JSON). */
+  dependsOn?: string[]
 }
 
 export interface Feature {

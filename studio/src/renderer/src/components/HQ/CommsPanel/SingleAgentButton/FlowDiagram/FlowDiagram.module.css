@@ -1,0 +1,116 @@
+.diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface0);
+  min-width: 0;
+}
+
+.blurb {
+  margin: 0;
+  font: 400 11.5px/1.45 var(--font-family-base);
+  color: var(--text-secondary);
+}
+
+.nodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 4px 2px;
+  min-width: 0;
+}
+
+/* Connector rail joining each dot to the next. */
+.node:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 17px;
+  bottom: -3px;
+  width: 2px;
+  background: color-mix(in srgb, var(--text-muted) 35%, transparent);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+  box-shadow: 0 0 0 3px var(--bg-surface0);
+  z-index: 1;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.state {
+  font: 600 11px/1.2 var(--font-family-mono);
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role {
+  font: 400 10px/1.2 var(--font-family-base);
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.agent {
+  font: 500 10px/1 var(--font-family-mono);
+  color: var(--text-secondary);
+  background: var(--bg-surface1);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doneIcon {
+  color: var(--green, #98c379);
+  flex-shrink: 0;
+}
+
+.loops {
+  margin: 2px 0 0;
+  font: 400 10px/1.35 var(--font-family-base);
+  color: var(--text-muted);
+}
+
+/* Role-accent dots so the pipeline reads at a glance. */
+.dot[data-role='builder']    { background: var(--accent); }
+.dot[data-role='reviewer']   { background: var(--yellow, #d8a657); }
+.dot[data-role='tester']     { background: var(--green, #98c379); }
+.dot[data-role='scout']      { background: var(--text-secondary); }
+.dot[data-role='explorer']   { background: #7aa2f7; }
+.dot[data-role='planner']    { background: #bb9af7; }
+.dot[data-role='designer']   { background: #f7768e; }
+.dot[data-role='discoverer'] { background: #2ac3de; }
+.dot[data-role='router']     { background: var(--text-muted); }
+.dot[data-role='retro']      { background: #9ece6a; }
+.dot[data-role='done']       { background: var(--green, #98c379); }

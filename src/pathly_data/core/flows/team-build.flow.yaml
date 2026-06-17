@@ -1,0 +1,86 @@
+version: 1
+flow: team-build
+storage_path: pathly/plans/{topic}/
+# Trimmed team flow — the `team` executor (GOALS-DAG-EXECUTORS §3, §6). Runs
+# build → review → test → retro on a goal whose decomposition (plan + task DAG)
+# already exists (from the consultation flow or a single planner run). The upfront
+# STORM/PLAN/DESIGN stages live in consultation.flow.yaml, not here.
+states:
+  - BUILDING
+  - REVIEWING
+  - TESTING
+  - RETRO
+  - DONE
+transitions:
+  BUILDING:
+    - REVIEWING
+  REVIEWING:
+    - BUILDING
+    - TESTING
+  TESTING:
+    - BUILDING
+    - RETRO
+  RETRO:
+    - DONE
+  DONE: []
+agent_map:
+  BUILDING: team/build
+  REVIEWING: team/review
+  TESTING: team/test
+  RETRO: team/retro
+role_map:
+  BUILDING: builder
+  REVIEWING: reviewer
+  TESTING: tester
+  RETRO: retro
+# Feedback files route BACK to the specialist who owns them, even though those
+# roles are not stages in this flow — the builder can escalate an architecture
+# question, a requirements gap, or a design question to the right consultation
+# role mid-build; the reviewer/tester send failures back to the builder.
+feedback_routing:
+  HUMAN_QUESTIONS: human
+  BLOCKED_ON_HUMAN: human
+  ARCH_QUESTION: architect
+  ARCH_FEEDBACK: architect
+  DESIGN_QUESTIONS: designer
+  PO_QUESTIONS: po
+  REQUIREMENT_GAP: po
+  ACCEPTANCE_QUESTION: po      # tester asks the PO whether the criteria themselves are right
+  IMPL_QUESTIONS: planner
+  REFLECT_CRITIQUE: builder
+  REVIEW_FAILURES: builder
+  SCOPE_VIOLATION: builder
+  TEST_FAILURES: builder
+# 3-tier escalation (fsm.engine.route_feedback): when a FAILURE file keeps failing,
+# its target climbs from the builder (rounds 1-2) → the upstream owner (round 3) →
+# the human (round 4+). The repeated failure usually means the plan/design/criteria
+# are wrong, not the build. Files absent here never tier (clarifications, human files).
+escalation_routing:
+  REVIEW_FAILURES: planner    # round 3: the plan/scope likely doesn't match reality
+  SCOPE_VIOLATION: planner    # round 3: the conversation scope is wrong
+  TEST_FAILURES: po           # round 3: the acceptance criteria may be wrong
+transition_rules:
+  BUILDING:
+    default: REVIEWING
+  REVIEWING:
+    on_artifact:
+      REVIEW_FAILURES.md: BUILDING
+    default: TESTING
+  TESTING:
+    on_artifact:
+      TEST_FAILURES.md: BUILDING
+    default: RETRO
+transition_actions:
+  BUILDING->REVIEWING:
+    - skill: commit
+      message: 'feat: complete building stage'
+  RETRO->DONE:
+    - skill: archive-artifacts
+scope_gate:
+  exempt_prefixes: []
+gates:
+  REVIEWING->TESTING:
+    - type: require_artifact
+      artifact: REVIEW.md
+      on_fail: HUMAN_QUESTIONS.md
+_comments: []

@@ -9,7 +9,8 @@
   position: fixed;
   top: 52px;
   right: 160px;
-  width: 420px;
+  width: 480px;
+  max-width: calc(100vw - 24px);
   background: var(--bg-mantle);
   border: 1px solid var(--bg-surface1);
   border-radius: 10px;
@@ -20,19 +21,46 @@
   z-index: 201;
 }
 
-.header {
+/* Top action bar: Reset (left) · Use once + Save default (right) */
+.toolbarTop {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px 8px;
+  gap: 8px;
+  padding: 8px 12px;
   border-bottom: var(--border);
   flex-shrink: 0;
 }
 
-.headerLeft {
+.topRight {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* Bottom action bar: Cancel (left) · engine picker (right) */
+.toolbarBottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: var(--border);
+  flex-shrink: 0;
+}
+
+.engineZone {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Caption row under the top bar — which prompt this is, and the file. */
+.caption {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 14px 8px;
+  border-bottom: var(--border);
+  flex-shrink: 0;
 }
 
 .title {
@@ -55,8 +83,8 @@
   background: transparent;
   border: var(--border);
   border-radius: var(--radius-md);
-  padding: 3px 8px;
-  font-size: 11px;
+  padding: 5px 10px;
+  font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
   color: var(--text-muted);
   cursor: pointer;
@@ -75,7 +103,6 @@
   color: var(--text-secondary);
   background: var(--bg-base, var(--bg-surface0));
   border: none;
-  border-bottom: var(--border);
   resize: none;
   padding: 12px 14px;
   outline: none;
@@ -86,15 +113,6 @@
 
 .textarea:focus {
   color: var(--text-primary);
-}
-
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: 8px 12px;
-  flex-shrink: 0;
 }
 
 .cancelBtn {

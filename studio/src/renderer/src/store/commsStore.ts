@@ -7,6 +7,7 @@ import {
   apiAcknowledge,
   apiToggleScope,
   apiDelete,
+  apiEditMessage,
   scopeToParams,
   buildFeature,
   fetchFeatureState,
@@ -19,10 +20,15 @@ import {
   apiAttach,
   apiRunBoard,
   apiStopBoard,
+  apiRunGoal,
+  apiDecomposeGoal,
+  type RunGoalOpts,
+  type DecomposeMode,
 } from './commsApi'
 import { listDirs } from '../services/pathlyApi'
 import { useRunnerStore } from './runnerStore'
 import { useProjectStore } from './projectStore'
+import { useToastStore } from './toastStore'
 
 function isPending(m: Message): boolean {
   return (m.type === 'question' && m.status === 'pending')
@@ -54,6 +60,8 @@ export interface CommsState {
   toggleScope: (featureId: string, scope: BoardScope, projectRoot: string) => void
   /** Remove any board message (force soft-delete; recoverable from trash). */
   deleteMessage: (key: string, messageId: string) => void
+  /** Edit a message's text in place (e.g. rename a goal). */
+  editMessage: (key: string, messageId: string, text: string) => void
 
   // GAP 4 — management actions + transient search overlay state.
   searchResults: Message[] | null
@@ -65,10 +73,25 @@ export interface CommsState {
 
   // C2 — single-agent run state keyed by board (e.g. feature id, 'project', 'global')
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
+  /** Epoch ms when the board run started — drives the elapsed clock in RunPill. */
+  boardRunStart: Record<string, number>
   runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string; progress?: string }) => void
+  /** Run the evaluator on a board: classify its content and propose concrete tasks. */
+  runEvaluator: (key: string, opts?: { adapter?: string }) => void
   /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
   markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
+
+  // Goal DAG run state keyed by goal message id
+  goalRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
+  /** Epoch ms when the goal run started — drives the elapsed clock in RunPill. */
+  goalRunStart: Record<string, number>
+  runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
+  /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
+  decomposeGoal: (goal_id: string, mode: DecomposeMode) => void
+  /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
+  markGoalRunPhase: (goal_id: string, phase: string) => void
+  stopGoal: (goal_id: string) => void
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -265,6 +288,17 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     apiDelete(messageId, true).catch(() => { /* best-effort */ })
   },
 
+  editMessage: (key, messageId, text) => {
+    // Optimistic in-place text update; the board reload reconciles. The id is
+    // preserved server-side so a goal keeps its task links.
+    set((s) => {
+      const arr = s.boards[key] || []
+      if (!arr.some((x) => x.id === messageId)) return s
+      return { boards: { ...s.boards, [key]: arr.map((x) => x.id === messageId ? { ...x, text } : x) } }
+    })
+    apiEditMessage(messageId, text).catch(() => { /* best-effort */ })
+  },
+
   searchResults: null,
   searchTerm: '',
 
@@ -301,9 +335,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   },
 
   boardRunState: {},
+  boardRunStart: {},
 
   runSingleAgent: (key, opts) => {
-    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
+    const now = Date.now()
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
 
     const isFeature = key !== 'project' && key !== 'global'
     // Align Studio's runner SSE subscription with this board's topic so the agent's
@@ -338,13 +374,49 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       })
   },
 
+  runEvaluator: (key, opts = {}) => {
+    const now = Date.now()
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
+
+    const isFeature = key !== 'project' && key !== 'global'
+    if (isFeature) useProjectStore.getState().setActiveTopic(key)
+    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
+    const params = scopeToParams(scope, key)
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+
+    apiRunBoard(params.board, params.scope, 'evaluator', { projectRoot, ...opts })
+      .then((res) => {
+        if (res === null) {
+          set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+          return
+        }
+        if (!res.ok && res.error === 'board_busy') {
+          set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } }))
+        }
+        // Otherwise stays 'running' until the board_run 'done' phase arrives via SSE.
+      })
+      .catch(() => {
+        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+      })
+  },
+
   markBoardRunPhase: (key, phase) => {
     if (phase === 'running') {
-      set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' } }))
+      const now = Date.now()
+      set((s) => ({
+        boardRunState: { ...s.boardRunState, [key]: 'running' },
+        // Only set start time if not already running (SSE may re-emit 'running')
+        boardRunStart: s.boardRunStart[key] ? s.boardRunStart : { ...s.boardRunStart, [key]: now },
+      }))
     } else if (phase === 'done' || phase === 'stopped') {
+      useToastStore.getState().push(
+        phase === 'done' ? 'Agent done' : 'Agent stopped',
+        phase === 'done' ? 'success' : 'info',
+        { category: phase === 'done' ? 'agent_done' : 'runner_state' },
+      )
       set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'done' } }))
       window.setTimeout(() => {
-        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+        set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' }, boardRunStart: { ...s.boardRunStart, [key]: 0 } }))
       }, 3000)
     }
   },
@@ -355,5 +427,78 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     const params = scopeToParams(scope, key)
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
     void apiStopBoard(params.board, params.scope)
+  },
+
+  goalRunState: {},
+  goalRunStart: {},
+
+  runGoal: (goal_id, executor, opts = {}) => {
+    const now = Date.now()
+    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' }, goalRunStart: { ...s.goalRunStart, [goal_id]: now } }))
+
+    apiRunGoal(goal_id, executor, opts)
+      .then((res) => {
+        if (res === null) {
+          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+          return
+        }
+        if (!res.ok && res.error === 'board_busy') {
+          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'busy' } }))
+          return
+        }
+        if (!res.ok && res.error === 'not_implemented') {
+          // team executor not yet available — surface via state, not by staying 'running'
+          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+          return
+        }
+        // ok=true: stay 'running'; SSE goal_run phase drives the transition to done/idle
+      })
+      .catch(() => {
+        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+      })
+  },
+
+  markGoalRunPhase: (goal_id, phase) => {
+    if (phase === 'running') {
+      const now = Date.now()
+      set((s) => ({
+        goalRunState: { ...s.goalRunState, [goal_id]: 'running' },
+        goalRunStart: s.goalRunStart[goal_id] ? s.goalRunStart : { ...s.goalRunStart, [goal_id]: now },
+      }))
+    } else if (phase === 'done' || phase === 'stopped') {
+      useToastStore.getState().push(
+        phase === 'done' ? 'Goal run complete' : 'Goal run stopped',
+        phase === 'done' ? 'success' : 'info',
+        { category: phase === 'done' ? 'agent_done' : 'runner_state' },
+      )
+      set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'done' } }))
+      window.setTimeout(() => {
+        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' }, goalRunStart: { ...s.goalRunStart, [goal_id]: 0 } }))
+      }, 3000)
+    }
+  },
+
+  stopGoal: (goal_id) => {
+    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+    // No dedicated stop endpoint for goals yet — optimistic clear only
+  },
+
+  decomposeGoal: (goal_id, mode) => {
+    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' } }))
+
+    apiDecomposeGoal(goal_id, mode)
+      .then((res) => {
+        if (res === null || !res.ok) {
+          // already_decomposed → the board reload will reveal the existing DAG;
+          // board_busy → flag busy; otherwise just clear.
+          const next = res?.reason === 'board_busy' ? 'busy' : 'idle'
+          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: next } }))
+          return
+        }
+        // ok=true: stay 'running'; the goal_decompose SSE phase drives done/idle.
+      })
+      .catch(() => {
+        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+      })
   },
 }))
