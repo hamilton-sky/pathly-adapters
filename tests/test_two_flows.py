@@ -60,3 +60,33 @@ def test_flows_load_via_fsm_loader():
     from pathly_orchestrator.fsm_ops import _load_flow
     assert _load_flow("team-build")["flow"] == "team-build"
     assert _load_flow("consultation")["flow"] == "consultation"
+
+
+def test_flow_config_roundtrips_escalation_and_custom_keys():
+    """Decompose→assemble is lossless for escalation_routing AND arbitrary custom keys
+    (the DB round-trip must not drop flow-level config)."""
+    from pathly_orchestrator.db.queries.flow_defs import _assemble_from_parts, _decompose_flow_dict
+
+    flow = {
+        "version": 1, "flow": "x", "storage_path": "p/{topic}/",
+        "states": ["A", "B"], "transitions": {"A": ["B"], "B": []},
+        "agent_map": {"A": "team/build"}, "role_map": {"A": "builder"},
+        "feedback_routing": {"REVIEW_FAILURES": "builder"},
+        "escalation_routing": {"REVIEW_FAILURES": "planner", "TEST_FAILURES": "po"},
+        "my_custom_key": {"anything": [1, 2]},
+    }
+    cfg, nodes, edges = _decompose_flow_dict(flow)
+    assembled = _assemble_from_parts(cfg, nodes, edges)
+    assert assembled["escalation_routing"] == {"REVIEW_FAILURES": "planner", "TEST_FAILURES": "po"}
+    assert assembled["my_custom_key"] == {"anything": [1, 2]}
+    assert assembled["feedback_routing"] == {"REVIEW_FAILURES": "builder"}
+
+
+def test_team_build_escalation_survives_db_backed_load(tmp_path):
+    """The real runtime path: _refresh_flows seeds team-build into the DB (decomposed),
+    and _load_flow reassembles it WITH escalation_routing — i.e. the 3-tier feature is
+    not silently dropped in production."""
+    from pathly_orchestrator.fsm_ops import _load_flow
+    flow = _load_flow("team-build", project_root=str(tmp_path))
+    assert flow.get("escalation_routing", {}).get("REVIEW_FAILURES") == "planner"
+    assert flow.get("escalation_routing", {}).get("TEST_FAILURES") == "po"

@@ -17,6 +17,21 @@ _log = logging.getLogger(__name__)
 # Pure helpers — no DB access
 # ---------------------------------------------------------------------------
 
+# Top-level flow keys that are decomposed into node/edge rows — everything ELSE is
+# carried verbatim as flow-level config (so new/custom keys round-trip losslessly).
+_STRUCTURAL_FLOW_KEYS = frozenset({
+    "states", "transitions", "agent_map", "role_map", "skill_map", "adapter_map",
+    "transition_rules", "composition", "transition_actions", "gates",
+})
+
+# Flow-level keys explicitly reconstructed by _assemble_from_parts; the pass-through
+# at the end restores any OTHER flow_level_config key (escalation_routing, custom keys).
+_ASSEMBLED_FLOW_KEYS = frozenset({
+    "version", "flow", "storage_path", "feedback_routing", "scope_gate",
+    "_comments", "adapter_default",
+})
+
+
 def _decompose_flow_dict(flow_dict: dict) -> tuple[dict, list[dict], list[dict]]:
     """Split a parsed YAML flow dict into (flow_level_config, node_rows, edge_rows).
 
@@ -38,11 +53,15 @@ def _decompose_flow_dict(flow_dict: dict) -> tuple[dict, list[dict], list[dict]]
     transition_actions = flow_dict.get("transition_actions") or {}
     gates = flow_dict.get("gates") or {}
 
+    # Flow-level config = every top-level key that is NOT decomposed into nodes/edges.
+    # Capturing by EXCLUSION (not a fixed allowlist) keeps the round-trip lossless: new
+    # flow config (e.g. escalation_routing) and user-defined keys survive automatically,
+    # so the DB-backed/Studio-edited flow matches the YAML without touching this code.
     flow_level_config: dict = {}
-    for key in ("version", "flow", "storage_path", "feedback_routing", "scope_gate", "_comments"):
-        val = flow_dict.get(key)
-        if val is not None:
-            flow_level_config[key] = val
+    for key, val in flow_dict.items():
+        if key in _STRUCTURAL_FLOW_KEYS or val is None:
+            continue
+        flow_level_config[key] = val
     adapter_default = adapter_map.get("default")
     if adapter_default is not None:
         flow_level_config["adapter_default"] = adapter_default
@@ -224,6 +243,14 @@ def _assemble_from_parts(
     comments = flow_level_config.get("_comments")
     if comments is not None:
         result["_comments"] = comments
+
+    # Pass-through: restore any flow-level key NOT explicitly reconstructed above
+    # (escalation_routing today; user/custom keys tomorrow) so the round-trip is
+    # lossless. Skips internal/derived keys and anything already set.
+    for key, val in flow_level_config.items():
+        if key in _ASSEMBLED_FLOW_KEYS or key in result:
+            continue
+        result[key] = val
 
     return result
 
