@@ -443,6 +443,32 @@ export type RunGoalResponse = RunGoalResult | RunGoalBusy | RunGoalTeamUnavailab
 export interface RunGoalOpts {
   adapter?: string
   model?: string
+  flow?: string
+}
+
+export type DecomposeMode = 'planner' | 'consultation'
+
+// Decompose a goal into a task DAG (planner = fast, consultation = deep). Returns the
+// parsed {ok, reason} so the caller can distinguish board_busy / already_decomposed.
+export async function apiDecomposeGoal(
+  goal_id: string,
+  mode: DecomposeMode,
+  opts: { adapter?: string } = {},
+): Promise<{ ok: boolean; reason?: string } | null> {
+  try {
+    const body: Record<string, unknown> = { goal_id, mode }
+    if (opts.adapter) body.adapter = opts.adapter
+    const r = await apiFetch('/comms/goals/decompose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const json = (await r.json().catch(() => null)) as { ok?: boolean; reason?: string } | null
+    if (json && typeof json.ok === 'boolean') return { ok: json.ok, reason: json.reason }
+    return { ok: r.ok }
+  } catch {
+    return null
+  }
 }
 
 export async function apiRunGoal(
@@ -455,6 +481,7 @@ export async function apiRunGoal(
     if (executor) body.executor = executor
     if (opts.adapter) body.adapter = opts.adapter
     if (opts.model) body.model = opts.model
+    if (opts.flow) body.flow = opts.flow
     const r = await apiFetch('/comms/goals/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

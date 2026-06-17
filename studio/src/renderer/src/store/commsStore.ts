@@ -20,7 +20,9 @@ import {
   apiRunBoard,
   apiStopBoard,
   apiRunGoal,
+  apiDecomposeGoal,
   type RunGoalOpts,
+  type DecomposeMode,
 } from './commsApi'
 import { listDirs } from '../services/pathlyApi'
 import { useRunnerStore } from './runnerStore'
@@ -75,7 +77,9 @@ export interface CommsState {
   // Goal DAG run state keyed by goal message id
   goalRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
   runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
-  /** Update a goal's run state from a goal_run SSE phase (running/done/stopped). */
+  /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
+  decomposeGoal: (goal_id: string, mode: DecomposeMode) => void
+  /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
   markGoalRunPhase: (goal_id: string, phase: string) => void
   stopGoal: (goal_id: string) => void
 }
@@ -407,5 +411,24 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   stopGoal: (goal_id) => {
     set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
     // No dedicated stop endpoint for goals yet — optimistic clear only
+  },
+
+  decomposeGoal: (goal_id, mode) => {
+    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' } }))
+
+    apiDecomposeGoal(goal_id, mode)
+      .then((res) => {
+        if (res === null || !res.ok) {
+          // already_decomposed → the board reload will reveal the existing DAG;
+          // board_busy → flag busy; otherwise just clear.
+          const next = res?.reason === 'board_busy' ? 'busy' : 'idle'
+          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: next } }))
+          return
+        }
+        // ok=true: stay 'running'; the goal_decompose SSE phase drives done/idle.
+      })
+      .catch(() => {
+        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+      })
   },
 }))

@@ -1116,7 +1116,7 @@ def comms_goals_run():
                 c = _get_db()
                 mid = _post_message(c, board=board, scope=scope, from_agent="system",
                                     type="status", text=text)
-                payload = {"type": "COMMS_UPDATE", "event": "goal_run",
+                payload = {"type": "COMMS_UPDATE", "event": "goal_run", "goal_id": goal_id,
                            "message_id": mid, "board": board, "scope": scope}
                 if phase:
                     payload["phase"] = phase
@@ -1208,7 +1208,7 @@ def comms_goals_decompose():
                 c = _get_db()
                 mid = _post_message(c, board=board, scope=scope, from_agent="system",
                                     type="status", text=text)
-                payload = {"type": "COMMS_UPDATE", "event": "goal_decompose",
+                payload = {"type": "COMMS_UPDATE", "event": "goal_decompose", "goal_id": goal_id,
                            "message_id": mid, "board": board, "scope": scope}
                 if phase:
                     payload["phase"] = phase

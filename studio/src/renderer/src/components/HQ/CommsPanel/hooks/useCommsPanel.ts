@@ -42,7 +42,8 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
             if (data.event === 'board_run' && data.phase) {
               useCommsStore.getState().markBoardRunPhase(key, data.phase)
             }
-            if (data.event === 'goal_run' && data.phase && data.goal_id) {
+            if ((data.event === 'goal_run' || data.event === 'goal_decompose')
+                && data.phase && data.goal_id) {
               useCommsStore.getState().markGoalRunPhase(data.goal_id, data.phase)
             }
             loadRef.current()

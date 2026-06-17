@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Message } from '../../../CommandCenter/types'
 import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import { GoalRunButton } from '../GoalRunButton/GoalRunButton'
+import { GoalDecomposeButton } from '../GoalDecomposeButton/GoalDecomposeButton'
 import { computeRollup } from './goalsViewUtils'
 import s from './GoalsView.module.css'
 
@@ -35,7 +36,10 @@ export function GoalGroupHeader({ goal, tasks, open, onToggle }: Props): JSX.Ele
           {r.failed > 0 ? ` · ${r.failed} blocked` : ''}
         </div>
       </div>
-      <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />
+      {/* No tasks yet → Decompose the goal into a DAG; once it has tasks → Run it. */}
+      {tasks.length === 0
+        ? <GoalDecomposeButton goalId={goal.id} />
+        : <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />}
     </div>
   )
 }
