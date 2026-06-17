@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Check, History, FileText, Search, Eye, ChevronRight } from 'lucide-react'
 import type { Message } from '../../CommandCenter/types'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
+import { GoalRunButton } from './GoalRunButton/GoalRunButton'
 import s from './CommsMsgCard.module.css'
 
 export interface CardBodyProps {
@@ -103,6 +104,19 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
               </button>
             </div>
           )}
+      </>
+    )
+  }
+
+  if (m.type === 'goal') {
+    return (
+      <>
+        {supersededBanner}
+        <MarkdownRenderer content={m.text} className={s.msgText} />
+        <GoalRunButton
+          goalId={m.id}
+          defaultExecutor={m.executor ?? 'single'}
+        />
       </>
     )
   }

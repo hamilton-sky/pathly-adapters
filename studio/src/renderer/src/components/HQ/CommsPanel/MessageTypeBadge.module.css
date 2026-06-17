@@ -23,3 +23,4 @@
 .badge[data-type='warning']   { color: var(--orange);   background: var(--orange-bg); }
 .badge[data-type='escalation']{ color: var(--red);      background: var(--red-bg); }
 .badge[data-type='artifact']  { color: var(--runtime);  background: var(--runner-bg); }
+.badge[data-type='goal']      { color: var(--blue);     background: var(--badge-body-bg); }

@@ -41,6 +41,8 @@ export interface CommsRow {
   artifact_type: string | null
   artifact_url: string | null
   superseded_by?: string | null
+  goal_id?: string | null
+  executor?: string | null
 }
 
 interface BackendOption {
@@ -113,6 +115,8 @@ export function rowToMessage(row: CommsRow): Message {
   }
 
   if (row.superseded_by) m.supersededBy = row.superseded_by
+  if (row.goal_id) m.goal_id = row.goal_id
+  if (row.executor) m.executor = row.executor as Message['executor']
 
   return m
 }
@@ -407,6 +411,59 @@ export async function apiStopBoard(board: string, scope: string): Promise<boolea
     return r.ok
   } catch {
     return false
+  }
+}
+
+// ── Goal DAG run ─────────────────────────────────────────────────────
+
+export interface RunGoalResult {
+  ok: true
+  run_id: string
+  executor: string
+}
+
+export interface RunGoalBusy {
+  ok: false
+  error: 'board_busy'
+  reason?: string
+}
+
+export interface RunGoalTeamUnavailable {
+  ok: false
+  error: 'not_implemented'
+}
+
+export type RunGoalResponse = RunGoalResult | RunGoalBusy | RunGoalTeamUnavailable
+
+export interface RunGoalOpts {
+  adapter?: string
+  model?: string
+}
+
+export async function apiRunGoal(
+  goal_id: string,
+  executor?: string,
+  opts: RunGoalOpts = {},
+): Promise<RunGoalResponse | null> {
+  try {
+    const body: Record<string, unknown> = { goal_id }
+    if (executor) body.executor = executor
+    if (opts.adapter) body.adapter = opts.adapter
+    if (opts.model) body.model = opts.model
+    const r = await apiFetch('/comms/goals/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (r.status === 409) {
+      return { ok: false, error: 'board_busy' }
+    }
+    if (r.status === 501) {
+      return { ok: false, error: 'not_implemented' }
+    }
+    return await r.json() as RunGoalResponse
+  } catch {
+    return null
   }
 }
 

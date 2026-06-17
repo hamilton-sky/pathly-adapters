@@ -90,6 +90,17 @@
   margin-bottom: 4px;
 }
 
+/* Indented child tasks under a goal card */
+.taskGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 20px;
+  border-left: 2px solid var(--border-color, var(--border));
+  margin-top: -6px;
+  min-width: 0;
+}
+
 /* Empty state */
 .empty {
   flex: 1;

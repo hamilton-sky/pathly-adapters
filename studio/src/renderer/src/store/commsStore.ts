@@ -19,6 +19,8 @@ import {
   apiAttach,
   apiRunBoard,
   apiStopBoard,
+  apiRunGoal,
+  type RunGoalOpts,
 } from './commsApi'
 import { listDirs } from '../services/pathlyApi'
 import { useRunnerStore } from './runnerStore'
@@ -69,6 +71,13 @@ export interface CommsState {
   /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
   markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
+
+  // Goal DAG run state keyed by goal message id
+  goalRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
+  runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
+  /** Update a goal's run state from a goal_run SSE phase (running/done/stopped). */
+  markGoalRunPhase: (goal_id: string, phase: string) => void
+  stopGoal: (goal_id: string) => void
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -355,5 +364,48 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     const params = scopeToParams(scope, key)
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
     void apiStopBoard(params.board, params.scope)
+  },
+
+  goalRunState: {},
+
+  runGoal: (goal_id, executor, opts = {}) => {
+    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' } }))
+
+    apiRunGoal(goal_id, executor, opts)
+      .then((res) => {
+        if (res === null) {
+          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+          return
+        }
+        if (!res.ok && res.error === 'board_busy') {
+          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'busy' } }))
+          return
+        }
+        if (!res.ok && res.error === 'not_implemented') {
+          // team executor not yet available — surface via state, not by staying 'running'
+          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+          return
+        }
+        // ok=true: stay 'running'; SSE goal_run phase drives the transition to done/idle
+      })
+      .catch(() => {
+        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+      })
+  },
+
+  markGoalRunPhase: (goal_id, phase) => {
+    if (phase === 'running') {
+      set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' } }))
+    } else if (phase === 'done' || phase === 'stopped') {
+      set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'done' } }))
+      window.setTimeout(() => {
+        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+      }, 3000)
+    }
+  },
+
+  stopGoal: (goal_id) => {
+    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+    // No dedicated stop endpoint for goals yet — optimistic clear only
   },
 }))
