@@ -142,7 +142,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
       ? effectivePath.replace(/\\/g, '/').split('/').slice(-2).join(' › ').replace('.md', '')
       : ''
 
-  const findEnabled = tab === 'edit' || tab === 'split'
+  const findEnabled = (tab === 'edit' || tab === 'split') && !draftViewerOpen
   const find = useFindReplace(markdownEditorRef, findEnabled, effectivePath)
 
   useEffect(() => {
