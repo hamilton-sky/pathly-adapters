@@ -36,6 +36,7 @@ export interface UiState {
   activeMonitorTab: string | null
   lastUsedFlowPath: string | null
   chatOpen: boolean
+  cliMonitorOpen: boolean
   skillsPanelOpen: boolean
   notebookPath: string | null
   notebookViewMode: 'cells' | 'editor'
@@ -76,6 +77,7 @@ export interface UiState {
   setActiveMonitorTab: (tab: string | null) => void
   setLastUsedFlowPath: (p: string | null) => void
   toggleChat: () => void
+  toggleCliMonitor: () => void
   toggleSkillsPanel: () => void
 }
 
@@ -94,6 +96,7 @@ export const useUiStore = create<UiState>()(
       activeMonitorTab: null,
       lastUsedFlowPath: loadLastUsedFlowPath(),
       chatOpen: false,
+      cliMonitorOpen: false,
       skillsPanelOpen: true,
       notebookPath: null,
       notebookViewMode: 'cells',
@@ -147,6 +150,7 @@ export const useUiStore = create<UiState>()(
         set((s) => ({ activeFlowSessions: updater(s.activeFlowSessions) })),
       setActiveMonitorTab: (tab) => set({ activeMonitorTab: tab }),
       toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
+      toggleCliMonitor: () => set((s) => ({ cliMonitorOpen: !s.cliMonitorOpen })),
       toggleSkillsPanel: () => set((s) => ({ skillsPanelOpen: !s.skillsPanelOpen })),
       setLastUsedFlowPath: (p) => {
         try {

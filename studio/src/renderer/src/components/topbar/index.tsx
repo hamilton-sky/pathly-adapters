@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { Menu, Brain, Moon, Sun, Copy } from 'lucide-react'
+import { Menu, Brain, Moon, Sun, Copy, Activity } from 'lucide-react'
 import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
+import { useTerminalStore } from '../../store/terminalStore'
 import { isLightPalette } from '../../theme'
 import { IconButton, Tooltip } from '../ui'
 import { TopicSelector } from './TopicSelector'
@@ -28,7 +29,8 @@ export function TopBar(): JSX.Element {
     setSidebarCollapsed,
   } = useStore()
 
-  const { chatOpen, toggleChat } = useUiStore()
+  const { chatOpen, toggleChat, cliMonitorOpen, toggleCliMonitor } = useUiStore()
+  const hasRunningEngine = useTerminalStore((s) => s.tabs.some((t) => t.status === 'running'))
   const [showLog, setShowLog] = useState(false)
   const compact = useWindowWidth() < TOPBAR_COMPACT_BREAKPOINT
 
@@ -67,6 +69,20 @@ export function TopBar(): JSX.Element {
         </div>
 
         <div className={styles.right}>
+          <div className={styles.cliMonitorWrap}>
+            <IconButton
+              onClick={toggleCliMonitor}
+              title="CLI Engines"
+              description="Monitor and stop active CLI processes"
+              placement="bottom"
+            >
+              <Activity
+                size={14}
+                style={hasRunningEngine ? { color: 'var(--amber, #e5c07b)' } : undefined}
+              />
+            </IconButton>
+            {hasRunningEngine && <span className={styles.cliDot} aria-hidden="true" />}
+          </div>
           <IconButton
             data-testid="topbar-chat-toggle"
             data-label="Chat"

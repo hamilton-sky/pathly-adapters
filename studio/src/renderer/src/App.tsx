@@ -22,6 +22,7 @@ import { SetupScreen } from './components/SetupScreen'
 import { HQ } from './components/HQ'
 import { CommandCenter } from './components/CommandCenter/CommandCenter'
 import { TerminalSpawnListener } from './components/TerminalSpawnListener'
+import { CliMonitorBar } from './components/CliMonitorBar/CliMonitorBar'
 import { Toaster } from './components/Toaster'
 import { themes } from './theme'
 import appStyles from './App.module.css'
@@ -280,6 +281,8 @@ function MainApp(): JSX.Element | null {
       <PanelErrorBoundary><Terminal /></PanelErrorBoundary>
       {/* App-level: opens/kills PTYs for any run, independent of the chat panel. */}
       <TerminalSpawnListener />
+      {/* Floating CLI monitor — always mounted so it persists across panel changes. */}
+      <CliMonitorBar />
     </div>
   )
 }

@@ -165,5 +165,12 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
     })),
 
   updateTabStatus: (id, status) =>
-    set((s) => ({ tabs: s.tabs.map((t) => t.id === id ? { ...t, status } : t) })),
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== id) return t
+        const patch: Partial<import('../types/terminal').TerminalTab> = { status }
+        if (status === 'running' && t.status !== 'running') patch.startedAt = Date.now()
+        return { ...t, ...patch }
+      }),
+    })),
 }))

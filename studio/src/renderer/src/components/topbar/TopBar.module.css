@@ -120,6 +120,29 @@
   white-space: nowrap;
 }
 
+/* ── CLI monitor icon + running-dot ── */
+.cliMonitorWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cliDot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber, #e5c07b);
+  pointer-events: none;
+  animation: cliDotPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cliDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
 .badgeLive {
   font-size: var(--font-size-base);
   color: var(--green);

@@ -1,0 +1,168 @@
+.bar {
+  position: fixed;
+  left: var(--bar-x);
+  top: var(--bar-y);
+  z-index: 900;
+  width: 288px;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-lg, 8px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── Header (drag handle) ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-surface0);
+  border-bottom: var(--border);
+  cursor: grab;
+}
+
+.header:active {
+  cursor: grabbing;
+}
+
+.grip {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.activeCount {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--amber, #e5c07b);
+  flex-shrink: 0;
+  animation: countPulse 2s ease-in-out infinite;
+}
+
+@keyframes countPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.closeBtn:hover {
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
+/* ── Body ── */
+.body {
+  padding: 4px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.empty {
+  margin: 0;
+  padding: 14px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Session row ── */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  transition: background var(--transition-fast);
+}
+
+.row:hover {
+  background: var(--bg-surface0);
+}
+
+.badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.badge[data-adapter='codex'] {
+  background: color-mix(in srgb, var(--green) 15%, var(--bg-surface0));
+  color: var(--green);
+}
+
+.badge[data-adapter='antigravity'] {
+  background: color-mix(in srgb, var(--blue, #61afef) 15%, var(--bg-surface0));
+  color: var(--blue, #61afef);
+}
+
+.rowLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elapsed {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--amber, #e5c07b);
+}
+
+.stopBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.stopBtn:hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.stopBtn svg {
+  fill: currentColor;
+}

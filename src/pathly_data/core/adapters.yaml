@@ -6,8 +6,8 @@ claude:
   parse: claude_json
 codex:
   terminal_kind: codex
-  headless: [codex, exec, "{prompt}", "--model", "{model}"]
-  autonomy_flag: "--full-auto"
+  headless: [codex, exec, "--full-auto", "--model", "{model}", "--", "{prompt}"]
+  autonomy_flag: null
   resume: {mode: flag, flag: "--continue"}
   parse: codex_json
 copilot:
