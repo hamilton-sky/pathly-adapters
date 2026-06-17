@@ -13,6 +13,7 @@ import { ArtifactsView } from './ArtifactsView/ArtifactsView'
 import { useCommsPanel } from './hooks/useCommsPanel'
 import { useStore } from '../../../store'
 import { apiStartFlow, apiPostArtifact, resolveFeaturePath, scopeToParams } from '../../../store/commsApi'
+import { useToastStore } from '../../../store/toastStore'
 import s from './CommsPanel.module.css'
 
 // Which chips each panel type shows, and their default on/off state.
@@ -38,6 +39,24 @@ function inferAtype(name: string): string {
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return 'image'
   if (ext === 'json') return 'json'
   return 'code'
+}
+
+// Avoid overwriting an existing artifact of the same name: report.pdf → report (1).pdf.
+function dedupeName(name: string, taken: Set<string>): string {
+  if (!taken.has(name)) return name
+  const dot = name.lastIndexOf('.')
+  const stem = dot > 0 ? name.slice(0, dot) : name
+  const ext = dot > 0 ? name.slice(dot) : ''
+  let n = 1
+  while (taken.has(`${stem} (${n})${ext}`)) n += 1
+  return `${stem} (${n})${ext}`
+}
+
+// One toast summarizing a drop: success for what was added, error for what failed.
+function notifyDrop(posted: number, failed: number, failHint?: string): void {
+  const push = useToastStore.getState().push
+  if (posted) push(`Added ${posted} artifact${posted === 1 ? '' : 's'} to the board`, 'success')
+  if (failed) push(`${failed} file${failed === 1 ? '' : 's'} couldn't be added${failHint ? ` — ${failHint}` : ''}`, 'error')
 }
 
 export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeature: string }) {
@@ -83,17 +102,24 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
     const base = scope === 'feature'
       ? await resolveFeaturePath(projectRoot, boardKey)
       : `${projectRoot}/pathly/.uploads/${boardKey}`
+    const dir = `${base}/artifacts`
+    // Dedupe against files already in the dest dir + names taken earlier this drop.
+    const taken = new Set<string>(await window.pathly.fs.list(dir).catch(() => []))
     let posted = 0
+    let failed = 0
     for (const file of files) {
       const src = window.pathly.fs.pathForFile(file)
-      if (!src) continue
-      const dest = `${base}/artifacts/${file.name}`
+      if (!src) { failed += 1; continue }
+      const name = dedupeName(file.name, taken)
+      taken.add(name)
       try {
-        await window.pathly.fs.copy(src, dest)
-        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${file.name}`, dest, inferAtype(file.name))
+        await window.pathly.fs.copy(src, `${dir}/${name}`)
+        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${name}`, `${dir}/${name}`, inferAtype(name))
         if (id) posted += 1
-      } catch { /* skip a file that fails to copy/post */ }
+        else failed += 1
+      } catch { failed += 1 }
     }
+    notifyDrop(posted, failed, 'files must be under your home folder')
     if (posted) reload()
   }
 
@@ -103,11 +129,14 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
     if (!items.length) return
     const params = scopeToParams(scope, boardKey)
     let posted = 0
+    let failed = 0
     for (const it of items) {
       const path = it.path.replace(/\\/g, '/')
       const id = await apiPostArtifact(boardKey, params.board, params.scope, `Added ${it.name}`, path, inferAtype(it.name))
       if (id) posted += 1
+      else failed += 1
     }
+    notifyDrop(posted, failed)
     if (posted) reload()
   }
   // Independent per-panel reads — only used for project/global panels.
