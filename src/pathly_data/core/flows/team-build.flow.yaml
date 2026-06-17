@@ -45,11 +45,20 @@ feedback_routing:
   DESIGN_QUESTIONS: designer
   PO_QUESTIONS: po
   REQUIREMENT_GAP: po
+  ACCEPTANCE_QUESTION: po      # tester asks the PO whether the criteria themselves are right
   IMPL_QUESTIONS: planner
   REFLECT_CRITIQUE: builder
   REVIEW_FAILURES: builder
   SCOPE_VIOLATION: builder
   TEST_FAILURES: builder
+# 3-tier escalation (fsm.engine.route_feedback): when a FAILURE file keeps failing,
+# its target climbs from the builder (rounds 1-2) → the upstream owner (round 3) →
+# the human (round 4+). The repeated failure usually means the plan/design/criteria
+# are wrong, not the build. Files absent here never tier (clarifications, human files).
+escalation_routing:
+  REVIEW_FAILURES: planner    # round 3: the plan/scope likely doesn't match reality
+  SCOPE_VIOLATION: planner    # round 3: the conversation scope is wrong
+  TEST_FAILURES: po           # round 3: the acceptance criteria may be wrong
 transition_rules:
   BUILDING:
     default: REVIEWING

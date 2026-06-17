@@ -210,14 +210,65 @@ def evaluate_transition_rules(
     raise ValueError(f"No default transition defined for state: {current_state!r}")
 
 
-def route_feedback(flow: dict, storage_path: Path) -> dict | None:
+# 3-tier feedback escalation. A failure file routes up the chain as the same loop
+# keeps failing: the more it's retried, the more likely the root cause is upstream
+# (the plan/design/criteria), not the local fix.
+#   attempts 1–2: the file's OWNER (feedback_routing[file]) — e.g. the builder.
+#   attempt 3:    the upstream SPECIALIST (escalation_routing[file]) — planner/architect/po.
+#   attempt 4+:   the HUMAN.
+# Files with no escalation_routing entry (clarification requests, human files) never
+# tier — they always go to their owner. A flow without escalation_routing is unchanged.
+_ESCALATE_AT_ATTEMPT = 3
+
+
+def _resolve_feedback_target(
+    filename: str, base_agent: str, retry_count: int, escalation_routing: dict
+) -> str:
+    """Map (feedback file, retry count) → the role that should handle it now."""
+    stem = filename[:-3] if filename.endswith(".md") else filename
+    esc = escalation_routing or {}
+    specialist = esc.get(stem) or esc.get(filename)
+    if specialist is None:
+        return base_agent
+    attempt = (retry_count or 0) + 1
+    if attempt > _ESCALATE_AT_ATTEMPT:
+        return "human"
+    if attempt == _ESCALATE_AT_ATTEMPT:
+        return specialist
+    return base_agent
+
+
+def _read_retry_counts(storage_path: Path) -> dict[str, int]:
+    """{FILENAME.md: max retry count} parsed from STATE.json's retry_count_by_key
+    (whose keys are 'conv-N:FILENAME.md'). Best-effort — {} on any error."""
+    import json as _json
+    out: dict[str, int] = {}
+    try:
+        raw = _json.loads((storage_path / "STATE.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return out
+    for key, count in (raw.get("retry_count_by_key") or {}).items():
+        fname = key.split(":", 1)[1] if ":" in key else key
+        try:
+            out[fname] = max(out.get(fname, 0), int(count or 0))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def route_feedback(
+    flow: dict, storage_path: Path, *, retry_counts: dict | None = None
+) -> dict | None:
     """
     Read *.md files in storage_path/feedback/.
     Apply priority order from flow["feedback_routing"] (dict, ordered by insertion):
       Keys earlier in the dict have higher priority.
     Return {"file": filename_with_ext, "target_agent": agent_name} for highest-priority match.
-    If file is HUMAN_QUESTIONS.md or BLOCKED_ON_HUMAN.md, also include
-      "instructions": <file contents>.
+    The target is then run through the 3-tier escalation ladder
+    (_resolve_feedback_target) using flow["escalation_routing"] + the file's retry count
+    (read from STATE.json, or injected via retry_counts for tests).
+    If the resolved target is "human" (or the file is HUMAN_QUESTIONS.md /
+    BLOCKED_ON_HUMAN.md), also include "instructions": <file contents>.
     Return None if feedback/ is empty or does not exist.
 
     Side-effect: syncs found/resolved files to the feedback_items DB table so
@@ -258,15 +309,20 @@ def route_feedback(flow: dict, storage_path: Path) -> dict | None:
         return None
 
     feedback_routing = flow.get("feedback_routing", {})
+    escalation_routing = flow.get("escalation_routing", {})
     human_files = {"HUMAN_QUESTIONS.md", "BLOCKED_ON_HUMAN.md"}
+    counts = retry_counts if retry_counts is not None else _read_retry_counts(storage_path)
 
     known_filenames: set[str] = set()
     for stem, agent in feedback_routing.items():
         filename = stem if stem.endswith(".md") else f"{stem}.md"
         known_filenames.add(filename)
         if filename in md_files:
-            result = {"file": filename, "target_agent": agent}
-            if filename in human_files:
+            target = _resolve_feedback_target(
+                filename, agent, counts.get(filename, 0), escalation_routing
+            )
+            result = {"file": filename, "target_agent": target}
+            if target == "human" or filename in human_files:
                 try:
                     result["instructions"] = (feedback_dir / filename).read_text(
                         encoding="utf-8"
