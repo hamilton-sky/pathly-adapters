@@ -27,7 +27,6 @@ interface Props {
 
 export function GoalRunButton({ goalId, defaultExecutor = 'single' }: Props): JSX.Element {
   const [executor, setExecutor] = useState<Executor>(defaultExecutor)
-  const [teamMsg, setTeamMsg] = useState(false)
 
   const goalRunState = useCommsStore((st) => st.goalRunState)
   const runGoal = useCommsStore((st) => st.runGoal)
@@ -38,11 +37,6 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single' }: Props): JS
   const isActive = runState === 'running' || runState === 'busy'
 
   function handleRun(): void {
-    if (executor === 'team') {
-      setTeamMsg(true)
-      window.setTimeout(() => setTeamMsg(false), 4000)
-      return
-    }
     runGoal(goalId, executor)
   }
 
@@ -92,10 +86,6 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single' }: Props): JS
           </Tooltip>
         </div>
       </div>
-
-      {teamMsg && (
-        <p className={s.teamNote}>Team executor is not available yet.</p>
-      )}
     </div>
   )
 }

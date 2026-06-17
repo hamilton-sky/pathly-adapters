@@ -1070,8 +1070,8 @@ def comms_goals_run():
 
     Required body: goal_id. Optional: adapter, model, project_root.
     Reads `executor` from the goal message and routes single|loop|team.
-    Returns 200 {ok, run_id, executor, ...} | 400 bad input / not a goal |
-    404 goal not found | 409 board busy | 501 executor not implemented (team).
+    Returns 200 {ok, run_id, executor, ...} | 400 bad input / not a goal /
+    unknown executor or flow | 404 goal not found | 409 board busy.
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
@@ -1158,7 +1158,6 @@ def comms_goals_run():
             "not_found": 404,
             "not_goal": 400,
             "board_busy": 409,
-            "not_implemented": 501,
             "unknown_executor": 400,
             "unknown_flow": 400,
         }.get(reason, 400)

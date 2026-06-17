@@ -8,7 +8,7 @@ See: pathly/plans/comms-board/phases/PHASE-1-dispatcher.md
 
   single → ONE agent drains the whole goal (reuses board_run + the drain-dag skill)
   loop   → supervisor owns the frontier (wires the existing scheduler_loop, serial)
-  team   → trimmed team FSM flow — GATED on the two-flow split (501 for now)
+  team   → trimmed team FSM flow (team-build) via start_run
 
 spawn_fn is dependency-injected so tests can drive both paths without real PTYs.
 """

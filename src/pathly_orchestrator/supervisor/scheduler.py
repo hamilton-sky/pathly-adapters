@@ -114,6 +114,16 @@ def scheduler_loop(
         """Run in a daemon thread. Calls spawn_fn and pushes result onto completion_q."""
         task_id = task["id"]
         instructions = task.get("text", "")
+        # Inject the same scope-aware board context (governance + memory, honoring
+        # the Reads toggle) the FSM/team path gets, so loop-executor tasks aren't
+        # blind to the board. Best-effort — never block a task on context.
+        try:
+            from pathly_orchestrator.runner.comms_context import board_context_for
+            _ctx = board_context_for(board, scope, getattr(state, "project_root", "") or "", instructions)
+            if _ctx:
+                instructions = f"{instructions}\n\n{_ctx}"
+        except Exception:
+            pass
         adapter = task.get("adapter") or (state.current_adapter if hasattr(state, "current_adapter") else "")
         model = task.get("model") or (state.model if hasattr(state, "model") else "")
 

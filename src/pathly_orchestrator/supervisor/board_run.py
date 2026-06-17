@@ -214,7 +214,11 @@ def start_board_run(
         agent = agent or "evaluator"
         skill = skill or "planning/evaluate"
 
-    context = _build_context(board=board, scope=scope)
+    # Scope-aware board context (governance + memory across the user's selected
+    # Reads tiers) — same source the FSM/team path uses, so single-agent and
+    # /comms/run agents are no longer blind to the board. Honors the Reads toggle.
+    from pathly_orchestrator.runner.comms_context import board_context_for
+    context = board_context_for(board, scope, project_root or "", instructions or "")
     prompt_parts: list[str] = []
     # The composed skill body is the agent's behavior contract for this run.
     skill_body = _compose_skill_body(skill, adapter)
@@ -314,25 +318,3 @@ def start_board_run(
     # so the Start button never hangs; progress streams onto the board.
     threading.Thread(target=_runner, daemon=True, name=f"board-run-{run_id[:8]}").start()
     return {"ok": True, "run_id": run_id, "mode": mode, "status": "started"}
-
-
-def _build_context(*, board: str, scope: str) -> str:
-    """Fetch governance + recent messages for (board, scope) and format them."""
-    try:
-        from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.comms import (
-            get_active_escalations,
-            get_messages,
-            get_pending_decisions,
-        )
-
-        conn = get_db()
-        decisions = get_pending_decisions(conn, boards=[board], scopes=[scope])
-        escalations = get_active_escalations(conn, boards=[board], scopes=[scope])
-        recent = get_messages(conn, board=board, scope=scope, limit=20)
-    except Exception:
-        decisions = []
-        escalations = []
-        recent = []
-
-    return _format_board_info(decisions, escalations, recent)
