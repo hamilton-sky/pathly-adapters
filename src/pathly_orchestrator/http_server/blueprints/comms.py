@@ -1091,6 +1091,11 @@ def comms_goals_run():
         executor_override = data.get("executor")
         if executor_override is not None and not isinstance(executor_override, str):
             return jsonify({"error": "Field 'executor' must be a string or null"}), 400
+        # flow: for executor='team', which FSM flow to run on the goal (team-build,
+        # debug, quick-fix, or any seeded/custom flow). Default team-build downstream.
+        flow_override = data.get("flow")
+        if flow_override is not None and not isinstance(flow_override, str):
+            return jsonify({"error": "Field 'flow' must be a string or null"}), 400
 
         adapter = (data.get("adapter", "") or "claude")
         model = (data.get("model", "") or "")
@@ -1135,6 +1140,7 @@ def comms_goals_run():
         result = start_goal_run(
             goal_id,
             executor_override=executor_override,
+            flow_override=flow_override,
             project_root=project_root,
             adapter=adapter,
             model=model,
@@ -1154,6 +1160,7 @@ def comms_goals_run():
             "board_busy": 409,
             "not_implemented": 501,
             "unknown_executor": 400,
+            "unknown_flow": 400,
         }.get(reason, 400)
         return jsonify(result), status
     except Exception as exc:

@@ -36,6 +36,7 @@ def start_goal_run(
     goal_id: str,
     *,
     executor_override: str | None = None,
+    flow_override: str | None = None,   # executor='team': which FSM flow to run (default team-build)
     project_root: str = "",
     adapter: str = "claude",
     model: str = "",
@@ -98,6 +99,7 @@ def start_goal_run(
     if executor == "team":
         return _run_team(
             goal_id, board, scope,
+            flow=(flow_override or _TEAM_FLOW),
             project_root=project_root, adapter=adapter, model=model,
             broadcast_fn=broadcast_fn, on_start=on_start, on_done=on_done,
             start_fn=start_fn,
@@ -208,10 +210,11 @@ def _run_loop(
 
 def _run_team(
     goal_id: str, board: str, scope: str, *,
+    flow: str = _TEAM_FLOW,
     project_root: str, adapter: str, model: str,
     broadcast_fn, on_start, on_done, start_fn,
 ) -> dict:
-    """team executor: run the trimmed team-build FSM flow (build→review→test→retro)
+    """team executor: run an FSM flow (default the trimmed team-build build→review→test→retro)
     on the goal's scope, reusing the supervisor pipeline (start_run → visible PTY
     stages). Serial: refuses if any run (board-lock or pipeline) is already active for
     the scope. start_run is async, so on_done (the board 'finished' post) is left to
@@ -235,6 +238,16 @@ def _run_team(
             "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
         }
 
+    # Validate the flow exists so a typo/unknown flow fails fast (400) instead of
+    # crashing the supervisor loop. Skipped when start_fn is injected (tests).
+    if start_fn is None:
+        try:
+            from pathly_orchestrator.fsm_ops import _load_flow
+            _load_flow(flow, project_root or None)
+        except Exception:
+            return {"ok": False, "reason": "unknown_flow",
+                    "error": f"flow {flow!r} not found (run any seeded flow: team-build, debug, quick-fix, …)"}
+
     _start = start_fn
     if _start is None:
         from pathly_orchestrator.supervisor.api import start_run as _start
@@ -242,7 +255,7 @@ def _run_team(
     try:
         state = _start(
             topic=scope,
-            flow=_TEAM_FLOW,
+            flow=flow,
             project_root=project_root or "",
             model=model or _DEFAULT_MODEL,
             broadcast_fn=broadcast_fn,
@@ -252,7 +265,8 @@ def _run_team(
 
     run_id = getattr(state, "run_id", "") or ""
     _safe_call(on_start, run_id)
-    return {"ok": True, "run_id": run_id, "executor": "team", "goal_id": goal_id, "status": "started"}
+    return {"ok": True, "run_id": run_id, "executor": "team", "flow": flow,
+            "goal_id": goal_id, "status": "started"}
 
 
 # ── Decompose bridge: turn a chosen goal into a task DAG ──────────────────────
