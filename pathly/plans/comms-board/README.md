@@ -17,6 +17,17 @@ executors). Active design lives at the top level; per-phase working docs in
 | [TASKGRAPH-DESIGN.md](TASKGRAPH-DESIGN.md) | DAG task-graph design |
 | [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md) | _Later / separate_ — fleet dashboard framing; overlaps `../parallel-fleet-part-2/` |
 
+### Context-retrieval (sub-feature — how agents get context from the board)
+
+Distinct from the Board→DAG phases above. Has its **own 4-phase build plan** (spec §9.1) —
+**not** the ROADMAP's P0–P3. Build kickoff prompts in [BUILD_PROMPTS.md](BUILD_PROMPTS.md).
+
+| Doc | What it covers |
+|---|---|
+| [DESIGN_SPEC-context-retrieval.md](DESIGN_SPEC-context-retrieval.md) | The plan — `context_refs` manifest + Board Catalog + `/section` hydration + three query modes |
+| [DESIGN_SPEC-local-inference.md](DESIGN_SPEC-local-inference.md) | Offline artifact summarizer feeding the catalog/index (no web API); used by Phase 4 |
+| [BUILD_PROMPTS.md](BUILD_PROMPTS.md) | Phase-by-phase kickoff prompts for building it |
+
 `STATE.json` / `EVENTS.jsonl` are the feature's FSM state — left in place.
 
 ## Phases (`phases/`)
