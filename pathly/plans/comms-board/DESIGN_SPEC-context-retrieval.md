@@ -270,6 +270,28 @@ Each entry is intentionally minimal — `{artifact, anchor}`. No line numbers (t
 stale; Team-Safe rule in `plan.md:256` forbids the planner emitting line numbers anyway),
 no summary (that lives in the section index), no embedding (INDEX tier owns that).
 
+**`context_refs` are DERIVED, not hand-authored by the planner LLM (locked).** The entries
+are produced **deterministically from the plan's own phase structure**, not written
+free-hand by the model. The derivation: parse `IMPLEMENTATION_PLAN.md` for its `## Phase N`
+headings (`plan.md:162-165`) and, for each phase task, emit
+`[{EDGE_CASES.md, phase-N}, {HAPPY_FLOW.md, phase-N}]` (plus the optional
+`ARCHITECTURE_PROPOSAL` section/whole-file ref per §10 Q1) — a mechanical
+`phase N → §phase-N` mapping, the same one §3.1 step 2 already makes load-bearing. The LLM's
+**only** job here is the easy half it is already good at: writing the advisory docs with
+**consistent `## Phase N` headings** (the templates in §6 row 10 already enforce this). The
+*linkage* itself — which task references which section — is a parse of structure the planner
+already wrote, never a fresh authoring judgement.
+
+> Why this matters: it takes the LLM **off the critical dependency of the authoritative
+> path.** The 📎 channel (§5) is the *authoritative* spec an executor consumes; making its
+> refs a deterministic derivation (rather than a thing the model might forget, mistype, or
+> hallucinate) means the authoritative path depends on a parse, not on model diligence. The
+> model only has to keep its headings consistent — a far smaller, template-enforced surface
+> than authoring N correct `{artifact, anchor}` tuples by hand. This is the §8 item 7
+> position ("the planner authors `context_refs` explicitly … the planner *does* the
+> phase→anchor mapping") sharpened: the planner *owns* the mapping, but performs it by
+> derivation from structure, not by free-hand authoring.
+
 ### 2.2 Storage decision — **new column on `comms_messages`** (RECOMMENDED, per locked decision 2)
 
 | Option | Verdict |
@@ -332,7 +354,47 @@ if context_refs is not None and (
 # ... add 'context_refs' to the route docstring "Optional:" line
 ```
 
-Backward-compat: omitting `context_refs` ⇒ NULL column ⇒ identical to today (§7).
+**Validate-at-write — each ref must resolve to a real section, or fall back loudly.** The
+shape check above proves an entry is *well-formed*; it does not prove the `anchor` actually
+exists in the artifact. So at post time, after the shape guard and **after** the advisory
+files have been posted + indexed (Step 6 posts the artifacts before the tasks, §6 row 7), the
+write path **resolves each `{artifact, anchor}`** against the freshly-built section index
+(`get_section(conn, artifact_id, anchor)` via the same `(scope, path)` lookup `/section`
+uses, §4.1):
+
+- **Resolves** → keep the ref verbatim.
+- **Does not resolve** (anchor absent — a heading the planner expected isn't there, or was
+  named differently) → **rewrite that entry to whole-file (`anchor: null`)** so the executor
+  still gets the *whole* artifact rather than a dead pointer, **and emit a visible warning** —
+  a board nudge (`post_message(type="nudge", …)`) naming the task + the unresolved
+  `artifact §anchor`, plus a logged `logging.warning`. **Never silently drop the ref and never
+  silently keep a dead anchor.** Whole-file fallback degrades a precise hydrate to a broader
+  one (the §10 Q1 whole-file behavior, already a supported mode) instead of to *nothing*.
+
+```
+post task with context_refs:
+  for each {artifact, anchor}:
+     resolve via get_section(scope, artifact, anchor)
+        ├─ found     → keep {artifact, anchor}
+        └─ not found → rewrite to {artifact, anchor: null}     (whole-file fallback)
+                       + board nudge  "⚠ task <id>: EDGE_CASES.md §phase-9 unresolved
+                                        → hydrating whole file"
+                       + logging.warning(...)
+```
+
+This composes with the read-side guards: even if a ref slips through unresolved (e.g. the
+file is edited *after* the task is posted and a heading is later renamed), the `/section`
+endpoint still returns `404 {anchor_not_found, available:[…]}` (§4.3) and `comms_context.py`
+skips it with a one-line note (§5.1). Validate-at-write moves the failure **forward** to post
+time where the planner context still exists, rather than discovering it only when an executor
+hydrates. It is a best-effort gate, not a hard reject: a transient resolve failure (index not
+yet built) **must not** fail the task post — on any resolver error the ref is kept as-authored
+and the read-side guards remain the backstop. The block-or-empty contract (F9) holds end to
+end.
+
+Backward-compat: omitting `context_refs` ⇒ NULL column ⇒ identical to today (§7). A ref that
+resolves cleanly is stored byte-identical to what the derivation (§2.1) produced — validation
+only ever *relaxes* a dead anchor to whole-file, never tightens a good one.
 
 ---
 
@@ -407,10 +469,17 @@ Plus two index/staleness columns on `comms_artifacts` (additive, beside `context
 ```python
 # migrations.py — _add_additive_migrations(), additional tuples
 ("comms_artifacts",     "indexed_mtime",         "REAL"),    # st_mtime at last index
-("comms_artifacts",     "indexed_hash",          "TEXT"),    # sha256 of file at last index
+("comms_artifacts",     "indexed_hash",          "TEXT"),    # sha256 of file at last index (FULL content)
+("comms_artifacts",     "indexed_structure_key", "TEXT"),    # order-independent set of heading slugs at last index
 ```
 
-`indexed_mtime` + `indexed_hash` are the **stale-index detector** (§3.4).
+`indexed_mtime` + `indexed_hash` are the cheap **content-change** gate; `indexed_structure_key`
+is the separate **structural-change** gate that decides whether the *expensive* tier
+(summary + embedding) must re-derive. The three are the **stale-index detector** (§3.4) and
+together implement the position-invariant re-derivation contract there. Adding
+`indexed_structure_key` is one more additive tuple in exactly the F5 pattern — chosen over
+recompute-and-compare-on-every-read so the structural trigger is a single stored-value
+comparison (`stored == current_structure_key?`), not a re-parse each check.
 
 ### 3.3 When/where the index runs (locked decision 3: "at artifact write-time")
 
@@ -440,18 +509,27 @@ def slugify_heading(heading: str) -> str:
     """The §3.1 algorithm. Pure."""
 
 def file_fingerprint(path: str) -> tuple[float, str]:
-    """(st_mtime, sha256-hex) for staleness detection. Reads the file once."""
+    """(st_mtime, sha256-hex of FULL content) for staleness detection. Reads once."""
+
+def structure_key(sections: list[Section]) -> str:
+    """The order-INDEPENDENT set of heading slugs, as a stable canonical string
+    (e.g. sorted slugs joined). Two files with the same headings in any order —
+    or the same headings with body text edited or sections reordered — yield the
+    SAME structure_key. Adding / removing / renaming a heading changes it. Pure."""
 ```
 
 The DB write helper lives in `db/queries/comms.py`:
 
 ```python
 def reindex_artifact_sections(
-    conn, artifact_id: str, sections: list[dict], mtime: float, content_hash: str,
+    conn, artifact_id: str, sections: list[dict],
+    mtime: float, content_hash: str, structure_key: str,
 ) -> None:
-    """Replace all section rows for artifact_id, then stamp comms_artifacts
-    .indexed_mtime/.indexed_hash. Idempotent: DELETE then INSERT under the
-    write lock (mirrors store_embedding's INSERT OR REPLACE pattern)."""
+    """Replace all section rows for artifact_id (the cheap line-range re-parse),
+    then stamp comms_artifacts.indexed_mtime / indexed_hash / indexed_structure_key.
+    Idempotent: DELETE then INSERT under the write lock (mirrors store_embedding's
+    INSERT OR REPLACE pattern). Does NOT re-summarize or re-embed — that expensive
+    tier is fired separately and only when structure_key changed (§3.4)."""
 ```
 
 **Two trigger points (both already exist as write paths):**
@@ -493,31 +571,84 @@ def reindex_artifact_sections(
 
 ### 3.4 Stale-index handling (locked decision 4 — the sharp edge)
 
-A plan file edited after its index was built would otherwise return **wrong line ranges**.
-Detection is mtime-first, hash-confirmed:
+**Principle: the stored index is a CACHE, not a source of truth.** The file on disk is the
+only source of truth. Every read *validates the cache against the live file* before serving,
+so `/section` can never serve stale content — and crucially, the two halves of the cache
+revalidate on **different, independent triggers**:
+
+- **Line-ranges** (`comms_artifact_sections.line_start/line_end`) are revalidated on **any
+  content change** and re-parsed *synchronously before the slice* — cheap, deterministic,
+  blocking is fine. This is what guarantees `/section` is always correct.
+- **Summaries + embeddings** (the INDEX tier — `comms_artifacts.summary`,
+  `comms_artifact_sections.summary`, the per-message embedding) are **eventually consistent**:
+  re-derived **async / debounced, never eagerly on edit, and nothing ever blocks on them.** A
+  read serves the existing (possibly slightly stale) summary while a re-derivation, if one was
+  triggered, runs in the background — exactly the fire-and-forget shape `embed_async` /
+  `summarize_async` already use (inference §4).
+
+This split is the whole point: keeping `/section` correct is cheap and must be synchronous;
+keeping summaries fresh is expensive and must not be on the read path.
+
+**Position-invariant re-derivation — the precise trigger logic.** Two fingerprints gate two
+different rebuilds, and they are deliberately independent:
+
+| Fingerprint | What it covers | What a change triggers | Cost |
+|---|---|---|---|
+| `indexed_hash` | sha256 of the **full file content** | re-parse **line-ranges** (cheap, deterministic, sync-before-slice) | low |
+| `indexed_structure_key` | the **order-independent set of heading slugs** | re-summarize + re-embed (the expensive INDEX tier) | high → **async only** |
 
 ```
 hydrate(anchor):
-  read comms_artifacts.indexed_mtime / indexed_hash
+  read indexed_mtime / indexed_hash / indexed_structure_key
   cur_mtime = os.stat(path).st_mtime
-  if cur_mtime == indexed_mtime:            # fast path — unchanged
-      use cached section rows
+  if cur_mtime == indexed_mtime:                 # fast path — file untouched
+      use cached section rows                    # one stat, nothing else
   else:
       cur_hash = sha256(file)
-      if cur_hash == indexed_hash:          # mtime moved but content identical (e.g. touch/checkout)
+      if cur_hash == indexed_hash:               # mtime moved, content identical (touch/checkout)
           update indexed_mtime; use cached rows
-      else:                                 # genuinely edited → REBUILD before slicing
-          reindex_artifact_sections(...) from fresh parse
-          slice from the fresh rows
+      else:                                       # content genuinely changed
+          fresh = parse_sections(file)
+          cur_struct = structure_key(fresh)
+          # ── ALWAYS: cheap line-range re-parse, synchronous, before slicing ──
+          reindex_artifact_sections(... fresh ..., cur_hash, cur_struct)
+          slice from the fresh rows               # /section stays correct
+          # ── ONLY on structural change: expensive re-derive, ASYNC ──
+          if cur_struct != indexed_structure_key:
+              schedule_resummarize_and_reembed_async(artifact_id)   # debounced, non-blocking
+          #   else: headings unchanged → summary + embedding STILL VALID → no churn
 ```
 
-- mtime is the cheap gate (one `stat`); the hash is only computed when mtime disagrees, so
-  the steady state is a single `stat`.
-- **Never serve a slice from a stale index.** If rebuild fails (file deleted/unreadable),
-  the endpoint returns a structured `stale`/`missing` error (§4) rather than guessing.
-- If the requested `anchor` no longer exists after a rebuild (the planner renamed the
-  heading), return `404 {error: "anchor_not_found", available:[...]}` listing current
-  anchors — actionable, not silent.
+**The consequence to state explicitly (the edge case this answers):** **moving or reordering
+a section, or shifting a section's position by editing text elsewhere in the file, changes
+`indexed_hash` (→ line-ranges re-parse) but does NOT change `indexed_structure_key` → NO
+re-summarize, NO re-embed.** The expensive tier fires **only** on a *true structural change* —
+a heading **added, removed, or renamed** (a new/dropped/renamed topic). Position is not
+structure; the set of topics is. This is the same stability property the topic-map summary was
+designed around (DESIGN_SPEC-local-inference §2a) — `structure_key` is its concrete trigger.
+
+- **Borderline case — content edits that shift the topic map.** Editing prose *inside* a
+  section can, in principle, change which keywords a topic-map summary would surface even
+  though no heading changed. Keep the topic map **structural enough that minor edits don't
+  move it** — it is a heading list with a short gloss (inference §2a), keyed on `structure_key`
+  (the slugs), not on body keywords. When a body edit genuinely *should* refresh a summary, it
+  is picked up the next time `structure_key` changes, or by a low-priority background refresh —
+  and either way it is re-derived **async (eventual consistency), never blocking a read.** We
+  accept a briefly-stale *summary* (a findability hint) as the cost of never blocking; we never
+  accept a stale *slice* (the payload), which is why line-ranges are the synchronous half.
+
+The original §3.4 guarantees still hold, now sharpened by the cache framing:
+
+- mtime is the cheap gate (one `stat`); the hash is computed only when mtime disagrees, and
+  `structure_key` only when the hash disagrees — steady state is a single `stat`.
+- **Never serve a slice from a stale index.** Line-ranges are re-parsed *before* slicing on
+  any content change. If the re-parse fails (file deleted/unreadable mid-edit), the endpoint
+  returns a structured `stale`/`missing` error (§4) rather than guessing. (Summaries, being
+  eventually-consistent and never the payload, never gate a read this way.)
+- If the requested `anchor` no longer exists after a re-parse (the planner renamed the
+  heading — which is also exactly a `structure_key` change), return
+  `404 {error: "anchor_not_found", available:[...]}` listing current anchors — actionable,
+  not silent — and the async re-derive picks up the new structure.
 
 ---
 
@@ -834,6 +965,53 @@ catalog lets a manifest-less agent see the whole board and choose; semantic catc
 relevance the planner never anticipated. None of them hands the agent content directly —
 each yields a pointer that a deterministic fetch resolves.
 
+### 5a.6 Scaling the catalog — goal-hierarchy first, then ranking
+
+The flat board-scoped catalog (§5a.4) is the right shape for a **small board**: a dozen
+artifacts fit in one scannable listing an agent reads top-to-bottom. It does not scale to a
+**large, aging, multi-goal board** — a flat list of hundreds of `{path, type, title, summary}`
+rows is itself a context-budget problem, the very thing the INDEX tier exists to avoid. Two
+**additive** moves keep orientation bounded as a board grows, both reusing structure that
+already exists — neither introduces a vector or revives §8:
+
+1. **Browse goals first, then a goal's artifacts (the common case at scale).** The board is
+   already a **Board → Goals → per-goal Task-DAG** hierarchy (`goal_id` on `comms_messages`,
+   F4; GOALS-DAG-EXECUTORS). So a large catalog is browsed in **two bounded steps**: list the
+   *goals* (a short set), then list **that goal's** artifacts (bounded by one goal's scope),
+   rather than every artifact on the board at once. The goal hierarchy is the natural index —
+   the same `goal_id` filter STRUCTURED mode (§5 ①) already uses — and it bounds the *common*
+   case for free, because an agent oriented to a goal rarely needs the whole board.
+
+   ```
+   small board                large/aging board
+   ───────────                ─────────────────
+   GET catalog (flat)         GET catalog/goals      ──► [Goal A, Goal B, Goal C …]
+     → all artifacts                 │  pick the relevant goal
+       (scannable)                   ▼
+                              GET catalog?goal_id=A  ──► A's artifacts only (bounded)
+   ```
+
+2. **Rank + paginate within a listing (true scale).** Where even a single goal (or a
+   goal-less board) holds too many artifacts, the listing returns a **ranked, paginated**
+   result instead of the full set — `ORDER BY` recency (`created_at`/`last_edit_at`,
+   DESC) for plain browse, or, when the agent has a task string, an **FTS5 keyword match of
+   that task against the existing message FTS** (`comms_fts`, §8 item 2 — already
+   compiled-in and proven) to surface the artifacts whose messages best match, `LIMIT N`. This
+   reuses the deterministic engines already present; it adds **no** new index and **no**
+   vector. The catalog query (§5a.4 / §6 row 2f) gains optional `goal_id`, `order`, `limit`,
+   `offset` params — additive, the flat board-scoped form unchanged when they are omitted.
+
+**Framing (and why this is correctly deferred-shaped):** the **goal hierarchy bounds the
+common case now** — it is structure the board already has, so two-step goal-then-artifact
+browse is essentially free and can ship with §5a if wanted. **Ranked/paginated listing + a
+section-level keyword index handle *true* scale** — and those are needed *only* at scale, on a
+large aging multi-goal board that does not yet exist for most features, which is exactly why
+the heavier slice (a new section-level FTS5 over plan text) is the **deferred next step**
+documented in §8 item 1's caveat + item 2, **not** a v1 deliverable. v1 ships the flat catalog
+(§5a.4); the goal-hierarchy bound is the cheap first scaling move; ranked/paginated + deferred
+FTS5 are the documented path the day a board outgrows both. None of this is vector search — it
+is the same deterministic spine, indexed by a hierarchy the board already carries.
+
 ---
 
 ## 6. All call-site changes
@@ -842,13 +1020,13 @@ Ordered by layer (db → runner → http_server → skills), each independently 
 
 | # | File | Change |
 |---|---|---|
-| 1 | `db/migrations.py` | Add `comms_messages.context_refs TEXT`, `comms_artifacts.indexed_mtime REAL`, `comms_artifacts.indexed_hash TEXT` to `_add_additive_migrations` (`:380`). Add `CREATE TABLE comms_artifact_sections` + its index to the `executescript` block (`~:265`). All additive/idempotent. |
-| 2 | `db/queries/comms.py` | (a) `post_message` gains `context_refs` kwarg (JSON-encoded, mirrors `depends_on`). (b) NEW `reindex_artifact_sections(conn, artifact_id, sections, mtime, hash)`. (c) NEW `get_artifact_sections(conn, artifact_id)` and `get_section(conn, artifact_id, anchor)`. (d) NEW `find_or_create_artifact_by_path(conn, scope, path)` — a **minimal defensive resolver** (no longer the primary mechanism, since Q3=(b) gives advisory files real rows via the Step-6 artifact posts). It resolves the `comms_artifacts` row by `(scope, path)` and creates a minimal row **only if one is missing** — the residual cases being legacy plans seeded before this feature, or a by-path hydrate (§4.1) of a file that was never posted. Keeping it minimal keeps lazy indexing (§3.3) and the by-path endpoint robust without crashing on those rows. (e) `update_artifact_summary` / `update_section_summary` writeback hooks for the inference service. (f) NEW `list_artifacts_catalog(conn, scope, exposed_boards)` — the **Board Catalog** query (§5a): `SELECT a.path, a.type, a.title, a.summary FROM comms_artifacts a JOIN comms_messages m ON m.id=a.message_id WHERE m.board IN (exposed) AND m.scope=?` (board/scope live on the message, F4), deterministic, summaries-only. Re-export from `db/__init__.py`. |
+| 1 | `db/migrations.py` | Add `comms_messages.context_refs TEXT`, `comms_artifacts.indexed_mtime REAL`, `comms_artifacts.indexed_hash TEXT`, `comms_artifacts.indexed_structure_key TEXT` to `_add_additive_migrations` (`:380`). Add `CREATE TABLE comms_artifact_sections` + its index to the `executescript` block (`~:265`). All additive/idempotent. |
+| 2 | `db/queries/comms.py` | (a) `post_message` gains `context_refs` kwarg (JSON-encoded, mirrors `depends_on`). (b) NEW `reindex_artifact_sections(conn, artifact_id, sections, mtime, hash, structure_key)` — replaces section rows (cheap line-range re-parse) and stamps `indexed_mtime`/`indexed_hash`/`indexed_structure_key`; does NOT re-summarize/re-embed (that fires async, only on `structure_key` change, §3.4). (c) NEW `get_artifact_sections(conn, artifact_id)` and `get_section(conn, artifact_id, anchor)` — the latter also backs validate-at-write (§2.4). (d) NEW `find_or_create_artifact_by_path(conn, scope, path)` — a **minimal defensive resolver** (no longer the primary mechanism, since Q3=(b) gives advisory files real rows via the Step-6 artifact posts). It resolves the `comms_artifacts` row by `(scope, path)` and creates a minimal row **only if one is missing** — the residual cases being legacy plans seeded before this feature, or a by-path hydrate (§4.1) of a file that was never posted. Keeping it minimal keeps lazy indexing (§3.3) and the by-path endpoint robust without crashing on those rows. (e) `update_artifact_summary` / `update_section_summary` writeback hooks for the inference service. (f) NEW `list_artifacts_catalog(conn, scope, exposed_boards, *, goal_id=None, order=None, limit=None, offset=None)` — the **Board Catalog** query (§5a): `SELECT a.path, a.type, a.title, a.summary FROM comms_artifacts a JOIN comms_messages m ON m.id=a.message_id WHERE m.board IN (exposed) AND m.scope=?` (board/scope live on the message, F4), deterministic, summaries-only. The optional `goal_id`/`order`/`limit`/`offset` params are the **§5a.6 scaling path** (goal-scoped + ranked/paginated browse); omitting them yields the flat board-scoped listing unchanged. Re-export from `db/__init__.py`. |
 | 3 | `runner/sections.py` (NEW) | `parse_sections`, `slugify_heading`, `file_fingerprint` (§3.3). Pure markdown logic, no I/O except `file_fingerprint`. |
-| 4 | `runner/hydrate.py` (NEW) | `hydrate_section(conn, *, artifact_id, scope, artifact, anchor)` and `ensure_indexed(conn, scope, path)` — orchestration + staleness (§3.4) + the result/status dict (§4.2/4.3). Never raises. `index_artifact_async(artifact_id, path)` daemon-thread eager indexer (mirrors `embeddings.embed_async`). |
+| 4 | `runner/hydrate.py` (NEW) | `hydrate_section(conn, *, artifact_id, scope, artifact, anchor)` and `ensure_indexed(conn, scope, path)` — orchestration + staleness (§3.4: cheap line-range re-parse synchronous-before-slice on `indexed_hash` change; expensive re-summarize/re-embed scheduled **async only** on `indexed_structure_key` change) + the result/status dict (§4.2/4.3). Never raises. `index_artifact_async(artifact_id, path)` daemon-thread eager indexer (mirrors `embeddings.embed_async`). |
 | 5 | `runner/comms_context.py` | Add optional `task_id` param; when set, read `context_refs`, hydrate each ref in-process, emit the new `### 📎 Referenced context` channel between Governance and Context (§5). Failures skipped with a note. Default `task_id=None` ⇒ identical to today. Thread `task_id` through `board_context_for`. |
-| 6 | `http_server/blueprints/comms.py` | (a) `/comms/post`: accept + validate `context_refs` (§2.4). (b) NEW `GET /comms/artifacts/<id>/section` + `GET /comms/artifacts/section` (path form) → `runner.hydrate.hydrate_section` (§4). (c) In the `type="artifact"` post/attach branches (`:197-209`, `:608-620`), fire `index_artifact_async(artifact_id, path)` (best-effort, after `insert_artifact`). (d) NEW board/scope-scoped listing form on the existing `GET /comms/artifacts` route → `list_artifacts_catalog` (§5a.4); additive query params (`board`/`scope`), `message_id` form unchanged. |
-| 7 | `core/skills/planning/plan.md` | **Step 6**: (i) **post each advisory file as an artifact (Q3=(b))** — before/alongside posting the phase tasks, the planner posts `EDGE_CASES.md`, `HAPPY_FLOW.md`, and `ARCHITECTURE_PROPOSAL.md` as `type="artifact"` messages via the existing artifact-post path (which creates the `comms_artifacts` row + fires `embed_async` + indexes), capturing each returned `message_id`. (ii) add `context_refs` to the per-phase task POST — for each phase task, set `context_refs` to the advisory sections that phase needs (now referencing the just-posted artifacts by path/anchor), minimally `[{artifact:"EDGE_CASES.md", anchor:"phase-N"}, {artifact:"HAPPY_FLOW.md", anchor:"phase-N"}]` when those files exist (standard/strict), where N is the phase number. **Also (sequencing step 1):** add an authoring instruction that `EDGE_CASES.md` / `HAPPY_FLOW.md` / `ARCHITECTURE_PROPOSAL.md` use `## Phase N` headings matching `IMPLEMENTATION_PLAN.md`. Keep the idempotency guard + fail-silent branch (both the artifact posts and the task posts skip cleanly on a re-run / failed board). **Propagate:** `pathly-setup claude --apply --repair ; python -m build`. |
+| 6 | `http_server/blueprints/comms.py` | (a) `/comms/post`: accept + validate `context_refs` — both the **shape** guard and the **validate-at-write** resolution gate (resolve each `{artifact, anchor}`, relax unresolved → whole-file + board-nudge warning, best-effort, §2.4). (b) NEW `GET /comms/artifacts/<id>/section` + `GET /comms/artifacts/section` (path form) → `runner.hydrate.hydrate_section` (§4). (c) In the `type="artifact"` post/attach branches (`:197-209`, `:608-620`), fire `index_artifact_async(artifact_id, path)` (best-effort, after `insert_artifact`). (d) NEW board/scope-scoped listing form on the existing `GET /comms/artifacts` route → `list_artifacts_catalog` (§5a.4); additive query params (`board`/`scope`, plus the optional §5a.6 scaling params `goal_id`/`order`/`limit`/`offset`), `message_id` form unchanged. |
+| 7 | `core/skills/planning/plan.md` | **Step 6**: (i) **post each advisory file as an artifact (Q3=(b))** — before/alongside posting the phase tasks (and **before** the task posts, so the section index exists for validate-at-write, §2.4), the planner posts `EDGE_CASES.md`, `HAPPY_FLOW.md`, and `ARCHITECTURE_PROPOSAL.md` as `type="artifact"` messages via the existing artifact-post path (which creates the `comms_artifacts` row + fires `embed_async` + indexes), capturing each returned `message_id`. (ii) add `context_refs` to the per-phase task POST. **`context_refs` are DERIVED, not hand-authored (§2.1):** the skill instruction is *"for each `## Phase N` in `IMPLEMENTATION_PLAN.md`, emit `[{EDGE_CASES.md, phase-N}, {HAPPY_FLOW.md, phase-N}]` (+ optional `ARCHITECTURE_PROPOSAL` per §10 Q1) on that phase's task"* — a mechanical phase→anchor mapping over headings the planner already wrote, **not** a free-hand authoring step. The model's authoring duty is only the consistent `## Phase N` headings (next sentence + row 10). Minimally `[{artifact:"EDGE_CASES.md", anchor:"phase-N"}, {artifact:"HAPPY_FLOW.md", anchor:"phase-N"}]` when those files exist (standard/strict). The post path then **validate-at-writes** each ref against the just-built index (§2.4): an unresolved anchor is relaxed to whole-file (`anchor:null`) + a board nudge, never silently dropped. **Also (sequencing step 1):** add an authoring instruction that `EDGE_CASES.md` / `HAPPY_FLOW.md` / `ARCHITECTURE_PROPOSAL.md` use `## Phase N` headings matching `IMPLEMENTATION_PLAN.md` — this is the *one* thing the LLM must get right for derivation to work. Keep the idempotency guard + fail-silent branch (both the artifact posts and the task posts skip cleanly on a re-run / failed board; a validate-at-write resolver error keeps the ref as-derived, §2.4). **Propagate:** `pathly-setup claude --apply --repair ; python -m build`. |
 | 8 | `core/skills/development/drain-dag.md` | **Step 3 (Do the work)**: after reading `artifact_path`, add: "If the task has `context_refs`, for each `{artifact, anchor}` call `GET /comms/artifacts/section?scope=$SCOPE&artifact=<artifact>&anchor=<anchor>` and read the returned `text` (the full section) — this is the advisory spec (edge cases, happy flow) for your phase. The `summary` is a pointer, not the spec; read `text`." Same propagation. |
 | 9 | `core/skills` (reviewer skill) | Mirror the drain-dag instruction so a reviewer hydrates the **same** `context_refs` off the task it is reviewing (decision 2). Same propagation. |
 | 10 | `core/templates/plan/{EDGE_CASES,HAPPY_FLOW,ARCHITECTURE_PROPOSAL}.template.md` | Reinforce `## Phase N` headings so generated artifacts are anchor-addressable (sequencing step 1, nearly free). |
@@ -968,16 +1146,32 @@ for the front of a longer roadmap.
    are hydrated as-is. Consolidation/fan-in is explicitly ROADMAP "deferred polish".
 5. **No artifact write-back / versioning hooks.** `version`/`supersedes`/`last_edit_*`
    stay as the ROADMAP follow-up. This spec only *reads* artifacts and *indexes* sections;
-   it adds `indexed_mtime`/`indexed_hash` (read-side staleness) but does NOT implement
-   edit-versioning. (Decision 6's write-isolation guarantee is *stated* here, *enforced*
-   by that later work — see §10 Q4.)
+   it adds `indexed_mtime`/`indexed_hash`/`indexed_structure_key` (read-side staleness +
+   the structural-change re-derive trigger, §3.4) but does NOT implement edit-versioning.
+   (Decision 6's write-isolation guarantee is *stated* here, *enforced* by that later
+   work — see §10 Q4.)
 6. **No new embedding model / no re-embedding existing messages.** Reuse MiniLM-384 as-is.
-7. **No auto-discovery of refs.** The planner authors `context_refs` explicitly. v1 does
-   NOT infer "phase 3 task ⇒ EDGE_CASES §phase-3" automatically at runtime — the planner
-   writes it at Step 6 (the planner *does* the phase→anchor mapping; the runtime just
-   follows the stored ref). Automatic ref inference is a possible deferred-phase extension.
+7. **No runtime auto-discovery of refs.** `context_refs` are **derived deterministically
+   from the plan's `## Phase N` structure at Step 6** (§2.1), not hand-authored free-hand by
+   the planner LLM and not inferred at *runtime*: v1 does NOT infer "phase 3 task ⇒
+   EDGE_CASES §phase-3" when the task runs — the planner does the phase→anchor mapping once,
+   by parsing structure at plan time, and the runtime just follows the stored ref. (The LLM's
+   only authoring duty is consistent headings; the mapping itself is mechanical, §2.1.)
+   Runtime / dynamic ref inference is a possible deferred-phase extension.
 8. **No deletion/GC of section rows.** Reindex replaces a file's rows; orphaned rows from
    deleted artifacts are harmless and left for a later sweep.
+
+**Scale note — the catalog's growth path is bounded, and the heavy slice is correctly
+deferred.** The flat Board Catalog (§5a.4) is sized for a small board. As a board grows large
+and aging, orientation stays bounded **without new fuzzy machinery** by §5a.6: browse **goals
+first** then a goal's artifacts (using the Board→Goals→DAG hierarchy the board already carries,
+F4), and return **ranked/paginated** listings (`ORDER BY` recency, or an FTS5 keyword match of
+the task against the *existing* message FTS, `LIMIT N`). The goal hierarchy bounds the **common
+case now** and is essentially free; ranked/paginated + a **new section-level FTS5 keyword
+index** handle *true* scale and are needed **only** at scale — which is exactly why the
+section-level keyword index is the **deferred next step** (item 1's caveat + item 2), not a v1
+build, and why **section-level *vectors* remain rejected outright** (item 1) rather than queued
+behind it. Start from the hierarchy, then keyword; never vectors.
 
 ---
 

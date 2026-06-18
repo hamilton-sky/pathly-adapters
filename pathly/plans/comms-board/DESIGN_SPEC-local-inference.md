@@ -164,10 +164,16 @@ counter."*
   for detail.
 - **It is stable to content edits → far less re-derivation churn.** A topic map changes
   only when a *topic* is added / removed / renamed. The common case — an agent editing
-  details *inside* a section — leaves it unchanged, so no re-summarize and no re-embed
-  fire. Only a structural change invalidates it (detected by the `indexed_hash` fingerprint,
-  DESIGN_SPEC-context-retrieval §3.4). A content-level summary, by contrast, goes stale on
-  every detail edit.
+  details *inside* a section, or moving/reordering a section — leaves it unchanged, so no
+  re-summarize and no re-embed fire. Only a true structural change invalidates it. This is
+  not just a property of the summary; it is the **concrete re-derivation trigger** on the
+  consuming side: DESIGN_SPEC-context-retrieval §3.4 keys the expensive re-derive on a
+  `structure_key` (the order-independent set of heading slugs), distinct from the
+  `indexed_hash` (full-content) fingerprint that re-parses cheap line-ranges. A content edit
+  or a section move changes `indexed_hash` but **not** `structure_key` → line-ranges re-parse,
+  but **no re-summarize and no re-embed**; only add/remove/rename a heading re-derives this
+  tier, and even then **async** (eventual consistency, never blocking a read). A content-level
+  summary, by contrast, would go stale on every detail edit.
 - **It reads well in the catalog** (scannable), and on the upload path (§3a) it is the text
   that gets embedded — so the embedding indexes *topics*, which is exactly what routing wants.
 
