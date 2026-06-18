@@ -147,6 +147,34 @@ def summarize_async(
   existing `embed_async`, exactly today's behavior. So "MiniLM backend" =
   "summarization disabled", which is a legitimate, zero-infra default.
 
+### 2a. Summary shape — a topic map, not a content digest
+
+When a generative backend (ollama/haiku) produces a summary, it describes **what subjects
+the artifact covers** (its headings + a few keywords each), **not the substance** of those
+subjects — roughly the section-heading list with a short gloss per heading, capped at
+`max_sentences`. e.g. *"Covers: rate-limit algorithm choice; edge cases (clock skew, Redis
+failover); config knobs."* — not *"uses a 60s sliding window; failover falls back to a local
+counter."*
+
+**Why topic-level, not content-level:**
+- **It matches the summary's job.** The summary exists to *find / route* to the artifact
+  (the INDEX tier); the substance is delivered by **hydrating the section** (the HYDRATE
+  tier / `/section` in DESIGN_SPEC-context-retrieval). A topic map is the ideal routing
+  signal — semantic search matches the query's *topic*, then the agent opens that chapter
+  for detail.
+- **It is stable to content edits → far less re-derivation churn.** A topic map changes
+  only when a *topic* is added / removed / renamed. The common case — an agent editing
+  details *inside* a section — leaves it unchanged, so no re-summarize and no re-embed
+  fire. Only a structural change invalidates it (detected by the `indexed_hash` fingerprint,
+  DESIGN_SPEC-context-retrieval §3.4). A content-level summary, by contrast, goes stale on
+  every detail edit.
+- **It reads well in the catalog** (scannable), and on the upload path (§3a) it is the text
+  that gets embedded — so the embedding indexes *topics*, which is exactly what routing wants.
+
+The **per-section** summaries (`comms_artifact_sections.summary`, ≤1 sentence per heading)
+stay naturally more specific — that is the correct granularity, and only the *changed*
+section's blurb is re-derived, never the whole artifact.
+
 ---
 
 ## 3. Backend selection — `app_settings` row, overridable per-call
