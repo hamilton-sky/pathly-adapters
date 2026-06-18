@@ -193,6 +193,78 @@ override only.
 
 ---
 
+## 3a. Upload path — per-upload backend + embed the summary
+
+The two producers of artifacts are not symmetric. An **agent-created** artifact is
+posted by a CLI with no human watching; an **uploaded** artifact is dropped by a
+human in Studio, who *can* be asked one question. The backend selector (§3) already
+draws this line — `backend=` is the highest-precedence override — so the upload path
+just **surfaces that override as a UI picker** and the agent path leaves it `None`.
+No new backend logic: the picker is a *producer* of the existing per-call override,
+nothing more. This stays inside the §6 scope guard (three fixed backends, no plugin
+registry).
+
+```
+producer            backend= passed to summarize_async      who decides
+─────────────       ──────────────────────────────────      ───────────
+agent-created       None  → resolve app_settings default     nobody (silent,
+  (CLI posts)              (§3 precedence), fire-and-forget    fire-and-forget)
+user-uploaded       picker value: "minilm" | "ollama"        the human, at
+  (Studio drop)            | "haiku"  → forwarded verbatim     upload time
+```
+
+**The picker (uploads only).** Studio's upload/attach UI offers three choices that
+map 1:1 onto the existing backends (§3 `_VALID_BACKENDS`):
+
+| Picker label | `backend=` value | Effect |
+|---|---|---|
+| **Off** | `"minilm"` | embed-only; no prose summary (`summary=None`, §2) |
+| **Local model** | `"ollama"` | offline generate via local Ollama (§1) |
+| **Haiku** | `"haiku"` | spawn the Haiku CLI one-shot (§1, §7) |
+
+The upload/attach endpoint accepts an **optional `backend` param** and forwards it
+verbatim to `summarize_async(backend=…)`. It is validated against the same
+`_VALID_BACKENDS` set §3 already enforces; an absent/invalid value falls through to
+the §3 precedence chain (so a malformed picker value degrades to the app default, it
+never errors the upload). **Agents are never prompted** — the agent-created post
+path passes `backend=None` and silently resolves the `app_settings` default, exactly
+as §4's fire-and-forget shape describes. The picker changes *who chooses*, not *what
+the choices are*: it is the §3 per-call override with a face.
+
+**Embed the generated summary for uploaded artifacts.** Today two channels are
+separate: the artifact `summary` feeds the **catalog** (browse/read), and the
+existing per-message MiniLM embedding (`embeddings.embed_async`, one row per message,
+`chunk_index=0`) runs over the **message text** (search). For an uploaded file the
+message text is a thin "uploaded `X`" note — so in semantic search the file is
+findable only by its filename. **On the upload path specifically, when a summary is
+generated, use that summary as the text the existing per-message embedder sees** — so
+one generated summary serves BOTH the catalog (browse) and semantic search (find).
+Recommend this as the **default for uploads**.
+
+```
+upload path (summary generated):
+  summarize_async(..., backend=<picker>)
+        │  summary = "<generated ≤3-sentence summary>"
+        ├─► update_artifact_summary(...)        → catalog description (browse)
+        └─► embed_async(message_id, text=summary)  → per-message vector (search)
+              (the SAME embedder, just fed the summary instead of the "uploaded X" note)
+```
+
+**This is artifact-level, on the existing per-message channel — NOT section-level
+embedding.** It does not revive the section-/summary-level vector index rejected in
+`DESIGN_SPEC-context-retrieval.md §8`. The only thing that changes is *what text the
+one already-existing per-message embedder is handed* for an uploaded artifact: its
+generated summary instead of a near-empty upload note. No new embedding rows per
+section, no per-artifact summary-vector table, no new model — `store_embedding`'s
+`chunk_index=0` per-message model is untouched. If the backend is **Off** (`minilm`,
+`summary=None`) there is no generated summary to embed, so the embedder falls back to
+the message text exactly as today. The context-retrieval spec records the matching
+scoped exception in its §5a.3, so the two specs agree: for **agent-created** artifacts
+and in general, summary ≠ embedding source; for **uploaded** artifacts on this path,
+the summary does double duty (catalog + search) via the existing per-message channel.
+
+---
+
 ## 4. Async model
 
 Two distinct shapes, both already have precedent in the repo:

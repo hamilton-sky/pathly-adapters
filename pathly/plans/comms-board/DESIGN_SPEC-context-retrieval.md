@@ -730,6 +730,14 @@ embedding rejected in §8 were ever revived, which the plan does not do. So in-p
 summary and the catalog are a single reader of a single INDEX-tier column, not a shared
 input to two pipelines.
 
+**Exception — the upload path.** For a **user-uploaded** artifact, the generated summary
+is *also* used as the embedded message text (see DESIGN_SPEC-local-inference §3a), so for
+uploaded artifacts the summary does double duty — catalog *and* search. This is the
+**existing per-message embedding** (F8, `chunk_index=0`) fed the summary instead of the
+thin "uploaded X" note — **not** section-level embedding, so it does not revive §8. The
+single-duty rule above still holds in general: for **agent-created** artifacts, the
+summary is the catalog description only and is never an embedding source.
+
 ### 5a.4 Catalog endpoint + backward compatibility
 
 A read-only listing route, following the F10 idiom (lazy import, validate, structured
@@ -931,7 +939,7 @@ works with `summary=NULL` until that lands (§7).
 | **1. Planner authors `## Phase N` headings** | `plan.md` + 3 templates reinforce phase-aligned headings in `EDGE_CASES`/`HAPPY_FLOW`/`ARCHITECTURE_PROPOSAL`. | **No** | Nearly free — convention text only, no code. Makes future hydration possible. Ship first. |
 | **2. Add `context_refs`** | Migration (1 column) + `post_message`/`/comms/post` accept it + `plan.md` Step 6 emits it. | **No** | Pure additive data plumbing, mirrors the 0b `goal_id`/`executor` change. Tasks now *carry* the link even before anything consumes it. |
 | **3. Section endpoint + write-time index + Board Catalog** | `runner/sections.py`, `runner/hydrate.py`, `comms_artifact_sections` table, `GET …/section` (lazy+eager index, staleness), **`list_artifacts_catalog` + the board-scoped `GET /comms/artifacts` listing (§5a)**, and **KEEP the existing per-message embedding** (`search_by_hybrid`, F8) as the 💡 discovery channel, scoped to exposed boards. | No (db + runner + http_server only) | The HYDRATE tier + the catalog go live; the deterministic spine is complete. `drain-dag`/reviewer skills add the hydrate step. Usable end-to-end with summaries=NULL (catalog falls back to path/title, §5a.4). |
-| **4. Wire the inference summarizer** | Call the inference service (DESIGN_SPEC-local-inference) at index time to fill `comms_artifacts.summary` + section `summary`; this is the catalog *description* (§5a.3) and is included in the `/section` HYDRATE response. (It is **not** an embedding source — the 💡 channel embeds message text, F8.) | No | **Cross-link only — do not redesign the summarizer.** Improves catalog orientation; HYDRATE and the catalog already worked without it. |
+| **4. Wire the inference summarizer** | Call the inference service (DESIGN_SPEC-local-inference) at index time to fill `comms_artifacts.summary` + section `summary`; this is the catalog *description* (§5a.3) and is included in the `/section` HYDRATE response. (For **agent-created** artifacts it is **not** an embedding source — the 💡 channel embeds message text, F8.) On the **upload path** the attach UI also exposes the per-upload backend picker (Off/Local/Haiku) and **embeds the generated summary** as the per-message text so it powers the 💡 search channel — see DESIGN_SPEC-local-inference §3a (artifact-level, the existing per-message channel, not section-level §8). | No | **Cross-link only — do not redesign the summarizer.** Improves catalog orientation; HYDRATE and the catalog already worked without it. |
 
 **The P1-safety argument:** steps 1–2 add a column and skill text; the dispatcher reads
 neither `context_refs` nor section rows, so it is untouched. Steps 3–4 add new
