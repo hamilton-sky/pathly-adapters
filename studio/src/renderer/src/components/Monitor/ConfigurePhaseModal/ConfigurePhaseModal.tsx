@@ -59,7 +59,7 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   const projectPath          = useStore((s) => s.projectPath)
   const activeTopic          = useStore((s) => s.activeTopic)
   const setActivePanel       = useStore((s) => s.setActivePanel)
-  const setNotebookPath = useUiStore((s) => s.setNotebookPath)
+  const setMdEditorPath = useUiStore((s) => s.setMdEditorPath)
 
   const agentCatalog = useAgentCatalog(projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
@@ -139,10 +139,10 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
       .catch(() => undefined)
   }
 
-  function handleOpenInNotebook(): void {
+  function handleOpenInMdEditor(): void {
     const relPath = SKILL_FILE_PATHS[skill] ?? skill
-    setNotebookPath(`${projectPath}/src/pathly_data/core/skills/${relPath}.md`)
-    setActivePanel('notebook')
+    setMdEditorPath(`${projectPath}/src/pathly_data/core/skills/${relPath}.md`)
+    setActivePanel('markdown-editor')
     onClose()
   }
 
@@ -220,8 +220,8 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
       </div>
 
       <footer className={styles.footer}>
-        <Button variant="ghost" icon={<BookOpen size={14} />} onClick={handleOpenInNotebook}>
-          Open skill in Notebook
+        <Button variant="ghost" icon={<BookOpen size={14} />} onClick={handleOpenInMdEditor}>
+          Open skill in Markdown Editor
         </Button>
         <span className={styles.spacer} />
         <Button variant="quiet" onClick={handleReset}>Reset to default</Button>

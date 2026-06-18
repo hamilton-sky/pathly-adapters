@@ -4,17 +4,17 @@ import MarkdownRenderer from '../../shared/MarkdownRenderer/MarkdownRenderer'
 import styles from './FilePreview.module.css'
 
 export default function FilePreview() {
-  const notebookPath = useUiStore(s => s.notebookPath)
+  const mdEditorPath = useUiStore(s => s.mdEditorPath)
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!notebookPath) return
+    if (!mdEditorPath) return
     setLoading(true)
-    window.pathly.fs.read(notebookPath)
+    window.pathly.fs.read(mdEditorPath)
       .then(text => { setContent(text ?? ''); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [notebookPath])
+  }, [mdEditorPath])
 
   if (loading) return <div className={styles.loading}>Loading…</div>
 

@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { X, RefreshCw, FileCode, Trash2 } from 'lucide-react'
-import { useUiStore, selectNotebookAnalysisPath } from '../../../store/uiStore'
+import { useUiStore, selectMdEditorAnalysisPath } from '../../../store/uiStore'
 import { MarkdownPreview } from '../../Editor/MarkdownPreview'
 import styles from './AnalysisPanel.module.css'
 
 export default function AnalysisPanel() {
-  const analysisPath    = useUiStore(selectNotebookAnalysisPath)
-  const setAnalysisPath = useUiStore((s) => s.setNotebookAnalysisPath)
-  const panelOpen       = useUiStore((s) => s.notebookAnalysisPanelOpen)
-  const setPanelOpen    = useUiStore((s) => s.setNotebookAnalysisPanelOpen)
-  const setNotebookPath     = useUiStore((s) => s.setNotebookPath)
-  const setNotebookViewMode = useUiStore((s) => s.setNotebookViewMode)
+  const analysisPath    = useUiStore(selectMdEditorAnalysisPath)
+  const setAnalysisPath = useUiStore((s) => s.setMdEditorAnalysisPath)
+  const panelOpen       = useUiStore((s) => s.mdEditorAnalysisPanelOpen)
+  const setPanelOpen    = useUiStore((s) => s.setMdEditorAnalysisPanelOpen)
+  const setMdEditorPath     = useUiStore((s) => s.setMdEditorPath)
+  const setMdEditorViewMode = useUiStore((s) => s.setMdEditorViewMode)
 
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,8 +32,8 @@ export default function AnalysisPanel() {
 
   function handleOpenInEditor() {
     if (!analysisPath) return
-    setNotebookPath(analysisPath)
-    setNotebookViewMode('editor')
+    setMdEditorPath(analysisPath)
+    setMdEditorViewMode('editor')
     setPanelOpen(false)
   }
 

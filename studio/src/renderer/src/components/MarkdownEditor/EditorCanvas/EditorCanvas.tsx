@@ -10,21 +10,21 @@ import InsertZone from '../InsertZone/InsertZone'
 
 export default function EditorCanvas() {
   const { cells, insertFragment, insertBodyCell, moveCell, removeCell, revertBodyCell, undo, redo } = useMarkdownEditorStore()
-  const notebookPath = useUiStore(s => s.notebookPath)
-  const setNotebookPath = useUiStore(s => s.setNotebookPath)
-  const setNotebookViewMode = useUiStore(s => s.setNotebookViewMode)
+  const mdEditorPath = useUiStore(s => s.mdEditorPath)
+  const setMdEditorPath = useUiStore(s => s.setMdEditorPath)
+  const setMdEditorViewMode = useUiStore(s => s.setMdEditorViewMode)
   const loadSkill = useMarkdownEditorStore(s => s.loadSkill)
 
   const [activeZone, setActiveZone] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [newCellId, setNewCellId] = useState<string | null>(null)
 
-  const pathParts = notebookPath ? notebookPath.replace(/\\/g, '/').split('/') : []
+  const pathParts = mdEditorPath ? mdEditorPath.replace(/\\/g, '/').split('/') : []
   const skillName = pathParts[pathParts.length - 1]?.replace('.md', '') ?? ''
 
   useEffect(() => {
-    if (notebookPath) loadSkill(notebookPath)
-  }, [notebookPath])
+    if (mdEditorPath) loadSkill(mdEditorPath)
+  }, [mdEditorPath])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -37,18 +37,18 @@ export default function EditorCanvas() {
 
   const handleOpenFragment = useCallback(async (path: string | undefined, name: string) => {
     if (path) {
-      setNotebookPath(path)
-      setNotebookViewMode('editor')
+      setMdEditorPath(path)
+      setMdEditorViewMode('editor')
       return
     }
     const { apiFetch } = await import('../../../lib/config')
     const res = await apiFetch('/catalog/all').then(r => r.json()).catch(() => null)
     const found = res?.fragments?.find((f: { name: string; path: string }) => f.name === name)
     if (found?.path) {
-      setNotebookPath(found.path)
-      setNotebookViewMode('editor')
+      setMdEditorPath(found.path)
+      setMdEditorViewMode('editor')
     }
-  }, [setNotebookPath, setNotebookViewMode])
+  }, [setMdEditorPath, setMdEditorViewMode])
 
   function handleInsertZoneDrop(afterCellId: string | null, e: React.DragEvent) {
     const fragmentName = e.dataTransfer.getData('fragment-name')

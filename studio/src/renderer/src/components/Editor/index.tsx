@@ -93,11 +93,11 @@ function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
 export function Editor({ path: pathOverride, embedded }: { path?: string | null; embedded?: boolean } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
   const resetLastAppliedPath = useMarkdownEditorStore((s) => s.resetLastAppliedPath)
-  const setNotebookDraftPath  = useUiStore(s => s.setNotebookDraftPath)
-  const notebookSaveRequested = useUiStore(s => s.notebookSaveRequested)
-  const notebookOpenDraftReq  = useUiStore(s => s.notebookOpenDraftRequested)
-  const notebookUndoReq       = useUiStore(s => s.notebookUndoRequested)
-  const notebookRedoReq       = useUiStore(s => s.notebookRedoRequested)
+  const setMdEditorDraftPath  = useUiStore(s => s.setMdEditorDraftPath)
+  const mdEditorSaveRequested = useUiStore(s => s.mdEditorSaveRequested)
+  const mdEditorOpenDraftReq  = useUiStore(s => s.mdEditorOpenDraftRequested)
+  const mdEditorUndoReq       = useUiStore(s => s.mdEditorUndoRequested)
+  const mdEditorRedoReq       = useUiStore(s => s.mdEditorRedoRequested)
   const markdownEditorRef     = useRef<MarkdownEditorHandle>(null)
 
   const effectivePath = pathOverride ?? selectedItem?.path ?? null
@@ -201,28 +201,28 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
   // ── Embedded: sync draft path into uiStore so EditorHeader can read it ───
   useEffect(() => {
     if (!embedded) return
-    setNotebookDraftPath(draftPath)
-    return () => setNotebookDraftPath(null)
-  }, [embedded, draftPath, setNotebookDraftPath])
+    setMdEditorDraftPath(draftPath)
+    return () => setMdEditorDraftPath(null)
+  }, [embedded, draftPath, setMdEditorDraftPath])
 
   // ── Embedded: save when EditorHeader's Save button is pressed ───────────
-  const prevSaveReqRef = useRef(notebookSaveRequested)
+  const prevSaveReqRef = useRef(mdEditorSaveRequested)
   useEffect(() => {
     if (!embedded) return
-    if (notebookSaveRequested === prevSaveReqRef.current) return
-    prevSaveReqRef.current = notebookSaveRequested
+    if (mdEditorSaveRequested === prevSaveReqRef.current) return
+    prevSaveReqRef.current = mdEditorSaveRequested
     void performSave(bodyRef.current, configRef.current)
-  }, [embedded, notebookSaveRequested, performSave])
+  }, [embedded, mdEditorSaveRequested, performSave])
 
   // ── Embedded: open draft viewer when EditorHeader's Review Draft is pressed
   const pendingOpenDraftRef   = useRef(false)
-  const prevOpenDraftReqRef   = useRef(notebookOpenDraftReq)
+  const prevOpenDraftReqRef   = useRef(mdEditorOpenDraftReq)
   useEffect(() => {
     if (!embedded) return
-    if (notebookOpenDraftReq === prevOpenDraftReqRef.current) return
-    prevOpenDraftReqRef.current = notebookOpenDraftReq
+    if (mdEditorOpenDraftReq === prevOpenDraftReqRef.current) return
+    prevOpenDraftReqRef.current = mdEditorOpenDraftReq
     if (draftPath) { setDraftViewerOpen(true) } else { pendingOpenDraftRef.current = true }
-  }, [embedded, notebookOpenDraftReq, draftPath])
+  }, [embedded, mdEditorOpenDraftReq, draftPath])
 
   useEffect(() => {
     if (pendingOpenDraftRef.current && draftPath) {
@@ -232,21 +232,21 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
   }, [draftPath])
 
   // ── Embedded: undo/redo via CodeMirror when EditorHeader buttons pressed ─
-  const prevUndoReqRef = useRef(notebookUndoReq)
+  const prevUndoReqRef = useRef(mdEditorUndoReq)
   useEffect(() => {
     if (!embedded) return
-    if (notebookUndoReq === prevUndoReqRef.current) return
-    prevUndoReqRef.current = notebookUndoReq
+    if (mdEditorUndoReq === prevUndoReqRef.current) return
+    prevUndoReqRef.current = mdEditorUndoReq
     markdownEditorRef.current?.undo()
-  }, [embedded, notebookUndoReq])
+  }, [embedded, mdEditorUndoReq])
 
-  const prevRedoReqRef = useRef(notebookRedoReq)
+  const prevRedoReqRef = useRef(mdEditorRedoReq)
   useEffect(() => {
     if (!embedded) return
-    if (notebookRedoReq === prevRedoReqRef.current) return
-    prevRedoReqRef.current = notebookRedoReq
+    if (mdEditorRedoReq === prevRedoReqRef.current) return
+    prevRedoReqRef.current = mdEditorRedoReq
     markdownEditorRef.current?.redo()
-  }, [embedded, notebookRedoReq])
+  }, [embedded, mdEditorRedoReq])
 
   function handleConfigChange(v: FrontmatterValues): void {
     setConfig(v)

@@ -13,7 +13,7 @@ export default function PreviewPanel() {
     previewSections, previewTokens, previewLoading,
     setPreview, setPreviewLoading,
   } = useMarkdownEditorStore()
-  const togglePreview = useUiStore((s) => s.toggleNotebookPreview)
+  const togglePreview = useUiStore((s) => s.toggleMdEditorPreview)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {

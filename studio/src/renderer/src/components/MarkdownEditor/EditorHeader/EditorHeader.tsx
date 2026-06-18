@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useMarkdownEditorStore, BodyCell } from '../../../store/markdownEditorStore'
-import { useUiStore, selectNotebookDraftPath, selectNotebookAnalysisPath, selectNotebookSplit, selectNotebookAnalyze } from '../../../store/uiStore'
+import { useUiStore, selectMdEditorDraftPath, selectMdEditorAnalysisPath, selectMdEditorSplit, selectMdEditorAnalyze } from '../../../store/uiStore'
 import { useTerminalStore } from '../../../store/terminalStore'
 import { useEditorAgentActions } from './hooks/useEditorAgentActions'
 import { apiFetch } from '../../../lib/config'
@@ -19,28 +19,28 @@ import { fmtElapsed, useElapsedProgress } from './editorProgress'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
 import styles from './EditorHeader.module.css'
 
-export type NotebookViewMode = 'cells' | 'editor'
+export type MdEditorViewMode = 'cells' | 'editor'
 
 interface Props {
-  viewMode: NotebookViewMode
+  viewMode: MdEditorViewMode
   onToggleViewMode: () => void
 }
 
 export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved, insertBodyCell, frontmatterRaw } = useMarkdownEditorStore()
 
-  const notebookPath         = useUiStore(s => s.notebookPath)
-  const setNotebookPath      = useUiStore(s => s.setNotebookPath)
-  const setNotebookViewMode  = useUiStore(s => s.setNotebookViewMode)
+  const mdEditorPath         = useUiStore(s => s.mdEditorPath)
+  const setMdEditorPath      = useUiStore(s => s.setMdEditorPath)
+  const setMdEditorViewMode  = useUiStore(s => s.setMdEditorViewMode)
   const dirtyItems                = useUiStore(s => s.dirtyItems)
-  const notebookDraftPath         = useUiStore(selectNotebookDraftPath)
-  const requestNotebookSave       = useUiStore(s => s.requestNotebookSave)
-  const requestNotebookOpenDraft  = useUiStore(s => s.requestNotebookOpenDraft)
-  const requestNotebookUndo       = useUiStore(s => s.requestNotebookUndo)
-  const requestNotebookRedo       = useUiStore(s => s.requestNotebookRedo)
-  const notebookAnalysisPath       = useUiStore(selectNotebookAnalysisPath)
-  const notebookAnalysisPanelOpen  = useUiStore(s => s.notebookAnalysisPanelOpen)
-  const setNotebookAnalysisPanelOpen = useUiStore(s => s.setNotebookAnalysisPanelOpen)
+  const mdEditorDraftPath         = useUiStore(selectMdEditorDraftPath)
+  const requestMdEditorSave       = useUiStore(s => s.requestMdEditorSave)
+  const requestMdEditorOpenDraft  = useUiStore(s => s.requestMdEditorOpenDraft)
+  const requestMdEditorUndo       = useUiStore(s => s.requestMdEditorUndo)
+  const requestMdEditorRedo       = useUiStore(s => s.requestMdEditorRedo)
+  const mdEditorAnalysisPath       = useUiStore(selectMdEditorAnalysisPath)
+  const mdEditorAnalysisPanelOpen  = useUiStore(s => s.mdEditorAnalysisPanelOpen)
+  const setMdEditorAnalysisPanelOpen = useUiStore(s => s.setMdEditorAnalysisPanelOpen)
 
   const [exportState, setExportState] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveState,   setSaveState]   = useState<'idle' | 'success' | 'error'>('idle')
@@ -56,7 +56,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const handleAnalyzeCli = (next: EditorCli) => { setAnalyzeCli(next); saveEditorCli(CLI_KEY_ANALYZE, next) }
 
   const { handleSplit, handleAnalyze, stopSplit, stopAnalyze } = useEditorAgentActions(
-    notebookPath,
+    mdEditorPath,
     splitOncePrompt,
     analyzeOncePrompt,
     () => setSplitOncePrompt(null),
@@ -67,8 +67,8 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
 
   // Per-file run state — derived from the store so each open file shows only its own run.
   // A run that completes while the user is on another file updates that file's slot, never this one.
-  const splitSlot    = useUiStore(selectNotebookSplit)
-  const analyzeSlot  = useUiStore(selectNotebookAnalyze)
+  const splitSlot    = useUiStore(selectMdEditorSplit)
+  const analyzeSlot  = useUiStore(selectMdEditorAnalyze)
   const splitState   = splitSlot?.status ?? 'idle'
   const analyzeState = analyzeSlot?.status ?? 'idle'
   const splitStartedAt   = useTerminalStore((s) => s.tabs.find((t) => t.id === splitSlot?.tabId)?.startedAt)
@@ -94,9 +94,9 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const canRedo = viewMode === 'cells' ? historyIndex < history.length - 1 : true
 
   const isCellsDirty = historyIndex !== savedHistoryIndex
-  const isSourceDirty = notebookPath ? dirtyItems.has(notebookPath) : false
+  const isSourceDirty = mdEditorPath ? dirtyItems.has(mdEditorPath) : false
 
-  const normPath = notebookPath ? notebookPath.replace(/\\/g, '/') : ''
+  const normPath = mdEditorPath ? mdEditorPath.replace(/\\/g, '/') : ''
   const pathParts = normPath ? normPath.split('/') : []
   const skillName = pathParts[pathParts.length - 1]?.replace('.md', '') ?? ''
   // Only skills/agents can be installed to adapter dirs; the rest of Export applies to any md.
@@ -106,8 +106,8 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
     const fragmentOrder = cells
       .filter(c => c.type === 'fragment')
       .map(c => (c as any).fragmentName as string)
-    const skillKey = notebookPath
-      ? notebookPath.replace(/\\/g, '/').replace(/^.*core\/skills\//, '').replace('.md', '')
+    const skillKey = mdEditorPath
+      ? mdEditorPath.replace(/\\/g, '/').replace(/^.*core\/skills\//, '').replace('.md', '')
       : 'unknown'
     try {
       const res = await apiFetch('/skills/export', {
@@ -132,7 +132,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
       const res = await apiFetch('/skills/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skill_path: notebookPath, body_cells: bodyCells, frontmatter: frontmatterRaw }),
+        body: JSON.stringify({ skill_path: mdEditorPath, body_cells: bodyCells, frontmatter: frontmatterRaw }),
       })
       if (res.ok) {
         markCellsSaved()
@@ -151,12 +151,12 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
     }
   }
 
-  const handleUndo = () => { if (viewMode === 'cells') { undo() } else { requestNotebookUndo() } }
-  const handleRedo = () => { if (viewMode === 'cells') { redo() } else { requestNotebookRedo() } }
+  const handleUndo = () => { if (viewMode === 'cells') { undo() } else { requestMdEditorUndo() } }
+  const handleRedo = () => { if (viewMode === 'cells') { redo() } else { requestMdEditorRedo() } }
 
   const handleReviewDraft = () => {
-    if (viewMode !== 'editor') setNotebookViewMode('editor')
-    requestNotebookOpenDraft()
+    if (viewMode !== 'editor') setMdEditorViewMode('editor')
+    requestMdEditorOpenDraft()
   }
 
   return (
@@ -164,7 +164,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => setNotebookPath(null)}
+        onClick={() => setMdEditorPath(null)}
         aria-label="Back"
       >
         <ArrowLeft size={16} />
@@ -232,18 +232,18 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
       <SplitPill
         state={splitState}
         progress={splitProgress}
-        hasPath={!!notebookPath}
+        hasPath={!!mdEditorPath}
         onAiSplit={() => void handleSplit()}
         onStop={() => stopSplit()}
         onSplitIntoCells={() => setSplitCellsOpen(true)}
         onTogglePrompt={() => setSplitPeekOpen(v => !v)}
         compact={isCompact}
       />
-      {splitPeekOpen && notebookPath && (
+      {splitPeekOpen && mdEditorPath && (
         <PromptPeekModal
           title="PROMPT — AI Split"
           fileName={skillName + '.md'}
-          defaultPrompt={buildSplitPrompt(notebookPath)}
+          defaultPrompt={buildSplitPrompt(mdEditorPath)}
           storageKey={STORAGE_KEY_SPLIT}
           cli={splitCli}
           onCliChange={handleSplitCli}
@@ -264,7 +264,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             type="button"
             className={styles.agentPillMain}
             data-state={analyzeState}
-            disabled={analyzeState === 'running' || !notebookPath}
+            disabled={analyzeState === 'running' || !mdEditorPath}
             onClick={() => void handleAnalyze()}
             aria-label="AI Analyze document for quality"
           >
@@ -293,7 +293,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
               type="button"
               className={styles.agentPillSettings}
               data-state={analyzeState}
-              disabled={!notebookPath}
+              disabled={!mdEditorPath}
               onClick={() => setAnalyzePeekOpen(v => !v)}
               aria-label="Edit analyze prompt"
             >
@@ -301,11 +301,11 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             </button>
           </Tooltip>
         )}
-        {analyzePeekOpen && notebookPath && (
+        {analyzePeekOpen && mdEditorPath && (
           <PromptPeekModal
             title="PROMPT — AI Analyze"
             fileName={skillName + '.md'}
-            defaultPrompt={buildAnalyzePrompt(notebookPath)}
+            defaultPrompt={buildAnalyzePrompt(mdEditorPath)}
             storageKey={STORAGE_KEY_ANALYZE}
             cli={analyzeCli}
             onCliChange={handleAnalyzeCli}
@@ -318,8 +318,8 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
       {/* View Analysis Report */}
       <Tooltip
         label={
-          !notebookAnalysisPath ? 'No report yet — run Analyze first' :
-          notebookAnalysisPanelOpen ? 'Close report panel' :
+          !mdEditorAnalysisPath ? 'No report yet — run Analyze first' :
+          mdEditorAnalysisPanelOpen ? 'Close report panel' :
           'Quality report ready — click to open'
         }
         placement="bottom"
@@ -327,9 +327,9 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         <button
           type="button"
           className={styles.analysisBtn}
-          data-has-analysis={!!notebookAnalysisPath}
-          aria-disabled={!notebookAnalysisPath}
-          onClick={notebookAnalysisPath ? () => setNotebookAnalysisPanelOpen(!notebookAnalysisPanelOpen) : undefined}
+          data-has-analysis={!!mdEditorAnalysisPath}
+          aria-disabled={!mdEditorAnalysisPath}
+          onClick={mdEditorAnalysisPath ? () => setMdEditorAnalysisPanelOpen(!mdEditorAnalysisPanelOpen) : undefined}
         >
           <FileSearch size={13} />
           <span className={styles.btnLabel}>Report</span>
@@ -338,7 +338,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
 
       {/* Review Draft */}
       <Tooltip
-        label={notebookDraftPath
+        label={mdEditorDraftPath
           ? 'Agent draft ready — click to review changes'
           : 'No agent draft pending — activates when an agent edits this file'}
         placement="bottom"
@@ -346,9 +346,9 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         <button
           type="button"
           className={styles.draftBtn}
-          data-has-draft={!!notebookDraftPath}
-          aria-disabled={!notebookDraftPath}
-          onClick={notebookDraftPath ? handleReviewDraft : undefined}
+          data-has-draft={!!mdEditorDraftPath}
+          aria-disabled={!mdEditorDraftPath}
+          onClick={mdEditorDraftPath ? handleReviewDraft : undefined}
         >
           <GitCompare size={13} />
           <span className={styles.btnLabel}>Review draft</span>
@@ -377,7 +377,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             type="button"
             className={styles.saveBtn}
             data-state={isSourceDirty ? 'idle' : 'saved'}
-            onClick={requestNotebookSave}
+            onClick={requestMdEditorSave}
             disabled={!isSourceDirty}
           >
             <Database size={14} />
@@ -390,7 +390,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
 
       {/* Export ▾ — far right. Save-as / Download / Copy for any md; Install for skills. */}
       <ExportMenu
-        path={notebookPath}
+        path={mdEditorPath}
         isSkillOrAgent={isSkillOrAgent}
         installState={exportState}
         onInstallSkill={handleExport}
@@ -398,20 +398,20 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
       />
 
       {/* Deterministic "Split into cells" — parses the open file into editable cells. */}
-      {splitCellsOpen && notebookPath && (
+      {splitCellsOpen && mdEditorPath && (
         <SkillSplitModal
-          filePath={notebookPath}
+          filePath={mdEditorPath}
           fileName={skillName + '.md'}
           onClose={() => setSplitCellsOpen(false)}
           onInsertOne={(raw) => {
             setSplitCellsOpen(false)
-            if (viewMode !== 'cells') setNotebookViewMode('cells')
+            if (viewMode !== 'cells') setMdEditorViewMode('cells')
             const lastId = cells[cells.length - 1]?.id ?? null
             insertBodyCell(skillName, raw, lastId)
           }}
           onConfirm={(proposed) => {
             setSplitCellsOpen(false)
-            if (viewMode !== 'cells') setNotebookViewMode('cells')
+            if (viewMode !== 'cells') setMdEditorViewMode('cells')
             let lastId = cells[cells.length - 1]?.id ?? null
             for (const c of proposed) lastId = insertBodyCell(c.heading, c.content, lastId)
           }}

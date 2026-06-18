@@ -78,8 +78,8 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
     // Markdown opens in the unified Markdown Notebook (cells + source + preview);
     // anything else (code, etc.) opens in the plain file editor.
     if (absPath.toLowerCase().endsWith('.md')) {
-      useUiStore.getState().setNotebookPath(absPath)
-      useUiStore.getState().setActivePanel('notebook')
+      useUiStore.getState().setMdEditorPath(absPath)
+      useUiStore.getState().setActivePanel('markdown-editor')
     } else {
       const name = absPath.split(/[/\\]/).pop() ?? absPath
       useProjectStore.getState().setSelectedItem({ name, path: absPath, type: 'plan' })

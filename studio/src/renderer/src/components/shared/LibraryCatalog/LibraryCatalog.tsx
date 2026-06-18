@@ -7,7 +7,7 @@ import type { PathlyCanvasDragItem, PathlySection } from '../../../types'
 import styles from './LibraryCatalog.module.css'
 
 interface Props {
-  context: 'notebook' | 'canvas'
+  context: 'markdown-editor' | 'canvas'
   pathlyRoot?: string | null
   onOpenSkill?: (path: string) => void
   onOpenFlow?: (pathOrName: string) => void
@@ -45,7 +45,7 @@ interface ItemRowProps {
   item: CatalogItemData
   type: CatalogGroup['type']
   groupIcon: CatalogGroup['icon']
-  context: 'notebook' | 'canvas'
+  context: 'markdown-editor' | 'canvas'
   displayName?: string
   categories?: string[]
   onOpenSkill?: (path: string) => void
@@ -101,7 +101,7 @@ function ItemRow({ item, type, groupIcon, context, displayName, categories, onOp
   function handleRowClick() {
     if (renaming) return
     if (isFlow) { onOpenFlow?.(item.path || item.name); return }
-    if (context !== 'notebook') return
+    if (context !== 'markdown-editor') return
     if (hasPath) { onOpenSkill?.(item.path!) }
   }
 
@@ -139,7 +139,7 @@ function ItemRow({ item, type, groupIcon, context, displayName, categories, onOp
 
   if (isFlow) {
     if (hasPath) menuItems.push({ label: 'Open on canvas', onClick: () => { setMenuOpen(false); onOpenFlow?.(item.path || item.name) } })
-  } else if (context === 'notebook') {
+  } else if (context === 'markdown-editor') {
     if (item.itemType === 'fragment' || hasPath) menuItems.push({ label: 'Insert as cell', onClick: () => { setMenuOpen(false); onInsertCell?.(item) } })
     if (hasPath) menuItems.push({ label: 'Open to edit', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
     if (hasPath) menuItems.push({ label: 'Split into cells', onClick: () => { setMenuOpen(false); onAddCells?.(item) } })
@@ -161,7 +161,7 @@ function ItemRow({ item, type, groupIcon, context, displayName, categories, onOp
   return (
     <div
       ref={rowRef}
-      className={`${styles.item} ${context === 'notebook' ? styles.itemClickable : styles.itemGrabbable}`}
+      className={`${styles.item} ${context === 'markdown-editor' ? styles.itemClickable : styles.itemGrabbable}`}
       draggable={context === 'canvas' && !isFlow && !renaming}
       onDragStart={context === 'canvas' && !isFlow && !renaming ? handleDragStart : undefined}
       onClick={handleRowClick}
@@ -264,7 +264,7 @@ interface SubGroupProps {
   parentCategory: string
   type: CatalogGroup['type']
   groupIcon: CatalogGroup['icon']
-  context: 'notebook' | 'canvas'
+  context: 'markdown-editor' | 'canvas'
   collapseKey: number
   categories?: string[]
   onOpenSkill?: (path: string) => void
@@ -506,7 +506,7 @@ function buildCategoryTree(groupItems: CatalogItemData[], groupType: string): Re
 
 interface GroupSectionProps {
   group: CatalogGroup
-  context: 'notebook' | 'canvas'
+  context: 'markdown-editor' | 'canvas'
   collapseKey: number
   onOpenSkill?: (path: string) => void
   onOpenFlow?: (pathOrName: string) => void

@@ -3,7 +3,7 @@ import { Sparkles, ChevronsUp, Plus, Copy, Undo2, PanelRightOpen } from 'lucide-
 import { Tooltip } from '../ui'
 import { useUiStore } from '../../store/uiStore'
 import styles from './MarkdownEditor.module.css'
-import EditorHeader, { NotebookViewMode } from './EditorHeader/EditorHeader'
+import EditorHeader, { MdEditorViewMode } from './EditorHeader/EditorHeader'
 import EditorCanvas from './EditorCanvas/EditorCanvas'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
 import EditorLanding from './EditorLanding/EditorLanding'
@@ -12,14 +12,14 @@ import { Editor } from '../Editor'
 import { usePreviewResize } from './usePreviewResize'
 
 export default function MarkdownEditorPanel() {
-  const notebookPath = useUiStore((s) => s.notebookPath)
-  const viewMode = useUiStore((s) => s.notebookViewMode)
-  const setViewMode = useUiStore((s) => s.setNotebookViewMode)
-  const previewOpen = useUiStore((s) => s.notebookPreviewOpen)
-  const togglePreview = useUiStore((s) => s.toggleNotebookPreview)
+  const mdEditorPath = useUiStore((s) => s.mdEditorPath)
+  const viewMode = useUiStore((s) => s.mdEditorViewMode)
+  const setViewMode = useUiStore((s) => s.setMdEditorViewMode)
+  const previewOpen = useUiStore((s) => s.mdEditorPreviewOpen)
+  const togglePreview = useUiStore((s) => s.toggleMdEditorPreview)
   const preview = usePreviewResize()
 
-  if (!notebookPath) {
+  if (!mdEditorPath) {
     return <EditorLanding />
   }
 
@@ -34,7 +34,7 @@ export default function MarkdownEditorPanel() {
       {viewMode === 'editor' ? (
         /* Source view — Editor in embedded mode; EditorHeader owns the action bar */
         <div className={styles.editorWrapper}>
-          <Editor path={notebookPath} embedded />
+          <Editor path={mdEditorPath} embedded />
         </div>
       ) : (
         /* Notebook cells + live preview panel */

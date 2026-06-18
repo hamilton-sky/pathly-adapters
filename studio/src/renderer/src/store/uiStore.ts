@@ -30,27 +30,27 @@ function loadSidebarTab(): 'library' | 'workspace' {
 }
 
 /** Lifecycle status of a notebook one-shot AI action (AI Split / AI Analyze). */
-export type NotebookActionStatus = 'idle' | 'running' | 'success' | 'error'
+export type MdEditorActionStatus = 'idle' | 'running' | 'success' | 'error'
 
 /** Per-file, per-action run state. The single source of truth for an in-flight run. */
-export interface NotebookActionSlot {
-  status: NotebookActionStatus
+export interface MdEditorActionSlot {
+  status: MdEditorActionStatus
   /** Terminal tab id of the running PTY (present while running). */
   tabId?: string
   /** Set true when the user requested a stop, so this run's onExit reports "stopped" not "done". */
   stopping?: boolean
 }
 
-export interface NotebookActionRecord {
-  split?: NotebookActionSlot
-  analyze?: NotebookActionSlot
+export interface MdEditorActionRecord {
+  split?: MdEditorActionSlot
+  analyze?: MdEditorActionSlot
 }
 
 export interface UiState {
   sidebarCollapsed: boolean
   /** Which tab the expanded sidebar shows — persisted to localStorage 'pathly:sidebarTab' */
   sidebarTab: 'library' | 'workspace'
-  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'notebook' | 'db-explorer' | 'command-center'
+  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center'
   dirtyItems: Set<string>
   theme: ThemeName
   preferredDark: ThemeName
@@ -63,39 +63,39 @@ export interface UiState {
   chatOpen: boolean
   cliMonitorOpen: boolean
   skillsPanelOpen: boolean
-  notebookPath: string | null
-  notebookViewMode: 'cells' | 'editor'
-  notebookPreviewOpen: boolean
-  /** Draft paths per notebook file — keyed by notebookPath */
-  notebookDraftPaths: Record<string, string>
-  /** Analysis file paths per notebook file — keyed by notebookPath */
-  notebookAnalysisPaths: Record<string, string>
-  notebookAnalysisPanelOpen: boolean
+  mdEditorPath: string | null
+  mdEditorViewMode: 'cells' | 'editor'
+  mdEditorPreviewOpen: boolean
+  /** Draft paths per notebook file — keyed by mdEditorPath */
+  mdEditorDraftPaths: Record<string, string>
+  /** Analysis file paths per notebook file — keyed by mdEditorPath */
+  mdEditorAnalysisPaths: Record<string, string>
+  mdEditorAnalysisPanelOpen: boolean
   /** Per-file, per-action run state — single source of truth for in-flight AI actions */
-  notebookActions: Record<string, NotebookActionRecord>
-  setNotebookAnalysisPanelOpen: (v: boolean) => void
+  mdEditorActions: Record<string, MdEditorActionRecord>
+  setMdEditorAnalysisPanelOpen: (v: boolean) => void
   /** Increment to request the embedded source editor to save */
-  notebookSaveRequested: number
+  mdEditorSaveRequested: number
   /** Increment to request the embedded source editor to open its draft diff viewer */
-  notebookOpenDraftRequested: number
+  mdEditorOpenDraftRequested: number
   /** Increment to request the embedded source editor to undo */
-  notebookUndoRequested: number
+  mdEditorUndoRequested: number
   /** Increment to request the embedded source editor to redo */
-  notebookRedoRequested: number
+  mdEditorRedoRequested: number
   setSidebarCollapsed: (v: boolean) => void
   setSidebarTab: (tab: 'library' | 'workspace') => void
-  setNotebookViewMode: (mode: 'cells' | 'editor') => void
-  toggleNotebookPreview: () => void
-  setNotebookDraftPath: (p: string | null, forFile?: string) => void
-  setNotebookAnalysisPath: (p: string | null, forFile?: string) => void
+  setMdEditorViewMode: (mode: 'cells' | 'editor') => void
+  toggleMdEditorPreview: () => void
+  setMdEditorDraftPath: (p: string | null, forFile?: string) => void
+  setMdEditorAnalysisPath: (p: string | null, forFile?: string) => void
   /** Merge a patch into a file's action slot; pass null to clear the slot. */
-  setNotebookAction: (filePath: string, action: 'split' | 'analyze', patch: Partial<NotebookActionSlot> | null) => void
-  requestNotebookSave: () => void
-  requestNotebookOpenDraft: () => void
-  requestNotebookUndo: () => void
-  requestNotebookRedo: () => void
-  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'notebook' | 'db-explorer' | 'command-center') => void
-  setNotebookPath: (path: string | null) => void
+  setMdEditorAction: (filePath: string, action: 'split' | 'analyze', patch: Partial<MdEditorActionSlot> | null) => void
+  requestMdEditorSave: () => void
+  requestMdEditorOpenDraft: () => void
+  requestMdEditorUndo: () => void
+  requestMdEditorRedo: () => void
+  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center') => void
+  setMdEditorPath: (path: string | null) => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void
   setTheme: (t: ThemeName) => void
@@ -129,76 +129,76 @@ export const useUiStore = create<UiState>()(
       chatOpen: false,
       cliMonitorOpen: false,
       skillsPanelOpen: true,
-      notebookPath: null,
-      notebookViewMode: 'cells',
-      notebookPreviewOpen: true,
-      notebookDraftPaths: {},
-      notebookAnalysisPaths: {},
-      notebookAnalysisPanelOpen: false,
-      notebookActions: {},
-      notebookSaveRequested: 0,
-      notebookOpenDraftRequested: 0,
-      notebookUndoRequested: 0,
-      notebookRedoRequested: 0,
+      mdEditorPath: null,
+      mdEditorViewMode: 'cells',
+      mdEditorPreviewOpen: true,
+      mdEditorDraftPaths: {},
+      mdEditorAnalysisPaths: {},
+      mdEditorAnalysisPanelOpen: false,
+      mdEditorActions: {},
+      mdEditorSaveRequested: 0,
+      mdEditorOpenDraftRequested: 0,
+      mdEditorUndoRequested: 0,
+      mdEditorRedoRequested: 0,
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setSidebarTab: (tab) => {
         try { localStorage.setItem('pathly:sidebarTab', tab) } catch {}
         set({ sidebarTab: tab })
       },
-      toggleNotebookPreview: () => set((s) => ({ notebookPreviewOpen: !s.notebookPreviewOpen })),
-      setNotebookDraftPath: (p, forFile) => set((s) => {
-        const key = forFile ?? s.notebookPath ?? ''
+      toggleMdEditorPreview: () => set((s) => ({ mdEditorPreviewOpen: !s.mdEditorPreviewOpen })),
+      setMdEditorDraftPath: (p, forFile) => set((s) => {
+        const key = forFile ?? s.mdEditorPath ?? ''
         if (!key) return {}
         if (p === null) {
-          const next = { ...s.notebookDraftPaths }
+          const next = { ...s.mdEditorDraftPaths }
           delete next[key]
-          return { notebookDraftPaths: next }
+          return { mdEditorDraftPaths: next }
         }
-        return { notebookDraftPaths: { ...s.notebookDraftPaths, [key]: p } }
+        return { mdEditorDraftPaths: { ...s.mdEditorDraftPaths, [key]: p } }
       }),
-      setNotebookAnalysisPath: (p, forFile) => set((s) => {
-        const key = forFile ?? s.notebookPath ?? ''
+      setMdEditorAnalysisPath: (p, forFile) => set((s) => {
+        const key = forFile ?? s.mdEditorPath ?? ''
         if (!key) return {}
         if (p === null) {
-          const next = { ...s.notebookAnalysisPaths }
+          const next = { ...s.mdEditorAnalysisPaths }
           delete next[key]
-          return { notebookAnalysisPaths: next }
+          return { mdEditorAnalysisPaths: next }
         }
         const update: Partial<UiState> = {
-          notebookAnalysisPaths: { ...s.notebookAnalysisPaths, [key]: p },
+          mdEditorAnalysisPaths: { ...s.mdEditorAnalysisPaths, [key]: p },
           // Only auto-open the report panel when the finished run is for the file the user
           // is currently viewing — a background file's completion must not pop a panel here.
-          ...(key === s.notebookPath ? { notebookAnalysisPanelOpen: true } : {}),
+          ...(key === s.mdEditorPath ? { mdEditorAnalysisPanelOpen: true } : {}),
         }
         return update
       }),
-      setNotebookAction: (filePath, action, patch) =>
+      setMdEditorAction: (filePath, action, patch) =>
         set((s) => {
           if (!filePath) return {}
-          const record = s.notebookActions[filePath] ?? {}
+          const record = s.mdEditorActions[filePath] ?? {}
           if (patch === null) {
             const { [action]: _omit, ...restActions } = record
             if (Object.keys(restActions).length === 0) {
-              const { [filePath]: _drop, ...restFiles } = s.notebookActions
-              return { notebookActions: restFiles }
+              const { [filePath]: _drop, ...restFiles } = s.mdEditorActions
+              return { mdEditorActions: restFiles }
             }
-            return { notebookActions: { ...s.notebookActions, [filePath]: restActions } }
+            return { mdEditorActions: { ...s.mdEditorActions, [filePath]: restActions } }
           }
-          const prevSlot: NotebookActionSlot = record[action] ?? { status: 'idle' }
-          const nextSlot: NotebookActionSlot = { ...prevSlot, ...patch }
-          return { notebookActions: { ...s.notebookActions, [filePath]: { ...record, [action]: nextSlot } } }
+          const prevSlot: MdEditorActionSlot = record[action] ?? { status: 'idle' }
+          const nextSlot: MdEditorActionSlot = { ...prevSlot, ...patch }
+          return { mdEditorActions: { ...s.mdEditorActions, [filePath]: { ...record, [action]: nextSlot } } }
         }),
-      setNotebookAnalysisPanelOpen: (v) => set({ notebookAnalysisPanelOpen: v }),
-      requestNotebookSave: () => set((s) => ({ notebookSaveRequested: s.notebookSaveRequested + 1 })),
-      requestNotebookOpenDraft: () => set((s) => ({ notebookOpenDraftRequested: s.notebookOpenDraftRequested + 1 })),
-      requestNotebookUndo: () => set((s) => ({ notebookUndoRequested: s.notebookUndoRequested + 1 })),
-      requestNotebookRedo: () => set((s) => ({ notebookRedoRequested: s.notebookRedoRequested + 1 })),
+      setMdEditorAnalysisPanelOpen: (v) => set({ mdEditorAnalysisPanelOpen: v }),
+      requestMdEditorSave: () => set((s) => ({ mdEditorSaveRequested: s.mdEditorSaveRequested + 1 })),
+      requestMdEditorOpenDraft: () => set((s) => ({ mdEditorOpenDraftRequested: s.mdEditorOpenDraftRequested + 1 })),
+      requestMdEditorUndo: () => set((s) => ({ mdEditorUndoRequested: s.mdEditorUndoRequested + 1 })),
+      requestMdEditorRedo: () => set((s) => ({ mdEditorRedoRequested: s.mdEditorRedoRequested + 1 })),
       setActivePanel: (p) => set({ activePanel: p }),
-      setNotebookPath: (path) => set((s) => ({
-        notebookPath: path,
-        ...(path !== s.notebookPath ? { notebookAnalysisPanelOpen: false } : {}),
+      setMdEditorPath: (path) => set((s) => ({
+        mdEditorPath: path,
+        ...(path !== s.mdEditorPath ? { mdEditorAnalysisPanelOpen: false } : {}),
       })),
-      setNotebookViewMode: (mode) => set({ notebookViewMode: mode }),
+      setMdEditorViewMode: (mode) => set({ mdEditorViewMode: mode }),
       markDirty: (path) => set((s) => ({ dirtyItems: new Set([...s.dirtyItems, path]) })),
       clearDirty: (path) =>
         set((s) => {
@@ -244,19 +244,19 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'pathly-studio-ui',
-      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme, preferredDark: s.preferredDark, preferredLight: s.preferredLight, notebookPreviewOpen: s.notebookPreviewOpen }),
+      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme, preferredDark: s.preferredDark, preferredLight: s.preferredLight, mdEditorPreviewOpen: s.mdEditorPreviewOpen }),
     }
   )
 )
 
-export const selectNotebookDraftPath = (s: UiState): string | null =>
-  s.notebookDraftPaths[s.notebookPath ?? ''] ?? null
+export const selectMdEditorDraftPath = (s: UiState): string | null =>
+  s.mdEditorDraftPaths[s.mdEditorPath ?? ''] ?? null
 
-export const selectNotebookAnalysisPath = (s: UiState): string | null =>
-  s.notebookAnalysisPaths[s.notebookPath ?? ''] ?? null
+export const selectMdEditorAnalysisPath = (s: UiState): string | null =>
+  s.mdEditorAnalysisPaths[s.mdEditorPath ?? ''] ?? null
 
-export const selectNotebookSplit = (s: UiState): NotebookActionSlot | undefined =>
-  s.notebookActions[s.notebookPath ?? '']?.split
+export const selectMdEditorSplit = (s: UiState): MdEditorActionSlot | undefined =>
+  s.mdEditorActions[s.mdEditorPath ?? '']?.split
 
-export const selectNotebookAnalyze = (s: UiState): NotebookActionSlot | undefined =>
-  s.notebookActions[s.notebookPath ?? '']?.analyze
+export const selectMdEditorAnalyze = (s: UiState): MdEditorActionSlot | undefined =>
+  s.mdEditorActions[s.mdEditorPath ?? '']?.analyze

@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { LayoutGrid, Activity, BookOpen, Database, MessageSquare } from "lucide-react";
 import { useStore } from "../../store";
 import { Tooltip } from "../ui";
@@ -62,9 +62,9 @@ export function PanelNav({ compact }: PanelNavProps): JSX.Element {
       <Tooltip label="Markdown Editor" shortcut="Ctrl+4" placement="bottom">
         <button
           type="button"
-          data-testid="topbar-panel-notebook"
-          className={`${styles.navBtn} ${activePanel === "notebook" ? styles.navBtnActive : ""}`}
-          onClick={() => setActivePanel("notebook")}
+          data-testid="topbar-panel-markdown-editor"
+          className={`${styles.navBtn} ${activePanel === "markdown-editor" ? styles.navBtnActive : ""}`}
+          onClick={() => setActivePanel("markdown-editor")}
         >
           <BookOpen size={15} />
           {!compact && <span className={styles.navBtnLabel}>Markdown Editor</span>}

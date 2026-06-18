@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { FileText, Lock, MoreHorizontal, Pencil, Plus, Scissors, Trash2 } from 'lucide-react'
 import { useUiStore } from '../../../store/uiStore'
 import type { PathlyItem, PathlyReorgDragItem, PathlySection } from '../../../types'
@@ -128,7 +128,7 @@ export function WorkspaceItem({
                   anchor={menuButtonRef.current.getBoundingClientRect()}
                   onClose={() => setMenuOpen(false)}
                 >
-                  {activePanel === 'notebook' && item.name.endsWith('.md') && onSplitIntoCells && (
+                  {activePanel === 'markdown-editor' && item.name.endsWith('.md') && onSplitIntoCells && (
                     <>
                       <button type="button" className={styles.itemMenuItem} onClick={(e) => { e.stopPropagation(); handleMenuAction(onSplitIntoCells) }}>
                         <Plus size={12} />

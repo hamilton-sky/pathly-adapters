@@ -98,7 +98,7 @@
 .bannerToggle svg { transition: transform 150ms ease; }
 .chevronOpen { transform: rotate(90deg); }
 
-.notebookLink {
+.mdEditorLink {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -112,7 +112,7 @@
   opacity: 0.8;
 }
 
-.notebookLink:hover { opacity: 1; }
+.mdEditorLink:hover { opacity: 1; }
 
 .bannerBody {
   border-top: var(--border);

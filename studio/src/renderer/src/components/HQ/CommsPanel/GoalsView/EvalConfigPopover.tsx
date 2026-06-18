@@ -64,12 +64,12 @@ function usePromptContent(
 
 function PromptBanner({
   content,
-  notebookPath,
-  onOpenNotebook,
+  mdEditorPath,
+  onOpenMdEditor,
 }: {
   content: string | null
-  notebookPath: string | null
-  onOpenNotebook: () => void
+  mdEditorPath: string | null
+  onOpenMdEditor: () => void
 }): JSX.Element {
   const [open, setOpen] = useState(false)
   return (
@@ -84,8 +84,8 @@ function PromptBanner({
           <ChevronRight size={10} className={open ? s.chevronOpen : undefined} />
           Prompt
         </button>
-        {notebookPath && (
-          <button type="button" className={s.notebookLink} onClick={onOpenNotebook}>
+        {mdEditorPath && (
+          <button type="button" className={s.mdEditorLink} onClick={onOpenMdEditor}>
             Open in Markdown Editor <ExternalLink size={10} />
           </button>
         )}
@@ -114,7 +114,7 @@ export function EvalConfigPopover({
   const [left, setLeft] = useState(0)
 
   const projectPath = useStore((st) => st.projectPath)
-  const setNotebookPath = useUiStore((st) => st.setNotebookPath)
+  const setMdEditorPath = useUiStore((st) => st.setMdEditorPath)
   const setActivePanel = useUiStore((st) => st.setActivePanel)
   const agentCatalog = useAgentCatalog(projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
@@ -131,24 +131,24 @@ export function EvalConfigPopover({
   )
 
   // Notebook paths for "Open in Notebook" links.
-  const agentNotebookPath = selectedAgent && projectPath
+  const agentMdEditorPath = selectedAgent && projectPath
     ? (() => {
       const rel = findPath(selectedAgent, agentCatalog, AGENT_FILE_PATHS)
       return rel ? `${projectPath}/src/pathly_data/core/agents/${rel}.md` : null
     })()
     : null
 
-  const skillNotebookPath = selectedSkill && projectPath
+  const skillMdEditorPath = selectedSkill && projectPath
     ? (() => {
       const rel = findPath(selectedSkill, skillCatalog, SKILL_FILE_PATHS)
       return rel ? `${projectPath}/src/pathly_data/core/skills/${rel}.md` : null
     })()
     : null
 
-  function openNotebook(path: string | null): void {
+  function openMdEditor(path: string | null): void {
     if (!path) return
-    setNotebookPath(path)
-    setActivePanel('notebook')
+    setMdEditorPath(path)
+    setActivePanel('markdown-editor')
     onClose()
   }
 
@@ -203,8 +203,8 @@ export function EvalConfigPopover({
         {selectedAgent && (
           <PromptBanner
             content={agentContent}
-            notebookPath={agentNotebookPath}
-            onOpenNotebook={() => openNotebook(agentNotebookPath)}
+            mdEditorPath={agentMdEditorPath}
+            onOpenMdEditor={() => openMdEditor(agentMdEditorPath)}
           />
         )}
       </section>
@@ -224,8 +224,8 @@ export function EvalConfigPopover({
         {selectedSkill && (
           <PromptBanner
             content={skillContent}
-            notebookPath={skillNotebookPath}
-            onOpenNotebook={() => openNotebook(skillNotebookPath)}
+            mdEditorPath={skillMdEditorPath}
+            onOpenMdEditor={() => openMdEditor(skillMdEditorPath)}
           />
         )}
       </section>

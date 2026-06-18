@@ -65,9 +65,9 @@ export function Sidebar(): JSX.Element | null {
     selectedItem,
     setSelectedItem,
     setActivePanel,
-    setNotebookPath,
-    notebookViewMode,
-    setNotebookViewMode,
+    setMdEditorPath,
+    mdEditorViewMode,
+    setMdEditorViewMode,
     dirtyItems,
     activePanel,
     setLastUsedFlowPath,
@@ -75,7 +75,7 @@ export function Sidebar(): JSX.Element | null {
 
   const insertFragment = useMarkdownEditorStore((s) => s.insertFragment)
   const insertBodyCell = useMarkdownEditorStore((s) => s.insertBodyCell)
-  const notebookCells  = useMarkdownEditorStore((s) => s.cells)
+  const mdEditorCells  = useMarkdownEditorStore((s) => s.cells)
 
   const { sections, setSections, loadItems, customWorkspaceSections } = useProjectFiles()
   const { planFolders, setPlanFolders, loadPlanFiles } = usePlanFiles()
@@ -194,8 +194,8 @@ export function Sidebar(): JSX.Element | null {
       setActivePanel('flow')
       setLastUsedFlowPath(item.path)
     } else if (item.path.endsWith('.md')) {
-      setActivePanel('notebook')
-      setNotebookPath(item.path)
+      setActivePanel('markdown-editor')
+      setMdEditorPath(item.path)
     } else {
       setActivePanel('editor')
     }
@@ -589,9 +589,9 @@ export function Sidebar(): JSX.Element | null {
       <div className={styles.treeContainer}>
         {libraryOpen && (
           <LibraryCatalog
-            context={activePanelUi === 'notebook' ? 'notebook' : 'canvas'}
+            context={activePanelUi === 'markdown-editor' ? 'markdown-editor' : 'canvas'}
             pathlyRoot={pathlyRoot}
-            onOpenSkill={(path) => { setNotebookPath(path); setActivePanel('notebook') }}
+            onOpenSkill={(path) => { setMdEditorPath(path); setActivePanel('markdown-editor') }}
             onOpenFlow={(pathOrName) => {
               const filename = pathOrName.replace(/\\/g, '/').split('/').pop() ?? pathOrName
               const name = filename.replace(/\.flow\.yaml$/i, '')
@@ -600,8 +600,8 @@ export function Sidebar(): JSX.Element | null {
               setLastUsedFlowPath(pathOrName)
             }}
             onInsertCell={(item) => {
-              if (notebookViewMode !== 'cells') setNotebookViewMode('cells')
-              const lastCell = notebookCells[notebookCells.length - 1]
+              if (mdEditorViewMode !== 'cells') setMdEditorViewMode('cells')
+              const lastCell = mdEditorCells[mdEditorCells.length - 1]
               if (item.itemType === 'fragment') {
                 insertFragment(item.name, lastCell?.id ?? null)
               } else if (item.path) {
@@ -738,14 +738,14 @@ export function Sidebar(): JSX.Element | null {
           onClose={() => setSplitModalItem(null)}
           onInsertOne={(raw) => {
             setSplitModalItem(null)
-            if (notebookViewMode !== 'cells') setNotebookViewMode('cells')
-            const lastCell = notebookCells[notebookCells.length - 1]
+            if (mdEditorViewMode !== 'cells') setMdEditorViewMode('cells')
+            const lastCell = mdEditorCells[mdEditorCells.length - 1]
             insertBodyCell(splitModalItem.name, raw, lastCell?.id ?? null)
           }}
           onConfirm={(cells) => {
             setSplitModalItem(null)
-            if (notebookViewMode !== 'cells') setNotebookViewMode('cells')
-            let lastId = notebookCells[notebookCells.length - 1]?.id ?? null
+            if (mdEditorViewMode !== 'cells') setMdEditorViewMode('cells')
+            let lastId = mdEditorCells[mdEditorCells.length - 1]?.id ?? null
             for (const cell of cells) {
               lastId = insertBodyCell(cell.heading, cell.content, lastId)
             }

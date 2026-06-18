@@ -57,7 +57,7 @@ function MainPanel(): JSX.Element {
     )
   if (activePanel === 'monitor') return <Monitor />
   if (activePanel === 'settings') return <Settings />
-  if (activePanel === 'notebook') return <MarkdownEditorPanel />
+  if (activePanel === 'markdown-editor') return <MarkdownEditorPanel />
   if (activePanel === 'db-explorer') return <DBExplorer />
   if (activePanel === 'command-center') return <CommandCenter />
   return (
@@ -202,11 +202,11 @@ function MainApp(): JSX.Element | null {
         if (!useTerminalStore.getState().open) useTerminalStore.getState().toggle()
         return
       }
-      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'notebook', 'db-explorer', 'command-center'])
+      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'markdown-editor', 'db-explorer', 'command-center'])
       if (!allowed.has(panelName)) {
         throw new Error(`Unknown panel: ${panelName}`)
       }
-      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'notebook' | 'db-explorer' | 'command-center')
+      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center')
     }
     return () => {
       delete bridge.__pathlyNavigate
@@ -214,11 +214,11 @@ function MainApp(): JSX.Element | null {
   }, [setActivePanel])
 
   useEffect(() => {
-    const PANEL_KEYS: Record<string, 'command-center' | 'monitor' | 'db-explorer' | 'notebook' | 'flow'> = {
+    const PANEL_KEYS: Record<string, 'command-center' | 'monitor' | 'db-explorer' | 'markdown-editor' | 'flow'> = {
       '1': 'command-center',
       '2': 'monitor',
       '3': 'db-explorer',
-      '4': 'notebook',
+      '4': 'markdown-editor',
       '5': 'flow',
     }
     const handler = (e: KeyboardEvent) => {
