@@ -248,8 +248,35 @@ export function killAllPtys(): void {
   runnerScripts.clear()
 }
 
+// ── CLI-engine concurrency gate ──────────────────────────────────────────────
+// Cap simultaneous HEADLESS CLI engine runs (claude/codex/…) so rapid Split/Analyze/Send
+// bursts across files don't spawn N processes at once and trigger API rate-limit storms.
+// Every spawn surface funnels through terminal:spawn, so gating here covers them all.
+// Interactive shells and manual terminals are NOT gated. FIFO within the cap.
+const MAX_CONCURRENT_ENGINES = 3
+const CLI_ENGINES = new Set(['claude', 'codex', 'antigravity', 'agy', 'copilot'])
+const gatedRunning = new Set<string>()
+const engineQueue: Array<{ tabId: string; resolve: () => void }> = []
+
+function acquireEngineSlot(tabId: string): Promise<void> {
+  if (gatedRunning.size < MAX_CONCURRENT_ENGINES) {
+    gatedRunning.add(tabId)
+    return Promise.resolve()
+  }
+  return new Promise<void>((resolve) => { engineQueue.push({ tabId, resolve }) })
+}
+
+function releaseEngineSlot(tabId: string): void {
+  const qi = engineQueue.findIndex((w) => w.tabId === tabId)
+  if (qi !== -1) { engineQueue.splice(qi, 1); return } // killed while still queued — never held a slot
+  if (!gatedRunning.has(tabId)) return
+  gatedRunning.delete(tabId)
+  const next = engineQueue.shift()
+  if (next) { gatedRunning.add(next.tabId); next.resolve() }
+}
+
 export function registerTerminalHandlers(win: BrowserWindow): void {
-  ipcMain.handle('terminal:spawn', (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[], initialInput?: string) => {
+  ipcMain.handle('terminal:spawn', async (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[], initialInput?: string) => {
     if (!pty) throw new Error('node-pty is not available')
     if (activePtys.has(tabId)) {
       throw new Error('Tab already exists')
@@ -287,13 +314,24 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       ;({ shell, args: shellArgs } = resolveShell(command))
     }
 
-    const ptyProcess = pty.spawn(shell, shellArgs, {
-      name: 'xterm-color',
-      cols: 80,
-      rows: 24,
-      cwd: cwd,
-      env: process.env as Record<string, string>,
-    })
+    // Gate only headless CLI-engine runs (not interactive sessions or manual shells). The slot
+    // is held until the PTY exits (released in onExit/kill), so the cap limits RUNNING engines.
+    const gatedEngine = !initialInput && !!runnerArgv && runnerArgv.length > 0 && CLI_ENGINES.has(runnerArgv[0])
+    if (gatedEngine) await acquireEngineSlot(tabId)
+
+    let ptyProcess: import('node-pty').IPty
+    try {
+      ptyProcess = pty.spawn(shell, shellArgs, {
+        name: 'xterm-color',
+        cols: 80,
+        rows: 24,
+        cwd: cwd,
+        env: process.env as Record<string, string>,
+      })
+    } catch (e) {
+      if (gatedEngine) releaseEngineSlot(tabId)
+      throw e
+    }
 
     // Default target window is the main window
     ptyWindows.set(tabId, win)
@@ -388,6 +426,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     ptyProcess.onExit(({ exitCode }) => {
       activePtys.delete(tabId)
       ptyOwners.delete(tabId)
+      releaseEngineSlot(tabId)
       const scriptPath = runnerScripts.get(tabId)
       if (scriptPath) { runnerScripts.delete(tabId); try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } }
       const exitTail = tailMeaningfulOutput(ptyOutput.get(tabId) ?? [])
@@ -460,6 +499,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       ptyOwners.delete(tabId)
       ptyWindows.delete(tabId)
     }
+    // Free the concurrency slot whether it was running or still queued.
+    releaseEngineSlot(tabId)
   })
 
   ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string) => {

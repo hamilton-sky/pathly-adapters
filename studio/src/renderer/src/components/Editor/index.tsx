@@ -5,6 +5,7 @@ import { useUiStore } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useMarkdownEditorStore } from '../../store/markdownEditorStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
+import { buildHeadlessArgv } from '../../services/cliEngine'
 import type { FrontmatterValues } from '../../types'
 import { Tooltip } from '../ui'
 import { ConfigForm } from './ConfigForm'
@@ -291,9 +292,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     const tabId = `review-${Date.now().toString(36)}`
     addTab(tabId, `Review · ${fileName}`)
     openTab(tabId)
-    await window.pathly.terminal.spawn(tabId, getSpawnCwd(effectivePath), undefined, [
-      'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
-    ])
+    await window.pathly.terminal.spawn(tabId, getSpawnCwd(effectivePath), undefined, buildHeadlessArgv('claude', prompt))
   }
 
   async function handleDiffApply(newContent: string): Promise<void> {
