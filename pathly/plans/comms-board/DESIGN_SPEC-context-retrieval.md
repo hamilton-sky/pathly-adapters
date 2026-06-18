@@ -113,6 +113,53 @@ draw, not the primary mechanism.
 
 ---
 
+## 1.0 How it works end-to-end (the lifecycle in three acts)
+
+The whole design reduces to one shape: a `.md` artifact is **stored once, read many ways,
+and re-derived only when it structurally changes.** This is the orientation; the mechanics
+live in the sections it cross-links — it does not restate them.
+
+```
+  ┌── STORE (once) ──────────────────────────────────────────────────────────┐
+  │  agent-made or uploaded .md  ──►  board CARD (instant)                     │
+  │                              ──►  async:  topic-map summary                │
+  │                                           + section index (anchors)        │
+  │                                           + per-message embedding          │
+  └───────────────────────────────────────────────────────────────────────────┘
+                                   │
+  ┌── READ (many ways) ───────────▼──────────────────────────────────────────┐
+  │  manifest / catalog / semantic  ──►  a section pointer                     │
+  │                                 ──►  ONE /section hydrate  ──►  full text  │
+  └───────────────────────────────────────────────────────────────────────────┘
+                                   │
+  ┌── CHANGE (only on structural edit) ─▼─────────────────────────────────────┐
+  │  indexed_hash re-derives only what changed                                 │
+  │  detail edit inside a section  ──►  summary + embedding STILL VALID         │
+  │  add / remove / rename a heading ──►  re-summarize + re-embed               │
+  └───────────────────────────────────────────────────────────────────────────┘
+```
+
+- **STORE (once).** A `.md` artifact — agent-authored (planner Step 6, §6 row 7) or
+  user-uploaded — becomes a board **card** instantly, then is enriched **asynchronously**
+  with its INDEX-tier topic-map summary, its **section index** of heading anchors, and the
+  existing per-message embedding. *How the tiers split:* **§1**. *Eager vs. lazy index
+  build:* **§3.3**.
+- **READ (many ways).** Three access patterns — the task **manifest** (`context_refs`),
+  the **catalog** (taskless browse), and **semantic** discovery — all yield a *pointer*,
+  and every pointer terminates at the **one** `/section` hydration endpoint that returns the
+  full chapter text. *The three patterns side by side:* **§5 / §5a**. *Why a pointer-then-
+  fetch split makes fuzzy retrieval safe:* **§1.1**.
+- **CHANGE (only on structural edit).** The `indexed_hash` fingerprint re-derives **only
+  what structurally changed.** A detail edit *inside* a section leaves the topic-map summary
+  and the embedding valid — **no churn**; only adding, removing, or renaming a **heading**
+  triggers a re-summarize + re-embed. *Staleness detection and rebuild:* **§3.4** (and the
+  topic-map rationale in DESIGN_SPEC-local-inference §2a).
+
+(`.md` only — the section/anchor/hydration model is heading-based; non-`.md` artifacts get
+a card but no chapters. The hard boundary is §8 item 0.)
+
+---
+
 ## 1. Two-tier retrieval (the core model)
 
 ```
@@ -838,6 +885,16 @@ Every new path degrades to today's behavior:
 
 ## 8. Scope guard — what NOT to build
 
+**`.md` only — every other artifact type is DEFERRED (the hard boundary).** v1 of the
+section/anchor model processes **only Markdown (`.md`) artifacts**. The entire mechanism in
+this spec — the heading-derived anchor convention (§3.1), `parse_sections` and the
+`comms_artifact_sections` index (§3.2–§3.3), the topic-map summary it consumes (§1, §2a of
+the inference spec), and the `/section` hydration endpoint (§4) — is **markdown-heading-based**
+and therefore applies **only to `.md`**. **Images, PDFs, plain text (`.txt`), code, and any
+other type are explicitly DEFERRED to a separate later effort** — they have no headings, so
+they have no chapters to anchor, index, or hydrate. This is item 0 because it gates
+everything else; see the dedicated guard below.
+
 **Semantic discovery is the existing message-level embedding, and nothing more.** The
 discovery channel is exactly today's `search_by_hybrid` over **per-message** embeddings
 (F8), scoped to the exposed boards. The plan builds **no** section-level embeddings and
@@ -845,6 +902,28 @@ discovery channel is exactly today's `search_by_hybrid` over **per-message** emb
 outright** (item 1 below). The deterministic spine (§9.1) is the whole plan; there is no
 end-state queued behind it. This boundary is stated up front so no one mistakes the plan
 for the front of a longer roadmap.
+
+0. **`.md` only — section model does not run for any other type (DEFERRED).** The
+   anchor/section/hydration model is **heading-based**, and only Markdown has headings, so
+   v1 fully processes **only `.md` artifacts**. Concretely:
+   - **`parse_sections` / `slugify_heading` (§3.1, §3.3), the `comms_artifact_sections`
+     index (§3.2), and the `/section` endpoint (§4) run for `.md` artifacts only.** For a
+     non-`.md` artifact they do **not** run — there is no section index, no anchor, and no
+     `/section` hydration. The eager `index_artifact_async` (§3.3) and lazy
+     `ensure_indexed` (§4.1) both **early-return for non-`.md`** before parsing; a
+     `context_refs` entry pointing at a non-`.md` artifact has no anchor to resolve and is
+     skipped with a one-line note (the §5.1 non-fatal-skip path).
+   - **A non-`.md` artifact may still be a board *card*.** It can be posted as a
+     `type="artifact"` message and appear in the **Board Catalog** (§5a) as a
+     `{path, type, title}` row — but in v1 it gets **no topic-map summary, no section index,
+     and no section hydration** (its `summary` stays NULL → the catalog falls back to
+     `path`/`title`, §5a.4). It is findable and openable as a whole file; it is not
+     chaptered.
+   - **Images, PDF, `.txt`, code, and everything else are DEFERRED to a separate later
+     effort** — not parked inside this feature. This mirrors the inference spec's matching
+     `.md`-only boundary (DESIGN_SPEC-local-inference §6): summarization (the topic map) also
+     runs only for `.md`, so the two specs agree on the same hard line. If chaptering ever
+     extends to another type, that is new design work, not a v1 toggle.
 
 1. **Section-level embeddings — rejected, not deferred.** The plan embeds **only the
    per-message vector that already exists** (F8) — NOT section summaries, NOT per-paragraph

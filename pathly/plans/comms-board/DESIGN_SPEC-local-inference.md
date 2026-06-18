@@ -354,13 +354,27 @@ That is why `summarize_async` takes `artifact_id`, not just `message_id`.
    as the editor spec describes. This service has zero overlap with it at the
    code level.
 
-3. **Do NOT build content extraction for `image` and `pdf` now.** MiniLM and a
-   text-prompt LLM can't read an image; PDF text extraction is a separate
-   dependency (pypdf/pdfminer) with its own failure modes. For v1: `image` →
-   summary stays the filename/alt-text; `pdf` → skip or summarize first-page text
-   only if a deps already present, else skip. Flag as a follow-up. The
-   `_EXT_ARTIFACT_TYPE` map already buckets these; the service just early-returns
-   `SummaryResult(summary=None, backend="none")` for them.
+3. **`.md` ONLY — summarize no other artifact type in v1 (the hard boundary).** v1
+   generates a topic-map summary **only for Markdown (`.md`) artifacts.** Every other
+   type — **`image`, `pdf`, plain text (`.txt`), code, and anything else — is explicitly
+   DEFERRED to a separate later effort**, not parked inside this feature.
+   - For any non-`.md` artifact, `summarize_content` / `summarize_async` **early-return
+     `SummaryResult(summary=None, backend="none")`** before touching a backend — exactly the
+     existing image/pdf skip, now widened to *all* non-`.md` types. `summary` therefore
+     stays NULL: an image keeps its filename/alt-text, a PDF/`.txt`/code file gets no prose
+     summary. The `_EXT_ARTIFACT_TYPE` map already buckets these; the early-return reads the
+     bucket and stops.
+   - **Why `.md` only:** MiniLM and a text-prompt LLM can't read an image; PDF text
+     extraction is a separate dependency (pypdf/pdfminer) with its own failure modes; and
+     the consuming **section/anchor model is heading-based** (DESIGN_SPEC-context-retrieval
+     §8 item 0), so a non-`.md` file has no chapters for a topic map to route into. The two
+     specs hold the **same `.md`-only line**: no topic-map summary here, no section index or
+     `/section` hydration there.
+   - **Consistent with the §2 `artifact_type` param.** The param may still *name* other types
+     (`"code"`/`"pdf"`/`"image"`/`"json"`) — that is a forward-compatible label, not a v1
+     capability. In v1 only `artifact_type="md"` is fully processed (summarized); every other
+     value takes the early-return above. Extending summarization to another type is new design
+     work, not a v1 toggle. Flag as a follow-up.
 
 4. **Do NOT build streaming / token-by-token output.** Only Feature 2 wants it,
    and Feature 2 gets it from the PTY. Fire-and-forget is the only shape here.
