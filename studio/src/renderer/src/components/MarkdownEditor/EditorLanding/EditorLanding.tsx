@@ -1,6 +1,7 @@
 import React from 'react'
 import { BookOpen, FileCode, GitCompare } from 'lucide-react'
-import styles from './NotebookLanding.module.css'
+import { useUiStore } from '../../../store/uiStore'
+import styles from './EditorLanding.module.css'
 
 const FEATURES = [
   {
@@ -20,7 +21,15 @@ const FEATURES = [
   },
 ] as const
 
-export default function NotebookLanding() {
+export default function EditorLanding() {
+  const setSidebarCollapsed = useUiStore((s) => s.setSidebarCollapsed)
+  const setSidebarTab = useUiStore((s) => s.setSidebarTab)
+
+  const openLibrary = (): void => {
+    setSidebarTab('library')
+    setSidebarCollapsed(false)
+  }
+
   return (
     <div className={styles.root}>
       {/* Ambient glow — decorative only */}
@@ -31,7 +40,7 @@ export default function NotebookLanding() {
           <BookOpen size={30} />
         </div>
         <div className={styles.heroText}>
-          <h2 className={styles.title}>Markdown Notebook</h2>
+          <h2 className={styles.title}>Markdown Editor</h2>
           <p className={styles.subtitle}>Your workspace for reading and editing any markdown file</p>
         </div>
       </div>
@@ -52,12 +61,12 @@ export default function NotebookLanding() {
         ))}
       </div>
 
-      <div className={styles.cta}>
+      <button type="button" className={styles.cta} onClick={openLibrary}>
         <span className={styles.ctaArrow}>←</span>
         <span className={styles.ctaText}>
           Open any <code className={styles.ctaCode}>.md</code> file from the Files sidebar
         </span>
-      </div>
+      </button>
     </div>
   )
 }

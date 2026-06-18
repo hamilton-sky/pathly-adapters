@@ -12,7 +12,7 @@ import { WorkspacePanel } from './panels/WorkspacePanel'
 import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
 import SkillSplitModal from '../shared/SkillSplitModal/SkillSplitModal'
 import type { CatalogGroup, CatalogItemData } from '../shared/LibraryCatalog/useCatalogData'
-import { useNotebookStore } from '../../store/notebookStore'
+import { useMarkdownEditorStore } from '../../store/markdownEditorStore'
 import { useSidebarResize } from './shell/useSidebarResize'
 import { useWindowWidth } from './shell/useWindowWidth'
 import { TabBar } from './shell/TabBar'
@@ -60,6 +60,8 @@ export function Sidebar(): JSX.Element | null {
     setActiveTopic,
     sidebarCollapsed,
     setSidebarCollapsed,
+    sidebarTab,
+    setSidebarTab,
     selectedItem,
     setSelectedItem,
     setActivePanel,
@@ -71,9 +73,9 @@ export function Sidebar(): JSX.Element | null {
     setLastUsedFlowPath,
   } = useStore()
 
-  const insertFragment = useNotebookStore((s) => s.insertFragment)
-  const insertBodyCell = useNotebookStore((s) => s.insertBodyCell)
-  const notebookCells  = useNotebookStore((s) => s.cells)
+  const insertFragment = useMarkdownEditorStore((s) => s.insertFragment)
+  const insertBodyCell = useMarkdownEditorStore((s) => s.insertBodyCell)
+  const notebookCells  = useMarkdownEditorStore((s) => s.cells)
 
   const { sections, setSections, loadItems, customWorkspaceSections } = useProjectFiles()
   const { planFolders, setPlanFolders, loadPlanFiles } = usePlanFiles()
@@ -123,10 +125,7 @@ export function Sidebar(): JSX.Element | null {
 
   const [planOpen, setPlanOpen]       = useState(true)
   const [filter, setFilter]           = useState('')
-  const [libraryOpen, setLibraryOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem('pathly:sidebarTab') !== 'workspace' }
-    catch { return true }
-  })
+  const libraryOpen = sidebarTab === 'library'
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
@@ -158,9 +157,8 @@ export function Sidebar(): JSX.Element | null {
   if (sidebarCollapsed && !isNarrow) {
     const openTab = (tab: 'library' | 'workspace'): void => {
       setSidebarCollapsed(false)
-      setLibraryOpen(tab === 'library')
+      setSidebarTab(tab)
       setFilter('')
-      try { localStorage.setItem('pathly:sidebarTab', tab) } catch { /* ignore */ }
     }
     return (
       <IconStrip
@@ -485,9 +483,8 @@ export function Sidebar(): JSX.Element | null {
   void dragOverPath
 
   function switchTab(tab: 'library' | 'workspace'): void {
-    setLibraryOpen(tab === 'library')
+    setSidebarTab(tab)
     setFilter('')
-    try { localStorage.setItem('pathly:sidebarTab', tab) } catch {}
   }
 
   function handleCollapseAll(): void {

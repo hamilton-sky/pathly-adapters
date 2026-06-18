@@ -1,8 +1,8 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import {
   Sparkles, Plus, Search, Brain, Diamond, BookOpen, LayoutGrid, GripVertical,
 } from 'lucide-react'
-import styles from './NotebookCatalog.module.css'
+import styles from './EditorCatalog.module.css'
 
 interface CatalogGroup {
   label: string
@@ -24,7 +24,7 @@ function GroupIcon({ type }: { type: CatalogGroup['icon'] }) {
   return <LayoutGrid size={15} />
 }
 
-export default function NotebookCatalog() {
+export default function EditorCatalog() {
   const [query, setQuery] = useState('')
 
   const filtered = query.trim()

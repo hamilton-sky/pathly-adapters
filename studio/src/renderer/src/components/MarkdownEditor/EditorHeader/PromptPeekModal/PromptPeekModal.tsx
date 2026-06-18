@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import CliSelect from '../CliSelect/CliSelect'
-import { NotebookCli } from '../notebookCli'
+import { EditorCli } from '../editorCli'
 import styles from './PromptPeekModal.module.css'
 
 interface Props {
@@ -10,9 +10,9 @@ interface Props {
   defaultPrompt: string
   storageKey: string
   /** Engine this action will run on. */
-  cli: NotebookCli
+  cli: EditorCli
   /** Change this action's engine. */
-  onCliChange: (cli: NotebookCli) => void
+  onCliChange: (cli: EditorCli) => void
   onClose: () => void
   onUseOnce: (prompt: string) => void
 }

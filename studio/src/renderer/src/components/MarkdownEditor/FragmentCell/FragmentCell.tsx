@@ -1,8 +1,8 @@
-﻿import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ChevronUp, ChevronDown, MoreHorizontal, Copy, Diamond, Trash2 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import styles from './FragmentCell.module.css'
-import { useNotebookStore } from '../../../store/notebookStore'
+import { useMarkdownEditorStore } from '../../../store/markdownEditorStore'
 
 interface Props {
   id: string
@@ -28,8 +28,8 @@ export default function FragmentCell({
   isNew = false, isFirst = false, isLast = false,
   onMoveUp, onMoveDown,
 }: Props) {
-  const removeCell = useNotebookStore(s => s.removeCell)
-  const duplicateCell = useNotebookStore(s => s.duplicateCell)
+  const removeCell = useMarkdownEditorStore(s => s.removeCell)
+  const duplicateCell = useMarkdownEditorStore(s => s.duplicateCell)
   const [showNew, setShowNew]   = useState(isNew)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)

@@ -48,7 +48,7 @@ export function buildHeadlessArgv(adapter: CliAdapter, prompt: string, opts: Spa
 
   if (adapter === 'codex') {
     const argv = ['codex', 'exec']
-    if (autonomy) argv.push('--full-auto')
+    if (autonomy) argv.push('--sandbox', 'workspace-write')
     if (model) argv.push('--model', model)
     if (session) argv.push('--continue')
     argv.push('--', prompt)
@@ -78,7 +78,7 @@ export function buildInteractiveArgv(adapter: CliAdapter, opts: SpawnOpts = {}):
   if (adapter === 'codex') {
     const argv = ['codex']
     if (model) argv.push('--model', model)
-    if (autonomy) argv.push('--full-auto')
+    if (autonomy) argv.push('--sandbox', 'workspace-write')
     return argv
   }
 

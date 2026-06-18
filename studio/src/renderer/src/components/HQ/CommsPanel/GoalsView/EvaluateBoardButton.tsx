@@ -4,10 +4,10 @@ import { Tooltip } from '../../../ui'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useElapsedProgress, fmtElapsed } from '../../../shared/RunPill/progress'
 import {
-  type NotebookCli,
-  loadNotebookCli,
-  saveNotebookCli,
-} from '../.././../MarkdownNotebook/NotebookHeader/notebookCli'
+  type EditorCli,
+  loadEditorCli,
+  saveEditorCli,
+} from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import { EvalConfigPopover } from './EvalConfigPopover'
 import s from './GoalsView.module.css'
 
@@ -35,7 +35,7 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
   const [selectedAgent, setSelectedAgent] = useState('')
   const [selectedSkill, setSelectedSkill] = useState('')
   const [extraPrompt, setExtraPrompt] = useState('')
-  const [selectedCli, setSelectedCli] = useState<NotebookCli>(() => loadNotebookCli(CLI_KEY_EVAL))
+  const [selectedCli, setSelectedCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_EVAL))
   const [configOpen, setConfigOpen] = useState(false)
   const gearRef = useRef<HTMLButtonElement>(null)
 
@@ -45,9 +45,9 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
     : runState === 'done' ? 'Done'
     : activeLabel
 
-  function handleCliChange(cli: NotebookCli): void {
+  function handleCliChange(cli: EditorCli): void {
     setSelectedCli(cli)
-    saveNotebookCli(CLI_KEY_EVAL, cli)
+    saveEditorCli(CLI_KEY_EVAL, cli)
   }
 
   function handleRun(): void {

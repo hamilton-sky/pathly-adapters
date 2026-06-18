@@ -29,6 +29,23 @@ function loadSidebarTab(): 'library' | 'workspace' {
   } catch { return 'library' }
 }
 
+/** Lifecycle status of a notebook one-shot AI action (AI Split / AI Analyze). */
+export type NotebookActionStatus = 'idle' | 'running' | 'success' | 'error'
+
+/** Per-file, per-action run state. The single source of truth for an in-flight run. */
+export interface NotebookActionSlot {
+  status: NotebookActionStatus
+  /** Terminal tab id of the running PTY (present while running). */
+  tabId?: string
+  /** Set true when the user requested a stop, so this run's onExit reports "stopped" not "done". */
+  stopping?: boolean
+}
+
+export interface NotebookActionRecord {
+  split?: NotebookActionSlot
+  analyze?: NotebookActionSlot
+}
+
 export interface UiState {
   sidebarCollapsed: boolean
   /** Which tab the expanded sidebar shows — persisted to localStorage 'pathly:sidebarTab' */
@@ -54,8 +71,8 @@ export interface UiState {
   /** Analysis file paths per notebook file — keyed by notebookPath */
   notebookAnalysisPaths: Record<string, string>
   notebookAnalysisPanelOpen: boolean
-  /** Active terminal tab IDs per notebook file, per action */
-  notebookActiveTabs: Record<string, { split?: string; analyze?: string }>
+  /** Per-file, per-action run state — single source of truth for in-flight AI actions */
+  notebookActions: Record<string, NotebookActionRecord>
   setNotebookAnalysisPanelOpen: (v: boolean) => void
   /** Increment to request the embedded source editor to save */
   notebookSaveRequested: number
@@ -69,9 +86,10 @@ export interface UiState {
   setSidebarTab: (tab: 'library' | 'workspace') => void
   setNotebookViewMode: (mode: 'cells' | 'editor') => void
   toggleNotebookPreview: () => void
-  setNotebookDraftPath: (p: string | null) => void
-  setNotebookAnalysisPath: (p: string | null) => void
-  setNotebookActiveTab: (notebookPath: string, action: 'split' | 'analyze', tabId: string | null) => void
+  setNotebookDraftPath: (p: string | null, forFile?: string) => void
+  setNotebookAnalysisPath: (p: string | null, forFile?: string) => void
+  /** Merge a patch into a file's action slot; pass null to clear the slot. */
+  setNotebookAction: (filePath: string, action: 'split' | 'analyze', patch: Partial<NotebookActionSlot> | null) => void
   requestNotebookSave: () => void
   requestNotebookOpenDraft: () => void
   requestNotebookUndo: () => void
@@ -117,7 +135,7 @@ export const useUiStore = create<UiState>()(
       notebookDraftPaths: {},
       notebookAnalysisPaths: {},
       notebookAnalysisPanelOpen: false,
-      notebookActiveTabs: {},
+      notebookActions: {},
       notebookSaveRequested: 0,
       notebookOpenDraftRequested: 0,
       notebookUndoRequested: 0,
@@ -128,8 +146,8 @@ export const useUiStore = create<UiState>()(
         set({ sidebarTab: tab })
       },
       toggleNotebookPreview: () => set((s) => ({ notebookPreviewOpen: !s.notebookPreviewOpen })),
-      setNotebookDraftPath: (p) => set((s) => {
-        const key = s.notebookPath ?? ''
+      setNotebookDraftPath: (p, forFile) => set((s) => {
+        const key = forFile ?? s.notebookPath ?? ''
         if (!key) return {}
         if (p === null) {
           const next = { ...s.notebookDraftPaths }
@@ -138,8 +156,8 @@ export const useUiStore = create<UiState>()(
         }
         return { notebookDraftPaths: { ...s.notebookDraftPaths, [key]: p } }
       }),
-      setNotebookAnalysisPath: (p) => set((s) => {
-        const key = s.notebookPath ?? ''
+      setNotebookAnalysisPath: (p, forFile) => set((s) => {
+        const key = forFile ?? s.notebookPath ?? ''
         if (!key) return {}
         if (p === null) {
           const next = { ...s.notebookAnalysisPaths }
@@ -148,17 +166,27 @@ export const useUiStore = create<UiState>()(
         }
         const update: Partial<UiState> = {
           notebookAnalysisPaths: { ...s.notebookAnalysisPaths, [key]: p },
-          ...(p !== null ? { notebookAnalysisPanelOpen: true } : {}),
+          // Only auto-open the report panel when the finished run is for the file the user
+          // is currently viewing — a background file's completion must not pop a panel here.
+          ...(key === s.notebookPath ? { notebookAnalysisPanelOpen: true } : {}),
         }
         return update
       }),
-      setNotebookActiveTab: (notebookPath, action, tabId) =>
+      setNotebookAction: (filePath, action, patch) =>
         set((s) => {
-          const current = s.notebookActiveTabs[notebookPath] ?? {}
-          const next = tabId === null
-            ? (({ [action]: _, ...rest }) => rest)(current)
-            : { ...current, [action]: tabId }
-          return { notebookActiveTabs: { ...s.notebookActiveTabs, [notebookPath]: next } }
+          if (!filePath) return {}
+          const record = s.notebookActions[filePath] ?? {}
+          if (patch === null) {
+            const { [action]: _omit, ...restActions } = record
+            if (Object.keys(restActions).length === 0) {
+              const { [filePath]: _drop, ...restFiles } = s.notebookActions
+              return { notebookActions: restFiles }
+            }
+            return { notebookActions: { ...s.notebookActions, [filePath]: restActions } }
+          }
+          const prevSlot: NotebookActionSlot = record[action] ?? { status: 'idle' }
+          const nextSlot: NotebookActionSlot = { ...prevSlot, ...patch }
+          return { notebookActions: { ...s.notebookActions, [filePath]: { ...record, [action]: nextSlot } } }
         }),
       setNotebookAnalysisPanelOpen: (v) => set({ notebookAnalysisPanelOpen: v }),
       requestNotebookSave: () => set((s) => ({ notebookSaveRequested: s.notebookSaveRequested + 1 })),
@@ -226,3 +254,9 @@ export const selectNotebookDraftPath = (s: UiState): string | null =>
 
 export const selectNotebookAnalysisPath = (s: UiState): string | null =>
   s.notebookAnalysisPaths[s.notebookPath ?? ''] ?? null
+
+export const selectNotebookSplit = (s: UiState): NotebookActionSlot | undefined =>
+  s.notebookActions[s.notebookPath ?? '']?.split
+
+export const selectNotebookAnalyze = (s: UiState): NotebookActionSlot | undefined =>
+  s.notebookActions[s.notebookPath ?? '']?.analyze

@@ -2,16 +2,16 @@ import React from 'react'
 import { Sparkles, ChevronsUp, Plus, Copy, Undo2, PanelRightOpen } from 'lucide-react'
 import { Tooltip } from '../ui'
 import { useUiStore } from '../../store/uiStore'
-import styles from './MarkdownNotebook.module.css'
-import NotebookHeader, { NotebookViewMode } from './NotebookHeader/NotebookHeader'
-import NotebookCanvas from './NotebookCanvas/NotebookCanvas'
+import styles from './MarkdownEditor.module.css'
+import EditorHeader, { NotebookViewMode } from './EditorHeader/EditorHeader'
+import EditorCanvas from './EditorCanvas/EditorCanvas'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
-import NotebookLanding from './NotebookLanding/NotebookLanding'
+import EditorLanding from './EditorLanding/EditorLanding'
 import AnalysisPanel from './AnalysisPanel/AnalysisPanel'
 import { Editor } from '../Editor'
 import { usePreviewResize } from './usePreviewResize'
 
-export default function MarkdownNotebookPanel() {
+export default function MarkdownEditorPanel() {
   const notebookPath = useUiStore((s) => s.notebookPath)
   const viewMode = useUiStore((s) => s.notebookViewMode)
   const setViewMode = useUiStore((s) => s.setNotebookViewMode)
@@ -20,19 +20,19 @@ export default function MarkdownNotebookPanel() {
   const preview = usePreviewResize()
 
   if (!notebookPath) {
-    return <NotebookLanding />
+    return <EditorLanding />
   }
 
   return (
     <div className={styles.root}>
       <AnalysisPanel />
-      <NotebookHeader
+      <EditorHeader
         viewMode={viewMode}
         onToggleViewMode={() => setViewMode(viewMode === 'cells' ? 'editor' : 'cells')}
       />
 
       {viewMode === 'editor' ? (
-        /* Source view — Editor in embedded mode; NotebookHeader owns the action bar */
+        /* Source view — Editor in embedded mode; EditorHeader owns the action bar */
         <div className={styles.editorWrapper}>
           <Editor path={notebookPath} embedded />
         </div>
@@ -40,7 +40,7 @@ export default function MarkdownNotebookPanel() {
         /* Notebook cells + live preview panel */
         <>
           <div className={styles.body}>
-            <NotebookCanvas />
+            <EditorCanvas />
             {previewOpen ? (
               <>
                 <div className={styles.resizeHandle} onMouseDown={preview.onDragStart} />

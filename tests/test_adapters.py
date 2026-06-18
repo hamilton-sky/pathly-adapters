@@ -79,7 +79,8 @@ def test_resolve_command_codex():
     argv = result["argv"]
     assert argv[0] == "codex"
     assert "exec" in argv
-    assert "--full-auto" in argv
+    assert "--sandbox" in argv
+    assert "workspace-write" in argv
 
 
 def test_resolve_command_copilot_raises():

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronRight, ExternalLink } from 'lucide-react'
 import MarkdownRenderer from '../../../shared/MarkdownRenderer/MarkdownRenderer'
-import CliSelect from '../.././../MarkdownNotebook/NotebookHeader/CliSelect/CliSelect'
-import { type NotebookCli } from '../.././../MarkdownNotebook/NotebookHeader/notebookCli'
+import CliSelect from '../.././../MarkdownEditor/EditorHeader/CliSelect/CliSelect'
+import { type EditorCli } from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import {
   AGENTS, SKILLS, SKILL_PROMPTS, SKILL_FILE_PATHS, AGENT_FILE_PATHS,
 } from '../../../Monitor/ConfigurePhaseModal/configurePhaseModalData'
@@ -19,12 +19,12 @@ interface Props {
   selectedAgent: string
   selectedSkill: string
   extraPrompt: string
-  selectedCli: NotebookCli
+  selectedCli: EditorCli
   running: boolean
   onSelectAgent: (a: string) => void
   onSelectSkill: (sk: string) => void
   onExtraPromptChange: (v: string) => void
-  onCliChange: (cli: NotebookCli) => void
+  onCliChange: (cli: EditorCli) => void
   onReset: () => void
   onRun: () => void
   onClose: () => void
@@ -86,7 +86,7 @@ function PromptBanner({
         </button>
         {notebookPath && (
           <button type="button" className={s.notebookLink} onClick={onOpenNotebook}>
-            Open in Notebook <ExternalLink size={10} />
+            Open in Markdown Editor <ExternalLink size={10} />
           </button>
         )}
       </div>

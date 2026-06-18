@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Pencil, Check, ChevronUp, ChevronDown, MoreHorizontal,
   Copy, Diamond, Trash2, RotateCcw, Sparkles, Code, Bold, Italic, Columns, Scissors,
@@ -7,7 +7,7 @@ import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../../shared/MarkdownRenderer/MarkdownRenderer'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
 import { applyInlineFormat, type InlineFormat } from '../../shared/markdownInline'
-import { useNotebookStore } from '../../../store/notebookStore'
+import { useMarkdownEditorStore } from '../../../store/markdownEditorStore'
 import styles from './BodyCell.module.css'
 
 type CellMode = 'view' | 'edit' | 'split'
@@ -32,10 +32,10 @@ export default function BodyCell({
   isSystem = false, isFirst = false, isLast = false,
   onMoveUp, onMoveDown, onRemove, onRevert,
 }: Props) {
-  const updateBodyCell = useNotebookStore(s => s.updateBodyCell)
-  const insertBodyCell = useNotebookStore(s => s.insertBodyCell)
-  const splitBodyCell  = useNotebookStore(s => s.splitBodyCell)
-  const duplicateCell  = useNotebookStore(s => s.duplicateCell)
+  const updateBodyCell = useMarkdownEditorStore(s => s.updateBodyCell)
+  const insertBodyCell = useMarkdownEditorStore(s => s.insertBodyCell)
+  const splitBodyCell  = useMarkdownEditorStore(s => s.splitBodyCell)
+  const duplicateCell  = useMarkdownEditorStore(s => s.duplicateCell)
 
   const [cellMode, setCellMode]         = useState<CellMode>('view')
   const [draft, setDraft]               = useState(content)

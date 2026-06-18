@@ -39,7 +39,7 @@ def resolve_interactive_argv(
     if adapter == "codex":
         argv = ["codex", "--model", model]
         if autonomy:
-            argv.append("--full-auto")
+            argv.extend(["--sandbox", "workspace-write"])
         return argv
     return [adapter]
 

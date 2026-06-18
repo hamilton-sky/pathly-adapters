@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { PanelRightClose } from 'lucide-react'
 import { Tooltip } from '../../ui'
-import { useNotebookStore } from '../../../store/notebookStore'
+import { useMarkdownEditorStore } from '../../../store/markdownEditorStore'
 import { useUiStore } from '../../../store/uiStore'
 import styles from './PreviewPanel.module.css'
 import PreviewSection from './PreviewSection/PreviewSection'
@@ -12,7 +12,7 @@ export default function PreviewPanel() {
     cells, compositionKey, featurePath,
     previewSections, previewTokens, previewLoading,
     setPreview, setPreviewLoading,
-  } = useNotebookStore()
+  } = useMarkdownEditorStore()
   const togglePreview = useUiStore((s) => s.toggleNotebookPreview)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 

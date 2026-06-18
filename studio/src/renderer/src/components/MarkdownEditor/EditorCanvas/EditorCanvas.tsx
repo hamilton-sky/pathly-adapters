@@ -1,19 +1,19 @@
-﻿import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { Tooltip } from '../../ui'
-import { useNotebookStore } from '../../../store/notebookStore'
+import { useMarkdownEditorStore } from '../../../store/markdownEditorStore'
 import { useUiStore } from '../../../store/uiStore'
-import styles from './NotebookCanvas.module.css'
+import styles from './EditorCanvas.module.css'
 import BodyCell from '../BodyCell/BodyCell'
 import FragmentCell from '../FragmentCell/FragmentCell'
 import InsertZone from '../InsertZone/InsertZone'
 
-export default function NotebookCanvas() {
-  const { cells, insertFragment, insertBodyCell, moveCell, removeCell, revertBodyCell, undo, redo } = useNotebookStore()
+export default function EditorCanvas() {
+  const { cells, insertFragment, insertBodyCell, moveCell, removeCell, revertBodyCell, undo, redo } = useMarkdownEditorStore()
   const notebookPath = useUiStore(s => s.notebookPath)
   const setNotebookPath = useUiStore(s => s.setNotebookPath)
   const setNotebookViewMode = useUiStore(s => s.setNotebookViewMode)
-  const loadSkill = useNotebookStore(s => s.loadSkill)
+  const loadSkill = useMarkdownEditorStore(s => s.loadSkill)
 
   const [activeZone, setActiveZone] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)

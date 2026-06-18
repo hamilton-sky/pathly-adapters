@@ -22,11 +22,11 @@ export interface FragmentCell {
   path?: string
 }
 
-export type NotebookCell = BodyCell | FragmentCell
+export type MarkdownEditorCell = BodyCell | FragmentCell
 
-interface NotebookState {
-  cells: NotebookCell[]
-  history: NotebookCell[][]
+interface MarkdownEditorState {
+  cells: MarkdownEditorCell[]
+  history: MarkdownEditorCell[][]
   historyIndex: number
   /** historyIndex at the time of the last successful save (or initial load) */
   savedHistoryIndex: number
@@ -39,7 +39,7 @@ interface NotebookState {
   previewSections: Array<{ heading: string; content: string; origin: 'body' | 'fragment' }>
   previewTokens: number
   previewLoading: boolean
-  pushCells: (cells: NotebookCell[]) => void
+  pushCells: (cells: MarkdownEditorCell[]) => void
   undo: () => void
   redo: () => void
   /** Call after a successful save or after loadSkill to mark the current state as clean */
@@ -60,7 +60,7 @@ interface NotebookState {
   splitBodyCell: (cellId: string, newCells: Array<{ heading: string; content: string }>) => void
 }
 
-export const useNotebookStore = create<NotebookState>((set, get) => ({
+export const useMarkdownEditorStore = create<MarkdownEditorState>((set, get) => ({
   cells: [],
   history: [],
   historyIndex: -1,
@@ -129,10 +129,20 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
         category: fc.category,
         description: fc.description,
       }))
-      set({ compositionKey: data.composition_key ?? '', frontmatterRaw: data.frontmatter ?? '', lastAppliedPath: skillPath })
-      get().pushCells([...bodyCells, ...fragmentCells])
-      // Mark the just-loaded state as clean so the Save button starts as "Saved"
-      get().markCellsSaved()
+      // Start a FRESH, file-scoped history. Do NOT append via pushCells — the history
+      // stack is global to the store, so appending would let undo/redo walk back into a
+      // previously-opened file's cells (showing file A's content under file B's title).
+      // Resetting here scopes undo/redo to edits within the current file only.
+      const initialCells = [...bodyCells, ...fragmentCells]
+      set({
+        compositionKey: data.composition_key ?? '',
+        frontmatterRaw: data.frontmatter ?? '',
+        lastAppliedPath: skillPath,
+        cells: initialCells,
+        history: [initialCells],
+        historyIndex: 0,
+        savedHistoryIndex: 0,
+      })
     } catch {
       get().setPreviewLoading(false)
     }
@@ -194,7 +204,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
     if (idx === -1) return
     const cell = state.cells[idx]
     // A duplicate is always an editable, user-owned copy (never a system cell)
-    const clone: NotebookCell = cell.type === 'body'
+    const clone: MarkdownEditorCell = cell.type === 'body'
       ? { ...cell, id: crypto.randomUUID(), isSystem: false, originalContent: '' }
       : { ...cell, id: crypto.randomUUID() }
     const next = [...state.cells]
@@ -206,7 +216,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
     const cell = state.cells.find(c => c.id === cellId)
     if (!cell) return
     const without = state.cells.filter(c => c.id !== cellId)
-    let newCells: NotebookCell[]
+    let newCells: MarkdownEditorCell[]
     if (afterCellId === null) {
       newCells = [cell, ...without]
     } else {

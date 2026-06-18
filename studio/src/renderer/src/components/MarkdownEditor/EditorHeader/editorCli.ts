@@ -2,7 +2,7 @@
 // Argv shapes are owned by cliEngine.ts — import from there, never define them inline.
 
 import { buildHeadlessArgv, ADAPTER_META } from '../../../services/cliEngine'
-export type { CliAdapter as NotebookCli } from '../../../services/cliEngine'
+export type { CliAdapter as EditorCli } from '../../../services/cliEngine'
 import type { CliAdapter } from '../../../services/cliEngine'
 
 export interface CliOption {
@@ -12,7 +12,7 @@ export interface CliOption {
   unavailable?: string
 }
 
-export const NOTEBOOK_CLIS: CliOption[] = ADAPTER_META.map((m) => ({
+export const EDITOR_CLIS: CliOption[] = ADAPTER_META.map((m) => ({
   id: m.id,
   label: m.label,
   hint: m.hint,
@@ -25,15 +25,15 @@ export const CLI_KEY_SPLIT   = 'pathly.notebook.cli.split'
 export const CLI_KEY_ANALYZE = 'pathly.notebook.cli.analyze'
 export const CLI_KEY_EVAL    = 'pathly.comms.cli.eval'
 
-export function loadNotebookCli(key: string): CliAdapter {
+export function loadEditorCli(key: string): CliAdapter {
   try {
     const v = localStorage.getItem(key)
-    if (v && NOTEBOOK_CLIS.some((c) => c.id === v && !c.unavailable)) return v as CliAdapter
+    if (v && EDITOR_CLIS.some((c) => c.id === v && !c.unavailable)) return v as CliAdapter
   } catch { /* ignore */ }
   return 'claude'
 }
 
-export function saveNotebookCli(key: string, cli: CliAdapter): void {
+export function saveEditorCli(key: string, cli: CliAdapter): void {
   try { localStorage.setItem(key, cli) } catch { /* ignore */ }
 }
 
@@ -44,5 +44,5 @@ export function buildCliArgv(cli: CliAdapter, prompt: string): string[] {
 
 /** Human-friendly engine name for toasts/labels. */
 export function cliLabel(cli: CliAdapter): string {
-  return NOTEBOOK_CLIS.find((c) => c.id === cli)?.label ?? cli
+  return EDITOR_CLIS.find((c) => c.id === cli)?.label ?? cli
 }

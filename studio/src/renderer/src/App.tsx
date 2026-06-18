@@ -14,7 +14,7 @@ import { TopBar } from './components/topbar'
 import { Monitor } from './components/Monitor'
 import { PlanBoard } from './components/PlanBoard'
 import { Settings } from './components/Settings'
-import MarkdownNotebookPanel from './components/MarkdownNotebook/MarkdownNotebook'
+import MarkdownEditorPanel from './components/MarkdownEditor/MarkdownEditor'
 import { DBExplorer } from './components/DBExplorer/DBExplorer'
 import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
@@ -57,7 +57,7 @@ function MainPanel(): JSX.Element {
     )
   if (activePanel === 'monitor') return <Monitor />
   if (activePanel === 'settings') return <Settings />
-  if (activePanel === 'notebook') return <MarkdownNotebookPanel />
+  if (activePanel === 'notebook') return <MarkdownEditorPanel />
   if (activePanel === 'db-explorer') return <DBExplorer />
   if (activePanel === 'command-center') return <CommandCenter />
   return (

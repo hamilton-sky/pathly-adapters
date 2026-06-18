@@ -5,18 +5,19 @@ import {
   ScanText, FileSearch, SlidersHorizontal, Square,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
-import { useNotebookStore, BodyCell } from '../../../store/notebookStore'
-import { useUiStore, selectNotebookDraftPath, selectNotebookAnalysisPath } from '../../../store/uiStore'
-import { useNotebookAgentActions } from './hooks/useNotebookAgentActions'
+import { useMarkdownEditorStore, BodyCell } from '../../../store/markdownEditorStore'
+import { useUiStore, selectNotebookDraftPath, selectNotebookAnalysisPath, selectNotebookSplit, selectNotebookAnalyze } from '../../../store/uiStore'
+import { useTerminalStore } from '../../../store/terminalStore'
+import { useEditorAgentActions } from './hooks/useEditorAgentActions'
 import { apiFetch } from '../../../lib/config'
 import { buildSplitPrompt, buildAnalyzePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import ExportMenu from './ExportMenu/ExportMenu'
 import SplitPill from './SplitPill/SplitPill'
-import { loadNotebookCli, saveNotebookCli, NotebookCli, CLI_KEY_SPLIT, CLI_KEY_ANALYZE } from './notebookCli'
-import { fmtElapsed } from './notebookProgress'
+import { loadEditorCli, saveEditorCli, EditorCli, CLI_KEY_SPLIT, CLI_KEY_ANALYZE } from './editorCli'
+import { fmtElapsed, useElapsedProgress } from './editorProgress'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
-import styles from './NotebookHeader.module.css'
+import styles from './EditorHeader.module.css'
 
 export type NotebookViewMode = 'cells' | 'editor'
 
@@ -25,8 +26,8 @@ interface Props {
   onToggleViewMode: () => void
 }
 
-export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
-  const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved, insertBodyCell, frontmatterRaw } = useNotebookStore()
+export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
+  const { undo, redo, cells, historyIndex, savedHistoryIndex, history, markCellsSaved, insertBodyCell, frontmatterRaw } = useMarkdownEditorStore()
 
   const notebookPath         = useUiStore(s => s.notebookPath)
   const setNotebookPath      = useUiStore(s => s.setNotebookPath)
@@ -48,13 +49,13 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const [analyzePeekOpen,  setAnalyzePeekOpen]  = useState(false)
   const [splitOncePrompt,  setSplitOncePrompt]  = useState<string | null>(null)
   const [analyzeOncePrompt, setAnalyzeOncePrompt] = useState<string | null>(null)
-  const [splitCli,   setSplitCli]   = useState<NotebookCli>(() => loadNotebookCli(CLI_KEY_SPLIT))
-  const [analyzeCli, setAnalyzeCli] = useState<NotebookCli>(() => loadNotebookCli(CLI_KEY_ANALYZE))
+  const [splitCli,   setSplitCli]   = useState<EditorCli>(() => loadEditorCli(CLI_KEY_SPLIT))
+  const [analyzeCli, setAnalyzeCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_ANALYZE))
 
-  const handleSplitCli   = (next: NotebookCli) => { setSplitCli(next);   saveNotebookCli(CLI_KEY_SPLIT, next) }
-  const handleAnalyzeCli = (next: NotebookCli) => { setAnalyzeCli(next); saveNotebookCli(CLI_KEY_ANALYZE, next) }
+  const handleSplitCli   = (next: EditorCli) => { setSplitCli(next);   saveEditorCli(CLI_KEY_SPLIT, next) }
+  const handleAnalyzeCli = (next: EditorCli) => { setAnalyzeCli(next); saveEditorCli(CLI_KEY_ANALYZE, next) }
 
-  const { handleSplit, handleAnalyze, stopSplit, stopAnalyze, splitState, analyzeState, splitProgress, analyzeProgress } = useNotebookAgentActions(
+  const { handleSplit, handleAnalyze, stopSplit, stopAnalyze } = useEditorAgentActions(
     notebookPath,
     splitOncePrompt,
     analyzeOncePrompt,
@@ -63,6 +64,18 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
     splitCli,
     analyzeCli,
   )
+
+  // Per-file run state — derived from the store so each open file shows only its own run.
+  // A run that completes while the user is on another file updates that file's slot, never this one.
+  const splitSlot    = useUiStore(selectNotebookSplit)
+  const analyzeSlot  = useUiStore(selectNotebookAnalyze)
+  const splitState   = splitSlot?.status ?? 'idle'
+  const analyzeState = analyzeSlot?.status ?? 'idle'
+  const splitStartedAt   = useTerminalStore((s) => s.tabs.find((t) => t.id === splitSlot?.tabId)?.startedAt)
+  const analyzeStartedAt = useTerminalStore((s) => s.tabs.find((t) => t.id === analyzeSlot?.tabId)?.startedAt)
+  // Elapsed timer is derived from the tab's startedAt so it survives navigation for free.
+  const splitProgress   = useElapsedProgress(splitState === 'running' ? splitStartedAt : undefined)
+  const analyzeProgress = useElapsedProgress(analyzeState === 'running' ? analyzeStartedAt : undefined)
 
   const headerRef = useRef<HTMLDivElement>(null)
   const [isCompact, setIsCompact] = useState(false)
@@ -163,7 +176,7 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
         </span>
       </div>
 
-      <span className={styles.badge}>NOTEBOOK</span>
+      <span className={styles.badge}>MD Editor</span>
 
       {/* View mode toggle */}
       <div className={styles.viewToggle} role="group" aria-label="View mode">

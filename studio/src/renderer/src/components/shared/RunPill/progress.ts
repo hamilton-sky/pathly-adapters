@@ -1,5 +1,5 @@
 // Shared progress infrastructure for one-shot AI actions.
-// Extracted from MarkdownNotebook/NotebookHeader/notebookProgress.ts — that file
+// Extracted from MarkdownEditor/EditorHeader/editorProgress.ts — that file
 // now re-exports from here so notebook code needs no import-path changes.
 
 import { useState, useEffect } from 'react'

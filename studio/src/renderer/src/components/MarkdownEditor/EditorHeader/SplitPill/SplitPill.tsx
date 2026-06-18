@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Wand2, Scissors, ChevronDown, SlidersHorizontal, Square } from 'lucide-react'
 import { Tooltip } from '../../../ui'
-import { ActionProgress, fmtElapsed } from '../notebookProgress'
+import { ActionProgress, fmtElapsed } from '../editorProgress'
 import styles from './SplitPill.module.css'
 
 type SplitState = 'idle' | 'running' | 'success' | 'error'

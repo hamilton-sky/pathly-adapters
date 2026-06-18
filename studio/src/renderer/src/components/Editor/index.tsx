@@ -3,7 +3,7 @@ import { GitCompare, Replace } from 'lucide-react'
 import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
-import { useNotebookStore } from '../../store/notebookStore'
+import { useMarkdownEditorStore } from '../../store/markdownEditorStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
 import type { FrontmatterValues } from '../../types'
 import { Tooltip } from '../ui'
@@ -92,7 +92,7 @@ function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
 
 export function Editor({ path: pathOverride, embedded }: { path?: string | null; embedded?: boolean } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
-  const resetLastAppliedPath = useNotebookStore((s) => s.resetLastAppliedPath)
+  const resetLastAppliedPath = useMarkdownEditorStore((s) => s.resetLastAppliedPath)
   const setNotebookDraftPath  = useUiStore(s => s.setNotebookDraftPath)
   const notebookSaveRequested = useUiStore(s => s.notebookSaveRequested)
   const notebookOpenDraftReq  = useUiStore(s => s.notebookOpenDraftRequested)
@@ -198,14 +198,14 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
   bodyRef.current   = body
   configRef.current = config
 
-  // ── Embedded: sync draft path into uiStore so NotebookHeader can read it ───
+  // ── Embedded: sync draft path into uiStore so EditorHeader can read it ───
   useEffect(() => {
     if (!embedded) return
     setNotebookDraftPath(draftPath)
     return () => setNotebookDraftPath(null)
   }, [embedded, draftPath, setNotebookDraftPath])
 
-  // ── Embedded: save when NotebookHeader's Save button is pressed ───────────
+  // ── Embedded: save when EditorHeader's Save button is pressed ───────────
   const prevSaveReqRef = useRef(notebookSaveRequested)
   useEffect(() => {
     if (!embedded) return
@@ -214,7 +214,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     void performSave(bodyRef.current, configRef.current)
   }, [embedded, notebookSaveRequested, performSave])
 
-  // ── Embedded: open draft viewer when NotebookHeader's Review Draft is pressed
+  // ── Embedded: open draft viewer when EditorHeader's Review Draft is pressed
   const pendingOpenDraftRef   = useRef(false)
   const prevOpenDraftReqRef   = useRef(notebookOpenDraftReq)
   useEffect(() => {
@@ -231,7 +231,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     }
   }, [draftPath])
 
-  // ── Embedded: undo/redo via CodeMirror when NotebookHeader buttons pressed ─
+  // ── Embedded: undo/redo via CodeMirror when EditorHeader buttons pressed ─
   const prevUndoReqRef = useRef(notebookUndoReq)
   useEffect(() => {
     if (!embedded) return

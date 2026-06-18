@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { Cpu, ChevronDown, Check } from 'lucide-react'
 import { Tooltip } from '../../../ui'
-import { NOTEBOOK_CLIS, NotebookCli } from '../notebookCli'
+import { EDITOR_CLIS, EditorCli } from '../editorCli'
 import styles from './CliSelect.module.css'
 
 interface Props {
   /** Currently selected engine. */
-  value: NotebookCli
+  value: EditorCli
   /** Pick a new engine (only enabled engines are reported). */
-  onChange: (cli: NotebookCli) => void
+  onChange: (cli: EditorCli) => void
   /** Hide the text label when the header is in compact mode. */
   compact?: boolean
   /** Which edge the menu aligns to — 'right' opens leftward (use inside a modal). */
@@ -37,7 +37,7 @@ export default function CliSelect({ value, onChange, compact, align = 'left', up
     }
   }, [open])
 
-  const current = NOTEBOOK_CLIS.find((c) => c.id === value) ?? NOTEBOOK_CLIS[0]
+  const current = EDITOR_CLIS.find((c) => c.id === value) ?? EDITOR_CLIS[0]
 
   return (
     <div className={styles.cliSelect} ref={ref}>
@@ -59,7 +59,7 @@ export default function CliSelect({ value, onChange, compact, align = 'left', up
       {open && (
         <div className={styles.menu} data-align={align} data-dir={up ? 'up' : 'down'} role="menu">
           <div className={styles.menuHead}>AI engine</div>
-          {NOTEBOOK_CLIS.map((c) => (
+          {EDITOR_CLIS.map((c) => (
             <button
               key={c.id}
               type="button"
