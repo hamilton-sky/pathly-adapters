@@ -112,14 +112,10 @@ export function useEditorAgentActions(
       if (exitedTabId !== tabId) return
       unsubscribe()
       stopProgress()
-      const stopping = useUiStore.getState().mdEditorActions[forFile]?.split?.stopping
-      if (stopping) {
-        useTerminalStore.getState().updateTabStatus(tabId, 'done')
-        useTerminalStore.getState().closeTab(tabId)
-        setMdEditorAction(forFile, 'split', null)
-        toast(`AI Split stopped · ${fileName}`, 'info', 'phase_summary')
-        return
-      }
+      // If this run's slot is gone or replaced — e.g. the user hit Stop, which closes the tab
+      // and clears the slot synchronously — this exit was already handled. No-op.
+      const live = useUiStore.getState().mdEditorActions[forFile]?.split
+      if (!live || live.tabId !== tabId) return
       void pollForFile(draftPath).then((found) => {
         if (found) {
           setMdEditorDraftPath(draftPath, forFile)
@@ -171,14 +167,9 @@ export function useEditorAgentActions(
       if (exitedTabId !== tabId) return
       unsubscribe()
       stopProgress()
-      const stopping = useUiStore.getState().mdEditorActions[forFile]?.analyze?.stopping
-      if (stopping) {
-        useTerminalStore.getState().updateTabStatus(tabId, 'done')
-        useTerminalStore.getState().closeTab(tabId)
-        setMdEditorAction(forFile, 'analyze', null)
-        toast(`AI Analyze stopped · ${fileName}`, 'info', 'phase_summary')
-        return
-      }
+      // If this run's slot is gone or replaced (e.g. the user hit Stop), it was already handled. No-op.
+      const live = useUiStore.getState().mdEditorActions[forFile]?.analyze
+      if (!live || live.tabId !== tabId) return
       void pollForFile(analysisPath).then((found) => {
         if (found) {
           setMdEditorAnalysisPath(analysisPath, forFile)
@@ -210,23 +201,23 @@ export function useEditorAgentActions(
     }
   }, [mdEditorPath, analyzeOncePrompt, onAnalyzeOnceUsed, addTab, openTab, setMdEditorAnalysisPath, setMdEditorAction, clearIfStill, analyzeCli])
 
-  const stopSplit = useCallback(() => {
-    const forFile = mdEditorPath
+  // Stop closes the tab IMMEDIATELY (like the terminal's own close button) rather than waiting
+  // for onExit — a force-killed PTY (taskkill /T /F) may never deliver a clean exit event.
+  // Clearing the slot makes the run's onExit a no-op if it does fire later.
+  const stopRun = useCallback((forFile: string | null, action: 'split' | 'analyze', label: string) => {
     if (!forFile) return
-    const tabId = useUiStore.getState().mdEditorActions[forFile]?.split?.tabId
+    const tabId = useUiStore.getState().mdEditorActions[forFile]?.[action]?.tabId
     if (!tabId) return
-    setMdEditorAction(forFile, 'split', { stopping: true })
     void window.pathly.terminal.kill(tabId)
-  }, [mdEditorPath, setMdEditorAction])
+    useTerminalStore.getState().updateTabStatus(tabId, 'done')
+    useTerminalStore.getState().closeTab(tabId)
+    setMdEditorAction(forFile, action, null)
+    const fileName = forFile.replace(/\\/g, '/').split('/').pop() ?? 'file'
+    toast(`${label} stopped · ${fileName}`, 'info', 'phase_summary')
+  }, [setMdEditorAction])
 
-  const stopAnalyze = useCallback(() => {
-    const forFile = mdEditorPath
-    if (!forFile) return
-    const tabId = useUiStore.getState().mdEditorActions[forFile]?.analyze?.tabId
-    if (!tabId) return
-    setMdEditorAction(forFile, 'analyze', { stopping: true })
-    void window.pathly.terminal.kill(tabId)
-  }, [mdEditorPath, setMdEditorAction])
+  const stopSplit   = useCallback(() => stopRun(mdEditorPath, 'split', 'AI Split'),    [mdEditorPath, stopRun])
+  const stopAnalyze = useCallback(() => stopRun(mdEditorPath, 'analyze', 'AI Analyze'), [mdEditorPath, stopRun])
 
   return { handleSplit, handleAnalyze, stopSplit, stopAnalyze }
 }
