@@ -174,8 +174,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
     },
-    onExit: (cb: (tabId: string) => void): (() => void) => {
-      const listener = (_e: Electron.IpcRendererEvent, tabId: string): void => cb(tabId)
+    onExit: (cb: (tabId: string, exitCode?: number, tail?: string) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, tabId: string, exitCode?: number, tail?: string): void => cb(tabId, exitCode, tail)
       ipcRenderer.on('terminal:exit', listener)
       return () => ipcRenderer.removeListener('terminal:exit', listener)
     },

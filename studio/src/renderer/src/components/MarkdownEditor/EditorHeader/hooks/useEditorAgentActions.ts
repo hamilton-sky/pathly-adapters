@@ -19,6 +19,25 @@ async function pollForFile(path: string): Promise<boolean> {
   return false
 }
 
+const snippet = (s: string, n = 160): string => (s.length > n ? s.slice(0, n - 1) + '…' : s)
+
+// Turn an opaque "no file" failure into a specific, actionable reason using the engine's
+// exit code and last output — so rate limits, auth errors, and "agent wrote nothing" are
+// distinguishable instead of all reading "no draft produced".
+function describeFailure(action: string, fileName: string, exitCode?: number, tail?: string): string {
+  const last = (tail ?? '').trim()
+  const low = last.toLowerCase()
+  if (/rate.?limit|usage limit|quota|429|too many requests|overloaded/.test(low))
+    return `${action} failed · ${fileName} — rate limit / quota${last ? `: ${snippet(last)}` : ''}`
+  if (/unauthor|not logged in|please log in|\blog ?in\b|api key|credential|forbidden|\b401\b|\b403\b/.test(low))
+    return `${action} failed · ${fileName} — auth / login needed${last ? `: ${snippet(last)}` : ''}`
+  if (typeof exitCode === 'number' && exitCode !== 0)
+    return `${action} failed · ${fileName} — engine exited (code ${exitCode})${last ? `: ${snippet(last)}` : ''}`
+  return last
+    ? `${action} failed · ${fileName} — no file written; engine said: ${snippet(last)}`
+    : `${action} failed · ${fileName} — no file produced (engine wrote nothing)`
+}
+
 // All run state lives in uiStore.mdEditorActions, keyed by the file that started the run.
 // This hook is a single shared instance (EditorHeader does not remount on navigation),
 // so it MUST NOT hold any per-run React state — every read/write is keyed by the captured
@@ -89,7 +108,7 @@ export function useEditorAgentActions(
     // attachProgress drives only the milestone toasts now; the pill's timer is derived from
     // tab.startedAt in the header, so we discard the per-tick progress payload.
     const stopProgress = attachProgress(tabId, () => {}, (line) => toast(`Split: ${line}`, 'info', 'phase_summary'))
-    const unsubscribe = window.pathly.terminal.onExit((exitedTabId: string) => {
+    const unsubscribe = window.pathly.terminal.onExit((exitedTabId: string, exitCode?: number, tail?: string) => {
       if (exitedTabId !== tabId) return
       unsubscribe()
       stopProgress()
@@ -114,7 +133,7 @@ export function useEditorAgentActions(
           useTerminalStore.getState().updateTabStatus(tabId, 'error')
           useTerminalStore.getState().closeTab(tabId)
           setMdEditorAction(forFile, 'split', { status: 'error', tabId, stopping: false })
-          toast(`AI Split failed · ${fileName} — no draft produced`, 'error', 'agent_done')
+          toast(describeFailure('AI Split', fileName, exitCode, tail), 'error', 'agent_done')
           setTimeout(() => clearIfStill(forFile, 'split', tabId), 3000)
         }
       })
@@ -148,7 +167,7 @@ export function useEditorAgentActions(
     openTab(tabId)
     toast(`AI Analyze started · ${fileName} (${cliLabel(analyzeCli)})`, 'info', 'phase_summary')
     const stopProgress = attachProgress(tabId, () => {}, (line) => toast(`Analyze: ${line}`, 'info', 'phase_summary'))
-    const unsubscribe = window.pathly.terminal.onExit((exitedTabId: string) => {
+    const unsubscribe = window.pathly.terminal.onExit((exitedTabId: string, exitCode?: number, tail?: string) => {
       if (exitedTabId !== tabId) return
       unsubscribe()
       stopProgress()
@@ -172,7 +191,7 @@ export function useEditorAgentActions(
           useTerminalStore.getState().updateTabStatus(tabId, 'error')
           useTerminalStore.getState().closeTab(tabId)
           setMdEditorAction(forFile, 'analyze', { status: 'error', tabId, stopping: false })
-          toast(`AI Analyze failed · ${fileName} — no report produced`, 'error', 'agent_done')
+          toast(describeFailure('AI Analyze', fileName, exitCode, tail), 'error', 'agent_done')
           setTimeout(() => clearIfStill(forFile, 'analyze', tabId), 3000)
         }
       })

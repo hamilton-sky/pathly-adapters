@@ -20,8 +20,20 @@ const activePtys = new Map<string, import('node-pty').IPty>()
 const ptyWindows = new Map<string, BrowserWindow>()
 // Maps tabId → webContentsId of the sender that spawned it
 const ptyOwners = new Map<string, number>()
-// Maps tabId → accumulated output lines for runner result reporting
+// Maps tabId → accumulated output lines for runner result reporting + failure-reason tails
 const ptyOutput = new Map<string, string[]>()
+
+// Strip ANSI and return the last few meaningful output lines — used to surface WHY a run
+// failed (rate limit, auth error, the agent's final message) instead of a generic message.
+function tailMeaningfulOutput(chunks: string[]): string {
+  const text = chunks
+    .join('')
+    .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')
+    .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+    .replace(/\r/g, '\n')
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  return lines.slice(-6).join(' | ').slice(-600)
+}
 // Maps tabId → runner metadata registered before spawn
 const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number; label: string }>()
 // Tracks tabs killed by the user (not by the runner exiting naturally)
@@ -197,7 +209,11 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
     }
   }
 
-  const scriptLines = [...varDecls, `& ${callTokens.join(' ')}`].join('\n') + '\r\n'
+  // `codex exec` reads stdin even when the prompt is passed as an argument ("Reading additional
+  // input from stdin…") and stalls forever in a PTY whose stdin never closes. Piping $null gives
+  // it an immediately-closed stdin so it proceeds with the prompt arg. Harmless for other engines.
+  const stdinClose = argv[0] === 'codex' ? '$null | ' : ''
+  const scriptLines = [...varDecls, `${stdinClose}& ${callTokens.join(' ')}`].join('\n') + '\r\n'
   fs.writeFileSync(tmpScript, Buffer.concat([bom, Buffer.from(scriptLines, 'utf8')]))
   return {
     shell: 'powershell.exe',
@@ -361,12 +377,12 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
 
     ptyProcess.onData((data: string) => {
       sendToWindow(tabId, `terminal:data:${tabId}`, data)
-      if (runnerTabMeta.has(tabId)) {
-        const lines = ptyOutput.get(tabId) ?? []
-        lines.push(data)
-        if (lines.length > 500) lines.splice(0, lines.length - 500)
-        ptyOutput.set(tabId, lines)
-      }
+      // Buffer a rolling tail for every tab (not just runner tabs) so onExit can report the
+      // real failure reason for notebook/editor AI actions too.
+      const lines = ptyOutput.get(tabId) ?? []
+      lines.push(data)
+      if (lines.length > 500) lines.splice(0, lines.length - 500)
+      ptyOutput.set(tabId, lines)
     })
 
     ptyProcess.onExit(({ exitCode }) => {
@@ -374,7 +390,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       ptyOwners.delete(tabId)
       const scriptPath = runnerScripts.get(tabId)
       if (scriptPath) { runnerScripts.delete(tabId); try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } }
-      sendToWindow(tabId, 'terminal:exit', tabId)
+      const exitTail = tailMeaningfulOutput(ptyOutput.get(tabId) ?? [])
+      sendToWindow(tabId, 'terminal:exit', tabId, exitCode, exitTail)
       const meta = runnerTabMeta.get(tabId)
       if (meta) {
         const userInitiated = ptyKilledByRunner.has(tabId)
@@ -407,6 +424,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
           body: postBody,
         })
         doPost().catch(() => setTimeout(() => doPost().catch(() => { /* give up */ }), 1000))
+      } else {
+        ptyOutput.delete(tabId)
       }
       ptyWindows.delete(tabId)
     })
