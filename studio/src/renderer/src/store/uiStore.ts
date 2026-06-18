@@ -23,8 +23,16 @@ function loadLastUsedFlowPath(): string | null {
   } catch { return null }
 }
 
+function loadSidebarTab(): 'library' | 'workspace' {
+  try {
+    return localStorage.getItem('pathly:sidebarTab') === 'workspace' ? 'workspace' : 'library'
+  } catch { return 'library' }
+}
+
 export interface UiState {
   sidebarCollapsed: boolean
+  /** Which tab the expanded sidebar shows — persisted to localStorage 'pathly:sidebarTab' */
+  sidebarTab: 'library' | 'workspace'
   activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'notebook' | 'db-explorer' | 'command-center'
   dirtyItems: Set<string>
   theme: ThemeName
@@ -41,11 +49,13 @@ export interface UiState {
   notebookPath: string | null
   notebookViewMode: 'cells' | 'editor'
   notebookPreviewOpen: boolean
-  /** Draft path known to the embedded source editor — null when no draft exists */
-  notebookDraftPath: string | null
-  /** Analysis file path — set when an agent has written a .analysis report */
-  notebookAnalysisPath: string | null
+  /** Draft paths per notebook file — keyed by notebookPath */
+  notebookDraftPaths: Record<string, string>
+  /** Analysis file paths per notebook file — keyed by notebookPath */
+  notebookAnalysisPaths: Record<string, string>
   notebookAnalysisPanelOpen: boolean
+  /** Active terminal tab IDs per notebook file, per action */
+  notebookActiveTabs: Record<string, { split?: string; analyze?: string }>
   setNotebookAnalysisPanelOpen: (v: boolean) => void
   /** Increment to request the embedded source editor to save */
   notebookSaveRequested: number
@@ -56,10 +66,12 @@ export interface UiState {
   /** Increment to request the embedded source editor to redo */
   notebookRedoRequested: number
   setSidebarCollapsed: (v: boolean) => void
+  setSidebarTab: (tab: 'library' | 'workspace') => void
   setNotebookViewMode: (mode: 'cells' | 'editor') => void
   toggleNotebookPreview: () => void
   setNotebookDraftPath: (p: string | null) => void
   setNotebookAnalysisPath: (p: string | null) => void
+  setNotebookActiveTab: (notebookPath: string, action: 'split' | 'analyze', tabId: string | null) => void
   requestNotebookSave: () => void
   requestNotebookOpenDraft: () => void
   requestNotebookUndo: () => void
@@ -85,6 +97,7 @@ export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       sidebarCollapsed: false,
+      sidebarTab: loadSidebarTab(),
       activePanel: 'monitor',
       dirtyItems: new Set(),
       theme: 'dark',
@@ -101,24 +114,62 @@ export const useUiStore = create<UiState>()(
       notebookPath: null,
       notebookViewMode: 'cells',
       notebookPreviewOpen: true,
-      notebookDraftPath: null,
-      notebookAnalysisPath: null,
+      notebookDraftPaths: {},
+      notebookAnalysisPaths: {},
       notebookAnalysisPanelOpen: false,
+      notebookActiveTabs: {},
       notebookSaveRequested: 0,
       notebookOpenDraftRequested: 0,
       notebookUndoRequested: 0,
       notebookRedoRequested: 0,
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+      setSidebarTab: (tab) => {
+        try { localStorage.setItem('pathly:sidebarTab', tab) } catch {}
+        set({ sidebarTab: tab })
+      },
       toggleNotebookPreview: () => set((s) => ({ notebookPreviewOpen: !s.notebookPreviewOpen })),
-      setNotebookDraftPath: (p) => set({ notebookDraftPath: p }),
-      setNotebookAnalysisPath: (p) => set({ notebookAnalysisPath: p, ...(p !== null ? { notebookAnalysisPanelOpen: true } : {}) }),
+      setNotebookDraftPath: (p) => set((s) => {
+        const key = s.notebookPath ?? ''
+        if (!key) return {}
+        if (p === null) {
+          const next = { ...s.notebookDraftPaths }
+          delete next[key]
+          return { notebookDraftPaths: next }
+        }
+        return { notebookDraftPaths: { ...s.notebookDraftPaths, [key]: p } }
+      }),
+      setNotebookAnalysisPath: (p) => set((s) => {
+        const key = s.notebookPath ?? ''
+        if (!key) return {}
+        if (p === null) {
+          const next = { ...s.notebookAnalysisPaths }
+          delete next[key]
+          return { notebookAnalysisPaths: next }
+        }
+        const update: Partial<UiState> = {
+          notebookAnalysisPaths: { ...s.notebookAnalysisPaths, [key]: p },
+          ...(p !== null ? { notebookAnalysisPanelOpen: true } : {}),
+        }
+        return update
+      }),
+      setNotebookActiveTab: (notebookPath, action, tabId) =>
+        set((s) => {
+          const current = s.notebookActiveTabs[notebookPath] ?? {}
+          const next = tabId === null
+            ? (({ [action]: _, ...rest }) => rest)(current)
+            : { ...current, [action]: tabId }
+          return { notebookActiveTabs: { ...s.notebookActiveTabs, [notebookPath]: next } }
+        }),
       setNotebookAnalysisPanelOpen: (v) => set({ notebookAnalysisPanelOpen: v }),
       requestNotebookSave: () => set((s) => ({ notebookSaveRequested: s.notebookSaveRequested + 1 })),
       requestNotebookOpenDraft: () => set((s) => ({ notebookOpenDraftRequested: s.notebookOpenDraftRequested + 1 })),
       requestNotebookUndo: () => set((s) => ({ notebookUndoRequested: s.notebookUndoRequested + 1 })),
       requestNotebookRedo: () => set((s) => ({ notebookRedoRequested: s.notebookRedoRequested + 1 })),
       setActivePanel: (p) => set({ activePanel: p }),
-      setNotebookPath: (path) => set({ notebookPath: path }),
+      setNotebookPath: (path) => set((s) => ({
+        notebookPath: path,
+        ...(path !== s.notebookPath ? { notebookAnalysisPanelOpen: false } : {}),
+      })),
       setNotebookViewMode: (mode) => set({ notebookViewMode: mode }),
       markDirty: (path) => set((s) => ({ dirtyItems: new Set([...s.dirtyItems, path]) })),
       clearDirty: (path) =>
@@ -169,3 +220,9 @@ export const useUiStore = create<UiState>()(
     }
   )
 )
+
+export const selectNotebookDraftPath = (s: UiState): string | null =>
+  s.notebookDraftPaths[s.notebookPath ?? ''] ?? null
+
+export const selectNotebookAnalysisPath = (s: UiState): string | null =>
+  s.notebookAnalysisPaths[s.notebookPath ?? ''] ?? null

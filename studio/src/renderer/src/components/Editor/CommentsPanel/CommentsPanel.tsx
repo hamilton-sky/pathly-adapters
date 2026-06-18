@@ -107,12 +107,14 @@ export function CommentsPanel({
         void window.pathly.fs.read(norm + '.draft').then((content) => {
           if (content !== null && content.trim().length > 0) {
             useTerminalStore.getState().updateTabStatus(tabId, 'done')
+            useTerminalStore.getState().closeTab(tabId)
             setIsWorking(false)
             onDraftReady(norm + '.draft')
           } else if (attempt < 5) {
             setTimeout(check, 600)
           } else {
             useTerminalStore.getState().updateTabStatus(tabId, 'error')
+            useTerminalStore.getState().closeTab(tabId)
             setIsWorking(false)
             pushToast('Agent finished but wrote no draft — check the terminal for errors', 'error')
           }

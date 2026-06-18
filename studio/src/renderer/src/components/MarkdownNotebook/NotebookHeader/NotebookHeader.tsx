@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useNotebookStore, BodyCell } from '../../../store/notebookStore'
-import { useUiStore } from '../../../store/uiStore'
+import { useUiStore, selectNotebookDraftPath, selectNotebookAnalysisPath } from '../../../store/uiStore'
 import { useNotebookAgentActions } from './hooks/useNotebookAgentActions'
 import { apiFetch } from '../../../lib/config'
 import { buildSplitPrompt, buildAnalyzePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
@@ -32,12 +32,12 @@ export default function NotebookHeader({ viewMode, onToggleViewMode }: Props) {
   const setNotebookPath      = useUiStore(s => s.setNotebookPath)
   const setNotebookViewMode  = useUiStore(s => s.setNotebookViewMode)
   const dirtyItems                = useUiStore(s => s.dirtyItems)
-  const notebookDraftPath         = useUiStore(s => s.notebookDraftPath)
+  const notebookDraftPath         = useUiStore(selectNotebookDraftPath)
   const requestNotebookSave       = useUiStore(s => s.requestNotebookSave)
   const requestNotebookOpenDraft  = useUiStore(s => s.requestNotebookOpenDraft)
   const requestNotebookUndo       = useUiStore(s => s.requestNotebookUndo)
   const requestNotebookRedo       = useUiStore(s => s.requestNotebookRedo)
-  const notebookAnalysisPath       = useUiStore(s => s.notebookAnalysisPath)
+  const notebookAnalysisPath       = useUiStore(selectNotebookAnalysisPath)
   const notebookAnalysisPanelOpen  = useUiStore(s => s.notebookAnalysisPanelOpen)
   const setNotebookAnalysisPanelOpen = useUiStore(s => s.setNotebookAnalysisPanelOpen)
 

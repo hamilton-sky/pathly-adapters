@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { X, RefreshCw, FileCode, Trash2 } from 'lucide-react'
-import { useUiStore } from '../../../store/uiStore'
+import { useUiStore, selectNotebookAnalysisPath } from '../../../store/uiStore'
 import { MarkdownPreview } from '../../Editor/MarkdownPreview'
 import styles from './AnalysisPanel.module.css'
 
 export default function AnalysisPanel() {
-  const analysisPath    = useUiStore((s) => s.notebookAnalysisPath)
+  const analysisPath    = useUiStore(selectNotebookAnalysisPath)
   const setAnalysisPath = useUiStore((s) => s.setNotebookAnalysisPath)
   const panelOpen       = useUiStore((s) => s.notebookAnalysisPanelOpen)
   const setPanelOpen    = useUiStore((s) => s.setNotebookAnalysisPanelOpen)
