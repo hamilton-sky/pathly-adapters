@@ -85,9 +85,11 @@ function HistoryRow({ record, expanded, onToggle }: { record: SessionRecord; exp
 export function CliMonitorBar(): JSX.Element | null {
   const open = useUiStore((s) => s.cliMonitorOpen)
   const toggleCliMonitor = useUiStore((s) => s.toggleCliMonitor)
-  const { sessions, history, pos, onDragStart, expandedIds, toggleExpand } = useCliMonitor()
+  const { sessions, history, spawnQueue, pos, onDragStart, expandedIds, toggleExpand } = useCliMonitor()
 
   if (!open) return null
+
+  const rateLimited = spawnQueue.rateLimitedUntil > Date.now()
 
   return (
     <div
@@ -100,13 +102,19 @@ export function CliMonitorBar(): JSX.Element | null {
         {sessions.length > 0 && (
           <span className={s.activeCount}>{sessions.length} active</span>
         )}
+        {spawnQueue.queued > 0 && (
+          <span className={s.queuedCount}>{spawnQueue.queued} queued</span>
+        )}
         <button type="button" className={s.closeBtn} onClick={toggleCliMonitor} aria-label="Close CLI monitor">
           <X size={12} />
         </button>
       </div>
 
       <div className={s.body}>
-        {sessions.length === 0 && history.length === 0 && (
+        {rateLimited && (
+          <div className={s.rateLimitBanner}>Rate-limited — backing off, runs are queued</div>
+        )}
+        {sessions.length === 0 && history.length === 0 && !rateLimited && spawnQueue.queued === 0 && (
           <p className={s.empty}>No active engines</p>
         )}
         {sessions.length > 0 && (

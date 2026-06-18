@@ -148,6 +148,7 @@ declare global {
         resize: (tabId: string, cols: number, rows: number) => Promise<void>
         onData: (tabId: string, cb: (data: string) => void) => () => void
         onExit: (cb: (tabId: string, exitCode?: number, tail?: string) => void) => () => void
+        onSpawnState: (cb: (s: { running: number; queued: number; rateLimitedUntil: number }) => void) => () => void
         registerRunner: (tabId: string, topic: string, runId: string, label?: string) => Promise<void>
         onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void) => () => void
       }

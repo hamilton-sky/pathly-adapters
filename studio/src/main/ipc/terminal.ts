@@ -246,6 +246,15 @@ export function killAllPtys(): void {
   runnerTabMeta.clear()
   ptyKilledByRunner.clear()
   runnerScripts.clear()
+  // Sweep any orphaned runner scripts left by force-killed PTYs (taskkill doesn't fire onExit).
+  try {
+    const dir = os.tmpdir()
+    for (const f of fs.readdirSync(dir)) {
+      if (f.startsWith('pathly-runner-') && f.endsWith('.ps1')) {
+        try { fs.unlinkSync(path.join(dir, f)) } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
 }
 
 // ── CLI-engine concurrency gate ──────────────────────────────────────────────
@@ -262,26 +271,42 @@ const engineQueue: Array<{ tabId: string; priority: number; resolve: () => void 
 // After a detected rate-limit, pause STARTING new gated runs until this timestamp (backpressure).
 let rateLimitedUntil = 0
 
+// Renderer gets live gate state (running / queued / rate-limited) so the CLI monitor can show
+// backpressure instead of the user thinking spawns silently failed.
+let spawnStateWin: BrowserWindow | null = null
+function broadcastSpawnState(): void {
+  try {
+    spawnStateWin?.webContents.send('spawn:state', {
+      running: gatedRunning.size,
+      queued: engineQueue.length,
+      rateLimitedUntil,
+    })
+  } catch { /* ignore */ }
+}
+
 function acquireEngineSlot(tabId: string, priority = 0): Promise<void> {
   if (gatedRunning.size < MAX_CONCURRENT_ENGINES) {
     gatedRunning.add(tabId)
+    broadcastSpawnState()
     return Promise.resolve()
   }
-  return new Promise<void>((resolve) => { engineQueue.push({ tabId, priority, resolve }) })
+  return new Promise<void>((resolve) => { engineQueue.push({ tabId, priority, resolve }); broadcastSpawnState() })
 }
 
 function releaseEngineSlot(tabId: string): void {
   const qi = engineQueue.findIndex((w) => w.tabId === tabId)
-  if (qi !== -1) { engineQueue.splice(qi, 1); return } // killed while still queued — never held a slot
+  if (qi !== -1) { engineQueue.splice(qi, 1); broadcastSpawnState(); return } // killed while still queued
   if (!gatedRunning.has(tabId)) return
   gatedRunning.delete(tabId)
-  if (!engineQueue.length) return
-  // Promote the highest-priority waiter (runner/board pipeline stages > inline editor actions).
-  let best = 0
-  for (let i = 1; i < engineQueue.length; i++) if (engineQueue[i].priority > engineQueue[best].priority) best = i
-  const next = engineQueue.splice(best, 1)[0]
-  gatedRunning.add(next.tabId)
-  next.resolve()
+  if (engineQueue.length) {
+    // Promote the highest-priority waiter (runner/board pipeline stages > inline editor actions).
+    let best = 0
+    for (let i = 1; i < engineQueue.length; i++) if (engineQueue[i].priority > engineQueue[best].priority) best = i
+    const next = engineQueue.splice(best, 1)[0]
+    gatedRunning.add(next.tabId)
+    next.resolve()
+  }
+  broadcastSpawnState()
 }
 
 // Hold before starting a gated run if we recently hit a rate limit, so a 429 burst backs off
@@ -292,6 +317,7 @@ async function awaitRateLimitCooldown(): Promise<void> {
 }
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
+  spawnStateWin = win
   ipcMain.handle('terminal:spawn', async (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[], initialInput?: string) => {
     if (!pty) throw new Error('node-pty is not available')
     if (activePtys.has(tabId)) {
@@ -455,6 +481,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       // If a gated engine run hit a rate limit, arm a cooldown so the next gated runs back off.
       if (gatedEngine && exitCode !== 0 && RATE_LIMIT_RE.test(exitTail)) {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
+        broadcastSpawnState()
       }
       sendToWindow(tabId, 'terminal:exit', tabId, exitCode, exitTail)
       const meta = runnerTabMeta.get(tabId)

@@ -179,6 +179,11 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on('terminal:exit', listener)
       return () => ipcRenderer.removeListener('terminal:exit', listener)
     },
+    onSpawnState: (cb: (s: { running: number; queued: number; rateLimitedUntil: number }) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, s: { running: number; queued: number; rateLimitedUntil: number }): void => cb(s)
+      ipcRenderer.on('spawn:state', listener)
+      return () => ipcRenderer.removeListener('spawn:state', listener)
+    },
     registerRunner: (tabId: string, topic: string, runId: string, label?: string): Promise<void> =>
       ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label),
     onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void): (() => void) => {

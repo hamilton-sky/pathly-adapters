@@ -50,8 +50,16 @@ export function useCliMonitor() {
   const tabs = useTerminalStore((s) => s.tabs)
   const scrollbackByTabId = useTerminalStore((s) => s.scrollbackByTabId)
   const sessionHistory = useTerminalStore((s) => s.sessionHistory)
+  const spawnQueue = useTerminalStore((s) => s.spawnQueue)
   const runningTabs = tabs.filter((t) => t.status === 'running')
   const hasRunning = runningTabs.length > 0
+
+  // Live spawn-gate state from the main process (running / queued / rate-limited).
+  useEffect(() => {
+    const api = window.pathly?.terminal
+    if (!api?.onSpawnState) return
+    return api.onSpawnState((s) => useTerminalStore.getState().setSpawnQueue(s))
+  }, [])
 
   // Position state (persisted)
   const [pos, setPos] = useState<{ x: number; y: number }>(loadPos)
@@ -148,5 +156,5 @@ export function useCliMonitor() {
     lastLines: lastNLines(scrollbackByTabId[tab.id] ?? [], 8),
   }))
 
-  return { sessions, history: sessionHistory, hasRunning, pos, onDragStart, expandedIds, toggleExpand }
+  return { sessions, history: sessionHistory, hasRunning, spawnQueue, pos, onDragStart, expandedIds, toggleExpand }
 }
