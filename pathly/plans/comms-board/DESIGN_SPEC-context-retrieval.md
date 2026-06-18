@@ -808,6 +808,20 @@ It does **not** currently receive the task being executed, so it cannot read
      • <semantic hits over summaries>
 ```
 
+**The 📎 channel does NOT suppress the 💡 channel — a task agent gets both.** The HYDRATE
+block is inserted *between* the existing 🔒 Governance and 💡 Context channels (the diagram
+above), so when a task-driven agent runs, the 💡 discovery channel is **still emitted** below
+its manifest. The two are deliberately distinct lanes, never blurred: 📎 is *"your must-reads —
+the spec for this task"* (**authoritative**, consume directly); 💡 (and the catalog) is *"what
+else on the board might help"* (**advisory** — verify before acting). So a task agent reads
+its authoritative manifest **and** sees advisory discovery in the same block, and it can
+*additionally* browse the Board Catalog (§5a) and `/comms/search` **on demand** and hydrate any
+hit through the same `/section` endpoint. The manifest is therefore **additive, not exclusive**:
+the access patterns of §5a.5 **compose** — they are not partitioned by agent type. The 💡 lane
+is force-injected but **top-k ranked** (`comms_context.py:118-124` caps k=3/2/1, no prompt
+bloat) and **board-scoped** (only boards the agent may see); the full catalog/search is reached
+**on demand**, never force-injected.
+
 ### 5.2 Who calls it with `task_id`
 
 - The **`loop` executor** path: `scheduler_loop` already knows the task row it is about to
@@ -821,6 +835,16 @@ It does **not** currently receive the task being executed, so it cannot read
   (FSM/team path) or via the `/section` endpoint (board-native path). Same refs, same
   sections the builder saw. This is the property that closes the gap for "a reviewer of
   Phase 3."
+
+**Discovery for a task agent reaches beyond the planner's artifacts.** The 💡 channel a task
+agent still receives (above) — and the on-demand `/comms/search` — are **not** limited to the
+plan files the planner referenced in `context_refs`. Because uploads and other agents' outputs
+are posted as `type="artifact"` messages (the Q3=(b) decision, §10), they are part of the same
+embedding/search pool, so the 💡 lane and `/comms/search` surface **all** artifacts on the
+agent's scoped boards — other agents' work, human drops, sibling-task decisions — not just the
+plan artifacts the planner foresaw. The manifest (📎) is the authoritative subset the planner
+foresaw; discovery (💡 / catalog / search) is the advisory remainder of everything else on the
+board. Both are scoped to boards the agent may see.
 
 ---
 
@@ -956,14 +980,28 @@ directly** — each terminates in a deterministic fetch (§1.1):
         all three ──►  deterministic fetch (/section · file read)  ──►  full text
 ```
 
-Manifest is **task-driven and authoritative** (section anchor, straight to `/section`);
-catalog is **browse-driven taskless orientation** (section/artifact pointer); semantic is
-**query-driven discovery** over the existing per-message embedding (a *message-level*
-pointer the agent then resolves by browsing the catalog or hydrating that artifact's
-sections). The manifest tells an executor exactly which sections its phase needs; the
-catalog lets a manifest-less agent see the whole board and choose; semantic catches
-relevance the planner never anticipated. None of them hands the agent content directly —
-each yields a pointer that a deterministic fetch resolves.
+**These patterns are distinguished by *how the pointer is obtained*, NOT by *which agent
+type* uses them — and they compose.** Each is a *way of obtaining a pointer*, and one agent
+commonly uses several at once. Manifest **derives** the pointer (a precise section anchor the
+planner foresaw, straight to `/section`) and is **authoritative**; catalog **browses** for it
+(a section/artifact pointer from the board's table of contents); semantic **infers** it (a
+*message-level* pointer over the existing per-message embedding, which the agent then resolves
+by browsing the catalog or hydrating that artifact's sections) — catalog and semantic are
+**advisory** (verify before acting). They are not three disjoint agent modes:
+
+- A **task-driven agent** (task_id set) uses the manifest **PLUS** discovery — it receives the
+  authoritative 📎 channel *and* the advisory 💡 channel together (§5.2), and may **also** browse
+  the catalog and `/comms/search` on demand. It does not give up discovery by having a manifest.
+- A **taskless agent** simply **lacks the manifest** (no `context_refs`) and so relies on the
+  catalog plus discovery. It is the *absence of the manifest pointer-source*, not a different
+  fetch, that distinguishes it.
+
+The manifest tells an executor exactly which sections its phase needs; the catalog lets any
+agent see the whole board and choose; semantic catches relevance the planner never anticipated
+(and, because uploads / other-agent outputs are `type="artifact"` posts per Q3=(b) §10, it
+reaches *all* artifacts on the agent's scoped boards, not just plan files). None of them hands
+the agent content directly — each yields a pointer, and **all three still terminate at the one
+deterministic fetch** (`/section` · file read).
 
 ### 5a.6 Scaling the catalog — goal-hierarchy first, then ranking
 
