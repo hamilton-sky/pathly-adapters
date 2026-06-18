@@ -47,8 +47,14 @@ export function useNotebookAgentActions(
   const splitStoppingRef   = useRef(false)
   const analyzeStoppingRef = useRef(false)
 
-  // Restore active tab refs after navigation
+  // Each file has its own inline state — reset when navigating, then restore if a run is active
   useEffect(() => {
+    // Always reset first so a run on file-A never bleeds into file-B's indicator
+    setSplitState('idle')
+    setAnalyzeState('idle')
+    splitTabRef.current = null
+    analyzeTabRef.current = null
+
     if (!notebookPath) return
     const stored = useUiStore.getState().notebookActiveTabs[notebookPath]
     if (stored?.split) {
