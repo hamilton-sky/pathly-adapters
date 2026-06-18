@@ -254,16 +254,20 @@ export function killAllPtys(): void {
 // Every spawn surface funnels through terminal:spawn, so gating here covers them all.
 // Interactive shells and manual terminals are NOT gated. FIFO within the cap.
 const MAX_CONCURRENT_ENGINES = 3
+const RATE_LIMIT_COOLDOWN_MS = 15000
+const RATE_LIMIT_RE = /rate.?limit|usage limit|quota|\b429\b|too many requests|overloaded/i
 const CLI_ENGINES = new Set(['claude', 'codex', 'antigravity', 'agy', 'copilot'])
 const gatedRunning = new Set<string>()
-const engineQueue: Array<{ tabId: string; resolve: () => void }> = []
+const engineQueue: Array<{ tabId: string; priority: number; resolve: () => void }> = []
+// After a detected rate-limit, pause STARTING new gated runs until this timestamp (backpressure).
+let rateLimitedUntil = 0
 
-function acquireEngineSlot(tabId: string): Promise<void> {
+function acquireEngineSlot(tabId: string, priority = 0): Promise<void> {
   if (gatedRunning.size < MAX_CONCURRENT_ENGINES) {
     gatedRunning.add(tabId)
     return Promise.resolve()
   }
-  return new Promise<void>((resolve) => { engineQueue.push({ tabId, resolve }) })
+  return new Promise<void>((resolve) => { engineQueue.push({ tabId, priority, resolve }) })
 }
 
 function releaseEngineSlot(tabId: string): void {
@@ -271,8 +275,20 @@ function releaseEngineSlot(tabId: string): void {
   if (qi !== -1) { engineQueue.splice(qi, 1); return } // killed while still queued — never held a slot
   if (!gatedRunning.has(tabId)) return
   gatedRunning.delete(tabId)
-  const next = engineQueue.shift()
-  if (next) { gatedRunning.add(next.tabId); next.resolve() }
+  if (!engineQueue.length) return
+  // Promote the highest-priority waiter (runner/board pipeline stages > inline editor actions).
+  let best = 0
+  for (let i = 1; i < engineQueue.length; i++) if (engineQueue[i].priority > engineQueue[best].priority) best = i
+  const next = engineQueue.splice(best, 1)[0]
+  gatedRunning.add(next.tabId)
+  next.resolve()
+}
+
+// Hold before starting a gated run if we recently hit a rate limit, so a 429 burst backs off
+// instead of immediately re-flooding. The slot is already held, which throttles naturally.
+async function awaitRateLimitCooldown(): Promise<void> {
+  const wait = rateLimitedUntil - Date.now()
+  if (wait > 0) await new Promise<void>((r) => setTimeout(r, wait))
 }
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
@@ -317,7 +333,13 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     // Gate only headless CLI-engine runs (not interactive sessions or manual shells). The slot
     // is held until the PTY exits (released in onExit/kill), so the cap limits RUNNING engines.
     const gatedEngine = !initialInput && !!runnerArgv && runnerArgv.length > 0 && CLI_ENGINES.has(runnerArgv[0])
-    if (gatedEngine) await acquireEngineSlot(tabId)
+    if (gatedEngine) {
+      // Runner/board stages register before spawn → give them priority so a headless burst
+      // can't starve the pipeline. Then honor any active rate-limit cooldown.
+      const priority = runnerTabMeta.has(tabId) ? 10 : 0
+      await acquireEngineSlot(tabId, priority)
+      await awaitRateLimitCooldown()
+    }
 
     let ptyProcess: import('node-pty').IPty
     try {
@@ -430,6 +452,10 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       const scriptPath = runnerScripts.get(tabId)
       if (scriptPath) { runnerScripts.delete(tabId); try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } }
       const exitTail = tailMeaningfulOutput(ptyOutput.get(tabId) ?? [])
+      // If a gated engine run hit a rate limit, arm a cooldown so the next gated runs back off.
+      if (gatedEngine && exitCode !== 0 && RATE_LIMIT_RE.test(exitTail)) {
+        rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
+      }
       sendToWindow(tabId, 'terminal:exit', tabId, exitCode, exitTail)
       const meta = runnerTabMeta.get(tabId)
       if (meta) {
