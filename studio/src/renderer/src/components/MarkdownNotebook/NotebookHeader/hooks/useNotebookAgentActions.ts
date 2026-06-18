@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
 import { useTerminalStore } from '../../../../store/terminalStore'
 import { useUiStore } from '../../../../store/uiStore'
 import type { TerminalTab } from '../../../../store/terminalStore'
@@ -47,8 +47,9 @@ export function useNotebookAgentActions(
   const splitStoppingRef   = useRef(false)
   const analyzeStoppingRef = useRef(false)
 
-  // Each file has its own inline state — reset when navigating, then restore if a run is active
-  useEffect(() => {
+  // Each file has its own inline state — reset when navigating, then restore if a run is active.
+  // useLayoutEffect fires before paint so the button never briefly shows "Analyzing..." on the wrong file.
+  useLayoutEffect(() => {
     // Always reset first so a run on file-A never bleeds into file-B's indicator
     setSplitState('idle')
     setAnalyzeState('idle')
