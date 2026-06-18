@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { SendHorizonal, Loader2, Eye, EyeOff, ChevronRight, Trash2 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useToastStore } from '../../../store/toastStore'
+import { useTerminalStore } from '../../../store/terminalStore'
+import { buildHeadlessArgv } from '../../../services/cliEngine'
 import type { Comment } from '../useComments'
 import { buildSendPrompt, getSpawnCwd } from '../commentUtils'
 import { CommentItem } from './CommentItem/CommentItem'
@@ -89,8 +91,10 @@ export function CommentsPanel({
     const cwd = getSpawnCwd(filePath)
     const prompt = buildSendPrompt(filePath, body, unresolved)
     const tabId = `review-${Date.now().toString(36)}`
+    const tabLabel = `Comments · ${filePath.split(/[\\/]/).pop() ?? 'file'}`
 
     setIsWorking(true)
+    useTerminalStore.getState().addTabSilent(tabId, tabLabel, 'claude', undefined, undefined, prompt)
     exitUnsubRef.current?.()
     exitUnsubRef.current = window.pathly.terminal.onExit((exitedTabId) => {
       if (exitedTabId !== tabId) return
@@ -102,11 +106,13 @@ export function CommentsPanel({
         attempt++
         void window.pathly.fs.read(norm + '.draft').then((content) => {
           if (content !== null && content.trim().length > 0) {
+            useTerminalStore.getState().updateTabStatus(tabId, 'done')
             setIsWorking(false)
             onDraftReady(norm + '.draft')
           } else if (attempt < 5) {
             setTimeout(check, 600)
           } else {
+            useTerminalStore.getState().updateTabStatus(tabId, 'error')
             setIsWorking(false)
             pushToast('Agent finished but wrote no draft — check the terminal for errors', 'error')
           }
@@ -115,9 +121,8 @@ export function CommentsPanel({
       check()
     })
 
-    await window.pathly.terminal.spawn(tabId, cwd, undefined, [
-      'claude', '-p', prompt, '--print', '--dangerously-skip-permissions',
-    ])
+    await window.pathly.terminal.spawn(tabId, cwd, undefined, buildHeadlessArgv('claude', prompt))
+    useTerminalStore.getState().updateTabStatus(tabId, 'running')
   }
 
   return (

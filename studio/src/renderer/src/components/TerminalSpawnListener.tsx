@@ -36,7 +36,7 @@ export function TerminalSpawnListener(): null {
       const isInteractive = !!(data.interactive as boolean | undefined)
       if (useTerminalStore.getState().tabs.some((t) => t.id === tab_id)) return   // idempotent — never double-open
       if (!cwd) console.warn('[spawn] no working directory for', tab_id, '— PTY may fail to start')
-      useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'])
+      useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'], undefined, undefined, prompt)
       useTerminalStore.getState().openTab(tab_id)
       useTerminalStore.setState((st) => ({
         tabs: st.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
@@ -48,6 +48,7 @@ export function TerminalSpawnListener(): null {
       void window.pathly.terminal.registerRunner(tab_id, topic, run_id, label)
         .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv, initialInput))
         .then(() => {
+          useTerminalStore.getState().updateTabStatus(tab_id, 'running')
           apiFetch('/runner/terminal/started', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

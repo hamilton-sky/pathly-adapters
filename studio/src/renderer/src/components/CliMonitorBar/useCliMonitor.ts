@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTerminalStore } from '../../store/terminalStore'
+import type { SessionRecord } from '../../store/terminalStore'
 import type { TerminalTab } from '../../types/terminal'
+import { lastNLines } from './ansiUtils'
 
 const POS_KEY = 'pathly:cliMonitorPos'
 const BAR_W   = 288
@@ -27,13 +29,10 @@ function snapPos(x: number, y: number): { x: number; y: number } {
   const vh = window.innerHeight
   let nx = x
   let ny = y
-  // Snap to nearest edge if within threshold
   if (x < SNAP) nx = 8
   else if (x > vw - BAR_W - SNAP) nx = vw - BAR_W - 8
-  // 50px top offset to clear the topbar
   if (y < SNAP) ny = 50
   else if (y > vh - SNAP) ny = vh - 160
-  // Clamp to viewport bounds
   nx = clamp(nx, 8, vw - BAR_W - 8)
   ny = clamp(ny, 50, vh - 60)
   return { x: nx, y: ny }
@@ -42,10 +41,15 @@ function snapPos(x: number, y: number): { x: number; y: number } {
 export interface CliSession {
   tab: TerminalTab
   elapsedS: number
+  lastLines: string[]
 }
+
+export type { SessionRecord }
 
 export function useCliMonitor() {
   const tabs = useTerminalStore((s) => s.tabs)
+  const scrollbackByTabId = useTerminalStore((s) => s.scrollbackByTabId)
+  const sessionHistory = useTerminalStore((s) => s.sessionHistory)
   const runningTabs = tabs.filter((t) => t.status === 'running')
   const hasRunning = runningTabs.length > 0
 
@@ -53,6 +57,18 @@ export function useCliMonitor() {
   const [pos, setPos] = useState<{ x: number; y: number }>(loadPos)
   const posRef = useRef(pos)
   posRef.current = pos
+
+  // Expand state — tracks which session ids are expanded
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const savePos = useCallback((p: { x: number; y: number }) => {
     try { localStorage.setItem(POS_KEY, JSON.stringify(p)) } catch { /* ignore */ }
@@ -129,7 +145,8 @@ export function useCliMonitor() {
   const sessions: CliSession[] = runningTabs.map((tab) => ({
     tab,
     elapsedS: elapsed[tab.id] ?? 0,
+    lastLines: lastNLines(scrollbackByTabId[tab.id] ?? [], 8),
   }))
 
-  return { sessions, hasRunning, pos, onDragStart }
+  return { sessions, history: sessionHistory, hasRunning, pos, onDragStart, expandedIds, toggleExpand }
 }

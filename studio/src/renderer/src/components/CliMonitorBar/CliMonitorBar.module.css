@@ -96,6 +96,11 @@
   gap: 7px;
   padding: 5px 6px;
   border-radius: 4px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
   transition: background var(--transition-fast);
 }
 
@@ -165,4 +170,111 @@
 
 .stopBtn svg {
   fill: currentColor;
+}
+
+/* ── Row group (row + optional expanded detail) ── */
+.rowGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Section labels ── */
+.sectionLabel {
+  padding: 4px 8px 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* ── History row (completed sessions) ── */
+.historyRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.historyRow:hover {
+  background: var(--bg-surface0);
+}
+
+/* ── History status icon ── */
+.historyStatus {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.historyStatus[data-status='done'] {
+  color: var(--green, #98c379);
+}
+
+.historyStatus[data-status='error'] {
+  color: var(--red, #e06c75);
+}
+
+/* ── Time-ago label ── */
+.timeAgo {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Expanded detail section ── */
+.expanded {
+  margin: 0 6px 4px;
+  padding: 6px 8px;
+  background: var(--bg-base, #1e1e2e);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Monospace output lines ── */
+.outputLines {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  overflow: hidden;
+  max-height: 112px;
+  overflow-y: auto;
+}
+
+/* ── Prompt snippet ── */
+.promptSnippet {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Open terminal button ── */
+.openTermBtn {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 10px;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.openTermBtn:hover {
+  color: var(--text-primary);
 }

@@ -55,7 +55,8 @@ export function useNotebookAgentActions(
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `split-${Date.now().toString(36)}`
     splitTabRef.current = tabId
-    addTab(tabId, `Split · ${fileName}`)
+    const prompt = splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, notebookPath)
+    addTab(tabId, `Split · ${fileName}`, 'left', undefined, undefined, undefined, prompt)
     openTab(tabId)
     toast(`AI Split started · ${fileName} (${cliLabel(splitCli)})`, 'info', 'phase_summary')
     const stopProgress = attachProgress(tabId, setSplitProgress, (line) => toast(`Split: ${line}`, 'info', 'phase_summary'))
@@ -75,23 +76,26 @@ export function useNotebookAgentActions(
         if (found) {
           setNotebookDraftPath(draftPath)
           setNotebookViewMode('editor')
+          useTerminalStore.getState().updateTabStatus(tabId, 'done')
           setSplitState('success')
           toast(`AI Split ready · ${fileName} — review the diff`, 'success', 'agent_done')
           setTimeout(() => setSplitState('idle'), 3000)
         } else {
+          useTerminalStore.getState().updateTabStatus(tabId, 'error')
           setSplitState('error')
           toast(`AI Split failed · ${fileName} — no draft produced`, 'error', 'agent_done')
           setTimeout(() => setSplitState('idle'), 3000)
         }
       })
     })
-    const prompt = splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, notebookPath)
     try {
       await window.pathly.terminal.spawn(tabId, getSpawnCwd(notebookPath), undefined, buildCliArgv(splitCli, prompt))
+      useTerminalStore.getState().updateTabStatus(tabId, 'running')
     } catch {
       unsubscribe()
       stopProgress()
       setSplitProgress(null)
+      useTerminalStore.getState().updateTabStatus(tabId, 'error')
       setSplitState('error')
       toast(`AI Split failed · ${fileName} — could not launch ${cliLabel(splitCli)}`, 'error', 'agent_done')
       setTimeout(() => setSplitState('idle'), 3000)
@@ -107,7 +111,8 @@ export function useNotebookAgentActions(
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `analyze-${Date.now().toString(36)}`
     analyzeTabRef.current = tabId
-    addTab(tabId, `Analyze · ${fileName}`)
+    const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, notebookPath)
+    addTab(tabId, `Analyze · ${fileName}`, 'left', undefined, undefined, undefined, prompt)
     openTab(tabId)
     toast(`AI Analyze started · ${fileName} (${cliLabel(analyzeCli)})`, 'info', 'phase_summary')
     const stopProgress = attachProgress(tabId, setAnalyzeProgress, (line) => toast(`Analyze: ${line}`, 'info', 'phase_summary'))
@@ -126,23 +131,26 @@ export function useNotebookAgentActions(
       void pollForFile(analysisPath).then((found) => {
         if (found) {
           setNotebookAnalysisPath(analysisPath)
+          useTerminalStore.getState().updateTabStatus(tabId, 'done')
           setAnalyzeState('success')
           toast(`AI Analyze ready · ${fileName} — open the Report`, 'success', 'agent_done')
           setTimeout(() => setAnalyzeState('idle'), 3000)
         } else {
+          useTerminalStore.getState().updateTabStatus(tabId, 'error')
           setAnalyzeState('error')
           toast(`AI Analyze failed · ${fileName} — no report produced`, 'error', 'agent_done')
           setTimeout(() => setAnalyzeState('idle'), 3000)
         }
       })
     })
-    const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, notebookPath)
     try {
       await window.pathly.terminal.spawn(tabId, getSpawnCwd(notebookPath), undefined, buildCliArgv(analyzeCli, prompt))
+      useTerminalStore.getState().updateTabStatus(tabId, 'running')
     } catch {
       unsubscribe()
       stopProgress()
       setAnalyzeProgress(null)
+      useTerminalStore.getState().updateTabStatus(tabId, 'error')
       setAnalyzeState('error')
       toast(`AI Analyze failed · ${fileName} — could not launch ${cliLabel(analyzeCli)}`, 'error', 'agent_done')
       setTimeout(() => setAnalyzeState('idle'), 3000)
