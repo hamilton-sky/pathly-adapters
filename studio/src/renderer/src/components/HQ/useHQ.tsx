@@ -700,7 +700,17 @@ export function useHQ() {
     const label = kind === 'claude' ? 'Claude Code' : kind === 'codex' ? 'Codex' : kind === 'antigravity' ? 'Antigravity' : 'Shell'
     addTabSilent(id, label, kind)
     xtermRegistry.getOrCreate(id, { fontSize: 12 })
-    await window.pathly?.terminal?.spawn(id, projectPath, kind === 'shell' ? undefined : kind === 'antigravity' ? 'agy' : kind)
+    try {
+      await window.pathly?.terminal?.spawn(id, projectPath, kind === 'shell' ? undefined : kind === 'antigravity' ? 'agy' : kind)
+    } catch (err) {
+      // Over-cap or failed spawn: the PTY never started. Tear down the dead tab/xterm
+      // instance and surface the reason instead of leaving an empty mini card.
+      xtermRegistry.dispose(id)
+      useTerminalStore.getState().closeTab(id)
+      const msg = err instanceof Error ? err.message : 'Failed to start CLI engine'
+      useToastStore.getState().push(msg, 'error', { category: 'runner_state' })
+      return
+    }
     setHiddenMiniCards((s) => ({ ...s, [kind]: false }))
   }
 

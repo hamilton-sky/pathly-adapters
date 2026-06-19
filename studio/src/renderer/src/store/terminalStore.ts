@@ -33,8 +33,8 @@ export interface TerminalState {
   scrollbackByTabId: Record<string, string[]>
   tabCounter: number
   sessionHistory: SessionRecord[]
-  /** Live CLI-engine spawn-gate state pushed from the main process. */
-  spawnQueue: { running: number; queued: number; rateLimitedUntil: number }
+  /** Live CLI-engine spawn-scheduler state pushed from the main process. */
+  spawnQueue: SpawnState
   toggle(): void
   addTab(id: string, label: string, pane?: 'left' | 'right', kind?: TerminalTab['kind'], plan?: string, stage?: string, prompt?: string): void
   addTabSilent(id: string, label: string, kind?: TerminalTab['kind'], plan?: string, stage?: string, prompt?: string): void
@@ -49,7 +49,7 @@ export interface TerminalState {
   clearScrollback(tabId: string): void
   updateTabStatus(id: string, status: TerminalTab['status']): void
   clearSessionHistory(): void
-  setSpawnQueue(s: { running: number; queued: number; rateLimitedUntil: number }): void
+  setSpawnQueue(s: SpawnState): void
 }
 
 export const useTerminalStore = create<TerminalState>()((set) => ({
@@ -63,7 +63,7 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
   scrollbackByTabId: {},
   tabCounter: 0,
   sessionHistory: [],
-  spawnQueue: { running: 0, queued: 0, rateLimitedUntil: 0 },
+  spawnQueue: { running: 0, interactive: 0, total: 0, queued: [], paused: false, rateLimitedUntil: 0, caps: { global: 8, headless: 5, interactive: 5 } },
 
   toggle: () => set((s) => ({ open: !s.open })),
 

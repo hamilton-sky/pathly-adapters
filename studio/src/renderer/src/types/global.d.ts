@@ -1,6 +1,23 @@
 export {}
 
 declare global {
+  interface SpawnCaps { global: number; headless: number; interactive: number }
+  interface SpawnState {
+    running: number
+    interactive: number
+    total: number
+    queued: string[]
+    paused: boolean
+    rateLimitedUntil: number
+    caps: SpawnCaps
+  }
+  interface QueueAction {
+    type: 'pause' | 'resume' | 'cancel' | 'reorder' | 'set-caps'
+    tabId?: string
+    dir?: 'up' | 'down'
+    caps?: Partial<SpawnCaps>
+  }
+
   interface DbStats {
     features: number
     events: number
@@ -148,7 +165,8 @@ declare global {
         resize: (tabId: string, cols: number, rows: number) => Promise<void>
         onData: (tabId: string, cb: (data: string) => void) => () => void
         onExit: (cb: (tabId: string, exitCode?: number, tail?: string) => void) => () => void
-        onSpawnState: (cb: (s: { running: number; queued: number; rateLimitedUntil: number }) => void) => () => void
+        onSpawnState: (cb: (s: SpawnState) => void) => () => void
+        queueControl: (action: QueueAction) => Promise<void>
         registerRunner: (tabId: string, topic: string, runId: string, label?: string) => Promise<void>
         onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void) => () => void
       }

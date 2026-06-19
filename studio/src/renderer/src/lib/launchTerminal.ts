@@ -1,6 +1,25 @@
 import type { TerminalTab } from '../types/terminal'
+import { useTerminalStore } from '../store/terminalStore'
+import { useToastStore } from '../store/toastStore'
+import * as xtermRegistry from '../components/Terminal/xtermRegistry'
 
 export type TerminalKind = NonNullable<TerminalTab['kind']>
+
+/**
+ * A rejected terminal.spawn() means the PTY never started — most often the main
+ * process refused an interactive engine over the concurrency cap (it throws
+ * "Too many engines running …"). Tear down the tab + xterm instance we
+ * optimistically created and surface the reason as a toast instead of failing
+ * silently, then rethrow so callers can run their own cleanup. dispose() is a
+ * no-op when no xterm exists, so this is safe for the bare-launchTerminal path.
+ */
+function surfaceSpawnError(tabId: string, err: unknown): never {
+  xtermRegistry.dispose(tabId)
+  useTerminalStore.getState().closeTab(tabId)
+  const msg = err instanceof Error ? err.message : 'Failed to start CLI engine'
+  useToastStore.getState().push(msg, 'error', { category: 'runner_state' })
+  throw err instanceof Error ? err : new Error(msg)
+}
 
 export interface LaunchTerminalParams {
   command: string | undefined
@@ -20,7 +39,11 @@ export async function launchTerminal(params: LaunchTerminalParams): Promise<void
   const id = crypto.randomUUID()
   const kind: TerminalKind = command === 'claude' ? 'claude' : command === 'codex' ? 'codex' : command === 'agy' ? 'antigravity' : 'shell'
   addTab(id, label, pane, kind, plan, stage)
-  await window.pathly?.terminal?.spawn(id, projectPath, command)
+  try {
+    await window.pathly?.terminal?.spawn(id, projectPath, command)
+  } catch (err) {
+    surfaceSpawnError(id, err)
+  }
 }
 
 export async function writeToTerminal(
@@ -46,15 +69,19 @@ export async function writeToTerminal(
     tabId = existingTab.id
   } else {
     tabId = crypto.randomUUID()
-    if (kind === 'shell') {
-      addTab(tabId, 'Shell', 'left', 'shell', plan, stage)
-      await window.pathly?.terminal?.spawn(tabId, projectPath, undefined)
-    } else if (kind === 'antigravity') {
-      addTab(tabId, 'antigravity', 'left', 'antigravity', plan, stage)
-      await window.pathly?.terminal?.spawn(tabId, projectPath, 'agy')
-    } else {
-      addTab(tabId, kind === 'claude' ? 'claude' : 'codex', 'left', kind, plan, stage)
-      await window.pathly?.terminal?.spawn(tabId, projectPath, kind)
+    try {
+      if (kind === 'shell') {
+        addTab(tabId, 'Shell', 'left', 'shell', plan, stage)
+        await window.pathly?.terminal?.spawn(tabId, projectPath, undefined)
+      } else if (kind === 'antigravity') {
+        addTab(tabId, 'antigravity', 'left', 'antigravity', plan, stage)
+        await window.pathly?.terminal?.spawn(tabId, projectPath, 'agy')
+      } else {
+        addTab(tabId, kind === 'claude' ? 'claude' : 'codex', 'left', kind, plan, stage)
+        await window.pathly?.terminal?.spawn(tabId, projectPath, kind)
+      }
+    } catch (err) {
+      surfaceSpawnError(tabId, err)
     }
   }
 

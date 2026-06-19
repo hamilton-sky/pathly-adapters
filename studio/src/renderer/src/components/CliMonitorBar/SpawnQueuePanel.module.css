@@ -1,0 +1,162 @@
+.panel {
+  margin: 2px 4px 4px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--bg-base, #1e1e2e);
+  border: var(--border);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 4px;
+}
+
+.headLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.ctlBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  font-size: 9px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 3px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.ctlBtn:hover:not(:disabled) {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.ctlBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ctlBtn[data-active='true'] {
+  color: var(--accent);
+  border-color: var(--accent-border, var(--accent));
+}
+
+/* ── Caps editor ── */
+.caps {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0 6px;
+}
+
+.capField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.capInput {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+/* ── Queued rows ── */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+}
+
+.pos {
+  flex-shrink: 0;
+  width: 12px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.rowLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.iconBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.iconBtn[data-danger]:hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  color: var(--red);
+}
+
+/* ── Collapsed "limits" affordance ── */
+.limitsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 6px 4px;
+  padding: 2px 4px;
+  font-size: 9px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.limitsLink:hover {
+  color: var(--text-secondary);
+}

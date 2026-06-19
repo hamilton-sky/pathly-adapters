@@ -3,6 +3,7 @@ import { useTerminalStore } from '../../store/terminalStore'
 import type { SessionRecord } from '../../store/terminalStore'
 import type { TerminalTab } from '../../types/terminal'
 import { lastNLines } from './ansiUtils'
+import { loadCaps } from './SpawnQueuePanel'
 
 const POS_KEY = 'pathly:cliMonitorPos'
 const BAR_W   = 288
@@ -54,11 +55,13 @@ export function useCliMonitor() {
   const runningTabs = tabs.filter((t) => t.status === 'running')
   const hasRunning = runningTabs.length > 0
 
-  // Live spawn-gate state from the main process (running / queued / rate-limited).
+  // Live spawn-scheduler state from the main process (running / queued / paused / caps).
   useEffect(() => {
     const api = window.pathly?.terminal
     if (!api?.onSpawnState) return
-    return api.onSpawnState((s) => useTerminalStore.getState().setSpawnQueue(s))
+    const caps = loadCaps()
+    if (caps) void api.queueControl?.({ type: 'set-caps', caps })
+    return api.onSpawnState((st) => useTerminalStore.getState().setSpawnQueue(st))
   }, [])
 
   // Position state (persisted)

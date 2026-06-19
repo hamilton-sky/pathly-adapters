@@ -257,63 +257,99 @@ export function killAllPtys(): void {
   } catch { /* ignore */ }
 }
 
-// ── CLI-engine concurrency gate ──────────────────────────────────────────────
-// Cap simultaneous HEADLESS CLI engine runs (claude/codex/…) so rapid Split/Analyze/Send
-// bursts across files don't spawn N processes at once and trigger API rate-limit storms.
-// Every spawn surface funnels through terminal:spawn, so gating here covers them all.
-// Interactive shells and manual terminals are NOT gated. FIFO within the cap.
-const MAX_CONCURRENT_ENGINES = 3
+// ── CLI-engine spawn scheduler ───────────────────────────────────────────────
+// One place controls how many CLI engines run at once. Every spawn funnels through
+// terminal:spawn. Two classes of engine:
+//   • headless one-shots (Analyze/Split/agents/board/goals) — capped and QUEUED.
+//   • interactive sessions (chat / manual `claude`) — capped but REJECTED (never queued),
+//     since they are long-lived and user-initiated.
+// A global ceiling bounds the SUM so the machine/API are never flooded. All caps configurable.
 const RATE_LIMIT_COOLDOWN_MS = 15000
 const RATE_LIMIT_RE = /rate.?limit|usage limit|quota|\b429\b|too many requests|overloaded/i
 const CLI_ENGINES = new Set(['claude', 'codex', 'antigravity', 'agy', 'copilot'])
-const gatedRunning = new Set<string>()
-const engineQueue: Array<{ tabId: string; priority: number; resolve: () => void }> = []
-// After a detected rate-limit, pause STARTING new gated runs until this timestamp (backpressure).
-let rateLimitedUntil = 0
 
-// Renderer gets live gate state (running / queued / rate-limited) so the CLI monitor can show
-// backpressure instead of the user thinking spawns silently failed.
+const caps = { global: 8, headless: 5, interactive: 5 }
+const gatedRunning = new Set<string>()        // headless one-shots currently running
+const interactiveRunning = new Set<string>()  // interactive engine sessions currently running
+interface QueueItem { tabId: string; priority: number; resolve: () => void; reject: (e: Error) => void }
+const engineQueue: QueueItem[] = []           // ordered — front runs next
+let queuePaused = false
+let rateLimitedUntil = 0
 let spawnStateWin: BrowserWindow | null = null
+
+function totalRunning(): number { return gatedRunning.size + interactiveRunning.size }
+function canStartHeadless(): boolean {
+  return !queuePaused && gatedRunning.size < caps.headless && totalRunning() < caps.global
+}
+function canStartInteractive(): boolean {
+  return interactiveRunning.size < caps.interactive && totalRunning() < caps.global
+}
+
 function broadcastSpawnState(): void {
   try {
     spawnStateWin?.webContents.send('spawn:state', {
       running: gatedRunning.size,
-      queued: engineQueue.length,
+      interactive: interactiveRunning.size,
+      total: totalRunning(),
+      queued: engineQueue.map((w) => w.tabId),
+      paused: queuePaused,
       rateLimitedUntil,
+      caps: { ...caps },
     })
   } catch { /* ignore */ }
 }
 
 function acquireEngineSlot(tabId: string, priority = 0): Promise<void> {
-  if (gatedRunning.size < MAX_CONCURRENT_ENGINES) {
+  if (canStartHeadless()) {
     gatedRunning.add(tabId)
     broadcastSpawnState()
     return Promise.resolve()
   }
-  return new Promise<void>((resolve) => { engineQueue.push({ tabId, priority, resolve }); broadcastSpawnState() })
+  return new Promise<void>((resolve, reject) => {
+    const item: QueueItem = { tabId, priority, resolve, reject }
+    // Keep priority items (runner/board) ahead of inline editor actions, preserving order in a tier.
+    const idx = priority > 0 ? engineQueue.findIndex((w) => w.priority < priority) : -1
+    if (idx === -1) engineQueue.push(item)
+    else engineQueue.splice(idx, 0, item)
+    broadcastSpawnState()
+  })
+}
+
+// Start as many queued runs as the caps now allow (a freed interactive slot may unblock several).
+function promoteQueue(): void {
+  while (engineQueue.length && canStartHeadless()) {
+    const next = engineQueue.shift() as QueueItem
+    gatedRunning.add(next.tabId)
+    next.resolve()
+  }
 }
 
 function releaseEngineSlot(tabId: string): void {
   const qi = engineQueue.findIndex((w) => w.tabId === tabId)
-  if (qi !== -1) { engineQueue.splice(qi, 1); broadcastSpawnState(); return } // killed while still queued
-  if (!gatedRunning.has(tabId)) return
-  gatedRunning.delete(tabId)
-  if (engineQueue.length) {
-    // Promote the highest-priority waiter (runner/board pipeline stages > inline editor actions).
-    let best = 0
-    for (let i = 1; i < engineQueue.length; i++) if (engineQueue[i].priority > engineQueue[best].priority) best = i
-    const next = engineQueue.splice(best, 1)[0]
-    gatedRunning.add(next.tabId)
-    next.resolve()
+  if (qi !== -1) {
+    const [w] = engineQueue.splice(qi, 1) // cancelled while queued — reject so the spawn() call unblocks
+    w.reject(new Error('cancelled'))
+    broadcastSpawnState()
+    return
   }
+  if (!gatedRunning.delete(tabId) && !interactiveRunning.delete(tabId)) return
+  promoteQueue()
   broadcastSpawnState()
 }
 
-// Hold before starting a gated run if we recently hit a rate limit, so a 429 burst backs off
-// instead of immediately re-flooding. The slot is already held, which throttles naturally.
+// Hold before starting a gated run if we recently hit a rate limit, so a 429 burst backs off.
 async function awaitRateLimitCooldown(): Promise<void> {
   const wait = rateLimitedUntil - Date.now()
   if (wait > 0) await new Promise<void>((r) => setTimeout(r, wait))
+}
+
+function reorderQueue(tabId: string, dir: 'up' | 'down'): void {
+  const i = engineQueue.findIndex((w) => w.tabId === tabId)
+  if (i === -1) return
+  const j = dir === 'up' ? i - 1 : i + 1
+  if (j < 0 || j >= engineQueue.length) return
+  const tmp = engineQueue[i]; engineQueue[i] = engineQueue[j]; engineQueue[j] = tmp
+  broadcastSpawnState()
 }
 
 export function registerTerminalHandlers(win: BrowserWindow): void {
@@ -358,13 +394,22 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
 
     // Gate only headless CLI-engine runs (not interactive sessions or manual shells). The slot
     // is held until the PTY exits (released in onExit/kill), so the cap limits RUNNING engines.
-    const gatedEngine = !initialInput && !!runnerArgv && runnerArgv.length > 0 && CLI_ENGINES.has(runnerArgv[0])
-    if (gatedEngine) {
+    const argvEngine = !!runnerArgv && runnerArgv.length > 0 && CLI_ENGINES.has(runnerArgv[0])
+    const cmdEngine = !!command && CLI_ENGINES.has(command)
+    const headlessEngine = argvEngine && !initialInput            // one-shot — queued
+    const interactiveEngine = (argvEngine && !!initialInput) || cmdEngine  // chat / manual — rejected over cap
+    if (headlessEngine) {
       // Runner/board stages register before spawn → give them priority so a headless burst
       // can't starve the pipeline. Then honor any active rate-limit cooldown.
       const priority = runnerTabMeta.has(tabId) ? 10 : 0
       await acquireEngineSlot(tabId, priority)
       await awaitRateLimitCooldown()
+    } else if (interactiveEngine) {
+      if (!canStartInteractive()) {
+        throw new Error(`Too many engines running (${totalRunning()}/${caps.global}). Close a session before opening another.`)
+      }
+      interactiveRunning.add(tabId)
+      broadcastSpawnState()
     }
 
     let ptyProcess: import('node-pty').IPty
@@ -377,7 +422,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         env: process.env as Record<string, string>,
       })
     } catch (e) {
-      if (gatedEngine) releaseEngineSlot(tabId)
+      if (headlessEngine || interactiveEngine) releaseEngineSlot(tabId)
       throw e
     }
 
@@ -479,7 +524,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       if (scriptPath) { runnerScripts.delete(tabId); try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } }
       const exitTail = tailMeaningfulOutput(ptyOutput.get(tabId) ?? [])
       // If a gated engine run hit a rate limit, arm a cooldown so the next gated runs back off.
-      if (gatedEngine && exitCode !== 0 && RATE_LIMIT_RE.test(exitTail)) {
+      if (headlessEngine && exitCode !== 0 && RATE_LIMIT_RE.test(exitTail)) {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
         broadcastSpawnState()
       }
@@ -554,6 +599,29 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     }
     // Free the concurrency slot whether it was running or still queued.
     releaseEngineSlot(tabId)
+  })
+
+  ipcMain.handle('terminal:queue-control', (_event, action: {
+    type: 'pause' | 'resume' | 'cancel' | 'reorder' | 'set-caps'
+    tabId?: string
+    dir?: 'up' | 'down'
+    caps?: Partial<{ global: number; headless: number; interactive: number }>
+  }) => {
+    switch (action.type) {
+      case 'pause': queuePaused = true; broadcastSpawnState(); break
+      case 'resume': queuePaused = false; promoteQueue(); broadcastSpawnState(); break
+      case 'cancel': if (action.tabId) releaseEngineSlot(action.tabId); break // rejects the queued spawn
+      case 'reorder': if (action.tabId && action.dir) reorderQueue(action.tabId, action.dir); break
+      case 'set-caps':
+        if (action.caps) {
+          if (typeof action.caps.global === 'number') caps.global = Math.max(1, Math.min(32, Math.floor(action.caps.global)))
+          if (typeof action.caps.headless === 'number') caps.headless = Math.max(1, Math.min(32, Math.floor(action.caps.headless)))
+          if (typeof action.caps.interactive === 'number') caps.interactive = Math.max(0, Math.min(32, Math.floor(action.caps.interactive)))
+          promoteQueue() // raising caps may unblock queued runs
+          broadcastSpawnState()
+        }
+        break
+    }
   })
 
   ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string) => {

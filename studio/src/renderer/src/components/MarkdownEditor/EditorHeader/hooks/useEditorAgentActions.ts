@@ -137,14 +137,21 @@ export function useEditorAgentActions(
     try {
       await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(splitCli, prompt))
       onSplitOnceUsed()
-    } catch {
+    } catch (e) {
       unsubscribe()
       stopProgress()
+      const slot = useUiStore.getState().mdEditorActions[forFile]?.split
+      if ((e instanceof Error && /cancelled/i.test(e.message)) || !slot || slot.tabId !== tabId) {
+        // Cancelled from the queue (or already finalized) — clean up quietly, no error toast.
+        useTerminalStore.getState().closeTab(tabId)
+        setMdEditorAction(forFile, 'split', null)
+        return
+      }
       useTerminalStore.getState().updateTabStatus(tabId, 'error')
       useTerminalStore.getState().closeTab(tabId)
       setMdEditorAction(forFile, 'split', { status: 'error', tabId, stopping: false })
       toast(`AI Split failed · ${fileName} — could not launch ${cliLabel(splitCli)}`, 'error', 'agent_done')
-      setTimeout(() => clearIfStill(forFile, 'split', 'error'), 3000)
+      setTimeout(() => clearIfStill(forFile, 'split', tabId), 3000)
     }
   }, [mdEditorPath, splitOncePrompt, onSplitOnceUsed, addTab, openTab, setMdEditorDraftPath, setMdEditorViewMode, setMdEditorAction, clearIfStill, splitCli])
 
@@ -190,14 +197,21 @@ export function useEditorAgentActions(
     try {
       await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(analyzeCli, prompt))
       onAnalyzeOnceUsed()
-    } catch {
+    } catch (e) {
       unsubscribe()
       stopProgress()
+      const slot = useUiStore.getState().mdEditorActions[forFile]?.analyze
+      if ((e instanceof Error && /cancelled/i.test(e.message)) || !slot || slot.tabId !== tabId) {
+        // Cancelled from the queue (or already finalized) — clean up quietly, no error toast.
+        useTerminalStore.getState().closeTab(tabId)
+        setMdEditorAction(forFile, 'analyze', null)
+        return
+      }
       useTerminalStore.getState().updateTabStatus(tabId, 'error')
       useTerminalStore.getState().closeTab(tabId)
       setMdEditorAction(forFile, 'analyze', { status: 'error', tabId, stopping: false })
       toast(`AI Analyze failed · ${fileName} — could not launch ${cliLabel(analyzeCli)}`, 'error', 'agent_done')
-      setTimeout(() => clearIfStill(forFile, 'analyze', 'error'), 3000)
+      setTimeout(() => clearIfStill(forFile, 'analyze', tabId), 3000)
     }
   }, [mdEditorPath, analyzeOncePrompt, onAnalyzeOnceUsed, addTab, openTab, setMdEditorAnalysisPath, setMdEditorAction, clearIfStill, analyzeCli])
 

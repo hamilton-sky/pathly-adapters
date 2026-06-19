@@ -1,6 +1,23 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // Mirrored in studio/src/renderer/src/types/global.d.ts — keep in sync
+interface SpawnCaps { global: number; headless: number; interactive: number }
+interface SpawnState {
+  running: number
+  interactive: number
+  total: number
+  queued: string[]
+  paused: boolean
+  rateLimitedUntil: number
+  caps: SpawnCaps
+}
+interface QueueAction {
+  type: 'pause' | 'resume' | 'cancel' | 'reorder' | 'set-caps'
+  tabId?: string
+  dir?: 'up' | 'down'
+  caps?: Partial<SpawnCaps>
+}
+
 interface DbStats {
   features: number
   events: number
@@ -179,11 +196,13 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on('terminal:exit', listener)
       return () => ipcRenderer.removeListener('terminal:exit', listener)
     },
-    onSpawnState: (cb: (s: { running: number; queued: number; rateLimitedUntil: number }) => void): (() => void) => {
-      const listener = (_e: Electron.IpcRendererEvent, s: { running: number; queued: number; rateLimitedUntil: number }): void => cb(s)
+    onSpawnState: (cb: (s: SpawnState) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, s: SpawnState): void => cb(s)
       ipcRenderer.on('spawn:state', listener)
       return () => ipcRenderer.removeListener('spawn:state', listener)
     },
+    queueControl: (action: QueueAction): Promise<void> =>
+      ipcRenderer.invoke('terminal:queue-control', action),
     registerRunner: (tabId: string, topic: string, runId: string, label?: string): Promise<void> =>
       ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label),
     onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void): (() => void) => {

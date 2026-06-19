@@ -7,6 +7,7 @@ import { adapterLabel } from '../../services/cliEngine'
 import type { CliAdapter } from '../../services/cliEngine'
 import { useCliMonitor } from './useCliMonitor'
 import type { CliSession, SessionRecord } from './useCliMonitor'
+import { SpawnQueuePanel } from './SpawnQueuePanel'
 import s from './CliMonitorBar.module.css'
 
 function fmtAgo(ms: number): string {
@@ -99,12 +100,11 @@ export function CliMonitorBar(): JSX.Element | null {
       <div className={s.header} onMouseDown={onDragStart} role="toolbar" aria-label="CLI Engines">
         <GripHorizontal size={12} className={s.grip} aria-hidden="true" />
         <span className={s.title}>CLI Engines</span>
-        {sessions.length > 0 && (
-          <span className={s.activeCount}>{sessions.length} active</span>
+        <span className={s.activeCount}>{spawnQueue.total}/{spawnQueue.caps.global}</span>
+        {spawnQueue.queued.length > 0 && (
+          <span className={s.queuedCount}>{spawnQueue.queued.length} queued</span>
         )}
-        {spawnQueue.queued > 0 && (
-          <span className={s.queuedCount}>{spawnQueue.queued} queued</span>
-        )}
+        {spawnQueue.paused && <span className={s.pausedBadge}>paused</span>}
         <button type="button" className={s.closeBtn} onClick={toggleCliMonitor} aria-label="Close CLI monitor">
           <X size={12} />
         </button>
@@ -114,7 +114,8 @@ export function CliMonitorBar(): JSX.Element | null {
         {rateLimited && (
           <div className={s.rateLimitBanner}>Rate-limited — backing off, runs are queued</div>
         )}
-        {sessions.length === 0 && history.length === 0 && !rateLimited && spawnQueue.queued === 0 && (
+        <SpawnQueuePanel spawnQueue={spawnQueue} />
+        {sessions.length === 0 && history.length === 0 && !rateLimited && spawnQueue.queued.length === 0 && (
           <p className={s.empty}>No active engines</p>
         )}
         {sessions.length > 0 && (
