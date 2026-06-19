@@ -402,8 +402,32 @@
 /* ── Tab bar: Library / Workspace ── */
 .tabBar {
   display: flex;
+  align-items: stretch;
   flex-shrink: 0;
   border-bottom: var(--border);
+}
+
+/* In-sidebar collapse toggle (replaces the old topbar hamburger) */
+.sbCollapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.sbCollapse:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface0);
+}
+.sbCollapse:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 .tab {
   flex: 1;

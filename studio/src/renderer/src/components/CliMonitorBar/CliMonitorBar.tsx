@@ -1,5 +1,5 @@
 import React from 'react'
-import { GripHorizontal, X } from 'lucide-react'
+import { GripHorizontal, X, Cpu } from 'lucide-react'
 import { useUiStore } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import { fmtElapsed } from '../shared/RunPill/progress'
@@ -99,6 +99,7 @@ export function CliMonitorBar(): JSX.Element | null {
     >
       <div className={s.header} onMouseDown={onDragStart} role="toolbar" aria-label="CLI Engines">
         <GripHorizontal size={12} className={s.grip} aria-hidden="true" />
+        <Cpu size={12} className={s.headerIcon} aria-hidden="true" />
         <span className={s.title}>CLI Engines</span>
         <span className={s.activeCount}>{spawnQueue.total}/{spawnQueue.caps.global}</span>
         {spawnQueue.queued.length > 0 && (

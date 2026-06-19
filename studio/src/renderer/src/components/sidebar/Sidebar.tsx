@@ -150,11 +150,9 @@ export function Sidebar(): JSX.Element | null {
 
   const isNarrow = windowWidth < POPOVER_BREAKPOINT
 
-  // Narrow + collapsed → completely hidden (TopBar toggle re-opens as popover)
-  if (sidebarCollapsed && isNarrow) return null
-
-  // Wide + collapsed → icon strip (no layout impact, thin rail)
-  if (sidebarCollapsed && !isNarrow) {
+  // Collapsed (wide or narrow) → icon strip. The strip carries the expand button,
+  // so there's always a way to reopen now that the topbar toggle is gone.
+  if (sidebarCollapsed) {
     const openTab = (tab: 'library' | 'workspace'): void => {
       setSidebarCollapsed(false)
       setSidebarTab(tab)
@@ -574,7 +572,7 @@ export function Sidebar(): JSX.Element | null {
       />
     )}
     <div ref={sidebarRef} className={sidebarClass}>
-      <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} />
+      <TabBar libraryOpen={libraryOpen} onSwitch={switchTab} onCollapse={() => setSidebarCollapsed(true)} />
 
       {!libraryOpen && (
         <FilterRow

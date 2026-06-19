@@ -21,6 +21,7 @@
 .bar input,
 .bar a {
   -webkit-app-region: no-drag;
+  box-sizing: border-box; /* so an explicit height is the OUTER height (incl. border) */
 }
 
 .backBtn {
@@ -38,6 +39,26 @@
 .backBtn:hover { background: var(--btn-b-hover-bg); border-color: var(--btn-b-hover-border); color: var(--btn-b-hover-color); }
 .backBtn:active { transform: scale(0.95); }
 .backBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+/* ── Corner brand mark (back to home) ── */
+.logoBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.12s, transform 0.12s;
+  -webkit-app-region: no-drag;
+}
+.logoBtn:hover { background: var(--bg-surface0); }
+.logoBtn:active { transform: scale(0.92); }
+.logoBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 
 .center {
@@ -175,12 +196,15 @@
 .terminalBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 .publishBtn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
   background: none;
   border: 1px solid var(--bg-surface1);
   border-radius: 5px;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 4px 10px;
+  padding: 0 10px;
   font-size: var(--font-size-sm);
   white-space: nowrap;
   flex-shrink: 0;
@@ -241,6 +265,8 @@
 .terminalSplit {
   display: inline-flex;
   align-items: center;
+  height: 28px;
+  box-sizing: border-box;
   border: 1px solid var(--bg-surface1);
   border-radius: 5px;
   transition: border-color 0.12s, background 0.12s;
@@ -331,6 +357,8 @@
 .vsCodeSplit {
   display: inline-flex;
   align-items: center;
+  height: 28px;
+  box-sizing: border-box;
   border: 1px solid var(--bg-surface1);
   border-radius: 5px;
   transition: border-color 0.12s, background 0.12s;
@@ -462,7 +490,7 @@
   font-size: var(--font-size-sm);
   font-weight: 500;
   padding: 0 10px;
-  height: 26px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 5px;

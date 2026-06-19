@@ -1,0 +1,175 @@
+.wrap {
+  position: relative;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 9px;
+  max-width: 220px;
+  min-width: 130px;
+  width: 100%;
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 7px;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  overflow: hidden;
+}
+
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  background: var(--bg-surface1);
+  border-color: var(--accent);
+}
+
+.trigger:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Icon-only trigger when the bar is compact */
+.triggerCompact {
+  min-width: 28px;
+  max-width: 28px;
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+}
+.triggerCompact .chev {
+  display: none;
+}
+
+.triggerLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.chev {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ── Portaled menu (position:fixed set inline from the trigger rect) ──
+   Matches the sidebar / LibraryCatalog context-menu look. */
+.menu {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 3px;
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* A project row = switch button + reveal-on-hover new-window button */
+.row {
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+}
+.row:hover {
+  background: var(--bg-surface0);
+}
+.row:hover .newWin {
+  opacity: 1;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 6px 9px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+.menuItem:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+.menuItem:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.menuItemActive,
+.menuItemActive:hover {
+  color: var(--accent);
+}
+
+.check {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.newWin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-right: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+.newWin:hover {
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+}
+.newWin:focus-visible {
+  opacity: 1;
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 3px 4px;
+}

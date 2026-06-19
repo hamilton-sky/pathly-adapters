@@ -1,4 +1,4 @@
-import { BookOpen, Layers, Activity, Database, Settings, ChevronRight, MessageSquare } from 'lucide-react'
+import { BookOpen, Layers, Activity, Database, Settings, PanelLeft, MessageSquare } from 'lucide-react'
 import { useBrightskyStore } from '../../../store/brightskyStore'
 import { Tooltip } from '../../ui'
 import styles from './IconStrip.module.css'
@@ -35,7 +35,7 @@ export function IconStrip({
     <aside className={styles.strip} aria-label="Collapsed sidebar">
       <Tooltip label="Expand sidebar" placement="right">
         <button type="button" className={styles.expandBtn} onClick={onExpand} aria-label="Expand sidebar">
-          <ChevronRight size={14} />
+          <PanelLeft size={15} />
         </button>
       </Tooltip>
 
