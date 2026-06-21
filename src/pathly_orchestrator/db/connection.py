@@ -108,9 +108,13 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
     db_dir.mkdir(parents=True, exist_ok=True)
     db_path = os.environ.get("PATHLY_DB_PATH") or str(db_dir / "pathly.db")
 
-    # Create this thread's connection if it doesn't have one yet.
+    # Create this thread's connection if it doesn't have one yet. Serialize the
+    # open+PRAGMA setup under the global write lock: `PRAGMA journal_mode=WAL`
+    # briefly needs an exclusive DB lock, so concurrent first-time opens from many
+    # threads otherwise race and intermittently raise "database is locked".
     if not hasattr(_local, "conn") or _local.conn is None:
-        _local.conn = _make_conn(db_path)
+        with _global_write_lock:
+            _local.conn = _make_conn(db_path)
 
     conn = _local.conn
 

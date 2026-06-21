@@ -209,7 +209,25 @@ def test_transitions_targets_are_valid_states():
 
 
 def test_concurrent_append_produces_500_valid_lines(tmp_path):
-    """10 threads × 50 appends must yield exactly 500 valid JSON lines."""
+    """10 threads × 50 appends must yield exactly 500 valid events.
+
+    Regression test for two real Windows concurrency bugs this used to flake on
+    (the count came back 498–499, varying run-to-run). NO writes were ever lost —
+    the rows were all in the DB — but they were unreadable:
+
+    1. project_root key split (fsm_events._norm) — `Path.resolve()` on Windows
+       returns the ``\\\\?\\`` extended-length prefix inconsistently, notably for a
+       not-yet-created dir racing directory creation, so a feature's first event(s)
+       were written under ``//?/C:/...`` while the reader queried ``C:/...`` and
+       missed them. _norm now strips the prefix so every form is one key.
+    2. connection-open race (db.connection.get_db) — `PRAGMA journal_mode=WAL`
+       briefly needs an exclusive lock, so concurrent first-time opens raised
+       "database is locked"; connection creation is now serialized under the
+       global write lock.
+
+    The tmp plans-dir is also patched ONCE around the whole block (not per call
+    inside each worker, which mutated a shared module global from 10 threads).
+    """
     THREADS = 10
     EVENTS_PER_THREAD = 50
     feature = "stress-test"
@@ -219,23 +237,30 @@ def test_concurrent_append_produces_500_valid_lines(tmp_path):
     def worker(thread_id: int):
         try:
             for i in range(EVENTS_PER_THREAD):
-                _append_event_in_tmp(
-                    tmp_path,
+                el.append_event(
                     feature,
                     {"type": "AGENT_DONE", "thread": thread_id, "seq": i},
                 )
         except Exception as exc:
             errors.append(exc)
 
-    threads = [threading.Thread(target=worker, args=(tid,)) for tid in range(THREADS)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    original_plans = el._plans_dir
+    el._plans_dir = lambda: tmp_path / "plans"
+    try:
+        threads = [
+            threading.Thread(target=worker, args=(tid,)) for tid in range(THREADS)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
-    assert not errors, f"Thread errors: {errors}"
+        assert not errors, f"Thread errors: {errors}"
 
-    events = _read_events_in_tmp(tmp_path, feature)
+        events = el.read_events(feature)
+    finally:
+        el._plans_dir = original_plans
+
     assert (
         len(events) == THREADS * EVENTS_PER_THREAD
     ), f"Expected {THREADS * EVENTS_PER_THREAD} events, got {len(events)}"

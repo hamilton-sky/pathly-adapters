@@ -9,8 +9,18 @@ from ..connection import _get_write_lock
 
 
 def _norm(project_root: str) -> str:
-    """Normalize path separators so Windows backslash and forward-slash paths hit the same row."""
-    return project_root.replace("\\", "/")
+    """Normalize a project_root to a stable SQLite key.
+
+    Forward-slashes so Windows backslash and HTTP paths hit the same row, AND strip the
+    Windows ``\\\\?\\`` extended-length prefix. ``Path.resolve()`` on Windows returns that
+    prefix inconsistently — notably for a not-yet-created directory, racing directory
+    creation — so without this strip a feature's first event(s) can be written under
+    ``//?/C:/...`` while the reader queries ``C:/...`` and silently misses them.
+    """
+    s = project_root.replace("\\", "/")
+    if s.startswith("//?/"):
+        s = s[4:]
+    return s
 
 
 def append_event(
