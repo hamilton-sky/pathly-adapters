@@ -59,6 +59,7 @@ interface ItemRowProps {
 
 function ItemRow({ item, type, groupIcon, context, displayName, categories, onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onDeleteItem, onMoveItem, onRenameItem }: ItemRowProps) {
   const isFlow = type === 'flow'
+  const isFragment = type === 'fragment'
   const hasPath = !!item.path
   const label = displayName ?? item.name
 
@@ -141,22 +142,22 @@ function ItemRow({ item, type, groupIcon, context, displayName, categories, onOp
     if (hasPath) menuItems.push({ label: 'Open on canvas', onClick: () => { setMenuOpen(false); onOpenFlow?.(item.path || item.name) } })
   } else if (context === 'markdown-editor') {
     if (item.itemType === 'fragment' || hasPath) menuItems.push({ label: 'Insert as cell', onClick: () => { setMenuOpen(false); onInsertCell?.(item) } })
-    if (hasPath) menuItems.push({ label: 'Open to edit', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
-    if (hasPath) menuItems.push({ label: 'Split into cells', onClick: () => { setMenuOpen(false); onAddCells?.(item) } })
+    if (!isFragment && hasPath) menuItems.push({ label: 'Open to edit', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
+    if (!isFragment && hasPath) menuItems.push({ label: 'Split into cells', onClick: () => { setMenuOpen(false); onAddCells?.(item) } })
   } else {
     if (hasPath) menuItems.push({ label: 'Open', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
   }
-  if (onRenameItem && !isFlow) {
+  if (!isFragment && onRenameItem && !isFlow) {
     menuItems.push({ label: 'Rename', onClick: () => {
       setMenuOpen(false)
       setRenameVal(leafName(item).replace(/\.[^.]+$/, ''))
       setRenaming(true)
     }})
   }
-  if (hasMoveTargets) {
+  if (!isFragment && hasMoveTargets) {
     menuItems.push({ label: 'Move to category…', onClick: () => { setPickerOpen(true) } })
   }
-  if (onDeleteItem) menuItems.push({ label: 'Delete', danger: true, onClick: () => { setMenuOpen(false); onDeleteItem(item, type) } })
+  if (!isFragment && onDeleteItem) menuItems.push({ label: 'Delete', danger: true, onClick: () => { setMenuOpen(false); onDeleteItem(item, type) } })
 
   return (
     <div
