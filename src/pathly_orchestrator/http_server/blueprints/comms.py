@@ -1051,6 +1051,66 @@ def comms_supersede():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/consolidate", methods=["POST"])
+def comms_consolidate():
+    """Deterministic memory consolidation — supersede near-duplicate free-form notes.
+
+    Required body: {board, scope}. Optional: max_distance (cosine, default 0.08). Keeps the
+    newest of each near-identical cluster; never touches goals/tasks/decisions/escalations
+    (the DAG + governance are protected). Posts a 'status' summary when anything collapsed.
+    Returns 200 {ok, superseded_count, pairs}. Idempotent — a re-run finds nothing new.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import (
+            dedupe_board as _dedupe,
+            post_message as _post_message,
+        )
+
+        data = request.get_json() or {}
+        scope = data.get("scope")
+        board = data.get("board", "feature")
+        if not isinstance(scope, str) or not scope.strip():
+            return jsonify({"error": "Field 'scope' is required"}), 400
+        if not isinstance(board, str) or board not in ("feature", "project", "global"):
+            board = "feature"
+        max_distance = data.get("max_distance", 0.08)
+        if not isinstance(max_distance, (int, float)):
+            return jsonify({"error": "Field 'max_distance' must be a number"}), 400
+
+        conn = _get_db()
+        pairs = _dedupe(conn, board, scope, max_distance=float(max_distance))
+
+        if pairs:
+            try:
+                mid = _post_message(
+                    conn,
+                    board=board,
+                    scope=scope,
+                    from_agent="system",
+                    type="status",
+                    text=f"🧹 Consolidated board — superseded {len(pairs)} near-duplicate note(s).",
+                )
+                _broadcast_comms(
+                    scope,
+                    {
+                        "type": "COMMS_UPDATE",
+                        "event": "consolidated",
+                        "message_id": mid,
+                        "board": board,
+                        "scope": scope,
+                        "superseded_count": len(pairs),
+                    },
+                )
+            except Exception:
+                pass
+
+        return jsonify({"ok": True, "superseded_count": len(pairs), "pairs": pairs}), 200
+    except Exception as exc:
+        logging.exception("comms_consolidate error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 # board_scope: project_root is normalized to forward-slash form to match the
 # key used at injection time (runner/comms_context.retrieve_board_context),
 # otherwise a UI-set scope would be stored under a different key than the FSM

@@ -282,6 +282,82 @@ def supersede_message(conn: sqlite3.Connection, old_id: str, new_id: str) -> str
     return "ok"
 
 
+# Types that carry structure or governance — NEVER auto-deduped (superseding a task
+# breaks the DAG; a goal breaks runs; a decision/escalation/question is governance the
+# human supersedes deliberately). Dedup only collapses free-form notes.
+_DEDUP_PROTECTED_TYPES = (
+    "goal",
+    "task",
+    "decision",
+    "escalation",
+    "question",
+    "answer",
+)
+
+
+def dedupe_board(
+    conn: sqlite3.Connection,
+    board: str,
+    scope: str,
+    *,
+    max_distance: float = 0.08,
+    embed_fn=None,
+) -> list[dict]:
+    """Supersede near-duplicate free-form notes on a board, keeping the newest of each
+    near-identical cluster (deterministic consolidation — no LLM).
+
+    For each non-superseded note (newest first) we find its semantic neighbours and
+    supersede any OLDER note within ``max_distance`` (cosine; 0.08 ≈ near-identical) by it.
+    Structural/governance types (:data:`_DEDUP_PROTECTED_TYPES`) are never touched, so the
+    task-DAG and decisions are safe. Returns the list of
+    ``{"superseded", "by", "distance"}`` pairs applied. No-op (returns []) when embeddings
+    are unavailable. Idempotent: a second run finds nothing new.
+    """
+    if embed_fn is None:
+        try:
+            from pathly_orchestrator.runner.embeddings import embed as embed_fn  # type: ignore
+        except Exception:
+            return []
+
+    placeholders = ",".join("?" * len(_DEDUP_PROTECTED_TYPES))
+    rows = conn.execute(
+        "SELECT id, ts, text FROM comms_messages "  # nosec B608
+        "WHERE board=? AND scope=? AND deleted_at IS NULL "
+        "AND (superseded_by IS NULL OR superseded_by='') "
+        f"AND type NOT IN ({placeholders}) "
+        "ORDER BY ts DESC",
+        [board, scope, *_DEDUP_PROTECTED_TYPES],
+    ).fetchall()
+
+    superseded: set[str] = set()
+    pairs: list[dict] = []
+    for r in rows:
+        keeper_id, keeper_ts = r["id"], r["ts"]
+        if keeper_id in superseded:
+            continue
+        try:
+            emb = embed_fn(r["text"] or "")
+        except Exception:
+            emb = None
+        if emb is None:
+            continue
+        neighbours = search_by_embedding(conn, emb, [board], [scope], k=20)
+        for n in neighbours:
+            nid = n.get("id")
+            if not nid or nid == keeper_id or nid in superseded:
+                continue
+            dist = n.get("_distance")
+            if dist is None or dist > max_distance:
+                continue
+            # Keep the newer; supersede only strictly-older near-duplicates.
+            if (n.get("ts") or "") >= keeper_ts:
+                continue
+            if supersede_message(conn, nid, keeper_id) == "ok":
+                superseded.add(nid)
+                pairs.append({"superseded": nid, "by": keeper_id, "distance": dist})
+    return pairs
+
+
 def get_active_escalations(
     conn: sqlite3.Connection,
     boards: list[str],
