@@ -2,10 +2,29 @@
 
 from __future__ import annotations
 
+import re
 from importlib.resources import files
 from typing import Optional
 
 import yaml
+
+# The prompt is substituted into the headless argv. For claude it lands as a bare
+# positional after -p/--print, so a prompt starting with "--" is parsed as an
+# unknown option ("error: unknown option '---...'"). Strip a leading
+# YAML-frontmatter / horizontal-rule block so the prompt can NEVER start with a
+# dash — regardless of source (composed skill, raw/absent skill, DAG task text).
+_LEADING_FRONTMATTER_RE = re.compile(r"^---[ \t]*\n.*?\n---[ \t]*\n", re.DOTALL)
+
+
+def _dash_safe_prompt(prompt: str) -> str:
+    """Remove a leading frontmatter / '---' block so the prompt never starts with '-'."""
+    p = prompt.lstrip()
+    m = _LEADING_FRONTMATTER_RE.match(p)
+    if m:
+        p = p[m.end() :].lstrip()
+    # Any remaining leading horizontal-rule lines with no closing pair.
+    p = re.sub(r"^(?:-{3,}[ \t]*\n\s*)+", "", p)
+    return p
 
 
 def _load_adapters() -> dict:
@@ -45,6 +64,7 @@ def resolve_command(
     supports_resume = resume_cfg is not None
     terminal_kind = cfg.get("terminal_kind", adapter)
 
+    prompt = _dash_safe_prompt(prompt)
     argv: list[str] = []
     for token in headless:
         token_str = str(token)
