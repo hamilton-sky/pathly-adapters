@@ -161,11 +161,68 @@ def ensure_indexed(
 
 
 def _schedule_resummarize_async(artifact_id: str) -> None:
-    """Placeholder for Phase 4: schedule async re-summarize + re-embed.
+    """Schedule async re-summarize of an artifact and its sections on structure change.
 
-    Phase 3 stub — does nothing. Phase 4 will wire the inference service here.
-    The call is already in place so Phase 4 only fills the body.
+    Called when structure_key changes (heading added/removed/renamed). Fires a daemon
+    thread that reads the artifact row, calls summarize_content for the whole artifact
+    (topic-map) and each section (≤1 sentence), and writes back only when a non-None
+    summary is returned. With backend=minilm (default) summarize_content returns None
+    → no writeback → behavior byte-identical to the Phase 3 stub.
     """
+
+    def _worker() -> None:
+        try:
+            from pathly_orchestrator.db.connection import get_db
+            from pathly_orchestrator.db.queries.comms import (
+                get_artifact_sections,
+                update_artifact_summary,
+                update_section_summary,
+            )
+            from pathly_orchestrator.runner.inference import summarize_content
+
+            conn = get_db()
+            row = conn.execute(
+                "SELECT path, type FROM comms_artifacts WHERE id=?",
+                (artifact_id,),
+            ).fetchone()
+            if row is None:
+                return
+            path = row["path"]
+            artifact_type = row["type"] or "md"
+
+            if not _is_md(path):
+                return
+
+            text = _read_file_text(path)
+            if text is None:
+                return
+
+            # Whole-artifact topic-map summary
+            result = summarize_content(text, artifact_type=artifact_type)
+            if result.summary is not None:
+                update_artifact_summary(conn, artifact_id, result.summary)
+
+            # Per-section summaries (≤1 sentence each)
+            sections = get_artifact_sections(conn, artifact_id)
+            if not sections:
+                return
+
+            file_lines = text.splitlines(keepends=True)
+            for sec in sections:
+                ls = max(1, sec["line_start"]) - 1
+                le = min(len(file_lines), sec["line_end"])
+                sec_text = "".join(file_lines[ls:le])
+                if not sec_text.strip():
+                    continue
+                sec_result = summarize_content(sec_text, artifact_type=artifact_type, max_sentences=1)
+                if sec_result.summary is not None:
+                    update_section_summary(conn, sec["id"], sec_result.summary)
+
+        except Exception:
+            logger.debug("_schedule_resummarize_async failed for %s", artifact_id, exc_info=True)
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
 
 
 def hydrate_section(

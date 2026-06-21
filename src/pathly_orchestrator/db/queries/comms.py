@@ -937,3 +937,46 @@ def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) ->
         )
         conn.commit()
     return "updated"
+
+
+def update_artifact_summary(
+    conn: sqlite3.Connection,
+    artifact_id: str,
+    summary: str,
+    token_count: int | None = None,
+) -> None:
+    """Overwrite comms_artifacts.summary (and optionally token_count) for artifact_id.
+
+    Called by summarize_async after a generative backend produces a non-None summary.
+    Only fires when summary is non-None — minilm callers never reach this function.
+    """
+    with _get_write_lock(conn):
+        if token_count is not None:
+            conn.execute(
+                "UPDATE comms_artifacts SET summary=?, token_count=? WHERE id=?",
+                (summary, token_count, artifact_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE comms_artifacts SET summary=? WHERE id=?",
+                (summary, artifact_id),
+            )
+        conn.commit()
+
+
+def update_section_summary(
+    conn: sqlite3.Connection,
+    section_id: str,
+    summary: str,
+) -> None:
+    """Overwrite comms_artifact_sections.summary for section_id.
+
+    Called by _schedule_resummarize_async per-section when a generative backend
+    produces a non-None per-section summary (≤1 sentence).
+    """
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_artifact_sections SET summary=? WHERE id=?",
+            (summary, section_id),
+        )
+        conn.commit()
