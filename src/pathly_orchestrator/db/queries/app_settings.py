@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 
@@ -118,3 +119,31 @@ def set_write_permissions(
     """Persist project-level write-permission overrides in app_settings."""
     key = f"write_permissions:{project_root}"
     set_setting(conn, key, json.dumps(overrides))
+
+
+_INFERENCE_BACKEND_KEY = "inference:summary_backend"
+_VALID_BACKENDS = {"minilm", "ollama", "haiku"}
+
+
+def get_summary_backend(conn: sqlite3.Connection) -> str:
+    """Return the active summary backend.
+
+    Precedence: app_settings row > PATHLY_SUMMARY_BACKEND env var > "minilm".
+    Always returns a member of {"minilm", "ollama", "haiku"}.
+    """
+    raw = get_setting(conn, _INFERENCE_BACKEND_KEY)
+    if raw in _VALID_BACKENDS:
+        return raw
+    env = os.environ.get("PATHLY_SUMMARY_BACKEND")
+    if env in _VALID_BACKENDS:
+        return env
+    return "minilm"
+
+
+def set_summary_backend(conn: sqlite3.Connection, backend: str) -> None:
+    """Persist the summary backend choice. Raises ValueError on invalid value."""
+    if backend not in _VALID_BACKENDS:
+        raise ValueError(
+            f"Invalid summary backend {backend!r}. Must be one of: {sorted(_VALID_BACKENDS)}"
+        )
+    set_setting(conn, _INFERENCE_BACKEND_KEY, backend)

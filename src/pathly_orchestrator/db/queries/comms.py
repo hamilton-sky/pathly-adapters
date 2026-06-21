@@ -33,12 +33,15 @@ def post_message(
     artifact_type: str | None = None,
     goal_id: str | None = None,
     executor: str | None = None,
+    context_refs: list[dict] | None = None,
 ) -> str:
     """Insert a new message into comms_messages. Returns the new message_id.
 
     goal_id ties a task to its goal message; executor ('single'|'loop'|'team')
     is set on the goal message only. Both default to None so existing callers
     keep their behavior (the columns are harmlessly NULL).
+    context_refs is a JSON-encoded list of {artifact, anchor?} advisory links
+    (Phase 2 — shape guard only; resolve-against-index gate lands in Phase 3).
     """
     message_id = str(uuid.uuid4())
     # A task enters the DAG frontier as 'pending' so get_ready_tasks() (which
@@ -47,8 +50,8 @@ def post_message(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -68,6 +71,7 @@ def post_message(
                 artifact_type,
                 goal_id,
                 executor,
+                json.dumps(context_refs) if context_refs is not None else None,
             ),
         )
         conn.commit()
@@ -721,6 +725,196 @@ def soft_delete_message(
     return "deleted"
 
 
+def reindex_artifact_sections(
+    conn: sqlite3.Connection,
+    artifact_id: str,
+    sections: list[dict],
+    mtime: float,
+    content_hash: str,
+    structure_key: str,
+) -> None:
+    """Replace all section rows for artifact_id and stamp staleness fingerprints.
+
+    Idempotent: DELETE then INSERT under the write lock (mirrors store_embedding's
+    locking pattern). Does NOT re-summarize or re-embed — the expensive tier fires
+    async only on structure_key change (§3.4). sections is a list of dicts with keys:
+    id, anchor, heading, line_start, line_end, ordinal.
+    """
+    with _get_write_lock(conn):
+        conn.execute(
+            "DELETE FROM comms_artifact_sections WHERE artifact_id=?", (artifact_id,)
+        )
+        for sec in sections:
+            conn.execute(
+                "INSERT INTO comms_artifact_sections "
+                "(id, artifact_id, anchor, heading, line_start, line_end, ordinal) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    sec["id"],
+                    artifact_id,
+                    sec["anchor"],
+                    sec.get("heading"),
+                    sec["line_start"],
+                    sec["line_end"],
+                    sec.get("ordinal", 0),
+                ),
+            )
+        conn.execute(
+            "UPDATE comms_artifacts SET indexed_mtime=?, indexed_hash=?, indexed_structure_key=? "
+            "WHERE id=?",
+            (mtime, content_hash, structure_key, artifact_id),
+        )
+        conn.commit()
+
+
+def update_artifact_indexed_mtime(
+    conn: sqlite3.Connection,
+    artifact_id: str,
+    mtime: float,
+) -> None:
+    """Update only indexed_mtime for artifact_id (mtime moved, content unchanged).
+
+    Used when cur_hash == stored_hash: avoids wiping the section index while
+    still recording the new mtime so the next staleness check is a fast no-op.
+    """
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_artifacts SET indexed_mtime=? WHERE id=?",
+            (mtime, artifact_id),
+        )
+        conn.commit()
+
+
+def get_artifact_sections(conn: sqlite3.Connection, artifact_id: str) -> list[dict]:
+    """Return all section rows for artifact_id, ordered by ordinal."""
+    rows = conn.execute(
+        "SELECT * FROM comms_artifact_sections WHERE artifact_id=? ORDER BY ordinal ASC",
+        (artifact_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_section(
+    conn: sqlite3.Connection, artifact_id: str, anchor: str
+) -> dict | None:
+    """Return the section row for (artifact_id, anchor), or None if absent."""
+    row = conn.execute(
+        "SELECT * FROM comms_artifact_sections WHERE artifact_id=? AND anchor=?",
+        (artifact_id, anchor),
+    ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def find_or_create_artifact_by_path(
+    conn: sqlite3.Connection, scope: str, path: str
+) -> dict | None:
+    """Resolve a comms_artifacts row by (scope via owning message, path).
+
+    Returns the existing artifact dict if found. For legacy plans (file on disk but
+    never posted as type='artifact'), creates a minimal sentinel row so the hydration
+    endpoint never crashes (§6 row 2d). Returns None only when the path does not
+    exist on disk and no row exists.
+    """
+    import os
+
+    row = conn.execute(
+        "SELECT a.* FROM comms_artifacts a "
+        "JOIN comms_messages m ON m.id = a.message_id "
+        "WHERE m.scope=? AND a.path=? "
+        "ORDER BY a.created_at DESC LIMIT 1",
+        (scope, path),
+    ).fetchone()
+    if row is not None:
+        return dict(row)
+
+    if not os.path.exists(path):
+        return None
+
+    # Defense-in-depth: refuse to create a sentinel for any path that does not
+    # contain a /pathly/plans/ segment — blocks the by-id disclosure vector even
+    # if a poisoned path somehow reached this function.
+    normalized_path = path.replace("\\", "/")
+    if "/pathly/plans/" not in normalized_path:
+        return None
+
+    sentinel_artifact_id = str(uuid.uuid4())
+    sentinel_msg_id = str(uuid.uuid4())
+    title = path.replace("\\", "/").rsplit("/", 1)[-1]
+    now = _now()
+    with _get_write_lock(conn):
+        conn.execute(
+            "INSERT INTO comms_messages "
+            "(id, board, scope, from_agent, to_agent, type, text, ts) "
+            "VALUES (?, 'feature', ?, 'system', '*', 'artifact', ?, ?)",
+            (sentinel_msg_id, scope, f"[legacy artifact] {title}", now),
+        )
+        conn.execute(
+            "INSERT INTO comms_artifacts "
+            "(id, message_id, path, type, title, created_at, created_by, version) "
+            "VALUES (?, ?, ?, 'md', ?, ?, 'system', 1)",
+            (sentinel_artifact_id, sentinel_msg_id, path, title, now),
+        )
+        conn.commit()
+
+    return {
+        "id": sentinel_artifact_id,
+        "message_id": sentinel_msg_id,
+        "path": path,
+        "type": "md",
+        "title": title,
+        "summary": None,
+        "indexed_mtime": None,
+        "indexed_hash": None,
+        "indexed_structure_key": None,
+    }
+
+
+def list_artifacts_catalog(
+    conn: sqlite3.Connection,
+    scope: str,
+    exposed_boards: list[str],
+    *,
+    goal_id: str | None = None,
+    order: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[dict]:
+    """Board Catalog query (§5a.4): deterministic listing of artifacts for a scope.
+
+    Returns [{path, type, title, summary}] over exposed boards. board/scope live on
+    comms_messages, joined via the artifact FK. Optional goal_id/order/limit/offset
+    are the §5a.6 scaling params — omitted => flat listing unchanged.
+    NULL summaries degrade to path/title (consumer responsibility per §7).
+    """
+    if not exposed_boards:
+        return []
+    board_ph = ",".join("?" * len(exposed_boards))
+    params: list[Any] = list(exposed_boards) + [scope]
+    goal_clause = ""
+    if goal_id is not None:
+        goal_clause = " AND m.goal_id=?"
+        params.append(goal_id)
+    order_clause = "ORDER BY a.type, a.path"
+    if order == "recency":
+        order_clause = "ORDER BY a.created_at DESC"
+    limit_clause = ""
+    if limit is not None:
+        limit_clause = " LIMIT ?"
+        params.append(limit)
+        if offset is not None:
+            limit_clause += " OFFSET ?"
+            params.append(offset)
+    sql = (
+        f"SELECT a.path, a.type, a.title, a.summary "  # nosec B608
+        f"FROM comms_artifacts a "
+        f"JOIN comms_messages m ON m.id = a.message_id "
+        f"WHERE m.board IN ({board_ph}) AND m.scope=? AND m.deleted_at IS NULL"
+        f"{goal_clause} {order_clause}{limit_clause}"
+    )
+    rows = conn.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]
+
+
 def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) -> str:
     """Edit a message's text in place — used by the board UI to rename a goal.
 
@@ -743,3 +937,46 @@ def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) ->
         )
         conn.commit()
     return "updated"
+
+
+def update_artifact_summary(
+    conn: sqlite3.Connection,
+    artifact_id: str,
+    summary: str,
+    token_count: int | None = None,
+) -> None:
+    """Overwrite comms_artifacts.summary (and optionally token_count) for artifact_id.
+
+    Called by summarize_async after a generative backend produces a non-None summary.
+    Only fires when summary is non-None — minilm callers never reach this function.
+    """
+    with _get_write_lock(conn):
+        if token_count is not None:
+            conn.execute(
+                "UPDATE comms_artifacts SET summary=?, token_count=? WHERE id=?",
+                (summary, token_count, artifact_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE comms_artifacts SET summary=? WHERE id=?",
+                (summary, artifact_id),
+            )
+        conn.commit()
+
+
+def update_section_summary(
+    conn: sqlite3.Connection,
+    section_id: str,
+    summary: str,
+) -> None:
+    """Overwrite comms_artifact_sections.summary for section_id.
+
+    Called by _schedule_resummarize_async per-section when a generative backend
+    produces a non-None per-section summary (≤1 sentence).
+    """
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_artifact_sections SET summary=? WHERE id=?",
+            (summary, section_id),
+        )
+        conn.commit()

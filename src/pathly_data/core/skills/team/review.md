@@ -96,6 +96,12 @@ Run: git diff HEAD~1 HEAD (or git diff --staged if not yet committed).
 ## Applicable Rules and Context (from pre-review scout)
 [compressed findings]
 
+If the task being reviewed has `context_refs`, for each `{artifact, anchor}` call:
+  GET /comms/artifacts/section?scope=$SCOPE&artifact=<artifact>&anchor=<anchor>
+and read the returned `text` field (the full advisory spec — edge cases / happy flow
+for the phase the builder implemented). The `summary` is a pointer, not the spec —
+read `text`. These are the same refs the builder hydrated; review against the same spec.
+
 Check against these rules and pathly/plans/[feature]/ARCHITECTURE_PROPOSAL.md.
 If architectural violations found: write pathly/plans/[feature]/feedback/ARCH_FEEDBACK.md
 If implementation violations found: write pathly/plans/[feature]/feedback/REVIEW_FAILURES.md

@@ -33,13 +33,25 @@ from .queries.catalog_items import (
     rebuild_catalog,
     read_catalog_item_by_path,
 )
-from .queries.app_settings import get_board_scope, set_board_scope
+from .queries.app_settings import (
+    get_board_scope,
+    set_board_scope,
+    get_summary_backend,
+    set_summary_backend,
+)
 from .queries.comms import (
     complete_task,
     get_ready_tasks,
     claim_task,
     fail_task,
     reclaim_stale_claims,
+    reindex_artifact_sections,
+    get_artifact_sections,
+    get_section,
+    find_or_create_artifact_by_path,
+    list_artifacts_catalog,
+    update_artifact_summary,
+    update_section_summary,
 )
 
 __all__ = [
@@ -75,9 +87,18 @@ __all__ = [
     "read_catalog_item_by_path",
     "get_board_scope",
     "set_board_scope",
+    "get_summary_backend",
+    "set_summary_backend",
     "complete_task",
     "get_ready_tasks",
     "claim_task",
     "fail_task",
     "reclaim_stale_claims",
+    "reindex_artifact_sections",
+    "get_artifact_sections",
+    "get_section",
+    "find_or_create_artifact_by_path",
+    "list_artifacts_catalog",
+    "update_artifact_summary",
+    "update_section_summary",
 ]

@@ -267,6 +267,24 @@ CREATE TABLE IF NOT EXISTS comms_artifacts (
 
 CREATE INDEX IF NOT EXISTS idx_comms_artifacts_msg  ON comms_artifacts(message_id);
 CREATE INDEX IF NOT EXISTS idx_comms_artifacts_path ON comms_artifacts(path);
+
+-- Section index: one row per heading-delimited section of a .md artifact.
+-- anchor is the slug (§3.1 algorithm) or explicit pathly:anchor id.
+-- line_start/line_end are 1-based inclusive; rebuilt on content change (§3.4).
+-- summary is INDEX-tier (filled by inference service, Phase 4); stays NULL until then.
+CREATE TABLE IF NOT EXISTS comms_artifact_sections (
+    id            TEXT PRIMARY KEY,
+    artifact_id   TEXT NOT NULL,
+    anchor        TEXT NOT NULL,
+    heading       TEXT,
+    line_start    INTEGER NOT NULL,
+    line_end      INTEGER NOT NULL,
+    summary       TEXT,
+    ordinal       INTEGER DEFAULT 0,
+    UNIQUE(artifact_id, anchor)
+);
+CREATE INDEX IF NOT EXISTS idx_artifact_sections_artifact
+    ON comms_artifact_sections(artifact_id);
 """)
     conn.commit()
     if vec_available:
@@ -378,6 +396,16 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # set on the goal message. A goal is type='goal' (existing type column).
         ("comms_messages", "goal_id", "TEXT"),
         ("comms_messages", "executor", "TEXT"),
+        # comms-board context-retrieval: advisory artifact links carried on the task.
+        # Phase 2 — SHAPE guard only; resolve-against-index gate lands in Phase 3.
+        ("comms_messages", "context_refs", "TEXT"),
+        # Phase 3 — staleness fingerprints for the section index (§3.4).
+        # indexed_mtime: st_mtime at last index (cheap gate, one stat).
+        # indexed_hash: sha256 of full file content at last index (content-change gate).
+        # indexed_structure_key: order-independent set of heading slugs (structural-change gate).
+        ("comms_artifacts", "indexed_mtime", "REAL"),
+        ("comms_artifacts", "indexed_hash", "TEXT"),
+        ("comms_artifacts", "indexed_structure_key", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

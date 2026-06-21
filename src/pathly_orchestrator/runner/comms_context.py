@@ -97,6 +97,7 @@ def retrieve_board_context(
     project_root: str,
     task_description: str,
     board_scope: dict[str, bool] | None = None,
+    task_id: str | None = None,
 ) -> str:
     """Return a `## Communication Board` markdown block, or '' when empty.
 
@@ -111,6 +112,10 @@ def retrieve_board_context(
     board_scope:
         Dict with keys 'feature', 'project', 'global' mapping to bool.
         Defaults to all-enabled when None or absent.
+    task_id:
+        Optional task message ID. When set, reads context_refs from the task
+        and emits the 📎 Referenced context channel (§5). Default None ⇒
+        output byte-identical to today.
     """
     if board_scope is None:
         board_scope = {"feature": True, "project": True, "global": True}
@@ -232,8 +237,72 @@ def retrieve_board_context(
             if kept >= k:
                 break
 
+    # --- HYDRATE channel: context_refs from the task (§5.1) -----------------
+    # Only runs when task_id is provided — otherwise byte-identical to today.
+    hydrate_lines: list[str] = []
+    if task_id is not None:
+        try:
+            task_row = conn.execute(
+                "SELECT context_refs, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+                (task_id,),
+            ).fetchone()
+            if task_row is not None:
+                refs_raw = task_row["context_refs"]
+                task_scope = task_row["scope"] or topic
+                if refs_raw:
+                    try:
+                        refs = json.loads(refs_raw) if isinstance(refs_raw, str) else refs_raw
+                    except (json.JSONDecodeError, TypeError):
+                        refs = []
+                    if refs:
+                        from pathly_orchestrator.runner.hydrate import hydrate_section as _hydrate
+
+                        for ref in refs:
+                            try:
+                                art = ref.get("artifact", "")
+                                anc = ref.get("anchor")
+                                if not art:
+                                    continue
+                                result = _hydrate(
+                                    conn,
+                                    scope=task_scope,
+                                    artifact=art,
+                                    anchor=anc,
+                                    project_root=project_root,
+                                )
+                                if result.get("status") == 200:
+                                    body = result["body"]
+                                    anchor_label = f" §{anc}" if anc else ""
+                                    hydrate_lines.append(
+                                        f"**{art}{anchor_label}**"
+                                    )
+                                    if body.get("heading"):
+                                        hydrate_lines.append(
+                                            f"_{body['heading']}_"
+                                        )
+                                    hydrate_lines.append("")
+                                    hydrate_lines.append(body.get("text", ""))
+                                    hydrate_lines.append("")
+                                else:
+                                    anchor_label = f" §{anc}" if anc else ""
+                                    hydrate_lines.append(
+                                        f"- ⚠ {art}{anchor_label} — section not found"
+                                    )
+                            except Exception:
+                                logger.debug(
+                                    "hydrate_section failed for ref %r", ref, exc_info=True
+                                )
+                                art = ref.get("artifact", "?")
+                                anc = ref.get("anchor")
+                                anchor_label = f" §{anc}" if anc else ""
+                                hydrate_lines.append(
+                                    f"- ⚠ {art}{anchor_label} — hydration error (skipped)"
+                                )
+        except Exception:
+            logger.debug("comms_context: task_id hydration failed", exc_info=True)
+
     # Nothing to show
-    if not decisions and not escalations and not context_msgs:
+    if not decisions and not escalations and not context_msgs and not hydrate_lines:
         return ""
 
     # --- Build two-channel markdown block ------------------------------------
@@ -268,6 +337,17 @@ def retrieve_board_context(
         lines.append("---")
         lines.append("")
 
+    # Referenced context channel — authoritative manifest for this task (§5.1)
+    if hydrate_lines:
+        lines.append("### 📎 Referenced context (authoritative for this task)")
+        lines.append(
+            "Full section text from the task's context_refs. Read `text`, not `summary`."
+        )
+        lines.append("")
+        lines.extend(hydrate_lines)
+        lines.append("---")
+        lines.append("")
+
     # Semantic / context channel — labeled as advisory
     if context_msgs:
         lines.append("### 💡 Context (possibly relevant — verify before acting)")
@@ -298,6 +378,7 @@ def board_context_for(
     scope: str,
     project_root: str,
     task_description: str = "",
+    task_id: str | None = None,
 ) -> str:
     """Scope-aware board context for ANY execution surface.
 
@@ -330,4 +411,5 @@ def board_context_for(
         project_root=project_root or "",
         task_description=task_description or "",
         board_scope=bscope,
+        task_id=task_id,
     )

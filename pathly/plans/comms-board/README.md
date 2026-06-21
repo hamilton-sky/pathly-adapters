@@ -19,8 +19,15 @@ executors). Active design lives at the top level; per-phase working docs in
 
 ### Context-retrieval (sub-feature — how agents get context from the board)
 
-Distinct from the Board→DAG phases above. Has its **own 4-phase build plan** (spec §9.1) —
+Distinct from the Board→DAG phases above. Had its **own 4-phase build plan** (spec §9.1) —
 **not** the ROADMAP's P0–P3. Build kickoff prompts in [BUILD_PROMPTS.md](BUILD_PROMPTS.md).
+
+> **✅ BUILT (2026-06-22)** — all 4 phases implemented on branch
+> `shammai/comms-board-contex` (commits `88d9730b`→`53f28fd7`), unpushed, awaiting
+> review. `context_refs` manifest + section index + `/section` hydration + Board
+> Catalog + opt-in offline summarizer are live; default summary backend `minilm`=off
+> ⇒ behavior-identical to before until enabled (`app_settings` `inference:summary_backend`).
+> Deferred: the §3a Studio upload backend picker (renderer work).
 
 | Doc | What it covers |
 |---|---|

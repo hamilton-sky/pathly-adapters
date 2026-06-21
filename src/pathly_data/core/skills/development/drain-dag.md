@@ -36,7 +36,17 @@ If the response is `{"claimed": false}`, someone else took it — go back to ste
 
 ### 3. Do the work
 Read the task's `text` (what to build) and `artifact_path` (the plan/spec to work
-from — open it for context). Carry out the task: make the change, then verify it
+from — open it for context).
+
+If the task has `context_refs`, for each `{artifact, anchor}` call:
+```
+GET /comms/artifacts/section?scope=$SCOPE&artifact=<artifact>&anchor=<anchor>
+```
+and read the returned `text` field (the full section — the advisory spec, e.g. edge
+cases / happy flow, for your phase). The `summary` is a pointer, not the spec — read
+`text`. If `anchor` is absent or null, omit it from the query to retrieve the whole file.
+
+Carry out the task: make the change, then verify it
 (run the relevant build/test/lint). Post brief progress to the board as you go so the
 human can follow (headless run — they can't see your terminal):
 ```

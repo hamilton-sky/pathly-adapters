@@ -110,7 +110,7 @@ def comms_post():
 
     Required body fields: feature, from, type, text.
     Optional: scope (default 'feature'), to, options, reply_to, stage, conv,
-    depends_on, artifact_path, artifact_type, goal_id, executor.
+    depends_on, artifact_path, artifact_type, goal_id, executor, context_refs.
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
@@ -220,6 +220,93 @@ def comms_post():
             return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
         if executor is not None and not isinstance(executor, str):
             return jsonify({"error": "Field 'executor' must be a string or null"}), 400
+        # context_refs: advisory artifact manifest — list of {artifact:str, anchor?:str}.
+        # SHAPE guard + validate-at-write resolution gate (§2.4).
+        context_refs = data.get("context_refs")
+        if context_refs is not None and (
+            not isinstance(context_refs, list)
+            or not all(
+                isinstance(r, dict) and isinstance(r.get("artifact"), str)
+                and (r.get("anchor") is None or isinstance(r.get("anchor"), str))
+                for r in context_refs
+            )
+        ):
+            return jsonify({"error": "Field 'context_refs' must be a list of {artifact:str, anchor?:str} objects or null"}), 400
+
+        # Validate-at-write: resolve each {artifact, anchor} against the section index
+        # (§2.4). Best-effort — a resolver error keeps the ref as-authored; never fail
+        # the post. Unresolved anchor → rewrite to whole-file (anchor:null) + nudge.
+        if context_refs:
+            try:
+                from pathly_orchestrator.db.queries.comms import (
+                    find_or_create_artifact_by_path as _find_artifact,
+                    get_section as _get_section,
+                )
+                from pathly_orchestrator.runner.hydrate import (
+                    ensure_indexed as _ensure_indexed,
+                    safe_plan_path as _safe_plan_path,
+                )
+
+                _resolve_scope = scope
+                # Same CWD fallback as the /section read route: validate-at-write must
+                # resolve pathly/plans/<scope>/ even when the poster sent no project_root.
+                import os as _vw_os
+
+                _project_root = project_root or _vw_os.getcwd()
+
+                resolved_refs = []
+                for ref in context_refs:
+                    art_name = ref.get("artifact", "")
+                    anc = ref.get("anchor")
+                    if not art_name or anc is None:
+                        resolved_refs.append(ref)
+                        continue
+                    try:
+                        art_path = _safe_plan_path(_resolve_scope, art_name, _project_root)
+                        if art_path is None:
+                            resolved_refs.append(ref)
+                            continue
+
+                        _ensure_indexed(conn, _resolve_scope, art_path, _project_root)
+                        art_row = _find_artifact(conn, _resolve_scope, art_path)
+                        if art_row is None:
+                            resolved_refs.append(ref)
+                            continue
+
+                        sec = _get_section(conn, art_row["id"], anc)
+                        if sec is None:
+                            resolved_refs.append({"artifact": art_name, "anchor": None})
+                            logging.warning(
+                                "context_refs validate-at-write: anchor %r not found in %s "
+                                "(scope=%s) — rewriting to whole-file",
+                                anc, art_name, _resolve_scope,
+                            )
+                            try:
+                                from pathly_orchestrator.db.queries.comms import (
+                                    post_message as _nudge_post,
+                                )
+                                _nudge_post(
+                                    conn,
+                                    board=board,
+                                    scope=scope,
+                                    from_agent="system",
+                                    type="nudge",
+                                    text=(
+                                        f"⚠ context_refs validate-at-write: "
+                                        f"{art_name} §{anc} unresolved → hydrating whole file. "
+                                        f"Check heading conventions (§3.1)."
+                                    ),
+                                )
+                            except Exception:
+                                pass
+                        else:
+                            resolved_refs.append(ref)
+                    except Exception:
+                        resolved_refs.append(ref)
+                context_refs = resolved_refs
+            except Exception:
+                pass
+
         message_id = _post_message(
             conn,
             board=board,
@@ -237,6 +324,7 @@ def comms_post():
             artifact_type=artifact_type if isinstance(artifact_type, str) else None,
             goal_id=goal_id,
             executor=executor,
+            context_refs=context_refs,
         )
 
         # An artifact message also gets a comms_artifacts row (the metadata
@@ -252,7 +340,7 @@ def comms_post():
                     insert_artifact as _insert_artifact,
                 )
 
-                _insert_artifact(
+                _artifact_id = _insert_artifact(
                     conn,
                     message_id=message_id,
                     path=artifact_path,
@@ -260,6 +348,15 @@ def comms_post():
                     summary=text,
                     created_by=from_agent,
                 )
+                # Fire eager section-index build for .md artifacts (§3.3).
+                # Best-effort — a post must never fail because of indexing.
+                try:
+                    from pathly_orchestrator.runner.hydrate import (
+                        index_artifact_async as _index_artifact_async,
+                    )
+                    _index_artifact_async(_artifact_id, artifact_path, scope=scope)
+                except Exception:
+                    logging.debug("index_artifact_async (post) failed", exc_info=True)
             except Exception:
                 logging.debug("comms_artifacts insert (post) failed", exc_info=True)
 
@@ -724,7 +821,7 @@ def comms_attach():
                     insert_artifact as _insert_artifact,
                 )
 
-                _insert_artifact(
+                _attach_artifact_id = _insert_artifact(
                     conn,
                     message_id=message_id,
                     path=artifact_path,
@@ -732,6 +829,15 @@ def comms_attach():
                     summary=row["text"],
                     created_by=row["from_agent"],
                 )
+                # Fire eager section-index build for .md artifacts (§3.3).
+                try:
+                    from pathly_orchestrator.runner.hydrate import (
+                        index_artifact_async as _index_artifact_async,
+                    )
+                    _index_artifact_async(_attach_artifact_id, artifact_path,
+                                          scope=row.get("scope", ""))
+                except Exception:
+                    logging.debug("index_artifact_async (attach) failed", exc_info=True)
             except Exception:
                 logging.debug("comms_artifacts insert (attach) failed", exc_info=True)
 
@@ -755,28 +861,103 @@ def comms_attach():
 
 @bp.route("/comms/artifacts", methods=["GET"])
 def comms_artifacts():
-    """List the artifacts linked to a message (comms_artifacts side-table).
+    """List artifacts — two forms:
 
-    Query param: message_id (required). Returns 200 {ok, artifacts:[...]} —
-    newest first, possibly empty. GET, so unauthenticated like the other reads.
+    1. message_id form (original): ?message_id=<id> — artifacts for one message.
+       Returns 200 {ok, artifacts:[...]}.
+    2. Board Catalog form (§5a.4): ?board=<board>&scope=<scope> — board-scoped TOC.
+       Optional: ?goal_id=<id>&order=recency&limit=N&offset=N (§5a.6 scaling params).
+       Returns 200 {ok, artifacts:[{path, type, title, summary}]}.
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.comms import (
-            list_artifacts_for_message as _list_artifacts,
-        )
 
-        message_id = request.args.get("message_id", "")
-        if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Query param 'message_id' is required"}), 400
+        message_id = (request.args.get("message_id") or "").strip()
+        board = (request.args.get("board") or "").strip()
+        scope = (request.args.get("scope") or "").strip()
 
         conn = _get_db()
-        return (
-            jsonify({"ok": True, "artifacts": _list_artifacts(conn, message_id)}),
-            200,
-        )
+
+        if message_id:
+            from pathly_orchestrator.db.queries.comms import (
+                list_artifacts_for_message as _list_artifacts,
+            )
+            return (
+                jsonify({"ok": True, "artifacts": _list_artifacts(conn, message_id)}),
+                200,
+            )
+
+        if board and scope:
+            from pathly_orchestrator.db.queries.comms import (
+                list_artifacts_catalog as _list_catalog,
+            )
+            goal_id = (request.args.get("goal_id") or "").strip() or None
+            order = (request.args.get("order") or "").strip() or None
+            limit_raw = request.args.get("limit")
+            offset_raw = request.args.get("offset")
+            limit = int(limit_raw) if limit_raw and limit_raw.isdigit() else None
+            offset = int(offset_raw) if offset_raw and offset_raw.isdigit() else None
+            rows = _list_catalog(
+                conn,
+                scope,
+                exposed_boards=[board],
+                goal_id=goal_id,
+                order=order,
+                limit=limit,
+                offset=offset,
+            )
+            return jsonify({"ok": True, "artifacts": rows}), 200
+
+        return jsonify({"error": "Query param 'message_id' or 'board'+'scope' is required"}), 400
     except Exception as exc:
         logging.exception("comms_artifacts error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/artifacts/<artifact_id>/section", methods=["GET"])
+@bp.route("/comms/artifacts/section", methods=["GET"])
+def comms_artifact_section(artifact_id: str | None = None):
+    """Hydrate a section of a .md artifact (§4).
+
+    Two forms:
+    - By id:   GET /comms/artifacts/<artifact_id>/section?anchor=<slug>
+    - By path: GET /comms/artifacts/section?scope=<scope>&artifact=<basename>&anchor=<slug>
+
+    anchor is optional — omit or pass null to get the whole file.
+    Returns §4.2 body or §4.3 error shapes.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.runner.hydrate import hydrate_section as _hydrate
+
+        anchor = (request.args.get("anchor") or "").strip() or None
+        scope = (
+            request.args.get("scope") or request.args.get("feature") or ""
+        ).strip()
+        artifact = (request.args.get("artifact") or "").strip()
+        # By-path resolution needs a root to locate pathly/plans/<scope>/. Prefer an
+        # explicit client project_root; else fall back to the FSM server's CWD (the
+        # project this server serves) so the drain-dag single-executor call — which per
+        # spec §4.1 sends only scope+artifact+anchor — still resolves. safe_plan_path
+        # still validates scope/artifact + realpath-containment under whatever root.
+        import os as _os
+
+        project_root = (
+            request.args.get("project_root") or ""
+        ).strip() or _os.getcwd()
+
+        conn = _get_db()
+        result = _hydrate(
+            conn,
+            artifact_id=artifact_id,
+            scope=scope,
+            artifact=artifact,
+            anchor=anchor,
+            project_root=project_root,
+        )
+        return jsonify(result["body"]), result["status"]
+    except Exception as exc:
+        logging.exception("comms_artifact_section error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

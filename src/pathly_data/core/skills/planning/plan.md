@@ -277,6 +277,16 @@ After all plan files are verified, seed the comms board DAG so the builder can p
 a **goal message** (`type=goal`): you post the goal first, then stamp every phase task
 with `goal_id` pointing at it.
 
+**Advisory artifact heading convention (anchor-addressable phases).** When writing
+`EDGE_CASES.md`, `HAPPY_FLOW.md`, and `ARCHITECTURE_PROPOSAL.md`, you MUST use `## Phase N`
+headings that match the `## Phase N` headings in `IMPLEMENTATION_PLAN.md` (e.g.
+`## Phase 3 — Fix path prefixes`). This makes each phase's advisory content anchor-addressable
+(slug `phase-N`) so the retrieval system can deterministically link a phase task to its
+edge-case, happy-flow, and architecture sections. The heading text must contain `Phase <N>`
+(e.g. `## Phase 2 — Add migration`). For `ARCHITECTURE_PROPOSAL.md`, use phase-aligned
+`## Phase N` headings where the proposal maps to specific phases; a single-phase or
+phase-agnostic proposal may use descriptive headings instead.
+
 **Idempotency guard — skip if this DAG already exists.** Check for BOTH an existing goal
 and existing tasks for this feature's scope:
 ```
@@ -304,6 +314,58 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
   }'
 ```
 Record the response `"message_id"` as `$GOAL_ID`.
+
+**Post advisory files as artifacts (standard/strict only).** Before posting phase tasks,
+post each advisory file that exists as a `type='artifact'` message so the context-retrieval
+system can index and hydrate them. Skip silently if the file does not exist (lite plans omit
+them). Capture each returned `message_id` for reference (the retrieval system looks up the
+artifact row by `(scope, path)`, so the id is advisory — you do not need to pass it into
+task posts). Keep these posts under the same idempotency guard and fail-silent-on-connection-
+refused branch as the rest of Step 6.
+
+```bash
+# Post EDGE_CASES.md if it exists
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "planner",
+    "type": "artifact",
+    "text": "Advisory artifact: edge cases for $FEATURE",
+    "board": "feature",
+    "scope": "$FEATURE",
+    "artifact_path": "pathly/plans/$FEATURE/EDGE_CASES.md",
+    "artifact_type": "plan_artifact"
+  }'
+
+# Post HAPPY_FLOW.md if it exists
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "planner",
+    "type": "artifact",
+    "text": "Advisory artifact: happy flow for $FEATURE",
+    "board": "feature",
+    "scope": "$FEATURE",
+    "artifact_path": "pathly/plans/$FEATURE/HAPPY_FLOW.md",
+    "artifact_type": "plan_artifact"
+  }'
+
+# Post ARCHITECTURE_PROPOSAL.md if it exists
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "planner",
+    "type": "artifact",
+    "text": "Advisory artifact: architecture proposal for $FEATURE",
+    "board": "feature",
+    "scope": "$FEATURE",
+    "artifact_path": "pathly/plans/$FEATURE/ARCHITECTURE_PROPOSAL.md",
+    "artifact_type": "plan_artifact"
+  }'
+```
 
 **Post each phase in order** (Phase 1 first). Track the `message_id` returned by each call
 so later phases can reference their dependencies.
@@ -335,10 +397,20 @@ For each phase in `IMPLEMENTATION_PLAN.md`:
    files outside this phase's scope. If verification fails and the fix needs out-of-scope
    changes, stop and report; if fundamentally broken, git checkout the affected files and retry.
    ```
-5. POST the task with `goal_id:"$GOAL_ID"` and that composed `text`. Emit this EXACT shape.
-   `executor` is **NOT** on the task (it lives on the goal). `conv` is the conversation number
-   from the plan and MUST be a JSON **integer** — omit the key entirely rather than send a
-   string (the route 400s on a string `conv`):
+5. **Derive `context_refs`** for this phase task (DERIVED from structure — do NOT hand-author
+   arbitrary refs; the derivation is mechanical from the phase number N):
+   - If `EDGE_CASES.md` exists: add `{"artifact": "EDGE_CASES.md", "anchor": "phase-N"}`.
+   - If `HAPPY_FLOW.md` exists: add `{"artifact": "HAPPY_FLOW.md", "anchor": "phase-N"}`.
+   - If `ARCHITECTURE_PROPOSAL.md` exists: if it has a `## Phase N` heading that aligns with
+     this phase, add `{"artifact": "ARCHITECTURE_PROPOSAL.md", "anchor": "phase-N"}`; if it is
+     a short phase-agnostic proposal (no `## Phase N` headings), add
+     `{"artifact": "ARCHITECTURE_PROPOSAL.md", "anchor": null}` (whole-file ref). Omit the
+     ARCHITECTURE_PROPOSAL ref when the proposal has phase headings but none for phase N.
+   - In lite (no advisory files): `context_refs` is `[]` or omit the field.
+6. POST the task with `goal_id:"$GOAL_ID"`, the composed `text`, and the derived `context_refs`.
+   Emit this EXACT shape. `executor` is **NOT** on the task (it lives on the goal). `conv` is
+   the conversation number from the plan and MUST be a JSON **integer** — omit the key entirely
+   rather than send a string (the route 400s on a string `conv`):
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
@@ -355,11 +427,15 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "depends_on": ["<phase_K_message_id>"],
     "goal_id": "$GOAL_ID",
     "artifact_path": "pathly/plans/$FEATURE/IMPLEMENTATION_PLAN.md",
-    "artifact_type": "plan_artifact"
+    "artifact_type": "plan_artifact",
+    "context_refs": [
+      {"artifact": "EDGE_CASES.md", "anchor": "phase-N"},
+      {"artifact": "HAPPY_FLOW.md", "anchor": "phase-N"}
+    ]
   }'
 ```
 
-6. Record the `"message_id"` from the response as `phase_N_id` in your local map.
+7. Record the `"message_id"` from the response as `phase_N_id` in your local map.
 
 If the comms server is unreachable (connection refused or non-200 response), skip this step
 silently — plan files are the authoritative source of truth and the DAG is advisory.
