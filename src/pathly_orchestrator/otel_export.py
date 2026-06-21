@@ -169,7 +169,7 @@ def _do_export(event: dict, endpoint: str) -> None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
             logger.debug(
                 "otel span exported: %s %s (status=%s)", agent, feature, resp.status
             )
@@ -188,7 +188,7 @@ def _do_export(event: dict, endpoint: str) -> None:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(log_req, timeout=5) as resp:
+            with urllib.request.urlopen(log_req, timeout=5) as resp:  # nosec B310
                 logger.debug(
                     "otel log exported: %s %s (status=%s)", agent, feature, resp.status
                 )

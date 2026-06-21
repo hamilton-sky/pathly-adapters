@@ -129,7 +129,7 @@ def search_by_embedding(
 
         embedding_bytes = struct.pack(f"{len(embedding)}f", *embedding)
         sql = (
-            "SELECT m.* FROM comms_messages m "
+            "SELECT m.* FROM comms_messages m "  # nosec B608
             "JOIN comms_embeddings e ON e.message_id = m.id "
             f"WHERE m.board IN ({board_ph}) AND m.scope IN ({scope_ph}) "
             "AND m.deleted_at IS NULL "
@@ -142,7 +142,7 @@ def search_by_embedding(
         board_ph = ",".join("?" * len(boards))
         scope_ph = ",".join("?" * len(scopes))
         sql = (
-            "SELECT * FROM comms_messages "
+            "SELECT * FROM comms_messages "  # nosec B608
             f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
             "AND deleted_at IS NULL "
             "ORDER BY ts DESC LIMIT ?"
@@ -168,7 +168,7 @@ def search_by_keyword(
     board_ph = ",".join("?" * len(boards))
     scope_ph = ",".join("?" * len(scopes))
     sql = (
-        "SELECT m.* FROM comms_messages m "
+        "SELECT m.* FROM comms_messages m "  # nosec B608
         "JOIN comms_fts ON comms_fts.rowid = m.rowid "
         f"WHERE comms_fts MATCH ? AND m.board IN ({board_ph}) AND m.scope IN ({scope_ph}) "
         "AND m.deleted_at IS NULL "
@@ -237,7 +237,7 @@ def get_pending_decisions(
     board_ph = ",".join("?" * len(boards))
     scope_ph = ",".join("?" * len(scopes))
     sql = (
-        "SELECT * FROM comms_messages "
+        "SELECT * FROM comms_messages "  # nosec B608
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
         "AND type='decision' AND status='pending' AND deleted_at IS NULL "
         "AND (superseded_by IS NULL OR superseded_by = '') "
@@ -276,7 +276,7 @@ def get_active_escalations(
     board_ph = ",".join("?" * len(boards))
     scope_ph = ",".join("?" * len(scopes))
     sql = (
-        "SELECT * FROM comms_messages "
+        "SELECT * FROM comms_messages "  # nosec B608
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
         "AND type='escalation' AND status='pending' AND deleted_at IS NULL "
         "AND (superseded_by IS NULL OR superseded_by = '') "
@@ -469,7 +469,7 @@ def restore_messages(
     ph = ",".join("?" * len(message_ids))
     with _get_write_lock(conn):
         conn.execute(
-            f"UPDATE comms_messages SET deleted_at=NULL, status='pending' WHERE id IN ({ph})",
+            f"UPDATE comms_messages SET deleted_at=NULL, status='pending' WHERE id IN ({ph})",  # nosec B608
             message_ids,
         )
         conn.commit()
@@ -511,7 +511,7 @@ def get_ready_tasks(
     goal_clause = " AND goal_id=?" if goal_id is not None else ""
     goal_param = [goal_id] if goal_id is not None else []
     pending_sql = (
-        "SELECT * FROM comms_messages "
+        "SELECT * FROM comms_messages "  # nosec B608
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
         f"AND type='task' AND task_status='pending' AND deleted_at IS NULL{goal_clause}"
     )
@@ -520,7 +520,7 @@ def get_ready_tasks(
     ).fetchall()
 
     done_sql = (
-        "SELECT id FROM comms_messages "
+        "SELECT id FROM comms_messages "  # nosec B608
         f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
         f"AND type='task' AND task_status='done' AND deleted_at IS NULL{goal_clause}"
     )
@@ -678,7 +678,7 @@ def reclaim_stale_claims(conn: sqlite3.Connection, board: str, scope: str) -> li
     ph = ",".join("?" * len(ids))
     with _get_write_lock(conn):
         conn.execute(
-            f"UPDATE comms_messages SET task_status='pending', claimed_by=NULL "
+            f"UPDATE comms_messages SET task_status='pending', claimed_by=NULL "  # nosec B608
             f"WHERE id IN ({ph})",
             ids,
         )

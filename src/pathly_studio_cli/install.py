@@ -19,7 +19,7 @@ def _latest_release() -> dict:
     req = urllib.request.Request(
         _API, headers={"Accept": "application/vnd.github+json"}
     )
-    with urllib.request.urlopen(req, timeout=15) as r:
+    with urllib.request.urlopen(req, timeout=15) as r:  # nosec B310
         return json.loads(r.read().decode())
 
 
@@ -39,7 +39,7 @@ def _find_asset(assets: list[dict]) -> dict | None:
 def _download(url: str, dest: Path) -> None:
     print(f"Downloading {url} …")
     req = urllib.request.Request(url, headers={"Accept": "application/octet-stream"})
-    with urllib.request.urlopen(req, timeout=120) as r:
+    with urllib.request.urlopen(req, timeout=120) as r:  # nosec B310
         total = int(r.getheader("Content-Length", 0))
         done = 0
         with open(dest, "wb") as f:

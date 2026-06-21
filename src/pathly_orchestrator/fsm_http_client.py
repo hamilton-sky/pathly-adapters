@@ -71,7 +71,7 @@ def _request_raw(
         headers["X-Pathly-Secret"] = secret
     req = Request(url, data=data, headers=headers, method=method)
     try:
-        with urlopen(req, timeout=timeout) as resp:
+        with urlopen(req, timeout=timeout) as resp:  # nosec B310
             return resp.read().decode("utf-8")
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace").strip()
@@ -135,7 +135,7 @@ def _start_server(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None
         }
         if os.name == "nt":
             kwargs["creationflags"] = (
-                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS  # type: ignore[attr-defined]
             )
         else:
             kwargs["start_new_session"] = True

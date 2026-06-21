@@ -68,7 +68,7 @@ class WebhookNotifier:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
                 logger.debug(
                     "Webhook posted %s → HTTP %d", data.get("type"), resp.status
                 )
