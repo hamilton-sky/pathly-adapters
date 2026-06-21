@@ -23,6 +23,22 @@ def tmp_path():
 
 
 @pytest.fixture(autouse=True)
+def _no_async_embed(monkeypatch):
+    """Disable the background embedding thread for all tests.
+
+    embed_async() spawns a daemon thread that opens its own connection and
+    writes embeddings concurrently — it races the per-test DB and causes
+    intermittent 'database is locked' failures in the concurrency tests.
+    """
+    try:
+        import pathly_orchestrator.runner.embeddings as _emb_mod
+
+        monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
+    except Exception:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def _isolate_db(tmp_path, monkeypatch):
     """Redirect ~/.pathly/pathly.db to a per-test temp dir for isolation.
 
@@ -42,8 +58,6 @@ def _isolate_db(tmp_path, monkeypatch):
         except Exception:
             pass
         _conn_mod._local.conn = None
-    with _conn_mod._write_locks_meta:
-        _conn_mod._write_locks.clear()
     _conn_mod._init_once_done = False
 
     yield
@@ -55,8 +69,6 @@ def _isolate_db(tmp_path, monkeypatch):
         except Exception:
             pass
         _conn_mod._local.conn = None
-    with _conn_mod._write_locks_meta:
-        _conn_mod._write_locks.clear()
     _conn_mod._init_once_done = False
 
 
@@ -72,9 +84,11 @@ def _reset_rate_limiter():
     Clearing per test fixes that; the dedicated rate-limit tests in test_http_server
     still trip the limit because they make their own 120+ requests after this reset.
     """
+
     def _clear():
         try:
             from pathly_orchestrator.http_server import middleware as _mw
+
             with _mw._rate_lock:
                 _mw._rate_counters.clear()
         except Exception:

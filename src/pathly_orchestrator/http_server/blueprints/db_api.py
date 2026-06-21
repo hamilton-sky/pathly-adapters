@@ -1,4 +1,5 @@
 """DB Explorer REST endpoints — /db/*."""
+
 from __future__ import annotations
 
 import json
@@ -12,21 +13,45 @@ from flask import Blueprint, jsonify, request
 logger = logging.getLogger("pathly.http")
 bp = Blueprint("db_api", __name__)
 
-_ALLOWED_KEYWORDS = {"select", "with", "from", "where", "join", "group", "order",
-                     "limit", "having", "union", "intersect", "except", "explain"}
-_FORBIDDEN_KEYWORDS = {"insert", "update", "delete", "drop", "create", "alter",
-                       "attach", "detach", "pragma", "vacuum", "reindex"}
+_ALLOWED_KEYWORDS = {
+    "select",
+    "with",
+    "from",
+    "where",
+    "join",
+    "group",
+    "order",
+    "limit",
+    "having",
+    "union",
+    "intersect",
+    "except",
+    "explain",
+}
+_FORBIDDEN_KEYWORDS = {
+    "insert",
+    "update",
+    "delete",
+    "drop",
+    "create",
+    "alter",
+    "attach",
+    "detach",
+    "pragma",
+    "vacuum",
+    "reindex",
+}
 
 
 def _get_db():
     from pathly_orchestrator.db.connection import get_db
+
     return get_db()
 
 
 def _project_root_param() -> str:
-    raw = (
-        request.args.get("project_root", "")
-        or os.environ.get("PATHLY_PROJECT_ROOT", "")
+    raw = request.args.get("project_root", "") or os.environ.get(
+        "PATHLY_PROJECT_ROOT", ""
     )
     return raw.replace("\\", "/")
 
@@ -42,7 +67,7 @@ def _parse_json_file(path: Path) -> dict:
 
 def _scan_filesystem_features(project_root: str) -> list[dict]:
     """Scan pathly/plans/*/STATE.json for features not yet in the DB."""
-    results = []
+    results: list[dict] = []
     plans_dir = Path(project_root) / "pathly" / "plans"
     if not plans_dir.is_dir():
         return results
@@ -68,19 +93,21 @@ def _scan_filesystem_features(project_root: str) -> list[dict]:
             except Exception:
                 pass
 
-        results.append({
-            "project_root": project_root,
-            "feature": feature_name,
-            "state": current,
-            "events": 0,
-            "invocations": 0,
-            "total_tokens": 0,
-            "cost_usd": cost_usd,
-            "updated_at": updated_at,
-            "convs_done": convs_done,
-            "convs_total": convs_total,
-            "source": "filesystem",
-        })
+        results.append(
+            {
+                "project_root": project_root,
+                "feature": feature_name,
+                "state": current,
+                "events": 0,
+                "invocations": 0,
+                "total_tokens": 0,
+                "cost_usd": cost_usd,
+                "updated_at": updated_at,
+                "convs_done": convs_done,
+                "convs_total": convs_total,
+                "source": "filesystem",
+            }
+        )
     return results
 
 
@@ -91,9 +118,15 @@ def db_stats():
         project_root = _project_root_param()
         conn = _get_db()
 
-        db_features_count = conn.execute("SELECT COUNT(DISTINCT feature) FROM fsm_state").fetchone()[0]
-        events = conn.execute("SELECT COUNT(*) FROM fsm_events WHERE event_type NOT IN ('BILLING_UPDATE')").fetchone()[0]
-        invocations = conn.execute("SELECT COUNT(*) FROM fsm_events WHERE event_type='AGENT_DONE'").fetchone()[0]
+        db_features_count = conn.execute(
+            "SELECT COUNT(DISTINCT feature) FROM fsm_state"
+        ).fetchone()[0]
+        events = conn.execute(
+            "SELECT COUNT(*) FROM fsm_events WHERE event_type NOT IN ('BILLING_UPDATE')"
+        ).fetchone()[0]
+        invocations = conn.execute(
+            "SELECT COUNT(*) FROM fsm_events WHERE event_type='AGENT_DONE'"
+        ).fetchone()[0]
         # Tokens from AGENT_DONE only; cost from both AGENT_DONE + BILLING_UPDATE.
         row = conn.execute(
             "SELECT "
@@ -111,13 +144,15 @@ def db_stats():
             db_features_count = len(fs_features)
             total_cost += sum(f["cost_usd"] for f in fs_features)
 
-        return jsonify({
-            "features": db_features_count,
-            "events": events,
-            "invocations": invocations,
-            "total_tokens": total_tokens,
-            "total_cost_usd": round(total_cost, 4),
-        })
+        return jsonify(
+            {
+                "features": db_features_count,
+                "events": events,
+                "invocations": invocations,
+                "total_tokens": total_tokens,
+                "total_cost_usd": round(total_cost, 4),
+            }
+        )
     except Exception as e:
         logger.exception("db_stats error")
         return jsonify({"error": str(e)}), 500
@@ -139,7 +174,9 @@ def db_features():
                 [pr_filter],
             ).fetchall()
         else:
-            state_rows = conn.execute("SELECT project_root, feature, state_json FROM fsm_state").fetchall()
+            state_rows = conn.execute(
+                "SELECT project_root, feature, state_json FROM fsm_state"
+            ).fetchall()
         for r in state_rows:
             try:
                 states[(r["project_root"], r["feature"])] = json.loads(r["state_json"])
@@ -155,7 +192,9 @@ def db_features():
             event_count_rows = conn.execute(
                 "SELECT project_root, feature, COUNT(*) as cnt FROM fsm_events GROUP BY project_root, feature"
             ).fetchall()
-        event_counts = {(r["project_root"], r["feature"]): r["cnt"] for r in event_count_rows}
+        event_counts = {
+            (r["project_root"], r["feature"]): r["cnt"] for r in event_count_rows
+        }
         # Tokens from AGENT_DONE only; cost from AGENT_DONE (where >0) + BILLING_UPDATE.
         # BILLING_UPDATE supersedes zero-cost AGENT_DONE rows — no double-counting.
         if pr_filter:
@@ -184,24 +223,28 @@ def db_features():
         # Only show features that have a real FSM-state entry — drop event-only phantoms
         all_keys = set(states)
         results = []
-        for (pr, feat) in sorted(all_keys, key=lambda x: x[1]):
+        for pr, feat in sorted(all_keys, key=lambda x: x[1]):
             state_obj = states.get((pr, feat), {})
             inv = inv_stats.get((pr, feat), {})
             # DB state_json stores current_state; filesystem uses current
-            state_val = state_obj.get("current_state") or state_obj.get("current", "UNKNOWN")
-            results.append({
-                "project_root": pr,
-                "feature": feat,
-                "state": state_val.upper(),
-                "events": event_counts.get((pr, feat), 0),
-                "invocations": inv.get("inv", 0),
-                "total_tokens": int(inv.get("total_tokens", 0)),
-                "cost_usd": round(float(inv.get("total_cost", 0.0)), 4),
-                "updated_at": state_obj.get("updated_at", ""),
-                "convs_done": state_obj.get("convs_done", 0),
-                "convs_total": state_obj.get("convs_total", 0),
-                "source": "db",
-            })
+            state_val = state_obj.get("current_state") or state_obj.get(
+                "current", "UNKNOWN"
+            )
+            results.append(
+                {
+                    "project_root": pr,
+                    "feature": feat,
+                    "state": state_val.upper(),
+                    "events": event_counts.get((pr, feat), 0),
+                    "invocations": inv.get("inv", 0),
+                    "total_tokens": int(inv.get("total_tokens", 0)),
+                    "cost_usd": round(float(inv.get("total_cost", 0.0)), 4),
+                    "updated_at": state_obj.get("updated_at", ""),
+                    "convs_done": state_obj.get("convs_done", 0),
+                    "convs_total": state_obj.get("convs_total", 0),
+                    "source": "db",
+                }
+            )
 
         # Filesystem fallback — add any features not already in DB results
         db_feature_names = {r["feature"] for r in results}
@@ -235,12 +278,14 @@ def db_feature_events(feature: str):
                 payload = json.loads(r["payload"])
             except (json.JSONDecodeError, TypeError):
                 payload = {}
-            results.append({
-                "seq": r["seq"],
-                "ts": r["ts"],
-                "event_type": r["event_type"],
-                "payload": payload,
-            })
+            results.append(
+                {
+                    "seq": r["seq"],
+                    "ts": r["ts"],
+                    "event_type": r["event_type"],
+                    "payload": payload,
+                }
+            )
         return jsonify(results)
     except Exception as e:
         logger.exception("db_feature_events error")
