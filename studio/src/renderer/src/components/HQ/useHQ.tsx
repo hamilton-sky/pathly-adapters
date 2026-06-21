@@ -705,9 +705,10 @@ export function useHQ() {
     } catch (err) {
       // Over-cap or failed spawn: the PTY never started. Tear down the dead tab/xterm
       // instance and surface the reason instead of leaving an empty mini card.
+      const msg = err instanceof Error ? err.message : 'Failed to start CLI engine'
+      console.error('[spawn] mini-terminal closed — spawn rejected', id, kind, '→', msg, err)
       xtermRegistry.dispose(id)
       useTerminalStore.getState().closeTab(id)
-      const msg = err instanceof Error ? err.message : 'Failed to start CLI engine'
       useToastStore.getState().push(msg, 'error', { category: 'runner_state' })
       return
     }

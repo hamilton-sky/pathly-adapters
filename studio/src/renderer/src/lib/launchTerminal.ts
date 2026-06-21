@@ -14,9 +14,10 @@ export type TerminalKind = NonNullable<TerminalTab['kind']>
  * no-op when no xterm exists, so this is safe for the bare-launchTerminal path.
  */
 function surfaceSpawnError(tabId: string, err: unknown): never {
+  const msg = err instanceof Error ? err.message : 'Failed to start CLI engine'
+  console.error('[spawn] terminal closed — spawn rejected', tabId, '→', msg, err)
   xtermRegistry.dispose(tabId)
   useTerminalStore.getState().closeTab(tabId)
-  const msg = err instanceof Error ? err.message : 'Failed to start CLI engine'
   useToastStore.getState().push(msg, 'error', { category: 'runner_state' })
   throw err instanceof Error ? err : new Error(msg)
 }

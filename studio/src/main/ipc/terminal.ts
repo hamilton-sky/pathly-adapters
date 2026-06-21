@@ -277,6 +277,14 @@ let queuePaused = false
 let rateLimitedUntil = 0
 let spawnStateWin: BrowserWindow | null = null
 
+// Lightweight spawn-lifecycle tracing → main-process console (the `npm run dev` terminal).
+// Flip SPAWN_DEBUG to false to silence.
+const SPAWN_DEBUG = true
+function slog(...a: unknown[]): void { if (SPAWN_DEBUG) console.log('[spawn]', ...a) }
+function spawnCounts(): string {
+  return `running=${gatedRunning.size} interactive=${interactiveRunning.size} total=${totalRunning()}/${caps.global} queued=${engineQueue.length} paused=${queuePaused}`
+}
+
 function totalRunning(): number { return gatedRunning.size + interactiveRunning.size }
 function canStartHeadless(): boolean {
   return !queuePaused && gatedRunning.size < caps.headless && totalRunning() < caps.global
@@ -329,10 +337,12 @@ function releaseEngineSlot(tabId: string): void {
   if (qi !== -1) {
     const [w] = engineQueue.splice(qi, 1) // cancelled while queued — reject so the spawn() call unblocks
     w.reject(new Error('cancelled'))
+    slog('release: cancelled while queued', tabId, '|', spawnCounts())
     broadcastSpawnState()
     return
   }
-  if (!gatedRunning.delete(tabId) && !interactiveRunning.delete(tabId)) return
+  if (!gatedRunning.delete(tabId) && !interactiveRunning.delete(tabId)) { slog('release: not tracked', tabId); return }
+  slog('release', tabId, '|', spawnCounts())
   promoteQueue()
   broadcastSpawnState()
 }
@@ -355,8 +365,10 @@ function reorderQueue(tabId: string, dir: 'up' | 'down'): void {
 export function registerTerminalHandlers(win: BrowserWindow): void {
   spawnStateWin = win
   ipcMain.handle('terminal:spawn', async (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[], initialInput?: string) => {
-    if (!pty) throw new Error('node-pty is not available')
+    slog('request', tabId, '| command=' + (command ?? '-'), 'argv0=' + (runnerArgv?.[0] ?? '-'), 'hasInput=' + !!initialInput, '|', spawnCounts())
+    if (!pty) { console.error('[spawn] reject: node-pty unavailable', tabId); throw new Error('node-pty is not available') }
     if (activePtys.has(tabId)) {
+      console.error('[spawn] reject: tab already exists', tabId)
       throw new Error('Tab already exists')
     }
 
@@ -402,14 +414,21 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       // Runner/board stages register before spawn → give them priority so a headless burst
       // can't starve the pipeline. Then honor any active rate-limit cooldown.
       const priority = runnerTabMeta.has(tabId) ? 10 : 0
+      slog('headless', tabId, canStartHeadless() ? 'run now' : 'QUEUED', 'priority=' + priority, '|', spawnCounts())
       await acquireEngineSlot(tabId, priority)
+      const cd = rateLimitedUntil - Date.now()
+      if (cd > 0) slog('headless', tabId, `rate-limit cooldown ${cd}ms`)
       await awaitRateLimitCooldown()
     } else if (interactiveEngine) {
       if (!canStartInteractive()) {
+        console.error('[spawn] reject: interactive over cap', tabId, '|', spawnCounts())
         throw new Error(`Too many engines running (${totalRunning()}/${caps.global}). Close a session before opening another.`)
       }
       interactiveRunning.add(tabId)
+      slog('interactive', tabId, 'run now', '|', spawnCounts())
       broadcastSpawnState()
+    } else {
+      slog('ungated', tabId, '(manual shell / non-engine)')
     }
 
     let ptyProcess: import('node-pty').IPty
@@ -422,9 +441,11 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         env: process.env as Record<string, string>,
       })
     } catch (e) {
+      console.error('[spawn] pty.spawn FAILED', tabId, 'shell=' + shell, 'args=' + JSON.stringify(shellArgs).slice(0, 200), '→', (e as Error).message)
       if (headlessEngine || interactiveEngine) releaseEngineSlot(tabId)
       throw e
     }
+    const ptyStartedAt = Date.now()
 
     // Default target window is the main window
     ptyWindows.set(tabId, win)
@@ -517,6 +538,12 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     })
 
     ptyProcess.onExit(({ exitCode }) => {
+      const wallS = ((Date.now() - ptyStartedAt) / 1000).toFixed(1)
+      const isEngine = headlessEngine || interactiveEngine
+      const dbgTail = tailMeaningfulOutput(ptyOutput.get(tabId) ?? []).slice(-500).replace(/\s+/g, ' ').trim()
+      if (exitCode !== 0) console.error('[spawn] exit', tabId, 'code=' + exitCode, `(${wallS}s)`, '| tail:', dbgTail || '(no output)')
+      else if (isEngine) slog('exit', tabId, 'code=0', `(${wallS}s) engine | tail:`, dbgTail || '(no output)')
+      else slog('exit', tabId, 'code=0', `(${wallS}s)`)
       activePtys.delete(tabId)
       ptyOwners.delete(tabId)
       releaseEngineSlot(tabId)
@@ -616,7 +643,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         if (action.caps) {
           if (typeof action.caps.global === 'number') caps.global = Math.max(1, Math.min(32, Math.floor(action.caps.global)))
           if (typeof action.caps.headless === 'number') caps.headless = Math.max(1, Math.min(32, Math.floor(action.caps.headless)))
-          if (typeof action.caps.interactive === 'number') caps.interactive = Math.max(0, Math.min(32, Math.floor(action.caps.interactive)))
+          if (typeof action.caps.interactive === 'number') caps.interactive = Math.max(1, Math.min(32, Math.floor(action.caps.interactive))) // min 1 — a 0 cap rejects every interactive spawn
           promoteQueue() // raising caps may unblock queued runs
           broadcastSpawnState()
         }

@@ -26,7 +26,7 @@ function CapInput({ label, value, onCommit }: { label: string; value: number; on
       <span>{label}</span>
       <input
         type="number"
-        min={0}
+        min={1}
         max={32}
         defaultValue={value}
         key={value}

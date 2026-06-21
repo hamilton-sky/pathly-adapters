@@ -47,7 +47,9 @@ export function buildHeadlessArgv(adapter: CliAdapter, prompt: string, opts: Spa
   }
 
   if (adapter === 'codex') {
-    const argv = ['codex', 'exec']
+    // --skip-git-repo-check: codex exec refuses to run ("Not inside a trusted directory")
+    // when the cwd isn't a trusted git repo — e.g. an arbitrary file's folder for Analyze/Split.
+    const argv = ['codex', 'exec', '--skip-git-repo-check']
     if (autonomy) argv.push('--sandbox', 'workspace-write')
     if (model) argv.push('--model', model)
     if (session) argv.push('--continue')
