@@ -1,5 +1,12 @@
 # Build Prompts — Board Context-Retrieval
 
+> **✅ ALL FOUR PHASES BUILT (2026-06-22) — do NOT re-run these prompts.**
+> Implemented on branch `shammai/comms-board-contex`, commits `88d9730b` (P1) →
+> `01f106a6` (P2) → `c2b845df` (P3) → `53f28fd7` (P4); 824 tests pass; unpushed,
+> awaiting review. These prompts are kept as the build record. Phase 3's adversarial
+> review caught + fixed a path-traversal hole and an index-wipe bug. Deferred follow-up:
+> the §3a Studio upload backend picker (Off/Local/Haiku) — renderer work, not built.
+
 Phase-by-phase kickoff prompts for implementing
 [`DESIGN_SPEC-context-retrieval.md`](DESIGN_SPEC-context-retrieval.md).
 
