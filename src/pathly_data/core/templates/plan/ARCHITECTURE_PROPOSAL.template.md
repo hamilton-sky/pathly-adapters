@@ -3,6 +3,12 @@ name: Architecture Proposal
 ---
 # [Feature Name] — Architecture Proposal
 
+<!-- Heading note: where the proposal maps to specific implementation phases, use
+     "## Phase N — <title>" headings matching IMPLEMENTATION_PLAN.md (e.g.
+     ## Phase 2 — Data layer). This makes those sections anchor-addressable (slug
+     "phase-N") for hydration. A single cross-phase or phase-agnostic proposal may
+     use descriptive headings (e.g. ## Problem Statement) instead. -->
+
 ## Problem Statement
 [What automation gap or framework capability are we adding?]
 

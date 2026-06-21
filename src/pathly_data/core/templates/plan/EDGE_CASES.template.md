@@ -4,7 +4,11 @@ name: Edge Cases
 
 # [Feature Name] — Edge Cases
 
-## Category 1: [Error type, e.g., Element Not Found]
+<!-- Heading rule: use "## Phase N — <title>" headings that match IMPLEMENTATION_PLAN.md.
+     Each phase heading (e.g. ## Phase 2 — Add migration) becomes anchor "phase-2" and
+     lets the retrieval system link a phase task to its edge-case section. -->
+
+## Phase 1 — [Phase title]
 
 ### EC-1.1: [Specific edge case]
 - **Trigger**: [What causes this — e.g., selector changes after site update]
@@ -12,7 +16,9 @@ name: Edge Cases
 - **Expected behavior**: [What should happen]
 - **Handled in**: [Phase X / Conv Y — e.g., add role-based cfg entry]
 
-## Category 2: [Error type, e.g., Dynamic Content]
+## Phase 2 — [Phase title]
+
+### EC-2.1: [Specific edge case]
 ...
 
 ## Known Limitations

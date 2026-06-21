@@ -277,6 +277,16 @@ After all plan files are verified, seed the comms board DAG so the builder can p
 a **goal message** (`type=goal`): you post the goal first, then stamp every phase task
 with `goal_id` pointing at it.
 
+**Advisory artifact heading convention (anchor-addressable phases).** When writing
+`EDGE_CASES.md`, `HAPPY_FLOW.md`, and `ARCHITECTURE_PROPOSAL.md`, you MUST use `## Phase N`
+headings that match the `## Phase N` headings in `IMPLEMENTATION_PLAN.md` (e.g.
+`## Phase 3 — Fix path prefixes`). This makes each phase's advisory content anchor-addressable
+(slug `phase-N`) so the retrieval system can deterministically link a phase task to its
+edge-case, happy-flow, and architecture sections. The heading text must contain `Phase <N>`
+(e.g. `## Phase 2 — Add migration`). For `ARCHITECTURE_PROPOSAL.md`, use phase-aligned
+`## Phase N` headings where the proposal maps to specific phases; a single-phase or
+phase-agnostic proposal may use descriptive headings instead.
+
 **Idempotency guard — skip if this DAG already exists.** Check for BOTH an existing goal
 and existing tasks for this feature's scope:
 ```
