@@ -1,7 +1,5 @@
 ---
 
----
-
 ## Completion report (AGENT_DONE)
 
 After the stage agent completes, write an AGENT_DONE event to the **central DB** via eventlog.

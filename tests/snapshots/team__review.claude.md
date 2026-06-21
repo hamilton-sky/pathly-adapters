@@ -213,13 +213,23 @@ If `pathly-fsm-call` fails or the server is not reachable:
 This makes phase logging reliable on any adapter (Codex, Copilot, CLI) where the
 FSM server is not automatically managed by the host environment.
 
+---
+
 ## Completion report (AGENT_DONE)
 
 After the stage agent completes, write an AGENT_DONE event to the **central DB** via eventlog.
 This is **mandatory** — the supervisor reads this event as the authoritative result.
 
+## Compute wall seconds
+
 1. Compute wall_seconds: `python3 -c "import time; print(int(time.time()) - BUILD_START)"`
+
+## Sum subagent tokens
+
 2. Sum `total_tokens` and `tool_uses` across **ALL** subagents spawned during this stage (analyze, scouts, implement/review, and every fix/retry iteration). Parse each subagent's `<usage>` block (look for `subagent_tokens:` and `tool_uses:` lines in the tool result) and add to running totals. `duration_ms = 0` if absent.
+
+## Estimate cost
+
 3. Compute `cost_usd` from `total_tokens` and `model` using an 80/20 input/output token split:
 
    | Model prefix | Input $/MTok | Output $/MTok |
@@ -235,6 +245,8 @@ This is **mandatory** — the supervisor reads this event as the authoritative r
    out_est = total_tokens * 0.2
    cost_usd = round((in_est / 1_000_000 * input_rate) + (out_est / 1_000_000 * output_rate), 6)
    ```
+
+## Write the AGENT_DONE event
 
 4. Write the event — **do not invoke a skill**, run this command:
 
@@ -302,6 +314,8 @@ with open(path, 'a', encoding='utf-8') as _f:
 "
 ```
 
+## Post to activity log
+
 5. POST to the activity log — non-blocking; skip silently if server is unavailable:
 
 ```bash
@@ -317,6 +331,8 @@ pathly-fsm-call record-activity \
   --cost-usd COST_USD
 ```
 
+## Placeholder reference
+
 Replace the UPPER_CASE placeholders with actual values:
 - `AGENT_ROLE` — e.g. `builder`, `reviewer`, `tester`, `planner`
 - `MODEL_ID` — model used in this stage (e.g. `claude-sonnet-4-6`)
@@ -324,6 +340,8 @@ Replace the UPPER_CASE placeholders with actual values:
 - `SUMMARY_SENTENCE` — one sentence: what was done and the outcome
 - `TOTAL_TOKENS`, `TOOL_USES`, `WALL_SECONDS` — from `<usage>` block or wall_seconds computation
 - `COST_USD` — computed in step 3
+
+## Return to orchestrator
 
 `<feature>` and `<feature_path>` are pre-substituted by the runner — use the values as written.
 

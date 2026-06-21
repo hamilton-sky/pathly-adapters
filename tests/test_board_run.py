@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 import pytest
 
@@ -154,7 +155,12 @@ def test_start_board_run_board_busy_returns_error():
     # Second fake was never called.
     assert calls_second == []
 
-    # After first finishes, lock is released.
+    # After first finishes, the lock is released. On CI the release can lag the
+    # thread's return slightly, so poll (up to ~5s) instead of asserting instantly.
+    for _ in range(250):
+        if not board_lock.is_locked("feature", "f1"):
+            break
+        time.sleep(0.02)
     assert not board_lock.is_locked("feature", "f1")
 
 
