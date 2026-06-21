@@ -40,6 +40,11 @@ from .queries.comms import (
     claim_task,
     fail_task,
     reclaim_stale_claims,
+    reindex_artifact_sections,
+    get_artifact_sections,
+    get_section,
+    find_or_create_artifact_by_path,
+    list_artifacts_catalog,
 )
 
 __all__ = [
@@ -80,4 +85,9 @@ __all__ = [
     "claim_task",
     "fail_task",
     "reclaim_stale_claims",
+    "reindex_artifact_sections",
+    "get_artifact_sections",
+    "get_section",
+    "find_or_create_artifact_by_path",
+    "list_artifacts_catalog",
 ]

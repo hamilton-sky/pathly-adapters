@@ -61,6 +61,15 @@ Read (if present):
 
 If neither exists, review against general software engineering good practices and note the absence.
 
+If the task you are reviewing has `context_refs`, for each `{artifact, anchor}` call:
+```
+GET /comms/artifacts/section?scope=$SCOPE&artifact=<artifact>&anchor=<anchor>
+```
+and read the returned `text` field (the full section — the advisory spec for that phase,
+e.g. edge cases / happy flow). The `summary` is a pointer, not the spec — read `text`.
+If `anchor` is absent or null, omit it to retrieve the whole file. These are the same
+refs the builder hydrated — review against the same advisory spec the builder used.
+
 ## Step 3 — Check for violations
 
 For each changed file, check:
