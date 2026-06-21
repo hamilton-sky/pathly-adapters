@@ -90,7 +90,10 @@
   color: var(--red) !important;
 }
 .menuItemBack {
-  composes: menuItem;
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; text-align: left; background: none; border: none;
+  padding: 6px 9px; font-size: 12px; border-radius: 5px; cursor: pointer;
+  font-family: var(--font-family-base);
   color: var(--accent);
   font-weight: 600;
   margin-bottom: 3px;
@@ -98,7 +101,10 @@
   padding-bottom: 7px;
 }
 .menuItemDisabled {
-  composes: menuItem;
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; text-align: left; background: none; border: none;
+  padding: 6px 9px; font-size: 12px; border-radius: 5px;
+  font-family: var(--font-family-base);
   color: var(--text-muted);
   cursor: default;
   pointer-events: none;
