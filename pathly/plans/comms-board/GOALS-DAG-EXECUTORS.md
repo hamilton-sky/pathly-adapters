@@ -89,12 +89,12 @@ the trimmed FSM flow.
 
 ## 7. Phase plan
 
-| Phase | Deliverable |
-|---|---|
-| **0a — schema** ✅ | `goal_id` + `executor` columns (additive migration) |
-| **0b — planner→DAG** | planner emits `type=task` (`depends_on` + `goal_id` + artifact paths); `post_message` / `/comms/post` accept `goal_id` + `executor`; `goal` message type |
-| **1 — dispatcher (serial)** | when a task/goal is run, route to its executor (`single` / `loop` / `team`); start serial |
-| **2 — UI** | per-goal executor selector + a "Run" action on a goal/task; goals shown as groupings on the board |
-| **3 — parallel** | flip `k>1` by lane (across-goal first, then within-goal worktrees) |
+| Phase | Deliverable | Status |
+|---|---|---|
+| **0a — schema** | `goal_id` + `executor` columns (additive migration) | ✅ done |
+| **0b — planner→DAG** | planner emits `type=task` (`depends_on` + `goal_id` + artifact paths); `post_message` / `/comms/post` accept `goal_id` + `executor`; `goal` message type | ✅ done |
+| **1 — dispatcher (serial)** | when a task/goal is run, route to its executor (`single` / `loop` / `team`); start serial | ✅ done (+ `/comms/goals/stop`) |
+| **2 — UI** | per-goal executor selector + a "Run" action on a goal/task; goals shown as groupings on the board | ✅ done |
+| **3 — parallel** | flip `k>1` by lane (across-goal first, then within-goal worktrees) | 🔭 next (only unbuilt phase) |
 
 **Keystone, built first:** the planner emitting the task DAG (Phase 0b).

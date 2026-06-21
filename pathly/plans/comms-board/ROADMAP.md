@@ -8,11 +8,17 @@ Model: [GOALS-DAG-EXECUTORS.md](GOALS-DAG-EXECUTORS.md). Per-phase specs: [phase
 | Phase | What | Status | Doc |
 |---|---|---|---|
 | 0a | goals + executor schema (`goal_id`/`executor` cols; goal = `type='goal'`) | ✅ done | [phases/PHASE-0-goals-schema.md](phases/PHASE-0-goals-schema.md) |
-| 0b | planner → task DAG (emit `type=task`; accept `goal_id`/`executor`) | 🔜 ready | [phases/PHASE-0b-planner-dag-wiring.md](phases/PHASE-0b-planner-dag-wiring.md) |
-| two-flow split | consultation flow (PO→arch→research→design→planner) + trimmed `team-build` flow (build→review→test→retro, feedback routes to specialists) | ✅ flows built | `core/flows/{consultation,team-build}.flow.yaml` |
-| P1 | **dispatcher** — route task/goal → `single`\|`loop`\|`team` (serial) | 🔭 next | [phases/PHASE-1-dispatcher.md](phases/PHASE-1-dispatcher.md) |
-| P2 | board UI — goals as groupings, executor+adapter selector, Run actions | 🔭 | _coming_ |
-| P3 | parallel — across-goal → lanes → worktree fan-in + **consolidation** | 🔭 | see `../parallel-fleet-part-1/`, `-part-2/` |
+| 0b | planner → task DAG (emit `type=task`; accept `goal_id`/`executor`) | ✅ done | [phases/PHASE-0b-planner-dag-wiring.md](phases/PHASE-0b-planner-dag-wiring.md) |
+| two-flow split | consultation flow (PO→arch→research→design→planner) + trimmed `team-build` flow (build→review→test→retro, feedback routes to specialists) | ✅ done | `core/flows/{consultation,team-build}.flow.yaml` |
+| P1 | **dispatcher** — route task/goal → `single`\|`loop`\|`team` (serial) | ✅ done | [phases/PHASE-1-dispatcher.md](phases/PHASE-1-dispatcher.md) |
+| P2 | board UI — goals as groupings, executor selector, Decompose/Run/Stop | ✅ done | [phases/PHASE-2-ui-ux-spec.md](phases/PHASE-2-ui-ux-spec.md) |
+| P3 | parallel — across-goal → lanes → worktree fan-in + **consolidation** | 🔭 next (only remaining phase) | see `../parallel-fleet-part-1/`, `-part-2/` |
+
+> **Status (2026-06-22):** 0a/0b/P1/P2 are **all shipped to `master`**, plus the separate
+> **context-retrieval** sub-feature (manifest + `/section` hydration + Board Catalog + opt-in
+> summarizer — see [BUILD_PROMPTS.md](BUILD_PROMPTS.md)). Recent follow-ups: `/comms/goals/stop`
+> endpoint (real goal Stop), the `loop` executor now hydrates the 📎 context channel, and the
+> evaluator now seeds a real goal+DAG. **P3 (parallel) is the only unbuilt phase.**
 
 ## Riders (cross-cutting — NOT separate end-phases)
 
@@ -36,6 +42,8 @@ separate folders. Only the parallel-fleet plans remain (below).
 ### Deferred polish
 - artifact **edit-hooks + versioning** (`last_edit_*`/`version` columns exist, unpopulated)
 - **consolidation** (fan-in / synthesis when a goal's frontier drains)
+- **per-task ad-hoc Run** button (no backend route yet — TaskCard escape hatch)
+- ✅ ~~goal-stop endpoint~~ — **done** (`/comms/goals/stop`, 2026-06-22)
 
 ## Separate later plans
 - **HQ command center / fleet dashboard** → [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md)
@@ -44,6 +52,7 @@ separate folders. Only the parallel-fleet plans remain (below).
   `../parallel-fleet-part-1/` and `../parallel-fleet-part-2/`.
 
 ## At a glance
-After **0b + two-flow split + P1** you have a working end-to-end self-driving system for
-one goal (decompose → run → verify), with multi-adapter routing riding along. **P2/P3**
-make it multi-goal, parallel, and visual; the **HQ dashboard** is the last surface.
+**0b + two-flow split + P1 + P2 are shipped**, so the end-to-end self-driving system for one
+goal (decompose → run → verify) works **and is visible/controllable in Studio** (Goals & Tasks
+view, executor selector, Decompose/Run/Stop), with multi-adapter routing riding along. **P3**
+makes it parallel (k>1 by lane → worktree fan-in); the **HQ dashboard** is the last surface.

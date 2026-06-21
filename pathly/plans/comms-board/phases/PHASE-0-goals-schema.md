@@ -2,7 +2,7 @@
 
 **Branch:** `feat/comms-board-dag-serial`
 **Master design:** [../GOALS-DAG-EXECUTORS.md](../GOALS-DAG-EXECUTORS.md)
-**Status:** 0a done ✅ · 0b in progress 🔄
+**Status:** 0a done ✅ · 0b done ✅ (both shipped to `master`)
 
 Phase 0 lays the data substrate for the Board → Goals → per-goal Task-DAG model.
 

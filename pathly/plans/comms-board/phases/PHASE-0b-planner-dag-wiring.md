@@ -2,7 +2,7 @@
 
 **Branch:** `feat/comms-board-dag-serial`
 **Master design:** [../GOALS-DAG-EXECUTORS.md](../GOALS-DAG-EXECUTORS.md) · **Phase 0:** [PHASE-0-goals-schema.md](PHASE-0-goals-schema.md)
-**Status:** ready to build. Grounded by the `phase0-recon` workflow (all paths verified against source).
+**Status:** ✅ done — shipped to `master`. (planner Step 6 emits the goal-first task DAG; `/comms/post` + `post_message` accept `goal_id`/`executor`.) Kept as the build record.
 
 > Goal of 0b: make decomposition emit a **machine-readable task DAG** onto the comms
 > board (so the serial runner / builder can consume it), instead of prose-only plans.
