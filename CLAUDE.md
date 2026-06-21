@@ -3,7 +3,7 @@
 ## What this repo is
 
 `pathly-adapters` is the monorepo for the **Pathly AI development framework**:
-- Python package (`pathly-adapters` v2.x) — FSM orchestrator, telemetry, install CLI
+- Python package (`pathly-adapters` v2.16.x) — FSM orchestrator, telemetry, install CLI
 - Electron app (`studio/`) — visual flow builder and AI chat panel
 - Agent/skill source (`src/pathly_data/`) — canonical role contracts, skill markdown, adapter configs
 
@@ -32,7 +32,9 @@ User → /pathly <cmd>           skills (installed at ~/.claude/skills/pathly-*)
 Studio → Start button          FlowControlBar → POST /runner/start
        → supervisor/            drives FSM + spawns agents as visible terminals
        → TERMINAL_SPAWN SSE    Studio opens a PTY tab (node-pty) per pipeline stage
-       → terminal:spawn IPC    argv injected: ['claude', '-p', '<full prompt>', '--print', ...]
+       → terminal:spawn IPC    argv injected from adapters.yaml headless template, e.g.
+                               claude: ['claude', '-p', '{prompt}', '--model', '{model}', '--output-format', 'json', '--dangerously-skip-permissions']
+                               codex:  ['codex', 'exec', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
        → PTY exits             POST /runner/terminal/result → FSM continues
      → EVENTS.jsonl         Claude writes AGENT_DONE with `summary` mid-run; supervisor reads it after PTY exits as the authoritative semantic result (stdout only used for session_id + cost_usd)
 ```
@@ -47,6 +49,10 @@ Studio → Start button          FlowControlBar → POST /runner/start
 | **Runner** | Studio Start button | `supervisor/` injects full prompt via `-p` argv | No — prompt assembled in Python at runtime |
 
 In runner mode Pathly is the single source of truth for skill content. The CLI receives the complete prompt as a command-line argument and exits when done — it never reads a skill file.
+
+**Dash-safety:** prompts delivered via CLI argv must never start with `---` (claude parses it as an unknown option). Three mirror implementations enforce this: `_dash_safe_prompt` in `src/pathly_orchestrator/adapters.py` (applied in `resolve_command`); `_strip_leading_frontmatter` in `src/pathly_orchestrator/skills/compose.py` (applied during skill composition); and `dashSafePrompt` in `studio/src/renderer/src/services/cliEngine.ts` (applied in `buildHeadlessArgv`).
+
+**Studio CLI spawn scheduler (`studio/src/main/ipc/terminal.ts`):** a dual-cap concurrency gate controls how many CLI engine processes run simultaneously. Default caps: global ≤ 8, headless ≤ 5, interactive ≤ 5 (all configurable at runtime via the SpawnQueuePanel). Headless one-shots are queued (FIFO + priority); interactive sessions are rejected over cap with a toast. On Windows, headless argv is encoded as a PowerShell temp-script; `codex` headless additionally pipes `$null` as stdin to prevent it stalling on terminal input.
 
 **FSM response contract (`agent_hint`):** Every `/next_action` response includes:
 - `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)

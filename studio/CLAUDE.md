@@ -59,7 +59,7 @@ window.pathly.terminal.spawn(tabId, cwd, 'claude')
 window.pathly.terminal.spawn(tabId, cwd, undefined, ['claude', '-p', '...', '--print', '--dangerously-skip-permissions'])
 ```
 
-On Windows, `terminal.ts` encodes the argv as a base64 PowerShell `-EncodedCommand` to handle newlines, quotes, and other special characters in the prompt safely.
+On Windows, `terminal.ts` writes a UTF-8 BOM `.ps1` temp script to handle newlines, quotes, and other special characters in the prompt safely (PowerShell `-EncodedCommand` has a ~32KB limit; stage prompts regularly exceed it). The script is deleted when the PTY exits.
 
 **Runner tab lifecycle:**
 1. `terminal:register-runner(tabId, topic, runId, label)` — called before spawn to link the tab to a pipeline run
@@ -76,12 +76,65 @@ On every app launch, `index.ts` ensures a clean FSM server:
 
 This guarantees the new server always starts, even against old server versions that predate the `/shutdown` endpoint.
 
+## Topbar and sidebar (redesigned)
+
+**Topbar** (`src/renderer/src/components/topbar/`):
+- `PathlyLogo` — corner brand button; clicking it calls `setProjectPath('')` to return to the project picker (replaces the old 'Projects' text button). No hamburger sidebar toggle in the topbar.
+- `ProjectSelector` — dropdown to switch projects, open a project in a new window (per-row ExternalLink icon), or open a folder. Replaced the old `TopicSelector`.
+- CLI Engines toggle uses the `Cpu` icon from lucide-react (was `Activity`).
+- Uniform 28px bar height; topbar content is left (`PathlyLogo`), center (`ProjectSelector`, `EditorLauncher`, `PanelNav`), right (engine monitor, HQ chat, theme, terminal, publish).
+
+**Sidebar collapse/expand** lives inside the sidebar, not the topbar:
+- `TabBar` (`shell/TabBar.tsx`) — renders WORKSPACE / LIBRARY tabs plus a `PanelLeft` collapse button at the right of the tab bar.
+- `IconStrip` (`shell/IconStrip.tsx`) — the collapsed sidebar; shows a `PanelLeft` expand button at the top plus icon shortcuts for each panel.
+
+## CLI-engine spawn scheduler (`src/main/ipc/terminal.ts`)
+
+Every `terminal:spawn` call for a CLI engine goes through a dual-cap concurrency gate. Two classes:
+
+| Class | Behaviour when over cap |
+|---|---|
+| **Headless one-shots** (runner/board stages, editor actions) | QUEUED (FIFO with priority; pipeline tabs get priority=10) |
+| **Interactive sessions** (manual `claude`, chat mode) | REJECTED — error thrown; Studio shows a toast |
+
+Default caps (all configurable at runtime via `terminal:queue-control` with `type:'set-caps'`):
+
+```
+global:      8   // max sum of headless + interactive running
+headless:    5   // max headless one-shots running simultaneously
+interactive: 5   // max interactive CLI sessions open simultaneously
+```
+
+Queue management IPC: `terminal:queue-control` accepts `pause | resume | cancel | reorder | set-caps`.
+`spawn:state` IPC event is broadcast to the renderer after every state change — `terminalStore.spawnQueue` holds the latest snapshot.
+
+**Rate-limit backoff:** when a headless run exits non-zero and its output matches the `RATE_LIMIT_RE` pattern (429, "rate limit", "overloaded", etc.), a 15-second cooldown (`RATE_LIMIT_COOLDOWN_MS`) is armed. Subsequent queued headless runs wait out the cooldown before starting.
+
+**`SPAWN_DEBUG` logging:** when `SPAWN_DEBUG = true` (default), every spawn lifecycle event is logged to the main-process console with a `[spawn]` prefix.
+
+**SpawnQueuePanel** (`src/renderer/src/components/CliMonitorBar/SpawnQueuePanel.tsx`): rendered inside `CliMonitorBar`; shows the live queue, pause/resume controls, and an editable cap form (global / headless / chat). Caps are persisted to `localStorage` under the key `pathly:spawnCaps`.
+
+## Dash-safe prompt (`src/renderer/src/services/cliEngine.ts`)
+
+`dashSafePrompt(prompt)` strips any leading YAML frontmatter block (`---…---`) from a prompt before it is passed to a CLI as a positional argument. Without this, `claude -p '---...'` is parsed as an unknown option and errors. Applied in `buildHeadlessArgv` before constructing argv. Mirrors `_dash_safe_prompt` in `src/pathly_orchestrator/adapters.py`.
+
+**Codex headless shape:** `codex exec --skip-git-repo-check --sandbox workspace-write -- <prompt>`. On Windows, `terminal.ts` pipes `$null` to stdin to prevent `codex exec` from stalling while waiting for additional stdin input.
+
+## Markdown Editor (formerly Notebook)
+
+The component formerly called "Notebook" is now fully renamed:
+- Component: `MarkdownEditor` (`src/renderer/src/components/MarkdownEditor/MarkdownEditor.tsx`)
+- Panel id: `'markdown-editor'`
+- Store: `markdownEditorStore` (`src/renderer/src/store/markdownEditorStore.ts`)
+- State key prefix: `mdEditor*`
+
 ## Key Zustand stores
 
 | Store | File | Purpose |
 |---|---|---|
 | `runnerStore` | `store/runnerStore.ts` | pipeline status, stage, adapter, cost, error — driven by SSE |
-| `terminalStore` | `store/terminalStore.ts` | terminal tabs registry; `addTab` registers, `openTab` reveals panel |
+| `terminalStore` | `store/terminalStore.ts` | terminal tabs registry; `addTab` registers, `openTab` reveals panel; also holds `spawnQueue: SpawnState` pushed from main via `spawn:state` IPC |
+| `markdownEditorStore` | `store/markdownEditorStore.ts` | cells, dirty state, and load/save logic for the Markdown Editor panel |
 
 `RunnerStatus` union: `'idle' | 'running' | 'paused' | 'blocked' | 'error' | 'done' | 'aborted' | 'finalizing'`
 

@@ -1,5 +1,56 @@
 # Changelog
 
+## 2.16.2
+
+### Studio topbar / sidebar redesign
+
+- Replace the `Projects` text button and the topbar hamburger with a corner `PathlyLogo`
+  component that acts as a back-to-home button; the `☰` sidebar toggle is removed from
+  the topbar entirely.
+- Add `ProjectSelector` dropdown to the topbar — switch project, open-in-new-window per
+  row, open project folder. Replaces the old `TopicSelector` (feature/topic dropdown).
+- Move sidebar collapse/expand inside the sidebar itself via a `PanelLeft` button in
+  `TabBar` / `IconStrip`; uniform 28 px header height across all topbar items.
+- Rename the CLI Engines toggle icon from `Activity` → `Cpu`.
+
+### Studio CLI spawn scheduler — dual-cap gate + queue UI
+
+- `studio/src/main/ipc/terminal.ts` — process-wide concurrency caps: global ≤ 8,
+  headless ≤ 5, interactive ≤ 5 (all configurable at runtime via `update-caps` action).
+- Headless one-shots are **queued** (FIFO + priority) when the cap is reached; interactive
+  sessions are **rejected** with a toast instead of queuing.
+- `SpawnQueuePanel` (`components/CliMonitorBar/SpawnQueuePanel.tsx`) — queue management
+  UI: reorder (up/down), cancel, and live cap editing.
+- `SPAWN_DEBUG` flag in `terminal.ts` — `[spawn]` prefixed `console.log` lines trace
+  spawn lifecycle (reject reasons, PTY errors, exit codes, wall time).
+- Rate-limit backoff in the headless queue path.
+
+### Studio — Codex headless fix
+
+- `cliEngine.ts` now invokes `codex exec --skip-git-repo-check` for headless runs,
+  preventing "Not inside a trusted directory" rejections on arbitrary project paths.
+- `terminal.ts` pipes `$null` into the Codex PTY so `codex exec` does not stall waiting
+  for stdin when the prompt is passed as a CLI argument.
+
+### Python — process-wide DB write lock
+
+- `src/pathly_orchestrator/db/connection.py` replaces per-connection locks with a single
+  process-wide `threading.RLock` (`_global_write_lock`, returned by `_get_write_lock`).
+  Reentrant so nested write paths under the same lock do not deadlock.
+  WAL mode + `busy_timeout=5000` remain in place.
+
+### Python — prompt dash-safety
+
+- `src/pathly_orchestrator/adapters.py` — `_dash_safe_prompt` strips a leading `---`
+  block from composed/headless prompts before they reach the CLI (root cause: `claude -p`
+  treated a prompt starting with `--` as an unknown option and rejected it).
+- `src/pathly_orchestrator/skills/compose.py` — `_strip_leading_frontmatter` applied to
+  skill body and raw converted paths so assembled prompts never start with `---`.
+- `studio/src/renderer/src/services/cliEngine.ts` — `dashSafePrompt` applies the same
+  guard in `buildHeadlessArgv` on the Studio side.
+
+---
+
 ## 2.14.1 — 2026-06-12
 
 ### Antigravity adapter + Studio improvements

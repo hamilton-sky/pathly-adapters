@@ -75,12 +75,37 @@ Four adapters derive from `core/`:
 
 Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that supply host-specific metadata (model name, tool list, `can_spawn` flag, install destination). `pathly-setup <host> --apply` stitches `core/` content with `_meta/` and writes deployable files.
 
+## Skill composition
+
+`src/pathly_orchestrator/skills/compose.py` assembles stage skills from reusable fragments. One resolver serves both skill-delivery modes — runtime (runner builds the prompt in Python) and build-time (`pathly-setup` writes installed skills to disk).
+
+**Manifest:** `core/skills/composition.yaml` is the authoritative map. Keys are core-skills-relative paths without `.md` (e.g. `team/build`, `development/build`).
+
+**Composition contract:**
+
+```
+assembled = _strip_leading_frontmatter(skill body) + defaults fragments + per-skill fragments
+```
+
+- `defaults` applies to every skill listed in the `skills:` map (currently `progress-logging`).
+- A skill **absent** from `skills:` is returned **raw and unchanged** — no fragments, no defaults. Skills are converted incrementally; not all are in the map yet.
+- A fragment entry is a bare name (`feedback-protocol`) or a gated object (`{ name: spawn-rules, requires: can_spawn }`). Gated entries are dropped when the adapter's capability flag is false.
+- `blocks:` is an optional top-level key for named fragment lists (`full-build`, `lite-build`, `review-strict`) — callers resolve these via `compose_skill_with_block()`.
+
+**Skills currently in the manifest (converted):** `team/build`, `team/review`, `team/test`, `team/plan`, `team/design`, `team/retro`, `development/build`, `development/review`, `development/test`, `development/design`, `development/explore`, `development/debug`, `debug/build`, `debug/verify`, `fix/build`, `planning/plan`, `planning/evaluate`, `planning/retro`.
+
+**Dash-safety — `_strip_leading_frontmatter`:** several skill bodies begin with `---` (empty/doubled horizontal rule, or real YAML frontmatter). A prompt delivered via `claude -p <prompt>` is parsed as a CLI argument; an argument starting with `--` is rejected as an unknown option (`error: unknown option '---...'`). `_strip_leading_frontmatter` removes any leading `--- … ---` block before the skill body is used in a composed prompt. Two mirror implementations enforce this:
+- Python: `src/pathly_orchestrator/skills/compose.py` — `_strip_leading_frontmatter` (called in `compose_skill`, `compose_skill_with_block`)
+- Python: `src/pathly_orchestrator/adapters.py` — `_dash_safe_prompt` in `resolve_command` (covers raw/absent skills and any other prompt source)
+- TypeScript: `studio/src/renderer/src/services/cliEngine.ts` — `dashSafePrompt` in `buildHeadlessArgv`
+
 ## FSM response contract
 
 `/next_action` returns `agent_hint` as the primary routing contract for all adapters:
 - `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)
 - `agent_hint.instructions` — full prompt for the next agent
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
+- `preferred_adapter` — per-stage adapter from the flow's `adapter_map` (passive relay; FSM never launches processes)
 - `codex_subagent` — **frozen legacy field**; present for backward compat only — new adapters must read `agent_hint`, not `codex_subagent`
 
 ## Canonical `adapter_map` shape

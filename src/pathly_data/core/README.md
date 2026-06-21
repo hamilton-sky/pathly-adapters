@@ -17,15 +17,16 @@ test, or execute Pathly in their own top-level folders.
 src/pathly_data/
   core/
     agents/       agent role contracts (building/, planning/, quality/, research/, support/, director.md)
-    skills/       skill markdown (flow/, development/, planning/, team/, utilities/, fragments/)
+    skills/       skill markdown (controls/, development/, planning/, team/, utilities/,
+                                  fix/, fix-hutk/, custom/, debug/, hello/, planning-hello/, fragments/)
     templates/    plan file templates (plan/, pipeline-walkthrough/)
-    flows/        flow YAML files (team, debug, explore, test, quick-fix)
+    flows/        flow YAML files (team, team-build, debug, explore, test, quick-fix, consultation)
     design/       UI/UX design subsystem (data/CSVs, scripts/, cli.py)
   adapters/
     claude/       _meta/ YAMLs + .claude-plugin/
     codex/        _meta/ YAMLs
     copilot/      _meta/ YAMLs
-    antigravity/  _meta/ YAMLs (experimental)
+    antigravity/  _meta/ YAMLs
 ```
 
-Current adapters: `claude` (→ ~/.claude/), `codex` (→ ~/.codex/), `copilot` (→ ~/.vscode/extensions/pathly/).
+Current adapters: `claude` (→ ~/.claude/), `codex` (→ ~/.codex/), `copilot` (→ ~/.vscode/extensions/pathly/), `antigravity` (→ ~/.gemini/antigravity-cli/).

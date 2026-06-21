@@ -121,6 +121,11 @@ Each monolithic file has been decomposed into a sub-package:
 pathly_orchestrator/
   db/                      # SQLite connection, migrations, per-entity query helpers
     connection.py          # get_db(), _get_write_lock(), connection cache
+                           # DB concurrency: one process-wide threading.RLock (_global_write_lock,
+                           # reentrant) is returned by _get_write_lock(conn). Every writer wraps
+                           # its execute+commit in `with _get_write_lock(conn):`. WAL mode +
+                           # busy_timeout=5000 handle cross-process contention; the RLock handles
+                           # cross-thread contention within the server process.
     migrations.py          # _run_migrations(), CREATE TABLE SQL
     queries/
       fsm_events.py        # append_event, read_events, read_last_agent_done
@@ -145,6 +150,19 @@ pathly_orchestrator/
     interactions.py        # _await_agent_question
     orchestrator.py        # _loop, _resolve_stage_supervised
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
+    goal_run.py            # Board→Goals→Task-DAG executor dispatcher (Phase 1):
+                           #   start_goal_run(goal_id, executor_override=…) reads the goal's
+                           #   `executor` field and routes to one of three strategies:
+                           #   single → one agent drains the whole DAG (start_board_run + drain-dag skill)
+                           #   loop   → supervisor owns the frontier via scheduler_loop (SerialIsolation)
+                           #   team   → runs an FSM flow (default 'team-build') via start_run
+                           #   Also: start_goal_decompose() bridges an analyzed goal into a DAG
+                           #   (mode='planner' or mode='consultation').
+    scheduler.py           # DAG frontier loop (scheduler_loop): event-driven, blocks on completion_q;
+                           #   at most one worker per lane (LaneIsolation); goal_id= scopes the
+                           #   frontier to a single goal's tasks. Used by goal_run._run_loop.
+    board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
+    board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
     app.py                 # Flask app factory, blueprint registration, main()
     middleware.py          # _log_request, _log_response, rate limiting, metrics
@@ -196,6 +214,23 @@ pathly-ff      # fast-forward current feature state one step
 pathly-back    # roll back current feature state one step
 pathly-status  # show all active features and their current FSM state
 ```
+
+## Prompt dash-safety
+
+Headless prompts are sanitized before being passed to the CLI to ensure they never
+start with `-` — which would be parsed as an unknown option (root cause: `claude -p
+'---...'` errors with "unknown option '---'").
+
+Two sanitization sites:
+
+| Site | Function | Trigger |
+|---|---|---|
+| `adapters.py` `resolve_command` | `_dash_safe_prompt(prompt)` | every headless argv build |
+| `skills/compose.py` `convert_to_headless` | `_strip_leading_frontmatter(text)` | composed/skill path |
+
+`_dash_safe_prompt` (in `adapters.py`): strips a leading YAML-frontmatter block (`---…---`)
+and then any remaining leading horizontal-rule lines, so the sanitized prompt is guaranteed
+not to start with `-` regardless of source.
 
 ## Result split — stdout vs EVENTS.jsonl
 

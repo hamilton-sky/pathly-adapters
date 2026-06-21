@@ -105,7 +105,7 @@ POST http://127.0.0.1:8765/runner/terminal/started   ← PTY started confirmatio
 
 **Authentication:** All `POST` routes require the `X-Pathly-Secret` header. The secret is a 64-char hex token auto-generated on first run and stored at `~/.pathly/server_secret.txt`. Studio reads and injects it automatically. `GET /events/*` endpoints are exempt (EventSource API cannot send custom headers). See [docs/SECURITY.md](docs/SECURITY.md#fsm-server-authentication).
 
-**State storage:** The FSM uses SQLite (WAL mode) at `~/.pathly/pathly.db`. Each Flask thread gets its own connection via `threading.local()` — no locking required. Flow definitions are stored in the `flow_definitions` table and refreshed from disk YAML on every server start.
+**State storage:** The FSM uses SQLite (WAL mode) at `~/.pathly/pathly.db`. Each Flask thread gets its own connection via `threading.local()`. A single process-wide `threading.RLock` (`_global_write_lock`, reentrant) serializes all in-process writers — SQLite WAL + `busy_timeout=5000` handle cross-process contention. Flow definitions are stored in the `flow_definitions` table and refreshed from disk YAML on every server start.
 
 Start it manually if needed:
 ```bash
@@ -127,7 +127,7 @@ driving Pathly workflows:
 - **Conductor**: chat-driven workflow control with Claude, Codex, and shell targets.
 - **Terminal**: full bottom terminal plus chat mini-terminal cards that share the
   same xterm/PTY tab through `xtermRegistry`.
-- **HQ / Runner**: visual pipeline control panel — Start, Pause, Resume, Advance, Reroute, Abort. Each pipeline stage spawns a visible terminal tab with the agent running non-interactively; you can watch the output in real time. Skills are injected via argv at spawn time — no disk-installed skill files required for automated runs. When a stage completes, `cost_usd` and `session_id` are read from `--output-format=json` stdout; the semantic result text is read from the last `AGENT_DONE` event in `EVENTS.jsonl` — which is never subject to PTY output truncation.
+- **HQ / Runner**: visual pipeline control panel — Start, Pause, Resume, Advance, Reroute, Abort. Each pipeline stage spawns a visible terminal tab with the agent running non-interactively; you can watch the output in real time. Skills are injected via argv at spawn time — no disk-installed skill files required for automated runs. When a stage completes, `cost_usd` and `session_id` are read from `--output-format=json` stdout; the semantic result text is read from the last `AGENT_DONE` event in `EVENTS.jsonl` — which is never subject to PTY output truncation. A CLI-engine spawn scheduler (dual-cap gate in `terminal.ts`) bounds concurrent engines: global ≤ 8, headless one-shots ≤ 5 (queued FIFO with priority), interactive sessions ≤ 5 (rejected over cap). Queue management UI lives in `SpawnQueuePanel`.
 
 Studio terminal behavior is intentionally shared, not duplicated: the mini card
 and full terminal reparent one xterm instance per `tabId`. The chat card can be
@@ -190,7 +190,7 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Current version: **2.14.1**. Four adapters ship: Claude Code, Codex, Copilot,
+Current version: **2.16.2**. Four adapters ship: Claude Code, Codex, Copilot,
 and Antigravity. Core install path (`--dry-run`, `--apply`, `--uninstall`) is
 verified with full rollback on failure. Copilot destination paths follow the VS
 Code Copilot agent spec and may require `--repair` after a VS Code update.
