@@ -29,14 +29,29 @@ export interface SpawnOpts {
 }
 
 /**
+ * Strip a leading YAML-frontmatter / '---' block so a prompt can never start with
+ * '--'. For claude the prompt is a bare positional after -p, and an argument
+ * starting with '--' is parsed as an unknown option ("error: unknown option '---...'").
+ * Mirrors the Python _dash_safe_prompt in src/pathly_orchestrator/adapters.py.
+ */
+export function dashSafePrompt(prompt: string): string {
+  let s = prompt.replace(/^\s+/, '')
+  const m = s.match(/^---[ \t]*\n[\s\S]*?\n---[ \t]*\n/)
+  if (m) s = s.slice(m[0].length).replace(/^\s+/, '')
+  s = s.replace(/^(?:-{3,}[ \t]*\n\s*)+/, '')
+  return s
+}
+
+/**
  * Build argv for a headless one-shot CLI run (notebook AI actions, editor actions, board runs).
  * Mirrors core/adapters.yaml headless + autonomy_flag — keep shapes in sync.
  *
  * Key invariant for Codex: prompt always follows '--' so leading '---' YAML frontmatter
  * is never parsed as a CLI flag.
  */
-export function buildHeadlessArgv(adapter: CliAdapter, prompt: string, opts: SpawnOpts = {}): string[] {
+export function buildHeadlessArgv(adapter: CliAdapter, promptRaw: string, opts: SpawnOpts = {}): string[] {
   const { model, session, autonomy = true } = opts
+  const prompt = dashSafePrompt(promptRaw)
 
   if (adapter === 'claude') {
     const argv = ['claude', '-p', prompt, '--print']
