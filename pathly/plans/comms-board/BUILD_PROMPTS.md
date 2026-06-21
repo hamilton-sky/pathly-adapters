@@ -23,6 +23,35 @@ commits but does **not** push without an explicit request.
 
 ---
 
+## ⚠ Validation note — revalidated against `master` on 2026-06-21
+
+The spec was authored against `shammai/cli-controls` (2026-06-18). **Phase 0b + P1 landed
+since**, so before pasting any phase below, know:
+
+1. **All `file:line` refs are approximate, not exact.** The comms blueprint grew ~50 lines
+   (`goals/run`, `goals/decompose`). **Locate every edit site by symbol / route name, never by
+   line number.** Structural anchors are all verified present on master:
+   additive-migration list still ends at `executor` (`db/migrations.py:380`) ·
+   `comms_artifacts` CREATE (`:252`) · `insert_artifact` (`db/queries/comms.py:318`,
+   idempotent per `(message_id,path)`) · artifact-post branch (`blueprints/comms.py` ~`:246-267`) ·
+   `/comms/attach` (`:655`) · `/comms/artifacts` GET (`:756`) · `embed_async`
+   (`runner/embeddings.py:46`) · `retrieve_board_context` / `board_context_for`
+   (`runner/comms_context.py:95` / `:296`). The F12 "greenfield" precondition still holds
+   (no `context_refs` / `section` / `anchor` anywhere).
+
+2. **`plan.md` Step 6 materially changed — merge, don't replace.** Phase 0b rewrote Step 6 to
+   post a `type='goal'` first and stamp `goal_id` on each task. Phase 2's plan.md edits must
+   **merge** advisory-artifact posting + `context_refs` into that existing goal-first block; the
+   pre-0b Step 6 the spec snapshots no longer exists.
+
+3. **Validate-at-write splits across Phase 2 and Phase 3.** §2.4's resolution gate calls
+   `get_section`, which does not exist until Phase 3. So **Phase 2 implements the `context_refs`
+   *shape* guard only**; the **resolve-and-relax-unresolved-anchors gate lands in Phase 3**, after
+   `get_section`. This is consistent with §2.4's "best-effort — on resolver error keep the ref
+   as-authored," which Phase 2 satisfies by simply storing refs as-derived.
+
+---
+
 ## Phase 1 — heading convention (no code, lowest risk)
 
 ```
@@ -52,12 +81,16 @@ Continue: Phase 2 of pathly/plans/comms-board/DESIGN_SPEC-context-retrieval.md
 (re-read §2, §6 rows 1/2a/6a/7, §10 Q1+Q3 if not in context). Additive; does not touch the
 P1 dispatcher.
 
-- db/migrations.py — add comms_messages.context_refs TEXT (additive, mirrors goal_id/executor).
+- db/migrations.py — add comms_messages.context_refs TEXT (additive, mirrors goal_id/executor;
+  append after the executor tuple at the end of _add_additive_migrations).
 - db/queries/comms.py — post_message gains a context_refs kwarg (JSON, like depends_on).
-- http_server/blueprints/comms.py — /comms/post accepts + validates context_refs (§2.4).
-- core/skills/planning/plan.md Step 6 — (a) post each advisory file as a type="artifact"
-  message, capturing message_id [Q3=(b)]; (b) emit context_refs per phase task:
-  {artifact, anchor:"phase-N"} for EDGE_CASES/HAPPY_FLOW, ARCH optional (whole-file
+- http_server/blueprints/comms.py — /comms/post accepts context_refs with the SHAPE guard ONLY
+  (list of {artifact:str, anchor?:str|null}). The §2.4 resolve-against-index gate is Phase 3
+  (it needs get_section); for now store refs as-derived (that IS §2.4's best-effort fallback).
+- core/skills/planning/plan.md Step 6 — MERGE into the existing Phase-0b goal-first block (it
+  already posts a type="goal" + stamps goal_id; do NOT replace it). (a) post each advisory file
+  as a type="artifact" message, capturing message_id [Q3=(b)]; (b) emit context_refs per phase
+  task: {artifact, anchor:"phase-N"} for EDGE_CASES/HAPPY_FLOW, ARCH optional (whole-file
   anchor:null for short proposals) [Q1]. Keep the idempotency + fail-silent guards.
 
 Verify: python -m pytest tests/ -q. Propagate: pathly-setup claude --apply --repair ;
@@ -80,7 +113,10 @@ Continue: Phase 3 of pathly/plans/comms-board/DESIGN_SPEC-context-retrieval.md
   index_artifact_async; never raises.
 - http_server/blueprints/comms.py — GET /comms/artifacts/<id>/section + path form (§4, with
   path-traversal guard); fire index_artifact_async on type="artifact" post; board/scope
-  listing form on GET /comms/artifacts (§5a.4).
+  listing form on GET /comms/artifacts (§5a.4). ALSO land here (deferred from Phase 2): the
+  §2.4 validate-at-write resolution gate on /comms/post — now that get_section exists, resolve
+  each {artifact, anchor}; relax unresolved → whole-file (anchor:null) + board-nudge warning;
+  best-effort — a resolver error keeps the ref as-authored (never fail the task post).
 - runner/comms_context.py — optional task_id param; hydrate context_refs → emit "### 📎
   Referenced context" between Governance and Context; default None ⇒ byte-identical to today.
 - core/skills/development/drain-dag.md + the reviewer skill — add the per-ref /section hydrate step.
