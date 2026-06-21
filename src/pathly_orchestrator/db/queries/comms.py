@@ -132,15 +132,19 @@ def search_by_embedding(
         import struct
 
         embedding_bytes = struct.pack(f"{len(embedding)}f", *embedding)
+        # Expose the cosine distance as `_distance` so callers can apply a relevance
+        # threshold (the alias is referenced by ORDER BY). Keyword/recency rows carry
+        # no `_distance` key → callers treat that as "no semantic score".
         sql = (
-            "SELECT m.* FROM comms_messages m "  # nosec B608
+            "SELECT m.*, vec_distance_cosine(e.embedding, ?) AS _distance "  # nosec B608
+            "FROM comms_messages m "
             "JOIN comms_embeddings e ON e.message_id = m.id "
             f"WHERE m.board IN ({board_ph}) AND m.scope IN ({scope_ph}) "
             "AND m.deleted_at IS NULL "
-            "ORDER BY vec_distance_cosine(e.embedding, ?) ASC "
+            "ORDER BY _distance ASC "
             "LIMIT ?"
         )
-        params: list[Any] = list(boards) + list(scopes) + [embedding_bytes, k]
+        params: list[Any] = [embedding_bytes] + list(boards) + list(scopes) + [k]
         rows = conn.execute(sql, params).fetchall()
     else:
         board_ph = ",".join("?" * len(boards))
@@ -227,7 +231,16 @@ def search_by_hybrid(
         key=lambda x: 1.0 / (_RRF_K + x["bm25"]) + 1.0 / (_RRF_K + x["sem"]),
         reverse=True,
     )
-    return [r["row"] for r in ranked[:k]]
+    # Carry the raw cosine distance through so a caller can threshold weak semantic
+    # hits (RRF fuses ranks, not scores, so the raw distance must ride along).
+    sem_dist = {row["id"]: row.get("_distance") for row in sem_rows}
+    out: list[dict] = []
+    for r in ranked[:k]:
+        row = dict(r["row"])
+        if row.get("id") in sem_dist:
+            row["_distance"] = sem_dist[row["id"]]
+        out.append(row)
+    return out
 
 
 def get_pending_decisions(

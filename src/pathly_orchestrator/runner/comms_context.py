@@ -92,6 +92,17 @@ def _format_question(msg: dict) -> str:
     return line
 
 
+# 💡 Context channel relevance gate (Phase: memory consolidation).
+# _SEMANTIC_MAX_DISTANCE is a cosine DISTANCE cutoff (sqlite-vec vec_distance_cosine,
+# 0 = identical … ~1.0+ = unrelated for MiniLM-384). Semantic hits weaker than this are
+# dropped so marginal matches never fill the k slots on a small/early board. Conservative
+# by design — only the clearly-weak tail is cut; keyword/recency hits (no _distance) are
+# always kept. _CONTEXT_CHAR_BUDGET caps the rendered 💡 body so a long board can't bloat
+# the prompt. Both are tunable.
+_SEMANTIC_MAX_DISTANCE = 0.75
+_CONTEXT_CHAR_BUDGET = 2000
+
+
 def retrieve_board_context(
     topic: str,
     project_root: str,
@@ -231,6 +242,11 @@ def retrieve_board_context(
                 continue
             if not _is_context(row):
                 continue
+            # Relevance gate: drop weak SEMANTIC matches. Keyword/recency hits carry no
+            # _distance and are kept (they matched query terms, or are the fallback).
+            dist = row.get("_distance")
+            if dist is not None and dist > _SEMANTIC_MAX_DISTANCE:
+                continue
             seen_ids.add(row_id)
             context_msgs.append(row)
             kept += 1
@@ -355,6 +371,8 @@ def retrieve_board_context(
             "Semantic matches for this task. Inform but do not override governance above."
         )
         lines.append("")
+        used = 0
+        shown = 0
         for msg in context_msgs:
             from_agent = msg.get("from_agent", "?")
             to_agent = msg.get("to_agent", "*")
@@ -368,7 +386,15 @@ def retrieve_board_context(
                 parts.append(age)
             header = ", ".join(parts)
             text = msg.get("text", "")
-            lines.append(f"  • {text}  [{header}]")
+            entry = f"  • {text}  [{header}]"
+            # Token budget: stop once the channel body would exceed the cap, so a large
+            # board can't bloat the prompt (the k-cap bounds count; this bounds size).
+            if used + len(entry) > _CONTEXT_CHAR_BUDGET and shown > 0:
+                lines.append(f"  • … ({len(context_msgs) - shown} more match(es) omitted — budget)")
+                break
+            lines.append(entry)
+            used += len(entry)
+            shown += 1
 
     return "\n".join(lines) + "\n"
 
