@@ -464,6 +464,20 @@ export async function apiStopBoard(board: string, scope: string): Promise<boolea
   }
 }
 
+/** Stop the executor running for a goal (single, loop, or team). */
+export async function apiStopGoal(goalId: string): Promise<boolean> {
+  try {
+    const r = await apiFetch('/comms/goals/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal_id: goalId }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 // ── Board-scoped flow run (footer launcher → /runner/start) ──────────
 
 export interface StartFlowOpts {

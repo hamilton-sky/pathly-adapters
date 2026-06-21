@@ -1541,6 +1541,107 @@ def comms_goals_run():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/goals/stop", methods=["POST"])
+def comms_goals_stop():
+    """Stop the executor running for a goal (single, loop, or team).
+
+    Required body: {goal_id} (non-empty string). Looks up the goal's (board, scope),
+    then dispatches to the right stop mechanism: if the board lock is held the PTY is
+    killed and the lock released (covers single + loop); otherwise an FSM abort is
+    attempted for the scope (covers team). Posts a status message and broadcasts a
+    goal_run/stopped event so the UI updates live. Idempotent: stopped=false when
+    nothing is running.
+    """
+    try:
+        from pathly_orchestrator.supervisor import board_lock, get_run
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+
+        data = request.get_json() or {}
+        goal_id = data.get("goal_id", "")
+        if not isinstance(goal_id, str) or not goal_id.strip():
+            return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT board, scope, type FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            (goal_id,),
+        ).fetchone()
+        if row is None:
+            return jsonify({"ok": False, "reason": "not_found"}), 404
+        if row["type"] != "goal":
+            return jsonify({"ok": False, "reason": "not_goal"}), 400
+
+        board = row["board"] or "feature"
+        scope = row["scope"] or ""
+
+        stopped = False
+        how = None
+        run_id = None
+
+        # --- board-lock path (covers single + loop executors) ---
+        run_id = board_lock.holder(board, scope)
+        if run_id:
+            tab_id = f"runner-{run_id[-10:]}"
+            try:
+                _broadcast_runner(
+                    scope, {"type": "TERMINAL_KILL", "tab_id": tab_id, "run_id": run_id}
+                )
+            except Exception:
+                pass
+            try:
+                run = get_run(run_id)
+                if run is not None:
+                    run.mark_pty_result(
+                        {"exit_code": 0, "result": {"result": "stopped by user"}}
+                    )
+            except Exception:
+                pass
+            board_lock.release(board, scope, run_id)
+            stopped = True
+            how = "board_run"
+        else:
+            # --- FSM path (covers team executor) ---
+            from pathly_orchestrator.supervisor.registry import get_state
+            st = get_state(scope)
+            if st is not None and st.status in ("running", "paused", "awaiting_decision"):
+                from pathly_orchestrator.supervisor.api import abort_run
+                abort_run(scope)
+                stopped = True
+                how = "fsm"
+
+        if stopped:
+            try:
+                mid = _post_message(
+                    conn,
+                    board=board,
+                    scope=scope,
+                    from_agent="system",
+                    type="status",
+                    text="⏹ goal run stopped by user",
+                )
+                _broadcast_comms(
+                    scope,
+                    {
+                        "type": "COMMS_UPDATE",
+                        "event": "goal_run",
+                        "goal_id": goal_id,
+                        "message_id": mid,
+                        "board": board,
+                        "scope": scope,
+                        "phase": "stopped",
+                    },
+                )
+            except Exception:
+                pass
+            return jsonify({"ok": True, "stopped": True, "how": how, "run_id": run_id}), 200
+
+        return jsonify({"ok": True, "stopped": False, "reason": "not_running"}), 200
+    except Exception as exc:
+        logging.exception("comms_goals_stop error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/goals/decompose", methods=["POST"])
 def comms_goals_decompose():
     """Decompose a goal into a task DAG — the analyze→tasks bridge.

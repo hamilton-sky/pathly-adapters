@@ -21,6 +21,7 @@ import {
   apiRunBoard,
   apiStopBoard,
   apiRunGoal,
+  apiStopGoal,
   apiDecomposeGoal,
   type RunGoalOpts,
   type DecomposeMode,
@@ -480,7 +481,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   stopGoal: (goal_id) => {
     set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
-    // No dedicated stop endpoint for goals yet — optimistic clear only
+    apiStopGoal(goal_id).catch(() => undefined)
   },
 
   decomposeGoal: (goal_id, mode) => {
