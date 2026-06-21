@@ -18,6 +18,7 @@ Composition contract:
 
 from __future__ import annotations
 
+import re
 from importlib.resources import files
 from typing import Any
 
@@ -28,6 +29,22 @@ _KNOWN_CAPABILITIES = {"can_spawn"}
 
 # Adapters whose ``_meta`` capability flags we can derive caps from.
 _KNOWN_ADAPTERS = {"claude", "codex", "copilot", "antigravity"}
+
+# A composed prompt must NOT start with ``---``: it is delivered to the CLI via a
+# ``-p`` argv token, and an argument starting with ``--`` is parsed as an unknown
+# option (e.g. claude: ``error: unknown option '---...'``). Several skill bodies
+# begin with ``---\n\n---`` (empty/doubled rule) or real frontmatter (team/team).
+_LEADING_FRONTMATTER_RE = re.compile(r"^---[ \t]*\n.*?\n---[ \t]*\n", re.DOTALL)
+
+
+def _strip_leading_frontmatter(text: str) -> str:
+    """Drop a leading YAML-frontmatter / horizontal-rule block from a skill body."""
+    if not text.startswith("---"):
+        return text
+    m = _LEADING_FRONTMATTER_RE.match(text)
+    if not m:
+        return text
+    return text[m.end() :].lstrip("\n")
 
 
 # ── Resource helpers ────────────────────────────────────────────────────────────
@@ -176,7 +193,7 @@ def compose_skill_with_block(
     fragment_bodies = resolve_block(
         block_name, caps, user_blocks=user_blocks, manifest=manifest
     )
-    parts = [skill_body.rstrip()] + fragment_bodies
+    parts = [_strip_leading_frontmatter(skill_body).rstrip()] + fragment_bodies
     return "\n\n".join(parts) + "\n"
 
 
@@ -203,7 +220,7 @@ def compose_skill(
     spec = skills_map[skill] or {}
     entries = list(manifest.get("defaults") or []) + list(spec.get("fragments") or [])
 
-    parts = [raw.rstrip("\n")]
+    parts = [_strip_leading_frontmatter(raw).rstrip("\n")]
     for entry in entries:
         name, requires = _entry_parts(entry)
         if requires and not caps.get(requires):
