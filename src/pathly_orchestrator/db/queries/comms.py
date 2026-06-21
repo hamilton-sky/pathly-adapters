@@ -33,12 +33,15 @@ def post_message(
     artifact_type: str | None = None,
     goal_id: str | None = None,
     executor: str | None = None,
+    context_refs: list[dict] | None = None,
 ) -> str:
     """Insert a new message into comms_messages. Returns the new message_id.
 
     goal_id ties a task to its goal message; executor ('single'|'loop'|'team')
     is set on the goal message only. Both default to None so existing callers
     keep their behavior (the columns are harmlessly NULL).
+    context_refs is a JSON-encoded list of {artifact, anchor?} advisory links
+    (Phase 2 — shape guard only; resolve-against-index gate lands in Phase 3).
     """
     message_id = str(uuid.uuid4())
     # A task enters the DAG frontier as 'pending' so get_ready_tasks() (which
@@ -47,8 +50,8 @@ def post_message(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -68,6 +71,7 @@ def post_message(
                 artifact_type,
                 goal_id,
                 executor,
+                json.dumps(context_refs) if context_refs is not None else None,
             ),
         )
         conn.commit()

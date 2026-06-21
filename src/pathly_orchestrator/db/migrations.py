@@ -378,6 +378,9 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # set on the goal message. A goal is type='goal' (existing type column).
         ("comms_messages", "goal_id", "TEXT"),
         ("comms_messages", "executor", "TEXT"),
+        # comms-board context-retrieval: advisory artifact links carried on the task.
+        # Phase 2 — SHAPE guard only; resolve-against-index gate lands in Phase 3.
+        ("comms_messages", "context_refs", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

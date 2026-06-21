@@ -110,7 +110,7 @@ def comms_post():
 
     Required body fields: feature, from, type, text.
     Optional: scope (default 'feature'), to, options, reply_to, stage, conv,
-    depends_on, artifact_path, artifact_type, goal_id, executor.
+    depends_on, artifact_path, artifact_type, goal_id, executor, context_refs.
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
@@ -220,6 +220,19 @@ def comms_post():
             return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
         if executor is not None and not isinstance(executor, str):
             return jsonify({"error": "Field 'executor' must be a string or null"}), 400
+        # context_refs: advisory artifact manifest — list of {artifact:str, anchor?:str}.
+        # SHAPE guard only (spec §2.4); the resolve-against-index gate lands in Phase 3
+        # (it needs get_section, which does not exist until then).
+        context_refs = data.get("context_refs")
+        if context_refs is not None and (
+            not isinstance(context_refs, list)
+            or not all(
+                isinstance(r, dict) and isinstance(r.get("artifact"), str)
+                and (r.get("anchor") is None or isinstance(r.get("anchor"), str))
+                for r in context_refs
+            )
+        ):
+            return jsonify({"error": "Field 'context_refs' must be a list of {artifact:str, anchor?:str} objects or null"}), 400
         message_id = _post_message(
             conn,
             board=board,
@@ -237,6 +250,7 @@ def comms_post():
             artifact_type=artifact_type if isinstance(artifact_type, str) else None,
             goal_id=goal_id,
             executor=executor,
+            context_refs=context_refs,
         )
 
         # An artifact message also gets a comms_artifacts row (the metadata
