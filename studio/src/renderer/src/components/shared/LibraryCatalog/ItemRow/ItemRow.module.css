@@ -1,0 +1,127 @@
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
+  height: 32px;
+  position: relative;
+}
+.item:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+.itemClickable { cursor: pointer; }
+.itemGrabbable { cursor: grab; }
+
+.itemGrip {
+  color: var(--text-muted);
+  opacity: 0.35;
+  flex-shrink: 0;
+  margin-left: -4px;
+}
+.item:hover .itemGrip { opacity: 0.8; }
+
+.itemIcon {
+  display: inline-flex;
+  opacity: 0.85;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.itemName {
+  flex: 1;
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.item:hover .itemName { color: var(--text-primary); }
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.45;
+  transition: opacity 80ms, background 80ms, color 80ms;
+  padding: 0;
+}
+.item:hover .actionBtn { opacity: 1; }
+.actionBtn:hover {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* ── Context menu ── */
+.menuWrap { position: relative; }
+.menu {
+  position: absolute; top: calc(100% + 2px); right: 0;
+  z-index: 300; background: var(--bg-surface1);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5); padding: 3px; min-width: 140px;
+}
+.menuItem {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; text-align: left; background: none; border: none;
+  padding: 6px 9px; font-size: 12px; color: var(--text-secondary);
+  border-radius: 5px; cursor: pointer; font-family: var(--font-family-base);
+}
+.menuItem:hover { background: var(--bg-surface0); color: var(--text-primary); }
+.menuItemDanger { color: var(--red) !important; }
+.menuItemDanger:hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent) !important;
+  color: var(--red) !important;
+}
+.menuItemBack {
+  composes: menuItem;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 3px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding-bottom: 7px;
+}
+.menuItemDisabled {
+  composes: menuItem;
+  color: var(--text-muted);
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* ── Inline rename ── */
+.renameInput {
+  flex: 1;
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  padding: 1px 5px;
+  outline: none;
+  min-width: 0;
+}
+
+@keyframes moveFlash {
+  0%   { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  60%  { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  100% { background: transparent; }
+}
+.itemMoveFlash { animation: moveFlash 500ms ease-out forwards; }

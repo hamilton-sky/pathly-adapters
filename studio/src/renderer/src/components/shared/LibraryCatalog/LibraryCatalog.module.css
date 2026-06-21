@@ -28,37 +28,14 @@
   justify-content: space-between;
 }
 
+.headerIcon { color: var(--accent); }
+
 .collapseBtn {
   background: none; border: none; cursor: pointer;
   color: var(--text-muted); padding: 2px 4px; border-radius: var(--radius-sm);
   display: inline-flex; align-items: center;
 }
 .collapseBtn:hover { color: var(--text-primary); background: var(--bg-surface1); }
-
-.menuWrap { position: relative; }
-.menu {
-  position: absolute; top: calc(100% + 2px); right: 0;
-  z-index: 300; background: var(--bg-surface1);
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5); padding: 3px; min-width: 140px;
-}
-.menuItem {
-  display: flex; align-items: center; gap: 7px;
-  width: 100%; text-align: left; background: none; border: none;
-  padding: 6px 9px; font-size: 12px; color: var(--text-secondary);
-  border-radius: 5px; cursor: pointer; font-family: var(--font-family-base);
-}
-.menuItem:hover { background: var(--bg-surface0); color: var(--text-primary); }
-
-.menuItemDanger { color: var(--red) !important; }
-.menuItemDanger:hover {
-  background: color-mix(in srgb, var(--red) 12%, transparent) !important;
-  color: var(--red) !important;
-}
-
-.headerIcon {
-  color: var(--accent);
-}
 
 .searchRow {
   display: flex;
@@ -82,116 +59,12 @@
   padding: 6px 0;
   font-family: var(--font-family-base);
 }
-
-.searchInput::placeholder {
-  color: var(--text-muted);
-}
+.searchInput::placeholder { color: var(--text-muted); }
 
 .list {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 8px;
-}
-
-.groupLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 8px 10px 7px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-family: var(--font-family-base);
-}
-.groupLabel:hover { color: var(--text-secondary); }
-
-.item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px 6px 14px;
-  cursor: grab;
-  height: 32px;
-  position: relative;
-}
-
-.item:hover {
-  background: var(--bg-surface0);
-  color: var(--text-primary);
-}
-
-.itemGrip {
-  color: var(--text-muted);
-  opacity: 0.35;
-  flex-shrink: 0;
-  margin-left: -4px;
-}
-
-.item:hover .itemGrip {
-  opacity: 0.8;
-}
-
-.itemIcon {
-  display: inline-flex;
-  opacity: 0.85;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-.itemName {
-  flex: 1;
-  font-family: var(--font-family-mono);
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.item:hover .itemName {
-  color: var(--text-primary);
-}
-
-/* Two always-visible action icon buttons */
-.itemActions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.actionBtn {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  opacity: 0.45;
-  transition: opacity 80ms, background 80ms, color 80ms;
-  padding: 0;
-}
-
-.item:hover .actionBtn {
-  opacity: 1;
-}
-
-.actionBtn:hover {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
-  opacity: 1;
 }
 
 .empty {
@@ -200,163 +73,83 @@
   color: var(--text-muted);
 }
 
-
-.groupCount {
-  margin-left: auto;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-muted);
-  opacity: 0.7;
-  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
-  padding: 1px 5px;
-  border-radius: 10px;
-}
-
-/* ── CHEVRON ── */
-.chevron {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  opacity: 0.5;
-  transition: transform 0.15s;
-}
-.chevronOpen {
-  transform: rotate(90deg);
-}
-
-/* ── SUB-GROUP ── */
-.subGroup {
-  margin-left: 10px;
-  border-left: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
-}
-
-.subGroupLabel {
+/* ── NEW CATEGORY FORM (bottom of list) ── */
+.newCatForm {
   display: flex;
   align-items: center;
-  gap: 5px;
-  width: 100%;
-  text-align: left;
+  gap: 4px;
+  margin: 8px 12px 6px;
+}
+.newCatSelect {
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 11px;
+  padding: 4px 6px;
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.newCatInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+}
+.newCatConfirm {
+  flex-shrink: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #000;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  white-space: nowrap;
+}
+.newCatConfirm:hover:not(:disabled) { opacity: 0.88; }
+.newCatCancelBtn {
+  flex-shrink: 0;
   background: none;
   border: none;
-  padding: 6px 8px 6px 6px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+.newCatCancelBtn:hover { color: var(--text-primary); }
+
+.newCat {
+  margin: 10px 12px 6px;
+  width: calc(100% - 24px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px dashed var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  background: transparent;
   cursor: pointer;
   font-family: var(--font-family-base);
 }
-.subGroupLabel:hover { color: var(--text-secondary); }
+.newCat:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
-.subGroupName {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.subGroupCount {
-  font-size: 9.5px;
-  font-weight: 500;
-  color: var(--text-muted);
-  opacity: 0.6;
-  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
-  padding: 1px 4px;
-  border-radius: 8px;
-}
-
-/* ── CURSOR VARIANTS (replace inline styles) ── */
-.itemClickable { cursor: pointer; }
-.itemGrabbable { cursor: grab; }
-
-/* ── GROUP HEADER with ··· menu ── */
-.groupHeader {
-  display: flex;
-  align-items: center;
-}
-
-/* hairline separator between adjacent top-level groups */
-.list > div + div > .groupHeader {
-  margin-top: 2px;
-  border-top: 1px solid color-mix(in srgb, var(--text-muted) 8%, transparent);
-  padding-top: 2px;
-}
-.groupLabel {
-  flex: 1;
-}
-.groupMenuBtn {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  opacity: 0;
-  border-radius: var(--radius-sm);
-  transition: opacity 80ms, background 80ms;
-  flex-shrink: 0;
-  margin-right: 4px;
-}
-.groupHeader:hover .groupMenuBtn {
-  opacity: 0.7;
-}
-.groupMenuBtn:hover {
-  opacity: 1 !important;
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
-}
-
-/* ── SUB-GROUP HEADER with delete button ── */
-.subGroupHeader {
-  display: flex;
-  align-items: center;
-}
-.subGroupLabel {
-  flex: 1;
-}
-.subGroupDeleteBtn {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  opacity: 0;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-  margin-right: 4px;
-  transition: opacity 80ms, color 80ms;
-}
-.subGroupHeader:hover .subGroupDeleteBtn {
-  opacity: 0.6;
-}
-.subGroupDeleteBtn:hover {
-  opacity: 1 !important;
-  color: var(--red);
-}
-
-/* ── DELETE BUTTON on item ── */
-.deleteBtn {
-  opacity: 0 !important;
-  transition: opacity 80ms, color 80ms !important;
-}
-.item:hover .deleteBtn {
-  opacity: 0.5 !important;
-}
-.deleteBtn:hover {
-  opacity: 1 !important;
-  color: var(--red) !important;
-  background: color-mix(in srgb, var(--red) 12%, transparent) !important;
-}
-
-/* ── CONFIRM MODAL ── */
+/* ── CONFIRM / ERROR / INFO MODALS ── */
 .confirmOverlay {
   position: absolute;
   inset: 0;
@@ -414,152 +207,3 @@
   font-family: var(--font-family-base);
 }
 .confirmDelete:hover { background: color-mix(in srgb, var(--red) 30%, transparent); }
-
-/* ── NEW CATEGORY FORM ── */
-.newCatForm {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 8px 12px 6px;
-}
-.newCatInput {
-  flex: 1;
-  min-width: 0;
-  background: var(--bg-base);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font-family-base);
-  font-size: 12px;
-  padding: 4px 8px;
-  outline: none;
-}
-.newCatConfirm {
-  flex-shrink: 0;
-  background: var(--accent);
-  border: none;
-  border-radius: var(--radius-sm);
-  color: #000;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  cursor: pointer;
-  font-family: var(--font-family-base);
-  white-space: nowrap;
-}
-
-.newCatConfirm:hover:not(:disabled) {
-  opacity: 0.88;
-}
-.newCatCancelBtn {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: var(--radius-sm);
-}
-.newCatCancelBtn:hover { color: var(--text-primary); }
-
-/* ── TYPE SELECTOR in new-category form ── */
-.newCatSelect {
-  background: var(--bg-base);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font-family-base);
-  font-size: 11px;
-  padding: 4px 6px;
-  outline: none;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-/* ── NEW CATEGORY button (bottom of list) ── */
-.newCat {
-  margin: 10px 12px 6px;
-  width: calc(100% - 24px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-  border: 1.5px dashed var(--accent-border);
-  border-radius: var(--radius-md);
-  padding: 8px;
-  background: transparent;
-  cursor: pointer;
-  font-family: var(--font-family-base);
-}
-.newCat:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-
-/* ── SUB-GROUP HEADER ··· menu btn ── */
-.subGroupMenuBtn {
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  opacity: 0;
-  border-radius: var(--radius-sm);
-  transition: opacity 80ms, background 80ms;
-  flex-shrink: 0;
-  margin-right: 4px;
-}
-.subGroupHeader:hover .subGroupMenuBtn {
-  opacity: 0.6;
-}
-.subGroupMenuBtn:hover {
-  opacity: 1 !important;
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
-}
-
-/* ── INLINE RENAME INPUT ── */
-.renameInput {
-  flex: 1;
-  background: var(--bg-base);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font-family-mono);
-  font-size: 12.5px;
-  padding: 1px 5px;
-  outline: none;
-  min-width: 0;
-}
-
-/* ── MOVE-TO-CATEGORY picker ── */
-.menuItemBack {
-  composes: menuItem;
-  color: var(--accent);
-  font-weight: 600;
-  margin-bottom: 3px;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-  padding-bottom: 7px;
-}
-
-.menuItemDisabled {
-  composes: menuItem;
-  color: var(--text-muted);
-  cursor: default;
-  pointer-events: none;
-  opacity: 0.5;
-}
-
-@keyframes moveFlash {
-  0%   { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-  60%  { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-  100% { background: transparent; }
-}
-.itemMoveFlash {
-  animation: moveFlash 500ms ease-out forwards;
-}

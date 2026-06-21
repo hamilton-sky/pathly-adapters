@@ -1,0 +1,155 @@
+.subGroup {
+  margin-left: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
+}
+
+.subGroupHeader { display: flex; align-items: center; }
+
+.subGroupLabel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 6px 8px 6px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+}
+.subGroupLabel:hover { color: var(--text-secondary); }
+
+.subGroupName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subGroupCount {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.6;
+  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+  padding: 1px 4px;
+  border-radius: 8px;
+}
+
+.subGroupMenuBtn {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0;
+  border-radius: var(--radius-sm);
+  transition: opacity 80ms, background 80ms;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.subGroupHeader:hover .subGroupMenuBtn { opacity: 0.6; }
+.subGroupMenuBtn:hover {
+  opacity: 1 !important;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.5;
+  transition: transform 0.15s;
+}
+.chevronOpen { transform: rotate(90deg); }
+
+/* ── Context menu ── */
+.menuWrap { position: relative; }
+.menu {
+  position: absolute; top: calc(100% + 2px); right: 0;
+  z-index: 300; background: var(--bg-surface1);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5); padding: 3px; min-width: 140px;
+}
+.menuItem {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; text-align: left; background: none; border: none;
+  padding: 6px 9px; font-size: 12px; color: var(--text-secondary);
+  border-radius: 5px; cursor: pointer; font-family: var(--font-family-base);
+}
+.menuItem:hover { background: var(--bg-surface0); color: var(--text-primary); }
+.menuItemDanger { color: var(--red) !important; }
+.menuItemDanger:hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent) !important;
+  color: var(--red) !important;
+}
+
+/* ── Inline rename ── */
+.renameInput {
+  flex: 1;
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  padding: 1px 5px;
+  outline: none;
+  min-width: 0;
+}
+
+/* ── Subcategory create form ── */
+.newCatForm {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 12px 6px;
+}
+.newCatInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+}
+.newCatConfirm {
+  flex-shrink: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #000;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  white-space: nowrap;
+}
+.newCatConfirm:hover:not(:disabled) { opacity: 0.88; }
+.newCatCancelBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+.newCatCancelBtn:hover { color: var(--text-primary); }

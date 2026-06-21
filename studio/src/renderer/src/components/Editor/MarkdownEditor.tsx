@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
+import styles from './MarkdownEditor.module.css'
 import { keymap } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorState, Prec } from '@codemirror/state'
@@ -230,6 +231,6 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       }
     }, [value])
 
-    return <div ref={containerRef} style={{ height: '100%', overflow: 'auto' }} />
+    return <div ref={containerRef} className={styles.container} />
   }
 )

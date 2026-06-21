@@ -1,0 +1,80 @@
+.wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.errorBanner {
+  background: var(--red-bg);
+  border-bottom: 1px solid var(--red-border);
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+.errorBanner[data-variant='warning'] {
+  background: rgba(234, 179, 8, 0.12);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.4);
+}
+
+.errorText {
+  color: var(--red);
+  font-size: 12px;
+  font-family: var(--font-family-mono);
+}
+.errorBanner[data-variant='warning'] .errorText {
+  color: #ca8a04;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--bg-surface0);
+  flex-shrink: 0;
+}
+
+.tab {
+  background: none;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.tab[data-active='true'] {
+  background: var(--bg-surface0);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.saveBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--bg-base);
+  cursor: pointer;
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+}
+.saveBtn:disabled {
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--bg-surface1);
+  margin: 0 6px;
+  align-self: center;
+}
+
+.editor {
+  flex: 1;
+  overflow: auto;
+}

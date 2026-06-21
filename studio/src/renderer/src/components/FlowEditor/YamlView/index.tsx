@@ -6,8 +6,8 @@ import * as jsYaml from 'js-yaml'
 import { useTheme } from '../../../useTheme'
 import type { FlowYaml } from '../../../types'
 import type { FlowValidationIssue } from '../utils/validateFlow'
-import { makeYamlViewStyles } from './YamlView.styles'
 import { Tooltip } from '../../ui'
+import css from './YamlView.module.css'
 
 interface Props {
   initialContent: string
@@ -23,7 +23,6 @@ interface Props {
 
 export function YamlView({ initialContent, onParsed, onParseError, onDirty, onSave, syncContent, validationIssues, tab, onTabClick }: Props): JSX.Element {
   const t = useTheme()
-  const styles = makeYamlViewStyles(t)
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -101,34 +100,35 @@ export function YamlView({ initialContent, onParsed, onParseError, onDirty, onSa
   }
 
   return (
-    <div style={styles.wrapper}>
+    <div className={css.wrapper}>
       {parseError && (
-        <div style={styles.errorBanner}>
-          <span style={styles.errorText}>YAML parse error: {parseError}</span>
+        <div className={css.errorBanner}>
+          <span className={css.errorText}>YAML parse error: {parseError}</span>
         </div>
       )}
       {saveWarning && !parseError && (
-        <div style={{ ...styles.errorBanner, background: 'rgba(234,179,8,0.12)', borderBottom: '1px solid rgba(234,179,8,0.4)' }}>
-          <span style={{ ...styles.errorText, color: '#ca8a04' }}>{saveWarning}</span>
+        <div className={css.errorBanner} data-variant="warning">
+          <span className={css.errorText}>{saveWarning}</span>
         </div>
       )}
-      <div style={styles.toolbar}>
+      <div className={css.toolbar}>
         <Tooltip label="Visual canvas editor" placement="bottom">
-          <button style={tab === 'visual' ? styles.tabActive : styles.tab} onClick={() => onTabClick('visual')}>Visual</button>
+          <button type="button" className={css.tab} {...(tab === 'visual' ? { 'data-active': 'true' } : {})} onClick={() => onTabClick('visual')}>Visual</button>
         </Tooltip>
         <Tooltip label="YAML source editor" placement="bottom">
-          <button style={tab === 'yaml' ? styles.tabActive : styles.tab} onClick={() => onTabClick('yaml')}>YAML</button>
+          <button type="button" className={css.tab} {...(tab === 'yaml' ? { 'data-active': 'true' } : {})} onClick={() => onTabClick('yaml')}>YAML</button>
         </Tooltip>
-        <div style={{ width: 1, height: 20, background: t.bgSurface1, margin: '0 6px', alignSelf: 'center' }} />
+        <div className={css.divider} />
         <button
-          style={parseError ? styles.saveBtnDisabled : styles.saveBtn}
+          type="button"
+          className={css.saveBtn}
           onClick={handleSave}
           disabled={!!parseError}
         >
           Save
         </button>
       </div>
-      <div ref={containerRef} style={styles.editor} />
+      <div ref={containerRef} className={css.editor} />
     </div>
   )
 }
