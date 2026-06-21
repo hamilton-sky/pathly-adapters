@@ -1,31 +1,32 @@
 """Provider-agnostic pricing registry and cost resolver."""
+
 from __future__ import annotations
 
 # Maps model-name prefixes to provider/adapter slugs.
 # Shared by pricing.py and blueprints/telemetry.py — single source of truth.
 _ADAPTER_PREFIXES: list[tuple[tuple[str, ...], str]] = [
-    (("claude-",),                     "claude"),
-    (("gpt-", "o1-", "o3-", "o4-"),   "codex"),
-    (("gemini-",),                     "google"),
-    (("copilot-",),                    "copilot"),
+    (("claude-",), "claude"),
+    (("gpt-", "o1-", "o3-", "o4-"), "codex"),
+    (("gemini-",), "google"),
+    (("copilot-",), "copilot"),
 ]
 
 # Keyed by provider slug → model-family-prefix → (input_$/MTok, output_$/MTok).
 # Prefix matching: longest matching prefix wins.
 PRICING: dict[str, dict[str, tuple[float, float]]] = {
     "claude": {
-        "claude-opus-4":   (15.00, 75.00),
-        "claude-sonnet-4": ( 3.00, 15.00),
-        "claude-haiku-4":  ( 0.80,  4.00),
+        "claude-opus-4": (15.00, 75.00),
+        "claude-sonnet-4": (3.00, 15.00),
+        "claude-haiku-4": (0.80, 4.00),
     },
     "codex": {
-        "gpt-4o": ( 2.50, 10.00),
-        "o1":     (15.00, 60.00),
-        "o3":     (10.00, 40.00),
+        "gpt-4o": (2.50, 10.00),
+        "o1": (15.00, 60.00),
+        "o3": (10.00, 40.00),
     },
     "google": {
-        "gemini-2.5-pro":   ( 1.25, 10.00),
-        "gemini-2.5-flash": ( 0.075, 0.30),
+        "gemini-2.5-pro": (1.25, 10.00),
+        "gemini-2.5-flash": (0.075, 0.30),
     },
     "antigravity": {
         "gemini-2.5-pro": (1.25, 10.00),

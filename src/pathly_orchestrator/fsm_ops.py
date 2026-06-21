@@ -74,6 +74,7 @@ def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
                 read_flow_definitions,
                 read_flow_nodes,
             )
+
             conn = get_db(project_root)
             for search_root in [project_root, None]:
                 for row in read_flow_definitions(conn, search_root):
@@ -81,8 +82,12 @@ def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
                         # Rows-if-present path (Phase 2)
                         node_rows = read_flow_nodes(conn, row["id"])
                         if node_rows:
-                            flow_level_config = _json.loads(row.get("config_json") or "{}")
-                            return _assemble_flow_dict(conn, row["id"], flow_level_config)
+                            flow_level_config = _json.loads(
+                                row.get("config_json") or "{}"
+                            )
+                            return _assemble_flow_dict(
+                                conn, row["id"], flow_level_config
+                            )
                         # Fallback: blob
                         return yaml.safe_load(row["flow_yaml"])
         except Exception:
@@ -118,11 +123,7 @@ def _load_agent_text(agent: str) -> str:
     relative_path = (
         f"core/agents/{group}/{agent}.md" if group else f"core/agents/{agent}.md"
     )
-    return (
-        files("pathly_data")
-        .joinpath(relative_path)
-        .read_text(encoding="utf-8")
-    )
+    return files("pathly_data").joinpath(relative_path).read_text(encoding="utf-8")
 
 
 _SKILL_AGENT_ROLE: dict[str, str] = {
@@ -135,7 +136,13 @@ _SKILL_AGENT_ROLE: dict[str, str] = {
 }
 
 
-def _inject_prompt_vars(text: str, feature: str, project_root: str, agent_role: str, storage_path: Path | None = None) -> str:
+def _inject_prompt_vars(
+    text: str,
+    feature: str,
+    project_root: str,
+    agent_role: str,
+    storage_path: Path | None = None,
+) -> str:
     """Replace log-phase markers and common placeholders with real values.
 
     Converts bare `log-phase PHASE_START <phase>` lines into executable bash
@@ -177,7 +184,11 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     feature = storage_path.name
     project_root = str(storage_path.parent.parent.parent)
     _role = _SKILL_AGENT_ROLE.get(agent)
-    agent_role: str = _role if _role is not None else (agent.split("/")[-1] if "/" in agent else agent)
+    agent_role: str = (
+        _role
+        if _role is not None
+        else (agent.split("/")[-1] if "/" in agent else agent)
+    )
 
     if "/" in agent:
         # Stage skill — compose fragments for the live adapter. Skills absent from
@@ -193,7 +204,8 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
             except KeyError:
                 logging.getLogger(__name__).warning(
                     "composition-blocks: unknown block %r for state %r — falling back to compose_skill",
-                    block_name, state_name
+                    block_name,
+                    state_name,
                 )
                 agent_text = compose_skill(agent, adapter)
         else:
@@ -201,7 +213,9 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     else:
         agent_text = _load_agent_text(agent)
 
-    agent_text = _inject_prompt_vars(agent_text, feature, project_root, agent_role, storage_path=storage_path)
+    agent_text = _inject_prompt_vars(
+        agent_text, feature, project_root, agent_role, storage_path=storage_path
+    )
 
     context = (
         f"\n\n## Current task\n"
@@ -211,6 +225,7 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     )
     from pathly_orchestrator.runner import build_pipeline_history_block
     import os
+
     feature_dir = os.path.join(project_root, "pathly", "plans", feature)
     history = build_pipeline_history_block(feature_dir)
 
@@ -219,6 +234,7 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
         from pathly_orchestrator.db.connection import get_db as _get_db_comms
         from pathly_orchestrator.db.queries.app_settings import get_board_scope
         from pathly_orchestrator.runner.comms_context import retrieve_board_context
+
         _conn = _get_db_comms()
         _scope = get_board_scope(_conn, project_root, feature)
         board_block = retrieve_board_context(
@@ -315,6 +331,7 @@ def _stage_brief(state_info: dict, storage_path: Path) -> dict:
     recent_events: list[dict] = []
     try:
         from pathly_orchestrator import eventlog as _eventlog
+
         all_events = _eventlog.read_events(str(storage_path))
         recent_events = all_events[-3:] if len(all_events) >= 3 else list(all_events)
     except Exception:
@@ -325,7 +342,11 @@ def _stage_brief(state_info: dict, storage_path: Path) -> dict:
     if feedback_dir.exists():
         try:
             consult_files = sorted(
-                [f for f in feedback_dir.iterdir() if f.name.startswith("CONSULT_") and f.suffix == ".md"],
+                [
+                    f
+                    for f in feedback_dir.iterdir()
+                    if f.name.startswith("CONSULT_") and f.suffix == ".md"
+                ],
                 key=lambda f: f.stat().st_mtime,
                 reverse=True,
             )
@@ -384,23 +405,38 @@ def _response_envelope(
     return result
 
 
-def _blocked_response(feedback: dict, state_info: dict, storage_path: Path | None = None, preferred_adapter: str = "") -> dict:
+def _blocked_response(
+    feedback: dict,
+    state_info: dict,
+    storage_path: Path | None = None,
+    preferred_adapter: str = "",
+) -> dict:
     decision = "escalate" if feedback["target_agent"] == "human" else "block"
-    brief = _stage_brief(state_info, storage_path) if storage_path else {
-        "state": state_info["current_state"],
-        "conv": state_info["conv"],
-        "retry_count": state_info.get("retry_count", 0),
-        "open_feedback": [feedback["file"]],
-        "feedback_age_hours": None,
-        "recent_events": [],
-        "recent_consult": None,
-        "plan_path": "",
-    }
+    brief = (
+        _stage_brief(state_info, storage_path)
+        if storage_path
+        else {
+            "state": state_info["current_state"],
+            "conv": state_info["conv"],
+            "retry_count": state_info.get("retry_count", 0),
+            "open_feedback": [feedback["file"]],
+            "feedback_age_hours": None,
+            "recent_events": [],
+            "recent_consult": None,
+            "plan_path": "",
+        }
+    )
     warnings: list[dict] = [{"code": "open_feedback", "file": feedback["file"]}]
     age = brief.get("feedback_age_hours")
     if age is not None and age >= 4:
-        warnings.append({"code": "feedback_stale", "file": feedback["file"], "age_hours": age,
-                         "message": f"⚠ {feedback['file']} has been open for {age}h — review before continuing."})
+        warnings.append(
+            {
+                "code": "feedback_stale",
+                "file": feedback["file"],
+                "age_hours": age,
+                "message": f"⚠ {feedback['file']} has been open for {age}h — review before continuing.",
+            }
+        )
     result = {
         "schema_version": _SCHEMA_VERSION,
         "decision": decision,
@@ -409,7 +445,9 @@ def _blocked_response(feedback: dict, state_info: dict, storage_path: Path | Non
         "role": feedback["target_agent"],
         "agent": feedback["target_agent"],
         "preferred_adapter": preferred_adapter,
-        "agent_hint": _agent_hint(feedback["target_agent"], feedback.get("instructions")),
+        "agent_hint": _agent_hint(
+            feedback["target_agent"], feedback.get("instructions")
+        ),
         "stage_brief": brief,
         "warnings": warnings,
         "limits": state_info["limits"],
@@ -452,7 +490,9 @@ def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -
                 {
                     "label": target,
                     "description": _MENU_LABELS.get(target, f"Advance to {target}."),
-                    "command": _STATE_TO_COMMAND.get(target, f"/pathly {target.lower()}"),
+                    "command": _STATE_TO_COMMAND.get(
+                        target, f"/pathly {target.lower()}"
+                    ),
                     "target_state": target,
                     "terminal_kind": "claude",
                 }
@@ -475,6 +515,7 @@ def build_menu_payload(flow_config: dict, state_name: str, storage_path: Path) -
 def _count_planned_convs(storage_path: Path) -> int:
     """Return convs_total from DB state, falling back to PROGRESS.md on first run."""
     from pathly_orchestrator import eventlog as _el
+
     state = _el.read_state(str(storage_path))
     if state and state.get("convs_total") is not None:
         return int(state["convs_total"])
@@ -519,6 +560,7 @@ def next_action(args: dict) -> dict:
     storage_path = _resolve_storage_path(flow_config, project_root, topic)
 
     from pathly_orchestrator import eventlog as _eventlog_pre
+
     _db_state = _eventlog_pre.read_state(str(storage_path))
 
     try:
@@ -531,8 +573,22 @@ def next_action(args: dict) -> dict:
             "conv": 0,
             "role": "human",
             "agent": "human",
-            "agent_hint": {"agent": "human", "role": "human", "mode": "escalate", "instructions": "FSM state is corrupt or unreadable. Human intervention required."},
-            "stage_brief": {"state": "UNKNOWN", "conv": 0, "retry_count": 0, "open_feedback": [], "feedback_age_hours": None, "recent_events": [], "recent_consult": None, "plan_path": ""},
+            "agent_hint": {
+                "agent": "human",
+                "role": "human",
+                "mode": "escalate",
+                "instructions": "FSM state is corrupt or unreadable. Human intervention required.",
+            },
+            "stage_brief": {
+                "state": "UNKNOWN",
+                "conv": 0,
+                "retry_count": 0,
+                "open_feedback": [],
+                "feedback_age_hours": None,
+                "recent_events": [],
+                "recent_consult": None,
+                "plan_path": "",
+            },
             "warnings": [{"code": "corrupt_state", "message": str(e)}],
             "blocked": True,
             "target_agent": "human",
@@ -542,6 +598,7 @@ def next_action(args: dict) -> dict:
         }
 
     from pathly_orchestrator import eventlog as _eventlog
+
     prior_state: dict = _eventlog.read_state(str(storage_path)) or {}
 
     stamped_state = dict(prior_state)
@@ -551,7 +608,9 @@ def next_action(args: dict) -> dict:
         stamped_state["conv_start_sha"] = _get_head_sha(project_root)
         needs_write = True
 
-    if state_info["current_state"] == "BUILDING" and not prior_state.get("build_baseline"):
+    if state_info["current_state"] == "BUILDING" and not prior_state.get(
+        "build_baseline"
+    ):
         try:
             dirty_run = subprocess.run(
                 ["git", "status", "--porcelain=v1"],
@@ -560,11 +619,17 @@ def next_action(args: dict) -> dict:
                 text=True,
                 timeout=30,
             )
-            dirty_paths = sorted(set(
-                line[3:].strip()
-                for line in dirty_run.stdout.splitlines()
-                if line.strip()
-            )) if dirty_run.returncode == 0 else []
+            dirty_paths = (
+                sorted(
+                    set(
+                        line[3:].strip()
+                        for line in dirty_run.stdout.splitlines()
+                        if line.strip()
+                    )
+                )
+                if dirty_run.returncode == 0
+                else []
+            )
         except Exception:
             dirty_paths = []
         truncated = len(dirty_paths) > 500
@@ -599,40 +664,64 @@ def next_action(args: dict) -> dict:
 
     if needs_write:
         from pathly_orchestrator import eventlog as _elog_ws
-        _elog_ws.write_state(str(storage_path), {**stamped_state, "current": state_info["current_state"]}, flow_config)
+
+        _elog_ws.write_state(
+            str(storage_path),
+            {**stamped_state, "current": state_info["current_state"]},
+            flow_config,
+        )
         prior_state = stamped_state
 
     # stage_configs override: operates on the assembled flow_config dict (Q3 DESIGN_SPEC).
     # No change needed here — _load_flow now returns rows-assembled dict, same shape.
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.stage_configs import read_stage_config as _read_stage_cfg
+        from pathly_orchestrator.db.queries.stage_configs import (
+            read_stage_config as _read_stage_cfg,
+        )
+
         _cfg_conn = _get_db()
-        _stage_cfg = _read_stage_cfg(_cfg_conn, project_root, topic, state_info["current_state"])
+        _stage_cfg = _read_stage_cfg(
+            _cfg_conn, project_root, topic, state_info["current_state"]
+        )
         if _stage_cfg:
             if _stage_cfg.get("agent"):
                 flow_config = dict(flow_config)
                 flow_config["agent_map"] = dict(flow_config.get("agent_map", {}))
-                flow_config["agent_map"][state_info["current_state"]] = _stage_cfg["agent"]
+                flow_config["agent_map"][state_info["current_state"]] = _stage_cfg[
+                    "agent"
+                ]
             if _stage_cfg.get("adapter"):
                 flow_config["adapter_map"] = dict(flow_config.get("adapter_map", {}))
-                flow_config["adapter_map"][state_info["current_state"]] = _stage_cfg["adapter"]
+                flow_config["adapter_map"][state_info["current_state"]] = _stage_cfg[
+                    "adapter"
+                ]
     except Exception:
         pass  # overrides are best-effort, never crash next_action
 
     feedback = route_feedback(flow_config, storage_path)
 
     if feedback is not None:
-        result = _blocked_response(feedback, state_info, storage_path,
-                                   preferred_adapter=_resolve_adapter(flow_config, state_info["current_state"]))
+        result = _blocked_response(
+            feedback,
+            state_info,
+            storage_path,
+            preferred_adapter=_resolve_adapter(
+                flow_config, state_info["current_state"]
+            ),
+        )
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
                     feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
-                result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
-                result["codex_subagent"] = _codex_subagent_hint(feedback["target_agent"], instructions)
+                result["agent_hint"] = _agent_hint(
+                    feedback["target_agent"], instructions
+                )
+                result["codex_subagent"] = _codex_subagent_hint(
+                    feedback["target_agent"], instructions
+                )
             except Exception:
                 result["instructions"] = None
         return result
@@ -677,6 +766,7 @@ def complete_stage(args: dict) -> dict:
                 )
 
     from pathly_orchestrator import eventlog as _eventlog
+
     state_before: dict | None = _eventlog.read_state(str(storage_path))
 
     try:
@@ -689,8 +779,22 @@ def complete_stage(args: dict) -> dict:
             "conv": 0,
             "role": "human",
             "agent": "human",
-            "agent_hint": {"agent": "human", "role": "human", "mode": "escalate", "instructions": "FSM state is corrupt or unreadable. Human intervention required."},
-            "stage_brief": {"state": "UNKNOWN", "conv": 0, "retry_count": 0, "open_feedback": [], "feedback_age_hours": None, "recent_events": [], "recent_consult": None, "plan_path": ""},
+            "agent_hint": {
+                "agent": "human",
+                "role": "human",
+                "mode": "escalate",
+                "instructions": "FSM state is corrupt or unreadable. Human intervention required.",
+            },
+            "stage_brief": {
+                "state": "UNKNOWN",
+                "conv": 0,
+                "retry_count": 0,
+                "open_feedback": [],
+                "feedback_age_hours": None,
+                "recent_events": [],
+                "recent_consult": None,
+                "plan_path": "",
+            },
             "warnings": [{"code": "corrupt_state", "message": str(e)}],
             "blocked": True,
             "target_agent": "human",
@@ -701,16 +805,26 @@ def complete_stage(args: dict) -> dict:
 
     feedback = route_feedback(flow_config, storage_path)
     if feedback is not None:
-        result = _blocked_response(feedback, state_info, storage_path,
-                                   preferred_adapter=_resolve_adapter(flow_config, state_info["current_state"]))
+        result = _blocked_response(
+            feedback,
+            state_info,
+            storage_path,
+            preferred_adapter=_resolve_adapter(
+                flow_config, state_info["current_state"]
+            ),
+        )
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
                     feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
-                result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
-                result["codex_subagent"] = _codex_subagent_hint(feedback["target_agent"], instructions)
+                result["agent_hint"] = _agent_hint(
+                    feedback["target_agent"], instructions
+                )
+                result["codex_subagent"] = _codex_subagent_hint(
+                    feedback["target_agent"], instructions
+                )
             except Exception:
                 result["instructions"] = None
         return result
@@ -764,22 +878,37 @@ def complete_stage(args: dict) -> dict:
         next_state = eval_result
 
     gate_failure = run_gates(
-        flow_config, state_info["current_state"], next_state,
-        storage_path, topic, state_info["conv"]
+        flow_config,
+        state_info["current_state"],
+        next_state,
+        storage_path,
+        topic,
+        state_info["conv"],
     )
     if gate_failure is not None:
         feedback = route_feedback(flow_config, storage_path)
         if feedback is None:
-            feedback = {"target_agent": "human", "file": gate_failure.get("feedback_file", "HUMAN_QUESTIONS.md")}
-        result = _blocked_response(feedback, state_info, storage_path,
-                                   preferred_adapter=_resolve_adapter(flow_config, state_info["current_state"]))
+            feedback = {
+                "target_agent": "human",
+                "file": gate_failure.get("feedback_file", "HUMAN_QUESTIONS.md"),
+            }
+        result = _blocked_response(
+            feedback,
+            state_info,
+            storage_path,
+            preferred_adapter=_resolve_adapter(
+                flow_config, state_info["current_state"]
+            ),
+        )
         if feedback["target_agent"] != "human":
             try:
                 instructions = build_prompt_for_agent(
                     feedback["target_agent"], storage_path
                 )
                 result["instructions"] = instructions
-                result["agent_hint"] = _agent_hint(feedback["target_agent"], instructions)
+                result["agent_hint"] = _agent_hint(
+                    feedback["target_agent"], instructions
+                )
                 result["codex_subagent"] = _codex_subagent_hint(
                     feedback["target_agent"], instructions
                 )
@@ -799,11 +928,14 @@ def complete_stage(args: dict) -> dict:
     # Re-read state after transition actions ran — update_progress writes convs_done
     # to the DB inside run_transition_actions(); using stale state_before would overwrite it.
     from pathly_orchestrator import eventlog as _elog_ws
+
     prior_state = _elog_ws.read_state(str(storage_path)) or dict(state_before or {})
     # Clear per-conversation baselines so the next conversation gets fresh snapshots.
     prior_state.pop("conv_start_sha", None)
     prior_state.pop("build_baseline", None)
-    _elog_ws.write_state(str(storage_path), {**prior_state, "current": next_state}, flow_config)
+    _elog_ws.write_state(
+        str(storage_path), {**prior_state, "current": next_state}, flow_config
+    )
 
     append_event(
         storage_path,

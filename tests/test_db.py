@@ -1,4 +1,5 @@
 """Unit tests for pathly_orchestrator.db — all tables and helpers."""
+
 from __future__ import annotations
 
 import json
@@ -30,6 +31,7 @@ _PROJECT_ROOT = "/project/alpha"
 # ---------------------------------------------------------------------------
 # Schema / connection tests
 # ---------------------------------------------------------------------------
+
 
 def test_get_db_creates_tables(tmp_path: Path) -> None:
     conn = get_db()
@@ -64,6 +66,7 @@ def test_get_db_accepts_deprecated_path_arg(tmp_path: Path) -> None:
 # fsm_events tests
 # ---------------------------------------------------------------------------
 
+
 def test_append_and_read_events(tmp_path: Path) -> None:
     conn = get_db()
     events = [
@@ -87,7 +90,9 @@ def test_read_events_since_seq(tmp_path: Path) -> None:
     conn = get_db()
     seqs = []
     for i in range(5):
-        seq = append_event(conn, _PROJECT_ROOT, "feat-b", {"type": "EV", "ts": f"t{i}", "i": i})
+        seq = append_event(
+            conn, _PROJECT_ROOT, "feat-b", {"type": "EV", "ts": f"t{i}", "i": i}
+        )
         seqs.append(seq)
 
     # since_seq = seqs[2] means we want events after index 2 (i.e. indices 3 and 4)
@@ -99,10 +104,22 @@ def test_read_events_since_seq(tmp_path: Path) -> None:
 
 def test_read_last_agent_done(tmp_path: Path) -> None:
     conn = get_db()
-    append_event(conn, _PROJECT_ROOT, "feat-c", {"type": "STATE_TRANSITION", "ts": "t1"})
-    append_event(conn, _PROJECT_ROOT, "feat-c", {"type": "AGENT_DONE", "ts": "t2", "summary": "first"})
+    append_event(
+        conn, _PROJECT_ROOT, "feat-c", {"type": "STATE_TRANSITION", "ts": "t1"}
+    )
+    append_event(
+        conn,
+        _PROJECT_ROOT,
+        "feat-c",
+        {"type": "AGENT_DONE", "ts": "t2", "summary": "first"},
+    )
     append_event(conn, _PROJECT_ROOT, "feat-c", {"type": "PHASE_START", "ts": "t3"})
-    append_event(conn, _PROJECT_ROOT, "feat-c", {"type": "AGENT_DONE", "ts": "t4", "summary": "second"})
+    append_event(
+        conn,
+        _PROJECT_ROOT,
+        "feat-c",
+        {"type": "AGENT_DONE", "ts": "t4", "summary": "second"},
+    )
 
     result = read_last_agent_done(conn, _PROJECT_ROOT, "feat-c")
     assert result is not None
@@ -117,17 +134,24 @@ def test_read_last_agent_done_none(tmp_path: Path) -> None:
 
 def test_project_root_isolation_different_roots_same_feature():
     from pathly_orchestrator.db import get_db, append_event, read_events
+
     conn = get_db()
-    append_event(conn, '/project/alpha', 'feat-x', {'type': 'TEST', 'ts': '2026-01-01', 'payload': '{}'})
-    events_beta = read_events(conn, '/project/beta', 'feat-x')
-    assert events_beta == [], f'Cross-project bleed: {events_beta}'
-    events_alpha = read_events(conn, '/project/alpha', 'feat-x')
+    append_event(
+        conn,
+        "/project/alpha",
+        "feat-x",
+        {"type": "TEST", "ts": "2026-01-01", "payload": "{}"},
+    )
+    events_beta = read_events(conn, "/project/beta", "feat-x")
+    assert events_beta == [], f"Cross-project bleed: {events_beta}"
+    events_alpha = read_events(conn, "/project/alpha", "feat-x")
     assert len(events_alpha) == 1
 
 
 # ---------------------------------------------------------------------------
 # fsm_state tests
 # ---------------------------------------------------------------------------
+
 
 def test_write_and_read_state(tmp_path: Path) -> None:
     conn = get_db()
@@ -170,6 +194,7 @@ def test_read_state_missing(tmp_path: Path) -> None:
 # runner_state tests
 # ---------------------------------------------------------------------------
 
+
 def test_write_and_read_runner_state(tmp_path: Path) -> None:
     conn = get_db()
     runner = {
@@ -210,10 +235,15 @@ def test_mark_stale_runners(tmp_path: Path) -> None:
 
     # Two 'running' rows and one 'done' row
     for feat, status in [("r1", "running"), ("r2", "running"), ("r3", "done")]:
-        write_runner_state(conn, _PROJECT_ROOT, feat, {
-            "status": status,
-            "updated_at": "2026-01-01T00:00:00Z",
-        })
+        write_runner_state(
+            conn,
+            _PROJECT_ROOT,
+            feat,
+            {
+                "status": status,
+                "updated_at": "2026-01-01T00:00:00Z",
+            },
+        )
 
     count = mark_stale_runners(conn)
     assert count == 2
@@ -230,6 +260,7 @@ def test_mark_stale_runners(tmp_path: Path) -> None:
 # Concurrency test
 # ---------------------------------------------------------------------------
 
+
 def test_concurrent_appends() -> None:
     # Each thread must call get_db() for its own per-thread connection.
     errors: list[Exception] = []
@@ -242,7 +273,12 @@ def test_concurrent_appends() -> None:
                     thread_conn,
                     _PROJECT_ROOT,
                     "feat-concurrent",
-                    {"type": "EV", "ts": f"t-{thread_id}-{i}", "thread": thread_id, "i": i},
+                    {
+                        "type": "EV",
+                        "ts": f"t-{thread_id}-{i}",
+                        "thread": thread_id,
+                        "i": i,
+                    },
                 )
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
@@ -273,8 +309,10 @@ def test_concurrent_appends() -> None:
 # Phase 8: Backward compat — legacy dirs (no pathly.db)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.skipif(
-    __import__("os").environ.get("PATHLY_DB_ONLY", "1").strip().lower() not in ("0", "false", "no"),
+    __import__("os").environ.get("PATHLY_DB_ONLY", "1").strip().lower()
+    not in ("0", "false", "no"),
     reason="STATE.json fallback is disabled in PATHLY_DB_ONLY mode — legacy path intentionally skipped",
 )
 def test_legacy_read_state_from_json(tmp_path: Path) -> None:
@@ -301,7 +339,8 @@ def test_legacy_read_state_from_json(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    __import__("os").environ.get("PATHLY_DB_ONLY", "1").strip().lower() not in ("0", "false", "no"),
+    __import__("os").environ.get("PATHLY_DB_ONLY", "1").strip().lower()
+    not in ("0", "false", "no"),
     reason="EVENTS.jsonl fallback is disabled in PATHLY_DB_ONLY mode — legacy path intentionally skipped",
 )
 def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
@@ -311,9 +350,23 @@ def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
     feature_dir = tmp_path / "pathly" / "plans" / "my-feature"
     feature_dir.mkdir(parents=True, exist_ok=True)
     lines = [
-        json.dumps({"type": "STATE_TRANSITION", "ts": "2026-01-01T00:00:01Z", "to": "BUILD", "schema_version": 1}),
+        json.dumps(
+            {
+                "type": "STATE_TRANSITION",
+                "ts": "2026-01-01T00:00:01Z",
+                "to": "BUILD",
+                "schema_version": 1,
+            }
+        ),
         "not valid json",
-        json.dumps({"type": "AGENT_DONE", "ts": "2026-01-01T00:00:02Z", "summary": "ok", "schema_version": 1}),
+        json.dumps(
+            {
+                "type": "AGENT_DONE",
+                "ts": "2026-01-01T00:00:02Z",
+                "summary": "ok",
+                "schema_version": 1,
+            }
+        ),
     ]
     (feature_dir / "EVENTS.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -329,10 +382,15 @@ def test_legacy_read_events_from_jsonl(tmp_path: Path) -> None:
 # feedback_items tests
 # ---------------------------------------------------------------------------
 
+
 def test_write_and_read_feedback_items() -> None:
     conn = get_db()
-    write_feedback_item(conn, _PROJECT_ROOT, "feat-fb", "REVIEW_FAILURES.md", "fix this")
-    write_feedback_item(conn, _PROJECT_ROOT, "feat-fb", "TEST_FAILURES.md", "test failed")
+    write_feedback_item(
+        conn, _PROJECT_ROOT, "feat-fb", "REVIEW_FAILURES.md", "fix this"
+    )
+    write_feedback_item(
+        conn, _PROJECT_ROOT, "feat-fb", "TEST_FAILURES.md", "test failed"
+    )
 
     items = read_feedback_items(conn, _PROJECT_ROOT, "feat-fb")
     assert len(items) == 2
@@ -372,10 +430,23 @@ def test_recover_stale_mirrors_no_db(tmp_path: Path) -> None:
     feature_dir = tmp_path / "pathly" / "plans" / "legacy-feature"
     feature_dir.mkdir(parents=True)
 
-    state = {"current": "BUILD", "rigor": "standard", "updated_at": "2026-01-01T00:00:00Z"}
+    state = {
+        "current": "BUILD",
+        "rigor": "standard",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
     (feature_dir / "STATE.json").write_text(json.dumps(state), encoding="utf-8")
 
-    lines = [json.dumps({"type": "AGENT_DONE", "ts": "2026-01-01T00:00:01Z", "summary": "s", "schema_version": 1})]
+    lines = [
+        json.dumps(
+            {
+                "type": "AGENT_DONE",
+                "ts": "2026-01-01T00:00:01Z",
+                "summary": "s",
+                "schema_version": 1,
+            }
+        )
+    ]
     (feature_dir / "EVENTS.jsonl").write_text("\n".join(lines), encoding="utf-8")
 
     # No pathly.db — should not raise

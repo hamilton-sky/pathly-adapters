@@ -1,4 +1,5 @@
 """Chat endpoint."""
+
 from __future__ import annotations
 
 from flask import Blueprint, request
@@ -12,6 +13,7 @@ bp = Blueprint("chat", __name__)
 def chat():
     if request.method == "OPTIONS":
         from flask import Response as _Resp
+
         resp = _Resp()
         resp.headers["Access-Control-Allow-Origin"] = "*"
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type"

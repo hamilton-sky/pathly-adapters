@@ -6,6 +6,7 @@ topic was not the active one never opened a PTY (terminal_spawn_timeout). The fi
 _broadcast_runner mirrors terminal-lifecycle events to a flat, topic-independent
 spawn channel that Studio subscribes to exactly once.
 """
+
 import queue
 
 import pytest
@@ -31,7 +32,10 @@ def _subscribe_spawn() -> queue.Queue:
 def test_spawn_reaches_subscriber_regardless_of_topic():
     q = _subscribe_spawn()
     # No runner client is registered for this topic at all.
-    sse._broadcast_runner("feature-X", {"type": "TERMINAL_SPAWN", "tab_id": "runner-1", "topic": "feature-X"})
+    sse._broadcast_runner(
+        "feature-X",
+        {"type": "TERMINAL_SPAWN", "tab_id": "runner-1", "topic": "feature-X"},
+    )
     assert not q.empty()
     assert "TERMINAL_SPAWN" in q.get_nowait()
 
@@ -39,7 +43,9 @@ def test_spawn_reaches_subscriber_regardless_of_topic():
 def test_kill_and_signal_also_mirror():
     q = _subscribe_spawn()
     sse._broadcast_runner("global", {"type": "TERMINAL_KILL", "tab_id": "runner-2"})
-    sse._broadcast_runner("project", {"type": "TERMINAL_SIGNAL", "tab_id": "runner-3", "signal": "term"})
+    sse._broadcast_runner(
+        "project", {"type": "TERMINAL_SIGNAL", "tab_id": "runner-3", "signal": "term"}
+    )
     types = [q.get_nowait() for _ in range(2)]
     assert any("TERMINAL_KILL" in t for t in types)
     assert any("TERMINAL_SIGNAL" in t for t in types)
@@ -57,7 +63,10 @@ def test_topic_channel_still_delivers_to_its_own_subscribers():
     rq: queue.Queue = queue.Queue(maxsize=50)
     sse._runner_clients.setdefault("feature-Y", []).append(rq)
     spawn_q = _subscribe_spawn()
-    sse._broadcast_runner("feature-Y", {"type": "TERMINAL_SPAWN", "tab_id": "runner-4", "topic": "feature-Y"})
+    sse._broadcast_runner(
+        "feature-Y",
+        {"type": "TERMINAL_SPAWN", "tab_id": "runner-4", "topic": "feature-Y"},
+    )
     # Reaches BOTH the topic subscriber and the global spawn channel.
     assert not rq.empty()
     assert not spawn_q.empty()

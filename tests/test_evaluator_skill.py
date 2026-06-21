@@ -21,6 +21,7 @@ _CORE_ROOT = Path(__file__).parent.parent / "src" / "pathly_data" / "core"
 
 # ── Composition ──────────────────────────────────────────────────────────────
 
+
 def test_evaluate_skill_composes():
     """planning/evaluate must compose without raising."""
     out = compose_skill("planning/evaluate", "claude")
@@ -60,7 +61,9 @@ def test_evaluator_agent_file_exists():
 def test_evaluator_agent_has_frontmatter():
     """The agent file must open with a YAML front-matter block (--- ... ---)."""
     text = _AGENT_FILE.read_text(encoding="utf-8")
-    assert text.startswith("---"), "evaluator.md must start with YAML front-matter (---)"
+    assert text.startswith(
+        "---"
+    ), "evaluator.md must start with YAML front-matter (---)"
     # The closing --- must also be present
     lines = text.splitlines()
     closing = [i for i, l in enumerate(lines) if l.strip() == "---" and i > 0]
@@ -89,6 +92,6 @@ def test_evaluator_agent_is_host_neutral():
     text = _AGENT_FILE.read_text(encoding="utf-8")
     host_specific = ["<tool_call>", "use_mcp_tool", "@claude", "claude.ai"]
     for marker in host_specific:
-        assert marker not in text, (
-            f"evaluator.md references host-specific marker {marker!r} — keep it host-neutral"
-        )
+        assert (
+            marker not in text
+        ), f"evaluator.md references host-specific marker {marker!r} — keep it host-neutral"

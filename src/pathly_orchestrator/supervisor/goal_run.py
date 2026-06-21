@@ -12,6 +12,7 @@ See: pathly/plans/comms-board/phases/PHASE-1-dispatcher.md
 
 spawn_fn is dependency-injected so tests can drive both paths without real PTYs.
 """
+
 from __future__ import annotations
 
 import threading
@@ -36,12 +37,14 @@ def start_goal_run(
     goal_id: str,
     *,
     executor_override: str | None = None,
-    flow_override: str | None = None,   # executor='team': which FSM flow to run (default team-build)
+    flow_override: (
+        str | None
+    ) = None,  # executor='team': which FSM flow to run (default team-build)
     project_root: str = "",
     adapter: str = "claude",
     model: str = "",
     progress: str = "normal",
-    broadcast_fn: Optional[Callable] = None,        # runner stream (worker TERMINAL_SPAWN)
+    broadcast_fn: Optional[Callable] = None,  # runner stream (worker TERMINAL_SPAWN)
     event_broadcast_fn: Optional[Callable] = None,  # comms stream (task-state events)
     on_start: Optional[Callable] = None,
     on_done: Optional[Callable] = None,
@@ -65,10 +68,15 @@ def start_goal_run(
         (goal_id,),
     ).fetchone()
     if row is None:
-        return {"ok": False, "reason": "not_found", "error": f"goal {goal_id!r} not found"}
+        return {
+            "ok": False,
+            "reason": "not_found",
+            "error": f"goal {goal_id!r} not found",
+        }
     if (row["type"] or "") != "goal":
         return {
-            "ok": False, "reason": "not_goal",
+            "ok": False,
+            "reason": "not_goal",
             "error": f"message {goal_id!r} is type={row['type']!r}, not 'goal'",
         }
 
@@ -84,36 +92,71 @@ def start_goal_run(
 
     if executor == "single":
         return _run_single(
-            goal_id, board, scope, goal_text,
-            project_root=project_root, adapter=adapter, model=model, progress=progress,
-            broadcast_fn=broadcast_fn, on_start=on_start, on_done=on_done,
-            spawn_fn=spawn_fn, block=block,
+            goal_id,
+            board,
+            scope,
+            goal_text,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            progress=progress,
+            broadcast_fn=broadcast_fn,
+            on_start=on_start,
+            on_done=on_done,
+            spawn_fn=spawn_fn,
+            block=block,
         )
     if executor == "loop":
         return _run_loop(
-            goal_id, board, scope,
-            project_root=project_root, adapter=adapter, model=model,
-            broadcast_fn=broadcast_fn, event_broadcast_fn=event_broadcast_fn,
-            on_start=on_start, on_done=on_done, spawn_fn=spawn_fn, block=block,
+            goal_id,
+            board,
+            scope,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            broadcast_fn=broadcast_fn,
+            event_broadcast_fn=event_broadcast_fn,
+            on_start=on_start,
+            on_done=on_done,
+            spawn_fn=spawn_fn,
+            block=block,
         )
     if executor == "team":
         return _run_team(
-            goal_id, board, scope,
+            goal_id,
+            board,
+            scope,
             flow=(flow_override or _TEAM_FLOW),
-            project_root=project_root, adapter=adapter, model=model,
-            broadcast_fn=broadcast_fn, on_start=on_start, on_done=on_done,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            broadcast_fn=broadcast_fn,
+            on_start=on_start,
+            on_done=on_done,
             start_fn=start_fn,
         )
     return {
-        "ok": False, "reason": "unknown_executor",
+        "ok": False,
+        "reason": "unknown_executor",
         "error": f"unknown executor {executor!r} (expected single|loop|team)",
     }
 
 
 def _run_single(
-    goal_id: str, board: str, scope: str, goal_text: str, *,
-    project_root: str, adapter: str, model: str, progress: str,
-    broadcast_fn, on_start, on_done, spawn_fn, block: bool,
+    goal_id: str,
+    board: str,
+    scope: str,
+    goal_text: str,
+    *,
+    project_root: str,
+    adapter: str,
+    model: str,
+    progress: str,
+    broadcast_fn,
+    on_start,
+    on_done,
+    spawn_fn,
+    block: bool,
 ) -> dict:
     """ONE agent drains the whole goal. Reuses start_board_run (lock + skill compose
     + async spawn); the drain-dag skill is the agent's self-loop contract."""
@@ -126,7 +169,9 @@ def _run_single(
         + (f"\n\nGoal: {goal_text}" if goal_text else "")
     )
     result = start_board_run(
-        board, scope, "single-agent",
+        board,
+        scope,
+        "single-agent",
         instructions=instructions,
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
@@ -134,7 +179,8 @@ def _run_single(
         skill="development/drain-dag",
         progress=progress,
         broadcast_fn=broadcast_fn,
-        on_start=on_start, on_done=on_done,
+        on_start=on_start,
+        on_done=on_done,
         spawn_fn=spawn_fn,
         block=block,
     )
@@ -145,9 +191,19 @@ def _run_single(
 
 
 def _run_loop(
-    goal_id: str, board: str, scope: str, *,
-    project_root: str, adapter: str, model: str,
-    broadcast_fn, event_broadcast_fn, on_start, on_done, spawn_fn, block: bool,
+    goal_id: str,
+    board: str,
+    scope: str,
+    *,
+    project_root: str,
+    adapter: str,
+    model: str,
+    broadcast_fn,
+    event_broadcast_fn,
+    on_start,
+    on_done,
+    spawn_fn,
+    block: bool,
 ) -> dict:
     """Supervisor owns the frontier: wire the existing scheduler_loop with
     SerialIsolation (one worker), scoped to this goal. Holds the board lock for the
@@ -160,13 +216,19 @@ def _run_loop(
     run_id = str(uuid.uuid4())
     if not board_lock.acquire(board, scope, run_id):
         return {
-            "ok": False, "reason": "board_busy", "error": "board is busy",
+            "ok": False,
+            "reason": "board_busy",
+            "error": "board is busy",
             "holder": board_lock.holder(board, scope),
         }
 
     state = RunnerState(
-        topic=scope, flow="goal-loop", project_root=project_root,
-        model=model or _DEFAULT_MODEL, timeout=600, run_id=run_id,
+        topic=scope,
+        flow="goal-loop",
+        project_root=project_root,
+        model=model or _DEFAULT_MODEL,
+        timeout=600,
+        run_id=run_id,
         current_adapter=adapter or "claude",
     )
     isolation = SerialIsolation()
@@ -179,8 +241,10 @@ def _run_loop(
         try:
             _safe_call(on_start, run_id)
             kwargs: dict = dict(
-                isolation=isolation, broadcast_fn=broadcast_fn,
-                event_broadcast_fn=event_broadcast_fn, goal_id=goal_id,
+                isolation=isolation,
+                broadcast_fn=broadcast_fn,
+                event_broadcast_fn=event_broadcast_fn,
+                goal_id=goal_id,
                 abort_check=_abort_check,
             )
             if spawn_fn is not None:
@@ -201,18 +265,30 @@ def _run_loop(
     def _runner() -> None:
         try:
             _work()
-        except Exception as exc:  # noqa: BLE001 — async failure must still reach the board
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 — async failure must still reach the board
             _safe_call(on_done, run_id, {"result": f"error: {exc}", "error": str(exc)})
 
-    threading.Thread(target=_runner, daemon=True, name=f"goal-loop-{run_id[:8]}").start()
+    threading.Thread(
+        target=_runner, daemon=True, name=f"goal-loop-{run_id[:8]}"
+    ).start()
     return {"ok": True, "run_id": run_id, "executor": "loop", "status": "started"}
 
 
 def _run_team(
-    goal_id: str, board: str, scope: str, *,
+    goal_id: str,
+    board: str,
+    scope: str,
+    *,
     flow: str = _TEAM_FLOW,
-    project_root: str, adapter: str, model: str,
-    broadcast_fn, on_start, on_done, start_fn,
+    project_root: str,
+    adapter: str,
+    model: str,
+    broadcast_fn,
+    on_start,
+    on_done,
+    start_fn,
 ) -> dict:
     """team executor: run an FSM flow (default the trimmed team-build build→review→test→retro)
     on the goal's scope, reusing the supervisor pipeline (start_run → visible PTY
@@ -230,11 +306,20 @@ def _run_team(
 
     # A single/loop run holds the board lock; an FSM pipeline run lives in the registry.
     if board_lock.holder(board, scope) is not None:
-        return {"ok": False, "reason": "board_busy", "error": "board is busy (a run holds the lock)"}
-    existing = get_state(scope)
-    if existing is not None and existing.status in ("running", "paused", "awaiting_decision"):
         return {
-            "ok": False, "reason": "board_busy",
+            "ok": False,
+            "reason": "board_busy",
+            "error": "board is busy (a run holds the lock)",
+        }
+    existing = get_state(scope)
+    if existing is not None and existing.status in (
+        "running",
+        "paused",
+        "awaiting_decision",
+    ):
+        return {
+            "ok": False,
+            "reason": "board_busy",
             "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
         }
 
@@ -243,10 +328,14 @@ def _run_team(
     if start_fn is None:
         try:
             from pathly_orchestrator.fsm_ops import _load_flow
+
             _load_flow(flow, project_root or None)
         except Exception:
-            return {"ok": False, "reason": "unknown_flow",
-                    "error": f"flow {flow!r} not found (run any seeded flow: team-build, debug, quick-fix, …)"}
+            return {
+                "ok": False,
+                "reason": "unknown_flow",
+                "error": f"flow {flow!r} not found (run any seeded flow: team-build, debug, quick-fix, …)",
+            }
 
     _start = start_fn
     if _start is None:
@@ -265,8 +354,14 @@ def _run_team(
 
     run_id = getattr(state, "run_id", "") or ""
     _safe_call(on_start, run_id)
-    return {"ok": True, "run_id": run_id, "executor": "team", "flow": flow,
-            "goal_id": goal_id, "status": "started"}
+    return {
+        "ok": True,
+        "run_id": run_id,
+        "executor": "team",
+        "flow": flow,
+        "goal_id": goal_id,
+        "status": "started",
+    }
 
 
 # ── Decompose bridge: turn a chosen goal into a task DAG ──────────────────────
@@ -302,10 +397,17 @@ def start_goal_decompose(
         (goal_id,),
     ).fetchone()
     if row is None:
-        return {"ok": False, "reason": "not_found", "error": f"goal {goal_id!r} not found"}
+        return {
+            "ok": False,
+            "reason": "not_found",
+            "error": f"goal {goal_id!r} not found",
+        }
     if (row["type"] or "") != "goal":
-        return {"ok": False, "reason": "not_goal",
-                "error": f"message {goal_id!r} is type={row['type']!r}, not 'goal'"}
+        return {
+            "ok": False,
+            "reason": "not_goal",
+            "error": f"message {goal_id!r} is type={row['type']!r}, not 'goal'",
+        }
 
     board = row["board"] or "feature"
     scope = row["scope"] or ""
@@ -317,31 +419,63 @@ def start_goal_decompose(
         (goal_id,),
     ).fetchone()
     if existing_tasks and existing_tasks["n"]:
-        return {"ok": False, "reason": "already_decomposed",
-                "error": f"goal {goal_id!r} already has {existing_tasks['n']} task(s)"}
+        return {
+            "ok": False,
+            "reason": "already_decomposed",
+            "error": f"goal {goal_id!r} already has {existing_tasks['n']} task(s)",
+        }
 
     mode = (mode or "planner").strip().lower()
     if mode == "planner":
         return _decompose_planner(
-            goal_id, board, scope, goal_text,
-            project_root=project_root, adapter=adapter, model=model, progress=progress,
-            broadcast_fn=broadcast_fn, on_start=on_start, on_done=on_done,
-            spawn_fn=spawn_fn, block=block,
+            goal_id,
+            board,
+            scope,
+            goal_text,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            progress=progress,
+            broadcast_fn=broadcast_fn,
+            on_start=on_start,
+            on_done=on_done,
+            spawn_fn=spawn_fn,
+            block=block,
         )
     if mode == "consultation":
         return _decompose_consultation(
-            goal_id, board, scope,
-            project_root=project_root, model=model, broadcast_fn=broadcast_fn,
-            on_start=on_start, on_done=on_done, start_fn=start_fn,
+            goal_id,
+            board,
+            scope,
+            project_root=project_root,
+            model=model,
+            broadcast_fn=broadcast_fn,
+            on_start=on_start,
+            on_done=on_done,
+            start_fn=start_fn,
         )
-    return {"ok": False, "reason": "unknown_mode",
-            "error": f"unknown decompose mode {mode!r} (expected planner|consultation)"}
+    return {
+        "ok": False,
+        "reason": "unknown_mode",
+        "error": f"unknown decompose mode {mode!r} (expected planner|consultation)",
+    }
 
 
 def _decompose_planner(
-    goal_id: str, board: str, scope: str, goal_text: str, *,
-    project_root: str, adapter: str, model: str, progress: str,
-    broadcast_fn, on_start, on_done, spawn_fn, block: bool,
+    goal_id: str,
+    board: str,
+    scope: str,
+    goal_text: str,
+    *,
+    project_root: str,
+    adapter: str,
+    model: str,
+    progress: str,
+    broadcast_fn,
+    on_start,
+    on_done,
+    spawn_fn,
+    block: bool,
 ) -> dict:
     """Light decomposer: one planner run on the goal's scope. The directive tells the
     planner the goal ALREADY exists, so it posts tasks under this goal_id (plan.md
@@ -356,7 +490,9 @@ def _decompose_planner(
         f"task with goal_id={goal_id!r}. The posted tasks are this goal's DAG."
     )
     result = start_board_run(
-        board, scope, "single-agent",
+        board,
+        scope,
+        "single-agent",
         instructions=instructions,
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
@@ -365,7 +501,8 @@ def _decompose_planner(
         agent="planner",
         progress=progress,
         broadcast_fn=broadcast_fn,
-        on_start=on_start, on_done=on_done,
+        on_start=on_start,
+        on_done=on_done,
         spawn_fn=spawn_fn,
         block=block,
     )
@@ -376,8 +513,16 @@ def _decompose_planner(
 
 
 def _decompose_consultation(
-    goal_id: str, board: str, scope: str, *,
-    project_root: str, model: str, broadcast_fn, on_start, on_done, start_fn,
+    goal_id: str,
+    board: str,
+    scope: str,
+    *,
+    project_root: str,
+    model: str,
+    broadcast_fn,
+    on_start,
+    on_done,
+    start_fn,
 ) -> dict:
     """Heavy decomposer: run the consultation FSM flow (PO→architect→researcher→
     designer→planner) on the goal's scope. The planner stage seeds the DAG."""
@@ -385,11 +530,22 @@ def _decompose_consultation(
     from pathly_orchestrator.supervisor.registry import get_state
 
     if board_lock.holder(board, scope) is not None:
-        return {"ok": False, "reason": "board_busy", "error": "board is busy (a run holds the lock)"}
+        return {
+            "ok": False,
+            "reason": "board_busy",
+            "error": "board is busy (a run holds the lock)",
+        }
     existing = get_state(scope)
-    if existing is not None and existing.status in ("running", "paused", "awaiting_decision"):
-        return {"ok": False, "reason": "board_busy",
-                "error": f"a pipeline run is already active for {scope!r} (status={existing.status})"}
+    if existing is not None and existing.status in (
+        "running",
+        "paused",
+        "awaiting_decision",
+    ):
+        return {
+            "ok": False,
+            "reason": "board_busy",
+            "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
+        }
 
     _start = start_fn
     if _start is None:
@@ -397,8 +553,10 @@ def _decompose_consultation(
 
     try:
         state = _start(
-            topic=scope, flow=_CONSULTATION_FLOW,
-            project_root=project_root or "", model=model or _DEFAULT_MODEL,
+            topic=scope,
+            flow=_CONSULTATION_FLOW,
+            project_root=project_root or "",
+            model=model or _DEFAULT_MODEL,
             broadcast_fn=broadcast_fn,
         )
     except ValueError as exc:
@@ -406,4 +564,10 @@ def _decompose_consultation(
 
     run_id = getattr(state, "run_id", "") or ""
     _safe_call(on_start, run_id)
-    return {"ok": True, "run_id": run_id, "mode": "consultation", "goal_id": goal_id, "status": "started"}
+    return {
+        "ok": True,
+        "run_id": run_id,
+        "mode": "consultation",
+        "goal_id": goal_id,
+        "status": "started",
+    }

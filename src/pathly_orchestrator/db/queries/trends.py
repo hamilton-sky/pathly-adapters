@@ -1,4 +1,5 @@
 """Query helpers for daily trend aggregates from agent_invocations."""
+
 from __future__ import annotations
 
 import sqlite3

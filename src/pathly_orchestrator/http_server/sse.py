@@ -1,4 +1,5 @@
 """SSE globals and broadcast helpers."""
+
 from __future__ import annotations
 
 import json
@@ -15,10 +16,30 @@ _NO_FEATURE_MENU = {
     "title": "Pathly · No active feature",
     "subtitle": "Start a new feature or explore the codebase.",
     "items": [
-        {"label": "Start a new feature", "description": "Describe it and let the director route.", "command": "/pathly go", "terminal_kind": "claude"},
-        {"label": "Brainstorm an idea", "description": "Open an architect storm session.", "command": "/pathly storm", "terminal_kind": "claude"},
-        {"label": "Import a PRD file", "description": "Import requirements from a PRD or BMAD file.", "command": "/pathly prd-import", "terminal_kind": "claude"},
-        {"label": "Explore the codebase", "description": "Read-only Q&A about the project.", "command": "/pathly explore", "terminal_kind": "claude"},
+        {
+            "label": "Start a new feature",
+            "description": "Describe it and let the director route.",
+            "command": "/pathly go",
+            "terminal_kind": "claude",
+        },
+        {
+            "label": "Brainstorm an idea",
+            "description": "Open an architect storm session.",
+            "command": "/pathly storm",
+            "terminal_kind": "claude",
+        },
+        {
+            "label": "Import a PRD file",
+            "description": "Import requirements from a PRD or BMAD file.",
+            "command": "/pathly prd-import",
+            "terminal_kind": "claude",
+        },
+        {
+            "label": "Explore the codebase",
+            "description": "Read-only Q&A about the project.",
+            "command": "/pathly explore",
+            "terminal_kind": "claude",
+        },
     ],
     "empty_message": "No menu items available.",
 }
@@ -129,9 +150,16 @@ def _tail_events(key: tuple[str, str], stop: threading.Event) -> None:
             except Exception:
                 _logger.debug("tail_events SQLite error", exc_info=True)
             wake.clear()
-            wake.wait(timeout=5.0)  # woken immediately by _on_new_event, or falls back to 5s
+            wake.wait(
+                timeout=5.0
+            )  # woken immediately by _on_new_event, or falls back to 5s
     except Exception:
-        _logger.warning("tail_events: cannot open central DB for %s/%s", topic, project_root, exc_info=True)
+        _logger.warning(
+            "tail_events: cannot open central DB for %s/%s",
+            topic,
+            project_root,
+            exc_info=True,
+        )
     finally:
         _bus.unsubscribe(bus_key, _on_new_event)
 

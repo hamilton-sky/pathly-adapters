@@ -1,4 +1,5 @@
 """Shim — re-exports from pathly_orchestrator.fsm_http_client for backward compat."""
+
 from pathly_orchestrator.fsm_http_client import *  # noqa: F401, F403
 from pathly_orchestrator.fsm_http_client import (  # noqa: F401
     DEFAULT_HOST,

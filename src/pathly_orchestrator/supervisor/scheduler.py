@@ -13,6 +13,7 @@ Design principles:
 - Pluggable isolation: Isolation impl (LaneIsolation or future WorktreeIsolation)
   supplies the TaskWorkspace; scheduler code is identical for both.
 """
+
 from __future__ import annotations
 
 import logging
@@ -88,7 +89,10 @@ def scheduler_loop(
     )
 
     if spawn_fn is None:
-        from pathly_orchestrator.supervisor.terminal import _run_stage_via_terminal as _default_spawn
+        from pathly_orchestrator.supervisor.terminal import (
+            _run_stage_via_terminal as _default_spawn,
+        )
+
         spawn_fn = _default_spawn
 
     conn = get_db()
@@ -96,7 +100,12 @@ def scheduler_loop(
     # 1. Reclaim any orphaned in_progress tasks from a previous crashed run.
     reclaimed = reclaim_stale_claims(conn, board, scope)
     if reclaimed:
-        logger.info("scheduler: reclaimed %d stale claims for %s/%s", len(reclaimed), board, scope)
+        logger.info(
+            "scheduler: reclaimed %d stale claims for %s/%s",
+            len(reclaimed),
+            board,
+            scope,
+        )
 
     completion_q: queue.Queue = queue.Queue()
     in_flight_lanes: set[str] = set()
@@ -119,12 +128,17 @@ def scheduler_loop(
         # blind to the board. Best-effort — never block a task on context.
         try:
             from pathly_orchestrator.runner.comms_context import board_context_for
-            _ctx = board_context_for(board, scope, getattr(state, "project_root", "") or "", instructions)
+
+            _ctx = board_context_for(
+                board, scope, getattr(state, "project_root", "") or "", instructions
+            )
             if _ctx:
                 instructions = f"{instructions}\n\n{_ctx}"
         except Exception:
             pass
-        adapter = task.get("adapter") or (state.current_adapter if hasattr(state, "current_adapter") else "")
+        adapter = task.get("adapter") or (
+            state.current_adapter if hasattr(state, "current_adapter") else ""
+        )
         model = task.get("model") or (state.model if hasattr(state, "model") else "")
 
         try:
@@ -145,7 +159,9 @@ def scheduler_loop(
     while True:
         # Abort check.
         if abort_check and abort_check():
-            logger.info("scheduler: abort signalled, exiting loop for %s/%s", board, scope)
+            logger.info(
+                "scheduler: abort signalled, exiting loop for %s/%s", board, scope
+            )
             break
 
         ready = get_ready_tasks(conn, boards=[board], scopes=[scope], goal_id=goal_id)
@@ -156,9 +172,8 @@ def scheduler_loop(
         capacity = max_workers - in_flight_count
 
         schedulable = [
-            t for t in ready
-            if (t.get("lane") or t["id"]) not in in_flight_lanes
-        ][:max(0, capacity)]
+            t for t in ready if (t.get("lane") or t["id"]) not in in_flight_lanes
+        ][: max(0, capacity)]
 
         for task in schedulable:
             task_id = task["id"]
@@ -170,7 +185,12 @@ def scheduler_loop(
                 # Another scheduler instance (or a race) claimed it first.
                 continue
 
-            _broadcast(event_broadcast_fn, scope, "task_claimed", {"task_id": task_id, "lane": lane, "board": board})
+            _broadcast(
+                event_broadcast_fn,
+                scope,
+                "task_claimed",
+                {"task_id": task_id, "lane": lane, "board": board},
+            )
 
             ws = isolation.acquire(task, state)
             workspaces[task_id] = ws
@@ -200,7 +220,9 @@ def scheduler_loop(
         try:
             item = completion_q.get(timeout=300)
         except queue.Empty:
-            logger.warning("scheduler: 5-minute timeout waiting for worker, checking abort")
+            logger.warning(
+                "scheduler: 5-minute timeout waiting for worker, checking abort"
+            )
             continue
 
         if item is _ABORT_SENTINEL:
@@ -218,11 +240,26 @@ def scheduler_loop(
             blocked_ids = fail_task(conn, task_id, reason=reason)
             result_failed.append(task_id)
             result_blocked.extend(blocked_ids)
-            _broadcast(event_broadcast_fn, scope, "task_failed", {"task_id": task_id, "lane": lane, "reason": reason, "blocked": blocked_ids})
+            _broadcast(
+                event_broadcast_fn,
+                scope,
+                "task_failed",
+                {
+                    "task_id": task_id,
+                    "lane": lane,
+                    "reason": reason,
+                    "blocked": blocked_ids,
+                },
+            )
         else:
             complete_task(conn, task_id)
             result_completed.append(task_id)
-            _broadcast(event_broadcast_fn, scope, "task_done", {"task_id": task_id, "lane": lane})
+            _broadcast(
+                event_broadcast_fn,
+                scope,
+                "task_done",
+                {"task_id": task_id, "lane": lane},
+            )
 
         # Release the SAME workspace lease we acquired for this task.
         if ws is not None:
@@ -238,7 +275,9 @@ def scheduler_loop(
     }
 
 
-def _broadcast(broadcast_fn: Optional[Callable], scope: str, event: str, payload: dict) -> None:
+def _broadcast(
+    broadcast_fn: Optional[Callable], scope: str, event: str, payload: dict
+) -> None:
     """Emit a scheduler task-state event on the COMMS stream, best-effort.
 
     Wraps the payload as a COMMS_UPDATE so Studio's board (which already listens

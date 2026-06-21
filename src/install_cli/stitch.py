@@ -4,7 +4,9 @@ from pathlib import Path
 import yaml
 
 
-def _compose_or_read(core_path: Path, compose_key: str | None, adapter: str | None) -> str:
+def _compose_or_read(
+    core_path: Path, compose_key: str | None, adapter: str | None
+) -> str:
     """Return the composed skill body when it's in the composition manifest, else raw.
 
     A skill absent from the manifest's ``skills:`` map composes to its raw body, so

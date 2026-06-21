@@ -1,4 +1,5 @@
 """Tests for /runner/* control endpoints and /events/runner SSE (Conv 3 — Phases 8-10)."""
+
 from __future__ import annotations
 
 import json
@@ -7,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
@@ -38,10 +39,15 @@ def _make_runner_dir(tmp_path, topic: str):
 
 # ── Phase 8: /runner/start — caps required ────────────────────────────────────
 
+
 def test_runner_start_missing_body(client):
     c, _ = client
-    r = c.post("/runner/start", data=b"", content_type="application/json",
-               headers={"Content-Length": "0"})
+    r = c.post(
+        "/runner/start",
+        data=b"",
+        content_type="application/json",
+        headers={"Content-Length": "0"},
+    )
     assert r.status_code in (400, 415, 500)
 
 
@@ -55,10 +61,15 @@ def test_runner_start_missing_required_fields(client):
 
 def test_runner_start_missing_max_iterations(client):
     c, _ = client
-    r = c.post("/runner/start", json={
-        "topic": "t", "flow": "team", "project_root": "/p",
-        "max_cost_usd": 1.0,
-    })
+    r = c.post(
+        "/runner/start",
+        json={
+            "topic": "t",
+            "flow": "team",
+            "project_root": "/p",
+            "max_cost_usd": 1.0,
+        },
+    )
     assert r.status_code == 400
     data = json.loads(r.data)
     assert "max_iterations" in data["error"]
@@ -66,10 +77,15 @@ def test_runner_start_missing_max_iterations(client):
 
 def test_runner_start_missing_max_cost_usd(client):
     c, _ = client
-    r = c.post("/runner/start", json={
-        "topic": "t", "flow": "team", "project_root": "/p",
-        "max_iterations": 5,
-    })
+    r = c.post(
+        "/runner/start",
+        json={
+            "topic": "t",
+            "flow": "team",
+            "project_root": "/p",
+            "max_iterations": 5,
+        },
+    )
     assert r.status_code == 400
     data = json.loads(r.data)
     assert "max_cost_usd" in data["error"]
@@ -77,19 +93,31 @@ def test_runner_start_missing_max_cost_usd(client):
 
 def test_runner_start_invalid_max_iterations_zero(client):
     c, _ = client
-    r = c.post("/runner/start", json={
-        "topic": "t", "flow": "team", "project_root": "/p",
-        "max_iterations": 0, "max_cost_usd": 1.0,
-    })
+    r = c.post(
+        "/runner/start",
+        json={
+            "topic": "t",
+            "flow": "team",
+            "project_root": "/p",
+            "max_iterations": 0,
+            "max_cost_usd": 1.0,
+        },
+    )
     assert r.status_code == 400
 
 
 def test_runner_start_invalid_max_cost_zero(client):
     c, _ = client
-    r = c.post("/runner/start", json={
-        "topic": "t", "flow": "team", "project_root": "/p",
-        "max_iterations": 5, "max_cost_usd": 0,
-    })
+    r = c.post(
+        "/runner/start",
+        json={
+            "topic": "t",
+            "flow": "team",
+            "project_root": "/p",
+            "max_iterations": 5,
+            "max_cost_usd": 0,
+        },
+    )
     assert r.status_code == 400
 
 
@@ -103,14 +131,19 @@ def test_runner_start_launches_run(client, tmp_path):
     mock_state.run_id = "test-run-id-abc"
     mock_state.public_dict.return_value = {"status": "running", "topic": topic}
 
-    with patch("pathly_orchestrator.supervisor.start_run", return_value=mock_state) as mock_start:
-        r = c.post("/runner/start", json={
-            "topic": topic,
-            "flow": "team",
-            "project_root": str(tmp_path),
-            "max_iterations": 5,
-            "max_cost_usd": 2.0,
-        })
+    with patch(
+        "pathly_orchestrator.supervisor.start_run", return_value=mock_state
+    ) as mock_start:
+        r = c.post(
+            "/runner/start",
+            json={
+                "topic": topic,
+                "flow": "team",
+                "project_root": str(tmp_path),
+                "max_iterations": 5,
+                "max_cost_usd": 2.0,
+            },
+        )
 
     assert r.status_code == 200
     data = json.loads(r.data)
@@ -128,15 +161,20 @@ def test_runner_start_409_when_already_active(client, tmp_path):
     c, _ = client
     topic = "ep-double-start"
 
-    with patch("pathly_orchestrator.supervisor.start_run",
-               side_effect=ValueError(f"Run for topic {topic!r} is already active")):
-        r = c.post("/runner/start", json={
-            "topic": topic,
-            "flow": "team",
-            "project_root": str(tmp_path),
-            "max_iterations": 5,
-            "max_cost_usd": 1.0,
-        })
+    with patch(
+        "pathly_orchestrator.supervisor.start_run",
+        side_effect=ValueError(f"Run for topic {topic!r} is already active"),
+    ):
+        r = c.post(
+            "/runner/start",
+            json={
+                "topic": topic,
+                "flow": "team",
+                "project_root": str(tmp_path),
+                "max_iterations": 5,
+                "max_cost_usd": 1.0,
+            },
+        )
 
     assert r.status_code == 409
     data = json.loads(r.data)
@@ -145,17 +183,24 @@ def test_runner_start_409_when_already_active(client, tmp_path):
 
 def test_runner_terminal_started_unknown_run_id(client):
     c, _ = client
-    r = c.post("/runner/terminal/started", json={"topic": "t", "run_id": "x", "tab_id": "tab", "pid": 0})
+    r = c.post(
+        "/runner/terminal/started",
+        json={"topic": "t", "run_id": "x", "tab_id": "tab", "pid": 0},
+    )
     assert r.status_code == 404
 
 
 def test_runner_terminal_result_unknown_run_id(client):
     c, _ = client
-    r = c.post("/runner/terminal/result", json={"topic": "t", "run_id": "x", "exit_code": 0, "stdout_tail": ""})
+    r = c.post(
+        "/runner/terminal/result",
+        json={"topic": "t", "run_id": "x", "exit_code": 0, "stdout_tail": ""},
+    )
     assert r.status_code == 404
 
 
 # ── Phase 8: /runner/decision — validates decision ∈ options ─────────────────
+
 
 def test_runner_decision_missing_topic(client):
     c, _ = client
@@ -181,14 +226,18 @@ def test_runner_decision_not_awaiting(client):
 
     topic = "ep-decision-bad-status"
     with _lock:
-        st = RunnerState(topic=topic, flow="team", project_root="/p", model="m", timeout=60)
+        st = RunnerState(
+            topic=topic, flow="team", project_root="/p", model="m", timeout=60
+        )
         st.status = "running"
         _registry[topic] = st
 
     r = c.post("/runner/decision", json={"topic": topic, "decision": "a"})
     assert r.status_code == 409
     data = json.loads(r.data)
-    assert "not awaiting" in data["error"].lower() or "awaiting" in data["error"].lower()
+    assert (
+        "not awaiting" in data["error"].lower() or "awaiting" in data["error"].lower()
+    )
 
 
 def test_runner_decision_invalid_option(client):
@@ -197,9 +246,15 @@ def test_runner_decision_invalid_option(client):
 
     topic = "ep-decision-bad-opt"
     with _lock:
-        st = RunnerState(topic=topic, flow="team", project_root="/p", model="m", timeout=60)
+        st = RunnerState(
+            topic=topic, flow="team", project_root="/p", model="m", timeout=60
+        )
         st.status = "awaiting_decision"
-        st.pending_menu = {"question": "Q?", "options": {"a": "PATH_A", "b": "PATH_B"}, "default": "a"}
+        st.pending_menu = {
+            "question": "Q?",
+            "options": {"a": "PATH_A", "b": "PATH_B"},
+            "default": "a",
+        }
         _registry[topic] = st
 
     r = c.post("/runner/decision", json={"topic": topic, "decision": "z"})
@@ -214,9 +269,15 @@ def test_runner_decision_valid_accepted(client):
 
     topic = "ep-decision-ok"
     with _lock:
-        st = RunnerState(topic=topic, flow="team", project_root="/p", model="m", timeout=60)
+        st = RunnerState(
+            topic=topic, flow="team", project_root="/p", model="m", timeout=60
+        )
         st.status = "awaiting_decision"
-        st.pending_menu = {"question": "Q?", "options": {"a": "PATH_A", "b": "PATH_B"}, "default": "a"}
+        st.pending_menu = {
+            "question": "Q?",
+            "options": {"a": "PATH_A", "b": "PATH_B"},
+            "default": "a",
+        }
         _registry[topic] = st
 
     with patch("pathly_orchestrator.supervisor.supply_decision") as mock_supply:
@@ -231,6 +292,7 @@ def test_runner_decision_valid_accepted(client):
 
 # ── Phase 8: /runner/reroute ─────────────────────────────────────────────────
 
+
 def test_runner_reroute_missing_adapter(client):
     c, _ = client
     r = c.post("/runner/reroute", json={"topic": "t"})
@@ -239,7 +301,9 @@ def test_runner_reroute_missing_adapter(client):
 
 def test_runner_reroute_topic_not_found(client):
     c, _ = client
-    with patch("pathly_orchestrator.supervisor.reroute_run", side_effect=KeyError("no-topic")):
+    with patch(
+        "pathly_orchestrator.supervisor.reroute_run", side_effect=KeyError("no-topic")
+    ):
         r = c.post("/runner/reroute", json={"topic": "no-topic", "adapter": "codex"})
     assert r.status_code == 404
 
@@ -257,6 +321,7 @@ def test_runner_reroute_success(client):
 
 
 # ── Phase 8: /runner/abort ────────────────────────────────────────────────────
+
 
 def test_runner_abort_missing_topic(client):
     c, _ = client
@@ -284,6 +349,7 @@ def test_runner_abort_success(client):
 
 # ── Phase 8: /runner/status GET ──────────────────────────────────────────────
 
+
 def test_runner_status_missing_topic(client):
     c, _ = client
     r = c.get("/runner/status")
@@ -302,7 +368,9 @@ def test_runner_status_returns_public_dict(client):
 
     topic = "ep-status-ok"
     with _lock:
-        st = RunnerState(topic=topic, flow="team", project_root="/p", model="m", timeout=60)
+        st = RunnerState(
+            topic=topic, flow="team", project_root="/p", model="m", timeout=60
+        )
         st.status = "paused"
         _registry[topic] = st
 
@@ -314,6 +382,7 @@ def test_runner_status_returns_public_dict(client):
 
 
 # ── Phase 8: /runner/pause and /runner/resume ─────────────────────────────────
+
 
 def test_runner_pause_success(client):
     c, _ = client
@@ -340,6 +409,7 @@ def test_runner_pause_not_found(client):
 
 # ── Phase 9: /events/runner SSE + _broadcast_runner ──────────────────────────
 
+
 def test_runner_events_missing_topic(client):
     c, _ = client
     r = c.get("/events/runner")
@@ -348,7 +418,11 @@ def test_runner_events_missing_topic(client):
 
 def test_broadcast_runner_delivers_to_subscriber():
     """_broadcast_runner enqueues a payload that the SSE generator would yield."""
-    from pathly_orchestrator.http_server import _broadcast_runner, _runner_clients, _runner_lock
+    from pathly_orchestrator.http_server import (
+        _broadcast_runner,
+        _runner_clients,
+        _runner_lock,
+    )
 
     topic = "ep-sse-topic"
     q: queue.Queue = queue.Queue(maxsize=50)
@@ -372,7 +446,11 @@ def test_broadcast_runner_delivers_to_subscriber():
 
 def test_broadcast_runner_ignores_other_topics():
     """_broadcast_runner for topic A does not enqueue to topic B's clients."""
-    from pathly_orchestrator.http_server import _broadcast_runner, _runner_clients, _runner_lock
+    from pathly_orchestrator.http_server import (
+        _broadcast_runner,
+        _runner_clients,
+        _runner_lock,
+    )
 
     topic_a = "ep-sse-a"
     topic_b = "ep-sse-b"
@@ -382,7 +460,9 @@ def test_broadcast_runner_ignores_other_topics():
         _runner_clients.setdefault(topic_b, []).append(q_b)
 
     try:
-        _broadcast_runner(topic_a, {"type": "RUNNER_STATUS", "topic": topic_a, "status": "done"})
+        _broadcast_runner(
+            topic_a, {"type": "RUNNER_STATUS", "topic": topic_a, "status": "done"}
+        )
         assert q_b.empty()
     finally:
         with _runner_lock:
@@ -411,7 +491,11 @@ def test_runner_events_sends_connected_event(client):
 
 def test_broadcast_runner_full_queue_does_not_raise():
     """A full queue is silently skipped — no exception propagates."""
-    from pathly_orchestrator.http_server import _broadcast_runner, _runner_clients, _runner_lock
+    from pathly_orchestrator.http_server import (
+        _broadcast_runner,
+        _runner_clients,
+        _runner_lock,
+    )
 
     topic = "ep-sse-full"
     q: queue.Queue = queue.Queue(maxsize=1)
@@ -422,8 +506,16 @@ def test_broadcast_runner_full_queue_does_not_raise():
 
     try:
         # Must not raise
-        _broadcast_runner(topic, {"type": "COST_UPDATE", "topic": topic, "cost_usd": 0.1,
-                                   "iterations": 1, "max_cost_usd": 2.0})
+        _broadcast_runner(
+            topic,
+            {
+                "type": "COST_UPDATE",
+                "topic": topic,
+                "cost_usd": 0.1,
+                "iterations": 1,
+                "max_cost_usd": 2.0,
+            },
+        )
     finally:
         with _runner_lock:
             clients = _runner_clients.get(topic, [])

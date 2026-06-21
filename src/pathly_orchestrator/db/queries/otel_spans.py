@@ -1,4 +1,5 @@
 """Query helpers for the otel_spans table."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -28,8 +29,15 @@ def write_otel_span(
             " name, start_time, end_time, attributes) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                project_root, feature, trace_id, span_id, parent_span_id,
-                name, start_time or now, end_time or now, attributes,
+                project_root,
+                feature,
+                trace_id,
+                span_id,
+                parent_span_id,
+                name,
+                start_time or now,
+                end_time or now,
+                attributes,
             ),
         )
         conn.commit()

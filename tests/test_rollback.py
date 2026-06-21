@@ -5,7 +5,6 @@ import pytest
 
 from install_cli.materialize import materialize, uninstall, MANIFEST_NAME
 
-
 # ---------------------------------------------------------------------------
 # Rollback on mid-install failure
 #
@@ -14,6 +13,7 @@ from install_cli.materialize import materialize, uninstall, MANIFEST_NAME
 # then call uninstall(dest) to clean up.  This test verifies that the
 # rollback-via-uninstall flow leaves no manifest on disk.
 # ---------------------------------------------------------------------------
+
 
 def test_no_orphans_after_mid_install_failure(tmp_path):
     """Mid-install OSError followed by uninstall() leaves no manifest on disk."""
@@ -44,9 +44,9 @@ def test_no_orphans_after_mid_install_failure(tmp_path):
 
     uninstall(tmp_path)
 
-    assert not (tmp_path / MANIFEST_NAME).exists(), (
-        "Manifest file should not exist after rollback-via-uninstall"
-    )
+    assert not (
+        tmp_path / MANIFEST_NAME
+    ).exists(), "Manifest file should not exist after rollback-via-uninstall"
 
 
 def test_failed_install_leaves_no_manifest(tmp_path):
@@ -74,7 +74,9 @@ def test_failed_install_leaves_no_manifest(tmp_path):
             materialize(files, tmp_path)
 
     manifest_path = tmp_path / MANIFEST_NAME
-    assert not manifest_path.exists(), "No manifest should exist after a failed materialize"
+    assert (
+        not manifest_path.exists()
+    ), "No manifest should exist after a failed materialize"
 
 
 def test_uninstall_without_manifest_returns_empty(tmp_path):

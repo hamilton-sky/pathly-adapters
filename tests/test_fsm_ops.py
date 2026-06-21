@@ -1,4 +1,5 @@
 """Integration tests for fsm_ops.py (next_action, complete_stage)."""
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,6 @@ import pytest
 
 import pathly_orchestrator.fsm_ops as fsm_ops
 from pathly_orchestrator.fsm_ops import complete_stage, next_action
-
 
 DECIDE_FLOW = {
     "version": 1,
@@ -60,12 +60,15 @@ def _storage_path(tmp_path: Path, topic: str = "test-topic") -> Path:
 
 # ── Basic routing tests ───────────────────────────────────────────────────────
 
+
 def test_next_action_initial_state(tmp_path):
-    result = next_action({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert result["current_state"] == "STORMING"
     assert result["agent"] == "team/discover"
     assert result["schema_version"] == "1"
@@ -85,11 +88,13 @@ def test_next_action_includes_codex_worker_hint(tmp_path, monkeypatch):
     _patch_load_flow(monkeypatch, ROUTING_FLOW)
     _patch_build_prompt(monkeypatch)
 
-    result = next_action({
-        "flow": "test",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "test",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
 
     assert result["agent"] == "builder"
     hint = result["agent_hint"]
@@ -107,11 +112,13 @@ def test_next_action_includes_menu_payload(tmp_path, monkeypatch):
     _patch_load_flow(monkeypatch, ROUTING_FLOW)
     _patch_build_prompt(monkeypatch)
 
-    result = next_action({
-        "flow": "test",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "test",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
 
     menu = result["menu"]
     assert menu["state"] == "BUILDING"
@@ -134,13 +141,17 @@ def test_complete_stage_after_planning(tmp_path):
     storage = _storage_path(tmp_path)
     state_file = storage / "STATE.json"
     state_file.write_text(json.dumps({"current": "PLANNING"}), encoding="utf-8")
-    (storage / "IMPLEMENTATION_PLAN.md").write_text("## Conversation 1\nplan content", encoding="utf-8")
+    (storage / "IMPLEMENTATION_PLAN.md").write_text(
+        "## Conversation 1\nplan content", encoding="utf-8"
+    )
 
-    result = complete_stage({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = complete_stage(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert result.get("current_state") in ("BUILDING", "DESIGNING")
     assert result["schema_version"] == "1"
     assert result["decision"] == "continue"
@@ -159,13 +170,17 @@ def test_complete_stage_blocked_by_review_failures(tmp_path):
     state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
     feedback_dir = storage / "feedback"
     feedback_dir.mkdir()
-    (feedback_dir / "REVIEW_FAILURES.md").write_text("these tests failed", encoding="utf-8")
+    (feedback_dir / "REVIEW_FAILURES.md").write_text(
+        "these tests failed", encoding="utf-8"
+    )
 
-    result = complete_stage({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = complete_stage(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert result.get("blocked") is True
     assert result.get("target_agent") == "builder"
     assert "# builder" in result["instructions"]
@@ -176,10 +191,13 @@ def test_complete_stage_blocked_by_review_failures(tmp_path):
     assert result["codex_subagent"]["pathly_agent"] == "builder"
     assert "stage_brief" in result
     assert "storage_path" in result
-    assert result["warnings"] == [{"code": "open_feedback", "file": "REVIEW_FAILURES.md"}]
+    assert result["warnings"] == [
+        {"code": "open_feedback", "file": "REVIEW_FAILURES.md"}
+    ]
 
 
 # ── Two-call decide protocol ──────────────────────────────────────────────────
+
 
 def _patch_load_flow(monkeypatch, flow: dict) -> None:
     monkeypatch.setattr(fsm_ops, "_load_flow", lambda *_: flow)
@@ -201,11 +219,13 @@ def test_complete_stage_returns_decide_sentinel(tmp_path, monkeypatch):
     state_file = storage / "STATE.json"
     state_file.write_text(json.dumps({"current": "DECIDING"}), encoding="utf-8")
 
-    result = complete_stage({
-        "flow": "test",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = complete_stage(
+        {
+            "flow": "test",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
 
     assert result.get("decide") is True
     assert isinstance(result.get("question"), str)
@@ -232,12 +252,14 @@ def test_complete_stage_with_valid_decision(tmp_path, monkeypatch):
     state_file = storage / "STATE.json"
     state_file.write_text(json.dumps({"current": "DECIDING"}), encoding="utf-8")
 
-    result = complete_stage({
-        "flow": "test",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-        "decision": "a",
-    })
+    result = complete_stage(
+        {
+            "flow": "test",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+            "decision": "a",
+        }
+    )
 
     assert result.get("current_state") == "PATH_A"
     assert "agent" in result
@@ -251,6 +273,7 @@ def test_complete_stage_with_valid_decision(tmp_path, monkeypatch):
 
     # Events now in SQLite, not EVENTS.jsonl
     from pathly_orchestrator import db as _db
+
     _conn = _db.get_db()
     events = _db.read_events(_conn, str(tmp_path), "test-topic")
     event_types = [e["type"] for e in events]
@@ -266,18 +289,21 @@ def test_complete_stage_with_invalid_decision(tmp_path, monkeypatch):
     state_file = storage / "STATE.json"
     state_file.write_text(json.dumps({"current": "DECIDING"}), encoding="utf-8")
 
-    result = complete_stage({
-        "flow": "test",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-        "decision": "nonsense",
-    })
+    result = complete_stage(
+        {
+            "flow": "test",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+            "decision": "nonsense",
+        }
+    )
 
     assert result.get("current_state") == "PATH_A"
     assert result["decision"] == "continue"
 
     # Events now in SQLite, not EVENTS.jsonl
     from pathly_orchestrator import db as _db
+
     _conn = _db.get_db()
     events = _db.read_events(_conn, str(tmp_path), "test-topic")
     decide_events = [e for e in events if e.get("type") == "DECIDE_ROUTING"]
@@ -288,15 +314,18 @@ def test_complete_stage_with_invalid_decision(tmp_path, monkeypatch):
 
 # ── Adapter-neutral envelope tests ───────────────────────────────────────────
 
+
 def test_agent_hint_uses_neutral_keys(tmp_path, monkeypatch):
     _patch_load_flow(monkeypatch, ROUTING_FLOW)
     _patch_build_prompt(monkeypatch)
 
-    result = next_action({
-        "flow": "test",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "test",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
 
     hint = result["agent_hint"]
     assert "agent" in hint
@@ -309,11 +338,13 @@ def test_codex_subagent_retains_legacy_keys(tmp_path, monkeypatch):
     _patch_load_flow(monkeypatch, ROUTING_FLOW)
     _patch_build_prompt(monkeypatch)
 
-    result = next_action({
-        "flow": "test",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "test",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
 
     codex = result["codex_subagent"]
     assert "codex_role" in codex
@@ -321,11 +352,13 @@ def test_codex_subagent_retains_legacy_keys(tmp_path, monkeypatch):
 
 
 def test_current_state_key_on_next_action(tmp_path):
-    result = next_action({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert "current_state" in result
     assert "next_state" not in result
 
@@ -336,11 +369,13 @@ def test_current_state_key_on_complete_stage(tmp_path):
     state_file.write_text(json.dumps({"current": "PLANNING"}), encoding="utf-8")
     (storage / "IMPLEMENTATION_PLAN.md").write_text("plan content", encoding="utf-8")
 
-    result = complete_stage({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = complete_stage(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert "current_state" in result
     assert "next_state" not in result
 
@@ -351,13 +386,17 @@ def test_escalate_decision_when_target_is_human(tmp_path):
     state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
     feedback_dir = storage / "feedback"
     feedback_dir.mkdir()
-    (feedback_dir / "HUMAN_QUESTIONS.md").write_text("needs human input", encoding="utf-8")
+    (feedback_dir / "HUMAN_QUESTIONS.md").write_text(
+        "needs human input", encoding="utf-8"
+    )
 
-    result = next_action({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert result["decision"] == "escalate"
     assert result["target_agent"] == "human"
 
@@ -368,13 +407,17 @@ def test_block_decision_when_target_is_non_human_agent(tmp_path):
     state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
     feedback_dir = storage / "feedback"
     feedback_dir.mkdir()
-    (feedback_dir / "REVIEW_FAILURES.md").write_text("these tests failed", encoding="utf-8")
+    (feedback_dir / "REVIEW_FAILURES.md").write_text(
+        "these tests failed", encoding="utf-8"
+    )
 
-    result = next_action({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert result["decision"] == "block"
     assert result["target_agent"] != "human"
 
@@ -385,26 +428,36 @@ def test_blocked_response_has_agent_hint_and_storage_path(tmp_path):
     state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
     feedback_dir = storage / "feedback"
     feedback_dir.mkdir()
-    (feedback_dir / "REVIEW_FAILURES.md").write_text("these tests failed", encoding="utf-8")
+    (feedback_dir / "REVIEW_FAILURES.md").write_text(
+        "these tests failed", encoding="utf-8"
+    )
 
-    result = next_action({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert result.get("blocked") is True
     assert "agent_hint" in result
     assert "storage_path" in result
 
 
 def test_next_action_corrupt_state_escalate_has_storage_path(tmp_path, monkeypatch):
-    monkeypatch.setattr(fsm_ops, "recover_state", lambda *_: (_ for _ in ()).throw(RuntimeError("corrupt")))
+    monkeypatch.setattr(
+        fsm_ops,
+        "recover_state",
+        lambda *_: (_ for _ in ()).throw(RuntimeError("corrupt")),
+    )
 
-    result = next_action({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
 
     assert result["decision"] == "escalate"
     assert "storage_path" in result
@@ -416,13 +469,17 @@ def test_blocked_response_warnings_contain_open_feedback(tmp_path):
     state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
     feedback_dir = storage / "feedback"
     feedback_dir.mkdir()
-    (feedback_dir / "REVIEW_FAILURES.md").write_text("these tests failed", encoding="utf-8")
+    (feedback_dir / "REVIEW_FAILURES.md").write_text(
+        "these tests failed", encoding="utf-8"
+    )
 
-    result = next_action({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert any(w.get("code") == "open_feedback" for w in result["warnings"])
 
 
@@ -435,14 +492,19 @@ def test_escalate_when_no_routable_feedback(tmp_path, monkeypatch):
     monkeypatch.setattr(
         fsm_ops,
         "run_gates",
-        lambda *_: {"gate_failed": "verify_gate", "feedback_file": "REVIEW_FAILURES.md"},
+        lambda *_: {
+            "gate_failed": "verify_gate",
+            "feedback_file": "REVIEW_FAILURES.md",
+        },
     )
 
-    result = complete_stage({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = complete_stage(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert result["decision"] == "escalate"
     assert result.get("blocked") is True
 
@@ -453,19 +515,24 @@ def test_escalate_response_not_continuable(tmp_path):
     state_file.write_text(json.dumps({"current": "REVIEWING"}), encoding="utf-8")
     feedback_dir = storage / "feedback"
     feedback_dir.mkdir()
-    (feedback_dir / "HUMAN_QUESTIONS.md").write_text("needs human input", encoding="utf-8")
+    (feedback_dir / "HUMAN_QUESTIONS.md").write_text(
+        "needs human input", encoding="utf-8"
+    )
 
-    result = next_action({
-        "flow": "team",
-        "topic": "test-topic",
-        "project_root": str(tmp_path),
-    })
+    result = next_action(
+        {
+            "flow": "team",
+            "topic": "test-topic",
+            "project_root": str(tmp_path),
+        }
+    )
     assert result["decision"] == "escalate"
     assert result.get("blocked") is True
     assert "next_state" not in result
 
 
 # ── preferred_adapter tests ───────────────────────────────────────────────────
+
 
 def test_resolve_adapter_state_in_map():
     flow = {**ROUTING_FLOW, "adapter_map": {"default": "claude", "BUILDING": "codex"}}
@@ -486,7 +553,9 @@ def test_next_action_preferred_adapter_from_state(tmp_path, monkeypatch):
     _patch_load_flow(monkeypatch, flow)
     _patch_build_prompt(monkeypatch)
 
-    result = next_action({"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)})
+    result = next_action(
+        {"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)}
+    )
     assert result["preferred_adapter"] == "codex"
 
 
@@ -495,7 +564,9 @@ def test_next_action_preferred_adapter_fallback_to_default(tmp_path, monkeypatch
     _patch_load_flow(monkeypatch, flow)
     _patch_build_prompt(monkeypatch)
 
-    result = next_action({"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)})
+    result = next_action(
+        {"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)}
+    )
     assert result["preferred_adapter"] == "claude"
 
 
@@ -503,12 +574,19 @@ def test_next_action_preferred_adapter_empty_when_no_map(tmp_path, monkeypatch):
     _patch_load_flow(monkeypatch, ROUTING_FLOW)
     _patch_build_prompt(monkeypatch)
 
-    result = next_action({"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)})
+    result = next_action(
+        {"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)}
+    )
     assert result["preferred_adapter"] == ""
 
 
 def test_blocked_response_carries_preferred_adapter():
-    state_info = {"current_state": "REVIEWING", "conv": 1, "retry_count": 0, "limits": {}}
+    state_info = {
+        "current_state": "REVIEWING",
+        "conv": 1,
+        "retry_count": 0,
+        "limits": {},
+    }
     feedback = {"target_agent": "builder", "file": "REVIEW_FAILURES.md"}
     result = fsm_ops._blocked_response(feedback, state_info, preferred_adapter="codex")
     assert result["preferred_adapter"] == "codex"
@@ -525,37 +603,51 @@ def test_build_prompt_includes_pipeline_history(tmp_path):
     plan_dir.mkdir(parents=True, exist_ok=True)
     # Write event via eventlog so it goes to DB (works in both normal and PATHLY_DB_ONLY mode)
     from pathly_orchestrator.eventlog import append_event as _ae
-    _ae(str(plan_dir), {
-        "type": "AGENT_DONE",
-        "agent": "builder",
-        "conversation": 1,
-        "summary": "smoke test entry",
-        "ts": "2026-01-01T00:00:00Z",
-        "schema_version": 1,
-    })
 
-    storage_path = plan_dir  # storage_path.name == feature, .parent.parent.parent == tmp_path
+    _ae(
+        str(plan_dir),
+        {
+            "type": "AGENT_DONE",
+            "agent": "builder",
+            "conversation": 1,
+            "summary": "smoke test entry",
+            "ts": "2026-01-01T00:00:00Z",
+            "schema_version": 1,
+        },
+    )
+
+    storage_path = (
+        plan_dir  # storage_path.name == feature, .parent.parent.parent == tmp_path
+    )
     flow_config = {
         "agent_map": {"BUILDING": "quick"},
         "composition": {},
     }
 
-    with patch("pathly_orchestrator.fsm_ops._load_agent_text", return_value="base agent text"):
+    with patch(
+        "pathly_orchestrator.fsm_ops._load_agent_text", return_value="base agent text"
+    ):
         result = build_prompt(flow_config, "BUILDING", storage_path)
 
-    assert "## Pipeline History" in result, f"History block missing from prompt:\n{result}"
+    assert (
+        "## Pipeline History" in result
+    ), f"History block missing from prompt:\n{result}"
     assert "smoke test entry" in result, f"History entry missing from prompt:\n{result}"
 
 
 # ── T2.4 — FSM loads flow from rows (Phase 2 regression) ─────────────────────
 
-@pytest.mark.parametrize("flow_name,expected_first_state", [
-    ("team",      "STORMING"),
-    ("debug",     "INVESTIGATING"),
-    ("explore",   "FRAMING"),
-    ("test",      "STORMING"),
-    ("quick-fix", "SCOPING"),
-])
+
+@pytest.mark.parametrize(
+    "flow_name,expected_first_state",
+    [
+        ("team", "STORMING"),
+        ("debug", "INVESTIGATING"),
+        ("explore", "FRAMING"),
+        ("test", "STORMING"),
+        ("quick-fix", "SCOPING"),
+    ],
+)
 def test_load_flow_from_rows(flow_name, expected_first_state):
     """_load_flow returns a rows-assembled dict equal to the original YAML."""
     import sqlite3 as _sqlite3
@@ -563,6 +655,7 @@ def test_load_flow_from_rows(flow_name, expected_first_state):
     from importlib.resources import files as _files
     from pathly_orchestrator.db.migrations import _run_migrations
     from pathly_orchestrator.db.queries.flow_defs import upsert_flow_definition
+
     # Build an isolated in-memory DB with the flow rows populated.
     # We cannot use get_db() here (that returns the per-test DB which already has
     # the flows from _refresh_flows). Instead, patch _load_flow to use a fresh conn.
@@ -570,7 +663,11 @@ def test_load_flow_from_rows(flow_name, expected_first_state):
     conn.row_factory = _sqlite3.Row
     _run_migrations(conn)
 
-    text = _files("pathly_data").joinpath(f"core/flows/{flow_name}.flow.yaml").read_text(encoding="utf-8")
+    text = (
+        _files("pathly_data")
+        .joinpath(f"core/flows/{flow_name}.flow.yaml")
+        .read_text(encoding="utf-8")
+    )
     original = _yaml.safe_load(text)
     upsert_flow_definition(conn, None, flow_name, "", text)
 
@@ -601,6 +698,7 @@ def test_load_flow_from_rows(flow_name, expected_first_state):
 
 
 # ── _resolve_storage_path tests ──────────────────────────────────────────────
+
 
 def test_resolve_storage_path_prefers_new_style(tmp_path):
     """New-style pathly/<topic>/ is returned when that directory exists."""

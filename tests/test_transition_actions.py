@@ -14,6 +14,7 @@ FLOWS_DIR = Path(__file__).parent.parent / "src" / "pathly_data" / "core" / "flo
 
 # ── get_transition_actions() ──────────────────────────────────────────────────
 
+
 def test_get_transition_actions_returns_full_dict_when_present():
     flow = {
         "transition_actions": {
@@ -40,6 +41,7 @@ def test_get_transition_actions_returns_empty_dict_when_key_is_falsy():
 
 # ── validate_flow_cli() helpers ───────────────────────────────────────────────
 
+
 def _run_cli(path: str, monkeypatch) -> int:
     monkeypatch.setattr(sys, "argv", ["pathly-validate-flow", path])
     with pytest.raises(SystemExit) as exc_info:
@@ -48,6 +50,7 @@ def _run_cli(path: str, monkeypatch) -> int:
 
 
 # ── validate_flow_cli(): real flow files ──────────────────────────────────────
+
 
 def test_validate_team_flow_passes(monkeypatch, capsys):
     code = _run_cli(str(FLOWS_DIR / "team.flow.yaml"), monkeypatch)
@@ -65,7 +68,10 @@ def test_validate_debug_flow_passes(monkeypatch, capsys):
 
 # ── validate_flow_cli(): warning when transition_actions absent ───────────────
 
-def test_validate_warns_but_exits_0_when_transition_actions_absent(monkeypatch, tmp_path, capsys):
+
+def test_validate_warns_but_exits_0_when_transition_actions_absent(
+    monkeypatch, tmp_path, capsys
+):
     flow = {
         "storage_path": "plans/{topic}/",
         "states": ["A", "B"],
@@ -84,6 +90,7 @@ def test_validate_warns_but_exits_0_when_transition_actions_absent(monkeypatch, 
 
 
 # ── validate_flow_cli(): unknown action type exits 1 ─────────────────────────
+
 
 def test_validate_exits_1_on_unknown_action_type(monkeypatch, tmp_path, capsys):
     flow = {
@@ -107,6 +114,7 @@ def test_validate_exits_1_on_unknown_action_type(monkeypatch, tmp_path, capsys):
 
 # ── validate_flow_cli(): invalid FROM->TO key exits 1 ────────────────────────
 
+
 def test_validate_exits_1_on_invalid_transition_key(monkeypatch, tmp_path, capsys):
     flow = {
         "storage_path": "plans/{topic}/",
@@ -128,6 +136,7 @@ def test_validate_exits_1_on_invalid_transition_key(monkeypatch, tmp_path, capsy
 
 
 # ── validate_flow_cli(): adapter_map validation ───────────────────────────────
+
 
 def _minimal_flow(**extra) -> dict:
     base = {
@@ -175,7 +184,9 @@ def test_validate_adapter_map_unknown_adapter_fails(monkeypatch, tmp_path, capsy
     assert "cursor" in out
 
 
-def test_validate_adapter_map_unknown_default_value_fails(monkeypatch, tmp_path, capsys):
+def test_validate_adapter_map_unknown_default_value_fails(
+    monkeypatch, tmp_path, capsys
+):
     """The 'default' key's own value must also be in _KNOWN_ADAPTERS."""
     flow = _minimal_flow(adapter_map={"default": "cursor"})
     flow_file = tmp_path / "bad_default_value.flow.yaml"
@@ -215,6 +226,7 @@ def test_validate_team_flow_with_adapter_map_still_passes(monkeypatch):
 
 # ── validate_flow_cli(): composition key validation ───────────────────────────
 
+
 def test_validate_flow_without_composition_key_passes(monkeypatch, tmp_path):
     """Flows with no composition: key must validate cleanly (backward-compatible)."""
     flow = _minimal_flow()
@@ -225,7 +237,9 @@ def test_validate_flow_without_composition_key_passes(monkeypatch, tmp_path):
     assert code == 0
 
 
-def test_validate_composition_valid_state_and_block_passes(monkeypatch, tmp_path, capsys):
+def test_validate_composition_valid_state_and_block_passes(
+    monkeypatch, tmp_path, capsys
+):
     """Flow with composition: {BUILDING: full-build} passes when BUILDING is declared."""
     flow = _minimal_flow(composition={"BUILDING": "full-build"})
     flow_file = tmp_path / "good_composition.flow.yaml"

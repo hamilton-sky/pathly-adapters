@@ -1,4 +1,5 @@
 """Query helpers for the catalog_items table."""
+
 from __future__ import annotations
 
 import os
@@ -9,8 +10,8 @@ from pathlib import Path
 
 from ..connection import _get_write_lock
 
-
 # ── public write/read ────────────────────────────────────────────────────────
+
 
 def upsert_catalog_item(
     conn: sqlite3.Connection,
@@ -58,12 +59,13 @@ def read_catalog_item_by_path(conn: sqlite3.Connection, abs_path: str) -> dict |
     norm = abs_path.replace("\\", "/")
     row = conn.execute(
         "SELECT * FROM catalog_items WHERE abs_path=? OR abs_path=?",
-        (norm, norm.replace("/", "\\"))
+        (norm, norm.replace("/", "\\")),
     ).fetchone()
     return dict(row) if row else None
 
 
 # ── indexer ──────────────────────────────────────────────────────────────────
+
 
 def move_catalog_item(
     conn: sqlite3.Connection,
@@ -91,8 +93,8 @@ def move_catalog_item(
 
     core = data_root / "core"
     type_to_base: dict[str, Path] = {
-        "skill":    core / "skills",
-        "agent":    core / "agents",
+        "skill": core / "skills",
+        "agent": core / "agents",
         "fragment": core / "skills" / "fragments",
         "template": core / "templates",
     }
@@ -129,7 +131,12 @@ def move_catalog_item(
         )
         conn.commit()
 
-    return {"name": new_name, "category": new_category, "abs_path": new_abs_str, "rel_path": new_rel}
+    return {
+        "name": new_name,
+        "category": new_category,
+        "abs_path": new_abs_str,
+        "rel_path": new_rel,
+    }
 
 
 def rename_catalog_item(
@@ -168,7 +175,11 @@ def rename_catalog_item(
     data_root = _find_data_root()
     category = row.get("category", "")
     if item_type in ("skill", "template", "fragment"):
-        new_name = f"{category}/{safe_stem}" if category and category not in (item_type, "fragments") else safe_stem
+        new_name = (
+            f"{category}/{safe_stem}"
+            if category and category not in (item_type, "fragments")
+            else safe_stem
+        )
     else:
         new_name = safe_stem
 
@@ -208,8 +219,8 @@ def rename_catalog_category(
 
     core = data_root / "core"
     type_to_base: dict[str, Path] = {
-        "skill":    core / "skills",
-        "agent":    core / "agents",
+        "skill": core / "skills",
+        "agent": core / "agents",
         "fragment": core / "skills" / "fragments",
         "template": core / "templates",
     }
@@ -274,6 +285,7 @@ def rebuild_catalog(conn: sqlite3.Connection) -> None:
 
 # ── private helpers ───────────────────────────────────────────────────────────
 
+
 def _find_data_root() -> Path | None:
     """Locate the pathly_data package root by walking up from this file."""
     this_dir = Path(__file__).resolve().parent
@@ -289,6 +301,7 @@ def _find_data_root() -> Path | None:
     # Fallback: importlib.resources
     try:
         from importlib.resources import files as _res_files
+
         p = Path(str(_res_files("pathly_data").joinpath("core")))
         if p.exists():
             return p.parent
@@ -404,7 +417,7 @@ def _first_line(path: Path) -> str:
         if text.startswith("---"):
             end = text.find("\n---", 3)
             if end != -1:
-                text = text[end + 4:]
+                text = text[end + 4 :]
         for line in text.splitlines():
             line = line.strip()
             if not line or line.startswith("#"):
@@ -415,7 +428,9 @@ def _first_line(path: Path) -> str:
     return ""
 
 
-def _parse_frontmatter(text: str, fallback_name: str) -> tuple[str, str, str, str | None]:
+def _parse_frontmatter(
+    text: str, fallback_name: str
+) -> tuple[str, str, str, str | None]:
     """Extract (name, description, category, requires) from YAML frontmatter."""
     name = fallback_name
     description = ""

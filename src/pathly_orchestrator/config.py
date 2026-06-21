@@ -15,6 +15,7 @@ _LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
 def _load_or_create_secret() -> str:
     """Read the shared API secret from ~/.pathly/server_secret.txt, creating it if absent."""
     from pathlib import Path
+
     secret_file = Path.home() / ".pathly" / "server_secret.txt"
     secret_file.parent.mkdir(parents=True, exist_ok=True)
     if secret_file.exists():

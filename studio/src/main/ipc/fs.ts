@@ -46,7 +46,11 @@ export function registerFsHandlers(): void {
       throw new Error('Path outside home directory is not allowed')
     }
     try {
-      return fs.readFileSync(filePath, 'utf-8')
+      const text = fs.readFileSync(filePath, 'utf-8')
+      // Strip a leading UTF-8 BOM (U+FEFF). PowerShell 5.1's `Set-Content -Encoding UTF8` (which a
+      // spawned agent may use to write a draft) prepends one; Node's utf-8 decode keeps it, which
+      // would otherwise surface as an invisible char and a phantom "changed" first diff section.
+      return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw err

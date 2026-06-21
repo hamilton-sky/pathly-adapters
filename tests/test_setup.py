@@ -7,13 +7,18 @@ from unittest.mock import patch
 import pytest
 
 from install_cli.detect import detect_hosts, _HOST_MARKERS
-from install_cli.materialize import materialize, materialize_flows, uninstall, MANIFEST_NAME
+from install_cli.materialize import (
+    materialize,
+    materialize_flows,
+    uninstall,
+    MANIFEST_NAME,
+)
 from install_cli.setup_command import main
-
 
 # ---------------------------------------------------------------------------
 # detect
 # ---------------------------------------------------------------------------
+
 
 def test_detect_hosts_returns_list():
     result = detect_hosts()
@@ -40,13 +45,17 @@ def test_detect_antigravity_when_dir_exists(tmp_path):
 
 
 def test_detect_antigravity_when_dir_missing(tmp_path):
-    with patch("install_cli.detect._HOST_MARKERS", {"antigravity": [tmp_path / "nonexistent"]}):
+    with patch(
+        "install_cli.detect._HOST_MARKERS", {"antigravity": [tmp_path / "nonexistent"]}
+    ):
         result = detect_hosts()
     assert "antigravity" not in result
 
 
 def test_detect_claude_when_dir_missing(tmp_path):
-    with patch("install_cli.detect._HOST_MARKERS", {"claude": [tmp_path / "nonexistent"]}):
+    with patch(
+        "install_cli.detect._HOST_MARKERS", {"claude": [tmp_path / "nonexistent"]}
+    ):
         result = detect_hosts()
     assert "claude" not in result
 
@@ -62,6 +71,7 @@ def test_detect_claude_when_dir_exists(tmp_path):
 # ---------------------------------------------------------------------------
 # materialize
 # ---------------------------------------------------------------------------
+
 
 def test_materialize_writes_new_files(tmp_path):
     files = {"agent.md": "# agent\n\nBody."}
@@ -137,6 +147,7 @@ def test_materialize_flows_preserves_owned_agent_files(tmp_path):
 # setup_command
 # ---------------------------------------------------------------------------
 
+
 def test_no_flags_launches_interactive_menu():
     # With no flags, main() delegates to _interactive_menu rather than writing
     # files directly. Patch the menu to return immediately (simulating Exit).
@@ -206,7 +217,9 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
 
     captured_plugin_files = {}
 
-    monkeypatch.setattr("install_cli.orchestrate.materialize", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        "install_cli.orchestrate.materialize", lambda *args, **kwargs: []
+    )
     monkeypatch.setattr(
         "install_cli.orchestrate.materialize_flows", lambda *args, **kwargs: []
     )
@@ -223,8 +236,12 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
     assert "agent_hint" in build_skill
     assert "`worker`" in build_skill
     assert "`explorer`" in build_skill
-    assert "Never block or claim failure solely because a named Pathly role" in build_skill
-    assert build_skill.index("## Codex Execution Contract") < build_skill.index("# build")
+    assert (
+        "Never block or claim failure solely because a named Pathly role" in build_skill
+    )
+    assert build_skill.index("## Codex Execution Contract") < build_skill.index(
+        "# build"
+    )
 
     builder_agent = captured_plugin_files["agents/builder.toml"]
     assert "pathly-fsm-call record-activity" in builder_agent
@@ -234,11 +251,16 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
 # SKILL_EXECUTION.md — adapter integration contract assertions
 # ---------------------------------------------------------------------------
 
+
 def test_skill_execution_md_decision_values():
     """SKILL_EXECUTION.md must document all three FSM decision values."""
     skill_exec = (
         Path(__file__).parent.parent
-        / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
+        / "src"
+        / "pathly_data"
+        / "adapters"
+        / "codex"
+        / "SKILL_EXECUTION.md"
     )
     content = skill_exec.read_text(encoding="utf-8")
     assert "continue" in content
@@ -250,7 +272,11 @@ def test_skill_execution_md_agent_hint_is_primary():
     """SKILL_EXECUTION.md must reference agent_hint as primary contract."""
     skill_exec = (
         Path(__file__).parent.parent
-        / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
+        / "src"
+        / "pathly_data"
+        / "adapters"
+        / "codex"
+        / "SKILL_EXECUTION.md"
     )
     content = skill_exec.read_text(encoding="utf-8")
     assert "agent_hint" in content
@@ -260,7 +286,11 @@ def test_skill_execution_md_no_codex_subagent_primary_dispatch():
     """codex_subagent must not appear as a primary dispatch reference."""
     skill_exec = (
         Path(__file__).parent.parent
-        / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
+        / "src"
+        / "pathly_data"
+        / "adapters"
+        / "codex"
+        / "SKILL_EXECUTION.md"
     )
     content = skill_exec.read_text(encoding="utf-8")
     assert "codex_subagent" not in content
@@ -270,11 +300,16 @@ def test_skill_execution_md_no_codex_subagent_primary_dispatch():
 # uninstall — manifest traversal guard
 # ---------------------------------------------------------------------------
 
+
 def _write_manifest(dest: Path, entries: dict) -> None:
     manifest_hash = hashlib.sha256(
         json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    manifest = {"_manifest_version": "1", "_manifest_hash": manifest_hash, "files": entries}
+    manifest = {
+        "_manifest_version": "1",
+        "_manifest_hash": manifest_hash,
+        "files": entries,
+    }
     (dest / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
@@ -307,6 +342,7 @@ def test_uninstall_clean_manifest(tmp_path):
 
 def test_materialize_raises_on_tampered_manifest(tmp_path):
     from install_cli.materialize import materialize, MANIFEST_NAME
+
     # Write a manifest with a bad hash
     manifest = {
         "_manifest_version": "1",
@@ -325,6 +361,7 @@ def test_materialize_raises_on_tampered_manifest(tmp_path):
 # ---------------------------------------------------------------------------
 # _apply_hooks — stop-hook path-corruption fix
 # ---------------------------------------------------------------------------
+
 
 def _stop_commands(settings: dict) -> list[str]:
     """Extract all stop-hook command strings from a settings dict."""
@@ -357,11 +394,11 @@ def test_apply_hooks_repair_replaces_stale_path(tmp_path):
 
     settings_path = tmp_path / ".claude" / "settings.json"
     settings_path.parent.mkdir(parents=True)
-    old_cmd = "python C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\stop_telemetry.py"
+    old_cmd = (
+        "python C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\stop_telemetry.py"
+    )
     old_settings = {
-        "hooks": {
-            "Stop": [{"hooks": [{"type": "command", "command": old_cmd}]}]
-        }
+        "hooks": {"Stop": [{"hooks": [{"type": "command", "command": old_cmd}]}]}
     }
     settings_path.write_text(json.dumps(old_settings))
 
@@ -382,11 +419,11 @@ def test_apply_hooks_no_repair_preserves_existing_pathly_hook(tmp_path):
 
     settings_path = tmp_path / ".claude" / "settings.json"
     settings_path.parent.mkdir(parents=True)
-    old_cmd = "python C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\stop_telemetry.py"
+    old_cmd = (
+        "python C:\\Users\\Yafit\\pathly-adapters\\src\\pathly_hooks\\stop_telemetry.py"
+    )
     old_settings = {
-        "hooks": {
-            "Stop": [{"hooks": [{"type": "command", "command": old_cmd}]}]
-        }
+        "hooks": {"Stop": [{"hooks": [{"type": "command", "command": old_cmd}]}]}
     }
     settings_path.write_text(json.dumps(old_settings))
 
@@ -408,9 +445,7 @@ def test_apply_hooks_preserves_non_pathly_hooks(tmp_path):
     settings_path.parent.mkdir(parents=True)
     other_cmd = "some-other-tool --cleanup"
     old_settings = {
-        "hooks": {
-            "Stop": [{"hooks": [{"type": "command", "command": other_cmd}]}]
-        }
+        "hooks": {"Stop": [{"hooks": [{"type": "command", "command": other_cmd}]}]}
     }
     settings_path.write_text(json.dumps(old_settings))
 
@@ -447,7 +482,12 @@ def test_apply_hooks_install_yaml_uses_module_notation():
 
     install_yaml = (
         Path(__file__).parent.parent
-        / "src" / "pathly_data" / "adapters" / "claude" / "_meta" / "install.yaml"
+        / "src"
+        / "pathly_data"
+        / "adapters"
+        / "claude"
+        / "_meta"
+        / "install.yaml"
     )
     cfg = _yaml.safe_load(install_yaml.read_text(encoding="utf-8"))
     stop_cmds = cfg.get("hooks", {}).get("Stop", [])

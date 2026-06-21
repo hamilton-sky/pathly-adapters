@@ -1,4 +1,5 @@
 """Query helpers for the runner_state table."""
+
 from __future__ import annotations
 
 import json
@@ -46,7 +47,9 @@ def mark_stale_runners(conn: sqlite3.Connection) -> int:
     Returns the number of rows updated.
     """
     with _get_write_lock(conn):
-        rows = conn.execute("SELECT project_root, feature, runner_json FROM runner_state").fetchall()
+        rows = conn.execute(
+            "SELECT project_root, feature, runner_json FROM runner_state"
+        ).fetchall()
         updated = 0
         for row in rows:
             try:

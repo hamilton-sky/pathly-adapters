@@ -32,6 +32,7 @@ _KNOWN_ADAPTERS = {"claude", "codex", "copilot", "antigravity"}
 
 # ── Resource helpers ────────────────────────────────────────────────────────────
 
+
 def _skills_root():
     return files("pathly_data").joinpath("core/skills")
 
@@ -51,7 +52,11 @@ def _skill_exists(skill: str) -> bool:
 
 
 def _read_fragment(fragments_dir: str, name: str) -> str:
-    return _skills_root().joinpath(f"{fragments_dir}/{name}.md").read_text(encoding="utf-8")
+    return (
+        _skills_root()
+        .joinpath(f"{fragments_dir}/{name}.md")
+        .read_text(encoding="utf-8")
+    )
 
 
 def _known_fragments(fragments_dir: str) -> set[str]:
@@ -70,12 +75,17 @@ def _entry_parts(entry: Any) -> tuple[str, str | None]:
     if isinstance(entry, dict):
         name = entry.get("name")
         if not name or not isinstance(name, str):
-            raise ValueError(f"composition: fragment object missing a 'name' string: {entry!r}")
+            raise ValueError(
+                f"composition: fragment object missing a 'name' string: {entry!r}"
+            )
         return name, entry.get("requires")
-    raise ValueError(f"composition: fragment entry must be a string or object, got {entry!r}")
+    raise ValueError(
+        f"composition: fragment entry must be a string or object, got {entry!r}"
+    )
 
 
 # ── Adapter capabilities ──────────────────────────────────────────────────────
+
 
 def adapter_caps_for(adapter: str) -> dict:
     """Derive capability flags for an adapter from its ``_meta/*.yaml`` files.
@@ -120,6 +130,7 @@ def _coerce_caps(adapter_caps: Any) -> dict:
 
 
 # ── Resolver ──────────────────────────────────────────────────────────────────
+
 
 def resolve_block(
     block_name: str,
@@ -169,7 +180,9 @@ def compose_skill_with_block(
     return "\n\n".join(parts) + "\n"
 
 
-def compose_skill(skill: str, adapter_caps: Any, *, manifest: dict | None = None) -> str:
+def compose_skill(
+    skill: str, adapter_caps: Any, *, manifest: dict | None = None
+) -> str:
     """Return the assembled markdown for ``skill`` under the given adapter caps.
 
     ``adapter_caps`` may be a caps dict (``{"can_spawn": True}``) or an adapter-name
@@ -201,6 +214,7 @@ def compose_skill(skill: str, adapter_caps: Any, *, manifest: dict | None = None
 
 # ── Validator ─────────────────────────────────────────────────────────────────
 
+
 def validate_composition(manifest: dict | None = None) -> None:
     """Validate the manifest, raising ``ValueError`` on the first problem found.
 
@@ -224,7 +238,9 @@ def validate_composition(manifest: dict | None = None) -> None:
         name, requires = _entry_parts(entry)
         _check(name, "defaults")
         if requires and requires not in _KNOWN_CAPABILITIES:
-            raise ValueError(f"composition: unknown capability {requires!r} in defaults")
+            raise ValueError(
+                f"composition: unknown capability {requires!r} in defaults"
+            )
         if name in seen_defaults:
             raise ValueError(f"composition: duplicate fragment {name!r} in defaults")
         seen_defaults.add(name)
@@ -232,16 +248,22 @@ def validate_composition(manifest: dict | None = None) -> None:
     # per-skill
     for skill, spec in (manifest.get("skills") or {}).items():
         if not _skill_exists(skill):
-            raise ValueError(f"composition: unknown skill {skill!r} (no core/skills/{skill}.md)")
+            raise ValueError(
+                f"composition: unknown skill {skill!r} (no core/skills/{skill}.md)"
+            )
         spec = spec or {}
         seen = set(seen_defaults)
         for entry in spec.get("fragments") or []:
             name, requires = _entry_parts(entry)
             _check(name, f"skill {skill!r}")
             if requires and requires not in _KNOWN_CAPABILITIES:
-                raise ValueError(f"composition: unknown capability {requires!r} in skill {skill!r}")
+                raise ValueError(
+                    f"composition: unknown capability {requires!r} in skill {skill!r}"
+                )
             if name in seen:
-                raise ValueError(f"composition: duplicate include {name!r} in skill {skill!r}")
+                raise ValueError(
+                    f"composition: duplicate include {name!r} in skill {skill!r}"
+                )
             seen.add(name)
 
     # blocks (optional — absent key is backward-compatible)
@@ -259,7 +281,9 @@ def validate_composition(manifest: dict | None = None) -> None:
             if name not in known_fragments:
                 raise ValueError(f"blocks[{block_name!r}]: unknown fragment {name!r}")
             if requires is not None and requires not in _KNOWN_CAPABILITIES:
-                raise ValueError(f"blocks[{block_name!r}]: unknown capability {requires!r}")
+                raise ValueError(
+                    f"blocks[{block_name!r}]: unknown capability {requires!r}"
+                )
             if name in seen_block:
                 raise ValueError(f"blocks[{block_name!r}]: duplicate fragment {name!r}")
             seen_block.add(name)

@@ -27,7 +27,7 @@ def split_frontmatter(text: str) -> tuple[str, str]:
     m = _FRONTMATTER_RE.match(text)
     if not m:
         return "", text
-    return m.group(1), text[m.end():]
+    return m.group(1), text[m.end() :]
 
 
 def _heading_level(line: str) -> int:
@@ -63,9 +63,9 @@ def _split_cells(body: str) -> list[dict]:
         cells.append(_cell("", 0, preamble))
 
     for i in range(1, len(parts) - 1, 2):
-        raw_heading = parts[i].strip()                      # e.g. "## Role"
-        level = _heading_level(raw_heading)                 # 2
-        heading = _HEADING_PREFIX_RE.sub("", raw_heading)   # "Role"
+        raw_heading = parts[i].strip()  # e.g. "## Role"
+        level = _heading_level(raw_heading)  # 2
+        heading = _HEADING_PREFIX_RE.sub("", raw_heading)  # "Role"
         content = parts[i + 1].strip() if i + 1 < len(parts) else ""
         cells.append(_cell(heading, level, content))
 
@@ -108,7 +108,9 @@ def serialize_skill_document(frontmatter: str, body_cells: list[dict]) -> str:
             if not isinstance(level, int) or level < 1 or level > 6:
                 level = 2
             hashes = "#" * level
-            parts.append(f"{hashes} {heading}\n\n{content}" if content else f"{hashes} {heading}")
+            parts.append(
+                f"{hashes} {heading}\n\n{content}" if content else f"{hashes} {heading}"
+            )
         elif content:
             parts.append(content)
 

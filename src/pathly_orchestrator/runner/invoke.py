@@ -87,7 +87,9 @@ def invoke_agent(
                         raise RuntimeError("aborted")
                     if time.monotonic() - t_start > timeout:
                         proc.kill()
-                        raise RuntimeError(f"Claude subprocess timed out after {timeout}s")
+                        raise RuntimeError(
+                            f"Claude subprocess timed out after {timeout}s"
+                        )
         else:
             try:
                 stdout_bytes, _ = proc.communicate(timeout=timeout)
@@ -133,7 +135,9 @@ def invoke_agent(
             },
         )
         if cost_usd == 0.0:
-            logger.warning("cost=0 from PTY stdout — billing will arrive via BILLING_UPDATE")
+            logger.warning(
+                "cost=0 from PTY stdout — billing will arrive via BILLING_UPDATE"
+            )
     except (json.JSONDecodeError, ValueError) as exc:
         logger.warning("failed to parse claude JSON output: %s", exc)
 

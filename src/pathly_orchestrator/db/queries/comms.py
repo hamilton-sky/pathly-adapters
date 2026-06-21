@@ -1,4 +1,5 @@
 """Query helpers for the comms_messages and comms_embeddings tables."""
+
 from __future__ import annotations
 
 import json
@@ -95,7 +96,9 @@ def get_messages(
     limit: int = 50,
 ) -> list[dict]:
     """Return messages for the given board/scope, newest first."""
-    sql = "SELECT * FROM comms_messages WHERE board=? AND scope=? AND deleted_at IS NULL"
+    sql = (
+        "SELECT * FROM comms_messages WHERE board=? AND scope=? AND deleted_at IS NULL"
+    )
     params: list[Any] = [board, scope]
     if type is not None:
         sql += " AND type=?"
@@ -123,6 +126,7 @@ def search_by_embedding(
         board_ph = ",".join("?" * len(boards))
         scope_ph = ",".join("?" * len(scopes))
         import struct
+
         embedding_bytes = struct.pack(f"{len(embedding)}f", *embedding)
         sql = (
             "SELECT m.* FROM comms_messages m "
@@ -171,7 +175,9 @@ def search_by_keyword(
         "ORDER BY rank LIMIT ?"
     )
     try:
-        rows = conn.execute(sql, [query_text] + list(boards) + list(scopes) + [k]).fetchall()
+        rows = conn.execute(
+            sql, [query_text] + list(boards) + list(scopes) + [k]
+        ).fetchall()
     except sqlite3.OperationalError:
         return []
     return [dict(r) for r in rows]
@@ -190,7 +196,9 @@ def search_by_hybrid(
     When query_embedding is None, falls back to keyword-only (then recency if
     FTS also unavailable). When query_text is empty, falls back to semantic-only.
     """
-    bm25_rows = search_by_keyword(conn, query_text, boards, scopes, k * 2) if query_text else []
+    bm25_rows = (
+        search_by_keyword(conn, query_text, boards, scopes, k * 2) if query_text else []
+    )
     sem_rows = (
         search_by_embedding(conn, query_embedding, boards, scopes, k * 2)
         if query_embedding is not None
@@ -243,7 +251,7 @@ def supersede_message(conn: sqlite3.Connection, old_id: str, new_id: str) -> str
     """Mark old_id as superseded by new_id. Returns 'ok'|'not_found'|'already_superseded'."""
     row = conn.execute(
         "SELECT superseded_by FROM comms_messages WHERE id=? AND deleted_at IS NULL",
-        (old_id,)
+        (old_id,),
     ).fetchone()
     if row is None:
         return "not_found"
@@ -251,8 +259,7 @@ def supersede_message(conn: sqlite3.Connection, old_id: str, new_id: str) -> str
         return "already_superseded"
     with _get_write_lock(conn):
         conn.execute(
-            "UPDATE comms_messages SET superseded_by=? WHERE id=?",
-            (new_id, old_id)
+            "UPDATE comms_messages SET superseded_by=? WHERE id=?", (new_id, old_id)
         )
         conn.commit()
     return "ok"
@@ -340,7 +347,17 @@ def insert_artifact(
             "INSERT INTO comms_artifacts "
             "(id, message_id, path, type, title, summary, token_count, created_at, created_by, version) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
-            (artifact_id, message_id, path, type, title, summary, token_count, _now(), created_by),
+            (
+                artifact_id,
+                message_id,
+                path,
+                type,
+                title,
+                summary,
+                token_count,
+                _now(),
+                created_by,
+            ),
         )
         conn.commit()
     return artifact_id
@@ -419,6 +436,7 @@ def store_embedding(
     if not _VEC_AVAILABLE:
         return
     import struct
+
     embedding_bytes = struct.pack(f"{len(embedding)}f", *embedding)
     with _get_write_lock(conn):
         conn.execute(
@@ -508,7 +526,9 @@ def get_ready_tasks(
     )
     done_ids = {
         r["id"]
-        for r in conn.execute(done_sql, list(boards) + list(scopes) + goal_param).fetchall()
+        for r in conn.execute(
+            done_sql, list(boards) + list(scopes) + goal_param
+        ).fetchall()
     }
 
     ready = []
@@ -666,7 +686,9 @@ def reclaim_stale_claims(conn: sqlite3.Connection, board: str, scope: str) -> li
     return ids
 
 
-def soft_delete_message(conn: sqlite3.Connection, message_id: str, force: bool = False) -> str:
+def soft_delete_message(
+    conn: sqlite3.Connection, message_id: str, force: bool = False
+) -> str:
     """Retract a message by soft-deleting it.
 
     By default a message is retractable only while no agent has read it (a human

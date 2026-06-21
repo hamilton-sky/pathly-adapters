@@ -7,6 +7,7 @@ Covers:
   - GET /comms/tasks shows dependents as blocked after fail
   - 400 on missing required fields (message_id, run_id)
 """
+
 from __future__ import annotations
 
 import json
@@ -18,12 +19,14 @@ import pytest
 def _no_async_embed(monkeypatch):
     """Stub embed_async so posting never spawns background threads during tests."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
 
 
 @pytest.fixture()
 def client():
     from pathly_orchestrator.http_server import app
+
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
@@ -33,8 +36,14 @@ def client():
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _post_task(client, text: str, depends_on: list[str] | None = None,
-               feature: str = "myfeature", scope: str = "myfeature") -> str:
+
+def _post_task(
+    client,
+    text: str,
+    depends_on: list[str] | None = None,
+    feature: str = "myfeature",
+    scope: str = "myfeature",
+) -> str:
     """Post a task message via the HTTP API and return its message_id."""
     payload: dict = {
         "feature": feature,
@@ -54,6 +63,7 @@ def _post_task(client, text: str, depends_on: list[str] | None = None,
 def _make_task_pending(message_id: str) -> None:
     """Set task_status=pending directly in the DB (bypasses HTTP)."""
     from pathly_orchestrator.db.connection import get_db
+
     conn = get_db()
     conn.execute(
         "UPDATE comms_messages SET task_status='pending' WHERE id=?",
@@ -65,6 +75,7 @@ def _make_task_pending(message_id: str) -> None:
 # ---------------------------------------------------------------------------
 # POST /comms/tasks/claim
 # ---------------------------------------------------------------------------
+
 
 def test_claim_pending_task_returns_true(client):
     """Claiming a pending task for the first time returns claimed=true."""
@@ -119,15 +130,19 @@ def test_claim_blank_run_id_returns_400(client):
 # POST /comms/tasks/fail
 # ---------------------------------------------------------------------------
 
+
 def test_fail_task_with_dependents_returns_blocked_list(client):
     """Failing a task that has dependents returns 200 with non-empty blocked list."""
     dep_id = _post_task(client, "parent task", scope="fail1", feature="fail1")
-    child_id = _post_task(client, "child task", depends_on=[dep_id],
-                          scope="fail1", feature="fail1")
+    child_id = _post_task(
+        client, "child task", depends_on=[dep_id], scope="fail1", feature="fail1"
+    )
     _make_task_pending(dep_id)
     _make_task_pending(child_id)
 
-    r = client.post("/comms/tasks/fail", json={"message_id": dep_id, "reason": "exploded"})
+    r = client.post(
+        "/comms/tasks/fail", json={"message_id": dep_id, "reason": "exploded"}
+    )
     assert r.status_code == 200
     data = json.loads(r.data)
     assert data["ok"] is True
@@ -140,8 +155,9 @@ def test_fail_task_dependents_show_as_blocked_in_get(client):
     from pathly_orchestrator.db.connection import get_db
 
     dep_id = _post_task(client, "parent task", scope="fail2", feature="fail2")
-    child_id = _post_task(client, "child task", depends_on=[dep_id],
-                          scope="fail2", feature="fail2")
+    child_id = _post_task(
+        client, "child task", depends_on=[dep_id], scope="fail2", feature="fail2"
+    )
     _make_task_pending(dep_id)
     _make_task_pending(child_id)
 
@@ -159,8 +175,12 @@ def test_fail_task_dependents_show_as_blocked_in_get(client):
 def test_fail_task_cascades_transitive_dependents(client):
     """Failing A with chain A→B→C cascades blocked to both B and C."""
     a_id = _post_task(client, "task A", scope="fail3", feature="fail3")
-    b_id = _post_task(client, "task B", depends_on=[a_id], scope="fail3", feature="fail3")
-    c_id = _post_task(client, "task C", depends_on=[b_id], scope="fail3", feature="fail3")
+    b_id = _post_task(
+        client, "task B", depends_on=[a_id], scope="fail3", feature="fail3"
+    )
+    c_id = _post_task(
+        client, "task C", depends_on=[b_id], scope="fail3", feature="fail3"
+    )
     for mid in (a_id, b_id, c_id):
         _make_task_pending(mid)
 

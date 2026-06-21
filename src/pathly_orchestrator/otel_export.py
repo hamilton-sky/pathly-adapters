@@ -16,6 +16,7 @@ _STATUS_ERROR = 2
 def _infer_vendor(model: str) -> str:
     """Return provider slug from model name prefix, or 'unknown'."""
     from pathly_orchestrator.http_server.telemetry_registry import _ADAPTER_PREFIXES
+
     for prefixes, slug in _ADAPTER_PREFIXES:
         if any(model.startswith(p) for p in prefixes):
             return slug
@@ -59,36 +60,60 @@ def _build_span_payload(event: dict) -> dict:
         {"key": "gen_ai.workflow.name", "value": {"stringValue": feature}},
         {"key": "gen_ai.usage.input_tokens", "value": {"intValue": tokens_in}},
         {"key": "gen_ai.usage.output_tokens", "value": {"intValue": tokens_out}},
-        {"key": "gen_ai.request.model", "value": {"stringValue": str(event.get("model", ""))}},
-        {"key": "gen_ai.conversation.id", "value": {"stringValue": str(event.get("conversation", ""))}},
-        {"key": "pathly.cost_usd", "value": {"doubleValue": float(event.get("cost_usd", 0.0) or 0.0)}},
-        {"key": "pathly.tool_uses", "value": {"intValue": int(event.get("tool_uses", 0) or 0)}},
-        {"key": "pathly.result", "value": {"stringValue": str(event.get("result", ""))}},
+        {
+            "key": "gen_ai.request.model",
+            "value": {"stringValue": str(event.get("model", ""))},
+        },
+        {
+            "key": "gen_ai.conversation.id",
+            "value": {"stringValue": str(event.get("conversation", ""))},
+        },
+        {
+            "key": "pathly.cost_usd",
+            "value": {"doubleValue": float(event.get("cost_usd", 0.0) or 0.0)},
+        },
+        {
+            "key": "pathly.tool_uses",
+            "value": {"intValue": int(event.get("tool_uses", 0) or 0)},
+        },
+        {
+            "key": "pathly.result",
+            "value": {"stringValue": str(event.get("result", ""))},
+        },
         {"key": "gen_ai.vendor", "value": {"stringValue": vendor}},
     ]
 
     return {
-        "resourceSpans": [{
-            "resource": {
-                "attributes": [
-                    {"key": "service.name", "value": {"stringValue": "pathly"}},
-                    {"key": "service.version", "value": {"stringValue": _service_version()}},
-                ]
-            },
-            "scopeSpans": [{
-                "scope": {"name": "pathly.orchestrator"},
-                "spans": [{
-                    "traceId": trace_id,
-                    "spanId": span_id,
-                    "name": f"invoke_agent {agent}",
-                    "kind": 1,
-                    "startTimeUnixNano": str(start_ns),
-                    "endTimeUnixNano": str(end_ns),
-                    "attributes": attributes,
-                    "status": {"code": status_code},
-                }]
-            }]
-        }]
+        "resourceSpans": [
+            {
+                "resource": {
+                    "attributes": [
+                        {"key": "service.name", "value": {"stringValue": "pathly"}},
+                        {
+                            "key": "service.version",
+                            "value": {"stringValue": _service_version()},
+                        },
+                    ]
+                },
+                "scopeSpans": [
+                    {
+                        "scope": {"name": "pathly.orchestrator"},
+                        "spans": [
+                            {
+                                "traceId": trace_id,
+                                "spanId": span_id,
+                                "name": f"invoke_agent {agent}",
+                                "kind": 1,
+                                "startTimeUnixNano": str(start_ns),
+                                "endTimeUnixNano": str(end_ns),
+                                "attributes": attributes,
+                                "status": {"code": status_code},
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
     }
 
 
@@ -102,22 +127,30 @@ def _build_log_payload(event: dict, trace_id: str, span_id: str) -> dict:
 
     summary = str(event.get("summary", ""))[:65535]
     return {
-        "resourceLogs": [{
-            "resource": {"attributes": [
-                {"key": "service.name", "value": {"stringValue": "pathly"}}
-            ]},
-            "scopeLogs": [{
-                "scope": {"name": "pathly.orchestrator"},
-                "logRecords": [{
-                    "timeUnixNano": str(time_ns),
-                    "traceId": trace_id,
-                    "spanId": span_id,
-                    "body": {"stringValue": summary},
-                    "severityNumber": 9,
-                    "severityText": "INFO",
-                }]
-            }]
-        }]
+        "resourceLogs": [
+            {
+                "resource": {
+                    "attributes": [
+                        {"key": "service.name", "value": {"stringValue": "pathly"}}
+                    ]
+                },
+                "scopeLogs": [
+                    {
+                        "scope": {"name": "pathly.orchestrator"},
+                        "logRecords": [
+                            {
+                                "timeUnixNano": str(time_ns),
+                                "traceId": trace_id,
+                                "spanId": span_id,
+                                "body": {"stringValue": summary},
+                                "severityNumber": 9,
+                                "severityText": "INFO",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
     }
 
 
@@ -137,7 +170,9 @@ def _do_export(event: dict, endpoint: str) -> None:
     )
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
-            logger.debug("otel span exported: %s %s (status=%s)", agent, feature, resp.status)
+            logger.debug(
+                "otel span exported: %s %s (status=%s)", agent, feature, resp.status
+            )
     except Exception as exc:
         logger.warning("otel export failed: %s", exc)
         return
@@ -154,7 +189,9 @@ def _do_export(event: dict, endpoint: str) -> None:
         )
         try:
             with urllib.request.urlopen(log_req, timeout=5) as resp:
-                logger.debug("otel log exported: %s %s (status=%s)", agent, feature, resp.status)
+                logger.debug(
+                    "otel log exported: %s %s (status=%s)", agent, feature, resp.status
+                )
         except Exception as exc:
             logger.warning("otel log export failed: %s", exc)
 
@@ -176,7 +213,9 @@ def cli_main() -> None:
     parser.add_argument("--feature", required=True, help="feature name")
     parser.add_argument("--endpoint", required=True, help="OTLP endpoint base URL")
     parser.add_argument("--project-root", default=None, help="path to project root")
-    parser.add_argument("--dry-run", action="store_true", help="print without sending HTTP requests")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="print without sending HTTP requests"
+    )
     args = parser.parse_args()
 
     project_root = args.project_root if args.project_root is not None else os.getcwd()

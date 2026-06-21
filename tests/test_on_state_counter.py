@@ -1,4 +1,5 @@
 """Tests for on_state_counter transition rule level in evaluate_transition_rules."""
+
 from __future__ import annotations
 
 import json
@@ -12,7 +13,10 @@ def _storage(tmp_path: Path, convs_done: int = 1, convs_total: int = 3) -> Path:
     storage = tmp_path / "pathly" / "plans" / "test"
     storage.mkdir(parents=True)
     # Write via eventlog so state goes to DB (works in both normal and PATHLY_DB_ONLY mode)
-    el.write_state(str(storage), {"current": "REVIEWING", "convs_done": convs_done, "convs_total": convs_total})
+    el.write_state(
+        str(storage),
+        {"current": "REVIEWING", "convs_done": convs_done, "convs_total": convs_total},
+    )
     return storage
 
 

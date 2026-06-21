@@ -97,7 +97,7 @@ def test_parser_returns_bare_heading_and_level(tmp_path):
     f.write_text("---\nname: x\n---\n\n## Role\n\nbody\n", encoding="utf-8")
     doc = parse_skill_document(str(f))
     cell = doc["body_cells"][0]
-    assert cell["heading"] == "Role"          # bare, no '## '
+    assert cell["heading"] == "Role"  # bare, no '## '
     assert cell["headingLevel"] == 2
 
 

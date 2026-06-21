@@ -25,15 +25,12 @@ CONTRACT_FILES: set[str] = set(CONTRACT["feedback_files"])
 
 # Derive allowed suffixes from the contract (e.g. _FEEDBACK.md, _QUESTIONS.md, _FAILURES.md).
 # This means the filter automatically widens when new feedback file types are added.
-_LAST_SEGMENT = re.compile(r'(_[A-Z]+\.md)$')
+_LAST_SEGMENT = re.compile(r"(_[A-Z]+\.md)$")
 _CONTRACT_SUFFIXES: frozenset[str] = frozenset(
-    m.group(1)
-    for name in CONTRACT_FILES
-    for m in [_LAST_SEGMENT.search(name)]
-    if m
+    m.group(1) for name in CONTRACT_FILES for m in [_LAST_SEGMENT.search(name)] if m
 )
 
-_UPPER_MD = re.compile(r'\b([A-Z][A-Z0-9_]+\.md)\b')
+_UPPER_MD = re.compile(r"\b([A-Z][A-Z0-9_]+\.md)\b")
 
 
 def _feedback_names_in_docs() -> set[str]:
@@ -53,7 +50,9 @@ def _feedback_names_in_docs() -> set[str]:
 
     # Keep only names whose suffix matches a known contract pattern
     # (avoids false positives from README.md, PROGRESS.md, etc.)
-    return {name for name in found if any(name.endswith(sfx) for sfx in _CONTRACT_SUFFIXES)}
+    return {
+        name for name in found if any(name.endswith(sfx) for sfx in _CONTRACT_SUFFIXES)
+    }
 
 
 class TestFeedbackProtocolAdapters:
@@ -79,9 +78,9 @@ class TestFeedbackProtocolAdapters:
 
     def test_contract_file_is_valid_yaml(self):
         """protocol_contract.yaml must parse and contain a feedback_files list."""
-        assert isinstance(CONTRACT_FILES, set) and len(CONTRACT_FILES) > 0, (
-            "protocol_contract.yaml parsed but 'feedback_files' is empty or missing"
-        )
+        assert (
+            isinstance(CONTRACT_FILES, set) and len(CONTRACT_FILES) > 0
+        ), "protocol_contract.yaml parsed but 'feedback_files' is empty or missing"
 
     def test_contract_version_matches_hooks_package(self):
         """The hook package and protocol_contract.yaml must advertise the same protocol version."""

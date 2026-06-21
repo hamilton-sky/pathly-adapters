@@ -1,4 +1,5 @@
 """Integration tests for the HTTP server endpoints."""
+
 from __future__ import annotations
 
 import json
@@ -13,6 +14,7 @@ def client(tmp_path, monkeypatch):
     """Flask test client with isolated tmp dirs."""
     monkeypatch.setenv("PATHLY_PROJECT_ROOT", str(tmp_path))
     from pathly_orchestrator.http_server import app, _rate_counters
+
     _rate_counters.clear()
     app.config["TESTING"] = True
     with app.test_client() as c:
@@ -29,6 +31,7 @@ def test_health_returns_ok(client):
 
 def test_rate_limit_blocks_after_limit(client, monkeypatch):
     from pathly_orchestrator import http_server
+
     monkeypatch.setenv("PATHLY_FF_RATE_LIMITING", "true")
     orig = http_server._RATE_LIMIT_MAX
     http_server._RATE_LIMIT_MAX = 3
@@ -47,6 +50,7 @@ def test_rate_limit_blocks_after_limit(client, monkeypatch):
 def test_health_bypasses_rate_limit(client, monkeypatch):
     """Health endpoint must never be rate-limited regardless of request volume."""
     from pathly_orchestrator import http_server
+
     monkeypatch.setenv("PATHLY_FF_RATE_LIMITING", "true")
     orig = http_server._RATE_LIMIT_MAX
     http_server._RATE_LIMIT_MAX = 1
@@ -54,7 +58,9 @@ def test_health_bypasses_rate_limit(client, monkeypatch):
     try:
         for _ in range(5):
             r = client[0].get("/health")
-            assert r.status_code == 200, "/health must always return 200 regardless of rate-limit"
+            assert (
+                r.status_code == 200
+            ), "/health must always return 200 regardless of rate-limit"
     finally:
         http_server._RATE_LIMIT_MAX = orig
         http_server._rate_counters.clear()
@@ -127,7 +133,13 @@ def test_record_activity_with_wall_seconds(client):
     c, _ = client
     r = c.post(
         "/record_activity",
-        json={"agent": "builder", "feature": "my-feature", "summary": "done", "wall_seconds": 42, "tool_uses": 5},
+        json={
+            "agent": "builder",
+            "feature": "my-feature",
+            "summary": "done",
+            "wall_seconds": 42,
+            "tool_uses": 5,
+        },
     )
     assert r.status_code == 200
 
@@ -196,6 +208,7 @@ def test_record_activity_appends_complete_agent_done_event(client):
 
     assert r.status_code == 200
     from pathly_orchestrator import eventlog as _eventlog
+
     events = _eventlog.read_events(str(events_dir))
     assert len(events) == 1
     event = events[0]
@@ -228,6 +241,7 @@ def test_record_activity_uses_total_tokens_when_split_is_missing(client):
 
     assert r.status_code == 200
     from pathly_orchestrator import eventlog as _eventlog
+
     events = _eventlog.read_events(str(events_dir))
     assert len(events) == 1
     event = events[0]
@@ -313,7 +327,9 @@ def test_events_stream_last_event_id_catchup(tmp_path, monkeypatch):
                 ) as resp:
                     # Read chunks from the streaming response
                     for chunk in resp.response:
-                        text = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+                        text = (
+                            chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+                        )
                         received.append(text)
                         # Stop after we have the connected message (catch-up + connected)
                         if '"type":"connected"' in text or 'type":"connected"' in text:

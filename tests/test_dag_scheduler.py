@@ -11,6 +11,7 @@ Covers:
 DB isolation: conftest._isolate_db redirects all connections to a per-test tmp
 SQLite file so the real ~/.pathly/pathly.db is never touched.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,14 +21,15 @@ from typing import Any
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Stub embeddings so post_message never spawns background threads.
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def _no_async_embed(monkeypatch):
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
 
 
@@ -35,8 +37,10 @@ def _no_async_embed(monkeypatch):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class _FakeState:
     """Minimal stand-in for RunnerState."""
+
     project_root = "/repo"
     db_path = ""
     fsm_port = 8765
@@ -101,10 +105,14 @@ def _make_fake_spawn(
 
     def _spawn(state, instructions, adapter, model, run_id, broadcast_fn):
         # run_id is "sched-<task_id>"; strip the prefix to get the task_id.
-        task_id = run_id[len("sched-"):] if run_id.startswith("sched-") else run_id
+        task_id = run_id[len("sched-") :] if run_id.startswith("sched-") else run_id
         start = time.monotonic()
         with lock:
-            records[task_id] = {"start": start, "end": None, "instructions": instructions}
+            records[task_id] = {
+                "start": start,
+                "end": None,
+                "instructions": instructions,
+            }
         time.sleep(sleep_s)
         end = time.monotonic()
         with lock:
@@ -125,7 +133,9 @@ def _run_scheduler(scope: str, isolation=None, **kwargs) -> dict:
     if isolation is None:
         isolation = LaneIsolation()
     state = _FakeState()
-    return scheduler_loop(state, board="feature", scope=scope, isolation=isolation, **kwargs)
+    return scheduler_loop(
+        state, board="feature", scope=scope, isolation=isolation, **kwargs
+    )
 
 
 def _intervals_overlap(r1: dict, r2: dict) -> bool:
@@ -136,6 +146,7 @@ def _intervals_overlap(r1: dict, r2: dict) -> bool:
 # ---------------------------------------------------------------------------
 # Test 1: Linear A -> B -> C (single lane)
 # ---------------------------------------------------------------------------
+
 
 def test_linear_chain_completes_in_order():
     """A->B->C in one lane: all complete; order is A then B then C."""
@@ -151,13 +162,21 @@ def test_linear_chain_completes_in_order():
     records: dict = {}
     result = _run_scheduler(scope, spawn_fn=_make_fake_spawn(records, sleep_s=0.02))
 
-    assert set(result["completed"]) == {a_id, b_id, c_id}, "all three tasks must complete"
+    assert set(result["completed"]) == {
+        a_id,
+        b_id,
+        c_id,
+    }, "all three tasks must complete"
     assert result["failed"] == []
     assert result["blocked"] == []
 
     # Completion order: A finishes before B starts, B finishes before C starts.
-    assert records[a_id]["end"] <= records[b_id]["start"] + 1e-6, "A must finish before B starts"
-    assert records[b_id]["end"] <= records[c_id]["start"] + 1e-6, "B must finish before C starts"
+    assert (
+        records[a_id]["end"] <= records[b_id]["start"] + 1e-6
+    ), "A must finish before B starts"
+    assert (
+        records[b_id]["end"] <= records[c_id]["start"] + 1e-6
+    ), "B must finish before C starts"
 
     assert _task_status(conn, a_id) == "done"
     assert _task_status(conn, b_id) == "done"
@@ -167,6 +186,7 @@ def test_linear_chain_completes_in_order():
 # ---------------------------------------------------------------------------
 # Test 2: Diamond A(data) -> B(backend),C(frontend) -> D(tests)
 # ---------------------------------------------------------------------------
+
 
 def test_diamond_dag_parallelism():
     """Diamond: A done before B,C start; B and C overlap; D starts only after both done."""
@@ -189,21 +209,25 @@ def test_diamond_dag_parallelism():
     assert result["blocked"] == []
 
     # A must finish before B and C start.
-    assert records[a_id]["end"] <= records[b_id]["start"] + 1e-6, "A must finish before B starts"
-    assert records[a_id]["end"] <= records[c_id]["start"] + 1e-6, "A must finish before C starts"
+    assert (
+        records[a_id]["end"] <= records[b_id]["start"] + 1e-6
+    ), "A must finish before B starts"
+    assert (
+        records[a_id]["end"] <= records[c_id]["start"] + 1e-6
+    ), "A must finish before C starts"
 
     # B and C must overlap (true parallelism — different lanes).
-    assert _intervals_overlap(records[b_id], records[c_id]), (
-        f"B and C must run concurrently; B={records[b_id]}, C={records[c_id]}"
-    )
+    assert _intervals_overlap(
+        records[b_id], records[c_id]
+    ), f"B and C must run concurrently; B={records[b_id]}, C={records[c_id]}"
 
     # D must start only after both B and C finish.
     b_end = records[b_id]["end"]
     c_end = records[c_id]["end"]
     last_of_bc = max(b_end, c_end)
-    assert records[d_id]["start"] >= last_of_bc - 1e-6, (
-        f"D must start after B and C both finish; D.start={records[d_id]['start']}, last_of_bc={last_of_bc}"
-    )
+    assert (
+        records[d_id]["start"] >= last_of_bc - 1e-6
+    ), f"D must start after B and C both finish; D.start={records[d_id]['start']}, last_of_bc={last_of_bc}"
 
     for tid in (a_id, b_id, c_id, d_id):
         assert _task_status(conn, tid) == "done"
@@ -212,6 +236,7 @@ def test_diamond_dag_parallelism():
 # ---------------------------------------------------------------------------
 # Test 3: Same-lane serialization
 # ---------------------------------------------------------------------------
+
 
 def test_same_lane_tasks_run_serially():
     """Two ready tasks in the same lane must NOT overlap (<=1 worker per lane)."""
@@ -232,14 +257,15 @@ def test_same_lane_tasks_run_serially():
 
     # Intervals must NOT overlap — one finished before the other started.
     rx, ry = records[x_id], records[y_id]
-    assert not _intervals_overlap(rx, ry), (
-        f"Same-lane tasks must serialize; X={rx}, Y={ry}"
-    )
+    assert not _intervals_overlap(
+        rx, ry
+    ), f"Same-lane tasks must serialize; X={rx}, Y={ry}"
 
 
 # ---------------------------------------------------------------------------
 # Test 4: Failure cascade — failed task blocks dependents; sibling completes
 # ---------------------------------------------------------------------------
+
 
 def test_failure_cascades_and_sibling_completes():
     """B fails -> D (depends on B,C) is blocked; C (sibling lane) still completes.
@@ -284,6 +310,6 @@ def test_failure_cascades_and_sibling_completes():
     # Either the scheduler returned d_id in blocked list or the DB has it blocked.
     scheduler_blocked = set(result["blocked"])
     db_blocked = d_status == "blocked"
-    assert d_id in scheduler_blocked or db_blocked, (
-        f"D must be blocked; scheduler blocked={scheduler_blocked}, db_status={d_status}"
-    )
+    assert (
+        d_id in scheduler_blocked or db_blocked
+    ), f"D must be blocked; scheduler blocked={scheduler_blocked}, db_status={d_status}"

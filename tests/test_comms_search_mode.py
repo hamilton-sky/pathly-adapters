@@ -8,6 +8,7 @@ POST /comms/search must:
 
 retrieve_board_context() must now call search_by_hybrid internally.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,35 +20,57 @@ import pytest
 def _no_async_embed(monkeypatch):
     """Stub embed_async so posting never spawns background threads during tests."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
 
 
 @pytest.fixture()
 def client():
     from pathly_orchestrator.http_server import app
+
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
 
 
-def _post(client, text: str, msg_type: str = "discovery",
-          board: str = "feature", scope: str = "demo") -> str:
-    r = client.post("/comms/post", json={
-        "feature": "demo",
-        "from": "builder",
-        "type": msg_type,
-        "text": text,
-        "board": board,
-        "scope": scope,
-    })
+def _post(
+    client,
+    text: str,
+    msg_type: str = "discovery",
+    board: str = "feature",
+    scope: str = "demo",
+) -> str:
+    r = client.post(
+        "/comms/post",
+        json={
+            "feature": "demo",
+            "from": "builder",
+            "type": msg_type,
+            "text": text,
+            "board": board,
+            "scope": scope,
+        },
+    )
     assert r.status_code == 200
     return json.loads(r.data)["message_id"]
 
 
-def _search(client, query: str, mode: str | None = None,
-            feature: str = "demo", board: str = "feature",
-            scope: str = "demo", k: int = 5) -> list:
-    payload: dict = {"query": query, "feature": feature, "board": board, "scope": scope, "k": k}
+def _search(
+    client,
+    query: str,
+    mode: str | None = None,
+    feature: str = "demo",
+    board: str = "feature",
+    scope: str = "demo",
+    k: int = 5,
+) -> list:
+    payload: dict = {
+        "query": query,
+        "feature": feature,
+        "board": board,
+        "scope": scope,
+        "k": k,
+    }
     if mode is not None:
         payload["mode"] = mode
     r = client.post("/comms/search", json=payload)
@@ -59,9 +82,11 @@ def _search(client, query: str, mode: str | None = None,
 # mode='semantic' regression — must behave identically to pre-Phase-12 code
 # ---------------------------------------------------------------------------
 
+
 def test_comms_search_mode_semantic_returns_200(client, monkeypatch):
     """mode='semantic' returns HTTP 200."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed", lambda text: None)
 
     _post(client, "Redis cache strategy")
@@ -74,16 +99,19 @@ def test_comms_search_mode_semantic_with_none_embedding_falls_back_to_recency(
 ):
     """mode='semantic' with embed()=None falls back to recency (get_messages)."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed", lambda text: None)
 
     mid = _post(client, "Auth token expiry fix")
     results = _search(client, "Auth", mode="semantic")
-    assert any(r["id"] == mid for r in results), (
-        "semantic+None embedding should fall back to recency and include the message"
-    )
+    assert any(
+        r["id"] == mid for r in results
+    ), "semantic+None embedding should fall back to recency and include the message"
 
 
-def test_comms_search_mode_semantic_regression_same_as_default_path(client, monkeypatch):
+def test_comms_search_mode_semantic_regression_same_as_default_path(
+    client, monkeypatch
+):
     """mode='semantic' produces same result as direct search_by_embedding call."""
     import pathly_orchestrator.db.queries.comms as _comms_mod
     import pathly_orchestrator.runner.embeddings as _emb_mod
@@ -105,14 +133,15 @@ def test_comms_search_mode_semantic_regression_same_as_default_path(client, monk
     _search(client, "SQLite", mode="semantic")
 
     # search_by_embedding should have been called exactly once for semantic mode
-    assert len(captured) == 1, (
-        f"mode='semantic' should call search_by_embedding once, called {len(captured)} times"
-    )
+    assert (
+        len(captured) == 1
+    ), f"mode='semantic' should call search_by_embedding once, called {len(captured)} times"
 
 
 # ---------------------------------------------------------------------------
 # mode='keyword'
 # ---------------------------------------------------------------------------
+
 
 def test_comms_search_mode_keyword_returns_200(client):
     """mode='keyword' returns HTTP 200."""
@@ -124,20 +153,22 @@ def test_comms_search_mode_keyword_returns_200(client):
 def test_comms_search_mode_keyword_finds_exact_term(client):
     """mode='keyword' finds a message whose text contains the query term."""
     import pathly_orchestrator.db.connection as _conn_mod
+
     _conn_mod.get_db()  # ensure init has run so _FTS_AVAILABLE is set
     if not _conn_mod._FTS_AVAILABLE:
         pytest.skip("FTS5 not available — keyword mode not testable")
 
     mid = _post(client, "setupWebGL crash in renderer process")
     results = _search(client, "setupWebGL", mode="keyword")
-    assert any(r["id"] == mid for r in results), (
-        "keyword mode should return the matching message"
-    )
+    assert any(
+        r["id"] == mid for r in results
+    ), "keyword mode should return the matching message"
 
 
 # ---------------------------------------------------------------------------
 # mode='hybrid' (default)
 # ---------------------------------------------------------------------------
+
 
 def test_comms_search_mode_hybrid_is_default(client, monkeypatch):
     """When mode is absent, hybrid is the default (search_by_hybrid is called)."""
@@ -159,9 +190,7 @@ def test_comms_search_mode_hybrid_is_default(client, monkeypatch):
     _post(client, "cache invalidation strategy")
     _search(client, "cache", mode=None)  # no mode field — should default to hybrid
 
-    assert len(hybrid_calls) == 1, (
-        "Default mode should call search_by_hybrid"
-    )
+    assert len(hybrid_calls) == 1, "Default mode should call search_by_hybrid"
 
 
 def test_comms_search_mode_hybrid_explicit(client, monkeypatch):
@@ -191,6 +220,7 @@ def test_comms_search_mode_hybrid_explicit(client, monkeypatch):
 # Invalid mode falls back to hybrid
 # ---------------------------------------------------------------------------
 
+
 def test_comms_search_mode_invalid_falls_back_to_hybrid(client, monkeypatch):
     """An invalid mode value falls back to hybrid without error."""
     import pathly_orchestrator.db.queries.comms as _comms_mod
@@ -209,11 +239,14 @@ def test_comms_search_mode_invalid_falls_back_to_hybrid(client, monkeypatch):
     monkeypatch.setattr(_comms_mod, "search_by_hybrid", _capture)
 
     _post(client, "any message")
-    r = client.post("/comms/search", json={
-        "query": "any",
-        "feature": "demo",
-        "mode": "invalid_mode_value",
-    })
+    r = client.post(
+        "/comms/search",
+        json={
+            "query": "any",
+            "feature": "demo",
+            "mode": "invalid_mode_value",
+        },
+    )
     assert r.status_code == 200
     assert len(hybrid_calls) == 1, "Invalid mode should fall back to hybrid"
 
@@ -221,6 +254,7 @@ def test_comms_search_mode_invalid_falls_back_to_hybrid(client, monkeypatch):
 # ---------------------------------------------------------------------------
 # retrieve_board_context uses search_by_hybrid internally
 # ---------------------------------------------------------------------------
+
 
 def test_comms_search_mode_retrieve_board_context_calls_hybrid(client, monkeypatch):
     """retrieve_board_context() delegates to search_by_hybrid for context retrieval."""
@@ -242,6 +276,7 @@ def test_comms_search_mode_retrieve_board_context_calls_hybrid(client, monkeypat
     _post(client, "cache strategy discovery")
 
     from pathly_orchestrator.runner.comms_context import retrieve_board_context
+
     retrieve_board_context(
         topic="demo",
         project_root="C:/proj",
@@ -249,19 +284,21 @@ def test_comms_search_mode_retrieve_board_context_calls_hybrid(client, monkeypat
         board_scope={"feature": True, "project": False, "global": False},
     )
 
-    assert len(hybrid_calls) >= 1, (
-        "retrieve_board_context should call search_by_hybrid at least once"
-    )
+    assert (
+        len(hybrid_calls) >= 1
+    ), "retrieve_board_context should call search_by_hybrid at least once"
 
 
 def test_comms_search_mode_retrieve_board_context_returns_block(client, monkeypatch):
     """retrieve_board_context still returns a valid block after switching to hybrid."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed", lambda text: None)
 
     _post(client, "Auth bug: session tokens expire too fast")
 
     from pathly_orchestrator.runner.comms_context import retrieve_board_context
+
     block = retrieve_board_context(
         topic="demo",
         project_root="C:/proj",

@@ -3,6 +3,7 @@
 All file I/O uses tmp_path. The real HOME/USERPROFILE env vars are redirected
 so that expanduser() resolves into the temp directory. No network calls.
 """
+
 from __future__ import annotations
 
 import os
@@ -49,12 +50,13 @@ def _run_install_cli(args: list[str], tmp_path: Path) -> subprocess.CompletedPro
 # test_dry_run_exits_0
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.slow
 def test_dry_run_exits_0(tmp_path):
     result = _run_install_cli(["claude", "--dry-run"], tmp_path)
-    assert result.returncode == 0, (
-        f"Expected exit 0 for dry-run.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"Expected exit 0 for dry-run.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     # The CLI prints "[claude] Would write to <dest>:" during dry-run
     assert "[claude]" in result.stdout
     assert "Would write" in result.stdout
@@ -64,12 +66,13 @@ def test_dry_run_exits_0(tmp_path):
 # test_apply_creates_expected_files
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.slow
 def test_apply_creates_expected_files(tmp_path):
     result = _run_install_cli(["claude", "--apply"], tmp_path)
-    assert result.returncode == 0, (
-        f"Expected exit 0 for apply.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"Expected exit 0 for apply.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     # The manifest must exist in the agents destination (~/.claude/agents/)
     agents_dest = tmp_path / ".claude" / "agents"
@@ -80,16 +83,20 @@ def test_apply_creates_expected_files(tmp_path):
     )
 
     # At least one file must have been written (agents may be nested in subdirs)
-    all_files = [f for f in agents_dest.rglob("*") if f.is_file() and f.name != ".pathly-manifest.json"]
+    all_files = [
+        f
+        for f in agents_dest.rglob("*")
+        if f.is_file() and f.name != ".pathly-manifest.json"
+    ]
     assert all_files, (
         f"Expected at least one file under {agents_dest} after apply.\n"
         f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
 
     orchestrator = (agents_dest / "orchestrator.md").read_text(encoding="utf-8")
-    fix_skill = (
-        tmp_path / ".claude" / "skills" / "pathly-fix" / "SKILL.md"
-    ).read_text(encoding="utf-8")
+    fix_skill = (tmp_path / ".claude" / "skills" / "pathly-fix" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
     assert "pathly_orchestrator.http_server" in orchestrator
     assert "fsm-call" in fix_skill
 
@@ -98,36 +105,40 @@ def test_apply_creates_expected_files(tmp_path):
 # test_apply_then_uninstall_cleans_up
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.slow
 def test_apply_then_uninstall_cleans_up(tmp_path):
     apply_result = _run_install_cli(["claude", "--apply"], tmp_path)
-    assert apply_result.returncode == 0, (
-        f"Apply failed.\nstdout:\n{apply_result.stdout}\nstderr:\n{apply_result.stderr}"
-    )
+    assert (
+        apply_result.returncode == 0
+    ), f"Apply failed.\nstdout:\n{apply_result.stdout}\nstderr:\n{apply_result.stderr}"
 
     agents_dest = tmp_path / ".claude" / "agents"
-    assert (agents_dest / ".pathly-manifest.json").exists(), "Manifest should exist after apply"
+    assert (
+        agents_dest / ".pathly-manifest.json"
+    ).exists(), "Manifest should exist after apply"
 
     uninstall_result = _run_install_cli(["claude", "--uninstall"], tmp_path)
-    assert uninstall_result.returncode == 0, (
-        f"Uninstall failed.\nstdout:\n{uninstall_result.stdout}\nstderr:\n{uninstall_result.stderr}"
-    )
+    assert (
+        uninstall_result.returncode == 0
+    ), f"Uninstall failed.\nstdout:\n{uninstall_result.stdout}\nstderr:\n{uninstall_result.stderr}"
 
     # After uninstall the manifest should be gone
-    assert not (agents_dest / ".pathly-manifest.json").exists(), (
-        "Manifest should be removed after uninstall"
-    )
+    assert not (
+        agents_dest / ".pathly-manifest.json"
+    ).exists(), "Manifest should be removed after uninstall"
 
     # All tracked files should be gone (agents may be nested in subdirs)
     remaining = [f for f in agents_dest.rglob("*") if f.is_file()]
-    assert not remaining, (
-        f"Expected no files after uninstall, found: {[str(f.relative_to(agents_dest)) for f in remaining]}"
-    )
+    assert (
+        not remaining
+    ), f"Expected no files after uninstall, found: {[str(f.relative_to(agents_dest)) for f in remaining]}"
 
 
 # ---------------------------------------------------------------------------
 # test_dry_run_does_not_write_files
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.slow
 def test_dry_run_does_not_write_files(tmp_path):
@@ -139,26 +150,27 @@ def test_dry_run_does_not_write_files(tmp_path):
     before = set(tmp_path.rglob("*"))
 
     result = _run_install_cli(["claude", "--dry-run"], tmp_path)
-    assert result.returncode == 0, (
-        f"Dry-run exited non-zero.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"Dry-run exited non-zero.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     after = set(tmp_path.rglob("*"))
     new_paths = after - before
-    assert not new_paths, (
-        f"Dry-run wrote unexpected files: {[str(p) for p in sorted(new_paths)]}"
-    )
+    assert (
+        not new_paths
+    ), f"Dry-run wrote unexpected files: {[str(p) for p in sorted(new_paths)]}"
 
 
 # ---------------------------------------------------------------------------
 # test_invalid_host_exits_nonzero
 # ---------------------------------------------------------------------------
 
+
 def test_invalid_host_exits_nonzero(tmp_path):
     result = _run_install_cli(["nonexistent_host_xyz", "--apply"], tmp_path)
-    assert result.returncode != 0, (
-        f"Expected non-zero exit for invalid host.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert (
+        result.returncode != 0
+    ), f"Expected non-zero exit for invalid host.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     assert "nonexistent_host_xyz" in result.stderr or "unsupported" in result.stderr
 
 
@@ -166,12 +178,13 @@ def test_invalid_host_exits_nonzero(tmp_path):
 # test_antigravity_dry_run_exits_0
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.slow
 def test_antigravity_dry_run_exits_0(tmp_path):
     (tmp_path / ".gemini" / "antigravity-cli").mkdir(parents=True)
     result = _run_install_cli(["antigravity", "--dry-run"], tmp_path)
-    assert result.returncode == 0, (
-        f"Expected exit 0 for antigravity dry-run.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"Expected exit 0 for antigravity dry-run.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     assert "[antigravity]" in result.stdout
     assert "Would write" in result.stdout

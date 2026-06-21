@@ -1,4 +1,5 @@
 """Schema migrations for pathly_orchestrator SQLite database."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -342,41 +343,41 @@ def _backfill_comms_artifacts(conn: sqlite3.Connection) -> None:
 def _add_additive_migrations(conn: sqlite3.Connection) -> None:
     """ALTER TABLE migrations — safe to re-run; skips columns that already exist."""
     for table, col, ctype in [
-        ("catalog_items",       "content",              "TEXT"),
-        ("flow_definitions",    "file_path",            "TEXT"),
+        ("catalog_items", "content", "TEXT"),
+        ("flow_definitions", "file_path", "TEXT"),
         # Phase 4 (provider-agnostic-telemetry): cost confidence + provider tracking
-        ("agent_invocations",   "cost_source",          "TEXT DEFAULT 'unpriced'"),
-        ("agent_invocations",   "provider",             "TEXT"),
-        ("agent_invocations",   "cache_read_tokens",    "INTEGER DEFAULT 0"),
-        ("agent_invocations",   "cache_write_tokens",   "INTEGER DEFAULT 0"),
-        ("run_history",         "cost_source",          "TEXT DEFAULT 'unpriced'"),
-        ("run_history",         "provider",             "TEXT"),
+        ("agent_invocations", "cost_source", "TEXT DEFAULT 'unpriced'"),
+        ("agent_invocations", "provider", "TEXT"),
+        ("agent_invocations", "cache_read_tokens", "INTEGER DEFAULT 0"),
+        ("agent_invocations", "cache_write_tokens", "INTEGER DEFAULT 0"),
+        ("run_history", "cost_source", "TEXT DEFAULT 'unpriced'"),
+        ("run_history", "provider", "TEXT"),
         # flow-nodes-edges-migration: normalized storage for flow graph
-        ("flow_nodes",          "agent",                "TEXT"),
-        ("flow_nodes",          "role",                 "TEXT"),
-        ("flow_nodes",          "adapter",              "TEXT"),
-        ("flow_nodes",          "skill",                "TEXT"),
-        ("flow_nodes",          "is_terminal",          "INTEGER DEFAULT 0"),
-        ("flow_nodes",          "position",             "INTEGER DEFAULT 0"),
-        ("flow_edges",          "config_json",          "TEXT"),
-        ("flow_edges",          "ordinal",              "INTEGER DEFAULT 0"),
-        ("flow_definitions",    "config_json",          "TEXT"),
+        ("flow_nodes", "agent", "TEXT"),
+        ("flow_nodes", "role", "TEXT"),
+        ("flow_nodes", "adapter", "TEXT"),
+        ("flow_nodes", "skill", "TEXT"),
+        ("flow_nodes", "is_terminal", "INTEGER DEFAULT 0"),
+        ("flow_nodes", "position", "INTEGER DEFAULT 0"),
+        ("flow_edges", "config_json", "TEXT"),
+        ("flow_edges", "ordinal", "INTEGER DEFAULT 0"),
+        ("flow_definitions", "config_json", "TEXT"),
         # Phase 1.4a (comms-board): supersede stale decisions
-        ("comms_messages",      "superseded_by",         "TEXT"),
+        ("comms_messages", "superseded_by", "TEXT"),
         # Phase 14 (comms-board-skills): DAG task decomposition
-        ("comms_messages",      "depends_on",            "TEXT"),
+        ("comms_messages", "depends_on", "TEXT"),
         # P2 scheduler: lane partition + claim/fail lifecycle
-        ("comms_messages",      "lane",                  "TEXT"),
-        ("comms_messages",      "claimed_at",            "TEXT"),
-        ("comms_messages",      "claimed_by",            "TEXT"),
-        ("comms_messages",      "failed_at",             "TEXT"),
-        ("comms_messages",      "fail_reason",           "TEXT"),
-        ("comms_messages",      "attempts",              "INTEGER DEFAULT 0"),
+        ("comms_messages", "lane", "TEXT"),
+        ("comms_messages", "claimed_at", "TEXT"),
+        ("comms_messages", "claimed_by", "TEXT"),
+        ("comms_messages", "failed_at", "TEXT"),
+        ("comms_messages", "fail_reason", "TEXT"),
+        ("comms_messages", "attempts", "INTEGER DEFAULT 0"),
         # comms-board-dag-serial: Board -> Goals -> per-goal task-DAG.
         # goal_id ties a task to its goal; executor ('single'|'loop'|'team') is
         # set on the goal message. A goal is type='goal' (existing type column).
-        ("comms_messages",      "goal_id",               "TEXT"),
-        ("comms_messages",      "executor",              "TEXT"),
+        ("comms_messages", "goal_id", "TEXT"),
+        ("comms_messages", "executor", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

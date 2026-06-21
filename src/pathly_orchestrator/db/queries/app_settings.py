@@ -1,4 +1,5 @@
 """Query helpers for the app_settings table."""
+
 from __future__ import annotations
 
 import json
@@ -22,7 +23,9 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
         conn.commit()
 
 
-def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
+def get_setting(
+    conn: sqlite3.Connection, key: str, default: str | None = None
+) -> str | None:
     """Return setting value or default."""
     row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
     return row["value"] if row else default
@@ -66,10 +69,18 @@ def set_board_scope(
 
 _DEFAULT_WRITE_PERMISSIONS: dict[str, list[str]] = {
     "feature": ["*"],
-    "project": sorted([
-        "tester", "reviewer", "explorer", "architect",
-        "planner", "designer", "director", "human",
-    ]),
+    "project": sorted(
+        [
+            "tester",
+            "reviewer",
+            "explorer",
+            "architect",
+            "planner",
+            "designer",
+            "director",
+            "human",
+        ]
+    ),
     "global": sorted(["director", "human"]),
 }
 

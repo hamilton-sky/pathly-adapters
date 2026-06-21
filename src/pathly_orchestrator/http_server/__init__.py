@@ -10,6 +10,7 @@ Environment variables:
   PATHLY_FSM_HTTP_HOST: Host to bind to (default 127.0.0.1)
   PATHLY_PROJECT_ROOT: If set, enables feedback file watcher on that project root
 """
+
 from __future__ import annotations
 
 # Re-export the Flask app and main entry point

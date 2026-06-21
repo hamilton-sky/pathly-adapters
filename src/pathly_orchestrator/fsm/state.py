@@ -36,7 +36,10 @@ import yaml
 
 # One extra .parent vs. old state.py because this file is in fsm/ sub-package.
 _SCHEMA_PATH = (
-    Path(__file__).parent.parent.parent / "pathly_data" / "schemas" / "state.schema.json"
+    Path(__file__).parent.parent.parent
+    / "pathly_data"
+    / "schemas"
+    / "state.schema.json"
 )
 _SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
@@ -44,7 +47,9 @@ STATES: dict[str, list[str]] = _SCHEMA["transitions"]
 VALID_STATES: frozenset[str] = frozenset(STATES.keys())
 TRANSITIONS: dict[str, list[str]] = STATES
 
-_KNOWN_ADAPTERS: frozenset[str] = frozenset({"claude", "codex", "copilot", "antigravity"})
+_KNOWN_ADAPTERS: frozenset[str] = frozenset(
+    {"claude", "codex", "copilot", "antigravity"}
+)
 
 _REQUIRED_FLOW_KEYS = {
     "storage_path",
@@ -167,10 +172,13 @@ def validate_flow_cli() -> None:
     if "composition" in flow:
         composition = flow["composition"]
         if not isinstance(composition, dict):
-            errors.append("composition: value must be a dict mapping state names to block names")
+            errors.append(
+                "composition: value must be a dict mapping state names to block names"
+            )
         else:
             declared_states = set(flow.get("states") or [])
             from pathly_orchestrator.compose import resolve_block
+
             for state_key, block_name in composition.items():
                 if state_key not in declared_states:
                     errors.append(

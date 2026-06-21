@@ -1,7 +1,11 @@
 """Pricing table and cost computation helpers."""
+
 from __future__ import annotations
 
-from pathly_orchestrator.http_server.telemetry_registry import PricingRegistry, _ADAPTER_PREFIXES
+from pathly_orchestrator.http_server.telemetry_registry import (
+    PricingRegistry,
+    _ADAPTER_PREFIXES,
+)
 
 # Legacy per-model pricing table — kept as reference only; no longer used at runtime.
 # MODEL_PRICING: dict[str, tuple[float, float]] = {

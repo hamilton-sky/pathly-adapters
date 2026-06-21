@@ -1,4 +1,5 @@
 """Health, status, and shutdown endpoints."""
+
 from __future__ import annotations
 
 import logging
@@ -65,7 +66,17 @@ def status_endpoint():
     if not plans_dir.resolve().is_relative_to(resolved_root):
         return jsonify({"error": "Invalid project_root"}), 400
     if not plans_dir.exists():
-        return jsonify({"current_state": "no-feature", "feature": "", "project_root": project_root, "menu": _NO_FEATURE_MENU}), 200
+        return (
+            jsonify(
+                {
+                    "current_state": "no-feature",
+                    "feature": "",
+                    "project_root": project_root,
+                    "menu": _NO_FEATURE_MENU,
+                }
+            ),
+            200,
+        )
 
     topic = request.args.get("topic", "").strip()
     best_state: dict | None = None
@@ -88,7 +99,10 @@ def status_endpoint():
         # (no STATE.json glob — the DB is the source of truth for enumeration too).
         try:
             from pathly_orchestrator.db.connection import get_db as _get_db
-            from pathly_orchestrator.db.queries.fsm_state import read_all_states as _read_all
+            from pathly_orchestrator.db.queries.fsm_state import (
+                read_all_states as _read_all,
+            )
+
             rows = _read_all(_get_db(project_root), project_root)
             if rows:
                 best_state = rows[0]["state"]
@@ -98,10 +112,22 @@ def status_endpoint():
             return jsonify({"current_state": "unknown"}), 200
 
     if best_state is None:
-        return jsonify({"current_state": "no-feature", "feature": "", "project_root": project_root, "menu": _NO_FEATURE_MENU}), 200
+        return (
+            jsonify(
+                {
+                    "current_state": "no-feature",
+                    "feature": "",
+                    "project_root": project_root,
+                    "menu": _NO_FEATURE_MENU,
+                }
+            ),
+            200,
+        )
 
     # Infer feature from directory name when STATE.json lacks the field.
-    feature = best_state.get("feature", "") or (best_state_dir.name if best_state_dir else "")
+    feature = best_state.get("feature", "") or (
+        best_state_dir.name if best_state_dir else ""
+    )
 
     menu = None
     try:
@@ -109,7 +135,9 @@ def status_endpoint():
         import yaml
 
         flow_config = yaml.safe_load(
-            files("pathly_data").joinpath("core/flows/team.flow.yaml").read_text(encoding="utf-8")
+            files("pathly_data")
+            .joinpath("core/flows/team.flow.yaml")
+            .read_text(encoding="utf-8")
         )
         storage_path = resolved_root / "pathly" / "plans" / feature
         menu = build_menu_payload(
@@ -120,11 +148,14 @@ def status_endpoint():
     except Exception:
         logger.debug("status: error building menu payload", exc_info=True)
 
-    return jsonify(
-        {
-            "current_state": best_state.get("current", "unknown"),
-            "feature": feature,
-            "project_root": project_root,
-            "menu": menu,
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "current_state": best_state.get("current", "unknown"),
+                "feature": feature,
+                "project_root": project_root,
+                "menu": menu,
+            }
+        ),
+        200,
+    )

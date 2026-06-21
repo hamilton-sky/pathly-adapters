@@ -1,4 +1,5 @@
 """Flow stage configuration endpoints."""
+
 from __future__ import annotations
 
 import logging
@@ -10,6 +11,7 @@ bp = Blueprint("flows", __name__)
 
 def _get_conn():
     from pathly_orchestrator.db.connection import get_db
+
     return get_db()
 
 
@@ -22,6 +24,7 @@ def get_stage_config():
         return jsonify({"error": "project_root, feature, stage required"}), 400
     try:
         from pathly_orchestrator.db.queries.stage_configs import read_stage_config
+
         conn = _get_conn()
         cfg = read_stage_config(conn, project_root, feature, stage)
         return jsonify(cfg or {})
@@ -40,9 +43,13 @@ def set_stage_config():
         return jsonify({"error": "project_root, feature, stage required"}), 400
     try:
         from pathly_orchestrator.db.queries.stage_configs import upsert_stage_config
+
         conn = _get_conn()
         upsert_stage_config(
-            conn, project_root, feature, stage,
+            conn,
+            project_root,
+            feature,
+            stage,
             agent=data.get("agent"),
             adapter=data.get("adapter"),
             skill=data.get("skill"),
@@ -63,6 +70,7 @@ def reset_stage_config():
         return jsonify({"error": "project_root, feature, stage required"}), 400
     try:
         from pathly_orchestrator.db.queries.stage_configs import delete_stage_config
+
         conn = _get_conn()
         delete_stage_config(conn, project_root, feature, stage)
         return jsonify({"ok": True})

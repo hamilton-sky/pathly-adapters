@@ -10,6 +10,7 @@ lock by topic in api.start_run, while board runs (single-agent, evaluator) lock 
 by (board, scope). For feature boards the two keys coincide conceptually; the board
 lock is the authoritative gate for board-initiated runs.
 """
+
 from __future__ import annotations
 
 import threading

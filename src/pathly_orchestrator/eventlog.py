@@ -34,11 +34,20 @@ from pathly_orchestrator import db as _db
 CURRENT_SCHEMA_VERSION = 1
 
 _TOAST_EVENTS: dict[str, tuple[str, object]] = {
-    "STATE_TRANSITION": ("info",    lambda e: f"{e.get('from','?')} → {e.get('to','?')}"),
-    "AGENT_DONE":       ("success", lambda e: (e.get("summary") or e.get("result") or "Agent done")[:80]),
-    "GATE_FAILED":      ("warning", lambda e: f"Gate blocked: {(e.get('reason') or e.get('gate',''))[:60]}"),
-    "FEEDBACK_RESOLVED":("info",    lambda e: f"Feedback resolved: {e.get('file','')[:50]}"),
-    "RETRY":            ("info",    lambda e: f"Retrying stage: {e.get('stage','')}"),
+    "STATE_TRANSITION": ("info", lambda e: f"{e.get('from','?')} → {e.get('to','?')}"),
+    "AGENT_DONE": (
+        "success",
+        lambda e: (e.get("summary") or e.get("result") or "Agent done")[:80],
+    ),
+    "GATE_FAILED": (
+        "warning",
+        lambda e: f"Gate blocked: {(e.get('reason') or e.get('gate',''))[:60]}",
+    ),
+    "FEEDBACK_RESOLVED": (
+        "info",
+        lambda e: f"Feedback resolved: {e.get('file','')[:50]}",
+    ),
+    "RETRY": ("info", lambda e: f"Retrying stage: {e.get('stage','')}"),
 }
 
 
@@ -58,7 +67,6 @@ def _resolve_path(storage_path: str) -> Path:
     if "/" not in storage_path and "\\" not in storage_path:
         return _self._plans_dir() / storage_path
     return Path(storage_path)
-
 
 
 def _now() -> str:
@@ -91,6 +99,7 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
 
     try:
         from pathly_orchestrator.event_bus import _bus
+
         _bus.publish(f"FSM_EVENT:{project_root}:{feature}", event)
         _bus.publish(event.get("type", ""), event)
     except Exception:
@@ -101,12 +110,16 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
         level, msg_fn = _TOAST_EVENTS[event_type]
         try:
             from pathly_orchestrator.http_server.sse import _broadcast_runner
-            _broadcast_runner(feature, {
-                "type": "TOAST",
-                "level": level,
-                "message": msg_fn(event),  # type: ignore[operator]
-                "feature": feature,
-            })
+
+            _broadcast_runner(
+                feature,
+                {
+                    "type": "TOAST",
+                    "level": level,
+                    "message": msg_fn(event),  # type: ignore[operator]
+                    "feature": feature,
+                },
+            )
         except Exception:
             pass  # SSE is best-effort — never crash event logging
 

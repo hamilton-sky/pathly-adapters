@@ -1,4 +1,5 @@
 """Skills catalog, parse, preview, and export endpoints."""
+
 from __future__ import annotations
 
 import json
@@ -25,6 +26,7 @@ def list_flows():
     try:
         from pathly_orchestrator.db import get_db
         from pathly_orchestrator.db.queries.flow_defs import read_flow_definitions
+
         conn = get_db()
         flows = read_flow_definitions(conn, project_root=None)
         result = [
@@ -53,6 +55,7 @@ def get_flow_graph(name: str):
             read_flow_by_name,
             read_flow_nodes,
         )
+
         conn = get_db()
         row = read_flow_by_name(conn, name)
         if not row:
@@ -61,6 +64,7 @@ def get_flow_graph(name: str):
         node_rows = read_flow_nodes(conn, row["id"])
         if not node_rows:
             import yaml as _yaml
+
             graph = _yaml.safe_load(row["flow_yaml"])
         else:
             flow_level_config = json.loads(row.get("config_json") or "{}")
@@ -84,7 +88,10 @@ def update_flow_graph(name: str):
     """
     try:
         from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import read_flow_by_name, upsert_flow_definition
+        from pathly_orchestrator.db.queries.flow_defs import (
+            read_flow_by_name,
+            upsert_flow_definition,
+        )
 
         data = request.get_json()
         if not data:
@@ -100,12 +107,19 @@ def update_flow_graph(name: str):
         file_path = (existing.get("file_path") or "") if existing else ""
 
         upsert_flow_definition(
-            conn, project_root=None, name=name, version="", flow_yaml=flow_yaml, file_path=file_path
+            conn,
+            project_root=None,
+            name=name,
+            version="",
+            flow_yaml=flow_yaml,
+            file_path=file_path,
         )
 
         if file_path:
             try:
-                Path(file_path.replace("/", "\\")).write_text(flow_yaml, encoding="utf-8")
+                Path(file_path.replace("/", "\\")).write_text(
+                    flow_yaml, encoding="utf-8"
+                )
             except Exception:
                 pass
 
@@ -121,16 +135,22 @@ def get_flow(name: str):
     try:
         from pathly_orchestrator.db import get_db
         from pathly_orchestrator.db.queries.flow_defs import read_flow_by_name
+
         conn = get_db()
         flow = read_flow_by_name(conn, name)
         if not flow:
             return jsonify({"error": f"Flow '{name}' not found"}), 404
-        return jsonify({
-            "name": flow["name"],
-            "flow_yaml": flow["flow_yaml"],
-            "file_path": (flow.get("file_path") or "").replace("\\", "/"),
-            "updated_at": flow.get("updated_at", ""),
-        }), 200
+        return (
+            jsonify(
+                {
+                    "name": flow["name"],
+                    "flow_yaml": flow["flow_yaml"],
+                    "file_path": (flow.get("file_path") or "").replace("\\", "/"),
+                    "updated_at": flow.get("updated_at", ""),
+                }
+            ),
+            200,
+        )
     except Exception as e:
         logging.exception("get_flow error")
         return jsonify({"error": str(e)}), 500
@@ -142,7 +162,11 @@ def update_flow(name: str):
     try:
         from pathlib import Path
         from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import read_flow_by_name, upsert_flow_definition
+        from pathly_orchestrator.db.queries.flow_defs import (
+            read_flow_by_name,
+            upsert_flow_definition,
+        )
+
         conn = get_db()
         data = request.get_json()
         if not data:
@@ -150,11 +174,20 @@ def update_flow(name: str):
         flow_yaml = data.get("flow_yaml", "")
         existing = read_flow_by_name(conn, name)
         file_path = (existing.get("file_path") or "") if existing else ""
-        upsert_flow_definition(conn, project_root=None, name=name, version="", flow_yaml=flow_yaml, file_path=file_path)
+        upsert_flow_definition(
+            conn,
+            project_root=None,
+            name=name,
+            version="",
+            flow_yaml=flow_yaml,
+            file_path=file_path,
+        )
         # Write-through to disk
         if file_path:
             try:
-                Path(file_path.replace("/", "\\")).write_text(flow_yaml, encoding="utf-8")
+                Path(file_path.replace("/", "\\")).write_text(
+                    flow_yaml, encoding="utf-8"
+                )
             except Exception:
                 pass
         return jsonify({"ok": True}), 200
@@ -168,7 +201,10 @@ def catalog_content():
     """Return content of a catalog item by abs_path query param."""
     try:
         from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.catalog_items import read_catalog_item_by_path
+        from pathly_orchestrator.db.queries.catalog_items import (
+            read_catalog_item_by_path,
+        )
+
         abs_path = request.args.get("path", "")
         if not abs_path:
             return jsonify({"error": "Missing 'path' query param"}), 400
@@ -176,11 +212,16 @@ def catalog_content():
         item = read_catalog_item_by_path(conn, abs_path)
         if not item:
             return jsonify({"error": "Item not found"}), 404
-        return jsonify({
-            "name": item["name"],
-            "content": item.get("content") or "",
-            "abs_path": (item.get("abs_path") or "").replace("\\", "/"),
-        }), 200
+        return (
+            jsonify(
+                {
+                    "name": item["name"],
+                    "content": item.get("content") or "",
+                    "abs_path": (item.get("abs_path") or "").replace("\\", "/"),
+                }
+            ),
+            200,
+        )
     except Exception as e:
         logging.exception("catalog_content error")
         return jsonify({"error": str(e)}), 500
@@ -239,13 +280,24 @@ transitions:
 """
         file_path.write_text(flow_yaml, encoding="utf-8")
         conn = get_db()
-        upsert_flow_definition(conn, project_root=None, name=name, version="1",
-                               flow_yaml=flow_yaml, file_path=str(file_path).replace("\\", "/"))
-        return jsonify({
-            "name": name,
-            "file_path": str(file_path).replace("\\", "/"),
-            "flow_yaml": flow_yaml,
-        }), 201
+        upsert_flow_definition(
+            conn,
+            project_root=None,
+            name=name,
+            version="1",
+            flow_yaml=flow_yaml,
+            file_path=str(file_path).replace("\\", "/"),
+        )
+        return (
+            jsonify(
+                {
+                    "name": name,
+                    "file_path": str(file_path).replace("\\", "/"),
+                    "flow_yaml": flow_yaml,
+                }
+            ),
+            201,
+        )
     except Exception as e:
         logging.exception("create_flow error")
         return jsonify({"error": str(e)}), 500
@@ -266,7 +318,10 @@ def delete_flow(name: str):
 
         # Delete from DB
         with _get_write_lock(conn):
-            conn.execute("DELETE FROM flow_definitions WHERE name=? AND project_root IS NULL", (name,))
+            conn.execute(
+                "DELETE FROM flow_definitions WHERE name=? AND project_root IS NULL",
+                (name,),
+            )
             conn.commit()
 
         # Delete from disk
@@ -292,7 +347,11 @@ def create_catalog_item():
     try:
         import re as _re
         from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.catalog_items import upsert_catalog_item, _find_data_root, _rel
+        from pathly_orchestrator.db.queries.catalog_items import (
+            upsert_catalog_item,
+            _find_data_root,
+            _rel,
+        )
 
         data = request.get_json() or {}
         item_type = data.get("type", "")
@@ -315,10 +374,14 @@ def create_catalog_item():
             return jsonify({"error": "Cannot locate pathly_data"}), 500
 
         core = data_root / "core"
-        fragment_dir = (core / "skills" / "fragments" / category) if category else (core / "skills" / "fragments")
+        fragment_dir = (
+            (core / "skills" / "fragments" / category)
+            if category
+            else (core / "skills" / "fragments")
+        )
         type_to_dir = {
-            "skill":    core / "skills" / (category or "custom"),
-            "agent":    core / "agents",
+            "skill": core / "skills" / (category or "custom"),
+            "agent": core / "agents",
             "fragment": fragment_dir,
             "template": core / "templates" / (category or "custom"),
         }
@@ -327,7 +390,10 @@ def create_catalog_item():
         file_path = target_dir / f"{safe_name}.md"
 
         if file_path.exists():
-            return jsonify({"error": f"Item '{safe_name}' already exists in {category}"}), 409
+            return (
+                jsonify({"error": f"Item '{safe_name}' already exists in {category}"}),
+                409,
+            )
 
         file_path.write_text(content, encoding="utf-8")
         abs_path = str(file_path).replace("\\", "/")
@@ -372,16 +438,23 @@ def delete_catalog_item():
         conn = get_db()
         # Find by type+name
         row = conn.execute(
-            "SELECT * FROM catalog_items WHERE item_type=? AND name=?", (item_type, name)
+            "SELECT * FROM catalog_items WHERE item_type=? AND name=?",
+            (item_type, name),
         ).fetchone()
         if not row:
-            return jsonify({"error": f"Item '{name}' of type '{item_type}' not found"}), 404
+            return (
+                jsonify({"error": f"Item '{name}' of type '{item_type}' not found"}),
+                404,
+            )
 
         abs_path = (dict(row).get("abs_path") or "").replace("/", "\\")
 
         # Delete from DB
         with _get_write_lock(conn):
-            conn.execute("DELETE FROM catalog_items WHERE item_type=? AND name=?", (item_type, name))
+            conn.execute(
+                "DELETE FROM catalog_items WHERE item_type=? AND name=?",
+                (item_type, name),
+            )
             conn.commit()
 
         # Delete from disk
@@ -477,7 +550,10 @@ def rename_catalog_category_route():
         new_name = (data.get("newName") or "").strip()
 
         if not old_name or not new_name:
-            return jsonify({"error": "Fields 'oldName' and 'newName' are required"}), 400
+            return (
+                jsonify({"error": "Fields 'oldName' and 'newName' are required"}),
+                400,
+            )
 
         conn = get_db()
         result = rename_catalog_category(conn, item_type, old_name, new_name)
@@ -508,7 +584,9 @@ def create_category():
             return jsonify({"error": "Field 'name' is required"}), 400
 
         # Support nested paths (e.g. "planning/hello") by sanitizing each segment
-        segments = [_re.sub(r"[^a-z0-9\-_]", "-", s.lower()).strip("-") for s in name.split("/")]
+        segments = [
+            _re.sub(r"[^a-z0-9\-_]", "-", s.lower()).strip("-") for s in name.split("/")
+        ]
         segments = [s for s in segments if s]
         if not segments:
             return jsonify({"error": "Invalid name"}), 400
@@ -556,14 +634,19 @@ def delete_category():
         if not data_root:
             return jsonify({"error": "Cannot locate pathly_data"}), 500
 
-        base = data_root / "core" / ("skills" if item_type in ("skill", "fragment") else "templates")
+        base = (
+            data_root
+            / "core"
+            / ("skills" if item_type in ("skill", "fragment") else "templates")
+        )
         cat_dir = base / name
 
         # Delete from DB (all items in this category)
         conn = get_db()
         with _get_write_lock(conn):
             conn.execute(
-                "DELETE FROM catalog_items WHERE item_type=? AND category=?", (item_type, name)
+                "DELETE FROM catalog_items WHERE item_type=? AND category=?",
+                (item_type, name),
             )
             conn.commit()
 
@@ -621,12 +704,14 @@ def catalog_all():
         for item in items:
             group = type_to_key.get(item.get("item_type", ""))
             if group:
-                result[group].append({
-                    "name":        item["name"],
-                    "description": item.get("description") or "",
-                    "category":    item.get("category") or "",
-                    "path":        (item.get("abs_path") or "").replace("\\", "/"),
-                })
+                result[group].append(
+                    {
+                        "name": item["name"],
+                        "description": item.get("description") or "",
+                        "category": item.get("category") or "",
+                        "path": (item.get("abs_path") or "").replace("\\", "/"),
+                    }
+                )
 
         return jsonify(result), 200
     except Exception as e:
@@ -652,7 +737,10 @@ def skills_parse():
 
         skill_path = data.get("skill_path", "")
         if not isinstance(skill_path, str) or not skill_path.strip():
-            return jsonify({"error": "Field 'skill_path' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'skill_path' must be a non-empty string"}),
+                400,
+            )
 
         document = parse_skill_document(skill_path)
         cells = document["body_cells"]
@@ -665,7 +753,7 @@ def skills_parse():
         marker = "core/skills/"
         idx = normalized.find(marker)
         if idx != -1:
-            rel = normalized[idx + len(marker):]
+            rel = normalized[idx + len(marker) :]
         else:
             rel = normalized.split("/")[-1]
         composition_key = rel.removesuffix(".md")
@@ -681,9 +769,11 @@ def skills_parse():
                     comp = _yaml.safe_load(f)
                 skill_entry = (comp.get("skills") or {}).get(composition_key)
                 if skill_entry:
-                    fragments_dir = (comp.get("fragments_dir") or "fragments")
+                    fragments_dir = comp.get("fragments_dir") or "fragments"
                     defaults = comp.get("defaults") or []
-                    all_fragment_names = list(defaults) + list(skill_entry.get("fragments") or [])
+                    all_fragment_names = list(defaults) + list(
+                        skill_entry.get("fragments") or []
+                    )
                     for frag in all_fragment_names:
                         if isinstance(frag, dict):
                             frag_name = frag.get("name", "")
@@ -700,17 +790,29 @@ def skills_parse():
                                     description = first_line.lstrip("#").strip()
                         except OSError:
                             pass
-                        fragment_cells.append({
-                            "id": str(_uuid.uuid4()),
-                            "type": "fragment",
-                            "fragmentName": frag_name,
-                            "category": "core",
-                            "description": description,
-                        })
+                        fragment_cells.append(
+                            {
+                                "id": str(_uuid.uuid4()),
+                                "type": "fragment",
+                                "fragmentName": frag_name,
+                                "category": "core",
+                                "description": description,
+                            }
+                        )
             except OSError:
                 pass
 
-        return jsonify({"body_cells": cells, "fragment_cells": fragment_cells, "composition_key": composition_key, "frontmatter": frontmatter}), 200
+        return (
+            jsonify(
+                {
+                    "body_cells": cells,
+                    "fragment_cells": fragment_cells,
+                    "composition_key": composition_key,
+                    "frontmatter": frontmatter,
+                }
+            ),
+            200,
+        )
     except FileNotFoundError as e:
         return jsonify({"error": str(e), "type": "FileNotFoundError"}), 404
     except Exception as e:
@@ -758,7 +860,9 @@ def skills_preview():
         fragment_names = [
             c["fragmentName"]
             for c in (cells or [])
-            if isinstance(c, dict) and c.get("type") == "fragment" and c.get("fragmentName")
+            if isinstance(c, dict)
+            and c.get("type") == "fragment"
+            and c.get("fragmentName")
         ]
 
         # Build assembled text: body (live cells or disk) + fragment bodies
@@ -774,6 +878,7 @@ def skills_preview():
             else:
                 try:
                     from pathly_orchestrator.compose import _read_skill_body
+
                     skill_body = _read_skill_body(skill)
                 except Exception:
                     skill_body = ""
@@ -781,7 +886,9 @@ def skills_preview():
             fragment_bodies = []
             for fname in fragment_names:
                 try:
-                    fragment_bodies.append(_read_fragment(fragments_dir, fname).rstrip("\n"))
+                    fragment_bodies.append(
+                        _read_fragment(fragments_dir, fname).rstrip("\n")
+                    )
                 except Exception:
                     pass
             raw_parts = [skill_body.rstrip("\n")] + fragment_bodies
@@ -791,7 +898,9 @@ def skills_preview():
 
         # Variable substitution
         feature = Path(feature_path).name if feature_path else ""
-        project_root = str(Path(feature_path).parent.parent.parent) if feature_path else ""
+        project_root = (
+            str(Path(feature_path).parent.parent.parent) if feature_path else ""
+        )
         agent_role = skill.split("/")[-1] if "/" in skill else skill
         storage_path = Path(feature_path) if feature_path else None
         assembled = _inject_prompt_vars(
@@ -804,6 +913,7 @@ def skills_preview():
 
         # Split into sections on ## headings
         import re as _re
+
         parts_list = _re.split(r"(?m)^(## .+)$", assembled)
         sections: list[dict] = []
         preamble = parts_list[0].strip()
@@ -842,7 +952,10 @@ def skills_save():
         frontmatter = data.get("frontmatter", "")
 
         if not isinstance(skill_path, str) or not skill_path.strip():
-            return jsonify({"error": "Field 'skill_path' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'skill_path' must be a non-empty string"}),
+                400,
+            )
         if not isinstance(body_cells, list):
             return jsonify({"error": "Field 'body_cells' must be a list"}), 400
         if not isinstance(frontmatter, str):
@@ -860,9 +973,15 @@ def skills_save():
         normalized = skill_path.replace("\\", "/")
         marker = "core/skills/"
         idx = normalized.find(marker)
-        skill_key = normalized[idx + len(marker):].removesuffix(".md") if idx != -1 else Path(skill_path).stem
+        skill_key = (
+            normalized[idx + len(marker) :].removesuffix(".md")
+            if idx != -1
+            else Path(skill_path).stem
+        )
         filename = Path(skill_path).name
-        natural_language = body_cells[0].get("heading", skill_key) if body_cells else skill_key
+        natural_language = (
+            body_cells[0].get("heading", skill_key) if body_cells else skill_key
+        )
 
         # Upsert to DB
         conn = get_db()
@@ -901,15 +1020,25 @@ def skills_export():
         fragment_order = data.get("fragment_order", [])
         if not isinstance(skill, str) or not skill.strip():
             return jsonify({"error": "Field 'skill' must be a non-empty string"}), 400
-        if not isinstance(fragment_order, list) or not all(isinstance(x, str) for x in fragment_order):
-            return jsonify({"error": "Field 'fragment_order' must be a list of strings"}), 400
+        if not isinstance(fragment_order, list) or not all(
+            isinstance(x, str) for x in fragment_order
+        ):
+            return (
+                jsonify({"error": "Field 'fragment_order' must be a list of strings"}),
+                400,
+            )
         # Reject path-like / absolute skill names so a stray UI value (e.g. an
         # absolute path to a plans artifact) can never inject a bogus key into the
         # hand-maintained manifest. A skill key is "category/name" (e.g. team/build).
         if not _SKILL_KEY_RE.fullmatch(skill):
-            return jsonify({
-                "error": "Field 'skill' must be a skill name like 'team/build', not a path"
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Field 'skill' must be a skill name like 'team/build', not a path"
+                    }
+                ),
+                400,
+            )
 
         # Locate the composition.yaml file on disk (importlib resources path)
         skills_resource = _res_files("pathly_data").joinpath("core/skills")
@@ -941,7 +1070,13 @@ def skills_export():
                 manifest["skills"][skill] = {}
             manifest["skills"][skill]["fragments"] = fragment_order
             with open(composition_path, "w", encoding="utf-8") as f:
-                yaml.dump(manifest, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                yaml.dump(
+                    manifest,
+                    f,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                )
 
         return jsonify({"ok": True}), 200
     except Exception as e:

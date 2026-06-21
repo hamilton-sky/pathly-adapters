@@ -2,6 +2,7 @@
 
 All file I/O uses tmp_path. No network calls. No real API key required.
 """
+
 from __future__ import annotations
 
 import json
@@ -44,6 +45,7 @@ def _run_hook(
 # test_hook_rejects_path_outside_plans
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
 def test_hook_rejects_path_outside_plans(hook, tmp_path):
     plans_dir = tmp_path / "pathly" / "plans"
@@ -63,6 +65,7 @@ def test_hook_rejects_path_outside_plans(hook, tmp_path):
 # ---------------------------------------------------------------------------
 # test_hook_accepts_valid_path
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
 def test_hook_accepts_valid_path(hook, tmp_path):
@@ -84,6 +87,7 @@ def test_hook_accepts_valid_path(hook, tmp_path):
 # test_hook_malformed_json
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
 def test_hook_malformed_json(hook, tmp_path):
     result = _run_hook(
@@ -100,6 +104,7 @@ def test_hook_malformed_json(hook, tmp_path):
 # ---------------------------------------------------------------------------
 # test_hook_already_tagged_file  (inject_feedback_ttl only)
 # ---------------------------------------------------------------------------
+
 
 def test_hook_already_tagged_file(tmp_path):
     plans_dir = tmp_path / "pathly" / "plans"
@@ -122,6 +127,7 @@ def test_hook_already_tagged_file(tmp_path):
 # test_hook_missing_api_key  (classify_feedback only)
 # ---------------------------------------------------------------------------
 
+
 def test_hook_missing_api_key(tmp_path):
     plans_dir = tmp_path / "pathly" / "plans"
     plans_dir.mkdir(parents=True)
@@ -142,6 +148,7 @@ def test_hook_missing_api_key(tmp_path):
 # ---------------------------------------------------------------------------
 # test_classify_feedback_uses_word_boundary_arch_keywords
 # ---------------------------------------------------------------------------
+
 
 def test_classify_feedback_uses_word_boundary_arch_keywords(tmp_path):
     plans_dir = tmp_path / "pathly" / "plans"
@@ -175,6 +182,7 @@ def test_classify_feedback_uses_word_boundary_arch_keywords(tmp_path):
 # test_hook_missing_project_root
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
 def test_hook_missing_project_root(hook, tmp_path):
     payload = {"file": str(tmp_path / "pathly" / "plans" / "feedback.md")}
@@ -194,4 +202,6 @@ def test_hook_missing_project_root(hook, tmp_path):
     )
     assert result.returncode == 0
     assert result.stderr == ""
-    assert "PATHLY_PROJECT_ROOT not set" in (tmp_path / ".pathly" / "hook.log").read_text(encoding="utf-8")
+    assert "PATHLY_PROJECT_ROOT not set" in (
+        tmp_path / ".pathly" / "hook.log"
+    ).read_text(encoding="utf-8")

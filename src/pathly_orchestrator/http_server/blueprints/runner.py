@@ -1,4 +1,5 @@
 """Runner control endpoints (/runner/*)."""
+
 from __future__ import annotations
 
 import logging
@@ -32,7 +33,10 @@ def runner_start():
         required = {"topic", "flow", "project_root", "max_iterations", "max_cost_usd"}
         missing = required - set(data.keys())
         if missing:
-            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+            return (
+                jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}),
+                400,
+            )
 
         topic = data.get("topic", "")
         if not isinstance(topic, str) or not topic.strip():
@@ -41,15 +45,26 @@ def runner_start():
         for field_name in ("flow", "project_root"):
             val = data.get(field_name, "")
             if not isinstance(val, str) or not val.strip():
-                return jsonify({"error": f"Field '{field_name}' must be a non-empty string"}), 400
+                return (
+                    jsonify(
+                        {"error": f"Field '{field_name}' must be a non-empty string"}
+                    ),
+                    400,
+                )
 
         max_iterations = data.get("max_iterations")
         if not isinstance(max_iterations, int) or max_iterations <= 0:
-            return jsonify({"error": "Field 'max_iterations' must be a positive integer"}), 400
+            return (
+                jsonify({"error": "Field 'max_iterations' must be a positive integer"}),
+                400,
+            )
 
         max_cost_usd = data.get("max_cost_usd")
         if not isinstance(max_cost_usd, (int, float)) or max_cost_usd <= 0:
-            return jsonify({"error": "Field 'max_cost_usd' must be a positive number"}), 400
+            return (
+                jsonify({"error": "Field 'max_cost_usd' must be a positive number"}),
+                400,
+            )
 
         model = data.get("model", "claude-sonnet-4-6") or "claude-sonnet-4-6"
         timeout = data.get("timeout", 600)
@@ -78,7 +93,10 @@ def runner_start():
         try:
             import time as _time
             from pathly_orchestrator.db.connection import get_db as _get_db
-            from pathly_orchestrator.db.queries.run_history import upsert_run as _upsert_run
+            from pathly_orchestrator.db.queries.run_history import (
+                upsert_run as _upsert_run,
+            )
+
             _now = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
             _upsert_run(
                 _get_db(),
@@ -91,7 +109,10 @@ def runner_start():
             )
         except Exception:
             logging.debug("run_history upsert (start) error", exc_info=True)
-        return jsonify({"status": "started", "topic": topic, "run_id": state.run_id}), 200
+        return (
+            jsonify({"status": "started", "topic": topic, "run_id": state.run_id}),
+            200,
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
     except Exception as exc:
@@ -140,8 +161,10 @@ def runner_terminal_result():
                 adapter = runner_state.current_adapter or "claude"
             else:
                 import logging as _logging
+
                 _logging.getLogger("pathly.http").warning(
-                    "runner_terminal_result: no RunnerState found for topic %r, falling back to 'claude'", topic
+                    "runner_terminal_result: no RunnerState found for topic %r, falling back to 'claude'",
+                    topic,
                 )
                 adapter = "claude"
 
@@ -151,8 +174,14 @@ def runner_terminal_result():
         # Enrich with EVENTS.jsonl summary (authoritative, never truncated)
         if runner_state is not None:
             try:
-                from pathly_orchestrator.runner import read_last_agent_done, _storage_path
-                storage = _storage_path(runner_state.flow, runner_state.project_root, runner_state.topic)
+                from pathly_orchestrator.runner import (
+                    read_last_agent_done,
+                    _storage_path,
+                )
+
+                storage = _storage_path(
+                    runner_state.flow, runner_state.project_root, runner_state.topic
+                )
                 agent_done = read_last_agent_done(storage)
                 if agent_done is not None:
                     summary = agent_done.get("summary", "")
@@ -160,39 +189,58 @@ def runner_terminal_result():
                         parsed["result"] = summary
                     # Use EVENTS.jsonl values as fallback when PTY stdout buffer was
                     # truncated and parseClaudeJsonResult couldn't find the final JSON.
-                    if not parsed.get("cost_usd") and agent_done.get("cost_usd", 0.0) > 0.0:
+                    if (
+                        not parsed.get("cost_usd")
+                        and agent_done.get("cost_usd", 0.0) > 0.0
+                    ):
                         parsed["cost_usd"] = agent_done["cost_usd"]
-                    if not parsed.get("tokens_in") and agent_done.get("tokens_in", 0) > 0:
+                    if (
+                        not parsed.get("tokens_in")
+                        and agent_done.get("tokens_in", 0) > 0
+                    ):
                         parsed["tokens_in"] = agent_done["tokens_in"]
-                    if not parsed.get("tokens_out") and agent_done.get("tokens_out", 0) > 0:
+                    if (
+                        not parsed.get("tokens_out")
+                        and agent_done.get("tokens_out", 0) > 0
+                    ):
                         parsed["tokens_out"] = agent_done["tokens_out"]
-                    if not parsed.get("tool_uses") and agent_done.get("tool_uses", 0) > 0:
+                    if (
+                        not parsed.get("tool_uses")
+                        and agent_done.get("tool_uses", 0) > 0
+                    ):
                         parsed["tool_uses"] = agent_done["tool_uses"]
             except Exception as exc:
-                logging.getLogger("pathly.http").warning("runner_terminal_result: EVENTS.jsonl read failed: %s", exc)
+                logging.getLogger("pathly.http").warning(
+                    "runner_terminal_result: EVENTS.jsonl read failed: %s", exc
+                )
 
         # Broadcast STAGE_RESULT so Studio renderer can update the stageLog
         # directly — this is the reliable path when PTY stdout parsing fails
         # (e.g. long-running builds where the final JSON scrolls out of the buffer).
         tab_id = runner_state.active_tab_id if runner_state is not None else ""
         if tab_id and topic:
-            _broadcast_runner(topic, {
-                "type": "STAGE_RESULT",
-                "topic": topic,
-                "run_id": run_id,
-                "tab_id": tab_id,
-                "result": parsed.get("result", ""),
-                "total_cost_usd": parsed.get("cost_usd", 0.0),
-                "duration_ms": int((data.get("wall_seconds") or 0) * 1000),
-                "usage": parsed.get("usage", {}),
-            })
+            _broadcast_runner(
+                topic,
+                {
+                    "type": "STAGE_RESULT",
+                    "topic": topic,
+                    "run_id": run_id,
+                    "tab_id": tab_id,
+                    "result": parsed.get("result", ""),
+                    "total_cost_usd": parsed.get("cost_usd", 0.0),
+                    "duration_ms": int((data.get("wall_seconds") or 0) * 1000),
+                    "usage": parsed.get("usage", {}),
+                },
+            )
 
-        run.mark_pty_result({
-            "result": parsed,
-            "exit_code": data.get("exit_code"),
-            "wall_seconds": data.get("wall_seconds"),
-            "user_initiated": data.get("user_initiated"),
-        })
+        run.mark_pty_result(
+            {
+                "result": parsed,
+                "exit_code": data.get("exit_code"),
+                "wall_seconds": data.get("wall_seconds"),
+                "user_initiated": data.get("user_initiated"),
+            }
+        )
         return jsonify({"ok": True}), 200
     except Exception as exc:
         logging.exception("runner_terminal_result error")
@@ -279,21 +327,39 @@ def runner_decision():
 
         decision = data.get("decision", "")
         if not isinstance(decision, str) or not decision.strip():
-            return jsonify({"error": "Field 'decision' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'decision' must be a non-empty string"}),
+                400,
+            )
 
         state = _sup.get_state(topic)
         if state is None:
             return jsonify({"error": "No run found for topic"}), 404
         if state.status != "awaiting_decision":
-            return jsonify({"error": f"Run is not awaiting a decision (status={state.status})"}), 409
+            return (
+                jsonify(
+                    {"error": f"Run is not awaiting a decision (status={state.status})"}
+                ),
+                409,
+            )
 
         if state.pending_menu:
             options = state.pending_menu.get("options", {})
             if options and decision not in options:
-                return jsonify({"error": f"Invalid decision {decision!r}; valid options: {list(options)}"}), 400
+                return (
+                    jsonify(
+                        {
+                            "error": f"Invalid decision {decision!r}; valid options: {list(options)}"
+                        }
+                    ),
+                    400,
+                )
 
         _sup.supply_decision(topic, decision)
-        return jsonify({"status": "accepted", "topic": topic, "decision": decision}), 200
+        return (
+            jsonify({"status": "accepted", "topic": topic, "decision": decision}),
+            200,
+        )
     except KeyError:
         return jsonify({"error": "No run found for topic"}), 404
     except ValueError as exc:
@@ -374,26 +440,47 @@ def runner_retry():
             return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
 
         state = _sup.get_state(topic)
-        if state is not None and state.status in {"running", "paused", "awaiting_decision"}:
-            return jsonify({"error": f"Run is currently active (status={state.status}); abort it first"}), 409
+        if state is not None and state.status in {
+            "running",
+            "paused",
+            "awaiting_decision",
+        }:
+            return (
+                jsonify(
+                    {
+                        "error": f"Run is currently active (status={state.status}); abort it first"
+                    }
+                ),
+                409,
+            )
 
         # Evict from registry so start_run won't reject it as active
         from pathly_orchestrator.supervisor import _lock, _registry
+
         with _lock:
             _registry.pop(topic, None)
 
         required = {"flow", "project_root", "max_iterations", "max_cost_usd"}
         missing = required - set(data.keys())
         if missing:
-            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+            return (
+                jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}),
+                400,
+            )
 
         max_iterations = data.get("max_iterations")
         if not isinstance(max_iterations, int) or max_iterations <= 0:
-            return jsonify({"error": "Field 'max_iterations' must be a positive integer"}), 400
+            return (
+                jsonify({"error": "Field 'max_iterations' must be a positive integer"}),
+                400,
+            )
 
         max_cost_usd = data.get("max_cost_usd")
         if not isinstance(max_cost_usd, (int, float)) or max_cost_usd <= 0:
-            return jsonify({"error": "Field 'max_cost_usd' must be a positive number"}), 400
+            return (
+                jsonify({"error": "Field 'max_cost_usd' must be a positive number"}),
+                400,
+            )
 
         model = data.get("model", "claude-sonnet-4-6") or "claude-sonnet-4-6"
         timeout = data.get("timeout", 600)
@@ -459,7 +546,10 @@ def runner_event():
         required = {"type", "feature", "project_root", "payload"}
         missing = required - set(data.keys())
         if missing:
-            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+            return (
+                jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}),
+                400,
+            )
 
         feature = data["feature"]
         project_root = data["project_root"]
@@ -468,7 +558,10 @@ def runner_event():
         if not isinstance(feature, str) or not feature.strip():
             return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
         if not isinstance(project_root, str) or not project_root.strip():
-            return jsonify({"error": "Field 'project_root' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'project_root' must be a non-empty string"}),
+                400,
+            )
         if not isinstance(payload, dict):
             return jsonify({"error": "Field 'payload' must be a JSON object"}), 400
 

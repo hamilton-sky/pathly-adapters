@@ -35,7 +35,10 @@ _SHARED_SECTIONS = [
 
 # ── Inert-seam: real (empty) manifest is a no-op ────────────────────────────
 
-@pytest.mark.parametrize("skill", ["development/fix", "development/quick-fix", "development/commit"])
+
+@pytest.mark.parametrize(
+    "skill", ["development/fix", "development/quick-fix", "development/commit"]
+)
 def test_unconverted_skill_composes_raw_body(skill):
     """A skill ABSENT from the manifest composes byte-identical to its raw body.
 
@@ -55,6 +58,7 @@ def test_real_manifest_validates():
 
 
 # ── Resolver: assembly + adapter gating ─────────────────────────────────────
+
 
 def _synthetic_manifest(fragments):
     return {
@@ -106,6 +110,7 @@ def test_adapter_string_resolves_to_caps():
 
 # ── adapter_caps_for ────────────────────────────────────────────────────────
 
+
 def test_adapter_caps_for_claude_can_spawn():
     assert adapter_caps_for("claude") == {"can_spawn": True}
 
@@ -116,6 +121,7 @@ def test_adapter_caps_for_unknown_raises():
 
 
 # ── Validator: rejects malformed manifests ──────────────────────────────────
+
 
 def test_validator_rejects_unknown_fragment():
     manifest = {
@@ -165,7 +171,9 @@ def test_validator_rejects_unknown_capability():
         "fragments_dir": "fragments",
         "defaults": [],
         "skills": {
-            "team/build": {"fragments": [{"name": "spawn-rules", "requires": "can_fly"}]}
+            "team/build": {
+                "fragments": [{"name": "spawn-rules", "requires": "can_fly"}]
+            }
         },
     }
     with pytest.raises(ValueError, match="unknown capability"):
@@ -289,6 +297,7 @@ def test_dev_build_drops_spawn_rules_for_non_spawn_adapter():
 
 
 # ── Block resolver tests ──────────────────────────────────────────────────────
+
 
 def test_valid_default_blocks_pass_validation():
     """The shipped manifest's blocks (full-build, lite-build, review-strict) are all valid."""

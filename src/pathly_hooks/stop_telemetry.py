@@ -24,6 +24,7 @@ def _find_active_feature_dir_db(project_root: str) -> Path | None:
     """Find the feature dir with the most recent event in the SQLite DB."""
     try:
         from pathly_orchestrator.db import get_db as _get_db
+
         conn = _get_db()
         row = conn.execute(
             "SELECT feature FROM fsm_events WHERE project_root=? ORDER BY seq DESC LIMIT 1",
@@ -50,6 +51,7 @@ def _write_billing_update_db(
     """
     try:
         from pathly_orchestrator.runner.events import _patch_last_agent_done
+
         _patch_last_agent_done(
             storage_path=feature_dir,
             cost_usd=cost_usd,
@@ -64,6 +66,7 @@ def _write_billing_update_db(
     # Fallback: write raw BILLING_UPDATE directly to DB without going through runner
     try:
         from pathly_orchestrator.db import get_db as _get_db, append_event as _db_ae
+
         conn = _get_db()
         project_root = _norm(str(feature_dir.parent.parent.parent))
         feature = feature_dir.name
@@ -132,7 +135,9 @@ def main() -> None:
     # Find active feature from DB and write BILLING_UPDATE
     feature_dir = _find_active_feature_dir_db(project_root)
     if feature_dir:
-        _write_billing_update_db(feature_dir, tokens_in, tokens_out, cost_usd, cost_source)
+        _write_billing_update_db(
+            feature_dir, tokens_in, tokens_out, cost_usd, cost_source
+        )
 
     sys.exit(0)
 

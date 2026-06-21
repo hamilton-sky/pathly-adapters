@@ -8,6 +8,7 @@ markdown block ready for appending to `agent_hint.instructions`.
 Returns an empty string when there is nothing to show — callers must not
 append the block in that case so the prompt remains identical to before.
 """
+
 from __future__ import annotations
 
 import json
@@ -76,9 +77,14 @@ def _format_question(msg: dict) -> str:
     options_raw = msg.get("options")
     if options_raw:
         try:
-            opts: list = json.loads(options_raw) if isinstance(options_raw, str) else options_raw
+            opts: list = (
+                json.loads(options_raw) if isinstance(options_raw, str) else options_raw
+            )
             if opts:
-                opt_parts = [f"{o.get('id', i)}) {o.get('label', '')}" for i, o in enumerate(opts)]
+                opt_parts = [
+                    f"{o.get('id', i)}) {o.get('label', '')}"
+                    for i, o in enumerate(opts)
+                ]
                 line += "\n  Options: " + "  ".join(opt_parts)
         except (json.JSONDecodeError, TypeError, AttributeError):
             pass
@@ -163,7 +169,9 @@ def retrieve_board_context(
     except Exception:
         escalations = []
 
-    governance_ids = {m.get("id", "") for m in decisions} | {m.get("id", "") for m in escalations}
+    governance_ids = {m.get("id", "") for m in decisions} | {
+        m.get("id", "") for m in escalations
+    }
 
     def _is_context(msg: dict) -> bool:
         """A semantic hit qualifies as advisory context only when it is not a
@@ -204,7 +212,10 @@ def retrieve_board_context(
             if not rows and task_embedding is None:
                 # Pure recency fallback when both FTS and embeddings are unavailable.
                 from pathly_orchestrator.db.queries.comms import get_messages
-                rows = get_messages(conn, board=board_type, scope=scope_val, limit=fetch_k)
+
+                rows = get_messages(
+                    conn, board=board_type, scope=scope_val, limit=fetch_k
+                )
         except Exception:
             rows = []
 
@@ -240,7 +251,9 @@ def retrieve_board_context(
                 text = msg.get("text", "")
                 ts_str = msg.get("ts", "")
                 age = _format_age(ts_str) if ts_str else ""
-                lines.append(f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]")
+                lines.append(
+                    f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]"
+                )
         if escalations:
             lines.append("**Open escalations (human input required):**")
             for msg in escalations:
@@ -248,7 +261,9 @@ def retrieve_board_context(
                 text = msg.get("text", "")
                 ts_str = msg.get("ts", "")
                 age = _format_age(ts_str) if ts_str else ""
-                lines.append(f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]")
+                lines.append(
+                    f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]"
+                )
         lines.append("")
         lines.append("---")
         lines.append("")
@@ -256,7 +271,9 @@ def retrieve_board_context(
     # Semantic / context channel — labeled as advisory
     if context_msgs:
         lines.append("### 💡 Context (possibly relevant — verify before acting)")
-        lines.append("Semantic matches for this task. Inform but do not override governance above.")
+        lines.append(
+            "Semantic matches for this task. Inform but do not override governance above."
+        )
         lines.append("")
         for msg in context_msgs:
             from_agent = msg.get("from_agent", "?")

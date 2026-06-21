@@ -12,11 +12,18 @@ import pytest
 from pathly_orchestrator.state import VALID_STATES, TRANSITIONS, STATES
 from pathly_orchestrator import eventlog as el
 
-SCHEMA_PATH = Path(__file__).parent.parent / "src" / "pathly_data" / "schemas" / "state.schema.json"
+SCHEMA_PATH = (
+    Path(__file__).parent.parent
+    / "src"
+    / "pathly_data"
+    / "schemas"
+    / "state.schema.json"
+)
 SCHEMA = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
 # ── Schema validation ─────────────────────────────────────────────────────────
+
 
 def _valid_state_doc(**overrides) -> dict:
     base = {
@@ -69,9 +76,12 @@ def test_iteration_by_stage_is_optional():
 
 # ── write_state validation ────────────────────────────────────────────────────
 
+
 def test_write_state_rejects_invalid_state_name(tmp_path):
     with pytest.raises(ValueError, match="Invalid state"):
-        el.write_state.__wrapped__(tmp_path, "test", {"current": "BOGUS", "feature": "x", "rigor": "lite"})
+        el.write_state.__wrapped__(
+            tmp_path, "test", {"current": "BOGUS", "feature": "x", "rigor": "lite"}
+        )
 
 
 def _write_state_in_tmp(tmp_path: Path, feature: str, state_dict: dict):
@@ -116,11 +126,15 @@ def _read_events_in_tmp(tmp_path: Path, feature: str) -> list[dict]:
 
 def test_write_state_rejects_invalid_state_name(tmp_path):
     with pytest.raises(ValueError, match="Invalid state"):
-        _write_state_in_tmp(tmp_path, "feat", {"current": "BOGUS", "feature": "feat", "rigor": "lite"})
+        _write_state_in_tmp(
+            tmp_path, "feat", {"current": "BOGUS", "feature": "feat", "rigor": "lite"}
+        )
 
 
 def test_write_state_accepts_valid_state(tmp_path):
-    _write_state_in_tmp(tmp_path, "feat", {"current": "BUILDING", "feature": "feat", "rigor": "lite"})
+    _write_state_in_tmp(
+        tmp_path, "feat", {"current": "BUILDING", "feature": "feat", "rigor": "lite"}
+    )
     # Read back via public API — works in both normal and PATHLY_DB_ONLY=1 mode
     original_plans = el._plans_dir
     el._plans_dir = lambda: tmp_path / "plans"
@@ -133,25 +147,40 @@ def test_write_state_accepts_valid_state(tmp_path):
 
 
 def test_write_state_rejects_illegal_transition(tmp_path):
-    _write_state_in_tmp(tmp_path, "feat", {"current": "BUILDING", "feature": "feat", "rigor": "lite"})
+    _write_state_in_tmp(
+        tmp_path, "feat", {"current": "BUILDING", "feature": "feat", "rigor": "lite"}
+    )
     with pytest.raises(ValueError, match="Invalid state transition"):
-        _write_state_in_tmp(tmp_path, "feat", {"current": "PLANNING", "feature": "feat", "rigor": "lite"})
+        _write_state_in_tmp(
+            tmp_path,
+            "feat",
+            {"current": "PLANNING", "feature": "feat", "rigor": "lite"},
+        )
 
 
 def test_write_state_allows_legal_transition(tmp_path):
-    _write_state_in_tmp(tmp_path, "feat", {"current": "BUILDING", "feature": "feat", "rigor": "lite"})
-    _write_state_in_tmp(tmp_path, "feat", {"current": "REVIEWING", "feature": "feat", "rigor": "lite"})
+    _write_state_in_tmp(
+        tmp_path, "feat", {"current": "BUILDING", "feature": "feat", "rigor": "lite"}
+    )
+    _write_state_in_tmp(
+        tmp_path, "feat", {"current": "REVIEWING", "feature": "feat", "rigor": "lite"}
+    )
 
 
 # ── append_event validation ───────────────────────────────────────────────────
 
+
 def test_append_event_rejects_invalid_to_state(tmp_path):
     with pytest.raises(ValueError, match="Invalid state in STATE_TRANSITION"):
-        _append_event_in_tmp(tmp_path, "feat", {"type": "STATE_TRANSITION", "to": "GARBAGE"})
+        _append_event_in_tmp(
+            tmp_path, "feat", {"type": "STATE_TRANSITION", "to": "GARBAGE"}
+        )
 
 
 def test_append_event_accepts_valid_to_state(tmp_path):
-    _append_event_in_tmp(tmp_path, "feat", {"type": "STATE_TRANSITION", "to": "BUILDING"})
+    _append_event_in_tmp(
+        tmp_path, "feat", {"type": "STATE_TRANSITION", "to": "BUILDING"}
+    )
     events = _read_events_in_tmp(tmp_path, "feat")
     assert len(events) == 1
     assert events[0]["to"] == "BUILDING"
@@ -165,6 +194,7 @@ def test_append_event_non_transition_not_validated(tmp_path):
 
 # ── TRANSITIONS constant ──────────────────────────────────────────────────────
 
+
 def test_transitions_covers_all_states():
     assert set(TRANSITIONS.keys()) == set(STATES.keys())
 
@@ -176,6 +206,7 @@ def test_transitions_targets_are_valid_states():
 
 
 # ── Concurrent append stress test ────────────────────────────────────────────
+
 
 def test_concurrent_append_produces_500_valid_lines(tmp_path):
     """10 threads × 50 appends must yield exactly 500 valid JSON lines."""
@@ -189,8 +220,9 @@ def test_concurrent_append_produces_500_valid_lines(tmp_path):
         try:
             for i in range(EVENTS_PER_THREAD):
                 _append_event_in_tmp(
-                    tmp_path, feature,
-                    {"type": "AGENT_DONE", "thread": thread_id, "seq": i}
+                    tmp_path,
+                    feature,
+                    {"type": "AGENT_DONE", "thread": thread_id, "seq": i},
                 )
         except Exception as exc:
             errors.append(exc)
@@ -204,9 +236,9 @@ def test_concurrent_append_produces_500_valid_lines(tmp_path):
     assert not errors, f"Thread errors: {errors}"
 
     events = _read_events_in_tmp(tmp_path, feature)
-    assert len(events) == THREADS * EVENTS_PER_THREAD, (
-        f"Expected {THREADS * EVENTS_PER_THREAD} events, got {len(events)}"
-    )
+    assert (
+        len(events) == THREADS * EVENTS_PER_THREAD
+    ), f"Expected {THREADS * EVENTS_PER_THREAD} events, got {len(events)}"
     for e in events:
         assert isinstance(e, dict)
         assert e["type"] == "AGENT_DONE"

@@ -1,4 +1,5 @@
 """Unit tests for pathly_orchestrator.fsm functions."""
+
 from __future__ import annotations
 
 import copy
@@ -26,6 +27,7 @@ def _load_team_flow() -> dict:
 
 
 # ── recover_state ─────────────────────────────────────────────────────────────
+
 
 def test_recover_state_no_state_json(tmp_path):
     flow = _load_team_flow()
@@ -78,7 +80,9 @@ def test_recover_state_limits_per_state(tmp_path):
     flow_copy = copy.deepcopy(flow)
     state_file = tmp_path / "STATE.json"
     state_file.write_text(json.dumps({"current": "BUILDING"}), encoding="utf-8")
-    flow_copy["states_config"] = {"BUILDING": {"limits": {"needs_context_per_stage": 1}}}
+    flow_copy["states_config"] = {
+        "BUILDING": {"limits": {"needs_context_per_stage": 1}}
+    }
     result = recover_state(tmp_path, flow_copy)
     assert result["limits"]["needs_context_per_stage"] == 1
     assert result["limits"]["feedback_rounds_per_stage"] == 2
@@ -86,9 +90,12 @@ def test_recover_state_limits_per_state(tmp_path):
 
 # ── evaluate_transition_rules ─────────────────────────────────────────────────
 
+
 def test_evaluate_l1_artifact_present(tmp_path):
     flow = _load_team_flow()
-    (tmp_path / "IMPLEMENTATION_PLAN.md").write_text("## Conversation 1\nsome plan", encoding="utf-8")
+    (tmp_path / "IMPLEMENTATION_PLAN.md").write_text(
+        "## Conversation 1\nsome plan", encoding="utf-8"
+    )
     result = evaluate_transition_rules(flow, "PLANNING", tmp_path)
     assert result == "DESIGNING"
 
@@ -108,7 +115,9 @@ def test_evaluate_l1_before_l2(tmp_path):
         "transition_rules": {
             "ALPHA": {
                 "on_artifact": {"EXISTS.md": "BETA"},
-                "on_content": [{"file": "TRIGGER.md", "contains": "go", "next": "GAMMA"}],
+                "on_content": [
+                    {"file": "TRIGGER.md", "contains": "go", "next": "GAMMA"}
+                ],
                 "default": "ALPHA",
             }
         },
@@ -232,6 +241,7 @@ def test_evaluate_order_l1_before_l3(tmp_path):
 
 # ── route_feedback ────────────────────────────────────────────────────────────
 
+
 def test_route_feedback_empty_dir(tmp_path):
     flow = _load_team_flow()
     feedback_dir = tmp_path / "feedback"
@@ -284,6 +294,7 @@ def test_route_feedback_human_wins(tmp_path):
 
 # ── run_transition_actions ────────────────────────────────────────────────────
 
+
 def _make_commit_flow() -> dict:
     return {
         "storage_path": "pathly/plans/{topic}/",
@@ -298,9 +309,7 @@ def _make_commit_flow() -> dict:
 def _make_archive_flow() -> dict:
     return {
         "storage_path": "pathly/plans/{topic}/",
-        "transition_actions": {
-            "RETRO->DONE": [{"skill": "archive-artifacts"}]
-        },
+        "transition_actions": {"RETRO->DONE": [{"skill": "archive-artifacts"}]},
     }
 
 
@@ -311,10 +320,22 @@ def test_run_transition_actions_git_commit(tmp_path):
 
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        run_transition_actions(flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1)
+        run_transition_actions(
+            flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1
+        )
 
     calls = mock_run.call_args_list
-    assert any(c == call(["git", "add", "-A"], cwd=str(tmp_path), capture_output=True, text=True, timeout=30) for c in calls)
+    assert any(
+        c
+        == call(
+            ["git", "add", "-A"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        for c in calls
+    )
     assert any(
         c[0][0] == ["git", "commit", "-m", "feat: complete building stage"]
         and c[1].get("cwd") == str(tmp_path)
@@ -341,7 +362,9 @@ def test_run_transition_actions_git_nothing_to_commit(tmp_path):
         return mock
 
     with patch("subprocess.run", side_effect=_mock_run):
-        run_transition_actions(flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1)
+        run_transition_actions(
+            flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1
+        )
 
 
 def test_run_transition_actions_archive_artifacts(tmp_path):
@@ -355,7 +378,9 @@ def test_run_transition_actions_archive_artifacts(tmp_path):
     flow = _make_archive_flow()
     run_transition_actions(flow, "RETRO", "DONE", storage_path, "my-topic", 1)
 
-    artifacts_dir = tmp_path / "pathly" / "pipeline-walkthrough" / "my-topic" / "artifacts"
+    artifacts_dir = (
+        tmp_path / "pathly" / "pipeline-walkthrough" / "my-topic" / "artifacts"
+    )
     assert (artifacts_dir / "REVIEW_FAILURES_conv1_attempt1.md").exists()
     assert (artifacts_dir / "TEST_FAILURES_conv1_attempt1.md").exists()
 
@@ -371,7 +396,9 @@ def test_run_transition_actions_archive_attempt_counter(tmp_path):
     run_transition_actions(flow, "RETRO", "DONE", storage_path, "my-topic", 1)
     run_transition_actions(flow, "RETRO", "DONE", storage_path, "my-topic", 1)
 
-    artifacts_dir = tmp_path / "pathly" / "pipeline-walkthrough" / "my-topic" / "artifacts"
+    artifacts_dir = (
+        tmp_path / "pathly" / "pipeline-walkthrough" / "my-topic" / "artifacts"
+    )
     assert (artifacts_dir / "REVIEW_FAILURES_conv1_attempt1.md").exists()
     assert (artifacts_dir / "REVIEW_FAILURES_conv1_attempt2.md").exists()
 
@@ -395,12 +422,15 @@ def test_run_transition_actions_wildcard(tmp_path):
 
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        run_transition_actions(flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1)
+        run_transition_actions(
+            flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1
+        )
 
     assert mock_run.called
 
 
 # ── write_state ───────────────────────────────────────────────────────────────
+
 
 def test_write_state_creates_file(tmp_path):
     write_state(tmp_path, "BUILDING", {"feature": "x"})
@@ -427,10 +457,12 @@ def test_write_state_creates_dir(tmp_path):
 
 # ── append_event ──────────────────────────────────────────────────────────────
 
+
 def test_append_event_creates_file(tmp_path):
     append_event(tmp_path, {"type": "A"})
     append_event(tmp_path, {"type": "B"})
     from pathly_orchestrator import db as _db
+
     conn = _db.get_db()
     project_root = str(tmp_path.parent.parent.parent)
     events = _db.read_events(conn, project_root, tmp_path.name)
@@ -442,6 +474,7 @@ def test_append_event_creates_file(tmp_path):
 def test_append_event_ts_injected(tmp_path):
     append_event(tmp_path, {"type": "TEST"})
     from pathly_orchestrator import db as _db
+
     conn = _db.get_db()
     project_root = str(tmp_path.parent.parent.parent)
     events = _db.read_events(conn, project_root, tmp_path.name)
@@ -450,8 +483,11 @@ def test_append_event_ts_injected(tmp_path):
 
 
 def test_append_event_preserves_other_fields(tmp_path):
-    append_event(tmp_path, {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING"})
+    append_event(
+        tmp_path, {"type": "STATE_TRANSITION", "from": "BUILDING", "to": "REVIEWING"}
+    )
     from pathly_orchestrator import db as _db
+
     conn = _db.get_db()
     project_root = str(tmp_path.parent.parent.parent)
     events = _db.read_events(conn, project_root, tmp_path.name)
@@ -465,11 +501,15 @@ def test_append_event_preserves_other_fields(tmp_path):
 
 # ── SQLite-backed reads (Conv 2) ──────────────────────────────────────────────
 
+
 def test_on_state_counter_reads_from_db(tmp_path):
     from pathly_orchestrator import eventlog
+
     storage = tmp_path / "pathly" / "plans" / "my-feature"
     storage.mkdir(parents=True)
-    eventlog.write_state(str(storage), {"current": "BUILDING", "convs_done": 3, "convs_total": 5})
+    eventlog.write_state(
+        str(storage), {"current": "BUILDING", "convs_done": 3, "convs_total": 5}
+    )
 
     flow = {
         "states": ["BUILDING", "REVIEWING"],
@@ -492,6 +532,7 @@ def test_on_state_counter_reads_from_db(tmp_path):
 
 def test_update_progress_conv_done_increments_db(tmp_path):
     from pathly_orchestrator import eventlog
+
     storage = tmp_path / "pathly" / "plans" / "my-feature"
     storage.mkdir(parents=True)
     eventlog.write_state(str(storage), {"current": "BUILDING", "convs_done": 1})

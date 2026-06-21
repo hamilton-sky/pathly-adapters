@@ -1,4 +1,5 @@
 """Query helpers for the stage_configs table."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -22,8 +23,15 @@ def upsert_stage_config(
             "VALUES (?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(project_root, feature, stage) DO UPDATE SET "
             "agent=excluded.agent, adapter=excluded.adapter, skill=excluded.skill, updated_at=excluded.updated_at",
-            (project_root, feature, stage, agent or None, adapter or None, skill or None,
-             datetime.now(timezone.utc).isoformat()),
+            (
+                project_root,
+                feature,
+                stage,
+                agent or None,
+                adapter or None,
+                skill or None,
+                datetime.now(timezone.utc).isoformat(),
+            ),
         )
         conn.commit()
 

@@ -6,6 +6,7 @@ worktrees (P3).
 
 See: pathly/plans/comms-board/DAG-SCHEDULER-ARCHITECTURE.md §2
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

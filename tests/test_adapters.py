@@ -1,4 +1,5 @@
 """Tests for multi-adapter runner Conv 1 — adapters.yaml, resolve_command, TS staleness."""
+
 from __future__ import annotations
 
 import sys
@@ -12,15 +13,20 @@ ROOT = Path(__file__).parent.parent
 
 # ── Phase 1: adapters.yaml shape ──────────────────────────────────────────────
 
+
 def test_adapters_yaml_loads():
     from importlib.resources import files
-    text = files("pathly_data").joinpath("core/adapters.yaml").read_text(encoding="utf-8")
+
+    text = (
+        files("pathly_data").joinpath("core/adapters.yaml").read_text(encoding="utf-8")
+    )
     data = yaml.safe_load(text)
     assert set(data.keys()) == {"claude", "codex", "copilot"}
 
 
 def test_adapters_yaml_required_keys():
     from importlib.resources import files
+
     data = yaml.safe_load(
         files("pathly_data").joinpath("core/adapters.yaml").read_text(encoding="utf-8")
     )
@@ -32,6 +38,7 @@ def test_adapters_yaml_required_keys():
 
 def test_copilot_has_null_headless_and_resume():
     from importlib.resources import files
+
     data = yaml.safe_load(
         files("pathly_data").joinpath("core/adapters.yaml").read_text(encoding="utf-8")
     )
@@ -65,7 +72,9 @@ def test_resolve_command_claude_no_autonomy():
 
 
 def test_resolve_command_claude_with_session():
-    result = resolve_command("claude", "do stuff", "claude-sonnet-4-6", session="sess123")
+    result = resolve_command(
+        "claude", "do stuff", "claude-sonnet-4-6", session="sess123"
+    )
     argv = result["argv"]
     assert "--resume" in argv
     idx = argv.index("--resume")
@@ -95,18 +104,22 @@ def test_resolve_command_unknown_adapter_raises():
 
 # ── Phase 3: adapters.gen.ts staleness ───────────────────────────────────────
 
+
 def test_adapters_gen_ts_is_not_stale():
     """Fails if the committed adapters.gen.ts diverges from what the generator would produce."""
     gen_script = ROOT / "scripts" / "gen_adapters_ts.py"
     out_ts = ROOT / "studio" / "src" / "renderer" / "src" / "lib" / "adapters.gen.ts"
 
     assert gen_script.exists(), f"Generator script not found: {gen_script}"
-    assert out_ts.exists(), f"adapters.gen.ts not found: {out_ts}. Run: python scripts/gen_adapters_ts.py"
+    assert (
+        out_ts.exists()
+    ), f"adapters.gen.ts not found: {out_ts}. Run: python scripts/gen_adapters_ts.py"
 
     # Import the generator's generate() function directly without writing to disk
     sys.path.insert(0, str(ROOT / "scripts"))
     try:
         import importlib
+
         gen_mod = importlib.import_module("gen_adapters_ts")
         importlib.reload(gen_mod)
     finally:
@@ -117,6 +130,6 @@ def test_adapters_gen_ts_is_not_stale():
     expected = gen_mod.generate(adapters)
 
     committed = out_ts.read_text(encoding="utf-8")
-    assert committed == expected, (
-        "adapters.gen.ts is stale. Run `python scripts/gen_adapters_ts.py` to regenerate."
-    )
+    assert (
+        committed == expected
+    ), "adapters.gen.ts is stale. Run `python scripts/gen_adapters_ts.py` to regenerate."

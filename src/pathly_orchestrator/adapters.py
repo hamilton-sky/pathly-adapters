@@ -10,9 +10,7 @@ import yaml
 
 def _load_adapters() -> dict:
     text = (
-        files("pathly_data")
-        .joinpath("core/adapters.yaml")
-        .read_text(encoding="utf-8")
+        files("pathly_data").joinpath("core/adapters.yaml").read_text(encoding="utf-8")
     )
     return yaml.safe_load(text)
 

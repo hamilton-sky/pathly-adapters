@@ -66,8 +66,10 @@ def _apply_hooks(host: str, hooks_cfg: dict, *, dry_run: bool, repair: bool) -> 
         event_groups: list = list(existing_hooks.get(event, []))
 
         pathly_indices = [
-            i for i, g in enumerate(event_groups)
-            if isinstance(g, dict) and any(
+            i
+            for i, g in enumerate(event_groups)
+            if isinstance(g, dict)
+            and any(
                 _PATHLY_HOOK_MARKER in h.get("command", "")
                 for h in g.get("hooks", [])
                 if isinstance(h, dict)
@@ -82,7 +84,9 @@ def _apply_hooks(host: str, hooks_cfg: dict, *, dry_run: bool, repair: bool) -> 
             event_groups.append(new_group)
             changed = True
         elif repair:
-            kept = [g for i, g in enumerate(event_groups) if i not in set(pathly_indices)]
+            kept = [
+                g for i, g in enumerate(event_groups) if i not in set(pathly_indices)
+            ]
             kept.append(new_group)
             event_groups = kept
             changed = True
@@ -102,6 +106,7 @@ def _apply_hooks(host: str, hooks_cfg: dict, *, dry_run: bool, repair: bool) -> 
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
     print(f"[{host}] Updated hooks in {settings_path}")
+
 
 _AGENT_GROUPS = {
     "architect": "planning",
@@ -389,9 +394,7 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                 f"[{host}] Nothing to write (files already current or not Pathly-owned)"
             )
 
-        flow_written = materialize_flows(
-            dest, force=force, dry_run=False
-        )
+        flow_written = materialize_flows(dest, force=force, dry_run=False)
         if flow_written:
             if dest not in written_dests:
                 written_dests.append(dest)

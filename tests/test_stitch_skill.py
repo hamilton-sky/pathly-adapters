@@ -12,9 +12,7 @@ def skill_files(tmp_path):
 
     meta = tmp_path / "go_skill.yaml"
     meta.write_text(
-        "skill: go\n"
-        "invocation: /go\n"
-        "natural_language: go, continue\n",
+        "skill: go\n" "invocation: /go\n" "natural_language: go, continue\n",
         encoding="utf-8",
     )
     return core, meta
@@ -36,9 +34,7 @@ def test_stitch_skill_starts_with_frontmatter(skill_files):
 def test_stitch_skill_wrapper_used_when_set(tmp_path):
     meta = tmp_path / "wrap_skill.yaml"
     meta.write_text(
-        "skill: wrap\n"
-        "invocation: /wrap\n"
-        "wrapper: This is the wrapper content.\n",
+        "skill: wrap\n" "invocation: /wrap\n" "wrapper: This is the wrapper content.\n",
         encoding="utf-8",
     )
     result = stitch_skill(tmp_path / "nonexistent.md", meta)

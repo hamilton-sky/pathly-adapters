@@ -1,4 +1,5 @@
 """Tests for supervisor/isolation.py — LaneIsolation workspace seam."""
+
 from __future__ import annotations
 
 import pytest
@@ -13,7 +14,12 @@ from pathly_orchestrator.supervisor.isolation import (
 class _FakeState:
     """Minimal stand-in for RunnerState with the fields isolation.py reads."""
 
-    def __init__(self, project_root: str = "/repo", db_path: str = "/db/pathly.db", fsm_port: int = 8765):
+    def __init__(
+        self,
+        project_root: str = "/repo",
+        db_path: str = "/db/pathly.db",
+        fsm_port: int = 8765,
+    ):
         self.project_root = project_root
         self.db_path = db_path
         self.fsm_port = fsm_port
@@ -34,7 +40,11 @@ class TestTaskWorkspace:
 class TestLaneIsolation:
     def test_acquire_builds_correct_workspace(self):
         iso = LaneIsolation()
-        state = _FakeState(project_root="/my/repo", db_path="/home/user/.pathly/pathly.db", fsm_port=8765)
+        state = _FakeState(
+            project_root="/my/repo",
+            db_path="/home/user/.pathly/pathly.db",
+            fsm_port=8765,
+        )
         task = {"id": "task-abc-123", "lane": "backend"}
 
         ws = iso.acquire(task, state)

@@ -32,17 +32,21 @@ def read_fragment_catalog(core_skills_dir: str) -> list[dict]:
             text = f.read()
 
         name, description, category, requires = _parse_frontmatter(text, basename)
-        catalog.append({
-            "name": name,
-            "description": description,
-            "category": category,
-            "requires": requires,
-        })
+        catalog.append(
+            {
+                "name": name,
+                "description": description,
+                "category": category,
+                "requires": requires,
+            }
+        )
 
     return catalog
 
 
-def _parse_frontmatter(text: str, fallback_name: str) -> tuple[str, str, str, str | None]:
+def _parse_frontmatter(
+    text: str, fallback_name: str
+) -> tuple[str, str, str, str | None]:
     """Extract (name, description, category, requires) from YAML frontmatter.
 
     Returns fallback_name for name and empty strings for other fields when no

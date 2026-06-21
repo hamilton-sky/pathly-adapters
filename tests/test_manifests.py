@@ -4,7 +4,6 @@ import tomllib
 
 import pytest
 
-
 _REPO_ROOT = Path(__file__).parent.parent
 
 _PLUGIN_JSON_PATHS = [
@@ -31,16 +30,24 @@ def test_manifest_required_fields(manifest_path):
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     for field in ("name", "version", "description"):
-        assert field in data, f"Required field {field!r} missing from {manifest_path.name}"
+        assert (
+            field in data
+        ), f"Required field {field!r} missing from {manifest_path.name}"
         value = data[field]
-        assert isinstance(value, str), (
-            f"Field {field!r} in {manifest_path.name} must be a str, got {type(value).__name__}"
-        )
-        assert value.strip(), f"Field {field!r} in {manifest_path.name} must not be empty"
+        assert isinstance(
+            value, str
+        ), f"Field {field!r} in {manifest_path.name} must be a str, got {type(value).__name__}"
+        assert (
+            value.strip()
+        ), f"Field {field!r} in {manifest_path.name} must not be empty"
 
     if manifest_path.stem in _PLUGIN_JSON_STEMS:
-        assert "author" in data, f"Required field 'author' missing from {manifest_path.name}"
-        assert "skills" in data, f"Required field 'skills' missing from {manifest_path.name}"
+        assert (
+            "author" in data
+        ), f"Required field 'author' missing from {manifest_path.name}"
+        assert (
+            "skills" in data
+        ), f"Required field 'skills' missing from {manifest_path.name}"
 
 
 def test_codex_plugin_version_matches_distribution_version():

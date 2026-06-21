@@ -8,6 +8,7 @@ Verifies:
   returns ok=False / error=board_busy.
 - POST /comms/run on a busy board returns 409.
 """
+
 from __future__ import annotations
 
 import json
@@ -31,12 +32,14 @@ def _clear_lock():
 def _no_async_embed(monkeypatch):
     """Prevent embed_async from spawning daemon threads that race the test DB."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
 
 
 @pytest.fixture()
 def client():
     from pathly_orchestrator.http_server import app
+
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
@@ -46,21 +49,28 @@ def client():
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _post_msg(client, *, msg_type: str, text: str, board: str = "feature",
-              scope: str = "f1") -> str:
-    r = client.post("/comms/post", json={
-        "feature": scope,
-        "from": "human",
-        "type": msg_type,
-        "text": text,
-        "board": board,
-        "scope": scope,
-    })
+
+def _post_msg(
+    client, *, msg_type: str, text: str, board: str = "feature", scope: str = "f1"
+) -> str:
+    r = client.post(
+        "/comms/post",
+        json={
+            "feature": scope,
+            "from": "human",
+            "type": msg_type,
+            "text": text,
+            "board": board,
+            "scope": scope,
+        },
+    )
     assert r.status_code == 200, r.data
     return json.loads(r.data)["message_id"]
 
 
-def _make_fake_spawn(*, calls: list, return_value: dict | None = None, block_event=None):
+def _make_fake_spawn(
+    *, calls: list, return_value: dict | None = None, block_event=None
+):
     """Return a fake spawn_fn that records its keyword arguments.
 
     If block_event is given the fake waits for it before returning — this
@@ -82,6 +92,7 @@ def _make_fake_spawn(*, calls: list, return_value: dict | None = None, block_eve
 # Tests — start_board_run
 # ---------------------------------------------------------------------------
 
+
 def test_start_board_run_ok_and_lock_released(client):
     """start_board_run returns ok=True; board lock is released when done."""
     from pathly_orchestrator.supervisor.board_run import start_board_run
@@ -93,7 +104,9 @@ def test_start_board_run_ok_and_lock_released(client):
     fake = _make_fake_spawn(calls=calls)
 
     result = start_board_run(
-        "feature", "f1", "single-agent",
+        "feature",
+        "f1",
+        "single-agent",
         instructions="Analyse the board",
         spawn_fn=fake,
         block=True,
@@ -143,7 +156,9 @@ def test_start_board_run_board_busy_returns_error():
     first_started.wait(timeout=5)
 
     fake2 = _make_fake_spawn(calls=calls_second)
-    result_holder["second"] = start_board_run("feature", "f1", "single-agent", spawn_fn=fake2)
+    result_holder["second"] = start_board_run(
+        "feature", "f1", "single-agent", spawn_fn=fake2
+    )
 
     # Let the first run finish.
     blocker.set()
@@ -181,6 +196,7 @@ def test_start_board_run_lock_released_on_spawn_exception():
 # Tests — POST /comms/run
 # ---------------------------------------------------------------------------
 
+
 def test_comms_run_busy_board_returns_409(client, monkeypatch):
     """POST /comms/run on a locked board returns 409."""
     from pathly_orchestrator.supervisor.board_run import start_board_run
@@ -195,18 +211,24 @@ def test_comms_run_busy_board_returns_409(client, monkeypatch):
     def _patched(board, scope, mode, instructions="", *, project_root="", **kw):
         calls: list = []
         return original(
-            board, scope, mode, instructions,
+            board,
+            scope,
+            mode,
+            instructions,
             project_root=project_root,
             spawn_fn=_make_fake_spawn(calls=calls),
         )
 
     monkeypatch.setattr(_br, "start_board_run", _patched)
 
-    r = client.post("/comms/run", json={
-        "board": "feature",
-        "scope": "f1",
-        "mode": "single-agent",
-    })
+    r = client.post(
+        "/comms/run",
+        json={
+            "board": "feature",
+            "scope": "f1",
+            "mode": "single-agent",
+        },
+    )
     assert r.status_code == 409
     payload = json.loads(r.data)
     assert payload["ok"] is False
@@ -227,16 +249,24 @@ def test_comms_run_ok(client, monkeypatch):
 
     def fake_start(board, scope, mode, instructions="", *, project_root="", **kw):
         calls.append({"board": board, "scope": scope, "mode": mode})
-        return {"ok": True, "run_id": "test-run-123", "mode": mode, "result": {"result": "ok"}}
+        return {
+            "ok": True,
+            "run_id": "test-run-123",
+            "mode": mode,
+            "result": {"result": "ok"},
+        }
 
     monkeypatch.setattr(_br, "start_board_run", fake_start)
 
-    r = client.post("/comms/run", json={
-        "board": "feature",
-        "scope": "f1",
-        "mode": "single-agent",
-        "instructions": "Summarise the board",
-    })
+    r = client.post(
+        "/comms/run",
+        json={
+            "board": "feature",
+            "scope": "f1",
+            "mode": "single-agent",
+            "instructions": "Summarise the board",
+        },
+    )
     assert r.status_code == 200
     payload = json.loads(r.data)
     assert payload["ok"] is True
@@ -266,8 +296,13 @@ def test_default_spawn_calls_terminal_with_runnerstate(monkeypatch):
     monkeypatch.setattr(_term, "_run_stage_via_terminal", fake_rsvt)
 
     out = board_run.start_board_run(
-        "feature", "wire", "single-agent", "do X",
-        project_root="/tmp", spawn_fn=None, block=True,
+        "feature",
+        "wire",
+        "single-agent",
+        "do X",
+        project_root="/tmp",
+        spawn_fn=None,
+        block=True,
     )
     assert out["ok"] is True
     assert isinstance(captured["state"], RunnerState)
@@ -284,7 +319,10 @@ def test_lifecycle_callbacks_fire_in_order():
 
     events: list = []
     start_board_run(
-        "feature", "lc", "single-agent", "x",
+        "feature",
+        "lc",
+        "single-agent",
+        "x",
         spawn_fn=lambda **k: {"result": "did the thing"},
         on_start=lambda rid: events.append(("start", rid)),
         on_done=lambda rid, res: events.append(("done", res.get("result"))),
@@ -310,14 +348,16 @@ def test_async_run_returns_started_immediately():
 
     out = start_board_run("feature", "async1", "single-agent", "x", spawn_fn=slow_spawn)
     assert out["ok"] is True and out.get("status") == "started"
-    assert started.wait(timeout=5)               # background thread is running
+    assert started.wait(timeout=5)  # background thread is running
     assert board_lock.is_locked("feature", "async1")  # still held mid-run
     release.set()
     # lock frees once the background thread finishes
     for _ in range(50):
         if not board_lock.is_locked("feature", "async1"):
             break
-        import time as _t; _t.sleep(0.05)
+        import time as _t
+
+        _t.sleep(0.05)
     assert not board_lock.is_locked("feature", "async1")
 
 
@@ -327,9 +367,13 @@ def test_interactive_flag_flows_to_spawn():
 
     cap: dict = {}
     start_board_run(
-        "feature", "ix", "single-agent", "x",
+        "feature",
+        "ix",
+        "single-agent",
+        "x",
         spawn_fn=lambda **k: cap.update(k) or {"result": "ok"},
-        interactive=True, block=True,
+        interactive=True,
+        block=True,
     )
     assert cap.get("interactive") is True
 
@@ -343,12 +387,19 @@ def test_default_spawn_interactive_sets_runnerstate(monkeypatch):
 
     cap: dict = {}
     monkeypatch.setattr(
-        _term, "_run_stage_via_terminal",
+        _term,
+        "_run_stage_via_terminal",
         lambda state, *a, **k: cap.update(state=state) or {"result": "ok"},
     )
     board_run.start_board_run(
-        "feature", "ix2", "single-agent", "x",
-        project_root="/tmp", spawn_fn=None, interactive=True, block=True,
+        "feature",
+        "ix2",
+        "single-agent",
+        "x",
+        project_root="/tmp",
+        spawn_fn=None,
+        interactive=True,
+        block=True,
     )
     assert isinstance(cap["state"], RunnerState)
     assert cap["state"].interactive is True
@@ -382,11 +433,16 @@ def test_system_prompt_and_board_framing_in_prompt():
 
     cap: dict = {}
     start_board_run(
-        "feature", "tpl", "single-agent", "",
+        "feature",
+        "tpl",
+        "single-agent",
+        "",
         system_prompt="You are a terse code reviewer.",
         spawn_fn=lambda **k: cap.update(prompt=k["prompt"]) or {"result": "ok"},
         block=True,
     )
     p = cap["prompt"]
-    assert "You are a terse code reviewer." in p          # system prompt → system instructions
-    assert "most recent message from the human on this board" in p  # board-as-task framing
+    assert "You are a terse code reviewer." in p  # system prompt → system instructions
+    assert (
+        "most recent message from the human on this board" in p
+    )  # board-as-task framing

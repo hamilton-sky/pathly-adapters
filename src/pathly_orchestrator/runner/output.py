@@ -63,8 +63,11 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
     tokens_out = int(usage.get("output_tokens", 0) or usage.get("outputTokens", 0))
     messages = payload.get("messages", [])
     tool_uses = sum(
-        1 for msg in messages
-        for block in (msg.get("content", []) if isinstance(msg.get("content"), list) else [])
+        1
+        for msg in messages
+        for block in (
+            msg.get("content", []) if isinstance(msg.get("content"), list) else []
+        )
         if isinstance(block, dict) and block.get("type") == "tool_use"
     )
 

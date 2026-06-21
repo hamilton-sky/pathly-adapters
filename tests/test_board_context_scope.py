@@ -5,6 +5,7 @@
 FSM/team path already injects. It resolves the per-feature board_scope selection
 (the Studio "Reads:" toggles) and only injects the enabled tiers.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -15,6 +16,7 @@ def _no_async_embed(monkeypatch):
     """Stub embeddings: no async daemon (avoids DB-reset races) and force the
     recency path so the test does not need a real embedding model."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
     monkeypatch.setattr(_emb_mod, "embed", lambda *a, **k: None)
 
@@ -30,13 +32,27 @@ def test_board_context_for_honors_reads_toggle():
     topic = "demo"
     root = "C:/proj"
 
-    post_message(conn, board="feature", scope=topic, from_agent="human",
-                 type="decision", text="FEATURE-LEVEL rule")
-    post_message(conn, board="project", scope=root, from_agent="human",
-                 type="decision", text="PROJECT-LEVEL rule")
+    post_message(
+        conn,
+        board="feature",
+        scope=topic,
+        from_agent="human",
+        type="decision",
+        text="FEATURE-LEVEL rule",
+    )
+    post_message(
+        conn,
+        board="project",
+        scope=root,
+        from_agent="human",
+        type="decision",
+        text="PROJECT-LEVEL rule",
+    )
 
     # Reads: feature OFF, project ON, global ON.
-    set_board_scope(conn, root, topic, {"feature": False, "project": True, "global": True})
+    set_board_scope(
+        conn, root, topic, {"feature": False, "project": True, "global": True}
+    )
 
     block = board_context_for("feature", topic, root, "do the work")
 
@@ -51,8 +67,14 @@ def test_board_context_for_defaults_to_all_tiers():
     from pathly_orchestrator.runner.comms_context import board_context_for
 
     conn = get_db()
-    post_message(conn, board="feature", scope="demo2", from_agent="human",
-                 type="decision", text="DEFAULT feature rule")
+    post_message(
+        conn,
+        board="feature",
+        scope="demo2",
+        from_agent="human",
+        type="decision",
+        text="DEFAULT feature rule",
+    )
 
     block = board_context_for("feature", "demo2", "C:/proj", "do the work")
     assert "DEFAULT feature rule" in block
@@ -66,12 +88,26 @@ def test_board_context_for_project_board_skips_feature_tier():
 
     conn = get_db()
     root = "C:/proj"
-    post_message(conn, board="feature", scope="some-feature", from_agent="human",
-                 type="decision", text="A FEATURE rule")
-    post_message(conn, board="project", scope=root, from_agent="human",
-                 type="decision", text="A PROJECT rule")
+    post_message(
+        conn,
+        board="feature",
+        scope="some-feature",
+        from_agent="human",
+        type="decision",
+        text="A FEATURE rule",
+    )
+    post_message(
+        conn,
+        board="project",
+        scope=root,
+        from_agent="human",
+        type="decision",
+        text="A PROJECT rule",
+    )
 
     block = board_context_for("project", root, root, "do the work")
 
     assert "A PROJECT rule" in block
-    assert "A FEATURE rule" not in block, "project-board run must not pull a feature topic"
+    assert (
+        "A FEATURE rule" not in block
+    ), "project-board run must not pull a feature topic"

@@ -33,12 +33,15 @@ def _await_agent_question(
 
     if broadcast_fn:
         try:
-            broadcast_fn(topic, {
-                "type": "AGENT_QUESTION",
-                "topic": topic,
-                "question": question_text,
-                "options": options,
-            })
+            broadcast_fn(
+                topic,
+                {
+                    "type": "AGENT_QUESTION",
+                    "topic": topic,
+                    "question": question_text,
+                    "options": options,
+                },
+            )
         except Exception as exc:
             logger.warning("broadcast_fn error: %s", exc)
 

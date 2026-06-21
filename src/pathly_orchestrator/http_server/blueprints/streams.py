@@ -1,4 +1,5 @@
 """SSE stream endpoints."""
+
 from __future__ import annotations
 
 import json
@@ -168,7 +169,9 @@ def events_history():
             events = events[-limit:]
         return jsonify(events)
     except Exception as exc:
-        logger.warning("events_history: DB error for %s/%s: %s", project_root, topic, exc)
+        logger.warning(
+            "events_history: DB error for %s/%s: %s", project_root, topic, exc
+        )
         return jsonify([])
 
 
@@ -212,8 +215,11 @@ def events_stream():
         if since_seq > 0:
             try:
                 from pathly_orchestrator import db as _db
+
                 catch_conn = _db.get_db()
-                for event in _db.read_events(catch_conn, str(resolved_root), topic, since_seq=since_seq):
+                for event in _db.read_events(
+                    catch_conn, str(resolved_root), topic, since_seq=since_seq
+                ):
                     seq = event.get("seq", 0)
                     yield f"id: {seq}\ndata: {json.dumps(event)}\n\n"
             except Exception:

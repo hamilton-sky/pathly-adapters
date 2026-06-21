@@ -1,4 +1,5 @@
 """Named menu and metrics endpoints."""
+
 from __future__ import annotations
 
 import logging
@@ -6,7 +7,12 @@ import time
 
 from flask import Blueprint, jsonify, request
 
-from ..sse import _NO_FEATURE_MENU, _schedule_push_clear, _broadcast_sse, _push_menu_to_sse
+from ..sse import (
+    _NO_FEATURE_MENU,
+    _schedule_push_clear,
+    _broadcast_sse,
+    _push_menu_to_sse,
+)
 from ..middleware import _metrics, _metrics_lock
 
 logger = logging.getLogger("pathly.http")
@@ -34,9 +40,15 @@ def get_named_menu(name: str):
     try:
         from importlib.resources import files as _res_files
         import yaml as _yaml
-        all_menus = _yaml.safe_load(
-            _res_files("pathly_data").joinpath("core/menus.yaml").read_text(encoding="utf-8")
-        ) or {}
+
+        all_menus = (
+            _yaml.safe_load(
+                _res_files("pathly_data")
+                .joinpath("core/menus.yaml")
+                .read_text(encoding="utf-8")
+            )
+            or {}
+        )
     except Exception:
         logger.debug("get_named_menu: failed to load menus.yaml", exc_info=True)
         return jsonify({"error": "Menu registry unavailable"}), 503
@@ -49,7 +61,11 @@ def get_named_menu(name: str):
     pushed_at_ms = int(time.time() * 1000)
 
     def sub(text: str) -> str:
-        return text.replace("{feature}", feature) if feature and isinstance(text, str) else (text or "")
+        return (
+            text.replace("{feature}", feature)
+            if feature and isinstance(text, str)
+            else (text or "")
+        )
 
     menu = {
         "state": name,
@@ -65,7 +81,9 @@ def get_named_menu(name: str):
                 "terminal_kind": item.get("terminal_kind", "claude"),
             }
             for item in raw.get("items", [])
-            if not item.get("states") or not state or state in [s.upper() for s in item["states"]]
+            if not item.get("states")
+            or not state
+            or state in [s.upper() for s in item["states"]]
         ],
         "empty_message": raw.get("empty_message", "No options available."),
         "ttl": ttl,

@@ -72,6 +72,20 @@ function resolveAgyPath(): string {
   return 'agy'  // rely on PATH on non-Windows or if known paths don't exist
 }
 
+// Windows PowerShell 5.1 reads AND writes files with the legacy ANSI code page (cp1252) by default,
+// so a Get-Content|Set-Content round-trip over a UTF-8 file mojibakes multi-byte chars
+// (em-dash — = E2 80 94 → misread as cp1252 "â€"" → re-saved as UTF-8). This preamble makes
+// THIS PowerShell session default to UTF-8 for cmdlet I/O + console output (the engine's stdout we
+// parse as JSON). NOTE: it only covers cmdlets run in this session — $PSDefaultParameterValues is a
+// session var, NOT inherited by a child PowerShell the agent itself spawns for its edits, and
+// Get-Content ignores the console codepage. The engine-agnostic prevention for that lives in the
+// AI-action prompts (commentUtils.ts), which tell the agent to write UTF-8 via its native tools.
+const PS_UTF8_PREAMBLE = [
+  '$OutputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false',
+  "$PSDefaultParameterValues['*:Encoding'] = 'utf8'",
+]
+const PS_UTF8_INLINE = PS_UTF8_PREAMBLE.join('; ')
+
 function resolveShell(command: string | undefined): { shell: string; args: string[] } {
   if (process.platform !== 'win32') {
     if (command === 'claude' || command === 'codex' || command === 'agy') {
@@ -79,11 +93,11 @@ function resolveShell(command: string | undefined): { shell: string; args: strin
     }
     return { shell: command ?? 'bash', args: [] }
   }
-  if (command === 'claude') return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'claude'] }
-  if (command === 'codex')  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', 'codex'] }
+  if (command === 'claude') return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `${PS_UTF8_INLINE}; claude`] }
+  if (command === 'codex')  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `${PS_UTF8_INLINE}; codex`] }
   if (command === 'agy') {
     const agyExe = resolveAgyPath()
-    return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `& '${agyExe}'`] }
+    return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `${PS_UTF8_INLINE}; & '${agyExe}'`] }
   }
   return { shell: 'powershell.exe', args: [] }
 }
@@ -166,7 +180,7 @@ function resolveInteractiveShell(argv: string[]): { shell: string; args: string[
   }
   // Windows: -NoExit keeps PowerShell open after the process exits so the user sees the result
   const tokens = [cmd, ...rest].map((a) => `'${a}'`).join(' ')
-  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `& ${tokens}`] }
+  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `${PS_UTF8_INLINE}; & ${tokens}`] }
 }
 
 /** Spawn a specific argv non-interactively — used by the runner so the PTY exits when the agent finishes. */
@@ -213,7 +227,8 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
   // input from stdin…") and stalls forever in a PTY whose stdin never closes. Piping $null gives
   // it an immediately-closed stdin so it proceeds with the prompt arg. Harmless for other engines.
   const stdinClose = argv[0] === 'codex' ? '$null | ' : ''
-  const scriptLines = [...varDecls, `${stdinClose}& ${callTokens.join(' ')}`].join('\n') + '\r\n'
+  // UTF-8 preamble first — hardens this session's cmdlet I/O + console encoding. See PS_UTF8_PREAMBLE.
+  const scriptLines = [...PS_UTF8_PREAMBLE, ...varDecls, `${stdinClose}& ${callTokens.join(' ')}`].join('\n') + '\r\n'
   fs.writeFileSync(tmpScript, Buffer.concat([bom, Buffer.from(scriptLines, 'utf8')]))
   return {
     shell: 'powershell.exe',

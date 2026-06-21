@@ -4,6 +4,7 @@ start_board_run acquires the board run-lock (A2/D1), assembles board context,
 and invokes spawn_fn with the combined prompt.  spawn_fn is dependency-injected
 so tests can pass a fake without touching the real PTY machinery.
 """
+
 from __future__ import annotations
 
 import threading
@@ -108,6 +109,7 @@ def _compose_skill_body(skill: str, adapter: str) -> str:
         return ""
     try:
         from pathly_orchestrator.skills.compose import compose_skill
+
         return compose_skill(skill, adapter or "claude")
     except Exception:
         return ""
@@ -218,6 +220,7 @@ def start_board_run(
     # Reads tiers) — same source the FSM/team path uses, so single-agent and
     # /comms/run agents are no longer blind to the board. Honors the Reads toggle.
     from pathly_orchestrator.runner.comms_context import board_context_for
+
     context = board_context_for(board, scope, project_root or "", instructions or "")
     prompt_parts: list[str] = []
     # The composed skill body is the agent's behavior contract for this run.
@@ -312,9 +315,13 @@ def start_board_run(
             _work()
         except Exception as exc:  # noqa: BLE001
             if on_done is not None:
-                _safe_call(on_done, run_id, {"result": f"error: {exc}", "error": str(exc)})
+                _safe_call(
+                    on_done, run_id, {"result": f"error: {exc}", "error": str(exc)}
+                )
 
     # Async path (production): spawn the agent in the background and return at once
     # so the Start button never hangs; progress streams onto the board.
-    threading.Thread(target=_runner, daemon=True, name=f"board-run-{run_id[:8]}").start()
+    threading.Thread(
+        target=_runner, daemon=True, name=f"board-run-{run_id[:8]}"
+    ).start()
     return {"ok": True, "run_id": run_id, "mode": mode, "status": "started"}

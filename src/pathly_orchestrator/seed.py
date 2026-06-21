@@ -2,6 +2,7 @@
 Seed flows, skills, and agent definitions from pathly_data into the central DB.
 Called by get_db() on first open; no-op if tables are already populated.
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,7 +27,11 @@ def seed_if_empty(conn: sqlite3.Connection) -> None:
 
     this_dir = Path(__file__).resolve().parent
     data_root = None
-    for parent in [this_dir.parent, this_dir.parent.parent, this_dir.parent.parent.parent]:
+    for parent in [
+        this_dir.parent,
+        this_dir.parent.parent,
+        this_dir.parent.parent.parent,
+    ]:
         candidate = parent / "pathly_data" / "core"
         if candidate.exists():
             data_root = parent / "pathly_data"
@@ -81,7 +86,9 @@ def seed_if_empty(conn: sqlite3.Connection) -> None:
         for skill_file in skills_dir.rglob("*.md"):
             try:
                 skill_name = skill_file.stem
-                meta_file = meta_dir / f"{skill_name}_skill.yaml" if meta_dir.exists() else None
+                meta_file = (
+                    meta_dir / f"{skill_name}_skill.yaml" if meta_dir.exists() else None
+                )
                 meta = {}
                 if meta_file and meta_file.exists():
                     meta = yaml.safe_load(meta_file.read_text(encoding="utf-8")) or {}

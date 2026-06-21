@@ -13,6 +13,7 @@ Example (Slack incoming webhook):
     PATHLY_WEBHOOK_EVENTS=AGENT_DONE,STATE_TRANSITION \
     pathly-fsm-server
 """
+
 from __future__ import annotations
 
 import json
@@ -63,7 +64,7 @@ class WebhookNotifier:
                 data=payload,
                 headers={
                     "Content-Type": "application/json",
-                    "User-Agent":   "pathly-webhook/1.0",
+                    "User-Agent": "pathly-webhook/1.0",
                 },
                 method="POST",
             )

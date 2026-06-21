@@ -23,7 +23,9 @@ _DEFAULT_LIMITS = {
 }
 
 
-def recover_state(storage_path: Path, flow: dict, state_doc: dict | None = None) -> dict:
+def recover_state(
+    storage_path: Path, flow: dict, state_doc: dict | None = None
+) -> dict:
     """
     Read STATE.json and EVENTS.jsonl from storage_path.
     Return {"current_state": str, "conv": int, "open_feedback_files": list[str],
@@ -179,6 +181,7 @@ def evaluate_transition_rules(
         if op_fn is not None and field and compare_to and next_s:
             try:
                 from pathly_orchestrator import eventlog as _eventlog
+
                 state_doc = _eventlog.read_state(str(storage_path)) or {}
                 field_val = int(state_doc[field])
                 compare_val = int(state_doc[compare_to])
@@ -276,6 +279,7 @@ def _read_retry_counts(storage_path: Path) -> dict[str, int]:
     """{FILENAME.md: max retry count} parsed from STATE.json's retry_count_by_key
     (whose keys are 'conv-N:FILENAME.md'). Best-effort — {} on any error."""
     import json as _json
+
     out: dict[str, int] = {}
     try:
         raw = _json.loads((storage_path / "STATE.json").read_text(encoding="utf-8"))
@@ -322,6 +326,7 @@ def route_feedback(
             resolve_feedback_item,
             write_feedback_item,
         )
+
         _conn = get_db()
         # storage_path is always <project_root>/pathly/plans/<feature>
         _feature = storage_path.name
@@ -345,7 +350,9 @@ def route_feedback(
     feedback_routing = flow.get("feedback_routing", {})
     escalation_routing = flow.get("escalation_routing", {})
     human_files = {"HUMAN_QUESTIONS.md", "BLOCKED_ON_HUMAN.md"}
-    counts = retry_counts if retry_counts is not None else _read_retry_counts(storage_path)
+    counts = (
+        retry_counts if retry_counts is not None else _read_retry_counts(storage_path)
+    )
 
     known_filenames: set[str] = set()
     for stem, agent in feedback_routing.items():
@@ -498,8 +505,11 @@ def run_transition_actions(
                     try:
                         from pathly_orchestrator import eventlog as _eventlog
                         from pathly_orchestrator.eventlog import VALID_STATES
+
                         state_doc = _eventlog.read_state(str(storage_path)) or {}
-                        state_doc["convs_done"] = int(state_doc.get("convs_done", 0)) + 1
+                        state_doc["convs_done"] = (
+                            int(state_doc.get("convs_done", 0)) + 1
+                        )
                         # Guard: SQLite may have a stale/invalid 'current' from before a
                         # STATE.json fix. Replace it with prev_state so write_state passes
                         # validation.
@@ -537,7 +547,12 @@ def _write_gate_feedback(storage_path: Path, on_fail: str, reason: str) -> None:
     target.write_text(reason, encoding="utf-8")
 
 
-def _scope_clean(storage_path: Path, scope_file: str, preexisting_dirty: set[str] | None, flow: dict | None = None) -> bool:
+def _scope_clean(
+    storage_path: Path,
+    scope_file: str,
+    preexisting_dirty: set[str] | None,
+    flow: dict | None = None,
+) -> bool:
     import re as _re
 
     scope_path = storage_path / scope_file
@@ -557,7 +572,11 @@ def _scope_clean(storage_path: Path, scope_file: str, preexisting_dirty: set[str
     if not declared:
         append_event(
             storage_path,
-            {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_declared_scope"},
+            {
+                "type": "GATE_SKIPPED",
+                "gate": "scope_gate",
+                "reason": "no_declared_scope",
+            },
         )
         return True
 
@@ -593,11 +612,15 @@ def _scope_clean(storage_path: Path, scope_file: str, preexisting_dirty: set[str
             text=True,
             timeout=30,
         )
-        untracked = {
-            line[3:].strip()
-            for line in status_result.stdout.splitlines()
-            if line.startswith("??")
-        } if status_result.returncode == 0 else set()
+        untracked = (
+            {
+                line[3:].strip()
+                for line in status_result.stdout.splitlines()
+                if line.startswith("??")
+            }
+            if status_result.returncode == 0
+            else set()
+        )
     except Exception:
         untracked = set()
 
@@ -679,6 +702,7 @@ def run_gates(
             build_baseline: dict | None = None
             try:
                 from pathly_orchestrator.eventlog import read_state as _read_state_db
+
                 _state_doc = _read_state_db(str(storage_path))
                 if _state_doc:
                     build_baseline = _state_doc.get("build_baseline")
@@ -695,18 +719,31 @@ def run_gates(
             if build_baseline is None:
                 append_event(
                     storage_path,
-                    {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline"},
+                    {
+                        "type": "GATE_SKIPPED",
+                        "gate": "scope_gate",
+                        "reason": "no_build_baseline",
+                    },
                 )
                 continue
-            if build_baseline.get("truncated") or len(build_baseline.get("preexisting_dirty", [])) > 500:
+            if (
+                build_baseline.get("truncated")
+                or len(build_baseline.get("preexisting_dirty", [])) > 500
+            ):
                 append_event(
                     storage_path,
-                    {"type": "GATE_DEGRADED", "gate": "scope_gate", "reason": "preexisting_dirty_truncated"},
+                    {
+                        "type": "GATE_DEGRADED",
+                        "gate": "scope_gate",
+                        "reason": "preexisting_dirty_truncated",
+                    },
                 )
                 continue
             preexisting = set(build_baseline.get("preexisting_dirty", []))
             if not _scope_clean(storage_path, scope_file, preexisting, flow=flow):
-                reason = f"Scope gate failed: changes outside declared scope in {scope_file}"
+                reason = (
+                    f"Scope gate failed: changes outside declared scope in {scope_file}"
+                )
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
                 append_event(
                     storage_path,

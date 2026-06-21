@@ -3,6 +3,7 @@
 Only message types in _EMBED_TYPES should produce a row in comms_embeddings.
 Transient types (status, nudge, question, answer, task) must NOT be embedded.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,18 +15,22 @@ import pytest
 def client():
     """Flask test client. DB is isolated per-test by the autouse conftest fixture."""
     from pathly_orchestrator.http_server import app
+
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
 
 
 def _post_msg(client, msg_type: str, text: str = "test message") -> str:
-    r = client.post("/comms/post", json={
-        "feature": "demo",
-        "from": "builder",
-        "type": msg_type,
-        "text": text,
-    })
+    r = client.post(
+        "/comms/post",
+        json={
+            "feature": "demo",
+            "from": "builder",
+            "type": msg_type,
+            "text": text,
+        },
+    )
     assert r.status_code == 200
     return json.loads(r.data)["message_id"]
 
@@ -33,6 +38,7 @@ def _post_msg(client, msg_type: str, text: str = "test message") -> str:
 def _embedding_exists(message_id: str) -> bool:
     """Check whether a comms_embeddings row exists for message_id."""
     from pathly_orchestrator.db.connection import _VEC_AVAILABLE, get_db
+
     if not _VEC_AVAILABLE:
         # Vec table doesn't exist — test is trivially satisfied (nothing embedded)
         return False
@@ -47,9 +53,11 @@ def _embedding_exists(message_id: str) -> bool:
 # _EMBED_TYPES constant test
 # ---------------------------------------------------------------------------
 
+
 def test_embed_types_constant_contains_expected_types():
     """_EMBED_TYPES frozenset contains the six high-value message types."""
     from pathly_orchestrator.http_server.blueprints.comms import _EMBED_TYPES
+
     assert "decision" in _EMBED_TYPES
     assert "discovery" in _EMBED_TYPES
     assert "constraint" in _EMBED_TYPES
@@ -61,13 +69,17 @@ def test_embed_types_constant_contains_expected_types():
 def test_embed_types_excludes_transient_types():
     """_EMBED_TYPES does NOT include transient message types."""
     from pathly_orchestrator.http_server.blueprints.comms import _EMBED_TYPES
+
     for transient in ("status", "nudge", "question", "answer", "task"):
-        assert transient not in _EMBED_TYPES, f"transient type '{transient}' should not be in _EMBED_TYPES"
+        assert (
+            transient not in _EMBED_TYPES
+        ), f"transient type '{transient}' should not be in _EMBED_TYPES"
 
 
 # ---------------------------------------------------------------------------
 # Conditional embed call tests (via mocking embed_async)
 # ---------------------------------------------------------------------------
+
 
 def test_comms_embed_curation_status_not_embedded(client, monkeypatch):
     """Posting a 'status' message does NOT call _embed_async."""
@@ -81,6 +93,7 @@ def test_comms_embed_curation_status_not_embedded(client, monkeypatch):
     # The blueprint imports embed_async inside the route via lazy import —
     # patch at the runner.embeddings module level so the import resolves to our fake.
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed_async", _fake_embed_async)
 
     _post_msg(client, "status", "Build stage started")
@@ -146,4 +159,6 @@ def test_comms_embed_curation_all_transient_types_skipped(client, monkeypatch):
     for t in ("status", "nudge", "question", "answer", "task"):
         _post_msg(client, t, f"A {t} message")
 
-    assert calls == [], f"embed_async should NOT be called for transient types, got: {calls}"
+    assert (
+        calls == []
+    ), f"embed_async should NOT be called for transient types, got: {calls}"

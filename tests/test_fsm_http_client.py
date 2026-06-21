@@ -28,6 +28,7 @@ class _FakeProc:
 
 # ── ensure_server_running + auto-start integration ───────────────────────────
 
+
 def test_next_action_auto_starts_server_and_posts_json(monkeypatch, tmp_path):
     """Server down on first check; up on first poll iteration; request succeeds."""
     calls = []
@@ -45,13 +46,22 @@ def test_next_action_auto_starts_server_and_posts_json(monkeypatch, tmp_path):
                 raise URLError("down")
             return _Response('{"status":"ok"}')
         payload = json.loads(request.data.decode("utf-8"))
-        assert payload == {"flow": "team", "topic": "demo", "project_root": "C:/work/project"}
+        assert payload == {
+            "flow": "team",
+            "topic": "demo",
+            "project_root": "C:/work/project",
+        }
         return _Response('{"current_state":"BUILDING","menu":{"state":"BUILDING"}}')
 
     pid_file = tmp_path / "fsm.pid"
     monkeypatch.setattr(client, "_pid_file", lambda: pid_file)
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.subprocess.Popen", fake_popen)
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.time.sleep", lambda s: calls.append(("sleep", s)))
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.subprocess.Popen", fake_popen
+    )
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.time.sleep",
+        lambda s: calls.append(("sleep", s)),
+    )
     monkeypatch.setattr("pathly_orchestrator.fsm_http_client.urlopen", fake_urlopen)
 
     result = client.next_action(
@@ -82,8 +92,14 @@ def test_poll_exits_early_on_first_healthy_response(monkeypatch, tmp_path):
         return _Response("{}")
 
     monkeypatch.setattr(client, "_pid_file", lambda: tmp_path / "fsm.pid")
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.subprocess.Popen", lambda *a, **k: _FakeProc())
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.time.sleep", lambda s: sleep_calls.append(s))
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.subprocess.Popen",
+        lambda *a, **k: _FakeProc(),
+    )
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.time.sleep",
+        lambda s: sleep_calls.append(s),
+    )
     monkeypatch.setattr("pathly_orchestrator.fsm_http_client.urlopen", fake_urlopen)
 
     client.ensure_server_running()
@@ -95,12 +111,18 @@ def test_poll_exits_early_on_first_healthy_response(monkeypatch, tmp_path):
 
 def test_poll_exhausted_raises_runtime_error(monkeypatch, tmp_path):
     """All 30 poll attempts fail → RuntimeError with the expected message."""
+
     def fake_urlopen(request, timeout=0):
         raise URLError("down")
 
     monkeypatch.setattr(client, "_pid_file", lambda: tmp_path / "fsm.pid")
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.subprocess.Popen", lambda *a, **k: _FakeProc())
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.time.sleep", lambda _: None)
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.subprocess.Popen",
+        lambda *a, **k: _FakeProc(),
+    )
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.time.sleep", lambda _: None
+    )
     monkeypatch.setattr("pathly_orchestrator.fsm_http_client.urlopen", fake_urlopen)
 
     with pytest.raises(RuntimeError, match="did not start within 7.5 s"):
@@ -108,6 +130,7 @@ def test_poll_exhausted_raises_runtime_error(monkeypatch, tmp_path):
 
 
 # ── _start_server PID file behaviour ─────────────────────────────────────────
+
 
 def test_pid_file_live_process_skips_spawn(monkeypatch, tmp_path):
     """Existing PID file + healthy server → no Popen call."""
@@ -162,6 +185,7 @@ def test_pid_file_stale_process_spawns_fresh(monkeypatch, tmp_path):
 
 # ── Platform-specific spawn flags ────────────────────────────────────────────
 
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX-only")
 def test_posix_spawn_uses_start_new_session(monkeypatch, tmp_path):
     """On POSIX, Popen is called with start_new_session=True, no creationflags."""
@@ -175,7 +199,9 @@ def test_posix_spawn_uses_start_new_session(monkeypatch, tmp_path):
         raise URLError("down")
 
     monkeypatch.setattr(client, "_pid_file", lambda: tmp_path / "fsm.pid")
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.subprocess.Popen", fake_popen)
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.subprocess.Popen", fake_popen
+    )
     monkeypatch.setattr("pathly_orchestrator.fsm_http_client.urlopen", always_down)
 
     client._start_server()  # will spawn; health inside _start_server fails, that's ok
@@ -199,7 +225,9 @@ def test_windows_spawn_uses_detached_process_flags(monkeypatch, tmp_path):
         raise URLError("down")
 
     monkeypatch.setattr(client, "_pid_file", lambda: tmp_path / "fsm.pid")
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.subprocess.Popen", fake_popen)
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.subprocess.Popen", fake_popen
+    )
     monkeypatch.setattr("pathly_orchestrator.fsm_http_client.urlopen", always_down)
 
     client._start_server()
@@ -210,6 +238,7 @@ def test_windows_spawn_uses_detached_process_flags(monkeypatch, tmp_path):
 
 
 # ── CLI record-activity ───────────────────────────────────────────────────────
+
 
 def test_record_activity_cli_prints_raw_json(monkeypatch, capsys, tmp_path):
     calls = []
@@ -228,20 +257,31 @@ def test_record_activity_cli_prints_raw_json(monkeypatch, capsys, tmp_path):
 
     monkeypatch.setattr(client, "_pid_file", lambda: tmp_path / "fsm.pid")
     monkeypatch.setattr("pathly_orchestrator.fsm_http_client.urlopen", fake_urlopen)
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.subprocess.Popen", lambda *a, **k: _FakeProc())
-    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.time.sleep", lambda _: None)
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.subprocess.Popen",
+        lambda *a, **k: _FakeProc(),
+    )
+    monkeypatch.setattr(
+        "pathly_orchestrator.fsm_http_client.time.sleep", lambda _: None
+    )
     monkeypatch.setattr(
         sys,
         "argv",
         [
             "pathly-fsm-call",
             "record-activity",
-            "--agent", "builder",
-            "--feature", "demo",
-            "--summary", "builder conv 1 DONE",
-            "--conversation", "1",
-            "--input-tokens", "12",
-            "--output-tokens", "3",
+            "--agent",
+            "builder",
+            "--feature",
+            "demo",
+            "--summary",
+            "builder conv 1 DONE",
+            "--conversation",
+            "1",
+            "--input-tokens",
+            "12",
+            "--output-tokens",
+            "3",
         ],
     )
 

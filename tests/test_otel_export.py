@@ -59,8 +59,11 @@ def test_span_status_error():
 
 
 def test_do_export_swallows_network_error(monkeypatch, caplog):
-    monkeypatch.setattr("urllib.request.urlopen", mock.Mock(side_effect=OSError("refused")))
+    monkeypatch.setattr(
+        "urllib.request.urlopen", mock.Mock(side_effect=OSError("refused"))
+    )
     import logging
+
     with caplog.at_level(logging.WARNING):
         _do_export(MINIMAL_EVENT, "http://localhost:4318")
     assert "otel export failed" in caplog.text
@@ -68,10 +71,15 @@ def test_do_export_swallows_network_error(monkeypatch, caplog):
 
 def test_do_export_swallows_http_error(monkeypatch, caplog):
     http_err = urllib.error.HTTPError(
-        "http://localhost:4318/v1/traces", 503, "Service Unavailable", http.client.HTTPMessage(), None
+        "http://localhost:4318/v1/traces",
+        503,
+        "Service Unavailable",
+        http.client.HTTPMessage(),
+        None,
     )
     monkeypatch.setattr("urllib.request.urlopen", mock.Mock(side_effect=http_err))
     import logging
+
     with caplog.at_level(logging.WARNING):
         _do_export(MINIMAL_EVENT, "http://localhost:4318")
     assert "otel export failed" in caplog.text
@@ -105,16 +113,20 @@ def test_record_activity_unaffected_by_export_failure(monkeypatch, tmp_path):
     monkeypatch.setenv("PATHLY_OTEL_ENDPOINT", "http://127.0.0.1:1")
     monkeypatch.setenv("PATHLY_PROJECT_ROOT", str(tmp_path))
     from pathly_orchestrator.http_server import app
+
     app.config["TESTING"] = True
     feature_dir = tmp_path / "pathly" / "plans" / "test"
     feature_dir.mkdir(parents=True)
     with app.test_client() as c:
-        r = c.post("/record_activity", json={
-            "agent": "builder",
-            "feature": "test",
-            "project_root": str(tmp_path),
-            "summary": "done",
-            "input_tokens": 10,
-            "output_tokens": 5,
-        })
+        r = c.post(
+            "/record_activity",
+            json={
+                "agent": "builder",
+                "feature": "test",
+                "project_root": str(tmp_path),
+                "summary": "done",
+                "input_tokens": 10,
+                "output_tokens": 5,
+            },
+        )
     assert r.status_code == 200

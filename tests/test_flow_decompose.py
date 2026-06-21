@@ -1,4 +1,5 @@
 """Tests for flow decompose/assemble round-trip and DB idempotency."""
+
 from __future__ import annotations
 
 import json
@@ -26,7 +27,11 @@ FIXTURE_DECIDE = {
     "storage_path": "pathly/plans/{topic}/",
     "states": ["CHOOSING", "PATH_A", "PATH_B"],
     "transitions": {"CHOOSING": ["PATH_A", "PATH_B"], "PATH_A": [], "PATH_B": []},
-    "agent_map": {"CHOOSING": "team/decide", "PATH_A": "team/build", "PATH_B": "team/review"},
+    "agent_map": {
+        "CHOOSING": "team/decide",
+        "PATH_A": "team/build",
+        "PATH_B": "team/review",
+    },
     "feedback_routing": {},
     "transition_rules": {
         "CHOOSING": {
@@ -46,8 +51,16 @@ FIXTURE_ON_CONTENT = {
     "flow": "content-test",
     "storage_path": "pathly/plans/{topic}/",
     "states": ["DRAFTING", "REVIEWING", "DONE"],
-    "transitions": {"DRAFTING": ["REVIEWING", "DRAFTING"], "REVIEWING": ["DONE"], "DONE": []},
-    "agent_map": {"DRAFTING": "team/build", "REVIEWING": "team/review", "DONE": "team/retro"},
+    "transitions": {
+        "DRAFTING": ["REVIEWING", "DRAFTING"],
+        "REVIEWING": ["DONE"],
+        "DONE": [],
+    },
+    "agent_map": {
+        "DRAFTING": "team/build",
+        "REVIEWING": "team/review",
+        "DONE": "team/retro",
+    },
     "feedback_routing": {},
     "transition_rules": {
         "DRAFTING": {
@@ -66,8 +79,16 @@ FIXTURE_ON_STATE_COUNTER = {
     "flow": "counter-test",
     "storage_path": "pathly/plans/{topic}/",
     "states": ["BUILDING", "REVIEWING", "DONE"],
-    "transitions": {"BUILDING": ["REVIEWING"], "REVIEWING": ["BUILDING", "DONE"], "DONE": []},
-    "agent_map": {"BUILDING": "team/build", "REVIEWING": "team/review", "DONE": "team/retro"},
+    "transitions": {
+        "BUILDING": ["REVIEWING"],
+        "REVIEWING": ["BUILDING", "DONE"],
+        "DONE": [],
+    },
+    "agent_map": {
+        "BUILDING": "team/build",
+        "REVIEWING": "team/review",
+        "DONE": "team/retro",
+    },
     "feedback_routing": {},
     "transition_rules": {
         "REVIEWING": {
@@ -88,7 +109,10 @@ FIXTURE_ON_STATE_COUNTER = {
 # T1.5 — Branch coverage tests for decide / on_content / on_state_counter
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("fixture", [FIXTURE_DECIDE, FIXTURE_ON_CONTENT, FIXTURE_ON_STATE_COUNTER])
+
+@pytest.mark.parametrize(
+    "fixture", [FIXTURE_DECIDE, FIXTURE_ON_CONTENT, FIXTURE_ON_STATE_COUNTER]
+)
 def test_decompose_does_not_raise(fixture):
     _decompose_flow_dict(fixture)
 
@@ -149,7 +173,11 @@ BUNDLED_FLOWS = ["team", "debug", "explore", "test", "quick-fix"]
 
 @pytest.mark.parametrize("flow_name", BUNDLED_FLOWS)
 def test_round_trip(flow_name):
-    text = files("pathly_data").joinpath(f"core/flows/{flow_name}.flow.yaml").read_text(encoding="utf-8")
+    text = (
+        files("pathly_data")
+        .joinpath(f"core/flows/{flow_name}.flow.yaml")
+        .read_text(encoding="utf-8")
+    )
     original = yaml.safe_load(text)
     flow_cfg, nodes, edges = _decompose_flow_dict(original)
     reconstructed = _assemble_from_parts(flow_cfg, nodes, edges)
@@ -164,6 +192,7 @@ def test_round_trip(flow_name):
 # T1.7 — Idempotency test: upsert twice, same row counts
 # ---------------------------------------------------------------------------
 
+
 def test_upsert_idempotency():
     from pathly_orchestrator.db.migrations import _run_migrations
 
@@ -171,7 +200,11 @@ def test_upsert_idempotency():
     conn.row_factory = sqlite3.Row
     _run_migrations(conn)
 
-    text = files("pathly_data").joinpath("core/flows/team.flow.yaml").read_text(encoding="utf-8")
+    text = (
+        files("pathly_data")
+        .joinpath("core/flows/team.flow.yaml")
+        .read_text(encoding="utf-8")
+    )
 
     fid = upsert_flow_definition(conn, None, "team", "", text)
     nodes_1 = read_flow_nodes(conn, fid)

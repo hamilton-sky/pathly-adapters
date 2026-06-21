@@ -1,4 +1,5 @@
 """Query helpers for the skill_overrides table."""
+
 from __future__ import annotations
 
 import sqlite3

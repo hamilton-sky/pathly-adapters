@@ -1,4 +1,5 @@
 """Query helpers for the run_history table."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -36,9 +37,16 @@ def upsert_run(
             "  cost_usd=excluded.cost_usd, "
             "  adapter=excluded.adapter",
             (
-                project_root, feature, run_id, status,
-                started_at or now, finished_at,
-                stage_count, total_tokens, cost_usd, adapter,
+                project_root,
+                feature,
+                run_id,
+                status,
+                started_at or now,
+                finished_at,
+                stage_count,
+                total_tokens,
+                cost_usd,
+                adapter,
             ),
         )
         conn.commit()

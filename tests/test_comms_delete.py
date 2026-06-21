@@ -1,4 +1,5 @@
 """Tests for POST /comms/delete — retract a message only while unread by an agent."""
+
 from __future__ import annotations
 
 import json
@@ -10,21 +11,29 @@ import pytest
 def client():
     """Flask test client. DB is isolated per-test by the autouse conftest fixture."""
     from pathly_orchestrator.http_server import app
+
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
 
 
 def _post(client, text: str = "hello") -> str:
-    r = client.post("/comms/post", json={
-        "feature": "demo", "from": "human", "type": "nudge", "text": text,
-    })
+    r = client.post(
+        "/comms/post",
+        json={
+            "feature": "demo",
+            "from": "human",
+            "type": "nudge",
+            "text": text,
+        },
+    )
     assert r.status_code == 200
     return json.loads(r.data)["message_id"]
 
 
 def _set_read_by(message_id: str, readers: list[str]) -> None:
     from pathly_orchestrator.db.connection import get_db
+
     conn = get_db()
     conn.execute(
         "UPDATE comms_messages SET read_by=? WHERE id=?",

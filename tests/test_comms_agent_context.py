@@ -5,6 +5,7 @@ Verifies:
   decisions/escalations populated, board_context contains decision text.
 - 400 when scope is missing.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,27 +17,33 @@ import pytest
 def _no_async_embed(monkeypatch):
     """Prevent embed_async from spawning daemon threads that race the test DB."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
 
 
 @pytest.fixture()
 def client():
     from pathly_orchestrator.http_server import app
+
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
 
 
-def _post_msg(client, *, msg_type: str, text: str, board: str = "feature",
-              scope: str = "f1") -> str:
-    r = client.post("/comms/post", json={
-        "feature": scope,
-        "from": "human",
-        "type": msg_type,
-        "text": text,
-        "board": board,
-        "scope": scope,
-    })
+def _post_msg(
+    client, *, msg_type: str, text: str, board: str = "feature", scope: str = "f1"
+) -> str:
+    r = client.post(
+        "/comms/post",
+        json={
+            "feature": scope,
+            "from": "human",
+            "type": msg_type,
+            "text": text,
+            "board": board,
+            "scope": scope,
+        },
+    )
     assert r.status_code == 200, r.data
     return json.loads(r.data)["message_id"]
 
@@ -104,7 +111,9 @@ def test_agent_context_empty_scope_string_returns_400(client):
 
 def test_agent_context_empty_board_no_messages(client):
     """board_context is empty string and message_count is 0 when board has nothing."""
-    r = client.post("/comms/agent-context", json={"board": "feature", "scope": "empty-board"})
+    r = client.post(
+        "/comms/agent-context", json={"board": "feature", "scope": "empty-board"}
+    )
     assert r.status_code == 200
     payload = json.loads(r.data)
     assert payload["message_count"] == 0

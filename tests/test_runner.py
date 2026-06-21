@@ -1,4 +1,5 @@
 """Unit tests for pathly_orchestrator.runner."""
+
 from __future__ import annotations
 
 import subprocess
@@ -25,11 +26,21 @@ _INVOKE_AGENT_PATH = "pathly_orchestrator.runner.invoke_agent"
 
 
 def _na_state(state: str = "STORMING") -> dict:
-    return {"current_state": state, "agent": "team/storm", "instructions": "do stuff", "limits": {}}
+    return {
+        "current_state": state,
+        "agent": "team/storm",
+        "instructions": "do stuff",
+        "limits": {},
+    }
 
 
 def _cs_next(from_: str = "STORMING", to: str = "PLANNING") -> dict:
-    return {"next_state": to, "agent": "team/plan", "instructions": "plan stuff", "limits": {}}
+    return {
+        "next_state": to,
+        "agent": "team/plan",
+        "instructions": "plan stuff",
+        "limits": {},
+    }
 
 
 def _cs_done() -> dict:
@@ -37,6 +48,7 @@ def _cs_done() -> dict:
 
 
 # ── run_flow: happy path (single stage → done) ────────────────────────────────
+
 
 def test_run_flow_single_stage_done(capsys):
     with (
@@ -46,13 +58,16 @@ def test_run_flow_single_stage_done(capsys):
     ):
         rc = run_flow("team", "my-topic", "/proj")
     assert rc == 0
-    mock_na.assert_called_once_with({"flow": "team", "topic": "my-topic", "project_root": "/proj"})
+    mock_na.assert_called_once_with(
+        {"flow": "team", "topic": "my-topic", "project_root": "/proj"}
+    )
     mock_invoke.assert_called_once()
     out = capsys.readouterr().out
     assert "✓ Complete" in out
 
 
 # ── run_flow: multi-stage ─────────────────────────────────────────────────────
+
 
 def test_run_flow_multi_stage(capsys):
     na_calls = [_na_state("STORMING"), _na_state("PLANNING")]
@@ -71,8 +86,14 @@ def test_run_flow_multi_stage(capsys):
 
 # ── run_flow: blocked on human before first stage ────────────────────────────
 
+
 def test_run_flow_blocked_human(capsys):
-    blocked = {"blocked": True, "target_agent": "human", "file": "HUMAN_QUESTIONS.md", "instructions": "Answer me!"}
+    blocked = {
+        "blocked": True,
+        "target_agent": "human",
+        "file": "HUMAN_QUESTIONS.md",
+        "instructions": "Answer me!",
+    }
     with (
         patch(_NEXT_ACTION_PATH, return_value=blocked),
         patch(_INVOKE_AGENT_PATH),
@@ -84,6 +105,7 @@ def test_run_flow_blocked_human(capsys):
 
 
 # ── handle_decide: valid input ────────────────────────────────────────────────
+
 
 def test_handle_decide_valid_input():
     response = {
@@ -97,16 +119,19 @@ def test_handle_decide_valid_input():
         patch(_COMPLETE_STAGE_PATH, return_value=_cs_done()) as mock_cs,
     ):
         result = handle_decide("team", "topic", "/proj", response)
-    mock_cs.assert_called_once_with({
-        "flow": "team",
-        "topic": "topic",
-        "project_root": "/proj",
-        "decision": "b",
-    })
+    mock_cs.assert_called_once_with(
+        {
+            "flow": "team",
+            "topic": "topic",
+            "project_root": "/proj",
+            "decision": "b",
+        }
+    )
     assert result == _cs_done()
 
 
 # ── handle_decide: invalid input falls back to default ───────────────────────
+
 
 def test_handle_decide_invalid_input_uses_default():
     response = {
@@ -120,24 +145,34 @@ def test_handle_decide_invalid_input_uses_default():
         patch(_COMPLETE_STAGE_PATH, return_value=_cs_done()) as mock_cs,
     ):
         handle_decide("team", "topic", "/proj", response)
-    mock_cs.assert_called_once_with({
-        "flow": "team",
-        "topic": "topic",
-        "project_root": "/proj",
-        "decision": "a",
-    })
+    mock_cs.assert_called_once_with(
+        {
+            "flow": "team",
+            "topic": "topic",
+            "project_root": "/proj",
+            "decision": "a",
+        }
+    )
 
 
 # ── resolve_stage: feedback resolved on second call ──────────────────────────
 
+
 def test_resolve_stage_feedback_once():
-    blocked = {"blocked": True, "target_agent": "reviewer", "file": "REVIEW.md", "instructions": "fix it"}
+    blocked = {
+        "blocked": True,
+        "target_agent": "reviewer",
+        "file": "REVIEW.md",
+        "instructions": "fix it",
+    }
     cs_sequence = [blocked, _cs_done()]
     with (
         patch(_COMPLETE_STAGE_PATH, side_effect=cs_sequence) as mock_cs,
         patch(_INVOKE_AGENT_PATH),
     ):
-        result = resolve_stage("team", "topic", "/proj", "claude-sonnet-4-6", "REVIEWING")
+        result = resolve_stage(
+            "team", "topic", "/proj", "claude-sonnet-4-6", "REVIEWING"
+        )
     assert result.get("done") is True
     assert mock_cs.call_count == 2
     # second call passes resolved_files
@@ -147,8 +182,14 @@ def test_resolve_stage_feedback_once():
 
 # ── resolve_stage: exceeds MAX_FEEDBACK_ROUNDS ───────────────────────────────
 
+
 def test_resolve_stage_exceeds_max_feedback_rounds(tmp_path):
-    blocked = {"blocked": True, "target_agent": "reviewer", "file": "REVIEW.md", "instructions": "fix it"}
+    blocked = {
+        "blocked": True,
+        "target_agent": "reviewer",
+        "file": "REVIEW.md",
+        "instructions": "fix it",
+    }
     # Returns blocked 4 times (exceeds MAX_FEEDBACK_ROUNDS=3), then done
     cs_calls = [blocked] * 4 + [_cs_done()]
     with (
@@ -157,7 +198,9 @@ def test_resolve_stage_exceeds_max_feedback_rounds(tmp_path):
         patch("pathly_orchestrator.runner._storage_path", return_value=tmp_path),
         patch("builtins.input", return_value=""),
     ):
-        result = resolve_stage("team", "topic", "/proj", "claude-sonnet-4-6", "REVIEWING")
+        result = resolve_stage(
+            "team", "topic", "/proj", "claude-sonnet-4-6", "REVIEWING"
+        )
     escalation = tmp_path / "feedback" / "HUMAN_QUESTIONS.md"
     assert escalation.exists()
     assert "Escalation" in escalation.read_text()
@@ -166,9 +209,12 @@ def test_resolve_stage_exceeds_max_feedback_rounds(tmp_path):
 
 # ── invoke_agent: timeout raises RuntimeError ────────────────────────────────
 
+
 def test_invoke_agent_timeout():
     mock_proc = MagicMock()
-    mock_proc.communicate.side_effect = subprocess.TimeoutExpired(cmd="claude", timeout=1)
+    mock_proc.communicate.side_effect = subprocess.TimeoutExpired(
+        cmd="claude", timeout=1
+    )
     with patch("subprocess.Popen", return_value=mock_proc):
         with pytest.raises(RuntimeError, match="timed out"):
             invoke_agent("do stuff", "/proj", "claude-sonnet-4-6", timeout=1)
@@ -177,9 +223,10 @@ def test_invoke_agent_timeout():
 
 # ── invoke_agent: non-zero exit raises RuntimeError ──────────────────────────
 
+
 def test_invoke_agent_nonzero_exit():
     mock_proc = MagicMock()
-    mock_proc.communicate.return_value = (b'{}', None)
+    mock_proc.communicate.return_value = (b"{}", None)
     mock_proc.returncode = 1
     with patch("subprocess.Popen", return_value=mock_proc):
         with pytest.raises(RuntimeError, match="exited with code 1"):
@@ -195,7 +242,7 @@ def test_resolve_argv_claude_adds_json_output():
     "raw, expected",
     [
         ('{"cost_usd": 1.25, "session_id": "s1"}', (1.25, "s1")),
-        ("\x1b[31m{\"cost_usd\": 2, \"session_id\": \"s2\"}\x1b[0m", (2.0, "s2")),
+        ('\x1b[31m{"cost_usd": 2, "session_id": "s2"}\x1b[0m', (2.0, "s2")),
         ("", (0.0, None)),
         ('{"cost_usd": 1}\n{"cost_usd": 3, "session_id": "s3"}\n', (3.0, "s3")),
         ('{"cost_usd": 4, "session_id": "s4"\n', (0.0, None)),
@@ -222,6 +269,7 @@ def test_parse_result_codex_shape_drift():
 
 # ── tail_agent_done ───────────────────────────────────────────────────────────
 
+
 def test_tail_agent_done_yields_and_stops(tmp_path):
     import threading
     import time
@@ -237,7 +285,9 @@ def test_tail_agent_done_yields_and_stops(tmp_path):
     results = []
 
     def _run():
-        for event in tail_agent_done(str(events_file), after_ts, stop_evt, poll_interval=0.05):
+        for event in tail_agent_done(
+            str(events_file), after_ts, stop_evt, poll_interval=0.05
+        ):
             results.append(event)
 
     thread = threading.Thread(target=_run, daemon=True)
@@ -260,17 +310,38 @@ def test_tail_agent_done_yields_and_stops(tmp_path):
 
 # ── build_pipeline_history_block ──────────────────────────────────────────────
 
+
 def test_pipeline_history_block_format(tmp_path):
     import json
     from pathly_orchestrator.runner import build_pipeline_history_block
 
     events_path = tmp_path / "EVENTS.jsonl"
     entries = [
-        {"type": "AGENT_DONE", "agent": "builder", "conversation": 1, "summary": "added event constant", "ts": "2026-01-01T00:00:01Z"},
-        {"type": "AGENT_DONE", "agent": "reviewer", "conversation": 1, "summary": "review PASS", "ts": "2026-01-01T00:00:02Z"},
-        {"type": "AGENT_DONE", "agent": "builder", "conversation": 2, "summary": "wired supervisor", "ts": "2026-01-01T00:00:03Z"},
+        {
+            "type": "AGENT_DONE",
+            "agent": "builder",
+            "conversation": 1,
+            "summary": "added event constant",
+            "ts": "2026-01-01T00:00:01Z",
+        },
+        {
+            "type": "AGENT_DONE",
+            "agent": "reviewer",
+            "conversation": 1,
+            "summary": "review PASS",
+            "ts": "2026-01-01T00:00:02Z",
+        },
+        {
+            "type": "AGENT_DONE",
+            "agent": "builder",
+            "conversation": 2,
+            "summary": "wired supervisor",
+            "ts": "2026-01-01T00:00:03Z",
+        },
     ]
-    events_path.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+    events_path.write_text(
+        "\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8"
+    )
 
     block = build_pipeline_history_block(str(events_path))
 
@@ -293,7 +364,10 @@ def test_pipeline_history_empty_when_no_events(tmp_path):
     # File with no AGENT_DONE lines returns ""
     events_path = tmp_path / "EVENTS.jsonl"
     events_path.write_text(
-        json.dumps({"type": "PHASE_START", "phase": "build", "ts": "2026-01-01T00:00:00Z"}) + "\n",
+        json.dumps(
+            {"type": "PHASE_START", "phase": "build", "ts": "2026-01-01T00:00:00Z"}
+        )
+        + "\n",
         encoding="utf-8",
     )
     assert build_pipeline_history_block(str(events_path)) == ""

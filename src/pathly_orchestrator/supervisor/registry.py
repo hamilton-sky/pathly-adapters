@@ -57,7 +57,9 @@ class TerminalRun:
 
     def wait_pty_result(self, timeout: float) -> bool:
         with self._cond:
-            return self._cond.wait_for(lambda: self.pty_result is not None, timeout=timeout)
+            return self._cond.wait_for(
+                lambda: self.pty_result is not None, timeout=timeout
+            )
 
     def wait_result_or_agent_done(self, timeout: float) -> str:
         """Returns 'agent_done', 'pty_result', or 'timeout'."""
@@ -142,15 +144,22 @@ def recover_stale_mirrors(project_root: str) -> None:
 def _write_mirror(state: RunnerState) -> None:
     try:
         from pathly_orchestrator import db as _db
+
         feature_dir = Path(state.project_root) / "pathly" / "plans" / state.topic
         feature_dir.mkdir(parents=True, exist_ok=True)
         conn = _db.get_db()
-        _db.write_runner_state(conn, state.project_root, state.topic, state.public_dict())
+        _db.write_runner_state(
+            conn, state.project_root, state.topic, state.public_dict()
+        )
     except Exception as exc:
-        logger.warning("Failed to write runner_state SQLite for %s: %s", state.topic, exc)
+        logger.warning(
+            "Failed to write runner_state SQLite for %s: %s", state.topic, exc
+        )
 
 
-def _set_status(state: RunnerState, status: str, broadcast_fn: Optional[Callable]) -> None:
+def _set_status(
+    state: RunnerState, status: str, broadcast_fn: Optional[Callable]
+) -> None:
     state.status = status
     _write_mirror(state)
     if broadcast_fn:
@@ -165,7 +174,10 @@ def _set_status(state: RunnerState, status: str, broadcast_fn: Optional[Callable
         try:
             import time as _time
             from pathly_orchestrator.db.connection import get_db as _get_db
-            from pathly_orchestrator.db.queries.run_history import upsert_run as _upsert_run
+            from pathly_orchestrator.db.queries.run_history import (
+                upsert_run as _upsert_run,
+            )
+
             _now = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
             _upsert_run(
                 _get_db(),

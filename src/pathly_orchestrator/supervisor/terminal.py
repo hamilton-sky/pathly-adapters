@@ -30,10 +30,12 @@ def _write_supervisor_phase_summary(
 ) -> None:
     """Write a PHASE_SUMMARY event to the feature's SQLite DB and broadcast to Studio via SSE."""
     import time as _time
+
     if not project_root or not topic:
         return
     try:
         from pathly_orchestrator import db as _db
+
         feature_dir = Path(project_root) / "pathly" / "plans" / topic
         if not feature_dir.exists():
             return
@@ -127,18 +129,40 @@ def _reconciliation_window(
         if arrived:
             data = run.pty_result or {}
             billing_record = data.get("result") or {}
-            cost_usd = float((billing_record.get("cost_usd") or 0.0) if isinstance(billing_record, dict) else 0.0)
-            tokens_in = int((billing_record.get("tokens_in") or 0) if isinstance(billing_record, dict) else 0)
-            tokens_out = int((billing_record.get("tokens_out") or 0) if isinstance(billing_record, dict) else 0)
-            tool_uses = int((billing_record.get("tool_uses") or 0) if isinstance(billing_record, dict) else 0)
+            cost_usd = float(
+                (billing_record.get("cost_usd") or 0.0)
+                if isinstance(billing_record, dict)
+                else 0.0
+            )
+            tokens_in = int(
+                (billing_record.get("tokens_in") or 0)
+                if isinstance(billing_record, dict)
+                else 0
+            )
+            tokens_out = int(
+                (billing_record.get("tokens_out") or 0)
+                if isinstance(billing_record, dict)
+                else 0
+            )
+            tool_uses = int(
+                (billing_record.get("tool_uses") or 0)
+                if isinstance(billing_record, dict)
+                else 0
+            )
             wall_seconds = int(data.get("wall_seconds") or 0)
             try:
                 _patch_last_agent_done(
                     Path(events_path).parent,
-                    cost_usd, tokens_in, tokens_out, wall_seconds, tool_uses,
+                    cost_usd,
+                    tokens_in,
+                    tokens_out,
+                    wall_seconds,
+                    tool_uses,
                 )
             except Exception as exc:
-                logger.warning("_reconciliation_window: _patch_last_agent_done failed: %s", exc)
+                logger.warning(
+                    "_reconciliation_window: _patch_last_agent_done failed: %s", exc
+                )
         else:
             try:
                 _eventlog.append_event(
@@ -171,7 +195,11 @@ def _run_stage_via_terminal(
     import datetime
     from pathly_orchestrator.events import TYPE_STAGE_INTERACTIVE_DONE
     from pathly_orchestrator.feature_flags import FeatureFlags
-    from pathly_orchestrator.runner import resolve_argv, resolve_interactive_argv, read_last_agent_done
+    from pathly_orchestrator.runner import (
+        resolve_argv,
+        resolve_interactive_argv,
+        read_last_agent_done,
+    )
 
     feature_flags = FeatureFlags()
     use_interactive = state.interactive
@@ -185,9 +213,18 @@ def _run_stage_via_terminal(
         raise RuntimeError(msg)
 
     if use_interactive:
-        argv = resolve_interactive_argv(adapter, model, session=session, autonomy=autonomy)
+        argv = resolve_interactive_argv(
+            adapter, model, session=session, autonomy=autonomy
+        )
     else:
-        argv = resolve_argv(adapter, instructions, model, session=session, autonomy=autonomy, interactive=False)
+        argv = resolve_argv(
+            adapter,
+            instructions,
+            model,
+            session=session,
+            autonomy=autonomy,
+            interactive=False,
+        )
 
     tab_id = f"runner-{run_id[-10:]}"
     label = f"{adapter} — {state.current_state or state.status}"
@@ -235,14 +272,17 @@ def _run_stage_via_terminal(
             last_seq = 0
             try:
                 from pathly_orchestrator import db as _db
+
                 _db_conn = _db.get_db()
                 row = _db_conn.execute(
                     "SELECT MAX(seq) FROM fsm_events WHERE project_root=? AND feature=?",
-                    (state.project_root, feature)
+                    (state.project_root, feature),
                 ).fetchone()
                 last_seq = row[0] or 0
             except Exception as exc:
-                logger.warning("_run_stage_via_terminal: could not read last_seq: %s", exc)
+                logger.warning(
+                    "_run_stage_via_terminal: could not read last_seq: %s", exc
+                )
 
             watcher_t = threading.Thread(
                 target=_agent_done_watcher,
@@ -263,7 +303,9 @@ def _run_stage_via_terminal(
                 )
 
             if outcome == "agent_done":
-                storage_path = Path(state.project_root) / "pathly" / "plans" / state.topic
+                storage_path = (
+                    Path(state.project_root) / "pathly" / "plans" / state.topic
+                )
                 agent_done_data = read_last_agent_done(storage_path) or {}
                 result_for_fsm = {
                     "cost_usd": agent_done_data.get("cost_usd", 0.0),
@@ -272,26 +314,34 @@ def _run_stage_via_terminal(
                 }
 
                 if broadcast_fn:
-                    broadcast_fn(state.topic, {
-                        "type": "TERMINAL_AGENT_DONE",
-                        "tab_id": tab_id,
-                        "run_id": run_id,
-                        "ts": datetime.datetime.now(datetime.timezone.utc).strftime(
-                            "%Y-%m-%dT%H:%M:%SZ"
-                        ),
-                    })
-
-                if use_interactive:
-                    if broadcast_fn:
-                        broadcast_fn(state.topic, {
-                            "type": "TERMINAL_KILL",
+                    broadcast_fn(
+                        state.topic,
+                        {
+                            "type": "TERMINAL_AGENT_DONE",
                             "tab_id": tab_id,
                             "run_id": run_id,
                             "ts": datetime.datetime.now(datetime.timezone.utc).strftime(
                                 "%Y-%m-%dT%H:%M:%SZ"
                             ),
-                        })
-                    now_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                        },
+                    )
+
+                if use_interactive:
+                    if broadcast_fn:
+                        broadcast_fn(
+                            state.topic,
+                            {
+                                "type": "TERMINAL_KILL",
+                                "tab_id": tab_id,
+                                "run_id": run_id,
+                                "ts": datetime.datetime.now(
+                                    datetime.timezone.utc
+                                ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            },
+                        )
+                    now_ts = datetime.datetime.now(datetime.timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    )
                     try:
                         _eventlog.append_event(
                             str(feature_dir),
@@ -303,13 +353,21 @@ def _run_stage_via_terminal(
                             },
                         )
                     except Exception as exc:
-                        logger.warning("_run_stage_via_terminal: failed to write STAGE_INTERACTIVE_DONE: %s", exc)
+                        logger.warning(
+                            "_run_stage_via_terminal: failed to write STAGE_INTERACTIVE_DONE: %s",
+                            exc,
+                        )
                     drop_run(run_id)
                 else:
                     events_path_for_recon = str(feature_dir / "EVENTS.jsonl")
                     recon_t = threading.Thread(
                         target=_reconciliation_window,
-                        args=(run, state.current_state, state.topic, events_path_for_recon),
+                        args=(
+                            run,
+                            state.current_state,
+                            state.topic,
+                            events_path_for_recon,
+                        ),
                         daemon=True,
                         name=f"recon-window-{run_id}",
                     )

@@ -18,7 +18,7 @@ def agent_files(tmp_path):
         "can_spawn: [quick]\n"
         "spawn_section: |\n"
         "  ## Sub-agent invocation\n"
-        "  Agent(subagent_type=\"quick\", prompt=\"...\")\n",
+        '  Agent(subagent_type="quick", prompt="...")\n',
         encoding="utf-8",
     )
     return core, meta

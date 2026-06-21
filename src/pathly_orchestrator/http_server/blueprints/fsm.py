@@ -1,4 +1,5 @@
 """FSM next_action and complete_stage endpoints."""
+
 from __future__ import annotations
 
 import logging
@@ -43,6 +44,7 @@ def next_action_endpoint():
         # Import lazily through the package namespace so tests can patch
         # pathly_orchestrator.http_server.next_action and have it take effect.
         import pathly_orchestrator.http_server as _hs
+
         result = _hs.next_action(data)
         if isinstance(result.get("menu"), dict):
             _push_menu_to_sse(result["menu"])
@@ -85,6 +87,7 @@ def complete_stage_endpoint():
                 )
 
         import pathly_orchestrator.http_server as _hs
+
         result = _hs.complete_stage(data)
         if isinstance(result.get("menu"), dict):
             _push_menu_to_sse(result["menu"])

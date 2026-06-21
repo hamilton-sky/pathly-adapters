@@ -1,4 +1,5 @@
 """Query helpers for the fsm_events table."""
+
 from __future__ import annotations
 
 import json

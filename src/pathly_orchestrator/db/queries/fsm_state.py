@@ -1,4 +1,5 @@
 """Query helpers for the fsm_state table."""
+
 from __future__ import annotations
 
 import json
@@ -59,5 +60,7 @@ def read_all_states(conn: sqlite3.Connection, project_root: str) -> list[dict]:
             state = json.loads(r["state_json"])
         except (json.JSONDecodeError, TypeError):
             state = {}
-        out.append({"feature": r["feature"], "state": state, "updated_at": r["updated_at"]})
+        out.append(
+            {"feature": r["feature"], "state": state, "updated_at": r["updated_at"]}
+        )
     return out

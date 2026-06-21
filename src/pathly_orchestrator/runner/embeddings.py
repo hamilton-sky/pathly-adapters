@@ -4,6 +4,7 @@ Lazy-loads SentenceTransformer('all-MiniLM-L6-v2') on first use.
 If sentence-transformers is not installed, embed() returns None and
 all callers fall back to recency-based retrieval.
 """
+
 from __future__ import annotations
 
 import threading
@@ -24,6 +25,7 @@ def _load_model():
     _model_load_attempted = True
     try:
         from sentence_transformers import SentenceTransformer
+
         _model = SentenceTransformer("all-MiniLM-L6-v2")
     except Exception:
         _model = None
@@ -43,6 +45,7 @@ def embed(text: str) -> list[float] | None:
 
 def embed_async(message_id: str, text: str) -> None:
     """Compute the embedding for *text* in a daemon thread and store it."""
+
     def _worker():
         vector = embed(text)
         if vector is None:
@@ -50,7 +53,10 @@ def embed_async(message_id: str, text: str) -> None:
         try:
             from pathly_orchestrator.db.connection import get_db
             from pathly_orchestrator.db.queries.comms import store_embedding
-            store_embedding(get_db(), message_id, vector, chunk_index=0, chunk_text=text)
+
+            store_embedding(
+                get_db(), message_id, vector, chunk_index=0, chunk_text=text
+            )
         except Exception:
             pass
 

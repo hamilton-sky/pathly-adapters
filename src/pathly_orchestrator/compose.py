@@ -1,4 +1,5 @@
 """Shim — re-exports from pathly_orchestrator.skills.compose for backward compat."""
+
 from pathly_orchestrator.skills.compose import *  # noqa: F401, F403
 from pathly_orchestrator.skills.compose import (  # noqa: F401
     load_manifest,

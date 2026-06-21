@@ -9,10 +9,10 @@ from .storage import ACTIVITY_FILE
 
 # Same prefix table as telemetry.py — infer adapter from model for legacy entries.
 _ADAPTER_PREFIXES: list[tuple[tuple[str, ...], str]] = [
-    (("claude-",),                   "claude"),
+    (("claude-",), "claude"),
     (("gpt-", "o1-", "o3-", "o4-"), "codex"),
-    (("gemini-",),                   "google"),
-    (("copilot-",),                  "copilot"),
+    (("gemini-",), "google"),
+    (("copilot-",), "copilot"),
 ]
 
 
@@ -75,26 +75,32 @@ def main() -> None:
         by_adapter[adapter]["tokens_in"] += e.get("input_tokens", 0)
         by_adapter[adapter]["tokens_out"] += e.get("output_tokens", 0)
 
-    if len(by_adapter) > 1 or (len(by_adapter) == 1 and list(by_adapter.keys())[0] not in ("—", "unknown")):
+    if len(by_adapter) > 1 or (
+        len(by_adapter) == 1 and list(by_adapter.keys())[0] not in ("—", "unknown")
+    ):
         print("\n  >> By adapter / CLI")
-        print(f"    {'Adapter':<14} {'Runs':>5}  {'Cost (USD)':>12}  {'Tokens In':>10}  {'Tokens Out':>10}")
+        print(
+            f"    {'Adapter':<14} {'Runs':>5}  {'Cost (USD)':>12}  {'Tokens In':>10}  {'Tokens Out':>10}"
+        )
         print(f"    {'-'*12}  {'-'*5}  {'-'*12}  {'-'*10}  {'-'*10}")
         for adapter, stats in sorted(by_adapter.items()):
             cost_str = f"${stats['cost_usd']:.4f}" if stats["cost_usd"] else "n/a"
-            tok_in   = f"{stats['tokens_in']:,}" if stats["tokens_in"] else "n/a"
-            tok_out  = f"{stats['tokens_out']:,}" if stats["tokens_out"] else "n/a"
-            print(f"    {adapter:<14} {stats['runs']:>5}  {cost_str:>12}  {tok_in:>10}  {tok_out:>10}")
+            tok_in = f"{stats['tokens_in']:,}" if stats["tokens_in"] else "n/a"
+            tok_out = f"{stats['tokens_out']:,}" if stats["tokens_out"] else "n/a"
+            print(
+                f"    {adapter:<14} {stats['runs']:>5}  {cost_str:>12}  {tok_in:>10}  {tok_out:>10}"
+            )
 
     # -- Per-feature detail -----------------------------------------------------
     total_in_all = total_out_all = 0.0
     total_cost_all = 0.0
 
     for feature, events in sorted(by_feature.items()):
-        feat_in   = sum(e.get("input_tokens",  0)   for e in events)
-        feat_out  = sum(e.get("output_tokens", 0)   for e in events)
-        feat_cost = sum(e.get("cost_usd",      0.0) for e in events)
-        total_in_all   += feat_in
-        total_out_all  += feat_out
+        feat_in = sum(e.get("input_tokens", 0) for e in events)
+        feat_out = sum(e.get("output_tokens", 0) for e in events)
+        feat_cost = sum(e.get("cost_usd", 0.0) for e in events)
+        total_in_all += feat_in
+        total_out_all += feat_out
         total_cost_all += feat_cost
 
         print(f"\n  >> {feature}  ({len(events)} run(s))")
@@ -103,21 +109,20 @@ def main() -> None:
             f"{'In':>7} {'Out':>7} {'Cost':>9}  Summary"
         )
         print(
-            f"    {'-'*16}  {'-'*8}  {'-'*14}  "
-            f"{'-'*7}  {'-'*7}  {'-'*9}  {'-'*24}"
+            f"    {'-'*16}  {'-'*8}  {'-'*14}  " f"{'-'*7}  {'-'*7}  {'-'*9}  {'-'*24}"
         )
 
         for e in sorted(events, key=lambda x: x.get("ts", "")):
-            ts      = (e.get("ts", "") or "")[:16].replace("T", " ")
+            ts = (e.get("ts", "") or "")[:16].replace("T", " ")
             adapter = _adapter_for(e)[:8]
-            agent   = (e.get("agent", "?"))[:14]
-            inp     = e.get("input_tokens",  0)
-            out     = e.get("output_tokens", 0)
-            cost    = e.get("cost_usd",      0.0)
+            agent = (e.get("agent", "?"))[:14]
+            inp = e.get("input_tokens", 0)
+            out = e.get("output_tokens", 0)
+            cost = e.get("cost_usd", 0.0)
             summary = (e.get("summary", "") or "")[:36]
-            tok_in  = f"{inp:,}"     if inp  else "n/a"
-            tok_out = f"{out:,}"     if out  else "n/a"
-            cost_s  = f"${cost:.4f}" if cost else "n/a"
+            tok_in = f"{inp:,}" if inp else "n/a"
+            tok_out = f"{out:,}" if out else "n/a"
+            cost_s = f"${cost:.4f}" if cost else "n/a"
             print(
                 f"    {ts:<18} {adapter:<10} {agent:<16} "
                 f"{tok_in:>7}  {tok_out:>7}  {cost_s:>9}  {summary}"

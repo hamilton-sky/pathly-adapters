@@ -98,7 +98,9 @@ def _request_json(
 
 def _health_ok(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> bool:
     try:
-        payload = _request_json("GET", _HEALTH_PATH, None, host=host, port=port, timeout=1.0)
+        payload = _request_json(
+            "GET", _HEALTH_PATH, None, host=host, port=port, timeout=1.0
+        )
     except Exception:
         return False
     return payload.get("status") == "ok"
@@ -107,6 +109,7 @@ def _health_ok(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> bool:
 def _pid_file() -> Path:
     try:
         import platformdirs
+
         cache_dir = Path(platformdirs.user_cache_dir("pathly"))
     except ImportError:
         cache_dir = Path.home() / ".cache" / "pathly"
@@ -150,7 +153,9 @@ def _start_server(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None
         ) from exc
 
 
-def ensure_server_running(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
+def ensure_server_running(
+    *, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT
+) -> None:
     if _health_ok(host=host, port=port):
         return
 
@@ -170,6 +175,7 @@ def _inprocess(fn_name: str, payload: dict) -> dict:
     server is unreachable. fsm_ops reads the fsm_state DB and falls back to the
     STATE.json mirror, so next-action / complete-stage still work with no server."""
     from pathly_orchestrator import fsm_ops
+
     return getattr(fsm_ops, fn_name)(payload)
 
 
@@ -194,7 +200,9 @@ def complete_stage(
 ) -> dict:
     try:
         ensure_server_running(host=host, port=port)
-        return _request_json("POST", _COMPLETE_STAGE_PATH, payload, host=host, port=port)
+        return _request_json(
+            "POST", _COMPLETE_STAGE_PATH, payload, host=host, port=port
+        )
     except _ServerUnreachable:
         return _inprocess("complete_stage", payload)
 
@@ -232,8 +240,12 @@ def _filter_none(values: dict[str, object | None]) -> dict[str, object]:
 
 
 def _add_common_net_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--host", default=DEFAULT_HOST, help="FSM host (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="FSM port (default: 8765)")
+    parser.add_argument(
+        "--host", default=DEFAULT_HOST, help="FSM host (default: 127.0.0.1)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=DEFAULT_PORT, help="FSM port (default: 8765)"
+    )
 
 
 def _main_next_action(args: argparse.Namespace) -> int:
@@ -244,7 +256,9 @@ def _main_next_action(args: argparse.Namespace) -> int:
     }
     try:
         ensure_server_running(host=args.host, port=args.port)
-        raw = _request_raw("POST", _NEXT_ACTION_PATH, payload, host=args.host, port=args.port)
+        raw = _request_raw(
+            "POST", _NEXT_ACTION_PATH, payload, host=args.host, port=args.port
+        )
     except _ServerUnreachable:
         # Degrade to in-process FSM so the pipeline isn't blocked by a down server.
         print(json.dumps(_inprocess("next_action", payload)))
@@ -254,16 +268,20 @@ def _main_next_action(args: argparse.Namespace) -> int:
 
 
 def _main_complete_stage(args: argparse.Namespace) -> int:
-    payload = _filter_none({
-        "flow": args.flow,
-        "topic": args.topic,
-        "project_root": args.project_root,
-        "decision": args.decision,
-        "resolved_files": args.resolved_file or None,
-    })
+    payload = _filter_none(
+        {
+            "flow": args.flow,
+            "topic": args.topic,
+            "project_root": args.project_root,
+            "decision": args.decision,
+            "resolved_files": args.resolved_file or None,
+        }
+    )
     try:
         ensure_server_running(host=args.host, port=args.port)
-        raw = _request_raw("POST", _COMPLETE_STAGE_PATH, payload, host=args.host, port=args.port)
+        raw = _request_raw(
+            "POST", _COMPLETE_STAGE_PATH, payload, host=args.host, port=args.port
+        )
     except _ServerUnreachable:
         print(json.dumps(_inprocess("complete_stage", payload)))
         return 0
@@ -386,12 +404,16 @@ def main() -> None:
     record_phase_parser.add_argument("--agent", required=True)
     record_phase_parser.add_argument("--phase", required=True)
     record_phase_parser.add_argument(
-        "--event-type", required=True, dest="event_type",
+        "--event-type",
+        required=True,
+        dest="event_type",
         choices=["PHASE_START", "PHASE_DONE"],
     )
     record_phase_parser.add_argument("--conv", type=int, default=None)
     record_phase_parser.add_argument("--summary", default=None)
-    record_phase_parser.add_argument("--project-root", default=None, dest="project_root")
+    record_phase_parser.add_argument(
+        "--project-root", default=None, dest="project_root"
+    )
     _add_common_net_args(record_phase_parser)
     record_phase_parser.set_defaults(func=_main_record_phase)
 

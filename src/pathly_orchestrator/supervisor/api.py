@@ -24,10 +24,13 @@ def start_run(
 ) -> RunnerState:
     """Start a new supervised run for *topic*.  Raises ValueError if already active."""
     import uuid as _uuid
+
     with _lock:
         existing = _registry.get(topic)
         if existing and existing.status in {"running", "paused", "awaiting_decision"}:
-            raise ValueError(f"Run for topic {topic!r} is already active (status={existing.status})")
+            raise ValueError(
+                f"Run for topic {topic!r} is already active (status={existing.status})"
+            )
 
         state = RunnerState(
             topic=topic,
@@ -61,6 +64,7 @@ def start_run(
             logger.warning("broadcast_fn error: %s", exc)
 
     from .orchestrator import _loop
+
     t = threading.Thread(
         target=_loop,
         args=(state, broadcast_fn),
@@ -128,7 +132,9 @@ def supply_decision(topic: str, decision: str) -> None:
         if state is None:
             raise KeyError(topic)
         if state.status != "awaiting_decision":
-            raise ValueError(f"Topic {topic!r} is not awaiting a decision (status={state.status})")
+            raise ValueError(
+                f"Topic {topic!r} is not awaiting a decision (status={state.status})"
+            )
         state._decision = decision
         state._decision_event.set()
 

@@ -1,4 +1,5 @@
 """Query helpers for the feedback_items table."""
+
 from __future__ import annotations
 
 import sqlite3

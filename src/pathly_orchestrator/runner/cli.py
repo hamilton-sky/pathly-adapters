@@ -25,6 +25,7 @@ def handle_decide(
     interactive: bool = True,
 ) -> dict:
     from pathly_orchestrator import runner as _mod
+
     if not interactive:
         raise RuntimeError("interactive decision required but running headless")
     print(f"\n? {response['question']}")
@@ -54,6 +55,7 @@ def resolve_stage(
     storage_path: Path | None = None,
 ) -> dict:
     from pathly_orchestrator import runner as _mod
+
     resolved: list[str] = []
     feedback_rounds = 0
     MAX_FEEDBACK_ROUNDS = 3
@@ -130,6 +132,7 @@ def run_flow(
     timeout: int = 600,
 ) -> int:
     from pathly_orchestrator import runner as _mod
+
     print(f"── pathly-run ──  flow={flow}  topic={topic}  project_root={project_root}")
     storage = _mod._storage_path(flow, project_root, topic)
 

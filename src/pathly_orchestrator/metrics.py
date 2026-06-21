@@ -7,6 +7,7 @@ Usage:
     from pathly_orchestrator.metrics import _collector
     snap = _collector.snapshot()  # returns a plain dict
 """
+
 from __future__ import annotations
 
 import threading
@@ -14,11 +15,13 @@ import threading
 from pathly_orchestrator.event_bus import _bus
 
 # Backwards transitions that represent rework cycles.
-_REWORK_EDGES: frozenset[tuple[str, str]] = frozenset({
-    ("REVIEWING", "BUILDING"),
-    ("TESTING",   "REVIEWING"),
-    ("TESTING",   "BUILDING"),
-})
+_REWORK_EDGES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("REVIEWING", "BUILDING"),
+        ("TESTING", "REVIEWING"),
+        ("TESTING", "BUILDING"),
+    }
+)
 
 
 class MetricsCollector:
@@ -41,21 +44,21 @@ class MetricsCollector:
         # Gate-failure count.
         self.gate_failures: int = 0
 
-        _bus.subscribe("AGENT_DONE",       self._on_agent_done)
+        _bus.subscribe("AGENT_DONE", self._on_agent_done)
         _bus.subscribe("STATE_TRANSITION", self._on_state_transition)
-        _bus.subscribe("GATE_FAILED",      self._on_gate_failed)
+        _bus.subscribe("GATE_FAILED", self._on_gate_failed)
 
     def _on_agent_done(self, data: dict) -> None:
         with self._lock:
-            self.cost_usd   += float(data.get("cost_usd")    or 0.0)
-            self.tokens_in  += int(data.get("tokens_in")     or 0)
-            self.tokens_out += int(data.get("tokens_out")    or 0)
+            self.cost_usd += float(data.get("cost_usd") or 0.0)
+            self.tokens_in += int(data.get("tokens_in") or 0)
+            self.tokens_out += int(data.get("tokens_out") or 0)
             agent = str(data.get("agent") or "unknown")
             self.agent_invocations[agent] = self.agent_invocations.get(agent, 0) + 1
 
     def _on_state_transition(self, data: dict) -> None:
         frm = str(data.get("from") or "")
-        to  = str(data.get("to")   or "")
+        to = str(data.get("to") or "")
         with self._lock:
             if to:
                 self.stage_visits[to] = self.stage_visits.get(to, 0) + 1
@@ -75,16 +78,16 @@ class MetricsCollector:
         """Thread-safe point-in-time snapshot of all counters."""
         with self._lock:
             return {
-                "cost_usd":           round(self.cost_usd, 4),
-                "tokens_in":          self.tokens_in,
-                "tokens_out":         self.tokens_out,
-                "pipelines_started":  self.pipelines_started,
-                "pipelines_done":     self.pipelines_done,
-                "pipelines_errored":  self.pipelines_errored,
-                "feedback_loops":     self.feedback_loops,
-                "gate_failures":      self.gate_failures,
-                "stage_visits":       dict(self.stage_visits),
-                "agent_invocations":  dict(self.agent_invocations),
+                "cost_usd": round(self.cost_usd, 4),
+                "tokens_in": self.tokens_in,
+                "tokens_out": self.tokens_out,
+                "pipelines_started": self.pipelines_started,
+                "pipelines_done": self.pipelines_done,
+                "pipelines_errored": self.pipelines_errored,
+                "feedback_loops": self.feedback_loops,
+                "gate_failures": self.gate_failures,
+                "stage_visits": dict(self.stage_visits),
+                "agent_invocations": dict(self.agent_invocations),
             }
 
 

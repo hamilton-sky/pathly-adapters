@@ -1,4 +1,5 @@
 """Query helpers for the flow_definitions table."""
+
 from __future__ import annotations
 
 import json
@@ -19,17 +20,34 @@ _log = logging.getLogger(__name__)
 
 # Top-level flow keys that are decomposed into node/edge rows — everything ELSE is
 # carried verbatim as flow-level config (so new/custom keys round-trip losslessly).
-_STRUCTURAL_FLOW_KEYS = frozenset({
-    "states", "transitions", "agent_map", "role_map", "skill_map", "adapter_map",
-    "transition_rules", "composition", "transition_actions", "gates",
-})
+_STRUCTURAL_FLOW_KEYS = frozenset(
+    {
+        "states",
+        "transitions",
+        "agent_map",
+        "role_map",
+        "skill_map",
+        "adapter_map",
+        "transition_rules",
+        "composition",
+        "transition_actions",
+        "gates",
+    }
+)
 
 # Flow-level keys explicitly reconstructed by _assemble_from_parts; the pass-through
 # at the end restores any OTHER flow_level_config key (escalation_routing, custom keys).
-_ASSEMBLED_FLOW_KEYS = frozenset({
-    "version", "flow", "storage_path", "feedback_routing", "scope_gate",
-    "_comments", "adapter_default",
-})
+_ASSEMBLED_FLOW_KEYS = frozenset(
+    {
+        "version",
+        "flow",
+        "storage_path",
+        "feedback_routing",
+        "scope_gate",
+        "_comments",
+        "adapter_default",
+    }
+)
 
 
 def _decompose_flow_dict(flow_dict: dict) -> tuple[dict, list[dict], list[dict]]:
@@ -82,17 +100,21 @@ def _decompose_flow_dict(flow_dict: dict) -> tuple[dict, list[dict], list[dict]]
 
         per_state_adapter = adapter_map.get(state)
 
-        node_rows.append({
-            "node_id": state,
-            "node_type": "state",
-            "position": position,
-            "agent": agent_map.get(state),
-            "role": role_map.get(state),
-            "adapter": per_state_adapter,
-            "skill": skill_map.get(state),
-            "is_terminal": is_terminal,
-            "config_json": json.dumps(node_cfg, ensure_ascii=False) if node_cfg else None,
-        })
+        node_rows.append(
+            {
+                "node_id": state,
+                "node_type": "state",
+                "position": position,
+                "agent": agent_map.get(state),
+                "role": role_map.get(state),
+                "adapter": per_state_adapter,
+                "skill": skill_map.get(state),
+                "is_terminal": is_terminal,
+                "config_json": (
+                    json.dumps(node_cfg, ensure_ascii=False) if node_cfg else None
+                ),
+            }
+        )
 
     edge_rows: list[dict] = []
     for state in states:
@@ -108,12 +130,16 @@ def _decompose_flow_dict(flow_dict: dict) -> tuple[dict, list[dict], list[dict]]
             edge_gates = gates.get(edge_key)
             if edge_gates is not None:
                 edge_cfg["gates"] = edge_gates
-            edge_rows.append({
-                "source_node": state,
-                "target_node": target,
-                "ordinal": ordinal,
-                "config_json": json.dumps(edge_cfg, ensure_ascii=False) if edge_cfg else None,
-            })
+            edge_rows.append(
+                {
+                    "source_node": state,
+                    "target_node": target,
+                    "ordinal": ordinal,
+                    "config_json": (
+                        json.dumps(edge_cfg, ensure_ascii=False) if edge_cfg else None
+                    ),
+                }
+            )
 
     return flow_level_config, node_rows, edge_rows
 
@@ -124,7 +150,8 @@ def _assemble_from_parts(
     edge_rows: list[dict],
 ) -> dict:
     """Pure inverse of _decompose_flow_dict. Uses in-memory row lists.
-    Used by the round-trip test in Phase 1 and called by _assemble_flow_dict in Phase 2."""
+    Used by the round-trip test in Phase 1 and called by _assemble_flow_dict in Phase 2.
+    """
     result: dict = {}
 
     # Scalar flow-level fields
@@ -174,9 +201,7 @@ def _assemble_from_parts(
 
     # adapter_map: per-state entries + optional default from flow_level_config
     per_state_adapters = {
-        r["node_id"]: r["adapter"]
-        for r in sorted_nodes
-        if r.get("adapter") is not None
+        r["node_id"]: r["adapter"] for r in sorted_nodes if r.get("adapter") is not None
     }
     adapter_default = flow_level_config.get("adapter_default")
     if per_state_adapters or adapter_default is not None:
@@ -259,6 +284,7 @@ def _assemble_from_parts(
 # DB-backed read helpers
 # ---------------------------------------------------------------------------
 
+
 def read_flow_nodes(conn: sqlite3.Connection, flow_def_id: int) -> list[dict]:
     """Return all node rows for a flow, ordered by position."""
     rows = conn.execute(
@@ -335,6 +361,7 @@ def _assemble_flow_dict(
 # Core upsert / query functions
 # ---------------------------------------------------------------------------
 
+
 def upsert_flow_definition(
     conn: sqlite3.Connection,
     project_root,
@@ -366,9 +393,14 @@ def upsert_flow_definition(
         flow_dict = yaml.safe_load(flow_yaml)
         if isinstance(flow_dict, dict):
             flow_level_cfg, nodes, edges = _decompose_flow_dict(flow_dict)
-            replace_flow_graph(conn, flow_def_id, flow_level_cfg, nodes, edges, commit=True)
+            replace_flow_graph(
+                conn, flow_def_id, flow_level_cfg, nodes, edges, commit=True
+            )
     except Exception:
-        _log.warning("upsert_flow_definition: decomposition failed for '%s', blob stored as fallback", name)
+        _log.warning(
+            "upsert_flow_definition: decomposition failed for '%s', blob stored as fallback",
+            name,
+        )
 
     return flow_def_id
 
@@ -386,23 +418,25 @@ def read_flow_definitions(conn: sqlite3.Connection, project_root=None) -> list[d
     return [dict(r) for r in rows]
 
 
-def read_flow_by_name(conn: sqlite3.Connection, name: str, project_root=None) -> dict | None:
+def read_flow_by_name(
+    conn: sqlite3.Connection, name: str, project_root=None
+) -> dict | None:
     """Return a single flow definition by name, or None if not found."""
     if project_root is not None:
         row = conn.execute(
             "SELECT * FROM flow_definitions WHERE name=? AND project_root=?",
-            (name, project_root)
+            (name, project_root),
         ).fetchone()
     else:
         row = conn.execute(
             "SELECT * FROM flow_definitions WHERE name=? AND project_root IS NULL",
-            (name,)
+            (name,),
         ).fetchone()
         if row is None:
             # Fallback: any flow with this name
             row = conn.execute(
                 "SELECT * FROM flow_definitions WHERE name=? ORDER BY project_root IS NULL DESC LIMIT 1",
-                (name,)
+                (name,),
             ).fetchone()
     return dict(row) if row else None
 
@@ -412,6 +446,7 @@ def _refresh_flows(conn: sqlite3.Connection) -> None:
     Called on every server start to keep DB in sync with filesystem.
     """
     from .catalog_items import _find_data_root
+
     data_root = _find_data_root()
     if data_root is None:
         return

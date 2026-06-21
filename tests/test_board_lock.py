@@ -1,4 +1,5 @@
 """Tests for the per-board run-lock (BOARD-RUNTIME-SPEC A2/D1)."""
+
 from __future__ import annotations
 
 import threading
@@ -43,8 +44,8 @@ def test_release_with_wrong_run_id_is_refused():
 
 def test_distinct_boards_are_independent():
     assert board_lock.acquire("feature", "f1", "r1") is True
-    assert board_lock.acquire("feature", "f2", "r2") is True       # different scope
-    assert board_lock.acquire("global", "global", "r3") is True    # different board
+    assert board_lock.acquire("feature", "f2", "r2") is True  # different scope
+    assert board_lock.acquire("global", "global", "r3") is True  # different board
     assert board_lock.holder("feature", "f1") == "r1"
     assert board_lock.holder("feature", "f2") == "r2"
 

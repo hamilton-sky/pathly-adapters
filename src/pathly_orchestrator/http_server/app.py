@@ -1,4 +1,5 @@
 """Flask application factory and main entry point."""
+
 from __future__ import annotations
 
 import sys
@@ -65,9 +66,12 @@ def main() -> None:
 
     # Update the middleware module globals (where the values actually live)
     from pathly_orchestrator.http_server import middleware as _middleware
+
     _middleware._RATE_LIMIT_MAX = settings.rate_limit_max
     _middleware._RATE_LIMIT_WINDOW = settings.rate_limit_window
-    _middleware.configure(cors_origin=settings.cors_origin, api_secret=settings.api_secret)
+    _middleware.configure(
+        cors_origin=settings.cors_origin, api_secret=settings.api_secret
+    )
     # Also keep the package-level names in sync for backward compat
     _self._RATE_LIMIT_MAX = settings.rate_limit_max
     _self._RATE_LIMIT_WINDOW = settings.rate_limit_window
@@ -80,8 +84,8 @@ def main() -> None:
     logger.info("  GET  %s:%s/events/stream?topic=TOPIC&project_root=PATH", host, port)
 
     # Instantiate pipeline-level subscribers (EventBus side-effects on import).
-    import pathly_orchestrator.metrics   # noqa: F401
-    import pathly_orchestrator.webhook   # noqa: F401
+    import pathly_orchestrator.metrics  # noqa: F401
+    import pathly_orchestrator.webhook  # noqa: F401
 
     project_root = settings.project_root
     _watcher_stop = threading.Event()
@@ -93,6 +97,7 @@ def main() -> None:
     # Warm the embedding model in the background so the first POST /comms/post
     # doesn't block on the ~1-2s model load.
     from pathly_orchestrator.runner.embeddings import warm as _warm_embeddings
+
     threading.Thread(target=_warm_embeddings, daemon=True).start()
 
     # Run Flask in non-debug mode, with warnings suppressed

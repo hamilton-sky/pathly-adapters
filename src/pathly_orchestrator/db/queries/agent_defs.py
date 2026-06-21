@@ -1,4 +1,5 @@
 """Query helpers for the agent_definitions table."""
+
 from __future__ import annotations
 
 import json

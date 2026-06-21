@@ -1,4 +1,5 @@
 """Tests for pathly-observability Conv 1: /record_phase endpoint and exempt_prefixes."""
+
 from __future__ import annotations
 
 import json
@@ -6,13 +7,14 @@ from pathlib import Path
 
 import pytest
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("PATHLY_PROJECT_ROOT", str(tmp_path))
     from pathly_orchestrator.http_server import app, _rate_counters
+
     _rate_counters.clear()
     app.config["TESTING"] = True
     with app.test_client() as c:
@@ -27,22 +29,27 @@ def _feature_dir(tmp_path: Path, feature: str = "my-feature") -> Path:
 
 # ── /record_phase — valid PHASE_START ─────────────────────────────────────────
 
+
 def test_record_phase_start_valid(client):
     c, tmp_path = client
     feature_dir = _feature_dir(tmp_path)
 
-    r = c.post("/record_phase", json={
-        "feature": "my-feature",
-        "agent": "builder",
-        "phase": "implement",
-        "event_type": "PHASE_START",
-        "project_root": str(tmp_path),
-    })
+    r = c.post(
+        "/record_phase",
+        json={
+            "feature": "my-feature",
+            "agent": "builder",
+            "phase": "implement",
+            "event_type": "PHASE_START",
+            "project_root": str(tmp_path),
+        },
+    )
     assert r.status_code == 200
     data = json.loads(r.data)
     assert data == {"status": "recorded"}
 
     from pathly_orchestrator import eventlog as _eventlog
+
     events = _eventlog.read_events(str(feature_dir))
     assert len(events) == 1
     line = events[0]
@@ -58,25 +65,30 @@ def test_record_phase_start_valid(client):
 
 # ── /record_phase — valid PHASE_DONE with all optional fields ─────────────────
 
+
 def test_record_phase_done_all_optional_fields(client):
     c, tmp_path = client
     feature_dir = _feature_dir(tmp_path)
 
-    r = c.post("/record_phase", json={
-        "feature": "my-feature",
-        "agent": "builder",
-        "phase": "implement",
-        "event_type": "PHASE_DONE",
-        "conv": 2,
-        "total_tokens": 1500,
-        "tool_uses": 7,
-        "scouts_count": 3,
-        "summary": "implemented the feature",
-        "project_root": str(tmp_path),
-    })
+    r = c.post(
+        "/record_phase",
+        json={
+            "feature": "my-feature",
+            "agent": "builder",
+            "phase": "implement",
+            "event_type": "PHASE_DONE",
+            "conv": 2,
+            "total_tokens": 1500,
+            "tool_uses": 7,
+            "scouts_count": 3,
+            "summary": "implemented the feature",
+            "project_root": str(tmp_path),
+        },
+    )
     assert r.status_code == 200
 
     from pathly_orchestrator import eventlog as _eventlog
+
     events = _eventlog.read_events(str(feature_dir))
     assert len(events) == 1
     line = events[0]
@@ -90,6 +102,7 @@ def test_record_phase_done_all_optional_fields(client):
 
 
 # ── /record_phase — missing required field → 400 ──────────────────────────────
+
 
 @pytest.mark.parametrize("missing_field", ["feature", "agent", "phase", "event_type"])
 def test_record_phase_missing_required_field(client, missing_field):
@@ -113,17 +126,21 @@ def test_record_phase_missing_required_field(client, missing_field):
 
 # ── /record_phase — invalid event_type → 400 ──────────────────────────────────
 
+
 def test_record_phase_invalid_event_type(client):
     c, tmp_path = client
     _feature_dir(tmp_path)
 
-    r = c.post("/record_phase", json={
-        "feature": "my-feature",
-        "agent": "builder",
-        "phase": "implement",
-        "event_type": "AGENT_DONE",
-        "project_root": str(tmp_path),
-    })
+    r = c.post(
+        "/record_phase",
+        json={
+            "feature": "my-feature",
+            "agent": "builder",
+            "phase": "implement",
+            "event_type": "AGENT_DONE",
+            "project_root": str(tmp_path),
+        },
+    )
     assert r.status_code == 400
     data = json.loads(r.data)
     assert "error" in data
@@ -132,17 +149,21 @@ def test_record_phase_invalid_event_type(client):
 
 # ── /record_phase — invalid phase value → 400 ─────────────────────────────────
 
+
 def test_record_phase_invalid_phase(client):
     c, tmp_path = client
     _feature_dir(tmp_path)
 
-    r = c.post("/record_phase", json={
-        "feature": "my-feature",
-        "agent": "builder",
-        "phase": "deploy",
-        "event_type": "PHASE_START",
-        "project_root": str(tmp_path),
-    })
+    r = c.post(
+        "/record_phase",
+        json={
+            "feature": "my-feature",
+            "agent": "builder",
+            "phase": "deploy",
+            "event_type": "PHASE_START",
+            "project_root": str(tmp_path),
+        },
+    )
     assert r.status_code == 400
     data = json.loads(r.data)
     assert "error" in data
@@ -150,6 +171,7 @@ def test_record_phase_invalid_phase(client):
 
 
 # ── _is_exempt with exempt_prefixes in flow ───────────────────────────────────
+
 
 def test_scope_clean_extra_prefix_recognized(tmp_path, monkeypatch):
     """A path matching a YAML-defined exempt_prefix is not flagged as a violation."""
@@ -170,16 +192,22 @@ def test_scope_clean_extra_prefix_recognized(tmp_path, monkeypatch):
     def fake_run(args, **_):
         if "diff" in args:
             # src/app.py is declared; pathly/pipeline-walkthrough/ is exempt via YAML
-            return type("R", (), {
-                "returncode": 0,
-                "stdout": "src/app.py\npathly/pipeline-walkthrough/feat/artifacts/x.md\n",
-                "stderr": "",
-            })()
+            return type(
+                "R",
+                (),
+                {
+                    "returncode": 0,
+                    "stdout": "src/app.py\npathly/pipeline-walkthrough/feat/artifacts/x.md\n",
+                    "stderr": "",
+                },
+            )()
         return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
     monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)
 
-    flow_with_extra = {"scope_gate": {"exempt_prefixes": ["pathly/pipeline-walkthrough/"]}}
+    flow_with_extra = {
+        "scope_gate": {"exempt_prefixes": ["pathly/pipeline-walkthrough/"]}
+    }
     result = _scope_clean(storage, "SCOPE.md", set(), flow=flow_with_extra)
     assert result is True
 
@@ -197,11 +225,15 @@ def test_scope_clean_exempt_prefixes_absent_unchanged(tmp_path, monkeypatch):
 
     def fake_run(args, **_):
         if "diff" in args:
-            return type("R", (), {
-                "returncode": 0,
-                "stdout": "src/app.py\nsrc/SURPRISE.py\n",
-                "stderr": "",
-            })()
+            return type(
+                "R",
+                (),
+                {
+                    "returncode": 0,
+                    "stdout": "src/app.py\nsrc/SURPRISE.py\n",
+                    "stderr": "",
+                },
+            )()
         return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
     monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)
@@ -224,11 +256,15 @@ def test_scope_clean_hardcoded_defaults_still_exempt(tmp_path, monkeypatch):
 
     def fake_run(args, **_):
         if "diff" in args:
-            return type("R", (), {
-                "returncode": 0,
-                "stdout": "src/app.py\npathly/plans/feat/EVENTS.jsonl\nstudio/build.tsbuildinfo\n",
-                "stderr": "",
-            })()
+            return type(
+                "R",
+                (),
+                {
+                    "returncode": 0,
+                    "stdout": "src/app.py\npathly/plans/feat/EVENTS.jsonl\nstudio/build.tsbuildinfo\n",
+                    "stderr": "",
+                },
+            )()
         return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
     monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)

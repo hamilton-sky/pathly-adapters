@@ -6,6 +6,7 @@ the hand-maintained composition.yaml as a bogus key (and the round-trip stripped
 all the manifest's doc comments). The route now rejects any non-skill-name key
 BEFORE touching the file, so these tests never write to the real manifest.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,6 +17,7 @@ import pytest
 @pytest.fixture()
 def client():
     from pathly_orchestrator.http_server import app
+
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
@@ -41,7 +43,9 @@ def test_export_rejects_dotted_file_path(client):
 
 
 def test_export_rejects_leading_slash(client):
-    r = client.put("/skills/export", json={"skill": "/team/build", "fragment_order": []})
+    r = client.put(
+        "/skills/export", json={"skill": "/team/build", "fragment_order": []}
+    )
     assert r.status_code == 400
 
 
@@ -52,5 +56,7 @@ def test_export_rejects_empty_skill(client):
 
 def test_export_rejects_non_string_fragment_order(client):
     """fragment_order must be a list of strings (defensive)."""
-    r = client.put("/skills/export", json={"skill": "team/build", "fragment_order": [1, 2]})
+    r = client.put(
+        "/skills/export", json={"skill": "team/build", "fragment_order": [1, 2]}
+    )
     assert r.status_code == 400

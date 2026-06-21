@@ -1,4 +1,5 @@
 """Logging, rate limiting, and metrics middleware."""
+
 from __future__ import annotations
 
 import collections
@@ -26,6 +27,8 @@ def configure(cors_origin: str, api_secret: str) -> None:
     global _cors_origin, _api_secret
     _cors_origin = cors_origin
     _api_secret = api_secret
+
+
 _rate_counters: dict[str, collections.deque] = {}
 _rate_lock = threading.Lock()
 
@@ -87,10 +90,15 @@ def _inc(key: str, amount: int | float = 1) -> None:
 def _check_rate_limit(ip: str) -> bool:
     """Return True if the request is allowed, False if rate limited."""
     import sys
+
     # Tests override _RATE_LIMIT_MAX on the package module (http_server.__init__);
     # read the effective value from there if available, otherwise use this module's value.
     _pkg = sys.modules.get("pathly_orchestrator.http_server")
-    max_val = getattr(_pkg, "_RATE_LIMIT_MAX", _RATE_LIMIT_MAX) if _pkg is not None else _RATE_LIMIT_MAX
+    max_val = (
+        getattr(_pkg, "_RATE_LIMIT_MAX", _RATE_LIMIT_MAX)
+        if _pkg is not None
+        else _RATE_LIMIT_MAX
+    )
     now = time.time()
     cutoff = now - _RATE_LIMIT_WINDOW
     with _rate_lock:
@@ -105,6 +113,7 @@ def _check_rate_limit(ip: str) -> bool:
 
 def _log_request():
     from flask import request, jsonify
+
     # Health endpoint bypasses all middleware — must respond before rate-limiting.
     if request.path == "/health":
         return None
@@ -113,10 +122,13 @@ def _log_request():
     # The browser sends this before every cross-origin POST with Content-Type: application/json.
     if request.method == "OPTIONS":
         from flask import Response as _Resp
+
         resp = _Resp()
         if _cors_origin:
             resp.headers["Access-Control-Allow-Origin"] = _cors_origin
-            resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Pathly-Secret"
+            resp.headers["Access-Control-Allow-Headers"] = (
+                "Content-Type, X-Pathly-Secret"
+            )
             resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return resp
 
@@ -125,6 +137,7 @@ def _log_request():
         token = request.headers.get("X-Pathly-Secret") or request.args.get("token", "")
         if token != _api_secret:
             from flask import jsonify as _jsonify
+
             return _jsonify({"error": "unauthorized"}), 401
 
     if flags.rate_limiting and not _check_rate_limit(request.remote_addr or "unknown"):
@@ -146,6 +159,7 @@ def _log_request():
 
 def _log_response(response):
     from flask import request
+
     request_id = request.environ.get("REQUEST_ID", "")
     logger.info(
         "response", extra={"request_id": request_id, "status": response.status_code}
@@ -154,6 +168,8 @@ def _log_response(response):
         _inc("pathly_request_errors_total")
     if _cors_origin:
         response.headers["Access-Control-Allow-Origin"] = _cors_origin
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Pathly-Secret"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, X-Pathly-Secret"
+        )
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response

@@ -32,6 +32,7 @@ def _patch_last_agent_done(
     try:
         from pathly_orchestrator.db import get_db as _get_db
         from pathly_orchestrator.db import read_last_agent_done as _db_read_last
+
         conn = _get_db()
         feature = storage_path.name
         project_root = str(storage_path.parent.parent.parent)
@@ -59,6 +60,7 @@ def _patch_last_agent_done(
     # --- write BILLING_UPDATE to DB ---
     try:
         from pathly_orchestrator.eventlog import append_event as _ae
+
         _ae(str(storage_path), billing)
     except Exception as exc:
         logger.warning("_patch_last_agent_done: DB write failed: %s", exc)
@@ -72,6 +74,7 @@ def read_last_agent_done(storage_path: Path) -> dict[str, Any] | None:
     try:
         from pathly_orchestrator.db import get_db as _get_db
         from pathly_orchestrator.db import read_last_agent_done as _db_read_last
+
         conn = _get_db()
         feature = storage_path.name
         project_root = str(storage_path.parent.parent.parent)
@@ -110,7 +113,10 @@ def tail_agent_done(
                     event = json.loads(raw_line)
                 except json.JSONDecodeError:
                     continue
-                if event.get("type") == "AGENT_DONE" and event.get("ts", "") >= after_ts:
+                if (
+                    event.get("type") == "AGENT_DONE"
+                    and event.get("ts", "") >= after_ts
+                ):
                     yield event
             time.sleep(poll_interval)
         else:

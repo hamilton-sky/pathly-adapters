@@ -27,6 +27,7 @@ def _resolve_stage_supervised(
     was aborted or errored during this phase.
     """
     import pathly_orchestrator.supervisor as _sup
+
     _run_stage_via_terminal = _sup._run_stage_via_terminal
 
     resolved: list[str] = []
@@ -212,6 +213,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
     from pathly_orchestrator import fsm_http_client as fhc
     from pathly_orchestrator.adapters import resolve_command
     import pathly_orchestrator.supervisor as _sup
+
     _run_stage_via_terminal = _sup._run_stage_via_terminal
 
     flow = state.flow
@@ -447,12 +449,14 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     with _lock:
                         state.error_kind = "subprocess"
                         _set_status(state, "error", broadcast_fn)
-                    _broadcast({
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": str(exc),
-                        "kind": "subprocess",
-                    })
+                    _broadcast(
+                        {
+                            "type": "RUNNER_ERROR",
+                            "topic": topic,
+                            "message": str(exc),
+                            "kind": "subprocess",
+                        }
+                    )
                     return
             # (end agent-question retry loop)
 
@@ -482,8 +486,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
 
             # ── Resolve stage (feedback loop + decide) ────────────────────────
             result = _resolve_stage_supervised(
-                state, flow, topic, project_root, model,
-                broadcast_fn, fhc
+                state, flow, topic, project_root, model, broadcast_fn, fhc
             )
 
             if result is None:

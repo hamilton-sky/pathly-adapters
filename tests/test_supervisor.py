@@ -1,4 +1,5 @@
 """Tests for pathly_orchestrator.supervisor (Conv 2 — Phases 5-7)."""
+
 from __future__ import annotations
 
 import json
@@ -71,9 +72,14 @@ def _fresh_registry(topic: str = "test-topic") -> None:
 
 # ── Phase 5: RunnerState + registry + mirror ──────────────────────────────────
 
+
 def test_runner_state_public_dict():
     state = RunnerState(
-        topic="t1", flow="team", project_root="/p", model="claude-sonnet-4-6", timeout=60
+        topic="t1",
+        flow="team",
+        project_root="/p",
+        model="claude-sonnet-4-6",
+        timeout=60,
     )
     d = state.public_dict()
     assert d["topic"] == "t1"
@@ -84,9 +90,13 @@ def test_runner_state_public_dict():
 
 def test_write_mirror_creates_file(tmp_path):
     from pathly_orchestrator import db as _db
+
     state = RunnerState(
-        topic="mirror-topic", flow="team",
-        project_root=str(tmp_path), model="m", timeout=60
+        topic="mirror-topic",
+        flow="team",
+        project_root=str(tmp_path),
+        model="m",
+        timeout=60,
     )
     state.status = "running"
     _write_mirror(state)
@@ -99,9 +109,13 @@ def test_write_mirror_creates_file(tmp_path):
 
 def test_write_mirror_updates_on_status_change(tmp_path):
     from pathly_orchestrator import db as _db
+
     state = RunnerState(
-        topic="mirror-topic2", flow="team",
-        project_root=str(tmp_path), model="m", timeout=60
+        topic="mirror-topic2",
+        flow="team",
+        project_root=str(tmp_path),
+        model="m",
+        timeout=60,
     )
     state.status = "running"
     _write_mirror(state)
@@ -147,6 +161,7 @@ def test_recover_stale_mirrors_no_plans_dir(tmp_path):
 
 # ── Phase 6: run loop + caps + abort ─────────────────────────────────────────
 
+
 def test_start_run_single_stage_done(tmp_path):
     topic = "conv2-single"
     _fresh_registry(topic)
@@ -167,7 +182,10 @@ def test_start_run_single_stage_done(tmp_path):
         )
         # Wait for the loop to finish
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "done"
@@ -193,7 +211,10 @@ def test_start_run_two_stages(tmp_path):
             max_cost_usd=10.0,
         )
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "done"
@@ -214,8 +235,11 @@ def test_start_run_already_active_raises(tmp_path):
 
     with pytest.raises(ValueError, match="already active"):
         start_run(
-            topic=topic, flow="team", project_root=str(tmp_path),
-            max_iterations=5, max_cost_usd=1.0,
+            topic=topic,
+            flow="team",
+            project_root=str(tmp_path),
+            max_iterations=5,
+            max_cost_usd=1.0,
         )
     _fresh_registry(topic)
 
@@ -239,7 +263,10 @@ def test_cap_exceeded_cost(tmp_path):
             max_cost_usd=2.0,  # will be exceeded after first stage costs 5.0
         )
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     # After first stage (cost 5.0 > max 2.0), second iteration boundary should cap
@@ -278,7 +305,10 @@ def test_cap_exceeded_cost_stops_loop(tmp_path):
             max_cost_usd=2.0,  # stage 1 costs 3.0 → exceeded
         )
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "error"
@@ -318,7 +348,10 @@ def test_cap_exceeded_iterations(tmp_path):
             max_cost_usd=100.0,
         )
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "error"
@@ -360,7 +393,10 @@ def test_abort_stops_run(tmp_path):
         abort_done.set()
 
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "aborted"
@@ -410,7 +446,10 @@ def test_pause_and_resume(tmp_path):
         resume_run(topic)
 
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "done"
@@ -418,6 +457,7 @@ def test_pause_and_resume(tmp_path):
 
 
 # ── Phase 7: decision + session continuity ────────────────────────────────────
+
 
 def test_decision_point_awaiting_and_resume(tmp_path):
     """Loop sets awaiting_decision, supply_decision resumes with FSM call."""
@@ -461,7 +501,10 @@ def test_decision_point_awaiting_and_resume(tmp_path):
         supply_thread.start()
 
         deadline = time.monotonic() + 8.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     decision_supplied.wait(timeout=2.0)
@@ -511,7 +554,10 @@ def test_session_continuity_same_adapter(tmp_path):
             max_cost_usd=100.0,
         )
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "done"
@@ -549,7 +595,10 @@ def test_session_fresh_on_adapter_change(tmp_path):
             max_cost_usd=100.0,
         )
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "done"
@@ -601,7 +650,10 @@ def test_reroute_overrides_adapter_for_next_stage(tmp_path):
         second_invoke_may_proceed.set()
 
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "done"
@@ -630,7 +682,10 @@ def test_cost_accumulated_across_stages(tmp_path):
             max_cost_usd=100.0,
         )
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     assert state.status == "done"
@@ -655,10 +710,14 @@ def test_mirror_written_on_completion(tmp_path):
             max_cost_usd=100.0,
         )
         deadline = time.monotonic() + 5.0
-        while state.status not in {"done", "error", "aborted"} and time.monotonic() < deadline:
+        while (
+            state.status not in {"done", "error", "aborted"}
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.05)
 
     from pathly_orchestrator import db as _db
+
     conn = _db.get_db()
     data = _db.read_runner_state(conn, str(tmp_path), topic)
     assert data is not None
@@ -671,6 +730,7 @@ def test_get_state_unknown_topic():
 
 
 # ── Early-advance tests ───────────────────────────────────────────────────────
+
 
 def _make_state(tmp_path, topic="ea-test") -> RunnerState:
     return RunnerState(
@@ -685,6 +745,7 @@ def _make_state(tmp_path, topic="ea-test") -> RunnerState:
 def _simulate_pty_start(run_id: str) -> None:
     """Mark the run as started so _run_stage_via_terminal can proceed past spawn."""
     import pathly_orchestrator.supervisor as _sup
+
     run = _sup.get_run(run_id)
     if run is not None:
         run.mark_started()
@@ -716,10 +777,12 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     def fake_recon(run_, stage, topic_, events_path_, **_):
         recon_started.set()
         # Simulate billing arriving via the new TerminalRun API
-        run_.mark_pty_result({
-            "result": {"cost_usd": 0.07, "session_id": "s1"},
-            "exit_code": 0,
-        })
+        run_.mark_pty_result(
+            {
+                "result": {"cost_usd": 0.07, "session_id": "s1"},
+                "exit_code": 0,
+            }
+        )
         original_recon(run_, stage, topic_, events_path_, timeout=0.2)
         advance_called.set()
 
@@ -729,9 +792,11 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
         broadcast_events.append(payload)
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
+
             # Write AGENT_DONE to SQLite after PTY starts (after last_seq is captured)
             def _write_event():
                 import time as _time
+
                 _time.sleep(0.05)
                 # Own DB connection: sqlite3 connects with check_same_thread=True,
                 # so reusing the main-thread `conn` here raises ProgrammingError,
@@ -739,17 +804,26 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
                 # never land and wait_result_or_agent_done would block the full
                 # 1800s _TERMINAL_RESULT_TIMEOUT. get_db() is per-thread.
                 _thread_conn = _db.get_db()
-                _db.append_event(_thread_conn, project_root, topic, {
-                    "type": "AGENT_DONE",
-                    "agent": "builder",
-                    "conversation": 2,
-                    "summary": "built it",
-                    "cost_usd": 0.05,
-                    "ts": "2026-01-01T00:00:00Z",
-                })
+                _db.append_event(
+                    _thread_conn,
+                    project_root,
+                    topic,
+                    {
+                        "type": "AGENT_DONE",
+                        "agent": "builder",
+                        "conversation": 2,
+                        "summary": "built it",
+                        "cost_usd": 0.05,
+                        "ts": "2026-01-01T00:00:00Z",
+                    },
+                )
+
             threading.Thread(target=_write_event, daemon=True).start()
 
-    with patch("pathly_orchestrator.supervisor.terminal._reconciliation_window", side_effect=fake_recon):
+    with patch(
+        "pathly_orchestrator.supervisor.terminal._reconciliation_window",
+        side_effect=fake_recon,
+    ):
         result = _run_stage_via_terminal(
             state,
             "do stuff",
@@ -788,6 +862,7 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
     from pathly_orchestrator import db as _db
+
     _db_conn = _db.get_db()
     _project_root = str(tmp_path)
 
@@ -803,26 +878,37 @@ def test_early_advance_billing_timeout(tmp_path, monkeypatch):
     def fake_broadcast(_, payload):
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
+
             # Write AGENT_DONE to SQLite after PTY starts (after last_seq is captured)
             def _write_event():
                 import time as _time
+
                 _time.sleep(0.05)
                 # Own DB connection: sqlite3 check_same_thread=True means the
                 # main-thread _db_conn cannot be reused here — the cross-thread
                 # write raises and a daemon thread swallows it, so AGENT_DONE never
                 # lands and the wait blocks the full 1800s. get_db() is per-thread.
                 _thread_conn = _db.get_db()
-                _db.append_event(_thread_conn, _project_root, topic, {
-                    "type": "AGENT_DONE",
-                    "agent": "builder",
-                    "conversation": 2,
-                    "summary": "built it",
-                    "cost_usd": 0.05,
-                    "ts": "2026-01-01T00:00:00Z",
-                })
+                _db.append_event(
+                    _thread_conn,
+                    _project_root,
+                    topic,
+                    {
+                        "type": "AGENT_DONE",
+                        "agent": "builder",
+                        "conversation": 2,
+                        "summary": "built it",
+                        "cost_usd": 0.05,
+                        "ts": "2026-01-01T00:00:00Z",
+                    },
+                )
+
             threading.Thread(target=_write_event, daemon=True).start()
 
-    with patch("pathly_orchestrator.supervisor.terminal._reconciliation_window", side_effect=fake_recon):
+    with patch(
+        "pathly_orchestrator.supervisor.terminal._reconciliation_window",
+        side_effect=fake_recon,
+    ):
         result = _run_stage_via_terminal(
             state,
             "do stuff",
@@ -856,7 +942,9 @@ def test_slow_path_no_regression(tmp_path, monkeypatch):
     topic = "ea-slow-path"
     run_id = f"{topic}-001"
     state = _make_state(tmp_path, topic=topic)
-    state.interactive = False  # test the original slow path (no early advance, no interactive)
+    state.interactive = (
+        False  # test the original slow path (no early advance, no interactive)
+    )
 
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
@@ -866,15 +954,19 @@ def test_slow_path_no_regression(tmp_path, monkeypatch):
     def fake_broadcast(_, payload):
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
+
             # Simulate PTY completing shortly after start
             def _post_result():
                 pty_result_ready.wait(timeout=2.0)
                 run = _sup.get_run(run_id)
                 if run is not None:
-                    run.mark_pty_result({
-                        "result": {"cost_usd": 0.03, "session_id": "s2"},
-                        "exit_code": 0,
-                    })
+                    run.mark_pty_result(
+                        {
+                            "result": {"cost_usd": 0.03, "session_id": "s2"},
+                            "exit_code": 0,
+                        }
+                    )
+
             t = threading.Thread(target=_post_result, daemon=True)
             t.start()
             pty_result_ready.set()
@@ -909,6 +1001,7 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)
     from pathly_orchestrator import db as _db
+
     _db_conn = _db.get_db()
     _project_root = str(tmp_path)
 
@@ -918,23 +1011,31 @@ def test_interactive_mode_kills_pty_on_agent_done(tmp_path, monkeypatch):
         broadcast_events.append(payload)
         if payload.get("type") == "TERMINAL_SPAWN":
             _simulate_pty_start(run_id)
+
             # Write AGENT_DONE to SQLite after PTY starts (after last_seq is captured)
             def _write_event():
                 import time as _time
+
                 _time.sleep(0.05)
                 # Own DB connection: sqlite3 check_same_thread=True means the
                 # main-thread _db_conn cannot be reused here — the cross-thread
                 # write raises and a daemon thread swallows it, so AGENT_DONE never
                 # lands and the wait blocks the full 1800s. get_db() is per-thread.
                 _thread_conn = _db.get_db()
-                _db.append_event(_thread_conn, _project_root, topic, {
-                    "type": "AGENT_DONE",
-                    "agent": "builder",
-                    "conversation": 4,
-                    "summary": "interactive done",
-                    "cost_usd": 0.02,
-                    "ts": "2026-01-01T00:00:00Z",
-                })
+                _db.append_event(
+                    _thread_conn,
+                    _project_root,
+                    topic,
+                    {
+                        "type": "AGENT_DONE",
+                        "agent": "builder",
+                        "conversation": 4,
+                        "summary": "interactive done",
+                        "cost_usd": 0.02,
+                        "ts": "2026-01-01T00:00:00Z",
+                    },
+                )
+
             threading.Thread(target=_write_event, daemon=True).start()
 
     _run_stage_via_terminal(
@@ -966,8 +1067,11 @@ def test_interactive_mode_strips_headless_flags(monkeypatch):
     monkeypatch.setenv("PATHLY_RUNNER_INTERACTIVE", "1")
 
     from pathly_orchestrator.runner import resolve_argv
+
     argv = resolve_argv("claude", "my prompt", "claude-sonnet-4-6", interactive=True)
 
     assert "--print" not in argv, f"--print should not be in interactive argv: {argv}"
-    assert "--output-format=json" not in argv, f"--output-format=json should not be in interactive argv: {argv}"
+    assert (
+        "--output-format=json" not in argv
+    ), f"--output-format=json should not be in interactive argv: {argv}"
     assert "-p" in argv, f"-p should be in argv: {argv}"

@@ -57,9 +57,9 @@ def test_stitch_shared_sections_appear_at_most_once(adapter, skill):
     core_path = _core_path(skill)
     composed = _compose_or_read(core_path, skill, adapter)
     for heading in _SHARED_SECTIONS:
-        assert composed.count(heading) <= 1, (
-            f"{skill} duplicated {heading!r} for adapter {adapter!r}"
-        )
+        assert (
+            composed.count(heading) <= 1
+        ), f"{skill} duplicated {heading!r} for adapter {adapter!r}"
 
 
 @pytest.mark.parametrize("adapter", _ADAPTERS)

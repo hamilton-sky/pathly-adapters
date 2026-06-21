@@ -1,4 +1,5 @@
 """Shim — re-exports from pathly_orchestrator.fsm_ops for backward compat."""
+
 from pathly_orchestrator.fsm_ops import *  # noqa: F401, F403
 from pathly_orchestrator.fsm_ops import (  # noqa: F401
     _AGENT_GROUPS,

@@ -1,4 +1,5 @@
 """Telemetry endpoints: /record_activity, /record_phase, /record_phase_summary."""
+
 from __future__ import annotations
 
 import logging
@@ -17,7 +18,17 @@ from ..telemetry_registry import PricingRegistry, _ADAPTER_PREFIXES
 
 bp = Blueprint("telemetry", __name__)
 
-_VALID_PHASES = {"analyze", "build", "design", "implement", "plan", "review", "scout", "storm", "test"}
+_VALID_PHASES = {
+    "analyze",
+    "build",
+    "design",
+    "implement",
+    "plan",
+    "review",
+    "scout",
+    "storm",
+    "test",
+}
 _VALID_EVENT_TYPES = {"PHASE_START", "PHASE_DONE"}
 
 
@@ -28,6 +39,7 @@ def _infer_adapter(model: str) -> str:
         if any(m.startswith(p) for p in prefixes):
             return name
     return "unknown" if model else ""
+
 
 logger = logging.getLogger("pathly.http")
 
@@ -141,14 +153,20 @@ def record_activity_endpoint():
         _model = str(data.get("model", ""))
         _provider = str(data.get("provider", "")) or _infer_adapter(_model)
         if not data.get("provider"):
-            logger.warning("record_activity: 'provider' field absent; inferred %r from model %r", _provider, _model)
+            logger.warning(
+                "record_activity: 'provider' field absent; inferred %r from model %r",
+                _provider,
+                _model,
+            )
 
         if float(cost_usd_val) > 0.0:
             cost_source = "provider_reported"
         else:
-            _tokens_in  = int(data.get("input_tokens",  0) or data.get("tokens_in",  0))
+            _tokens_in = int(data.get("input_tokens", 0) or data.get("tokens_in", 0))
             _tokens_out = int(data.get("output_tokens", 0) or data.get("tokens_out", 0))
-            _computed, cost_source = PricingRegistry().compute(_provider, _model, _tokens_in, _tokens_out)
+            _computed, cost_source = PricingRegistry().compute(
+                _provider, _model, _tokens_in, _tokens_out
+            )
             if cost_source == "estimated":
                 cost_usd_val = _computed
 
@@ -205,38 +223,44 @@ def record_activity_endpoint():
             # OTel export — fire-and-forget; no-op if PATHLY_OTEL_ENDPOINT is unset
             try:
                 from pathly_orchestrator import otel_export as _otel
-                _otel.export_span_async({
-                    "type": "AGENT_DONE",
-                    "agent": str(data["agent"]),
-                    "feature": str(data["feature"]),
-                    "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "result": str(data.get("result", "DONE")),
-                    "tokens_in": tokens_in,
-                    "tokens_out": tokens_out,
-                    "cost_usd": float(cost_usd_val),
-                    "wall_seconds": wall_seconds,
-                    "model": str(data.get("model", "")),
-                    "provider": _provider,
-                    "conversation": data.get("conversation"),
-                    "summary": str(data.get("summary", "")),
-                    "trace_id": str(data.get("trace_id", "")),
-                    "span_id": str(data.get("span_id", "")),
-                })
+
+                _otel.export_span_async(
+                    {
+                        "type": "AGENT_DONE",
+                        "agent": str(data["agent"]),
+                        "feature": str(data["feature"]),
+                        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "result": str(data.get("result", "DONE")),
+                        "tokens_in": tokens_in,
+                        "tokens_out": tokens_out,
+                        "cost_usd": float(cost_usd_val),
+                        "wall_seconds": wall_seconds,
+                        "model": str(data.get("model", "")),
+                        "provider": _provider,
+                        "conversation": data.get("conversation"),
+                        "summary": str(data.get("summary", "")),
+                        "trace_id": str(data.get("trace_id", "")),
+                        "span_id": str(data.get("span_id", "")),
+                    }
+                )
             except Exception:
                 logger.debug("otel_export hook error", exc_info=True)
             # Write span to local otel_spans table for Studio DB Explorer
             try:
                 import json as _json
+
                 _now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                _attrs = _json.dumps({
-                    "gen_ai.agent.name": str(data["agent"]),
-                    "gen_ai.usage.input_tokens": tokens_in,
-                    "gen_ai.usage.output_tokens": tokens_out,
-                    "gen_ai.request.model": str(data.get("model", "")),
-                    "pathly.cost_usd": float(cost_usd_val),
-                    "pathly.wall_seconds": wall_seconds,
-                    "pathly.result": str(data.get("result", "DONE")),
-                })
+                _attrs = _json.dumps(
+                    {
+                        "gen_ai.agent.name": str(data["agent"]),
+                        "gen_ai.usage.input_tokens": tokens_in,
+                        "gen_ai.usage.output_tokens": tokens_out,
+                        "gen_ai.request.model": str(data.get("model", "")),
+                        "pathly.cost_usd": float(cost_usd_val),
+                        "pathly.wall_seconds": wall_seconds,
+                        "pathly.result": str(data.get("result", "DONE")),
+                    }
+                )
                 _conn = _get_db()
                 _conn.execute(
                     "INSERT INTO otel_spans "
@@ -244,10 +268,14 @@ def record_activity_endpoint():
                     " name, start_time, end_time, attributes) "
                     "VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)",
                     (
-                        str(project_root), str(data["feature"]),
+                        str(project_root),
+                        str(data["feature"]),
                         str(trace_id) if trace_id else None,
                         str(span_id) if span_id else None,
-                        f"agent.{data['agent']}", _now, _now, _attrs,
+                        f"agent.{data['agent']}",
+                        _now,
+                        _now,
+                        _attrs,
                     ),
                 )
                 _conn.commit()
@@ -274,6 +302,7 @@ def trends_endpoint():
 
     try:
         from pathly_orchestrator.db.queries.trends import get_daily_trends
+
         conn = _get_db()
         buckets = get_daily_trends(conn, feature, days)
         return jsonify({"trends": buckets}), 200
@@ -301,25 +330,47 @@ def record_phase_endpoint():
             if field not in data:
                 return jsonify({"error": f"Missing required field: '{field}'"}), 400
             if not isinstance(data[field], str) or not data[field].strip():
-                return jsonify({"error": f"Field '{field}' must be a non-empty string"}), 400
+                return (
+                    jsonify({"error": f"Field '{field}' must be a non-empty string"}),
+                    400,
+                )
 
         event_type = data["event_type"]
         if event_type not in _VALID_EVENT_TYPES:
-            return jsonify({"error": f"Invalid event_type '{event_type}'; must be one of {sorted(_VALID_EVENT_TYPES)}"}), 400
+            return (
+                jsonify(
+                    {
+                        "error": f"Invalid event_type '{event_type}'; must be one of {sorted(_VALID_EVENT_TYPES)}"
+                    }
+                ),
+                400,
+            )
 
         phase = data["phase"]
         if phase not in _VALID_PHASES:
-            return jsonify({"error": f"Invalid phase '{phase}'; must be one of {sorted(_VALID_PHASES)}"}), 400
+            return (
+                jsonify(
+                    {
+                        "error": f"Invalid phase '{phase}'; must be one of {sorted(_VALID_PHASES)}"
+                    }
+                ),
+                400,
+            )
 
         feature = data["feature"]
-        project_root = data.get("project_root") or os.environ.get("PATHLY_PROJECT_ROOT", "")
+        project_root = data.get("project_root") or os.environ.get(
+            "PATHLY_PROJECT_ROOT", ""
+        )
         if project_root:
             feature_dir = Path(project_root) / "pathly" / "plans" / feature
         else:
             feature_dir = Path("pathly") / "plans" / feature
 
         if not feature_dir.exists():
-            return jsonify({"error": f"Feature directory does not exist: {feature_dir}"}), 400
+            return (
+                jsonify({"error": f"Feature directory does not exist: {feature_dir}"}),
+                400,
+            )
 
         event: dict[str, object] = {
             "schema_version": 1,
@@ -355,20 +406,32 @@ def record_phase_summary_endpoint():
             return jsonify({"error": "Missing JSON body"}), 400
 
         for field in ("feature", "agent", "text"):
-            if field not in data or not isinstance(data[field], str) or not data[field].strip():
+            if (
+                field not in data
+                or not isinstance(data[field], str)
+                or not data[field].strip()
+            ):
                 return jsonify({"error": f"Missing required field: '{field}'"}), 400
 
         text = data["text"]
         if len(text) > 2000:
-            return jsonify({"error": "Field 'text' must not exceed 2000 characters"}), 400
+            return (
+                jsonify({"error": "Field 'text' must not exceed 2000 characters"}),
+                400,
+            )
 
         feature = data["feature"]
         agent = data["agent"]
-        project_root = data.get("project_root") or os.environ.get("PATHLY_PROJECT_ROOT", "")
+        project_root = data.get("project_root") or os.environ.get(
+            "PATHLY_PROJECT_ROOT", ""
+        )
         feature_dir = Path(project_root) / "pathly" / "plans" / feature
 
         if not feature_dir.exists():
-            return jsonify({"error": f"Feature directory does not exist: {feature_dir}"}), 400
+            return (
+                jsonify({"error": f"Feature directory does not exist: {feature_dir}"}),
+                400,
+            )
 
         event: dict[str, object] = {
             "schema_version": 1,
@@ -396,6 +459,7 @@ def record_phase_summary_endpoint():
         # Live-broadcast to Studio so the log card updates in headless mode
         try:
             from pathly_orchestrator.http_server.sse import _broadcast_runner
+
             _broadcast_runner(feature, event)
         except Exception:
             pass

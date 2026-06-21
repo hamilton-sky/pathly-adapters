@@ -7,6 +7,7 @@ Covers:
   (c) reclaim_stale_claims — reverts in_progress tasks back to pending
   (d) get_ready_tasks — never returns in_progress/failed/blocked tasks
 """
+
 from __future__ import annotations
 
 import json
@@ -19,12 +20,14 @@ import pytest
 def _no_async_embed(monkeypatch):
     """Stub embed_async so posting never spawns background threads during tests."""
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
     monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_task(conn, scope: str, text: str, depends_on: list[str] | None = None) -> str:
     """Insert a pending task and return its ID."""
@@ -39,9 +42,7 @@ def _make_task(conn, scope: str, text: str, depends_on: list[str] | None = None)
         text=text,
         depends_on=depends_on,
     )
-    conn.execute(
-        "UPDATE comms_messages SET task_status='pending' WHERE id=?", (mid,)
-    )
+    conn.execute("UPDATE comms_messages SET task_status='pending' WHERE id=?", (mid,))
     conn.commit()
     return mid
 
@@ -56,6 +57,7 @@ def _task_status(conn, mid: str) -> str | None:
 # ---------------------------------------------------------------------------
 # (a) claim_task race
 # ---------------------------------------------------------------------------
+
 
 def test_claim_task_race_exactly_one_winner():
     """Two threads racing to claim the same pending task — exactly one returns True.
@@ -112,6 +114,7 @@ def test_claim_task_returns_false_when_already_claimed():
 # (b) fail_task cascade
 # ---------------------------------------------------------------------------
 
+
 def test_fail_task_cascade_marks_dependents_blocked():
     """A<-B<-C chain: fail A → B and C become blocked; get_ready_tasks excludes them."""
     from pathly_orchestrator.db.connection import get_db
@@ -159,6 +162,7 @@ def test_fail_task_idempotent():
 # (c) reclaim_stale_claims
 # ---------------------------------------------------------------------------
 
+
 def test_reclaim_stale_claims_reverts_in_progress():
     """reclaim_stale_claims reverts in_progress tasks to pending."""
     from pathly_orchestrator.db.connection import get_db
@@ -193,6 +197,7 @@ def test_reclaim_stale_claims_empty_when_none_in_progress():
 # (d) get_ready_tasks excludes non-pending statuses
 # ---------------------------------------------------------------------------
 
+
 def test_get_ready_tasks_excludes_in_progress():
     """get_ready_tasks never returns an in_progress task."""
     from pathly_orchestrator.db.connection import get_db
@@ -208,7 +213,9 @@ def test_get_ready_tasks_excludes_in_progress():
     claim_task(conn, mid, run_id="worker-Z")
 
     after = get_ready_tasks(conn, boards=["feature"], scopes=[scope])
-    assert not any(r["id"] == mid for r in after), "claimed task must not appear in ready"
+    assert not any(
+        r["id"] == mid for r in after
+    ), "claimed task must not appear in ready"
 
 
 def test_get_ready_tasks_excludes_failed():

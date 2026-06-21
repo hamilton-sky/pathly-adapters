@@ -18,6 +18,7 @@ Event-type keys used internally:
     "FSM_EVENT:{project_root}:{feature}"   — any new FSM event for a feature
     Any value from pathly_orchestrator.events (AGENT_DONE, STATE_TRANSITION, …)
 """
+
 from __future__ import annotations
 
 import logging

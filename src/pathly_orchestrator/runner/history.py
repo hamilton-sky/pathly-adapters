@@ -19,6 +19,7 @@ def build_pipeline_history_block(events_path: str, max_items: int = 10) -> str:
     if path.is_dir():
         try:
             from pathly_orchestrator import eventlog as _ev
+
             all_events = _ev.read_events(events_path)
             events = [e for e in all_events if e.get("type") == "AGENT_DONE"]
         except Exception:

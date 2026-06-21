@@ -1,4 +1,5 @@
 """Communication board endpoints (/comms/*)."""
+
 from __future__ import annotations
 
 import logging
@@ -10,14 +11,22 @@ from ..sse import _broadcast_comms, _broadcast_runner
 
 bp = Blueprint("comms", __name__)
 
-_EMBED_TYPES: frozenset[str] = frozenset({
-    "decision", "discovery", "constraint", "warning", "escalation", "artifact"
-})
+_EMBED_TYPES: frozenset[str] = frozenset(
+    {"decision", "discovery", "constraint", "warning", "escalation", "artifact"}
+)
 
-_PROJECT_WRITERS: frozenset[str] = frozenset({
-    "tester", "reviewer", "explorer", "architect",
-    "planner", "designer", "director", "human",
-})
+_PROJECT_WRITERS: frozenset[str] = frozenset(
+    {
+        "tester",
+        "reviewer",
+        "explorer",
+        "architect",
+        "planner",
+        "designer",
+        "director",
+        "human",
+    }
+)
 _GLOBAL_WRITERS: frozenset[str] = frozenset({"director", "human"})
 
 
@@ -48,13 +57,34 @@ def _check_write_permission(
 _PATH_RE = re.compile(r"(?:[\w.\-]+[/\\])+[\w.\-]+\.[A-Za-z0-9]{1,8}")
 
 _EXT_ARTIFACT_TYPE: dict[str, str] = {
-    "md": "md", "markdown": "md", "txt": "md",
-    "py": "code", "ts": "code", "tsx": "code", "js": "code", "jsx": "code",
-    "go": "code", "rs": "code", "java": "code", "rb": "code", "c": "code",
-    "h": "code", "cpp": "code", "css": "code", "html": "code", "sh": "code",
-    "yaml": "code", "yml": "code", "toml": "code",
-    "json": "json", "pdf": "pdf",
-    "png": "image", "jpg": "image", "jpeg": "image", "gif": "image", "svg": "image",
+    "md": "md",
+    "markdown": "md",
+    "txt": "md",
+    "py": "code",
+    "ts": "code",
+    "tsx": "code",
+    "js": "code",
+    "jsx": "code",
+    "go": "code",
+    "rs": "code",
+    "java": "code",
+    "rb": "code",
+    "c": "code",
+    "h": "code",
+    "cpp": "code",
+    "css": "code",
+    "html": "code",
+    "sh": "code",
+    "yaml": "code",
+    "yml": "code",
+    "toml": "code",
+    "json": "json",
+    "pdf": "pdf",
+    "png": "image",
+    "jpg": "image",
+    "jpeg": "image",
+    "gif": "image",
+    "svg": "image",
 }
 
 
@@ -84,7 +114,9 @@ def comms_post():
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import get_write_permissions as _get_write_perms
+        from pathly_orchestrator.db.queries.app_settings import (
+            get_write_permissions as _get_write_perms,
+        )
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
         from pathly_orchestrator.runner.embeddings import embed_async as _embed_async
 
@@ -95,7 +127,10 @@ def comms_post():
         required = {"feature", "from", "type", "text"}
         missing = required - set(data.keys())
         if missing:
-            return jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}), 400
+            return (
+                jsonify({"error": f"Missing fields: {', '.join(sorted(missing))}"}),
+                400,
+            )
 
         feature = data.get("feature", "")
         from_agent = data.get("from", "")
@@ -125,13 +160,19 @@ def comms_post():
         perm_table = _get_write_perms(conn, norm_root)
 
         if not _check_write_permission(from_agent, board, perm_table=perm_table):
-            allowed = sorted(perm_table.get(board) or (
-                _GLOBAL_WRITERS if board == "global" else _PROJECT_WRITERS
-            ))
-            return jsonify({
-                "error": f"Role '{from_agent}' cannot write to '{board}' scope",
-                "allowed_roles": allowed,
-            }), 403
+            allowed = sorted(
+                perm_table.get(board)
+                or (_GLOBAL_WRITERS if board == "global" else _PROJECT_WRITERS)
+            )
+            return (
+                jsonify(
+                    {
+                        "error": f"Role '{from_agent}' cannot write to '{board}' scope",
+                        "allowed_roles": allowed,
+                    }
+                ),
+                403,
+            )
 
         to_agent = data.get("to", "*") or "*"
         options = data.get("options")
@@ -145,12 +186,14 @@ def comms_post():
         executor = data.get("executor")
         # Artifact link — lets an agent post a type=artifact message that points at
         # the file it created, so the board can open it in the editor.
-        artifact_path = (data.get("artifact_path") or None)
-        artifact_type = (data.get("artifact_type") or None)
+        artifact_path = data.get("artifact_path") or None
+        artifact_type = data.get("artifact_type") or None
         # Fallback: some agents (notably Codex) put the path only in the message
         # text instead of the artifact_path field. Recover it so the artifact card
         # still gets a path, preview, editor button, and a comms_artifacts row.
-        if msg_type == "artifact" and not (isinstance(artifact_path, str) and artifact_path.strip()):
+        if msg_type == "artifact" and not (
+            isinstance(artifact_path, str) and artifact_path.strip()
+        ):
             recovered = _extract_artifact_path(text)
             if recovered:
                 artifact_path = recovered
@@ -165,7 +208,12 @@ def comms_post():
             not isinstance(depends_on, list)
             or not all(isinstance(d, str) for d in depends_on)
         ):
-            return jsonify({"error": "Field 'depends_on' must be a list of strings or null"}), 400
+            return (
+                jsonify(
+                    {"error": "Field 'depends_on' must be a list of strings or null"}
+                ),
+                400,
+            )
         # executor is accepted as any string here — the {single,loop,team} enum is
         # enforced downstream by the Phase-1 dispatcher, not at the write path.
         if goal_id is not None and not isinstance(goal_id, str):
@@ -194,9 +242,16 @@ def comms_post():
         # An artifact message also gets a comms_artifacts row (the metadata
         # substrate: many-per-task, version/edit history). Best-effort — a board
         # post must never fail because the artifact side-table hiccupped.
-        if msg_type == "artifact" and isinstance(artifact_path, str) and artifact_path.strip():
+        if (
+            msg_type == "artifact"
+            and isinstance(artifact_path, str)
+            and artifact_path.strip()
+        ):
             try:
-                from pathly_orchestrator.db.queries.comms import insert_artifact as _insert_artifact
+                from pathly_orchestrator.db.queries.comms import (
+                    insert_artifact as _insert_artifact,
+                )
+
                 _insert_artifact(
                     conn,
                     message_id=message_id,
@@ -211,14 +266,17 @@ def comms_post():
         if msg_type in _EMBED_TYPES:
             _embed_async(message_id, text)
 
-        _broadcast_comms(scope, {
-            "type": "COMMS_UPDATE",
-            "message_id": message_id,
-            "feature": feature,
-            "board": board,
-            "scope": scope,
-            "msg_type": msg_type,
-        })
+        _broadcast_comms(
+            scope,
+            {
+                "type": "COMMS_UPDATE",
+                "message_id": message_id,
+                "feature": feature,
+                "board": board,
+                "scope": scope,
+                "msg_type": msg_type,
+            },
+        )
 
         return jsonify({"ok": True, "message_id": message_id}), 200
     except Exception as exc:
@@ -278,8 +336,12 @@ def comms_search():
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import search_by_embedding as _search
-        from pathly_orchestrator.db.queries.comms import search_by_hybrid as _search_hybrid
-        from pathly_orchestrator.db.queries.comms import search_by_keyword as _search_keyword
+        from pathly_orchestrator.db.queries.comms import (
+            search_by_hybrid as _search_hybrid,
+        )
+        from pathly_orchestrator.db.queries.comms import (
+            search_by_keyword as _search_keyword,
+        )
         from pathly_orchestrator.runner.embeddings import embed as _embed
 
         data = request.get_json()
@@ -312,14 +374,22 @@ def comms_search():
             results = _search_keyword(conn, query, [board], [scope], k)
         elif mode == "semantic":
             if embedding is not None:
-                results = _search(conn, embedding=embedding, boards=[board], scopes=[scope], k=k)
+                results = _search(
+                    conn, embedding=embedding, boards=[board], scopes=[scope], k=k
+                )
             else:
-                from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
+                from pathly_orchestrator.db.queries.comms import (
+                    get_messages as _get_messages,
+                )
+
                 results = _get_messages(conn, board=board, scope=scope, limit=k)
         else:  # hybrid — fall back to recency when both BM25 and vec are absent (SPEC §26.7)
             results = _search_hybrid(conn, query, embedding, [board], [scope], k)
             if not results:
-                from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
+                from pathly_orchestrator.db.queries.comms import (
+                    get_messages as _get_messages,
+                )
+
                 results = _get_messages(conn, board=board, scope=scope, limit=k)
 
         return jsonify(results), 200
@@ -345,7 +415,10 @@ def comms_acknowledge():
         message_id = data.get("message_id", "")
         agent = data.get("agent", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
         if not isinstance(agent, str) or not agent.strip():
             return jsonify({"error": "Field 'agent' must be a non-empty string"}), 400
 
@@ -375,14 +448,19 @@ def comms_answer():
         question_id = data.get("question_id", "")
         answer_text = data.get("answer", "")
         if not isinstance(question_id, str) or not question_id.strip():
-            return jsonify({"error": "Field 'question_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'question_id' must be a non-empty string"}),
+                400,
+            )
         if not isinstance(answer_text, str) or not answer_text.strip():
             return jsonify({"error": "Field 'answer' must be a non-empty string"}), 400
 
         option_id = data.get("option_id")
 
         conn = _get_db()
-        answer_id = _answer(conn, question_id=question_id, answer_text=answer_text, option_id=option_id)
+        answer_id = _answer(
+            conn, question_id=question_id, answer_text=answer_text, option_id=option_id
+        )
         return jsonify({"ok": True, "answer_id": answer_id}), 200
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 404
@@ -402,7 +480,9 @@ def comms_tasks_get():
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
-        from pathly_orchestrator.db.queries.comms import get_ready_tasks as _get_ready_tasks
+        from pathly_orchestrator.db.queries.comms import (
+            get_ready_tasks as _get_ready_tasks,
+        )
 
         feature = request.args.get("feature", "").strip()
         if not feature:
@@ -420,9 +500,13 @@ def comms_tasks_get():
         conn = _get_db()
         ready_flag = request.args.get("ready", "").strip().lower()
         if ready_flag == "true":
-            tasks = _get_ready_tasks(conn, boards=[board], scopes=[scope], goal_id=goal_id)
+            tasks = _get_ready_tasks(
+                conn, boards=[board], scopes=[scope], goal_id=goal_id
+            )
         else:
-            tasks = _get_messages(conn, board=board, scope=scope, type="task", status="pending")
+            tasks = _get_messages(
+                conn, board=board, scope=scope, type="task", status="pending"
+            )
         return jsonify(tasks), 200
     except Exception as exc:
         logging.exception("comms_tasks_get error")
@@ -447,19 +531,25 @@ def comms_tasks_complete():
 
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
 
         conn = _get_db()
         newly_ready = _complete_task(conn, message_id=message_id)
 
         scope = data.get("feature") or data.get("scope") or ""
         for nrid in newly_ready:
-            _broadcast_comms(scope, {
-                "type": "COMMS_UPDATE",
-                "message_id": nrid,
-                "event": "task_unblocked",
-                "feature": scope,
-            })
+            _broadcast_comms(
+                scope,
+                {
+                    "type": "COMMS_UPDATE",
+                    "message_id": nrid,
+                    "event": "task_unblocked",
+                    "feature": scope,
+                },
+            )
 
         return jsonify({"ok": True, "newly_ready": newly_ready}), 200
     except Exception as exc:
@@ -486,7 +576,10 @@ def comms_tasks_claim():
         message_id = data.get("message_id", "")
         run_id = data.get("run_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
         if not isinstance(run_id, str) or not run_id.strip():
             return jsonify({"error": "Field 'run_id' must be a non-empty string"}), 400
 
@@ -518,7 +611,10 @@ def comms_tasks_fail():
 
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
 
         reason = data.get("reason") or ""
 
@@ -532,17 +628,23 @@ def comms_tasks_fail():
 
         blocked = _fail_task(conn, message_id=message_id, reason=reason)
 
-        _broadcast_comms(scope, {
-            "type": "COMMS_UPDATE",
-            "event": "task_failed",
-            "message_id": message_id,
-        })
-        for bid in blocked:
-            _broadcast_comms(scope, {
+        _broadcast_comms(
+            scope,
+            {
                 "type": "COMMS_UPDATE",
-                "event": "task_blocked",
-                "message_id": bid,
-            })
+                "event": "task_failed",
+                "message_id": message_id,
+            },
+        )
+        for bid in blocked:
+            _broadcast_comms(
+                scope,
+                {
+                    "type": "COMMS_UPDATE",
+                    "event": "task_blocked",
+                    "message_id": bid,
+                },
+            )
 
         return jsonify({"ok": True, "blocked": blocked}), 200
     except Exception as exc:
@@ -570,7 +672,10 @@ def comms_attach():
 
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
 
         artifact_path = data.get("artifact_path")
         artifact_url = data.get("artifact_url")
@@ -579,11 +684,19 @@ def comms_attach():
         has_path = isinstance(artifact_path, str) and artifact_path.strip()
         has_url = isinstance(artifact_url, str) and artifact_url.strip()
         if not has_path and not has_url:
-            return jsonify({
-                "error": "Provide at least one of 'artifact_path' or 'artifact_url'"
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Provide at least one of 'artifact_path' or 'artifact_url'"
+                    }
+                ),
+                400,
+            )
         if artifact_type is not None and not isinstance(artifact_type, str):
-            return jsonify({"error": "Field 'artifact_type' must be a string or null"}), 400
+            return (
+                jsonify({"error": "Field 'artifact_type' must be a string or null"}),
+                400,
+            )
 
         conn = _get_db()
         row = conn.execute(
@@ -607,7 +720,10 @@ def comms_attach():
         # files, so they're skipped). Best-effort — never fail the attach on it.
         if has_path:
             try:
-                from pathly_orchestrator.db.queries.comms import insert_artifact as _insert_artifact
+                from pathly_orchestrator.db.queries.comms import (
+                    insert_artifact as _insert_artifact,
+                )
+
                 _insert_artifact(
                     conn,
                     message_id=message_id,
@@ -619,14 +735,17 @@ def comms_attach():
             except Exception:
                 logging.debug("comms_artifacts insert (attach) failed", exc_info=True)
 
-        _broadcast_comms(row["scope"], {
-            "type": "COMMS_UPDATE",
-            "message_id": message_id,
-            "event": "artifact_attached",
-            "board": row["board"],
-            "scope": row["scope"],
-            "artifact_type": artifact_type,
-        })
+        _broadcast_comms(
+            row["scope"],
+            {
+                "type": "COMMS_UPDATE",
+                "message_id": message_id,
+                "event": "artifact_attached",
+                "board": row["board"],
+                "scope": row["scope"],
+                "artifact_type": artifact_type,
+            },
+        )
 
         return jsonify({"ok": True, "message_id": message_id}), 200
     except Exception as exc:
@@ -652,7 +771,10 @@ def comms_artifacts():
             return jsonify({"error": "Query param 'message_id' is required"}), 400
 
         conn = _get_db()
-        return jsonify({"ok": True, "artifacts": _list_artifacts(conn, message_id)}), 200
+        return (
+            jsonify({"ok": True, "artifacts": _list_artifacts(conn, message_id)}),
+            200,
+        )
     except Exception as exc:
         logging.exception("comms_artifacts error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
@@ -696,9 +818,15 @@ def comms_restore():
 
         message_ids = data.get("message_ids")
         if not isinstance(message_ids, list) or not message_ids:
-            return jsonify({"error": "Field 'message_ids' must be a non-empty list"}), 400
+            return (
+                jsonify({"error": "Field 'message_ids' must be a non-empty list"}),
+                400,
+            )
         if not all(isinstance(i, str) for i in message_ids):
-            return jsonify({"error": "Field 'message_ids' must be a list of strings"}), 400
+            return (
+                jsonify({"error": "Field 'message_ids' must be a list of strings"}),
+                400,
+            )
 
         conn = _get_db()
         _restore(conn, message_ids=message_ids)
@@ -760,7 +888,9 @@ def comms_scope_get():
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import get_board_scope as _get_scope
+        from pathly_orchestrator.db.queries.app_settings import (
+            get_board_scope as _get_scope,
+        )
 
         feature = request.args.get("feature", "").strip()
         project_root = request.args.get("project_root", "").strip()
@@ -770,7 +900,9 @@ def comms_scope_get():
             return jsonify({"error": "Query parameter 'project_root' is required"}), 400
 
         conn = _get_db()
-        scope = _get_scope(conn, project_root=_norm_project_root(project_root), feature=feature)
+        scope = _get_scope(
+            conn, project_root=_norm_project_root(project_root), feature=feature
+        )
         return jsonify(scope), 200
     except Exception as exc:
         logging.exception("comms_scope_get error")
@@ -802,16 +934,24 @@ def comms_scope_set():
         if not isinstance(feature, str) or not feature.strip():
             return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
         if not isinstance(project_root, str) or not project_root.strip():
-            return jsonify({"error": "Field 'project_root' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'project_root' must be a non-empty string"}),
+                400,
+            )
         if not isinstance(scope, dict):
             return jsonify({"error": "Field 'scope' must be an object"}), 400
 
         allowed = {"feature", "project", "global"}
         updates = {k: bool(v) for k, v in scope.items() if k in allowed}
         if not updates:
-            return jsonify({
-                "error": "Field 'scope' must contain at least one of: feature, project, global"
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Field 'scope' must contain at least one of: feature, project, global"
+                    }
+                ),
+                400,
+            )
 
         conn = _get_db()
         norm_root = _norm_project_root(project_root)
@@ -835,7 +975,9 @@ def comms_permissions():
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import get_write_permissions as _get_perms
+        from pathly_orchestrator.db.queries.app_settings import (
+            get_write_permissions as _get_perms,
+        )
 
         project_root = request.args.get("project_root", "").strip()
         norm_root = _norm_project_root(project_root) if project_root else ""
@@ -884,16 +1026,21 @@ def comms_agent_context():
 
         board_context = _format_board_info(decisions, escalations, recent)
 
-        return jsonify({
-            "mode": "board-info",
-            "has_flow": False,
-            "board": board,
-            "scope": scope,
-            "board_context": board_context,
-            "decisions": decisions,
-            "escalations": escalations,
-            "message_count": len(recent),
-        }), 200
+        return (
+            jsonify(
+                {
+                    "mode": "board-info",
+                    "has_flow": False,
+                    "board": board,
+                    "scope": scope,
+                    "board_context": board_context,
+                    "decisions": decisions,
+                    "escalations": escalations,
+                    "message_count": len(recent),
+                }
+            ),
+            200,
+        )
     except Exception as exc:
         logging.exception("comms_agent_context error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
@@ -937,7 +1084,7 @@ def comms_run():
         adapter = (data.get("adapter", "") or "claude").strip().lower()
         if adapter not in _DEFAULT_MODEL:
             adapter = "claude"
-        model = (data.get("model", "") or _DEFAULT_MODEL[adapter])
+        model = data.get("model", "") or _DEFAULT_MODEL[adapter]
 
         if not isinstance(scope, str) or not scope.strip():
             return jsonify({"error": "Field 'scope' is required"}), 400
@@ -954,11 +1101,20 @@ def comms_run():
         def _board_post(text: str, phase: str | None = None) -> None:
             try:
                 conn = _get_db()
-                mid = _post_message(conn, board=board, scope=scope,
-                                    from_agent="system", type="status", text=text)
+                mid = _post_message(
+                    conn,
+                    board=board,
+                    scope=scope,
+                    from_agent="system",
+                    type="status",
+                    text=text,
+                )
                 payload = {
-                    "type": "COMMS_UPDATE", "event": "board_run",
-                    "message_id": mid, "board": board, "scope": scope,
+                    "type": "COMMS_UPDATE",
+                    "event": "board_run",
+                    "message_id": mid,
+                    "board": board,
+                    "scope": scope,
                 }
                 # phase lets Studio keep the agent control 'running' until the run
                 # actually ends (vs. flipping to done on the async start ack).
@@ -968,16 +1124,20 @@ def comms_run():
             except Exception:
                 logging.debug("board_run lifecycle post failed", exc_info=True)
 
-        label = (agent if isinstance(agent, str) and agent else mode)
+        label = agent if isinstance(agent, str) and agent else mode
 
         def _on_start(_run_id: str) -> None:
-            _board_post(f"🤖 {label} started on this board… (via {adapter})", phase="running")
+            _board_post(
+                f"🤖 {label} started on this board… (via {adapter})", phase="running"
+            )
 
         def _on_done(_run_id: str, res) -> None:
             summary = ""
             if isinstance(res, dict):
                 summary = str(res.get("result") or res.get("summary") or "done")
-            _board_post(f"✅ {label} finished via {adapter} — {summary[:280]}", phase="done")
+            _board_post(
+                f"✅ {label} finished via {adapter} — {summary[:280]}", phase="done"
+            )
 
         result = start_board_run(
             board,
@@ -992,13 +1152,16 @@ def comms_run():
             system_prompt=system_prompt if isinstance(system_prompt, str) else "",
             interactive=interactive,
             progress=progress,
-            broadcast_fn=_broadcast_runner,   # so TERMINAL_SPAWN reaches Studio
+            broadcast_fn=_broadcast_runner,  # so TERMINAL_SPAWN reaches Studio
             on_start=_on_start,
             on_done=_on_done,
         )
 
         if not result.get("ok"):
-            return jsonify({"ok": False, "error": result.get("error", "board_busy")}), 409
+            return (
+                jsonify({"ok": False, "error": result.get("error", "board_busy")}),
+                409,
+            )
 
         return jsonify(result), 200
     except Exception as exc:
@@ -1034,14 +1197,18 @@ def comms_run_stop():
         # 1. Kill the visible PTY tab in Studio.
         tab_id = f"runner-{run_id[-10:]}"
         try:
-            _broadcast_runner(scope, {"type": "TERMINAL_KILL", "tab_id": tab_id, "run_id": run_id})
+            _broadcast_runner(
+                scope, {"type": "TERMINAL_KILL", "tab_id": tab_id, "run_id": run_id}
+            )
         except Exception:
             pass
         # 2. Unblock the waiting run (its finally then releases the lock).
         try:
             run = get_run(run_id)
             if run is not None:
-                run.mark_pty_result({"exit_code": 0, "result": {"result": "stopped by user"}})
+                run.mark_pty_result(
+                    {"exit_code": 0, "result": {"result": "stopped by user"}}
+                )
         except Exception:
             pass
         # 3. Belt-and-suspenders — free the board lock immediately.
@@ -1050,11 +1217,25 @@ def comms_run_stop():
         # 4. Tell the board it was stopped (streamed live).
         try:
             conn = _get_db()
-            mid = _post_message(conn, board=board, scope=scope, from_agent="system",
-                                type="status", text="⏹ run stopped by user")
-            _broadcast_comms(scope, {"type": "COMMS_UPDATE", "event": "board_run",
-                                     "message_id": mid, "board": board, "scope": scope,
-                                     "phase": "stopped"})
+            mid = _post_message(
+                conn,
+                board=board,
+                scope=scope,
+                from_agent="system",
+                type="status",
+                text="⏹ run stopped by user",
+            )
+            _broadcast_comms(
+                scope,
+                {
+                    "type": "COMMS_UPDATE",
+                    "event": "board_run",
+                    "message_id": mid,
+                    "board": board,
+                    "scope": scope,
+                    "phase": "stopped",
+                },
+            )
         except Exception:
             pass
 
@@ -1097,9 +1278,9 @@ def comms_goals_run():
         if flow_override is not None and not isinstance(flow_override, str):
             return jsonify({"error": "Field 'flow' must be a string or null"}), 400
 
-        adapter = (data.get("adapter", "") or "claude")
-        model = (data.get("model", "") or "")
-        project_root = (data.get("project_root", "") or "")
+        adapter = data.get("adapter", "") or "claude"
+        model = data.get("model", "") or ""
+        project_root = data.get("project_root", "") or ""
 
         # Resolve board/scope for the lifecycle posts (start_goal_run re-reads the
         # goal authoritatively; this is only for the human-facing status posts).
@@ -1114,10 +1295,22 @@ def comms_goals_run():
         def _board_post(text: str, phase: str | None = None) -> None:
             try:
                 c = _get_db()
-                mid = _post_message(c, board=board, scope=scope, from_agent="system",
-                                    type="status", text=text)
-                payload = {"type": "COMMS_UPDATE", "event": "goal_run", "goal_id": goal_id,
-                           "message_id": mid, "board": board, "scope": scope}
+                mid = _post_message(
+                    c,
+                    board=board,
+                    scope=scope,
+                    from_agent="system",
+                    type="status",
+                    text=text,
+                )
+                payload = {
+                    "type": "COMMS_UPDATE",
+                    "event": "goal_run",
+                    "goal_id": goal_id,
+                    "message_id": mid,
+                    "board": board,
+                    "scope": scope,
+                }
                 if phase:
                     payload["phase"] = phase
                 _broadcast_comms(scope, payload)
@@ -1144,8 +1337,8 @@ def comms_goals_run():
             project_root=project_root,
             adapter=adapter,
             model=model,
-            broadcast_fn=_broadcast_runner,        # worker terminals → runner stream
-            event_broadcast_fn=_broadcast_comms,   # task-state events → comms stream
+            broadcast_fn=_broadcast_runner,  # worker terminals → runner stream
+            event_broadcast_fn=_broadcast_comms,  # task-state events → comms stream
             on_start=_on_start,
             on_done=_on_done,
         )
@@ -1187,12 +1380,12 @@ def comms_goals_decompose():
         goal_id = data.get("goal_id", "")
         if not isinstance(goal_id, str) or not goal_id.strip():
             return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
-        mode = (data.get("mode", "") or "planner")
+        mode = data.get("mode", "") or "planner"
         if not isinstance(mode, str):
             return jsonify({"error": "Field 'mode' must be a string"}), 400
-        adapter = (data.get("adapter", "") or "claude")
-        model = (data.get("model", "") or "")
-        project_root = (data.get("project_root", "") or "")
+        adapter = data.get("adapter", "") or "claude"
+        model = data.get("model", "") or ""
+        project_root = data.get("project_root", "") or ""
 
         conn = _get_db()
         goal = conn.execute(
@@ -1205,10 +1398,22 @@ def comms_goals_decompose():
         def _board_post(text: str, phase: str | None = None) -> None:
             try:
                 c = _get_db()
-                mid = _post_message(c, board=board, scope=scope, from_agent="system",
-                                    type="status", text=text)
-                payload = {"type": "COMMS_UPDATE", "event": "goal_decompose", "goal_id": goal_id,
-                           "message_id": mid, "board": board, "scope": scope}
+                mid = _post_message(
+                    c,
+                    board=board,
+                    scope=scope,
+                    from_agent="system",
+                    type="status",
+                    text=text,
+                )
+                payload = {
+                    "type": "COMMS_UPDATE",
+                    "event": "goal_decompose",
+                    "goal_id": goal_id,
+                    "message_id": mid,
+                    "board": board,
+                    "scope": scope,
+                }
                 if phase:
                     payload["phase"] = phase
                 _broadcast_comms(scope, payload)
@@ -1222,8 +1427,14 @@ def comms_goals_decompose():
             _board_post("✅ decomposition finished — task DAG seeded", phase="done")
 
         result = start_goal_decompose(
-            goal_id, mode=mode, project_root=project_root, adapter=adapter, model=model,
-            broadcast_fn=_broadcast_runner, on_start=_on_start, on_done=_on_done,
+            goal_id,
+            mode=mode,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            broadcast_fn=_broadcast_runner,
+            on_start=_on_start,
+            on_done=_on_done,
         )
 
         if result.get("ok"):
@@ -1252,7 +1463,9 @@ def comms_edit():
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.comms import update_message_text as _update_text
+        from pathly_orchestrator.db.queries.comms import (
+            update_message_text as _update_text,
+        )
 
         data = request.get_json()
         if not data:
@@ -1260,7 +1473,10 @@ def comms_edit():
 
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
 
         text = data.get("text", "")
         if not isinstance(text, str) or not text.strip():
@@ -1286,7 +1502,9 @@ def comms_delete():
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.comms import soft_delete_message as _soft_delete
+        from pathly_orchestrator.db.queries.comms import (
+            soft_delete_message as _soft_delete,
+        )
 
         data = request.get_json()
         if not data:
@@ -1294,7 +1512,10 @@ def comms_delete():
 
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
 
         # force=True lets the human remove any board message (incl. agent posts and
         # already-read messages). Still a soft delete — recoverable from trash.
@@ -1305,7 +1526,15 @@ def comms_delete():
         if result == "not_found":
             return jsonify({"ok": False, "error": "Message not found"}), 404
         if result == "locked":
-            return jsonify({"ok": False, "error": "Message already read by an agent — cannot retract"}), 409
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Message already read by an agent — cannot retract",
+                    }
+                ),
+                409,
+            )
         return jsonify({"ok": True}), 200
     except Exception as exc:
         logging.exception("comms_delete error")

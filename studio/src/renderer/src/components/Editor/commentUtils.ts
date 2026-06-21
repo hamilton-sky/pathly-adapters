@@ -12,12 +12,17 @@ export function buildSplitPrompt(filePath: string): string {
     ``,
     `Rules:`,
     `- Preserve all existing content exactly — do not rewrite, add, or remove instructions`,
+    `- Preserve every character byte-for-byte, including Unicode punctuation (em-dash —, en-dash –,`,
+    `  curly quotes ' ' " ", ellipsis …). Never substitute or re-encode them.`,
     `- Group related paragraphs under a single ## heading`,
     `- Use short, descriptive ## headings (3–5 words)`,
     `- Maintain the original logical order`,
     `- If the content already has ## sections, refine them for better granularity`,
     ``,
     `Write the restructured content to: ${norm}.draft`,
+    `Write the file as UTF-8 using your native file-writing tool. Do NOT route content through shell`,
+    `commands (Get-Content/Set-Content/Out-File or > redirection) — on Windows PowerShell they corrupt`,
+    `Unicode into mojibake (— becomes "â€").`,
     ``,
     `Do not write anything else. Exit when done.`,
   ].join('\n')
@@ -53,6 +58,8 @@ export function buildAnalyzePrompt(filePath: string): string {
     `## Token Estimate`,
     `Rough token cost per invocation and whether it is appropriate for the task complexity.`,
     ``,
+    `Write the report as UTF-8 using your native file-writing tool — do NOT route it through shell`,
+    `commands (Get-Content/Set-Content/Out-File or > redirection), which corrupt Unicode on Windows.`,
     `Do not write anything else. Exit when done.`,
   ].join('\n')
 }
@@ -96,6 +103,8 @@ export function buildSendPrompt(filePath: string, body: string, unresolved: Comm
     '',
     'Address each reviewer comment below. Do not change sections that have no comments.',
     'Do not ask clarifying questions. Make your best interpretation of each comment and apply it directly.',
+    'Preserve every character byte-for-byte in untouched text, including Unicode punctuation',
+    '(em-dash, curly quotes, ellipsis). Never substitute or re-encode them.',
     '',
     '--- REVIEWER COMMENTS ---',
     commentLines,
@@ -106,6 +115,9 @@ export function buildSendPrompt(filePath: string, body: string, unresolved: Comm
     '---',
     '',
     `Write the complete revised content to: ${norm}.draft`,
+    'Write the file as UTF-8 using your native file-writing tool. Do NOT route content through shell',
+    'commands (Get-Content/Set-Content/Out-File or > redirection) — on Windows PowerShell they corrupt',
+    'Unicode into mojibake.',
     'Do not write anything else — only the file content goes to that path. Exit when done.',
   ].join('\n')
 }
