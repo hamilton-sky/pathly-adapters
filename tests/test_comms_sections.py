@@ -626,3 +626,47 @@ def test_backward_compat_task_id_none_identical_to_before(client):
     assert "📎" not in block_no_task_id
     # The governance decision should still appear
     assert "Use SQLite" in block_no_task_id
+
+
+def test_context_refs_emits_pinned_channel(client, conn, plan_dir):
+    """§5.1 positive path: a task WITH a resolvable context_refs emits the 📎 Referenced
+    context channel containing the hydrated FULL section text. This is the path the loop
+    executor now exercises — scheduler threads task_id → board_context_for →
+    retrieve_board_context (regression for the dropped-task_id wiring bug)."""
+    import json
+
+    base, scope, plan_root = plan_dir
+    _write_plan_file(
+        plan_root,
+        "EDGE_CASES.md",
+        "## Phase 1 — first phase\nedge case body for phase one\n\n## Phase 2\nother\n",
+    )
+
+    r = client.post(
+        "/comms/post",
+        json={
+            "feature": scope,
+            "from": "planner",
+            "type": "task",
+            "text": "Phase 1: do the thing",
+            "board": "feature",
+            "scope": scope,
+            "context_refs": [{"artifact": "EDGE_CASES.md", "anchor": "phase-1"}],
+        },
+    )
+    assert r.status_code == 200, r.data
+    task_id = json.loads(r.data)["message_id"]
+
+    from pathly_orchestrator.runner.comms_context import retrieve_board_context
+
+    block = retrieve_board_context(
+        topic=scope,
+        project_root=str(base),
+        task_description="Phase 1: do the thing",
+        board_scope={"feature": True, "project": False, "global": False},
+        task_id=task_id,
+    )
+    assert "📎 Referenced context" in block, block
+    assert "EDGE_CASES.md" in block
+    # the lossless HYDRATE payload — the full section body, not a summary
+    assert "edge case body for phase one" in block

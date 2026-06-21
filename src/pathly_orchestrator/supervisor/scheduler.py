@@ -130,7 +130,11 @@ def scheduler_loop(
             from pathly_orchestrator.runner.comms_context import board_context_for
 
             _ctx = board_context_for(
-                board, scope, getattr(state, "project_root", "") or "", instructions
+                board,
+                scope,
+                getattr(state, "project_root", "") or "",
+                instructions,
+                task_id=task_id,
             )
             if _ctx:
                 instructions = f"{instructions}\n\n{_ctx}"
