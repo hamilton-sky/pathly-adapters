@@ -71,20 +71,70 @@ self-contained — other agents read it without opening the file.
 
 ---
 
-## Step 4 — Post concrete task proposals
+## Step 4 — Post goal + concrete task proposals
 
-Post one or more `type=task` messages to the board. Tasks must be actionable and specific.
-The user runs them with the standard board controls — no intermediate "options" layer.
+Post a `type=goal` message first, then one or more `type=task` messages stamped with its
+`goal_id`. Tasks must be actionable and specific. The user runs them with the standard board
+controls — no intermediate "options" layer.
+
+**Idempotency guard — skip if a DAG already exists for this scope.** Before posting, check:
+
+```bash
+curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
+curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE"
+```
+
+If either response contains any messages, skip this entire step — the board has already been
+seeded. Do not double-post.
+
+**Post the goal first.** Compose a one-line synthesis of what the board calls for and POST:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "evaluator",
+    "type": "goal",
+    "text": "Goal: <one-line synthesis of what the board calls for>",
+    "board": "feature",
+    "scope": "$FEATURE",
+    "executor": "single"
+  }'
+```
+
+Record the response `"message_id"` as `$GOAL_ID`.
+
+**Post tasks stamped with `$GOAL_ID`:**
 
 **`CODE`:** One task per logical implementation unit.
 **`RESEARCH`:** One exploration task naming the open question.
-**`BOTH`:** Research task first (no dependency), then implementation task(s) depending on it.
+**`BOTH`:** Research task first (no `depends_on`), then implementation task(s) with
+`depends_on` set to the research task's returned `message_id`.
+
+Each task must include `"goal_id": "$GOAL_ID"`. Example shape:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "evaluator",
+    "type": "task",
+    "text": "<actionable task description>",
+    "board": "feature",
+    "scope": "$FEATURE",
+    "stage": "BUILDING",
+    "goal_id": "$GOAL_ID",
+    "depends_on": []
+  }'
+```
 
 Post at least one task. If the board content is too vague, post a `type=question` instead,
-state your fallback assumption in `text`, and include 2–4 options.
+state your fallback assumption in `text`, and include 2–4 options (omit the goal in that case).
 
-If the FSM server is unreachable for any post, skip it silently and list the proposed tasks
-in your text output so the user can post them manually.
+If the FSM server is unreachable for any post, skip it silently and list the proposed goal
+and tasks in your text output so the user can post them manually.
 
 ---
 
@@ -97,6 +147,7 @@ After all posts succeed (or are skipped), output:
 
 Classification: <CODE | RESEARCH | BOTH>
 Analysis artifact: pathly/plans/<feature>/artifacts/BOARD_EVAL.md
+Goal posted: <goal text> (id: <$GOAL_ID>)
 Tasks posted: <N>
 
 - <task 1 text>
