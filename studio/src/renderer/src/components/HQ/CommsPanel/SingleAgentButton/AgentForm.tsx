@@ -1,8 +1,13 @@
 import { useState } from 'react'
 import { Send } from 'lucide-react'
 import { useStore } from '../../../../store'
-import { AGENTS, SKILLS } from '../../../Monitor/ConfigurePhaseModal/configurePhaseModalData'
+import { useUiStore } from '../../../../store/uiStore'
+import {
+  AGENTS, SKILLS, SKILL_PROMPTS, SKILL_FILE_PATHS, AGENT_FILE_PATHS,
+} from '../../../Monitor/ConfigurePhaseModal/configurePhaseModalData'
 import { useAgentCatalog, useSkillCatalog } from '../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
+import { BoardSelect, type BoardSelectOption } from '../../../shared/BoardSelect/BoardSelect'
+import { PromptBanner, usePromptContent, findPath } from '../../../shared/PromptPreview/PromptPreview'
 import { ENGINES, PROGRESS_LEVELS, SYSTEM_PROMPTS } from './agentFormData'
 import s from './SingleAgentButton.module.css'
 
@@ -25,24 +30,73 @@ interface Props {
   onClose: () => void
 }
 
+const NONE = '— none —'
+
 // One-agent mode of the run modal: configuration (engine · agent · skill · system
 // prompt · mode) + a message box. "Send to agent" posts the message to the board
-// AND runs the configured agent on it.
+// AND runs the configured agent on it. Mode lives in a pinned band so it stays
+// visible no matter how far the config scrolls.
 export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   const [engine, setEngine] = useState<string>('claude')
   const [agent, setAgent] = useState<string>('')
   const [skill, setSkill] = useState<string>('')
   const [sysName, setSysName] = useState<string>('')   // '' = none
+  const [sysText, setSysText] = useState<string>('')   // editable system-prompt text
   const [interactive, setInteractive] = useState(false)
   const [progress, setProgress] = useState<string>('normal')
   const [message, setMessage] = useState<string>('')
 
   // Full agent/skill lists from the real core/ dirs (fall back to common picks).
   const projectPath = useStore((st) => st.projectPath)
+  const setMdEditorPath = useUiStore((st) => st.setMdEditorPath)
+  const setActivePanel = useUiStore((st) => st.setActivePanel)
   const agentCatalog = useAgentCatalog(projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
-  const agentOptions = agentCatalog.length ? agentCatalog.map((i) => i.name) : [...AGENTS]
-  const skillOptions = skillCatalog.length ? skillCatalog.map((i) => i.name) : [...SKILLS]
+  const agentNames = agentCatalog.length ? agentCatalog.map((i) => i.name) : [...AGENTS]
+  const skillNames = skillCatalog.length ? skillCatalog.map((i) => i.name) : [...SKILLS]
+
+  const engineOptions: BoardSelectOption[] = ENGINES.map((en) => ({ value: en.value, label: en.label }))
+  const agentOptions: BoardSelectOption[] = [{ value: '', label: NONE }, ...agentNames.map((a) => ({ value: a, label: a }))]
+  const skillOptions: BoardSelectOption[] = [{ value: '', label: NONE }, ...skillNames.map((sk) => ({ value: sk, label: sk }))]
+  const sysOptions: BoardSelectOption[] = [
+    { value: '', label: NONE },
+    ...SYSTEM_PROMPTS.map((p) => ({ value: p.name, label: p.name, hint: p.prompt })),
+  ]
+  const progressOptions: BoardSelectOption[] = PROGRESS_LEVELS.map((p) => ({ value: p.value, label: p.label }))
+
+  // Prompt previews for the current agent/skill — read the real core/ .md.
+  const agentContent = usePromptContent(
+    agent, 'src/pathly_data/core/agents', agentCatalog, AGENT_FILE_PATHS, {}, projectPath,
+  )
+  const skillContent = usePromptContent(
+    skill, 'src/pathly_data/core/skills', skillCatalog, SKILL_FILE_PATHS, SKILL_PROMPTS, projectPath,
+  )
+
+  const agentMdEditorPath = agent && projectPath
+    ? (() => {
+      const rel = findPath(agent, agentCatalog, AGENT_FILE_PATHS)
+      return rel ? `${projectPath}/src/pathly_data/core/agents/${rel}.md` : null
+    })()
+    : null
+  const skillMdEditorPath = skill && projectPath
+    ? (() => {
+      const rel = findPath(skill, skillCatalog, SKILL_FILE_PATHS)
+      return rel ? `${projectPath}/src/pathly_data/core/skills/${rel}.md` : null
+    })()
+    : null
+
+  function openMdEditor(path: string | null): void {
+    if (!path) return
+    setMdEditorPath(path)
+    setActivePanel('markdown-editor')
+    onClose()
+  }
+
+  // Selecting a preset seeds the editable text; the user can then tweak it inline.
+  function pickSys(name: string): void {
+    setSysName(name)
+    setSysText(SYSTEM_PROMPTS.find((p) => p.name === name)?.prompt ?? '')
+  }
 
   // A run needs something to act on: a typed message, a skill (which encodes the
   // task), or a system prompt (a directive). Any one of the three enables Send.
@@ -50,12 +104,11 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
 
   function send(): void {
     if (!canSend) return
-    const sys = SYSTEM_PROMPTS.find((p) => p.name === sysName)?.prompt
     onRun({
       adapter: engine,
       agent: agent || undefined,
       skill: skill || undefined,
-      systemPrompt: sys,
+      systemPrompt: sysText || undefined,
       interactive,
       // Progress cadence only applies headless — interactive shows the terminal.
       progress: interactive ? undefined : progress,
@@ -81,28 +134,47 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
         />
 
         <label className={s.label} htmlFor="sa-engine">Engine</label>
-        <select id="sa-engine" className={s.select} value={engine} onChange={(e) => setEngine(e.currentTarget.value)}>
-          {ENGINES.map((en) => <option key={en.value} value={en.value}>{en.label}</option>)}
-        </select>
+        <BoardSelect id="sa-engine" ariaLabel="Engine" value={engine} options={engineOptions} onChange={setEngine} />
 
         <label className={s.label} htmlFor="sa-agent">Agent</label>
-        <select id="sa-agent" className={s.select} value={agent} onChange={(e) => setAgent(e.currentTarget.value)}>
-          <option value="">— none —</option>
-          {agentOptions.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
+        <BoardSelect id="sa-agent" ariaLabel="Agent" value={agent} options={agentOptions} onChange={setAgent} placeholder={NONE} />
+        {agent && (
+          <PromptBanner
+            content={agentContent}
+            mdEditorPath={agentMdEditorPath}
+            onOpenMdEditor={() => openMdEditor(agentMdEditorPath)}
+          />
+        )}
 
         <label className={s.label} htmlFor="sa-skill">Skill</label>
-        <select id="sa-skill" className={s.select} value={skill} onChange={(e) => setSkill(e.currentTarget.value)}>
-          <option value="">— none —</option>
-          {skillOptions.map((sk) => <option key={sk} value={sk}>{sk}</option>)}
-        </select>
+        <BoardSelect id="sa-skill" ariaLabel="Skill" value={skill} options={skillOptions} onChange={setSkill} placeholder={NONE} />
+        {skill && (
+          <PromptBanner
+            content={skillContent}
+            mdEditorPath={skillMdEditorPath}
+            onOpenMdEditor={() => openMdEditor(skillMdEditorPath)}
+          />
+        )}
 
         <label className={s.label} htmlFor="sa-sys">System prompt</label>
-        <select id="sa-sys" className={s.select} value={sysName} onChange={(e) => setSysName(e.currentTarget.value)}>
-          <option value="">— none —</option>
-          {SYSTEM_PROMPTS.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
-        </select>
+        <BoardSelect id="sa-sys" ariaLabel="System prompt" value={sysName} options={sysOptions} onChange={pickSys} placeholder={NONE} />
+        {sysName && (
+          <PromptBanner editable editValue={sysText} onEditChange={setSysText} />
+        )}
 
+        {!interactive && (
+          <>
+            <label className={s.label} htmlFor="sa-progress">Board updates <span className={s.optional}>· how often the agent posts progress</span></label>
+            <BoardSelect id="sa-progress" ariaLabel="Board updates" value={progress} options={progressOptions} onChange={setProgress} />
+          </>
+        )}
+
+        <p className={s.modeHint}>
+          Sending posts your message to the board and runs the agent on it. The board’s own input box just adds a note — it doesn’t call an agent.
+        </p>
+      </div>
+
+      <div className={s.modeBand}>
         <span className={s.label}>Mode</span>
         <div className={s.modeRow} role="radiogroup" aria-label="Run mode">
           <button
@@ -130,18 +202,6 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
           {interactive
             ? 'Opens a live session and types the prompt for you — stays open for follow-ups.'
             : 'One-shot: runs the prompt and exits when done.'}
-        </p>
-
-        {!interactive && (
-          <>
-            <label className={s.label} htmlFor="sa-progress">Board updates <span className={s.optional}>· how often the agent posts progress</span></label>
-            <select id="sa-progress" className={s.select} value={progress} onChange={(e) => setProgress(e.currentTarget.value)}>
-              {PROGRESS_LEVELS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-          </>
-        )}
-        <p className={s.modeHint}>
-          Sending posts your message to the board and runs the agent on it. The board’s own input box just adds a note — it doesn’t call an agent.
         </p>
       </div>
 

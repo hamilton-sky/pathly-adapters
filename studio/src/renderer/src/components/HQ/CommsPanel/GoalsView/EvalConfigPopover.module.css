@@ -208,6 +208,27 @@
 
 .textarea::placeholder { color: var(--text-muted); }
 
+/* ── Redirect note (agents/skills live in the run modal) ── */
+.redirect {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  font: 400 10.5px/1.4 var(--font-family-base);
+  color: var(--text-muted);
+  border-bottom: var(--border);
+}
+
+.redirect strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.redirectIcon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
 /* ── Footer ── */
 .footer {
   display: flex;

@@ -22,3 +22,16 @@ export const SYSTEM_PROMPTS: { name: string; prompt: string }[] = [
   { name: 'Explainer', prompt: 'Explain clearly and simply, with a short concrete example.' },
   { name: 'Planner', prompt: 'Break the request into a short ordered list of concrete steps.' },
 ]
+
+// Evaluation lenses for the Evaluate button — these shape HOW the board evaluator
+// reads the board, not which worker runs (agents/skills live in "Run on this board").
+// The default ('' / "Propose tasks") runs the plain evaluator; every other lens is
+// passed as the evaluator's system prompt. `name: ''` is the no-lens default row.
+export interface EvalLens { name: string; label: string; hint: string; prompt: string }
+export const EVAL_LENSES: EvalLens[] = [
+  { name: '', label: 'Propose tasks', hint: 'default · analyze board → task list', prompt: '' },
+  { name: 'risks', label: 'Find risks', hint: 'surface bugs, blockers, regressions', prompt: 'Evaluate this board with a risk lens. Surface the bugs, blockers, regressions, and unsafe assumptions hiding in the work, and propose concrete tasks to de-risk them. Prioritize the highest-impact risks first.' },
+  { name: 'gaps', label: 'Find gaps', hint: 'what is missing or unspecified', prompt: 'Evaluate this board for gaps. Identify what is missing, under-specified, or contradictory across the goals, decisions, and artifacts, and propose concrete tasks to close each gap.' },
+  { name: 'summary', label: 'Summarize state', hint: 'where things stand right now', prompt: 'Evaluate this board and summarize the current state: what is decided, what is in flight, what is blocked, and what is done. Be terse and factual. Only propose tasks for clear, unambiguous next steps.' },
+  { name: 'prioritize', label: 'Prioritize', hint: 'order the open work by impact', prompt: 'Evaluate this board and prioritize the open work. Order the outstanding tasks and goals by impact and dependency, call out what should happen next and why, and propose any missing tasks needed to unblock the top items.' },
+]

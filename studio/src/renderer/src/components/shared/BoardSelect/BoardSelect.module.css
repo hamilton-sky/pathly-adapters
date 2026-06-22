@@ -1,0 +1,189 @@
+/* Generic custom dropdown — the portaled-menu look from ProjectSelector, reusable
+   inside modals/popovers where a native <select> can't match the dark theme or
+   render two-line rows. */
+
+.wrap {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+/* ── Trigger ── */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font: 400 12.5px/1 var(--font-family-base);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  border-color: var(--accent-border, var(--accent));
+}
+
+.trigger:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.lead {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.triggerLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.placeholder {
+  color: var(--text-muted);
+}
+
+.chev {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ── Portaled menu (position:fixed, anchored from the trigger rect) ──
+   Outer shell holds an optional count header + the scroll area; it clips so the
+   fade overlays and rounded corners stay inside. The inner .scroll does the
+   scrolling, and .fadeTop/.fadeBottom signal there's more above/below. */
+.menu {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--bg-surface1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  outline: none;
+}
+
+/* Up-opening: anchor the menu's bottom edge to the trigger top. */
+.menu[data-dir='up'] {
+  transform: translateY(-100%);
+}
+
+.menuHead {
+  flex-shrink: 0;
+  padding: 6px 11px 5px;
+  font: 600 9.5px/1 var(--font-family-base);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.scrollWrap {
+  position: relative;
+  min-height: 0;
+}
+
+/* The actual scroll container — a definite max-height (set inline from the
+   available space) guarantees the wheel scrolls it when the list overflows. */
+.scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 3px;
+}
+
+/* Scroll-shadow fades — only rendered when overflowing and not at that edge. */
+.fadeTop,
+.fadeBottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 24px;
+  pointer-events: none;
+}
+
+.fadeTop {
+  top: 0;
+  background: linear-gradient(to bottom, var(--bg-surface1), transparent);
+}
+
+.fadeBottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg-surface1), transparent);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 7px 9px;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.item:hover,
+.item[data-active='true'] {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.item[data-selected='true'] .itemLabel {
+  color: var(--accent);
+}
+
+.check {
+  width: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.itemLabel {
+  font-size: 12.5px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemHint {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -9,6 +9,7 @@ import {
   saveEditorCli,
 } from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import { EvalConfigPopover } from './EvalConfigPopover'
+import { EVAL_LENSES } from '../SingleAgentButton/agentFormData'
 import s from './GoalsView.module.css'
 
 // Persistent localStorage key for the evaluate button's engine choice.
@@ -23,7 +24,6 @@ interface Props {
 // EvalConfigPopover lets the user pick agent, skill, engine, and extra instructions.
 export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
   const runEvaluator = useCommsStore((st) => st.runEvaluator)
-  const runSingleAgent = useCommsStore((st) => st.runSingleAgent)
   const stopBoard = useCommsStore((st) => st.stopBoard)
   const boardRunState = useCommsStore((st) => st.boardRunState)
   const boardRunStart = useCommsStore((st) => st.boardRunStart)
@@ -32,14 +32,15 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
   const running = runState === 'running'
   const progress = useElapsedProgress(boardRunStart[boardKey] || undefined)
 
-  const [selectedAgent, setSelectedAgent] = useState('')
-  const [selectedSkill, setSelectedSkill] = useState('')
+  const [selectedLens, setSelectedLens] = useState('')
+  const [lensText, setLensText] = useState('')   // editable lens-prompt text
   const [extraPrompt, setExtraPrompt] = useState('')
   const [selectedCli, setSelectedCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_EVAL))
   const [configOpen, setConfigOpen] = useState(false)
   const gearRef = useRef<HTMLButtonElement>(null)
 
-  const activeLabel = selectedSkill || 'Evaluate'
+  const lensLabel = EVAL_LENSES.find((l) => l.name === selectedLens && l.name)?.label
+  const activeLabel = lensLabel ?? 'Evaluate'
   const label =
     running ? (progress != null ? `${activeLabel}… ${fmtElapsed(progress.elapsedS)}` : `${activeLabel}…`)
     : runState === 'done' ? 'Done'
@@ -50,18 +51,19 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
     saveEditorCli(CLI_KEY_EVAL, cli)
   }
 
+  // Selecting a lens seeds the editable text; the user can then tweak it inline.
+  function pickLens(name: string): void {
+    setSelectedLens(name)
+    setLensText(EVAL_LENSES.find((l) => l.name === name)?.prompt ?? '')
+  }
+
   function handleRun(): void {
     const adapter = selectedCli !== 'claude' ? selectedCli : undefined
-    if (selectedAgent || selectedSkill) {
-      runSingleAgent(boardKey, {
-        agent: selectedAgent || undefined,
-        skill: selectedSkill || undefined,
-        instructions: extraPrompt || undefined,
-        adapter,
-      })
-    } else {
-      runEvaluator(boardKey, { adapter })
-    }
+    runEvaluator(boardKey, {
+      adapter,
+      systemPrompt: lensText || undefined,
+      instructions: extraPrompt || undefined,
+    })
   }
 
   function handleConfigRun(): void {
@@ -70,8 +72,8 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
   }
 
   function handleReset(): void {
-    setSelectedAgent('')
-    setSelectedSkill('')
+    setSelectedLens('')
+    setLensText('')
     setExtraPrompt('')
   }
 
@@ -79,8 +81,8 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
     <>
       <div className={s.evalRoot}>
         <Tooltip
-          label={selectedSkill ? `Run ${selectedSkill} on this board` : 'Evaluate board'}
-          description={selectedSkill ? undefined : 'Analyze everything on this board and propose concrete tasks'}
+          label={lensLabel ? `Evaluate board — ${lensLabel}` : 'Evaluate board'}
+          description="Analyze everything on this board and propose concrete tasks"
           placement="bottom"
         >
           <button
@@ -119,13 +121,13 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
       {configOpen && (
         <EvalConfigPopover
           anchorEl={gearRef.current}
-          selectedAgent={selectedAgent}
-          selectedSkill={selectedSkill}
+          selectedLens={selectedLens}
+          lensText={lensText}
           extraPrompt={extraPrompt}
           selectedCli={selectedCli}
           running={running}
-          onSelectAgent={setSelectedAgent}
-          onSelectSkill={setSelectedSkill}
+          onSelectLens={pickLens}
+          onLensTextChange={setLensText}
           onExtraPromptChange={setExtraPrompt}
           onCliChange={handleCliChange}
           onReset={handleReset}

@@ -3,6 +3,7 @@ import { Play } from 'lucide-react'
 import { BOARD_FLOWS } from './flowCatalog'
 import { FlowDiagram } from './FlowDiagram/FlowDiagram'
 import { FlowAbout } from './FlowAbout/FlowAbout'
+import { BoardSelect, type BoardSelectOption } from '../../../shared/BoardSelect/BoardSelect'
 import s from './SingleAgentButton.module.css'
 
 interface Props {
@@ -11,8 +12,11 @@ interface Props {
   onClose: () => void
 }
 
+const FLOW_OPTIONS: BoardSelectOption[] = BOARD_FLOWS.map((f) => ({ value: f.key, label: f.label, hint: f.blurb }))
+
 // Flow mode of the run modal: pick a board-scoped flow, preview its stage pipeline,
-// then run the whole flow on this board's topic (no goal/DAG required).
+// then run the whole flow on this board's topic (no goal/DAG required). Mode lives in
+// a pinned band so it stays reachable even when the diagram + About push the body tall.
 export function FlowForm({ running, onRunFlow, onClose }: Props): JSX.Element {
   const [flowKey, setFlowKey] = useState<string>(BOARD_FLOWS[0].key)
   const [interactive, setInteractive] = useState(true)
@@ -28,13 +32,17 @@ export function FlowForm({ running, onRunFlow, onClose }: Props): JSX.Element {
     <>
       <div className={s.body}>
         <label className={s.label} htmlFor="flow-pick">Flow</label>
-        <select id="flow-pick" className={s.select} value={flowKey} onChange={(e) => setFlowKey(e.currentTarget.value)}>
-          {BOARD_FLOWS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-        </select>
+        <BoardSelect id="flow-pick" ariaLabel="Flow" value={flowKey} options={FLOW_OPTIONS} onChange={setFlowKey} />
 
         <FlowDiagram flow={flow} />
         <FlowAbout flow={flow} />
 
+        <p className={s.modeHint}>
+          Runs the whole flow on this board’s topic — no goal or task DAG needed. Stages spawn as terminals, just like the Start button.
+        </p>
+      </div>
+
+      <div className={s.modeBand}>
         <span className={s.label}>Mode</span>
         <div className={s.modeRow} role="radiogroup" aria-label="Run mode">
           <button
@@ -62,9 +70,6 @@ export function FlowForm({ running, onRunFlow, onClose }: Props): JSX.Element {
           {interactive
             ? 'Each stage opens a live terminal you can watch and steer.'
             : 'Each stage runs headless; progress posts to the board and terminals.'}
-        </p>
-        <p className={s.modeHint}>
-          Runs the whole flow on this board’s topic — no goal or task DAG needed. Stages spawn as terminals, just like the Start button.
         </p>
       </div>
 

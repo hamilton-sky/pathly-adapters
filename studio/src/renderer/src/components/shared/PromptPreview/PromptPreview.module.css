@@ -1,0 +1,170 @@
+/* Collapsible prompt-preview banner shown under an agent/skill selector — reads the
+   role/skill .md and renders a truncated markdown preview. Shared by the Evaluate
+   popover and the board run modal. */
+
+.banner {
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  overflow: hidden;
+}
+
+.bannerHeader {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 4px;
+}
+
+.bannerToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: 500 11px/1 var(--font-family-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex: 1;
+  text-align: left;
+}
+
+.bannerToggle:hover { color: var(--text-primary); }
+
+.bannerToggle svg { transition: transform 150ms ease; }
+.chevronOpen { transform: rotate(90deg); }
+
+.mdEditorLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: 400 10px/1 var(--font-family-base);
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.mdEditorLink:hover { opacity: 1; }
+
+/* ── Preview / edit icon toggle (editable presets only) ── */
+.modeToggle {
+  display: inline-flex;
+  align-items: center;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.modeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.modeBtn + .modeBtn { border-left: var(--border); }
+.modeBtn:hover { color: var(--text-secondary); background: var(--bg-surface1); }
+.modeBtn[data-on] { color: var(--accent); background: var(--accent-bg); }
+
+/* ── Inline edit textarea ── */
+.editArea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 120px;
+  max-height: 260px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: none;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: 400 11.5px/1.55 var(--font-family-mono);
+}
+
+.editArea:focus { outline: none; }
+.editArea::placeholder { color: var(--text-muted); }
+
+.bannerBody {
+  border-top: var(--border);
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Compact markdown — overrides the shared MarkdownRenderer sizes for the tight banner */
+.previewMd {
+  padding: 6px 10px;
+}
+
+.previewMd :global(h1),
+.previewMd :global(h2) {
+  font-size: 11px;
+  margin: 4px 0 3px;
+}
+
+.previewMd :global(h3),
+.previewMd :global(h4),
+.previewMd :global(h5),
+.previewMd :global(h6) {
+  font-size: 10.5px;
+  margin: 3px 0 2px;
+}
+
+.previewMd :global(p) {
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 2px 0 4px;
+}
+
+.previewMd :global(ul),
+.previewMd :global(ol) {
+  padding-left: 14px;
+  margin: 2px 0 4px;
+}
+
+.previewMd :global(li) {
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 1px 0;
+}
+
+.previewMd :global(pre) {
+  margin: 4px 0 6px;
+  padding: 6px 8px;
+}
+
+.previewMd :global(pre code) {
+  font-size: 10px;
+}
+
+.previewMd :global(code) {
+  font-size: 10.5px;
+}
+
+.previewMd :global(hr) {
+  margin: 6px 0;
+}
+
+.previewMd :global(blockquote) {
+  margin: 4px 0;
+  padding-left: 8px;
+}
+
+.previewEmpty {
+  display: block;
+  padding: 8px 10px;
+  font: 400 11px/1.4 var(--font-family-base);
+  color: var(--text-muted);
+}
