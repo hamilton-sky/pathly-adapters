@@ -244,7 +244,13 @@ def comms_post():
                     from pathly_orchestrator.runner.hydrate import (
                         index_artifact_async as _index_async,
                     )
-                    _index_async(art_id, artifact_path, scope=scope, backend=summary_backend)
+                    _index_async(
+                        art_id,
+                        artifact_path,
+                        scope=scope,
+                        backend=summary_backend,
+                        broadcast_fn=lambda _p: _broadcast_comms(scope, _p),
+                    )
                 except Exception:
                     logging.debug("index_artifact_async (post) failed", exc_info=True)
             except Exception:

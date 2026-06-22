@@ -33,6 +33,18 @@
 .msgStage[data-stage='RETRO']     { color: var(--state-retro); }
 .msgStage[data-stage='DONE']      { color: var(--state-done); }
 
+.summaryBadge {
+  font: 600 9px/1 var(--font-family-mono);
+  letter-spacing: 0.04em;
+  padding: 2px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-surface1);
+  white-space: nowrap;
+}
+.summaryBadge[data-summary='summarizing'] { color: var(--text-muted); }
+.summaryBadge[data-summary='ready']       { color: var(--state-done); }
+.summaryBadge[data-summary='failed']      { color: var(--red); }
+
 .msgTime {
   font-family: var(--font-family-mono);
   font-size: 10px;

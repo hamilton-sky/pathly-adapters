@@ -160,14 +160,9 @@ _fake_start_board_run.calls = []
 def patch_board_run(monkeypatch):
     """Monkeypatch start_board_run inside the comms blueprint's import namespace."""
     _fake_start_board_run.calls = []
-    import pathly_orchestrator.http_server.blueprints.comms as comms_bp
-
-    monkeypatch.setattr(
-        comms_bp,
-        "comms_consolidate",
-        comms_bp.comms_consolidate,  # keep route handler; patch happens inside it
-    )
-    # Patch the module that the route handler imports from at call time
+    # The /comms/consolidate handler lazily imports start_board_run from
+    # supervisor.board_run at call time, so patching the SOURCE module is what the
+    # route picks up (works regardless of which blueprint submodule the route lives in).
     import pathly_orchestrator.supervisor.board_run as br_mod
 
     monkeypatch.setattr(br_mod, "start_board_run", _fake_start_board_run)

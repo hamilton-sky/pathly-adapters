@@ -160,7 +160,9 @@ def ensure_indexed(
     return {"ok": True, "artifact_id": artifact_id, "stale_rebuilt": True}
 
 
-def _schedule_resummarize_async(artifact_id: str, backend: str | None = None) -> None:
+def _schedule_resummarize_async(
+    artifact_id: str, backend: str | None = None, broadcast_fn=None
+) -> None:
     """Schedule async re-summarize of an artifact and its sections on structure change.
 
     `backend` overrides the summary backend for THIS run (per-upload choice); None
@@ -182,45 +184,87 @@ def _schedule_resummarize_async(artifact_id: str, backend: str | None = None) ->
                 update_artifact_summary,
                 update_section_summary,
             )
-            from pathly_orchestrator.runner.inference import summarize_content
+            from pathly_orchestrator.runner.inference import (
+                _resolve_backend,
+                summarize_content,
+            )
 
             conn = get_db()
             row = conn.execute(
-                "SELECT path, type FROM comms_artifacts WHERE id=?",
+                "SELECT message_id, path, type FROM comms_artifacts WHERE id=?",
                 (artifact_id,),
             ).fetchone()
             if row is None:
                 return
+            message_id = row["message_id"]
             path = row["path"]
             artifact_type = row["type"] or "md"
 
             if not _is_md(path):
                 return
 
+            # Resolve the effective backend up-front. Off (minilm) ⇒ no work and no
+            # signals — keeps the default byte-identical and silent.
+            eff_backend = _resolve_backend(backend)
+            if eff_backend == "minilm":
+                return
+
             text = _read_file_text(path)
             if text is None:
                 return
 
+            def _signal(event: str, **extra) -> None:
+                """Log + (best-effort) broadcast a summarizer lifecycle event so the
+                board/console can show that summarization started / finished / failed."""
+                if event == "summary_failed":
+                    logger.warning(
+                        "summarize %s: artifact=%s backend=%s %s",
+                        event, artifact_id, eff_backend, extra.get("error", ""),
+                    )
+                else:
+                    logger.info(
+                        "summarize %s: artifact=%s backend=%s", event, artifact_id, eff_backend
+                    )
+                if broadcast_fn is None:
+                    return
+                try:
+                    broadcast_fn(
+                        {
+                            "type": "COMMS_UPDATE",
+                            "event": event,
+                            "artifact_id": artifact_id,
+                            "message_id": message_id,
+                            **extra,
+                        }
+                    )
+                except Exception:
+                    logger.debug("summarize signal broadcast failed", exc_info=True)
+
+            _signal("summarizing")
+
             # Whole-artifact topic-map summary
-            result = summarize_content(text, artifact_type=artifact_type, backend=backend)
-            if result.summary is not None:
-                update_artifact_summary(conn, artifact_id, result.summary)
-
-            # Per-section summaries (≤1 sentence each)
-            sections = get_artifact_sections(conn, artifact_id)
-            if not sections:
+            result = summarize_content(text, artifact_type=artifact_type, backend=eff_backend)
+            if result.summary is None:
+                _signal("summary_failed", error=result.error or "no summary produced")
                 return
+            update_artifact_summary(conn, artifact_id, result.summary)
 
+            # Per-section summaries (≤1 sentence each) — best-effort
+            sections = get_artifact_sections(conn, artifact_id)
             file_lines = text.splitlines(keepends=True)
-            for sec in sections:
+            for sec in sections or []:
                 ls = max(1, sec["line_start"]) - 1
                 le = min(len(file_lines), sec["line_end"])
                 sec_text = "".join(file_lines[ls:le])
                 if not sec_text.strip():
                     continue
-                sec_result = summarize_content(sec_text, artifact_type=artifact_type, max_sentences=1, backend=backend)
+                sec_result = summarize_content(
+                    sec_text, artifact_type=artifact_type, max_sentences=1, backend=eff_backend
+                )
                 if sec_result.summary is not None:
                     update_section_summary(conn, sec["id"], sec_result.summary)
+
+            _signal("summary_ready")
 
         except Exception:
             logger.debug("_schedule_resummarize_async failed for %s", artifact_id, exc_info=True)
@@ -429,7 +473,11 @@ def hydrate_section(
 
 
 def index_artifact_async(
-    artifact_id: str, path: str, scope: str = "", backend: str | None = None
+    artifact_id: str,
+    path: str,
+    scope: str = "",
+    backend: str | None = None,
+    broadcast_fn=None,
 ) -> None:
     """Daemon-thread eager indexer, mirrors embed_async.
 
@@ -499,7 +547,9 @@ def index_artifact_async(
             # so the default stays behavior-identical; with a backend on, new uploads
             # and agent-created .md actually get summarized.
             if old_struct is None or cur_struct != old_struct:
-                _schedule_resummarize_async(artifact_id, backend=backend)
+                _schedule_resummarize_async(
+                    artifact_id, backend=backend, broadcast_fn=broadcast_fn
+                )
 
         except Exception:
             logger.debug("index_artifact_async failed for %s", path, exc_info=True)

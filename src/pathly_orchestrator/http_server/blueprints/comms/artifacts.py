@@ -84,7 +84,13 @@ def comms_attach():
                     from pathly_orchestrator.runner.hydrate import (
                         index_artifact_async as _index_async,
                     )
-                    _index_async(art_id, artifact_path, scope=row.get("scope", ""))
+                    _ascope = row.get("scope", "")
+                    _index_async(
+                        art_id,
+                        artifact_path,
+                        scope=_ascope,
+                        broadcast_fn=lambda _p: _broadcast_comms(_ascope, _p),
+                    )
                 except Exception:
                     logging.debug("index_artifact_async (attach) failed", exc_info=True)
             except Exception:

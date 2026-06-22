@@ -35,7 +35,7 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
       es = new EventSource(`${PATHLY_API_BASE}/events/comms?scope=${encodeURIComponent(key)}`)
       es.onmessage = (e: MessageEvent) => {
         try {
-          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string; goal_id?: string }
+          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string; goal_id?: string; message_id?: string; error?: string }
           if (data.type === 'COMMS_UPDATE') {
             // Drive the agent control's run state from the run lifecycle so it stays
             // green (and Stop stays enabled) until the agent actually finishes.
@@ -45,6 +45,13 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
             if ((data.event === 'goal_run' || data.event === 'goal_decompose')
                 && data.phase && data.goal_id) {
               useCommsStore.getState().markGoalRunPhase(data.goal_id, data.phase)
+            }
+            // Offline summarizer lifecycle → per-artifact badge + toast on done/fail.
+            if (data.message_id && (data.event === 'summarizing'
+                || data.event === 'summary_ready' || data.event === 'summary_failed')) {
+              const st = data.event === 'summarizing' ? 'summarizing'
+                : data.event === 'summary_ready' ? 'ready' : 'failed'
+              useCommsStore.getState().markSummaryStatus(data.message_id, st, data.error)
             }
             loadRef.current()
           }

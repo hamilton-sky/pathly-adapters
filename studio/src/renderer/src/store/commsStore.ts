@@ -95,6 +95,15 @@ export interface CommsState {
   /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
   markGoalRunPhase: (goal_id: string, phase: string) => void
   stopGoal: (goal_id: string) => void
+
+  // Per-artifact offline-summarizer status, keyed by the artifact's MESSAGE id.
+  summaryStatus: Record<string, 'summarizing' | 'ready' | 'failed'>
+  /** Update from a summarizing / summary_ready / summary_failed SSE event. */
+  markSummaryStatus: (
+    messageId: string,
+    status: 'summarizing' | 'ready' | 'failed',
+    error?: string,
+  ) => void
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -434,6 +443,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   goalRunState: {},
   goalRunStart: {},
+  summaryStatus: {},
 
   runGoal: (goal_id, executor, opts = {}) => {
     const now = Date.now()
@@ -484,6 +494,19 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   stopGoal: (goal_id) => {
     set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
     apiStopGoal(goal_id).catch(() => undefined)
+  },
+
+  markSummaryStatus: (messageId, status, error) => {
+    set((s) => ({ summaryStatus: { ...s.summaryStatus, [messageId]: status } }))
+    if (status === 'ready') {
+      useToastStore.getState().push('📝 Summary ready', 'success', { category: 'db_crud' })
+    } else if (status === 'failed') {
+      useToastStore.getState().push(
+        `⚠ Summary failed${error ? `: ${error}` : ''}`,
+        'error',
+        { category: 'runner_state' },
+      )
+    }
   },
 
   decomposeGoal: (goal_id, mode) => {

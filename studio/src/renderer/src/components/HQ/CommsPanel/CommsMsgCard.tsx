@@ -9,7 +9,14 @@ import { SupersedeMenu } from './SupersedeMenu/SupersedeMenu'
 import { ConfirmModal } from '../../shared/ConfirmModal/ConfirmModal'
 import { ArtifactModal } from './ArtifactModal/ArtifactModal'
 import { Tooltip } from '../../ui'
+import { useCommsStore } from '../../../store/commsStore'
 import s from './CommsMsgCard.module.css'
+
+const SUMMARY_LABEL = {
+  summarizing: 'summarizing…',
+  ready: '📝 summary',
+  failed: '⚠ summary failed',
+} as const
 
 export interface CommsMsgCardProps {
   message: Message
@@ -26,6 +33,7 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
   const canDelete = !!onDelete   // every message can be removed from the board
   const [confirming, setConfirming] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
+  const summaryState = useCommsStore((st) => st.summaryStatus[m.id])
   return (
     <div
       className={`${s.msg}${flash ? ` ${s.flash}` : ''}`}
@@ -77,6 +85,11 @@ export function CommsMsgCard({ message: m, flash, onAnswer, onResolve, onDelete,
                 <Info size={11} /> Details
               </button>
             </Tooltip>
+          )}
+          {m.type === 'artifact' && summaryState && (
+            <span className={s.summaryBadge} data-summary={summaryState}>
+              {SUMMARY_LABEL[summaryState]}
+            </span>
           )}
           {m.stage && (
             <span className={s.msgStage} data-stage={m.stage}>{m.stage}</span>
