@@ -1,11 +1,13 @@
 # Pathly Adapters Production Readiness
 
+> **Refreshed 2026-06-22 (v2.16.2):** version bumped from 2.14.1; CI confirmed (6 GitHub Actions workflows); Codex local marketplace, Antigravity adapter, and comms-board features (Board→Goals→Task-DAG, context-retrieval, memory consolidation, goal-stop) are shipped. Studio installer code-signing remains still-needed.
+
 Release criteria for pathly-adapters. Until these gates are met, describe
 pathly-adapters publicly as a public beta / technical preview.
 
 ## Release Position
 
-pathly-adapters is currently at **version 2.14.1**:
+pathly-adapters is currently at **version 2.16.2**:
 
 - Stable for the core install path (`--dry-run`, `--apply`, `--uninstall`) with
   full rollback on failure.

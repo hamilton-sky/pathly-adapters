@@ -5,6 +5,10 @@ _Full trace and conclusions: `pathly/explorations/architecture-risk-assessment/`
 
 ---
 
+> **Re-audit note (2026-06-22, v2.16.2):** several risks below are resolved — CI now exists (6 GitHub Actions workflows: `test.yml`, `studio-ci.yml`, `e2e.yml`, `lint.yml`, `publish.yml`, `studio-release.yml`), `check_version_sync.py` shipped, Codex and Antigravity adapters shipped.
+
+---
+
 ## Risk 1 — Hook contract mismatch: spec says exit 0, code exits 1
 
 ### Description
@@ -24,6 +28,8 @@ the user's perspective (the host tool continues, but feedback classification and
 TTL injection never happen).
 
 **Severity: Moderate**
+
+**Status (2026-06):** still open — hook exit-code contract and PATHLY_PROJECT_ROOT guidance not yet resolved.
 
 ### Proposed solution
 
@@ -63,6 +69,8 @@ No CI pipeline exists (`.github/` is absent). No end-to-end clean-machine smoke 
 has been run. The README Known Limitations section (`line 120`) correctly flags this.
 
 **Severity: Moderate (before any public Codex claim)**
+
+**Status (2026-06):** partially resolved — CI now exists (6 workflows); Codex adapter shipped. Unguarded writes and clean-machine smoke test remain open.
 
 ### Proposed solution
 
@@ -106,6 +114,8 @@ prevents a field rename from shipping without a migration step.
 
 **Severity: Moderate (latent — no field renames planned, but no guard exists)**
 
+**Status (2026-06):** still open — no schema_version field added yet.
+
 ### Proposed solution
 
 1. **Add `schema_version: 1` to every appended event** in `eventlog.py:append_event()`:
@@ -130,7 +140,7 @@ prevents a field rename from shipping without a migration step.
 
 ### Description
 
-`pyproject.toml:7` is at version `2.3.0`. Two files are out of date:
+`pyproject.toml:7` was at version `2.3.0` at audit time (now `2.16.2`). Two files were out of date:
 - `docs/SECURITY.md:6` — says `1.0.0` (2 major versions stale)
 - `CHANGELOG.md:2` — last entry is `2.1.0`; versions 2.2.0 and 2.3.0 are undocumented
 
@@ -139,6 +149,8 @@ Version bumps are not gated on documentation updates.
 
 **Severity: Low (no functional impact; erodes trust and loses release history)**
 
+**Status (2026-06):** partially resolved — CI now exists (6 workflows); `scripts/check_version_sync.py` shipped. SECURITY.md and CHANGELOG backfill status unknown.
+
 ### Proposed solution
 
 1. **Immediate fix:**
@@ -146,7 +158,7 @@ Version bumps are not gated on documentation updates.
    - Backfill `CHANGELOG.md` with entries for 2.2.0 and 2.3.0
      (even brief: "Internal refactor, no breaking changes" is better than nothing).
 
-2. **Process fix — add `scripts/check_version_sync.py`:**
+2. **Process fix — `scripts/check_version_sync.py` (shipped):**
    ```python
    import re, sys
    from pathlib import Path

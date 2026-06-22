@@ -1,8 +1,10 @@
 # Pathly Adapters Architecture
 
+> Scope: runtime adapter surfaces and install pipeline. For package layout and install/publish details see `PATHLY_ARCHITECTURE.md`. Version: **2.16.2**.
+
 pathly-adapters installs Pathly agent and skill files into AI host tools (Claude
-Code, Codex, Copilot). It owns the stitch pipeline, host detection, resource
-loading, the `pathly-setup` CLI, and the local Pathly Studio desktop UI.
+Code, Codex, Copilot, Antigravity). It owns the stitch pipeline, host detection,
+resource loading, the `pathly-setup` CLI, and the local Pathly Studio desktop UI.
 
 ## Package Layout
 
@@ -260,6 +262,19 @@ The FSM server persists state in SQLite at `~/.pathly/pathly.db`.
 | `flow_edges` | Per-edge config (reserved — unused, for future visual flow builder) |
 
 **Connection model:** each Flask thread gets its own `sqlite3.Connection` via `threading.local()`. WAL mode means readers never block writers. A background daemon thread checkpoints the WAL file every 30 seconds.
+
+## Board→Goals→Task-DAG Executor Model
+
+The runtime orchestration layer now extends beyond `transition_actions` auto-spawning. The comms board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) acts as the live orchestration substrate:
+
+- **Goals** are top-level intent records; each goal owns a Task-DAG (`goal_id` column on tasks).
+- **Executors** (`single` / `loop` / `team`) are pluggable per goal and drive how tasks are dispatched (`supervisor/goal_run.py`).
+- **Per-goal adapter selection** routes each goal's execution to a specific CLI adapter (Claude, Codex, Antigravity, etc.).
+- **Context-retrieval** (`context_refs` + `/comms/artifacts/<id>/section` hydration, Board Catalog, opt-in summarizer) injects relevant board context into every agent prompt.
+- **Memory consolidation** (`/comms/consolidate`) deduplicates and merges near-duplicate notes.
+- **Goal-stop** (`POST /comms/goals/stop`) terminates an in-progress goal run.
+
+All of these are shipped as of v2.16.2. `transition_actions` auto-spawning remains the baseline for flow-driven pipelines; the Board executor model is the layer above it for interactive and multi-goal orchestration.
 
 ## Source of Truth
 

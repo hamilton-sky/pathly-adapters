@@ -45,7 +45,7 @@ metadata, and expose the host-native invocation style.
 |---|---|---|
 | Claude Code | `/pathly <request>` or `/path <request>` (slash commands) | `src/pathly_data/adapters/claude/` |
 | Codex | `Use Pathly <request>` or `Pathly <request>` (natural language) plus `pathly-fsm-call` for HTTP lifecycle steps | `src/pathly_data/adapters/codex/` |
-| Copilot | Version-dependent; agent files as custom instructions | `src/pathly_data/adapters/copilot/` |
+| Copilot | Native skill invocation (VS Code Copilot agent spec; skills are native as of Aug 2025) | `src/pathly_data/adapters/copilot/` |
 | Antigravity | `/pathly <request>` slash commands (Gemini CLI layout); models: `gemini-2.5-pro` / `gemini-2.5-flash` | `src/pathly_data/adapters/antigravity/` |
 
 ## Studio Surface
