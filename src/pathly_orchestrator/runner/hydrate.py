@@ -160,8 +160,12 @@ def ensure_indexed(
     return {"ok": True, "artifact_id": artifact_id, "stale_rebuilt": True}
 
 
-def _schedule_resummarize_async(artifact_id: str) -> None:
+def _schedule_resummarize_async(artifact_id: str, backend: str | None = None) -> None:
     """Schedule async re-summarize of an artifact and its sections on structure change.
+
+    `backend` overrides the summary backend for THIS run (per-upload choice); None
+    falls back to the global app-setting. With the default (minilm/off) summarize
+    returns None → no writeback → behavior byte-identical.
 
     Called when structure_key changes (heading added/removed/renamed). Fires a daemon
     thread that reads the artifact row, calls summarize_content for the whole artifact
@@ -198,7 +202,7 @@ def _schedule_resummarize_async(artifact_id: str) -> None:
                 return
 
             # Whole-artifact topic-map summary
-            result = summarize_content(text, artifact_type=artifact_type)
+            result = summarize_content(text, artifact_type=artifact_type, backend=backend)
             if result.summary is not None:
                 update_artifact_summary(conn, artifact_id, result.summary)
 
@@ -214,7 +218,7 @@ def _schedule_resummarize_async(artifact_id: str) -> None:
                 sec_text = "".join(file_lines[ls:le])
                 if not sec_text.strip():
                     continue
-                sec_result = summarize_content(sec_text, artifact_type=artifact_type, max_sentences=1)
+                sec_result = summarize_content(sec_text, artifact_type=artifact_type, max_sentences=1, backend=backend)
                 if sec_result.summary is not None:
                     update_section_summary(conn, sec["id"], sec_result.summary)
 
@@ -424,11 +428,16 @@ def hydrate_section(
         }
 
 
-def index_artifact_async(artifact_id: str, path: str, scope: str = "") -> None:
+def index_artifact_async(
+    artifact_id: str, path: str, scope: str = "", backend: str | None = None
+) -> None:
     """Daemon-thread eager indexer, mirrors embed_async.
 
     Parses sections and writes the index for path. .md ONLY (§8 item 0) —
     early-returns for non-.md before parsing. Best-effort: never raises to caller.
+
+    `backend` is the per-upload summary-backend override (None ⇒ global app-setting),
+    used when this index triggers a (re)summarize.
     """
     if not _is_md(path):
         return
@@ -485,8 +494,12 @@ def index_artifact_async(artifact_id: str, path: str, scope: str = "") -> None:
                 conn, artifact_id, section_dicts, cur_mtime, cur_hash, cur_struct
             )
 
-            if old_struct is not None and cur_struct != old_struct:
-                _schedule_resummarize_async(artifact_id)
+            # Summarize on FIRST index (old_struct is None) or a structural change.
+            # No-op when the effective backend is minilm/off (summarize returns None),
+            # so the default stays behavior-identical; with a backend on, new uploads
+            # and agent-created .md actually get summarized.
+            if old_struct is None or cur_struct != old_struct:
+                _schedule_resummarize_async(artifact_id, backend=backend)
 
         except Exception:
             logger.debug("index_artifact_async failed for %s", path, exc_info=True)

@@ -216,6 +216,7 @@ export async function apiPostArtifact(
   text: string,
   artifactPath: string,
   artifactType?: string,
+  summaryBackend?: string,
 ): Promise<string | null> {
   try {
     const r = await apiFetch(`/comms/post`, {
@@ -225,6 +226,7 @@ export async function apiPostArtifact(
         feature, from: 'human', type: 'artifact', text, board, scope,
         artifact_path: artifactPath,
         ...(artifactType ? { artifact_type: artifactType } : {}),
+        ...(summaryBackend ? { summary_backend: summaryBackend } : {}),
       }),
     })
     if (!r.ok) return null
@@ -232,6 +234,32 @@ export async function apiPostArtifact(
     return json.message_id ?? null
   } catch {
     return null
+  }
+}
+
+/** Fetch the global summary backend setting. Returns 'minilm' (Off) on any error. */
+export async function apiGetSummaryBackend(): Promise<string> {
+  try {
+    const r = await apiFetch('/comms/summary-backend')
+    if (!r.ok) return 'minilm'
+    const json = await r.json() as { backend?: string }
+    return json.backend ?? 'minilm'
+  } catch {
+    return 'minilm'
+  }
+}
+
+/** Persist the global summary backend setting. Returns true on success. */
+export async function apiSetSummaryBackend(backend: string): Promise<boolean> {
+  try {
+    const r = await apiFetch('/comms/summary-backend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backend }),
+    })
+    return r.ok
+  } catch {
+    return false
   }
 }
 

@@ -110,7 +110,8 @@ def comms_post():
 
     Required body fields: feature, from, type, text.
     Optional: scope (default 'feature'), to, options, reply_to, stage, conv,
-    depends_on, artifact_path, artifact_type, goal_id, executor, context_refs.
+    depends_on, artifact_path, artifact_type, goal_id, executor, context_refs,
+    summary_backend (per-upload summarizer override: minilm|ollama|haiku).
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
@@ -220,6 +221,22 @@ def comms_post():
             return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
         if executor is not None and not isinstance(executor, str):
             return jsonify({"error": "Field 'executor' must be a string or null"}), 400
+        # summary_backend: per-upload override for the offline summarizer on a .md
+        # artifact (None ⇒ the global app-setting). Enum guarded here.
+        summary_backend = data.get("summary_backend")
+        if summary_backend is not None and summary_backend not in (
+            "minilm",
+            "ollama",
+            "haiku",
+        ):
+            return (
+                jsonify(
+                    {
+                        "error": "Field 'summary_backend' must be one of minilm|ollama|haiku or null"
+                    }
+                ),
+                400,
+            )
         # context_refs: advisory artifact manifest — list of {artifact:str, anchor?:str}.
         # SHAPE guard + validate-at-write resolution gate (§2.4).
         context_refs = data.get("context_refs")
@@ -354,7 +371,9 @@ def comms_post():
                     from pathly_orchestrator.runner.hydrate import (
                         index_artifact_async as _index_artifact_async,
                     )
-                    _index_artifact_async(_artifact_id, artifact_path, scope=scope)
+                    _index_artifact_async(
+                        _artifact_id, artifact_path, scope=scope, backend=summary_backend
+                    )
                 except Exception:
                     logging.debug("index_artifact_async (post) failed", exc_info=True)
             except Exception:
@@ -1188,6 +1207,45 @@ def comms_consolidate():
         return jsonify({"ok": True, "superseded_count": len(pairs), "pairs": pairs}), 200
     except Exception as exc:
         logging.exception("comms_consolidate error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/summary-backend", methods=["GET"])
+def comms_get_summary_backend():
+    """Return the global offline-summarizer backend (minilm=off | ollama=local | haiku)."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import get_summary_backend
+
+        return jsonify({"backend": get_summary_backend(_get_db())}), 200
+    except Exception as exc:
+        logging.exception("comms_get_summary_backend error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/summary-backend", methods=["POST"])
+def comms_set_summary_backend():
+    """Set the global offline-summarizer backend. Body: {backend: minilm|ollama|haiku}.
+
+    minilm = off (no prose generated) · ollama = local · haiku = claude-haiku.
+    400 on a missing/invalid backend (the {minilm,ollama,haiku} enum is enforced by
+    set_summary_backend, which raises ValueError).
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import set_summary_backend
+
+        data = request.get_json() or {}
+        backend = data.get("backend", "")
+        if not isinstance(backend, str) or not backend.strip():
+            return jsonify({"error": "Field 'backend' is required"}), 400
+        try:
+            set_summary_backend(_get_db(), backend)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": True, "backend": backend}), 200
+    except Exception as exc:
+        logging.exception("comms_set_summary_backend error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

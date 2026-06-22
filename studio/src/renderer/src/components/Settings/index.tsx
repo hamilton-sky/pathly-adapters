@@ -6,6 +6,7 @@ import { paletteLabels } from '../../theme'
 import { PaletteSwatch } from './PaletteSwatch'
 import { RadioCard } from './RadioCard'
 import { NotificationSettings } from './NotificationSettings'
+import { SummarySettings } from './SummarySettings'
 import s from './Settings.module.css'
 
 const DARK_PALETTES: ThemeName[] = ['dark', 'nord', 'mocha', 'solarized', 'dracula', 'rose-pine']
@@ -159,6 +160,7 @@ export function Settings(): JSX.Element {
           </div>
         </div>
 
+        <SummarySettings />
         <NotificationSettings />
 
       </div>

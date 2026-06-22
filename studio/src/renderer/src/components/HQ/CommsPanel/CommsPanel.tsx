@@ -90,6 +90,15 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
     void apiStartFlow(boardKey, flow, { projectRoot, interactive: opts.interactive })
   }
 
+  // Read the per-upload summary backend override from localStorage.
+  // Returns undefined when absent/empty so apiPostArtifact uses the global default.
+  function getUploadBackend(): string | undefined {
+    try {
+      const v = localStorage.getItem('pathly.comms.uploadSummary') ?? ''
+      return (v === 'minilm' || v === 'ollama' || v === 'haiku') ? v : undefined
+    } catch { return undefined }
+  }
+
   // Drop files onto the Artifacts view → copy each into the feature's artifacts/
   // dir (binary-safe, in-place reference would break if the original moves) → post
   // it as an artifact card. The dropped files then become board content the
@@ -103,6 +112,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
       ? await resolveFeaturePath(projectRoot, boardKey)
       : `${projectRoot}/pathly/.uploads/${boardKey}`
     const dir = `${base}/artifacts`
+    const uploadBackend = getUploadBackend()
     // Dedupe against files already in the dest dir + names taken earlier this drop.
     const taken = new Set<string>(await window.pathly.fs.list(dir).catch(() => []))
     let posted = 0
@@ -114,7 +124,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
       taken.add(name)
       try {
         await window.pathly.fs.copy(src, `${dir}/${name}`)
-        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${name}`, `${dir}/${name}`, inferAtype(name))
+        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${name}`, `${dir}/${name}`, inferAtype(name), uploadBackend)
         if (id) posted += 1
         else failed += 1
       } catch { failed += 1 }
@@ -128,11 +138,12 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   const handleDropPaths = async (items: { path: string; name: string }[]): Promise<void> => {
     if (!items.length) return
     const params = scopeToParams(scope, boardKey)
+    const uploadBackend = getUploadBackend()
     let posted = 0
     let failed = 0
     for (const it of items) {
       const path = it.path.replace(/\\/g, '/')
-      const id = await apiPostArtifact(boardKey, params.board, params.scope, `Added ${it.name}`, path, inferAtype(it.name))
+      const id = await apiPostArtifact(boardKey, params.board, params.scope, `Added ${it.name}`, path, inferAtype(it.name), uploadBackend)
       if (id) posted += 1
       else failed += 1
     }

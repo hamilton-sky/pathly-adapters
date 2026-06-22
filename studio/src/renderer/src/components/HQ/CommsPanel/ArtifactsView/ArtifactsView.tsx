@@ -1,9 +1,15 @@
-import { useState, type DragEvent } from 'react'
+import { useState, type DragEvent, type ChangeEvent } from 'react'
 import { FileText, Upload } from 'lucide-react'
 import type { Message } from '../../../CommandCenter/types'
 import { PATHLY_DRAG_MIME } from '../../../../types'
 import { CommsMsgCard } from '../CommsMsgCard'
 import s from './ArtifactsView.module.css'
+
+const LS_KEY = 'pathly.comms.uploadSummary'
+
+function readStoredBackend(): string {
+  try { return localStorage.getItem(LS_KEY) ?? '' } catch { return '' }
+}
 
 interface Props {
   messages: Message[]
@@ -23,7 +29,14 @@ interface Props {
 export function ArtifactsView({ messages, onDelete, onSupersede, onDropFiles, onDropPaths }: Props): JSX.Element {
   const artifacts = messages.filter((m) => m.type === 'artifact')
   const [dragOver, setDragOver] = useState(false)
+  const [uploadBackend, setUploadBackend] = useState<string>(readStoredBackend)
   const canDrop = Boolean(onDropFiles || onDropPaths)
+
+  function handleBackendChange(e: ChangeEvent<HTMLSelectElement>): void {
+    const val = e.target.value
+    setUploadBackend(val)
+    try { localStorage.setItem(LS_KEY, val) } catch { /* storage unavailable */ }
+  }
 
   function handleDrop(e: DragEvent<HTMLDivElement>): void {
     if (!canDrop) return
@@ -61,6 +74,21 @@ export function ArtifactsView({ messages, onDelete, onSupersede, onDropFiles, on
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
+      <div className={s.toolbar}>
+        <label className={s.toolbarLabel} htmlFor="av-upload-backend">Upload summary:</label>
+        <select
+          id="av-upload-backend"
+          className={s.backendSelect}
+          aria-label="Per-upload summary backend"
+          value={uploadBackend}
+          onChange={handleBackendChange}
+        >
+          <option value="">Use default</option>
+          <option value="minilm">Off</option>
+          <option value="ollama">Local</option>
+          <option value="haiku">Haiku</option>
+        </select>
+      </div>
       {artifacts.length === 0 ? (
         <div className={s.empty}>
           <FileText size={22} />
