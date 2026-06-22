@@ -1,60 +1,45 @@
 # comms-board / Goals-DAG — Roadmap
 
-Live phase tracker for the **Board → Goals → Task-DAG → pluggable-executors** build.
-Model: [GOALS-DAG-EXECUTORS.md](GOALS-DAG-EXECUTORS.md). Per-phase specs: [phases/](phases/).
+Live tracker for the **Board → Goals → Task-DAG → pluggable-executors** build.
+Model: [GOALS-DAG-EXECUTORS.md](GOALS-DAG-EXECUTORS.md). Shipped-phase specs are in
+[`_archive/phases/`](_archive/phases/).
 
-## Phases
+## Shipped to `master` ✅
 
-| Phase | What | Status | Doc |
-|---|---|---|---|
-| 0a | goals + executor schema (`goal_id`/`executor` cols; goal = `type='goal'`) | ✅ done | [phases/PHASE-0-goals-schema.md](phases/PHASE-0-goals-schema.md) |
-| 0b | planner → task DAG (emit `type=task`; accept `goal_id`/`executor`) | ✅ done | [phases/PHASE-0b-planner-dag-wiring.md](phases/PHASE-0b-planner-dag-wiring.md) |
-| two-flow split | consultation flow (PO→arch→research→design→planner) + trimmed `team-build` flow (build→review→test→retro, feedback routes to specialists) | ✅ done | `core/flows/{consultation,team-build}.flow.yaml` |
-| P1 | **dispatcher** — route task/goal → `single`\|`loop`\|`team` (serial) | ✅ done | [phases/PHASE-1-dispatcher.md](phases/PHASE-1-dispatcher.md) |
-| P2 | board UI — goals as groupings, executor selector, Decompose/Run/Stop | ✅ done | [phases/PHASE-2-ui-ux-spec.md](phases/PHASE-2-ui-ux-spec.md) |
-| P3 | parallel — across-goal → lanes → worktree fan-in + **consolidation** | 🔭 next (only remaining phase) | see `../parallel-fleet-part-1/`, `-part-2/` |
+The end-to-end self-driving system for one goal works **and is visible/controllable in
+Studio** (Goals & Tasks view, executor selector, Decompose / Run / Stop):
 
-> **Status (2026-06-22):** 0a/0b/P1/P2 are **all shipped to `master`**, plus the separate
-> **context-retrieval** sub-feature (manifest + `/section` hydration + Board Catalog + opt-in
-> summarizer — see [BUILD_PROMPTS.md](BUILD_PROMPTS.md)). Recent follow-ups: `/comms/goals/stop`
-> endpoint (real goal Stop), the `loop` executor now hydrates the 📎 context channel, and the
-> evaluator now seeds a real goal+DAG. **P3 (parallel) is the only unbuilt phase.**
+| Phase | What | Spec |
+|---|---|---|
+| 0a | goals + executor schema (`goal_id`/`executor` cols; goal = `type='goal'`) | [`_archive/phases/PHASE-0-goals-schema.md`](_archive/phases/PHASE-0-goals-schema.md) |
+| 0b | planner → task DAG (emit `type=task`; accept `goal_id`/`executor`) | [`_archive/phases/PHASE-0b-planner-dag-wiring.md`](_archive/phases/PHASE-0b-planner-dag-wiring.md) |
+| two-flow split | consultation flow (PO→arch→research→design→planner) + trimmed `team-build` | `core/flows/{consultation,team-build}.flow.yaml` |
+| P1 | **dispatcher** — route task/goal → `single`\|`loop`\|`team` (serial) + `/comms/goals/stop` | [`_archive/phases/PHASE-1-dispatcher.md`](_archive/phases/PHASE-1-dispatcher.md) |
+| P2 | board UI — goals as groupings, executor + engine selectors, Decompose/Run/Stop | [`_archive/phases/PHASE-2-ui-ux-spec.md`](_archive/phases/PHASE-2-ui-ux-spec.md) |
 
-## Riders (cross-cutting — NOT separate end-phases)
+Plus three shipped sub-features (specs in `_archive/`):
+- **context-retrieval** — `context_refs` manifest + `/section` hydration + Board Catalog + opt-in summarizer (incl. §3a: uploaded `.md` summary feeds the 💡 semantic channel)
+- **summarizer controls** — global default + per-upload backend (Off/Local/Haiku) + start/done/fail observability
+- **memory-consolidation** — [MEMORY-CONSOLIDATION.md](MEMORY-CONSOLIDATION.md) (`/comms/consolidate`)
 
-### Multi-adapter routing — **rides P1**
-Run different goals/stages on different CLIs (architect→Codex, builder→Claude, …).
-**The routing PRIMITIVE is already wired — do NOT rebuild it** (verified 2026-06-16):
+The full chain is verified (2026-06-22): start feature → create/drag artifacts →
+evaluator / planner / consultation seed a goal + DAG → single / loop / team execute it.
 
-- flow `adapter_map` → `_resolve_adapter(state)` → `preferred_adapter` in `/next_action` ([fsm_ops.py:343](../../../src/pathly_orchestrator/fsm_ops.py))
-- per-stage UI override via `stage_configs` injected into `adapter_map` at runtime ([fsm_ops.py:611](../../../src/pathly_orchestrator/fsm_ops.py))
-- runner honors it: `TERMINAL_SPAWN` carries `adapter`; cross-adapter transition → new session
-- board single-agent run already has the **engine selector** (claude/codex) we shipped
+## Remaining work
 
-**What's left (small, rides P1):** populate `adapter_map` in flows (a few YAML lines);
-finish Copilot/Antigravity spawn argv (Claude+Codex done). ✅ ~~per-goal adapter chosen
-WITH the executor~~ — **done** (2026-06-22): the goal card has an engine selector beside
-the executor; the pick rides `/comms/goals/run` → `start_goal_run` into the single/loop
-spawn (team stays flow-`adapter_map`-governed). Per-*task* override remains future.
+### P3 — parallel  🔭 (the only unbuilt phase)
+Across-goal lanes → within-goal worktree fan-in + **consolidation**. Flip `k>1` by lane;
+the data model is already parallel-ready. Design lives in `../parallel-fleet-part-1/` and
+`../parallel-fleet-part-2/` (the latter overlaps [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md)
+— consolidate the fleet-dashboard framing when P3 starts).
 
-**History:** the old `multi-adapter-routing` / `multi-adapter-runner` / `hq-panel` plan
-folders were **built into the comms-board/live-board work** — they no longer exist as
-separate folders. Only the parallel-fleet plans remain (below).
-
-### Deferred polish
-- artifact **edit-hooks + versioning** (`last_edit_*`/`version` columns exist, unpopulated)
-- **consolidation** (fan-in / synthesis when a goal's frontier drains)
-- **per-task ad-hoc Run** button (no backend route yet — TaskCard escape hatch)
-- ✅ ~~goal-stop endpoint~~ — **done** (`/comms/goals/stop`, 2026-06-22)
-
-## Separate later plans
-- **HQ command center / fleet dashboard** → [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md)
-  ⚠ overlaps the existing `../parallel-fleet-part-2/` "Studio HQ Fleet Dashboard" — consolidate.
-- **Parallel fleet** (worktree-per-lane + conservative merge agent) → existing plans
-  `../parallel-fleet-part-1/` and `../parallel-fleet-part-2/`.
+### Deferred polish (small, non-blocking — none gate the chain above)
+- **per-task ad-hoc Run** button — no backend route yet (goal-level Run already covers it)
+- artifact **edit-hooks + versioning** — `last_edit_*`/`version` columns exist, unpopulated
+- **multi-adapter routing** — primitive is wired (Claude+Codex spawn done; per-goal engine
+  selector ships). Left: populate `adapter_map` in flow YAMLs (a few lines) + finish
+  Copilot/Antigravity spawn argv.
 
 ## At a glance
-**0b + two-flow split + P1 + P2 are shipped**, so the end-to-end self-driving system for one
-goal (decompose → run → verify) works **and is visible/controllable in Studio** (Goals & Tasks
-view, executor selector, Decompose/Run/Stop), with multi-adapter routing riding along. **P3**
-makes it parallel (k>1 by lane → worktree fan-in); the **HQ dashboard** is the last surface.
+Everything except **P3** is shipped. P3 makes it parallel (k>1 by lane → worktree fan-in);
+the HQ dashboard is the last surface after that.

@@ -3,7 +3,7 @@
 **Branch:** `feat/comms-board-dag-serial`
 **Status:** locked model (2026-06-16). Phase 0 in progress.
 **Supersedes the "flat DAG per board" framing** in earlier notes; relates to
-[BOARD-COMPLETION-SPEC.md](BOARD-COMPLETION-SPEC.md) and the P2/P3 roadmap.
+[BOARD-COMPLETION-SPEC.md](_archive/BOARD-COMPLETION-SPEC.md) and the P2/P3 roadmap.
 
 ---
 
