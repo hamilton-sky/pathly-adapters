@@ -161,7 +161,10 @@ def ensure_indexed(
 
 
 def _schedule_resummarize_async(
-    artifact_id: str, backend: str | None = None, broadcast_fn=None
+    artifact_id: str,
+    backend: str | None = None,
+    broadcast_fn=None,
+    embed_summary: bool = False,
 ) -> None:
     """Schedule async re-summarize of an artifact and its sections on structure change.
 
@@ -263,6 +266,24 @@ def _schedule_resummarize_async(
                 )
                 if sec_result.summary is not None:
                     update_section_summary(conn, sec["id"], sec_result.summary)
+
+            # §3a — UPLOAD path only: feed the generated summary into the message's
+            # search vector (and its display text) so the doc surfaces in the 💡 semantic
+            # channel / retrieve_board_context, not just the catalog. Agent-created
+            # artifacts keep their thin note (embed_summary stays False for them).
+            if embed_summary and message_id:
+                try:
+                    import os as _os
+                    from pathly_orchestrator.db.queries.comms import update_message_text
+                    from pathly_orchestrator.runner.embeddings import embed_async
+
+                    new_text = f"{_os.path.basename(path)}: {result.summary}"
+                    update_message_text(conn, message_id, new_text)
+                    embed_async(message_id, new_text)
+                except Exception:
+                    logger.debug(
+                        "embed-summary (upload) failed for %s", message_id, exc_info=True
+                    )
 
             _signal("summary_ready")
 
@@ -478,6 +499,7 @@ def index_artifact_async(
     scope: str = "",
     backend: str | None = None,
     broadcast_fn=None,
+    embed_summary: bool = False,
 ) -> None:
     """Daemon-thread eager indexer, mirrors embed_async.
 
@@ -548,7 +570,10 @@ def index_artifact_async(
             # and agent-created .md actually get summarized.
             if old_struct is None or cur_struct != old_struct:
                 _schedule_resummarize_async(
-                    artifact_id, backend=backend, broadcast_fn=broadcast_fn
+                    artifact_id,
+                    backend=backend,
+                    broadcast_fn=broadcast_fn,
+                    embed_summary=embed_summary,
                 )
 
         except Exception:

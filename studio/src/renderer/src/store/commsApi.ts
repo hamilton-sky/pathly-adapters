@@ -217,6 +217,7 @@ export async function apiPostArtifact(
   artifactPath: string,
   artifactType?: string,
   summaryBackend?: string,
+  embedSummary?: boolean,
 ): Promise<string | null> {
   try {
     const r = await apiFetch(`/comms/post`, {
@@ -227,6 +228,7 @@ export async function apiPostArtifact(
         artifact_path: artifactPath,
         ...(artifactType ? { artifact_type: artifactType } : {}),
         ...(summaryBackend ? { summary_backend: summaryBackend } : {}),
+        ...(embedSummary ? { embed_summary: true } : {}),
       }),
     })
     if (!r.ok) return null

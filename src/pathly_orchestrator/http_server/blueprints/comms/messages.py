@@ -130,6 +130,11 @@ def comms_post():
                 ),
                 400,
             )
+        # embed_summary (§3a): when an UPLOADED .md is summarized, feed the generated
+        # summary into the message's search vector + display text so it surfaces in the
+        # 💡 semantic channel / retrieve_board_context. Set by the upload UI; agent
+        # posts leave it false (their summary stays catalog-only).
+        embed_summary = bool(data.get("embed_summary"))
         context_refs = data.get("context_refs")
         if context_refs is not None and (
             not isinstance(context_refs, list)
@@ -250,6 +255,7 @@ def comms_post():
                         scope=scope,
                         backend=summary_backend,
                         broadcast_fn=lambda _p: _broadcast_comms(scope, _p),
+                        embed_summary=embed_summary,
                     )
                 except Exception:
                     logging.debug("index_artifact_async (post) failed", exc_info=True)

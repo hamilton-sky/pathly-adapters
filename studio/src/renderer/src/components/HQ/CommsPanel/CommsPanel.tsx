@@ -124,7 +124,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
       taken.add(name)
       try {
         await window.pathly.fs.copy(src, `${dir}/${name}`)
-        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${name}`, `${dir}/${name}`, inferAtype(name), uploadBackend)
+        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${name}`, `${dir}/${name}`, inferAtype(name), uploadBackend, true)
         if (id) posted += 1
         else failed += 1
       } catch { failed += 1 }
@@ -143,7 +143,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
     let failed = 0
     for (const it of items) {
       const path = it.path.replace(/\\/g, '/')
-      const id = await apiPostArtifact(boardKey, params.board, params.scope, `Added ${it.name}`, path, inferAtype(it.name), uploadBackend)
+      const id = await apiPostArtifact(boardKey, params.board, params.scope, `Added ${it.name}`, path, inferAtype(it.name), uploadBackend, true)
       if (id) posted += 1
       else failed += 1
     }
