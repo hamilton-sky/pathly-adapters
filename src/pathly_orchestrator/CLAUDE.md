@@ -75,6 +75,17 @@ GET  /comms/scope           ← read the active board scope
 POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
 POST /comms/delete          ← soft-delete a message
+POST /comms/edit            ← edit a message's text (e.g. goal rename)
+POST /comms/tasks/claim     ← claim a ready task (pending → in_progress)
+POST /comms/tasks/fail      ← mark a task failed (cascade-blocks dependents)
+GET  /comms/artifacts/<id>/section ← hydrate a named section of a .md artifact (+ path form); context-retrieval HYDRATE tier
+POST /comms/run             ← single-agent / evaluator board run
+POST /comms/run/stop        ← stop a board run
+POST /comms/agent-context   ← board context block for prompt injection
+POST /comms/goals/run       ← dispatch a goal's task-DAG to its executor (single|loop|team)
+POST /comms/goals/stop      ← stop a running goal (releases lock / aborts FSM run)
+POST /comms/goals/decompose ← decompose a goal into a task-DAG (planner|consultation)
+POST /comms/consolidate     ← memory consolidation: near-dup dedup; mode=full adds the reflection pass
 GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
 
@@ -141,7 +152,10 @@ pathly_orchestrator/
     history.py             # build_pipeline_history_block
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
     embeddings.py          # warm()/embed() — local embedding model for comms hybrid search
-    comms_context.py       # assembles board context injected into agent prompts
+    comms_context.py       # assembles board context (🔒 governance + 📎 referenced + 💡 semantic, relevance-gated)
+    sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
+    hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager)
+    inference.py           # offline artifact summarizer (minilm/ollama/haiku) — fills INDEX-tier summaries (opt-in)
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses
@@ -179,7 +193,7 @@ pathly_orchestrator/
       flows.py             # GET/POST/DELETE /flows/stage-config (per-stage agent/model overrides)
       menu.py              # GET /menu/<name>, GET /metrics, GET /metrics/json
       db_api.py            # /db/* read API: stats, features, features/<f>/{events,agents,otel,runs}, stats/trends, query, settings
-      comms.py             # 16 /comms/* routes — message board (post, search, tasks, scope, supersede, artifacts, …); see "Comms board endpoints" above
+      comms.py             # ~29 /comms/* routes — board + goals/DAG (goals/run|stop|decompose), context hydration (artifacts/<id>/section), memory consolidation (consolidate); see "Comms board endpoints" above
       chat.py              # POST /chat
       streams.py           # GET /events/menu|runner|history|stream|comms
 ```
