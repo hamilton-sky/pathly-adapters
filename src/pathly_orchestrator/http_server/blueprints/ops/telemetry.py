@@ -14,7 +14,7 @@ from pathly_orchestrator.db import append_event as _db_append_event
 from pathly_orchestrator.db.connection import get_db as _get_db
 from pathly_orchestrator.feature_flags import flags
 from pathly_telemetry.storage import append_activity
-from ..telemetry_registry import PricingRegistry, _ADAPTER_PREFIXES
+from ...telemetry_registry import PricingRegistry, _ADAPTER_PREFIXES
 
 bp = Blueprint("telemetry", __name__)
 
@@ -149,7 +149,6 @@ def record_activity_endpoint():
                 400,
             )
 
-        # Resolve cost_source and optionally compute cost via PricingRegistry.
         _model = str(data.get("model", ""))
         _provider = str(data.get("provider", "")) or _infer_adapter(_model)
         if not data.get("provider"):
@@ -220,7 +219,6 @@ def record_activity_endpoint():
                 trace_id=str(trace_id) if trace_id else "",
                 span_id=str(span_id) if span_id else "",
             )
-            # OTel export — fire-and-forget; no-op if PATHLY_OTEL_ENDPOINT is unset
             try:
                 from pathly_orchestrator import otel_export as _otel
 
@@ -245,7 +243,6 @@ def record_activity_endpoint():
                 )
             except Exception:
                 logger.debug("otel_export hook error", exc_info=True)
-            # Write span to local otel_spans table for Studio DB Explorer
             try:
                 import json as _json
 
@@ -456,7 +453,6 @@ def record_phase_summary_endpoint():
         conn = _get_db()
         seq = _db_append_event(conn, str(project_root), feature, event)
 
-        # Live-broadcast to Studio so the log card updates in headless mode
         try:
             from pathly_orchestrator.http_server.sse import _broadcast_runner
 

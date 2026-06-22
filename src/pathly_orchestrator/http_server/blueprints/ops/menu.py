@@ -7,13 +7,13 @@ import time
 
 from flask import Blueprint, jsonify, request
 
-from ..sse import (
+from ...sse import (
     _NO_FEATURE_MENU,
     _schedule_push_clear,
     _broadcast_sse,
     _push_menu_to_sse,
 )
-from ..middleware import _metrics, _metrics_lock
+from ...middleware import _metrics, _metrics_lock
 
 logger = logging.getLogger("pathly.http")
 
@@ -22,18 +22,7 @@ bp = Blueprint("menu", __name__)
 
 @bp.route("/menu/<name>", methods=["GET"])
 def get_named_menu(name: str):
-    """Return a pre-defined named menu, broadcast it as MENU_PUSH via SSE, start TTL.
-
-    Query params:
-      feature (optional): substituted into {feature} placeholders in title/descriptions.
-      state   (optional): FSM state name (e.g. BUILDING); items whose `states:` list
-                          does not include this state are filtered out.  Items with no
-                          `states:` field are always included.
-
-    The Studio Conductor shows the menu until TTL expires (MENU_CLEAR SSE event)
-    or the user dismisses it.  Skills call this endpoint instead of rendering
-    ASCII menus in the terminal.
-    """
+    """Return a pre-defined named menu, broadcast it as MENU_PUSH via SSE, start TTL."""
     feature = request.args.get("feature", "").strip()
     state = request.args.get("state", "").strip().upper()
 
@@ -119,7 +108,6 @@ def metrics_endpoint():
         "# HELP pathly_sse_clients_active Currently connected SSE clients",
         "# TYPE pathly_sse_clients_active gauge",
         f"pathly_sse_clients_active {http_snap.get('pathly_sse_clients_active', 0)}",
-        # Pipeline counters
         "# HELP pathly_cost_usd_total Agent cost since server start (USD)",
         "# TYPE pathly_cost_usd_total counter",
         f"pathly_cost_usd_total {pipe['cost_usd']}",
@@ -139,7 +127,6 @@ def metrics_endpoint():
         "# TYPE pathly_gate_failures_total counter",
         f"pathly_gate_failures_total {pipe['gate_failures']}",
     ]
-    # Per-stage visit counts (labelled)
     if pipe["stage_visits"]:
         lines += [
             "# HELP pathly_stage_visits_total Entries into each FSM state",
@@ -147,7 +134,6 @@ def metrics_endpoint():
         ]
         for state, count in sorted(pipe["stage_visits"].items()):
             lines.append(f'pathly_stage_visits_total{{state="{state}"}} {count}')
-    # Per-agent invocation counts (labelled)
     if pipe["agent_invocations"]:
         lines += [
             "# HELP pathly_agent_invocations_total Agent invocations by role",

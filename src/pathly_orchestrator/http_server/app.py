@@ -16,19 +16,19 @@ except ImportError:
 from pathly_orchestrator.api import api_bp
 from .middleware import _log_request, _log_response, _setup_logging
 from .feedback import _feedback_watcher
-from .blueprints.health import bp as health_bp
-from .blueprints.fsm import bp as fsm_bp
-from .blueprints.runner import bp as runner_bp
-from .blueprints.telemetry import bp as telemetry_bp
-from .blueprints.skills import bp as skills_bp
-from .blueprints.flow_defs import bp as flow_defs_bp
-from .blueprints.catalog import bp as catalog_bp
-from .blueprints.stage_configs import bp as stage_configs_bp
-from .blueprints.menu import bp as menu_bp
-from .blueprints.chat import bp as chat_bp
-from .blueprints.streams import bp as streams_bp
-from .blueprints.db_api import bp as db_api_bp
-from .blueprints.comms import bp as comms_bp
+from .blueprints.core.health import bp as health_bp
+from .blueprints.core.fsm import bp as fsm_bp
+from .blueprints.runner.api import bp as runner_bp
+from .blueprints.runner.streams import bp as streams_bp
+from .blueprints.flows.defs import bp as flow_defs_bp
+from .blueprints.flows.stage_configs import bp as stage_configs_bp
+from .blueprints.catalog.items import bp as catalog_bp
+from .blueprints.skills.editor import bp as skills_bp
+from .blueprints.comms import all_blueprints as comms_blueprints
+from .blueprints.ops.telemetry import bp as telemetry_bp
+from .blueprints.ops.menu import bp as menu_bp
+from .blueprints.ops.db_api import bp as db_api_bp
+from .blueprints.ops.chat import bp as chat_bp
 
 app = Flask(__name__)
 
@@ -48,7 +48,8 @@ app.register_blueprint(menu_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(streams_bp)
 app.register_blueprint(db_api_bp)
-app.register_blueprint(comms_bp)
+for _comms_bp in comms_blueprints:
+    app.register_blueprint(_comms_bp)
 
 # Register request/response hooks
 app.before_request(_log_request)

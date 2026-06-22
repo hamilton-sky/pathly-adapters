@@ -12,7 +12,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from pathly_orchestrator.feature_flags import flags
-from ..sse import (
+from ...sse import (
     _clients,
     _lock,
     _tailers,
@@ -26,7 +26,7 @@ from ..sse import (
     _comms_clients,
     _comms_lock,
 )
-from ..middleware import _inc
+from ...middleware import _inc
 
 logger = logging.getLogger("pathly.http")
 
@@ -35,12 +35,7 @@ bp = Blueprint("streams", __name__)
 
 @bp.route("/events/menu", methods=["GET"])
 def menu_events_endpoint():
-    """SSE endpoint: pushes MENU_UPDATE events whenever FSM state changes.
-
-    The Studio renderer subscribes here with EventSource so the PathlyMenuCard
-    updates the instant Claude calls /next_action or /complete_stage —
-    no polling delay.
-    """
+    """SSE endpoint: pushes MENU_UPDATE events whenever FSM state changes."""
     from flask import Response, stream_with_context
 
     q: queue.Queue = queue.Queue(maxsize=50)
@@ -70,13 +65,7 @@ def menu_events_endpoint():
 
 @bp.route("/events/runner", methods=["GET"])
 def runner_events_endpoint():
-    """SSE endpoint: streams runner lifecycle events for a given topic.
-
-    Query param: topic (required).
-
-    Event types (see FEATURE_INDEX.md):
-      connected, STAGE_CHANGE, DECISION_MENU, RUNNER_STATUS, COST_UPDATE, SESSION, RUNNER_ERROR
-    """
+    """SSE endpoint: streams runner lifecycle events for a given topic."""
     from flask import Response, stream_with_context
 
     topic = request.args.get("topic", "").strip()
@@ -111,15 +100,7 @@ def runner_events_endpoint():
 
 @bp.route("/events/spawn", methods=["GET"])
 def spawn_events_endpoint():
-    """SSE endpoint: topic-INDEPENDENT terminal lifecycle stream.
-
-    Studio mounts exactly one always-on subscriber here. It is the single place
-    that opens and kills PTYs, so a run started from any board (feature, project,
-    global, or one that isn't currently being viewed) still gets its terminal.
-
-    Event types: connected, TERMINAL_SPAWN, TERMINAL_KILL, TERMINAL_SIGNAL.
-    No query params — every connected client receives every terminal event.
-    """
+    """SSE endpoint: topic-INDEPENDENT terminal lifecycle stream."""
     from flask import Response, stream_with_context
 
     q: queue.Queue = queue.Queue(maxsize=50)
@@ -207,7 +188,6 @@ def events_stream():
             threading.Thread(target=_tail_events, args=(key, stop), daemon=True).start()
 
     def generate():
-        # Catch-up for reconnecting clients
         try:
             since_seq = int(request.headers.get("Last-Event-ID") or 0)
         except (ValueError, TypeError):
@@ -259,10 +239,7 @@ def events_stream():
 
 @bp.route("/events/comms", methods=["GET"])
 def comms_events_endpoint():
-    """SSE endpoint: streams COMMS_UPDATE events for a given scope.
-
-    Query param: scope (default 'global').
-    """
+    """SSE endpoint: streams COMMS_UPDATE events for a given scope."""
     from flask import Response, stream_with_context
 
     scope = request.args.get("scope", "global").strip() or "global"

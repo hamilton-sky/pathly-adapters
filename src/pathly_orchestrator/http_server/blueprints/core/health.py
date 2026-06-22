@@ -11,8 +11,8 @@ from flask import Blueprint, jsonify, request
 
 from pathly_orchestrator.eventlog import read_state
 from pathly_orchestrator.fsm_ops import build_menu_payload
-from ..middleware import _metrics, _inc
-from ..sse import _NO_FEATURE_MENU
+from ...middleware import _metrics, _inc
+from ...sse import _NO_FEATURE_MENU
 
 logger = logging.getLogger("pathly.http")
 
@@ -44,16 +44,7 @@ def health():
 
 @bp.route("/status", methods=["GET"])
 def status_endpoint():
-    """Read-only FSM state endpoint for the Studio renderer.
-
-    Query params:
-      project_root (optional): absolute path to project root;
-                               falls back to PATHLY_PROJECT_ROOT env var.
-
-    Returns JSON:
-      { "current_state": str, "feature": str, "project_root": str }
-    or { "current_state": "unknown" } if STATE.json not found or project_root not set.
-    """
+    """Read-only FSM state endpoint for the Studio renderer."""
     project_root = request.args.get("project_root", "").strip()
     if not project_root:
         project_root = os.environ.get("PATHLY_PROJECT_ROOT", "").strip()
@@ -83,7 +74,6 @@ def status_endpoint():
     best_state_dir: Path | None = None
 
     if topic:
-        # Specific topic requested — read directly, skip the glob.
         topic_dir = plans_dir / topic
         try:
             if not topic_dir.resolve().is_relative_to(resolved_root):
@@ -95,8 +85,6 @@ def status_endpoint():
             if best_state is not None:
                 best_state_dir = topic_dir
     else:
-        # Most-recently-updated feature, read from the authoritative fsm_state DB
-        # (no STATE.json glob — the DB is the source of truth for enumeration too).
         try:
             from pathly_orchestrator.db.connection import get_db as _get_db
             from pathly_orchestrator.db.queries.fsm_state import (
@@ -124,7 +112,6 @@ def status_endpoint():
             200,
         )
 
-    # Infer feature from directory name when STATE.json lacks the field.
     feature = best_state.get("feature", "") or (
         best_state_dir.name if best_state_dir else ""
     )

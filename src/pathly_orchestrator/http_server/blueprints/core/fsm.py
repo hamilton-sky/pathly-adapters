@@ -6,26 +6,19 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from ..sse import _push_menu_to_sse
+from ...sse import _push_menu_to_sse
 
 bp = Blueprint("fsm", __name__)
 
 
 @bp.route("/next_action", methods=["POST"])
 def next_action_endpoint():
-    """Call next_action FSM function.
-
-    Expects JSON POST with fields:
-      - flow (str): Flow name (e.g. 'team')
-      - topic (str): Feature/topic name
-      - project_root (str): Absolute path to project root
-    """
+    """Call next_action FSM function."""
     try:
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
-        # Validate required fields
         required = {"flow", "topic", "project_root"}
         missing = required - set(data.keys())
         if missing:
@@ -41,8 +34,6 @@ def next_action_endpoint():
                     400,
                 )
 
-        # Import lazily through the package namespace so tests can patch
-        # pathly_orchestrator.http_server.next_action and have it take effect.
         import pathly_orchestrator.http_server as _hs
 
         result = _hs.next_action(data)
@@ -56,21 +47,12 @@ def next_action_endpoint():
 
 @bp.route("/complete_stage", methods=["POST"])
 def complete_stage_endpoint():
-    """Call complete_stage FSM function.
-
-    Expects JSON POST with fields:
-      - flow (str): Flow name (e.g. 'team')
-      - topic (str): Feature/topic name
-      - project_root (str): Absolute path to project root
-      - decision (str, optional): Decision key for decide-blocks
-      - resolved_files (list[str], optional): Feedback files to delete
-    """
+    """Call complete_stage FSM function."""
     try:
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
-        # Validate required fields
         required = {"flow", "topic", "project_root"}
         missing = required - set(data.keys())
         if missing:

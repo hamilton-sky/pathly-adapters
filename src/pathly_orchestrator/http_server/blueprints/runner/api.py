@@ -6,7 +6,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from ..sse import _broadcast_runner
+from ...sse import _broadcast_runner
 
 bp = Blueprint("runner", __name__)
 
@@ -73,7 +73,6 @@ def runner_start():
         autonomy = data.get("autonomy", {})
         if not isinstance(autonomy, dict):
             autonomy = {}
-        # interactive: True = visible PTY killed on AGENT_DONE, False = headless/reconciliation
         interactive = data.get("interactive", True)
         if not isinstance(interactive, bool):
             interactive = bool(interactive)
@@ -168,10 +167,8 @@ def runner_terminal_result():
                 )
                 adapter = "claude"
 
-        # Parse stdout result (session_id + cost_usd) — outside the lock
         parsed = parse_result(adapter, data.get("stdout_tail", ""))
 
-        # Enrich with EVENTS.jsonl summary (authoritative, never truncated)
         if runner_state is not None:
             try:
                 from pathly_orchestrator.runner import (
@@ -187,8 +184,6 @@ def runner_terminal_result():
                     summary = agent_done.get("summary", "")
                     if summary:
                         parsed["result"] = summary
-                    # Use EVENTS.jsonl values as fallback when PTY stdout buffer was
-                    # truncated and parseClaudeJsonResult couldn't find the final JSON.
                     if (
                         not parsed.get("cost_usd")
                         and agent_done.get("cost_usd", 0.0) > 0.0
@@ -214,9 +209,6 @@ def runner_terminal_result():
                     "runner_terminal_result: EVENTS.jsonl read failed: %s", exc
                 )
 
-        # Broadcast STAGE_RESULT so Studio renderer can update the stageLog
-        # directly — this is the reliable path when PTY stdout parsing fails
-        # (e.g. long-running builds where the final JSON scrolls out of the buffer).
         tab_id = runner_state.active_tab_id if runner_state is not None else ""
         if tab_id and topic:
             _broadcast_runner(
@@ -287,11 +279,7 @@ def runner_resume():
 
 @bp.route("/runner/advance", methods=["POST"])
 def runner_advance():
-    """Advance a paused run by one stage (resume + re-pause after next boundary).
-
-    This is a thin control shim — it unpauses the loop; the boundary logic in
-    the supervisor handles the actual step semantics.
-    """
+    """Advance a paused run by one stage."""
     try:
         from pathly_orchestrator import supervisor as _sup
 
@@ -310,10 +298,7 @@ def runner_advance():
 
 @bp.route("/runner/decision", methods=["POST"])
 def runner_decision():
-    """Supply a decision for an awaiting_decision run.
-
-    Required: topic, decision (must be a key in pending_menu.options).
-    """
+    """Supply a decision for an awaiting_decision run."""
     try:
         from pathly_orchestrator import supervisor as _sup
 
@@ -371,7 +356,7 @@ def runner_decision():
 
 @bp.route("/runner/agent-answer", methods=["POST"])
 def runner_agent_answer():
-    """Supply a user answer for a stage that asked a question via AskUserQuestion (denied in headless mode)."""
+    """Supply a user answer for a stage that asked a question."""
     try:
         from pathly_orchestrator import supervisor as _sup
 
@@ -423,11 +408,7 @@ def runner_reroute():
 
 @bp.route("/runner/retry", methods=["POST"])
 def runner_retry():
-    """Retry a run that ended in error by starting it fresh.
-
-    Thin wrapper: clears error state from registry then delegates to start_run
-    with the same parameters.  Requires full start params (caps required).
-    """
+    """Retry a run that ended in error."""
     try:
         from pathly_orchestrator import supervisor as _sup
 
@@ -454,7 +435,6 @@ def runner_retry():
                 409,
             )
 
-        # Evict from registry so start_run won't reject it as active
         from pathly_orchestrator.supervisor import _lock, _registry
 
         with _lock:
@@ -511,7 +491,7 @@ def runner_retry():
 
 @bp.route("/runner/abort", methods=["POST"])
 def runner_abort():
-    """Hard-abort an active run; kills in-flight subprocess within ~2s."""
+    """Hard-abort an active run."""
     try:
         from pathly_orchestrator import supervisor as _sup
 
@@ -530,11 +510,7 @@ def runner_abort():
 
 @bp.route("/runner/event", methods=["POST"])
 def runner_event():
-    """Accept an event from an agent and persist it via eventlog.
-
-    Required body fields: type, feature, project_root, payload (dict).
-    Returns {"ok": true} on success.
-    """
+    """Accept an event from an agent and persist it via eventlog."""
     try:
         from pathlib import Path
         from pathly_orchestrator import eventlog as _evtlog
@@ -575,10 +551,7 @@ def runner_event():
 
 @bp.route("/runner/status", methods=["GET"])
 def runner_status():
-    """Return the current RunnerState for a topic.
-
-    Query param: topic (required).
-    """
+    """Return the current RunnerState for a topic."""
     try:
         from pathly_orchestrator import supervisor as _sup
 

@@ -127,7 +127,6 @@ def db_stats():
         invocations = conn.execute(
             "SELECT COUNT(*) FROM fsm_events WHERE event_type='AGENT_DONE'"
         ).fetchone()[0]
-        # Tokens from AGENT_DONE only; cost from both AGENT_DONE + BILLING_UPDATE.
         row = conn.execute(
             "SELECT "
             "  COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
@@ -138,7 +137,6 @@ def db_stats():
         total_tokens = int(row[0])
         total_cost = float(row[1])
 
-        # Supplement feature count from filesystem if DB is empty
         if db_features_count == 0 and project_root:
             fs_features = _scan_filesystem_features(project_root)
             db_features_count = len(fs_features)
@@ -165,8 +163,7 @@ def db_features():
         project_root = _project_root_param()
         conn = _get_db()
 
-        # DB-backed features — skip rows with corrupt state_json
-        pr_filter = project_root  # None → all projects; set → scoped to one project
+        pr_filter = project_root
         states: dict[tuple[str, str], dict] = {}
         if pr_filter:
             state_rows = conn.execute(
@@ -195,8 +192,6 @@ def db_features():
         event_counts = {
             (r["project_root"], r["feature"]): r["cnt"] for r in event_count_rows
         }
-        # Tokens from AGENT_DONE only; cost from AGENT_DONE (where >0) + BILLING_UPDATE.
-        # BILLING_UPDATE supersedes zero-cost AGENT_DONE rows — no double-counting.
         if pr_filter:
             inv_rows = conn.execute(
                 "SELECT project_root, feature, "
@@ -220,13 +215,11 @@ def db_features():
             ).fetchall()
         inv_stats = {(r["project_root"], r["feature"]): dict(r) for r in inv_rows}
 
-        # Only show features that have a real FSM-state entry — drop event-only phantoms
         all_keys = set(states)
         results = []
         for pr, feat in sorted(all_keys, key=lambda x: x[1]):
             state_obj = states.get((pr, feat), {})
             inv = inv_stats.get((pr, feat), {})
-            # DB state_json stores current_state; filesystem uses current
             state_val = state_obj.get("current_state") or state_obj.get(
                 "current", "UNKNOWN"
             )
@@ -246,7 +239,6 @@ def db_features():
                 }
             )
 
-        # Filesystem fallback — add any features not already in DB results
         db_feature_names = {r["feature"] for r in results}
         if project_root:
             for fs_feat in _scan_filesystem_features(project_root):

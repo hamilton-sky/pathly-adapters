@@ -121,6 +121,48 @@ pathly-setup claude --apply --repair  # update already-installed files (fragment
 
 ---
 
+## Code architecture — SOLID rules
+
+These rules apply to all Python in `src/pathly_orchestrator/` and all TypeScript in `studio/src/`. Claude Code must enforce them when writing or reviewing code.
+
+**1. Single Responsibility — one file, one domain.**
+- A blueprint file owns exactly one HTTP domain (messages, tasks, artifacts, runs, goals, settings).
+- A module file owns exactly one concern (DB queries, embeddings, output parsing, …).
+- **Hard limit: 400 lines per file.** If a file approaches this, split it before adding more code.
+
+**2. Open/Closed — extend by adding files, not by growing existing ones.**
+- New endpoints → new file in the correct domain subpackage. Never append to an already-large file.
+- New query type → new file under `db/queries/`, not a longer `comms.py`.
+
+**3. Layer dependency rule (no upward imports).**
+```
+db/ → (nothing internal)
+runner/ → db/
+supervisor/ → db/, runner/
+http_server/ → all (lazy imports inside route handlers only)
+```
+- Imports that violate this direction are architecture bugs, not style issues.
+- All supervisor/db imports inside Flask route functions (`from X import Y` inside the `def`), never at module top-level — prevents circular imports and keeps startup fast.
+
+**4. Blueprint domain map — where each route family lives.**
+```
+blueprints/
+  core/       health, fsm (FSM lifecycle)
+  runner/     api (runner control), streams (SSE)
+  flows/      defs (flow CRUD), stage_configs (per-stage overrides)
+  catalog/    items (file-tree catalog)
+  skills/     editor (skill notebook routes)
+  comms/      messages, tasks, artifacts, runs, goals, settings (board subsystems)
+  ops/        telemetry, menu, db_api, chat (operational/infra)
+```
+A new endpoint goes into the matching domain file. If no domain matches, create a new domain file — do not add it to an unrelated file.
+
+**5. Shared helpers belong in `_helpers.py`, not copy-pasted.**
+- Constants, regex, and pure utility functions shared across files in a subpackage → `<subpackage>/_helpers.py`.
+- Never duplicate a helper across files.
+
+---
+
 ## Commit policy
 
 - **Never push to master without explicit user request.**
