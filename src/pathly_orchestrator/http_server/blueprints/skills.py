@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from pathlib import Path
 
-import yaml
 from flask import Blueprint, jsonify, request
 
 bp = Blueprint("skills", __name__)
@@ -17,647 +15,6 @@ bp = Blueprint("skills", __name__)
 # absolute path, a drive letter, backslashes, a ".md" file path — is rejected so a
 # stray UI value can never inject a bogus key into the hand-maintained manifest.
 _SKILL_KEY_RE = re.compile(r"[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*")
-
-
-@bp.route("/flows/", methods=["GET"])
-@bp.route("/flows", methods=["GET"])
-def list_flows():
-    """Return all flow definitions as a list."""
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import read_flow_definitions
-
-        conn = get_db()
-        flows = read_flow_definitions(conn, project_root=None)
-        result = [
-            {
-                "name": f["name"],
-                "file_path": (f.get("file_path") or "").replace("\\", "/"),
-                "updated_at": f.get("updated_at", ""),
-            }
-            for f in flows
-        ]
-        return jsonify(result), 200
-    except Exception as e:
-        logging.exception("list_flows error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/flows/<name>/graph", methods=["GET"])
-def get_flow_graph(name: str):
-    """Return a flow's structure as a parsed JSON object (assembled from rows).
-    Response: { "graph": <FlowYaml-shaped dict>, "name": str }
-    """
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import (
-            _assemble_flow_dict,
-            read_flow_by_name,
-            read_flow_nodes,
-        )
-
-        conn = get_db()
-        row = read_flow_by_name(conn, name)
-        if not row:
-            return jsonify({"error": f"Flow '{name}' not found"}), 404
-
-        node_rows = read_flow_nodes(conn, row["id"])
-        if not node_rows:
-            import yaml as _yaml
-
-            graph = _yaml.safe_load(row["flow_yaml"])
-        else:
-            flow_level_config = json.loads(row.get("config_json") or "{}")
-            graph = _assemble_flow_dict(conn, row["id"], flow_level_config)
-
-        return jsonify({"graph": graph, "name": name}), 200
-    except Exception as e:
-        logging.exception("get_flow_graph error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/flows/<name>/graph", methods=["PUT"])
-def update_flow_graph(name: str):
-    """Replace a flow's nodes+edges from a structured graph JSON payload.
-    Body: { "graph": <FlowYaml-shaped dict> }
-    Effect (one write-lock, one commit):
-      - upsert flow_definitions (re-serialized flow_yaml cache + config_json)
-      - replace-all flow_nodes / flow_edges
-      - write-through .flow.yaml to disk
-    Returns: { "ok": true }
-    """
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import (
-            read_flow_by_name,
-            upsert_flow_definition,
-        )
-
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Missing JSON body"}), 400
-        graph = data.get("graph")
-        if not graph or not isinstance(graph, dict):
-            return jsonify({"error": "Missing or invalid 'graph' key"}), 400
-
-        flow_yaml = yaml.dump(graph, allow_unicode=True, sort_keys=False)
-
-        conn = get_db()
-        existing = read_flow_by_name(conn, name)
-        file_path = (existing.get("file_path") or "") if existing else ""
-
-        upsert_flow_definition(
-            conn,
-            project_root=None,
-            name=name,
-            version="",
-            flow_yaml=flow_yaml,
-            file_path=file_path,
-        )
-
-        if file_path:
-            try:
-                Path(file_path.replace("/", "\\")).write_text(
-                    flow_yaml, encoding="utf-8"
-                )
-            except Exception:
-                pass
-
-        return jsonify({"ok": True}), 200
-    except Exception as e:
-        logging.exception("update_flow_graph error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/flows/<path:name>", methods=["GET"])
-def get_flow(name: str):
-    """Return a flow definition by name."""
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import read_flow_by_name
-
-        conn = get_db()
-        flow = read_flow_by_name(conn, name)
-        if not flow:
-            return jsonify({"error": f"Flow '{name}' not found"}), 404
-        return (
-            jsonify(
-                {
-                    "name": flow["name"],
-                    "flow_yaml": flow["flow_yaml"],
-                    "file_path": (flow.get("file_path") or "").replace("\\", "/"),
-                    "updated_at": flow.get("updated_at", ""),
-                }
-            ),
-            200,
-        )
-    except Exception as e:
-        logging.exception("get_flow error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/flows/<path:name>", methods=["PUT"])
-def update_flow(name: str):
-    """Update a flow's YAML content in DB and write-through to disk."""
-    try:
-        from pathlib import Path
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import (
-            read_flow_by_name,
-            upsert_flow_definition,
-        )
-
-        conn = get_db()
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Missing JSON body"}), 400
-        flow_yaml = data.get("flow_yaml", "")
-        existing = read_flow_by_name(conn, name)
-        file_path = (existing.get("file_path") or "") if existing else ""
-        upsert_flow_definition(
-            conn,
-            project_root=None,
-            name=name,
-            version="",
-            flow_yaml=flow_yaml,
-            file_path=file_path,
-        )
-        # Write-through to disk
-        if file_path:
-            try:
-                Path(file_path.replace("/", "\\")).write_text(
-                    flow_yaml, encoding="utf-8"
-                )
-            except Exception:
-                pass
-        return jsonify({"ok": True}), 200
-    except Exception as e:
-        logging.exception("update_flow error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/catalog/content", methods=["GET"])
-def catalog_content():
-    """Return content of a catalog item by abs_path query param."""
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.catalog_items import (
-            read_catalog_item_by_path,
-        )
-
-        abs_path = request.args.get("path", "")
-        if not abs_path:
-            return jsonify({"error": "Missing 'path' query param"}), 400
-        conn = get_db()
-        item = read_catalog_item_by_path(conn, abs_path)
-        if not item:
-            return jsonify({"error": "Item not found"}), 404
-        return (
-            jsonify(
-                {
-                    "name": item["name"],
-                    "content": item.get("content") or "",
-                    "abs_path": (item.get("abs_path") or "").replace("\\", "/"),
-                }
-            ),
-            200,
-        )
-    except Exception as e:
-        logging.exception("catalog_content error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/flows/new", methods=["POST"])
-def create_flow():
-    """Create a new .flow.yaml file from a name template.
-    Body: {"name": "my-flow"}
-    Returns: {"name": "my-flow", "file_path": "...", "flow_yaml": "..."}
-    """
-    try:
-        import re as _re
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import upsert_flow_definition
-        from pathly_orchestrator.db.queries.catalog_items import _find_data_root
-
-        data = request.get_json() or {}
-        name = data.get("name", "").strip()
-        if not name:
-            return jsonify({"error": "Field 'name' is required"}), 400
-        # Sanitize: lowercase, hyphens only
-        name = _re.sub(r"[^a-z0-9\-]", "-", name.lower()).strip("-")
-        if not name:
-            return jsonify({"error": "Invalid name"}), 400
-
-        data_root = _find_data_root()
-        if not data_root:
-            return jsonify({"error": "Cannot locate pathly_data"}), 500
-
-        flows_dir = data_root / "core" / "flows"
-        flows_dir.mkdir(parents=True, exist_ok=True)
-        file_path = flows_dir / f"{name}.flow.yaml"
-
-        if file_path.exists():
-            return jsonify({"error": f"Flow '{name}' already exists"}), 409
-
-        flow_yaml = f"""---
-
----
-version: 1
-flow: {name}
-storage_path: "pathly/plans/{{topic}}/"
-states:
-  - STORMING
-  - PLANNING
-  - BUILDING
-  - DONE
-transitions:
-  STORMING:
-    - PLANNING
-  PLANNING:
-    - BUILDING
-  BUILDING:
-    - DONE
-"""
-        file_path.write_text(flow_yaml, encoding="utf-8")
-        conn = get_db()
-        upsert_flow_definition(
-            conn,
-            project_root=None,
-            name=name,
-            version="1",
-            flow_yaml=flow_yaml,
-            file_path=str(file_path).replace("\\", "/"),
-        )
-        return (
-            jsonify(
-                {
-                    "name": name,
-                    "file_path": str(file_path).replace("\\", "/"),
-                    "flow_yaml": flow_yaml,
-                }
-            ),
-            201,
-        )
-    except Exception as e:
-        logging.exception("create_flow error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/flows/<path:name>", methods=["DELETE"])
-def delete_flow(name: str):
-    """Delete a flow from DB and disk."""
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.flow_defs import read_flow_by_name
-        from pathly_orchestrator.db.connection import _get_write_lock
-
-        conn = get_db()
-        flow = read_flow_by_name(conn, name)
-        if not flow:
-            return jsonify({"error": f"Flow '{name}' not found"}), 404
-
-        # Delete from DB
-        with _get_write_lock(conn):
-            conn.execute(
-                "DELETE FROM flow_definitions WHERE name=? AND project_root IS NULL",
-                (name,),
-            )
-            conn.commit()
-
-        # Delete from disk
-        file_path = (flow.get("file_path") or "").replace("/", "\\")
-        if file_path:
-            try:
-                Path(file_path).unlink(missing_ok=True)
-            except Exception:
-                pass
-
-        return jsonify({"ok": True}), 200
-    except Exception as e:
-        logging.exception("delete_flow error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/catalog/item/new", methods=["POST"])
-def create_catalog_item():
-    """Create a new .md file and index it.
-    Body: {"type": "skill", "name": "my-skill", "category": "development", "content": "# My Skill\\n\\n"}
-    Returns: {"name": "...", "abs_path": "..."}
-    """
-    try:
-        import re as _re
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.catalog_items import (
-            upsert_catalog_item,
-            _find_data_root,
-            _rel,
-        )
-
-        data = request.get_json() or {}
-        item_type = data.get("type", "")
-        name = (data.get("name") or "").strip()
-        category = (data.get("category") or "").strip()
-        content = data.get("content") or f"# {name}\n\n"
-
-        if item_type not in ("skill", "agent", "fragment", "template"):
-            return jsonify({"error": "type must be skill|agent|fragment|template"}), 400
-        if not name:
-            return jsonify({"error": "Field 'name' is required"}), 400
-
-        # Sanitize name
-        safe_name = _re.sub(r"[^a-z0-9\-_]", "-", name.lower()).strip("-")
-        if not safe_name:
-            return jsonify({"error": "Invalid name"}), 400
-
-        data_root = _find_data_root()
-        if not data_root:
-            return jsonify({"error": "Cannot locate pathly_data"}), 500
-
-        core = data_root / "core"
-        fragment_dir = (
-            (core / "skills" / "fragments" / category)
-            if category
-            else (core / "skills" / "fragments")
-        )
-        type_to_dir = {
-            "skill": core / "skills" / (category or "custom"),
-            "agent": core / "agents",
-            "fragment": fragment_dir,
-            "template": core / "templates" / (category or "custom"),
-        }
-        target_dir = type_to_dir[item_type]
-        target_dir.mkdir(parents=True, exist_ok=True)
-        file_path = target_dir / f"{safe_name}.md"
-
-        if file_path.exists():
-            return (
-                jsonify({"error": f"Item '{safe_name}' already exists in {category}"}),
-                409,
-            )
-
-        file_path.write_text(content, encoding="utf-8")
-        abs_path = str(file_path).replace("\\", "/")
-        rel_path = _rel(file_path, data_root.parent)
-
-        if item_type in ("skill", "template", "fragment"):
-            item_name = f"{category}/{safe_name}" if category else safe_name
-        else:
-            item_name = safe_name
-
-        conn = get_db()
-        upsert_catalog_item(
-            conn,
-            item_type=item_type,
-            name=item_name,
-            rel_path=rel_path,
-            abs_path=abs_path,
-            category=category or "",
-            description="",
-            content=content,
-        )
-        return jsonify({"name": item_name, "abs_path": abs_path}), 201
-    except Exception as e:
-        logging.exception("create_catalog_item error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/catalog/item", methods=["DELETE"])
-def delete_catalog_item():
-    """Delete a catalog item by type+name query params.
-    Query: ?type=skill&name=development/my-skill
-    """
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.connection import _get_write_lock
-
-        item_type = request.args.get("type", "")
-        name = request.args.get("name", "")
-        if not item_type or not name:
-            return jsonify({"error": "Query params 'type' and 'name' required"}), 400
-
-        conn = get_db()
-        # Find by type+name
-        row = conn.execute(
-            "SELECT * FROM catalog_items WHERE item_type=? AND name=?",
-            (item_type, name),
-        ).fetchone()
-        if not row:
-            return (
-                jsonify({"error": f"Item '{name}' of type '{item_type}' not found"}),
-                404,
-            )
-
-        abs_path = (dict(row).get("abs_path") or "").replace("/", "\\")
-
-        # Delete from DB
-        with _get_write_lock(conn):
-            conn.execute(
-                "DELETE FROM catalog_items WHERE item_type=? AND name=?",
-                (item_type, name),
-            )
-            conn.commit()
-
-        # Delete from disk
-        if abs_path:
-            try:
-                Path(abs_path).unlink(missing_ok=True)
-            except Exception:
-                pass
-
-        return jsonify({"ok": True}), 200
-    except Exception as e:
-        logging.exception("delete_catalog_item error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/catalog/item/move", methods=["POST"])
-def move_catalog_item_route():
-    """Move a catalog item to a different category.
-    Body: {"type": "skill", "name": "development/my-skill", "newCategory": "planning"}
-    Returns updated fields: {name, category, abs_path, rel_path}
-    """
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.catalog_items import move_catalog_item
-
-        data = request.get_json() or {}
-        item_type = data.get("type", "")
-        name = (data.get("name") or "").strip()
-        new_category = (data.get("newCategory") or "").strip()
-
-        if item_type not in ("skill", "agent", "fragment", "template"):
-            return jsonify({"error": "type must be skill|agent|fragment|template"}), 400
-        if not name:
-            return jsonify({"error": "Field 'name' is required"}), 400
-
-        conn = get_db()
-        result = move_catalog_item(conn, item_type, name, new_category)
-        return jsonify(result), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404
-    except FileExistsError as e:
-        return jsonify({"error": str(e)}), 409
-    except Exception as e:
-        logging.exception("move_catalog_item error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/catalog/item/rename", methods=["POST"])
-def rename_catalog_item_route():
-    """Rename a catalog item (same directory, new filename stem).
-    Body: {"type": "skill", "name": "development/my-skill", "newName": "better-name"}
-    Returns updated fields: {name, abs_path, rel_path}
-    """
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.catalog_items import rename_catalog_item
-
-        data = request.get_json() or {}
-        item_type = data.get("type", "")
-        name = (data.get("name") or "").strip()
-        new_name = (data.get("newName") or "").strip()
-
-        if item_type not in ("skill", "agent", "fragment", "template"):
-            return jsonify({"error": "type must be skill|agent|fragment|template"}), 400
-        if not name or not new_name:
-            return jsonify({"error": "Fields 'name' and 'newName' are required"}), 400
-
-        conn = get_db()
-        result = rename_catalog_item(conn, item_type, name, new_name)
-        return jsonify(result), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404
-    except FileExistsError as e:
-        return jsonify({"error": str(e)}), 409
-    except Exception as e:
-        logging.exception("rename_catalog_item error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/catalog/category/rename", methods=["POST"])
-def rename_catalog_category_route():
-    """Rename a catalog category directory.
-    Body: {"type": "skill", "oldName": "dev", "newName": "development"}
-    Returns: {oldName, newName, updatedItems}
-    """
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.catalog_items import rename_catalog_category
-
-        data = request.get_json() or {}
-        item_type = data.get("type", "skill")
-        old_name = (data.get("oldName") or "").strip()
-        new_name = (data.get("newName") or "").strip()
-
-        if not old_name or not new_name:
-            return (
-                jsonify({"error": "Fields 'oldName' and 'newName' are required"}),
-                400,
-            )
-
-        conn = get_db()
-        result = rename_catalog_category(conn, item_type, old_name, new_name)
-        return jsonify(result), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404
-    except FileExistsError as e:
-        return jsonify({"error": str(e)}), 409
-    except Exception as e:
-        logging.exception("rename_catalog_category error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/catalog/category/new", methods=["POST"])
-def create_category():
-    """Create a new category (subdirectory under skills or templates).
-    Body: {"type": "skill", "name": "mycategory"}
-    Returns: {"name": "mycategory", "path": "..."}
-    """
-    try:
-        import re as _re
-        from pathly_orchestrator.db.queries.catalog_items import _find_data_root
-
-        data = request.get_json() or {}
-        item_type = data.get("type", "skill")
-        name = (data.get("name") or "").strip()
-        if not name:
-            return jsonify({"error": "Field 'name' is required"}), 400
-
-        # Support nested paths (e.g. "planning/hello") by sanitizing each segment
-        segments = [
-            _re.sub(r"[^a-z0-9\-_]", "-", s.lower()).strip("-") for s in name.split("/")
-        ]
-        segments = [s for s in segments if s]
-        if not segments:
-            return jsonify({"error": "Invalid name"}), 400
-        safe = "/".join(segments)
-
-        data_root = _find_data_root()
-        if not data_root:
-            return jsonify({"error": "Cannot locate pathly_data"}), 500
-
-        if item_type == "fragment":
-            base = data_root / "core" / "skills" / "fragments"
-        elif item_type in ("skill",):
-            base = data_root / "core" / "skills"
-        else:
-            base = data_root / "core" / "templates"
-        new_dir = base.joinpath(*segments)
-        if new_dir.exists():
-            return jsonify({"error": f"Category '{safe}' already exists"}), 409
-
-        new_dir.mkdir(parents=True, exist_ok=True)
-        (new_dir / ".gitkeep").write_text("", encoding="utf-8")
-        return jsonify({"name": safe, "path": str(new_dir).replace("\\", "/")}), 201
-    except Exception as e:
-        logging.exception("create_category error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/catalog/category", methods=["DELETE"])
-def delete_category():
-    """Delete a category and all items in it.
-    Query: ?type=skill&name=mycategory
-    """
-    try:
-        import shutil
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.connection import _get_write_lock
-        from pathly_orchestrator.db.queries.catalog_items import _find_data_root
-
-        item_type = request.args.get("type", "skill")
-        name = request.args.get("name", "")
-        if not name:
-            return jsonify({"error": "Query param 'name' required"}), 400
-
-        data_root = _find_data_root()
-        if not data_root:
-            return jsonify({"error": "Cannot locate pathly_data"}), 500
-
-        base = (
-            data_root
-            / "core"
-            / ("skills" if item_type in ("skill", "fragment") else "templates")
-        )
-        cat_dir = base / name
-
-        # Delete from DB (all items in this category)
-        conn = get_db()
-        with _get_write_lock(conn):
-            conn.execute(
-                "DELETE FROM catalog_items WHERE item_type=? AND category=?",
-                (item_type, name),
-            )
-            conn.commit()
-
-        # Delete from disk
-        if cat_dir.exists():
-            shutil.rmtree(str(cat_dir), ignore_errors=True)
-
-        return jsonify({"ok": True}), 200
-    except Exception as e:
-        logging.exception("delete_category error")
-        return jsonify({"error": str(e)}), 500
 
 
 @bp.route("/skills/catalog", methods=["GET"])
@@ -672,50 +29,6 @@ def skills_catalog():
         return jsonify(catalog), 200
     except Exception as e:
         logging.exception("skills_catalog error")
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-
-@bp.route("/catalog/all", methods=["GET"])
-def catalog_all():
-    """Return all catalog items grouped by type.
-
-    Response:
-      {
-        "agents":    [{"name", "description", "category", "path"}],
-        "fragments": [...],
-        "skills":    [...],
-        "templates": [...]
-      }
-    """
-    try:
-        from pathly_orchestrator.db import get_db
-        from pathly_orchestrator.db.queries.catalog_items import read_all_catalog_items
-
-        conn = get_db()
-        items = read_all_catalog_items(conn)
-
-        result: dict = {"agents": [], "fragments": [], "skills": [], "templates": []}
-        type_to_key = {
-            "agent": "agents",
-            "fragment": "fragments",
-            "skill": "skills",
-            "template": "templates",
-        }
-        for item in items:
-            group = type_to_key.get(item.get("item_type", ""))
-            if group:
-                result[group].append(
-                    {
-                        "name": item["name"],
-                        "description": item.get("description") or "",
-                        "category": item.get("category") or "",
-                        "path": (item.get("abs_path") or "").replace("\\", "/"),
-                    }
-                )
-
-        return jsonify(result), 200
-    except Exception as e:
-        logging.exception("catalog_all error")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
@@ -746,10 +59,7 @@ def skills_parse():
         cells = document["body_cells"]
         frontmatter = document["frontmatter"]
 
-        # Derive composition_key from path: strip leading dirs down to team/build form
-        # Normalize slashes and strip any known prefix to arrive at skill name
         normalized = skill_path.replace("\\", "/")
-        # Remove everything up to and including "core/skills/"
         marker = "core/skills/"
         idx = normalized.find(marker)
         if idx != -1:
@@ -758,7 +68,6 @@ def skills_parse():
             rel = normalized.split("/")[-1]
         composition_key = rel.removesuffix(".md")
 
-        # Load fragment cells from composition.yaml if the skill is listed there
         fragment_cells: list[dict] = []
         skills_dir_idx = normalized.find(marker)
         if skills_dir_idx != -1:
@@ -846,9 +155,6 @@ def skills_preview():
         body_cells_raw = data.get("body_cells", [])
         feature_path = data.get("feature_path", "")
 
-        # Build skill body text from live editor body cells (preferred over disk read).
-        # Frontmatter is metadata, not part of the composed prompt → omit it here.
-        # Same serializer as /skills/save, so the preview matches what gets written.
         body_cells_text = ""
         if body_cells_raw:
             body_cells_text = serialize_skill_document("", body_cells_raw).rstrip("\n")
@@ -856,7 +162,6 @@ def skills_preview():
         if not skill and not body_cells_text:
             return jsonify({"error": "Provide 'skill' key or 'body_cells'"}), 400
 
-        # Collect fragment names from cells where type == "fragment"
         fragment_names = [
             c["fragmentName"]
             for c in (cells or [])
@@ -865,14 +170,12 @@ def skills_preview():
             and c.get("fragmentName")
         ]
 
-        # Build assembled text: body (live cells or disk) + fragment bodies
         if fragment_names or body_cells_text:
             from pathly_orchestrator.compose import load_manifest, _read_fragment
 
             manifest = load_manifest()
             fragments_dir = manifest.get("fragments_dir", "fragments")
 
-            # Prefer live body cells; fall back to reading skill from disk
             if body_cells_text:
                 skill_body = body_cells_text
             else:
@@ -896,7 +199,6 @@ def skills_preview():
         else:
             assembled = compose_skill(skill, adapter_caps={"can_spawn": True})
 
-        # Variable substitution
         feature = Path(feature_path).name if feature_path else ""
         project_root = (
             str(Path(feature_path).parent.parent.parent) if feature_path else ""
@@ -911,7 +213,6 @@ def skills_preview():
             storage_path=storage_path,
         )
 
-        # Split into sections on ## headings
         import re as _re
 
         parts_list = _re.split(r"(?m)^(## .+)$", assembled)
@@ -961,15 +262,11 @@ def skills_save():
         if not isinstance(frontmatter, str):
             frontmatter = ""
 
-        # Reconstruct markdown — frontmatter preserved byte-for-byte, heading levels
-        # honored. Shared serializer keeps save and preview in lockstep.
         markdown = serialize_skill_document(frontmatter, body_cells)
 
-        # Write to disk (create parent dir if it was deleted)
         Path(skill_path).parent.mkdir(parents=True, exist_ok=True)
         Path(skill_path).write_text(markdown, encoding="utf-8")
 
-        # Derive skill key from path (e.g. "development/build")
         normalized = skill_path.replace("\\", "/")
         marker = "core/skills/"
         idx = normalized.find(marker)
@@ -983,7 +280,6 @@ def skills_save():
             body_cells[0].get("heading", skill_key) if body_cells else skill_key
         )
 
-        # Upsert to DB
         conn = get_db()
         upsert_skill_definition(
             conn,
@@ -1027,9 +323,6 @@ def skills_export():
                 jsonify({"error": "Field 'fragment_order' must be a list of strings"}),
                 400,
             )
-        # Reject path-like / absolute skill names so a stray UI value (e.g. an
-        # absolute path to a plans artifact) can never inject a bogus key into the
-        # hand-maintained manifest. A skill key is "category/name" (e.g. team/build).
         if not _SKILL_KEY_RE.fullmatch(skill):
             return (
                 jsonify(
@@ -1040,13 +333,9 @@ def skills_export():
                 400,
             )
 
-        # Locate the composition.yaml file on disk (importlib resources path)
         skills_resource = _res_files("pathly_data").joinpath("core/skills")
         composition_path = _Path(str(skills_resource)) / "composition.yaml"
 
-        # Round-trip with ruamel.yaml so the manifest's header/inline documentation
-        # comments survive the edit. Fall back to PyYAML (lossy — drops comments)
-        # only when ruamel isn't installed.
         try:
             from ruamel.yaml import YAML  # type: ignore
 

@@ -21,10 +21,12 @@ from .blueprints.fsm import bp as fsm_bp
 from .blueprints.runner import bp as runner_bp
 from .blueprints.telemetry import bp as telemetry_bp
 from .blueprints.skills import bp as skills_bp
+from .blueprints.flow_defs import bp as flow_defs_bp
+from .blueprints.catalog import bp as catalog_bp
+from .blueprints.stage_configs import bp as stage_configs_bp
 from .blueprints.menu import bp as menu_bp
 from .blueprints.chat import bp as chat_bp
 from .blueprints.streams import bp as streams_bp
-from .blueprints import flows as _flows_bp
 from .blueprints.db_api import bp as db_api_bp
 from .blueprints.comms import bp as comms_bp
 
@@ -39,10 +41,12 @@ app.register_blueprint(fsm_bp)
 app.register_blueprint(runner_bp)
 app.register_blueprint(telemetry_bp)
 app.register_blueprint(skills_bp)
+app.register_blueprint(flow_defs_bp)
+app.register_blueprint(catalog_bp)
+app.register_blueprint(stage_configs_bp)
 app.register_blueprint(menu_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(streams_bp)
-app.register_blueprint(_flows_bp.bp)
 app.register_blueprint(db_api_bp)
 app.register_blueprint(comms_bp)
 
