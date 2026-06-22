@@ -1,5 +1,44 @@
 # Changelog
 
+## 2.17.0
+
+### Comms board — Goals → Task-DAG → pluggable executors
+
+- `goal_id` / `executor` columns on `comms_messages`; a goal is `type='goal'`, its DAG is
+  `tasks WHERE goal_id=<goal>` + `depends_on` edges (Phase 0a/0b).
+- `/comms/goals/run` dispatches a goal's DAG to one of three executors via
+  `supervisor/goal_run.py`: **single** (one agent drains the whole goal via the `drain-dag`
+  skill), **loop** (supervisor-owned frontier, fresh agent per task via `scheduler_loop`),
+  **team** (the trimmed `team-build` FSM flow). `/comms/goals/stop` halts any of them.
+- `/comms/goals/decompose` turns a goal into a DAG — `mode=planner` (fast, DAG-only) or
+  `mode=consultation` (PO→architect→researcher→designer→planner flow).
+- Two-flow split: new `consultation` flow + trimmed `team-build` flow.
+- Evaluator (`planning/evaluate`) now seeds a real `type=goal` + `type=task` DAG.
+- Studio: Goals & Tasks board view, per-goal executor + CLI-engine selectors,
+  Decompose / Run / Stop controls.
+
+### Comms board — context retrieval
+
+- `context_refs` manifest on messages; per-`.md` section index (`comms_artifact_sections`)
+  with anchors + staleness gates (mtime → hash → structure_key).
+- `GET /comms/artifacts/<id>/section` hydrates a named section (+ Board Catalog listing).
+- Opt-in offline summarizer (`runner/inference.py`, backends `minilm`=off / `ollama` / `haiku`)
+  fills artifact + section summaries; default off ⇒ behavior-identical.
+- §3a: an uploaded `.md`'s generated summary feeds the message's display text + search
+  vector, so it surfaces in the 💡 semantic channel of `retrieve_board_context`.
+- Summarizer controls: global default + per-upload backend override, plus
+  start/done/fail observability (`summarizing` / `summary_ready` / `summary_failed`).
+
+### Comms board — memory consolidation
+
+- `/comms/consolidate` — relevance-gated 💡 channel, deterministic near-duplicate dedup,
+  and a manual reflection pass (`mode=full`).
+
+### Docs
+
+- `pathly/plans/comms-board/` reorganized: shipped-phase specs archived to `_archive/`;
+  ROADMAP/README trimmed to the remaining P3 (parallel) + deferred-polish items.
+
 ## 2.16.2
 
 ### Studio topbar / sidebar redesign
