@@ -101,6 +101,10 @@ skills:
     fragments:
       - comms-post
 
+  planning/consolidate:
+    fragments:
+      - comms-post
+
   planning/plan:
     fragments:
       - completion-report

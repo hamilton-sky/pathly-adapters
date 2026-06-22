@@ -117,3 +117,111 @@ def test_consolidate_route_empty_board(client):
 def test_consolidate_route_requires_scope(client):
     r = client.post("/comms/consolidate", json={"board": "feature"})
     assert r.status_code == 400
+
+
+# ── mode="dedup" (default) — unchanged behaviour ──────────────────────────────
+
+def test_consolidate_mode_dedup_default_no_run_id(client):
+    """Default mode must not spawn a board agent — no run_id in response."""
+    scope = f"dedup-mode-{uuid.uuid4().hex[:6]}"
+    r = client.post("/comms/consolidate", json={"board": "feature", "scope": scope})
+    assert r.status_code == 200, r.data
+    body = json.loads(r.data)
+    assert body["ok"] is True
+    assert "superseded_count" in body
+    assert "run_id" not in body
+
+
+def test_consolidate_mode_dedup_explicit_no_run_id(client):
+    """Explicit mode='dedup' must not spawn a board agent."""
+    scope = f"dedup-explicit-{uuid.uuid4().hex[:6]}"
+    r = client.post(
+        "/comms/consolidate",
+        json={"board": "feature", "scope": scope, "mode": "dedup"},
+    )
+    assert r.status_code == 200, r.data
+    body = json.loads(r.data)
+    assert body["ok"] is True
+    assert "run_id" not in body
+
+
+# ── mode="full" / "reflect" — spawn path ─────────────────────────────────────
+
+def _fake_start_board_run(*args, **kwargs):
+    """Stub for start_board_run: records calls and returns a canned success dict."""
+    _fake_start_board_run.calls.append({"args": args, "kwargs": kwargs})
+    return {"ok": True, "run_id": "x", "mode": "single-agent", "status": "started"}
+
+
+_fake_start_board_run.calls = []
+
+
+@pytest.fixture(autouse=False)
+def patch_board_run(monkeypatch):
+    """Monkeypatch start_board_run inside the comms blueprint's import namespace."""
+    _fake_start_board_run.calls = []
+    import pathly_orchestrator.http_server.blueprints.comms as comms_bp
+
+    monkeypatch.setattr(
+        comms_bp,
+        "comms_consolidate",
+        comms_bp.comms_consolidate,  # keep route handler; patch happens inside it
+    )
+    # Patch the module that the route handler imports from at call time
+    import pathly_orchestrator.supervisor.board_run as br_mod
+
+    monkeypatch.setattr(br_mod, "start_board_run", _fake_start_board_run)
+    yield _fake_start_board_run
+
+
+def test_consolidate_mode_full_spawns_board_run(client, patch_board_run):
+    """mode='full' must spawn a board run with skill='planning/consolidate'."""
+    scope = f"reflect-full-{uuid.uuid4().hex[:6]}"
+    r = client.post(
+        "/comms/consolidate",
+        json={"board": "feature", "scope": scope, "mode": "full"},
+    )
+    assert r.status_code == 200, r.data
+    body = json.loads(r.data)
+    assert body["ok"] is True
+    assert body.get("run_id") == "x"
+    assert body.get("status") == "started"
+    assert "superseded_count" in body
+    # Stub was called with skill="planning/consolidate"
+    assert len(patch_board_run.calls) == 1
+    call_kwargs = patch_board_run.calls[0]["kwargs"]
+    assert call_kwargs.get("skill") == "planning/consolidate"
+
+
+def test_consolidate_mode_reflect_spawns_board_run(client, patch_board_run):
+    """mode='reflect' is an alias for 'full' and must also spawn."""
+    scope = f"reflect-alias-{uuid.uuid4().hex[:6]}"
+    r = client.post(
+        "/comms/consolidate",
+        json={"board": "feature", "scope": scope, "mode": "reflect"},
+    )
+    assert r.status_code == 200, r.data
+    body = json.loads(r.data)
+    assert body["ok"] is True
+    assert body.get("run_id") == "x"
+    assert len(patch_board_run.calls) == 1
+    call_kwargs = patch_board_run.calls[0]["kwargs"]
+    assert call_kwargs.get("skill") == "planning/consolidate"
+
+
+def test_consolidate_mode_full_409_when_board_busy(client, monkeypatch):
+    """mode='full' must return 409 when start_board_run signals board_busy."""
+    import pathly_orchestrator.supervisor.board_run as br_mod
+
+    def _busy(*args, **kwargs):
+        return {"ok": False, "error": "board_busy", "holder": "some-run-id"}
+
+    monkeypatch.setattr(br_mod, "start_board_run", _busy)
+    scope = f"reflect-busy-{uuid.uuid4().hex[:6]}"
+    r = client.post(
+        "/comms/consolidate",
+        json={"board": "feature", "scope": scope, "mode": "full"},
+    )
+    assert r.status_code == 409, r.data
+    body = json.loads(r.data)
+    assert body["ok"] is False

@@ -1053,12 +1053,18 @@ def comms_supersede():
 
 @bp.route("/comms/consolidate", methods=["POST"])
 def comms_consolidate():
-    """Deterministic memory consolidation — supersede near-duplicate free-form notes.
+    """Memory consolidation — deterministic dedup and optional LLM synthesis.
 
-    Required body: {board, scope}. Optional: max_distance (cosine, default 0.08). Keeps the
-    newest of each near-identical cluster; never touches goals/tasks/decisions/escalations
-    (the DAG + governance are protected). Posts a 'status' summary when anything collapsed.
-    Returns 200 {ok, superseded_count, pairs}. Idempotent — a re-run finds nothing new.
+    Required body: {board, scope}.
+    Optional:
+      max_distance (cosine, default 0.08) — dedup similarity threshold.
+      mode         — "dedup" (default, unchanged behavior) | "full" | "reflect".
+                     "full"/"reflect" runs dedupe_board first, then spawns a board
+                     agent with the planning/consolidate skill to synthesize free-form
+                     notes into a single durable discovery. Returns 409 when the board
+                     is already busy (mode full/reflect only).
+    mode="dedup" returns 200 {ok, superseded_count, pairs} — unchanged.
+    mode="full"/"reflect" returns 200 {ok, superseded_count, pairs, run_id, status}.
     """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
@@ -1077,6 +1083,9 @@ def comms_consolidate():
         max_distance = data.get("max_distance", 0.08)
         if not isinstance(max_distance, (int, float)):
             return jsonify({"error": "Field 'max_distance' must be a number"}), 400
+        mode = (data.get("mode", "") or "dedup").strip().lower()
+        if mode not in ("dedup", "full", "reflect"):
+            mode = "dedup"
 
         conn = _get_db()
         pairs = _dedupe(conn, board, scope, max_distance=float(max_distance))
@@ -1104,6 +1113,77 @@ def comms_consolidate():
                 )
             except Exception:
                 pass
+
+        if mode in ("full", "reflect"):
+            from pathly_orchestrator.supervisor.board_run import start_board_run
+
+            project_root = data.get("project_root", "") or ""
+
+            def _board_post(text: str, phase: str | None = None) -> None:
+                try:
+                    _conn = _get_db()
+                    _mid = _post_message(
+                        _conn,
+                        board=board,
+                        scope=scope,
+                        from_agent="system",
+                        type="status",
+                        text=text,
+                    )
+                    payload = {
+                        "type": "COMMS_UPDATE",
+                        "event": "board_run",
+                        "message_id": _mid,
+                        "board": board,
+                        "scope": scope,
+                    }
+                    if phase:
+                        payload["phase"] = phase
+                    _broadcast_comms(scope, payload)
+                except Exception:
+                    logging.debug("consolidate lifecycle post failed", exc_info=True)
+
+            def _on_start(_run_id: str) -> None:
+                _board_post("🤖 reflector started synthesizing this board…", phase="running")
+
+            def _on_done(_run_id: str, res) -> None:
+                summary = ""
+                if isinstance(res, dict):
+                    summary = str(res.get("result") or res.get("summary") or "done")
+                _board_post(
+                    f"✅ reflector finished synthesis — {summary[:280]}", phase="done"
+                )
+
+            result = start_board_run(
+                board,
+                scope,
+                "single-agent",
+                skill="planning/consolidate",
+                agent="planner",
+                project_root=project_root,
+                broadcast_fn=_broadcast_runner,
+                on_start=_on_start,
+                on_done=_on_done,
+            )
+
+            if not result.get("ok"):
+                return (
+                    jsonify({"ok": False, "error": result.get("error", "board_busy")}),
+                    409,
+                )
+
+            return (
+                jsonify(
+                    {
+                        "ok": True,
+                        "superseded_count": len(pairs),
+                        "pairs": pairs,
+                        "run_id": result.get("run_id"),
+                        "status": result.get("status", "started"),
+                    }
+                ),
+                200,
+            )
 
         return jsonify({"ok": True, "superseded_count": len(pairs), "pairs": pairs}), 200
     except Exception as exc:
