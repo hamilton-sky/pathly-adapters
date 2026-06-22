@@ -24,6 +24,7 @@ export const EDITOR_CLIS: CliOption[] = ADAPTER_META.map((m) => ({
 export const CLI_KEY_SPLIT   = 'pathly.notebook.cli.split'
 export const CLI_KEY_ANALYZE = 'pathly.notebook.cli.analyze'
 export const CLI_KEY_EVAL    = 'pathly.comms.cli.eval'
+export const CLI_KEY_GOAL    = 'pathly.comms.cli.goal'
 
 export function loadEditorCli(key: string): CliAdapter {
   try {

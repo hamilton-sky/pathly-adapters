@@ -32,8 +32,10 @@ Run different goals/stages on different CLIs (architect→Codex, builder→Claud
 - board single-agent run already has the **engine selector** (claude/codex) we shipped
 
 **What's left (small, rides P1):** populate `adapter_map` in flows (a few YAML lines);
-finish Copilot/Antigravity spawn argv (Claude+Codex done); **per-goal/per-task adapter
-chosen WITH the executor** in the dispatcher (one selector, two fields).
+finish Copilot/Antigravity spawn argv (Claude+Codex done). ✅ ~~per-goal adapter chosen
+WITH the executor~~ — **done** (2026-06-22): the goal card has an engine selector beside
+the executor; the pick rides `/comms/goals/run` → `start_goal_run` into the single/loop
+spawn (team stays flow-`adapter_map`-governed). Per-*task* override remains future.
 
 **History:** the old `multi-adapter-routing` / `multi-adapter-runner` / `hq-panel` plan
 folders were **built into the comms-board/live-board work** — they no longer exist as
