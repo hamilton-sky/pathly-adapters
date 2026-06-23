@@ -8,6 +8,8 @@ import { buildSendPrompt, getSpawnCwd } from '../commentUtils'
 import {
   CLI_KEY_COMMENT,
   PRESET_KEY_COMMENT,
+  COMMENT_EXTRA_KEY,
+  COMMENT_PROMPT_KEY,
   loadEditorCli,
   loadPreset,
   buildCliArgv,
@@ -101,8 +103,14 @@ export function CommentsPanel({
     if (!unresolved.length || isWorking) return
     const norm = filePath.replace(/\\/g, '/')
     const cwd = getSpawnCwd(filePath)
-    const verb = COMMENT_VERBS.find((v) => v.name === defaultPreset)
-    const prompt = buildSendPrompt(filePath, body, unresolved, verb)
+    // Panel-default framing: an edited prompt override wins, else the selected verb.
+    // Extra instructions (if any) are appended by buildSendPrompt.
+    const override = loadPreset(COMMENT_PROMPT_KEY)
+    const extra = loadPreset(COMMENT_EXTRA_KEY)
+    const verb = override.trim()
+      ? { name: 'custom', label: '', hint: '', prompt: override.trim() }
+      : COMMENT_VERBS.find((v) => v.name === defaultPreset)
+    const prompt = buildSendPrompt(filePath, body, unresolved, verb, extra)
     const tabId = `review-${Date.now().toString(36)}`
     const tabLabel = `Comments · ${filePath.split(/[\\/]/).pop() ?? 'file'}`
 

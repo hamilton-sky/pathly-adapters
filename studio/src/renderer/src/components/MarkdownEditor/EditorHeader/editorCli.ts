@@ -33,6 +33,11 @@ export const PRESET_KEY_SPLIT    = 'pathly.notebook.preset.split'
 export const PRESET_KEY_ANALYZE  = 'pathly.notebook.preset.analyze'
 export const PRESET_KEY_COMMENT  = 'pathly.editor.preset.comment'
 
+// Comment-defaults config: persisted extra-instructions + prompt-framing override
+// (string load/save reuses loadPreset/savePreset).
+export const COMMENT_EXTRA_KEY  = 'pathly.editor.comment.extra'
+export const COMMENT_PROMPT_KEY = 'pathly.editor.comment.prompt'
+
 export function loadPreset(key: string, fallback = ''): string {
   try { return localStorage.getItem(key) ?? fallback } catch { return fallback }
 }

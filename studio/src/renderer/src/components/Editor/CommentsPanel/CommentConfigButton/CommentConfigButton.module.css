@@ -20,16 +20,21 @@
 .trigger:hover { color: var(--accent); background: var(--bg-surface0); }
 .trigger:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
+/* Portal/positioning shell — inner styles live in PromptActionConfig.module.css.
+   Fixed + portaled to <body> so the narrow comments panel's overflow:hidden never clips it. */
 .popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 200;
-  width: 260px;
-  background: var(--bg-surface0);
+  position: fixed;
+  top: var(--pop-top);
+  left: var(--pop-left);
+  z-index: 9999;
+  width: 290px;
+  max-width: calc(100vw - 16px);
+  background: var(--bg-mantle);
   border: var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-modal);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   min-width: 0;
 }

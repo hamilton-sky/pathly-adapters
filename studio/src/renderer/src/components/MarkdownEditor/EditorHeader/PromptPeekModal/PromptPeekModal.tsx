@@ -35,6 +35,7 @@ export default function PromptPeekModal({
   onPresetChange,
 }: Props) {
   const norm = filePath.replace(/\\/g, '/')
+  const [extra, setExtra] = useState('')
 
   // Migration: if a legacy override exists in localStorage, load it as the editable text
   // for the current preset so it is never silently discarded.
@@ -74,7 +75,10 @@ export default function PromptPeekModal({
   }
 
   function handleUseOnce() {
-    onUseOnce(prompt)
+    const eff = extra.trim()
+      ? `${prompt}\n\n--- ADDITIONAL INSTRUCTIONS ---\n${extra.trim()}`
+      : prompt
+    onUseOnce(eff)
     onClose()
   }
 
@@ -91,18 +95,17 @@ export default function PromptPeekModal({
           presets={presets}
           selectedPreset={selectedPreset}
           promptText={prompt}
-          extra=""
+          extra={extra}
           cli={cli}
           primaryLabel="Use once"
           secondaryLabel="Save default"
           onSelectPreset={handleSelectPreset}
           onPromptTextChange={setPrompt}
-          onExtraChange={() => { /* unused */ }}
+          onExtraChange={setExtra}
           onCliChange={onCliChange}
           onReset={handleReset}
           onPrimary={handleUseOnce}
           onSecondary={handleSaveDefault}
-          showExtra={false}
         />
       </div>
     </div>

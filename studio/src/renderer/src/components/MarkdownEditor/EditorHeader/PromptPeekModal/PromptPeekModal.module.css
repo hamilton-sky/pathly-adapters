@@ -9,7 +9,7 @@
   position: fixed;
   top: 52px;
   right: 160px;
-  width: 480px;
+  width: 300px;
   max-width: calc(100vw - 24px);
   background: var(--bg-mantle);
   border: 1px solid var(--bg-surface1);

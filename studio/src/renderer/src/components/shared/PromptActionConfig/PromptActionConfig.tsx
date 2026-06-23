@@ -29,6 +29,10 @@ interface Props {
   secondaryLabel?: string
   onSecondary?: () => void
   showExtra?: boolean
+  /** Hide the prompt-preview banner (e.g. the comment card, which has no editable prompt). */
+  showBanner?: boolean
+  /** Hide the Reset/secondary/primary footer (e.g. when the host supplies its own buttons). */
+  showFooter?: boolean
 }
 
 const PRESET_OPTIONS = (presets: PromptPreset[]) =>
@@ -55,10 +59,12 @@ export function PromptActionConfig({
   secondaryLabel,
   onSecondary,
   showExtra = true,
+  showBanner = true,
+  showFooter = true,
 }: Props): JSX.Element {
   return (
     <>
-      <div className={s.heading}>{heading}</div>
+      {heading && <div className={s.heading}>{heading}</div>}
 
       <section className={s.section}>
         <label className={s.sectionLabel} htmlFor="pac-preset">{presetLabel}</label>
@@ -70,9 +76,10 @@ export function PromptActionConfig({
           onChange={onSelectPreset}
           leadingIcon={<Sparkles size={13} />}
         />
-        {bannerSlot ?? (
-          <PromptBanner editable editValue={promptText} onEditChange={onPromptTextChange} />
-        )}
+        {showBanner !== false &&
+          (bannerSlot ?? (
+            <PromptBanner editable editValue={promptText} onEditChange={onPromptTextChange} />
+          ))}
       </section>
 
       {showExtra !== false && (
@@ -101,14 +108,16 @@ export function PromptActionConfig({
 
       {footerNote && <div className={s.redirect}>{footerNote}</div>}
 
-      <ConfigFooter
-        primaryLabel={primaryLabel}
-        secondaryLabel={secondaryLabel}
-        running={running}
-        onReset={onReset}
-        onPrimary={onPrimary}
-        onSecondary={onSecondary}
-      />
+      {showFooter !== false && (
+        <ConfigFooter
+          primaryLabel={primaryLabel}
+          secondaryLabel={secondaryLabel}
+          running={running}
+          onReset={onReset}
+          onPrimary={onPrimary}
+          onSecondary={onSecondary}
+        />
+      )}
     </>
   )
 }

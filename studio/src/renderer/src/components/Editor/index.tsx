@@ -24,6 +24,7 @@ import { CommentModal } from './CommentModal/CommentModal'
 import { useComments } from './useComments'
 import type { CommentColor } from './useComments'
 import { deriveLineNumber, buildSendPrompt, getSpawnCwd } from './commentUtils'
+import { COMMENT_VERBS } from './commentVerbs'
 import styles from './index.module.css'
 
 type TabMode = 'edit' | 'preview' | 'split'
@@ -273,7 +274,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     setPendingBody('')
   }
 
-  async function handleModalSendNow(commentBody: string, color: CommentColor, cli: EditorCli): Promise<void> {
+  async function handleModalSendNow(commentBody: string, color: CommentColor, cli: EditorCli, verbName: string, extra: string): Promise<void> {
     if (!pendingAnchor || !effectivePath) return
     const lineNumber = deriveLineNumber(body, pendingAnchor)
     const newId = addComment(lineNumber, pendingAnchor, commentBody, color)
@@ -289,7 +290,8 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     const allUnresolved = [...comments.filter((c) => !c.resolved), newItem]
     const norm = effectivePath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'file'
-    const prompt = buildSendPrompt(effectivePath, body, allUnresolved)
+    const verb = COMMENT_VERBS.find((v) => v.name === verbName)
+    const prompt = buildSendPrompt(effectivePath, body, allUnresolved, verb, extra)
     const tabId = `review-${Date.now().toString(36)}`
     addTab(tabId, `Review · ${fileName}`)
     openTab(tabId)
@@ -499,7 +501,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
           y={anchorPos.y}
           initialBody={pendingBody}
           onAdd={handleModalAdd}
-          onSendNow={(b, color, cli) => void handleModalSendNow(b, color, cli)}
+          onSendNow={(b, color, cli, verbName, extra) => void handleModalSendNow(b, color, cli, verbName, extra)}
           onDraftChange={setPendingBody}
           onClose={() => setModalOpen(false)}
           onCancel={() => { setModalOpen(false); setPendingAnchor(null); setAnchorPos(null); setPendingBody('') }}

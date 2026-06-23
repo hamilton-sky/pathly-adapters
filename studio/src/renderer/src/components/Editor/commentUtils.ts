@@ -99,7 +99,7 @@ export function getEffectivePrompt(
   }
 }
 
-export function buildSendPrompt(filePath: string, body: string, unresolved: Comment[], verb?: PromptPreset): string {
+export function buildSendPrompt(filePath: string, body: string, unresolved: Comment[], verb?: PromptPreset, extra?: string): string {
   const norm = filePath.replace(/\\/g, '/')
   const commentLines = unresolved
     .map((c) => `Line ${c.lineNumber} ("${c.lineText.slice(0, 60).trim()}"): ${c.body}`)
@@ -107,7 +107,7 @@ export function buildSendPrompt(filePath: string, body: string, unresolved: Comm
 
   const useDefault = !verb || verb.name === ''
 
-  const instruction = useDefault
+  const baseInstruction = useDefault
     ? [
         'Address each reviewer comment below. Do not change sections that have no comments.',
         'Do not ask clarifying questions. Make your best interpretation of each comment and apply it directly.',
@@ -115,6 +115,11 @@ export function buildSendPrompt(filePath: string, body: string, unresolved: Comm
         '(em-dash, curly quotes, ellipsis). Never substitute or re-encode them.',
       ].join('\n')
     : verb.prompt
+
+  // Extra instructions are appended only when present, so the default send stays byte-identical.
+  const instruction = extra && extra.trim()
+    ? `${baseInstruction}\n\nAdditional instructions:\n${extra.trim()}`
+    : baseInstruction
 
   return [
     `You are revising the file: ${norm}`,
