@@ -1,67 +1,73 @@
 import type { Comment } from './useComments'
+import { resolvePrompt } from '../shared/PromptActionConfig/presetTypes'
+import type { PromptPreset } from '../shared/PromptActionConfig/presetTypes'
+
+export const SPLIT_PROMPT_TEMPLATE = [
+  `You are restructuring a Pathly skill file into well-organized sections.`,
+  ``,
+  `Read the file at: {{FILE}}`,
+  ``,
+  `Analyze the content and identify natural split points. Each logical concern, phase, or topic`,
+  `should become its own ## section — small enough to be an independent cell in the skill editor.`,
+  ``,
+  `Rules:`,
+  `- Preserve all existing content exactly — do not rewrite, add, or remove instructions`,
+  `- Preserve every character byte-for-byte, including Unicode punctuation (em-dash —, en-dash –,`,
+  `  curly quotes ' ' " ", ellipsis …). Never substitute or re-encode them.`,
+  `- Group related paragraphs under a single ## heading`,
+  `- Use short, descriptive ## headings (3–5 words)`,
+  `- Maintain the original logical order`,
+  `- If the content already has ## sections, refine them for better granularity`,
+  ``,
+  `Write the restructured content to: {{FILE}}.draft`,
+  `Write the file as UTF-8 using your native file-writing tool. Do NOT route content through shell`,
+  `commands (Get-Content/Set-Content/Out-File or > redirection) — on Windows PowerShell they corrupt`,
+  `Unicode into mojibake (— becomes "â€").`,
+  ``,
+  `Do not write anything else. Exit when done.`,
+].join('\n')
+
+export const ANALYZE_PROMPT_TEMPLATE = [
+  `You are reviewing a Pathly skill file for quality.`,
+  ``,
+  `Read the file at: {{FILE}}`,
+  ``,
+  `Write an analysis report to: {{FILE}}.analysis`,
+  ``,
+  `Format your report as markdown with these sections:`,
+  ``,
+  `## Summary`,
+  `1–2 sentence overview of what this skill does.`,
+  ``,
+  `## Strengths`,
+  `What this skill does well — clear instructions, good structure, appropriate scope.`,
+  ``,
+  `## Gaps & Ambiguities`,
+  `Unclear instructions, missing edge cases, or steps that could be misinterpreted.`,
+  `Reference exact phrases or sections where possible.`,
+  ``,
+  `## Redundancies`,
+  `Verbose or repeated sections that could be tightened without losing meaning.`,
+  ``,
+  `## Suggested Improvements`,
+  `Concrete, actionable changes ranked by impact. 1–2 sentences each.`,
+  ``,
+  `## Token Estimate`,
+  `Rough token cost per invocation and whether it is appropriate for the task complexity.`,
+  ``,
+  `Write the report as UTF-8 using your native file-writing tool — do NOT route it through shell`,
+  `commands (Get-Content/Set-Content/Out-File or > redirection), which corrupt Unicode on Windows.`,
+  `Do not write anything else. Exit when done.`,
+].join('\n')
 
 export function buildSplitPrompt(filePath: string): string {
   const norm = filePath.replace(/\\/g, '/')
-  return [
-    `You are restructuring a Pathly skill file into well-organized sections.`,
-    ``,
-    `Read the file at: ${norm}`,
-    ``,
-    `Analyze the content and identify natural split points. Each logical concern, phase, or topic`,
-    `should become its own ## section — small enough to be an independent cell in the skill editor.`,
-    ``,
-    `Rules:`,
-    `- Preserve all existing content exactly — do not rewrite, add, or remove instructions`,
-    `- Preserve every character byte-for-byte, including Unicode punctuation (em-dash —, en-dash –,`,
-    `  curly quotes ' ' " ", ellipsis …). Never substitute or re-encode them.`,
-    `- Group related paragraphs under a single ## heading`,
-    `- Use short, descriptive ## headings (3–5 words)`,
-    `- Maintain the original logical order`,
-    `- If the content already has ## sections, refine them for better granularity`,
-    ``,
-    `Write the restructured content to: ${norm}.draft`,
-    `Write the file as UTF-8 using your native file-writing tool. Do NOT route content through shell`,
-    `commands (Get-Content/Set-Content/Out-File or > redirection) — on Windows PowerShell they corrupt`,
-    `Unicode into mojibake (— becomes "â€").`,
-    ``,
-    `Do not write anything else. Exit when done.`,
-  ].join('\n')
+  return resolvePrompt(SPLIT_PROMPT_TEMPLATE, { FILE: norm })
 }
 
 export function buildAnalyzePrompt(filePath: string): string {
   const norm = filePath.replace(/\\/g, '/')
-  return [
-    `You are reviewing a Pathly skill file for quality.`,
-    ``,
-    `Read the file at: ${norm}`,
-    ``,
-    `Write an analysis report to: ${norm}.analysis`,
-    ``,
-    `Format your report as markdown with these sections:`,
-    ``,
-    `## Summary`,
-    `1–2 sentence overview of what this skill does.`,
-    ``,
-    `## Strengths`,
-    `What this skill does well — clear instructions, good structure, appropriate scope.`,
-    ``,
-    `## Gaps & Ambiguities`,
-    `Unclear instructions, missing edge cases, or steps that could be misinterpreted.`,
-    `Reference exact phrases or sections where possible.`,
-    ``,
-    `## Redundancies`,
-    `Verbose or repeated sections that could be tightened without losing meaning.`,
-    ``,
-    `## Suggested Improvements`,
-    `Concrete, actionable changes ranked by impact. 1–2 sentences each.`,
-    ``,
-    `## Token Estimate`,
-    `Rough token cost per invocation and whether it is appropriate for the task complexity.`,
-    ``,
-    `Write the report as UTF-8 using your native file-writing tool — do NOT route it through shell`,
-    `commands (Get-Content/Set-Content/Out-File or > redirection), which corrupt Unicode on Windows.`,
-    `Do not write anything else. Exit when done.`,
-  ].join('\n')
+  return resolvePrompt(ANALYZE_PROMPT_TEMPLATE, { FILE: norm })
 }
 
 export function deriveLineNumber(fileBody: string, anchorText: string): number {
@@ -93,18 +99,27 @@ export function getEffectivePrompt(
   }
 }
 
-export function buildSendPrompt(filePath: string, body: string, unresolved: Comment[]): string {
+export function buildSendPrompt(filePath: string, body: string, unresolved: Comment[], verb?: PromptPreset): string {
   const norm = filePath.replace(/\\/g, '/')
   const commentLines = unresolved
     .map((c) => `Line ${c.lineNumber} ("${c.lineText.slice(0, 60).trim()}"): ${c.body}`)
     .join('\n')
+
+  const useDefault = !verb || verb.name === ''
+
+  const instruction = useDefault
+    ? [
+        'Address each reviewer comment below. Do not change sections that have no comments.',
+        'Do not ask clarifying questions. Make your best interpretation of each comment and apply it directly.',
+        'Preserve every character byte-for-byte in untouched text, including Unicode punctuation',
+        '(em-dash, curly quotes, ellipsis). Never substitute or re-encode them.',
+      ].join('\n')
+    : verb.prompt
+
   return [
     `You are revising the file: ${norm}`,
     '',
-    'Address each reviewer comment below. Do not change sections that have no comments.',
-    'Do not ask clarifying questions. Make your best interpretation of each comment and apply it directly.',
-    'Preserve every character byte-for-byte in untouched text, including Unicode punctuation',
-    '(em-dash, curly quotes, ellipsis). Never substitute or re-encode them.',
+    instruction,
     '',
     '--- REVIEWER COMMENTS ---',
     commentLines,

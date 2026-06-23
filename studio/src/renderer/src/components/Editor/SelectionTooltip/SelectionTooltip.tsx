@@ -1,6 +1,13 @@
-﻿import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { MessageSquarePlus } from 'lucide-react'
+import { COMMENT_VERBS } from '../commentVerbs'
 import styles from './SelectionTooltip.module.css'
+
+// Derive the default action hint from the shared verb list (single source of truth).
+const DEFAULT_VERB = COMMENT_VERBS[0]
+const COMMENT_BUTTON_LABEL = DEFAULT_VERB.hint.split(' · ')[0] === 'default'
+  ? 'Comment'
+  : DEFAULT_VERB.label
 
 interface Props {
   x: number
@@ -30,7 +37,7 @@ export function SelectionTooltip({ x, y, onComment }: Props): JSX.Element {
         aria-label="Add comment on selection"
       >
         <MessageSquarePlus size={14} />
-        Comment
+        {COMMENT_BUTTON_LABEL}
       </button>
     </div>
   )

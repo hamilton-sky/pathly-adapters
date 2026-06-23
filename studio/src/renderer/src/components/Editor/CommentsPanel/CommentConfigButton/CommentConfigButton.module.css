@@ -1,0 +1,35 @@
+.wrapper {
+  position: relative;
+}
+
+.trigger {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 5px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
+}
+.trigger:hover { color: var(--accent); background: var(--bg-surface0); }
+.trigger:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  width: 260px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  min-width: 0;
+}

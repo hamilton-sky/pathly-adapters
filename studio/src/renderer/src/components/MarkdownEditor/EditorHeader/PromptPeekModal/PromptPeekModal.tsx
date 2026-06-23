@@ -1,37 +1,75 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
-import CliSelect from '../CliSelect/CliSelect'
-import { EditorCli } from '../editorCli'
+import React, { useState } from 'react'
+import { PromptActionConfig } from '../../../shared/PromptActionConfig/PromptActionConfig'
+import { resolvePrompt, type PromptPreset } from '../../../shared/PromptActionConfig/presetTypes'
+import { type EditorCli, savePreset } from '../editorCli'
 import styles from './PromptPeekModal.module.css'
 
 interface Props {
   title: string
   fileName: string
-  defaultPrompt: string
+  /** Resolved file path (with forward slashes) used for {{FILE}} substitution. */
+  filePath: string
   storageKey: string
-  /** Engine this action will run on. */
+  presets: PromptPreset[]
+  selectedPreset: string
+  presetPersistKey: string
   cli: EditorCli
-  /** Change this action's engine. */
   onCliChange: (cli: EditorCli) => void
   onClose: () => void
   onUseOnce: (prompt: string) => void
+  onPresetChange: (name: string) => void
 }
 
-export default function PromptPeekModal({ title, fileName, defaultPrompt, storageKey, cli, onCliChange, onClose, onUseOnce }: Props) {
-  const [prompt, setPrompt] = useState(() => {
-    try { return localStorage.getItem(storageKey) ?? defaultPrompt } catch { return defaultPrompt }
-  })
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+export default function PromptPeekModal({
+  title,
+  fileName,
+  filePath,
+  storageKey,
+  presets,
+  selectedPreset,
+  presetPersistKey,
+  cli,
+  onCliChange,
+  onClose,
+  onUseOnce,
+  onPresetChange,
+}: Props) {
+  const norm = filePath.replace(/\\/g, '/')
 
-  useEffect(() => { textareaRef.current?.focus() }, [])
+  // Migration: if a legacy override exists in localStorage, load it as the editable text
+  // for the current preset so it is never silently discarded.
+  const [prompt, setPrompt] = useState<string>(() => {
+    try {
+      const legacy = localStorage.getItem(storageKey)
+      if (legacy) return legacy
+      const preset = presets.find((p) => p.name === selectedPreset) ?? presets[0]
+      return resolvePrompt(preset.prompt, { FILE: norm })
+    } catch {
+      const preset = presets.find((p) => p.name === selectedPreset) ?? presets[0]
+      return resolvePrompt(preset.prompt, { FILE: norm })
+    }
+  })
+
+  function handleSelectPreset(name: string) {
+    const preset = presets.find((p) => p.name === name) ?? presets[0]
+    const resolved = resolvePrompt(preset.prompt, { FILE: norm })
+    setPrompt(resolved)
+    savePreset(presetPersistKey, name)
+    onPresetChange(name)
+  }
 
   function handleReset() {
-    setPrompt(defaultPrompt)
-    try { localStorage.removeItem(storageKey) } catch {}
+    const defaultPreset = presets[0]
+    const resolved = resolvePrompt(defaultPreset.prompt, { FILE: norm })
+    setPrompt(resolved)
+    savePreset(presetPersistKey, defaultPreset.name)
+    onPresetChange(defaultPreset.name)
+    try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
   }
 
   function handleSaveDefault() {
-    try { localStorage.setItem(storageKey, prompt) } catch {}
+    try { localStorage.setItem(storageKey, prompt) } catch { /* ignore */ }
+    savePreset(presetPersistKey, selectedPreset)
     onClose()
   }
 
@@ -42,35 +80,30 @@ export default function PromptPeekModal({ title, fileName, defaultPrompt, storag
 
   return (
     <div className={styles.backdrop} onClick={onClose}>
-      <div className={styles.card} onClick={e => e.stopPropagation()}>
-        <div className={styles.toolbarTop}>
-          <button type="button" className={styles.resetBtn} onClick={handleReset} aria-label="Reset to default">
-            <RotateCcw size={12} />
-            Reset
-          </button>
-          <div className={styles.topRight}>
-            <button type="button" className={styles.useOnceBtn} onClick={handleUseOnce}>Use once</button>
-            <button type="button" className={styles.saveBtn} onClick={handleSaveDefault}>Save default</button>
-          </div>
-        </div>
+      <div className={styles.card} onClick={(e) => e.stopPropagation()}>
         <div className={styles.caption}>
           <span className={styles.title}>{title}</span>
           <span className={styles.fileName}>{fileName}</span>
         </div>
-        <textarea
-          ref={textareaRef}
-          className={styles.textarea}
-          value={prompt}
-          onChange={e => setPrompt(e.target.value)}
-          spellCheck={false}
-          rows={10}
+        <PromptActionConfig
+          heading=""
+          presetLabel="PRESET"
+          presets={presets}
+          selectedPreset={selectedPreset}
+          promptText={prompt}
+          extra=""
+          cli={cli}
+          primaryLabel="Use once"
+          secondaryLabel="Save default"
+          onSelectPreset={handleSelectPreset}
+          onPromptTextChange={setPrompt}
+          onExtraChange={() => { /* unused */ }}
+          onCliChange={onCliChange}
+          onReset={handleReset}
+          onPrimary={handleUseOnce}
+          onSecondary={handleSaveDefault}
+          showExtra={false}
         />
-        <div className={styles.toolbarBottom}>
-          <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-          <div className={styles.engineZone}>
-            <CliSelect value={cli} onChange={onCliChange} align="right" up />
-          </div>
-        </div>
       </div>
     </div>
   )

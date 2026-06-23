@@ -3,6 +3,14 @@ import { X } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { COMMENT_COLORS } from '../useComments'
 import type { CommentColor } from '../useComments'
+import CliSelect from '../../MarkdownEditor/EditorHeader/CliSelect/CliSelect'
+import {
+  type EditorCli,
+  CLI_KEY_COMMENT,
+  loadEditorCli,
+  saveEditorCli,
+  cliLabel,
+} from '../../MarkdownEditor/EditorHeader/editorCli'
 import styles from './CommentModal.module.css'
 
 interface Props {
@@ -11,7 +19,7 @@ interface Props {
   y: number
   initialBody?: string
   onAdd: (body: string, color: CommentColor) => void
-  onSendNow: (body: string, color: CommentColor) => void
+  onSendNow: (body: string, color: CommentColor, cli: EditorCli) => void
   onDraftChange: (body: string) => void
   onClose: () => void
   onCancel: () => void
@@ -20,6 +28,7 @@ interface Props {
 export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, onDraftChange, onClose, onCancel }: Props): JSX.Element {
   const [body, setBody] = useState(initialBody ?? '')
   const [selectedColor, setSelectedColor] = useState<CommentColor>('yellow')
+  const [cli, setCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_COMMENT))
   const canSubmit = body.trim().length > 0
   const ref = useRef<HTMLDivElement>(null)
   const preview = anchorText.length > 120 ? anchorText.slice(0, 120).trimEnd() + '…' : anchorText.trim()
@@ -54,6 +63,11 @@ export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, 
   function handleCancel(): void {
     setSelectedColor('yellow')
     onCancel()
+  }
+
+  function handleCliChange(next: EditorCli): void {
+    setCli(next)
+    saveEditorCli(CLI_KEY_COMMENT, next)
   }
 
   return (
@@ -93,13 +107,14 @@ export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, 
       />
 
       <div className={styles.actions}>
+        <CliSelect value={cli} onChange={handleCliChange} compact align="right" up />
         <button
           type="button"
           className={styles.sendBtn}
           disabled={!canSubmit}
-          onClick={() => { if (canSubmit) onSendNow(body.trim(), selectedColor) }}
+          onClick={() => { if (canSubmit) onSendNow(body.trim(), selectedColor, cli) }}
         >
-          Send to Claude
+          Send to {cliLabel(cli)}
         </button>
         <button
           type="button"

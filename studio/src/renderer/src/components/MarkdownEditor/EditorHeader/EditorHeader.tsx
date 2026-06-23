@@ -10,11 +10,12 @@ import { useUiStore, selectMdEditorDraftPath, selectMdEditorAnalysisPath, select
 import { useTerminalStore } from '../../../store/terminalStore'
 import { useEditorAgentActions } from './hooks/useEditorAgentActions'
 import { apiFetch } from '../../../lib/config'
-import { buildSplitPrompt, buildAnalyzePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
+import { STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import ExportMenu from './ExportMenu/ExportMenu'
 import SplitPill from './SplitPill/SplitPill'
-import { loadEditorCli, saveEditorCli, EditorCli, CLI_KEY_SPLIT, CLI_KEY_ANALYZE } from './editorCli'
+import { loadEditorCli, saveEditorCli, EditorCli, CLI_KEY_SPLIT, CLI_KEY_ANALYZE, loadPreset, savePreset, PRESET_KEY_SPLIT, PRESET_KEY_ANALYZE } from './editorCli'
+import { SPLIT_PRESETS, ANALYZE_LENSES } from './actionPresets'
 import { fmtElapsed, useElapsedProgress } from './editorProgress'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
 import styles from './EditorHeader.module.css'
@@ -51,9 +52,14 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const [analyzeOncePrompt, setAnalyzeOncePrompt] = useState<string | null>(null)
   const [splitCli,   setSplitCli]   = useState<EditorCli>(() => loadEditorCli(CLI_KEY_SPLIT))
   const [analyzeCli, setAnalyzeCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_ANALYZE))
+  const [splitPreset,   setSplitPreset]   = useState<string>(() => loadPreset(PRESET_KEY_SPLIT))
+  const [analyzePreset, setAnalyzePreset] = useState<string>(() => loadPreset(PRESET_KEY_ANALYZE))
 
   const handleSplitCli   = (next: EditorCli) => { setSplitCli(next);   saveEditorCli(CLI_KEY_SPLIT, next) }
   const handleAnalyzeCli = (next: EditorCli) => { setAnalyzeCli(next); saveEditorCli(CLI_KEY_ANALYZE, next) }
+
+  const handleSplitPreset = (name: string) => { setSplitPreset(name); savePreset(PRESET_KEY_SPLIT, name) }
+  const handleAnalyzePreset = (name: string) => { setAnalyzePreset(name); savePreset(PRESET_KEY_ANALYZE, name) }
 
   const { handleSplit, handleAnalyze, stopSplit, stopAnalyze } = useEditorAgentActions(
     mdEditorPath,
@@ -243,12 +249,16 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         <PromptPeekModal
           title="PROMPT — AI Split"
           fileName={skillName + '.md'}
-          defaultPrompt={buildSplitPrompt(mdEditorPath)}
+          filePath={mdEditorPath}
           storageKey={STORAGE_KEY_SPLIT}
+          presets={SPLIT_PRESETS}
+          selectedPreset={splitPreset}
+          presetPersistKey={PRESET_KEY_SPLIT}
           cli={splitCli}
           onCliChange={handleSplitCli}
           onClose={() => setSplitPeekOpen(false)}
           onUseOnce={(p) => { setSplitOncePrompt(p); setSplitPeekOpen(false) }}
+          onPresetChange={handleSplitPreset}
         />
       )}
 
@@ -305,12 +315,16 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
           <PromptPeekModal
             title="PROMPT — AI Analyze"
             fileName={skillName + '.md'}
-            defaultPrompt={buildAnalyzePrompt(mdEditorPath)}
+            filePath={mdEditorPath}
             storageKey={STORAGE_KEY_ANALYZE}
+            presets={ANALYZE_LENSES}
+            selectedPreset={analyzePreset}
+            presetPersistKey={PRESET_KEY_ANALYZE}
             cli={analyzeCli}
             onCliChange={handleAnalyzeCli}
             onClose={() => setAnalyzePeekOpen(false)}
             onUseOnce={(p) => { setAnalyzeOncePrompt(p); setAnalyzePeekOpen(false) }}
+            onPresetChange={handleAnalyzePreset}
           />
         )}
       </div>

@@ -107,11 +107,24 @@ def test_ollama_unreachable_no_raise(monkeypatch):
     import pathly_orchestrator.runner.inference as inf
 
     def _boom(*a, **k):
-        raise OSError("connection refused")
+        raise inf.urllib.error.URLError("connection refused")
 
     monkeypatch.setattr(inf.urllib.request, "urlopen", _boom)
     r = inf.summarize_content("# Doc\n## Phase 1\nx", backend="ollama")
-    assert r.summary is None and r.error == "ollama unreachable"
+    # Honest, mode-specific message (server-down vs model-missing) — never raises.
+    assert r.summary is None and r.error is not None and "ollama" in r.error.lower()
+
+
+def test_ollama_model_missing_message(monkeypatch):
+    """A 404 from Ollama (model not pulled) must say so, not 'unreachable'."""
+    import pathly_orchestrator.runner.inference as inf
+
+    def _http404(*a, **k):
+        raise inf.urllib.error.HTTPError("url", 404, "not found", None, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(inf.urllib.request, "urlopen", _http404)
+    r = inf.summarize_content("# Doc\n## Phase 1\nx", backend="ollama")
+    assert r.summary is None and r.error is not None and "pull" in r.error.lower()
 
 
 def test_haiku_success(monkeypatch):

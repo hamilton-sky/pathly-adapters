@@ -3,10 +3,20 @@ import { SendHorizonal, Loader2, Eye, EyeOff, ChevronRight, Trash2 } from 'lucid
 import { Tooltip } from '../../ui'
 import { useToastStore } from '../../../store/toastStore'
 import { useTerminalStore } from '../../../store/terminalStore'
-import { buildHeadlessArgv } from '../../../services/cliEngine'
 import type { Comment } from '../useComments'
 import { buildSendPrompt, getSpawnCwd } from '../commentUtils'
+import {
+  CLI_KEY_COMMENT,
+  PRESET_KEY_COMMENT,
+  loadEditorCli,
+  loadPreset,
+  buildCliArgv,
+  cliLabel,
+  type EditorCli,
+} from '../../MarkdownEditor/EditorHeader/editorCli'
+import { COMMENT_VERBS } from '../commentVerbs'
 import { CommentItem } from './CommentItem/CommentItem'
+import { CommentConfigButton } from './CommentConfigButton/CommentConfigButton'
 import styles from './CommentsPanel.module.css'
 
 const MIN_WIDTH = 200
@@ -44,6 +54,8 @@ export function CommentsPanel({
 }: Props): JSX.Element {
   const pushToast = useToastStore((s) => s.push)
   const [isWorking, setIsWorking] = useState(false)
+  const [defaultCli, setDefaultCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_COMMENT))
+  const [defaultPreset, setDefaultPreset] = useState(() => loadPreset(PRESET_KEY_COMMENT))
 
   const panelRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
@@ -89,7 +101,8 @@ export function CommentsPanel({
     if (!unresolved.length || isWorking) return
     const norm = filePath.replace(/\\/g, '/')
     const cwd = getSpawnCwd(filePath)
-    const prompt = buildSendPrompt(filePath, body, unresolved)
+    const verb = COMMENT_VERBS.find((v) => v.name === defaultPreset)
+    const prompt = buildSendPrompt(filePath, body, unresolved, verb)
     const tabId = `review-${Date.now().toString(36)}`
     const tabLabel = `Comments · ${filePath.split(/[\\/]/).pop() ?? 'file'}`
 
@@ -99,8 +112,6 @@ export function CommentsPanel({
     exitUnsubRef.current = window.pathly.terminal.onExit((exitedTabId) => {
       if (exitedTabId !== tabId) return
       exitUnsubRef.current = null
-      // Retry up to 5 times with 600 ms gaps — agent may still be flushing the file
-      // to disk when the PTY exit event arrives.
       let attempt = 0
       const check = (): void => {
         attempt++
@@ -123,7 +134,7 @@ export function CommentsPanel({
       check()
     })
 
-    await window.pathly.terminal.spawn(tabId, cwd, undefined, buildHeadlessArgv('claude', prompt))
+    await window.pathly.terminal.spawn(tabId, cwd, undefined, buildCliArgv(defaultCli, prompt))
     useTerminalStore.getState().updateTabStatus(tabId, 'running')
   }
 
@@ -136,6 +147,10 @@ export function CommentsPanel({
           {unresolved.length > 0 && <span className={styles.badge}>{unresolved.length}</span>}
         </span>
         <div className={styles.headerBtns}>
+          <CommentConfigButton
+            onCliChange={setDefaultCli}
+            onPresetChange={setDefaultPreset}
+          />
           <Tooltip label={showHighlights ? 'Hide highlights' : 'Show highlights'} placement="bottom">
             <button
               type="button"
@@ -214,12 +229,12 @@ export function CommentsPanel({
             className={styles.sendBtn}
             onClick={() => void handleSendToAgent()}
             disabled={isWorking}
-            aria-label={isWorking ? 'Agent is working…' : 'Send comments to agent'}
+            aria-label={isWorking ? 'Agent is working…' : `Send comments to ${cliLabel(defaultCli)}`}
           >
             {isWorking
               ? <Loader2 size={15} className={styles.spinning} />
               : <SendHorizonal size={15} />}
-            {isWorking ? 'Working…' : 'Send to Agent'}
+            {isWorking ? 'Working…' : `Send to ${cliLabel(defaultCli)}`}
           </button>
         </div>
       )}

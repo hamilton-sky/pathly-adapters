@@ -86,12 +86,29 @@ def summarize_content(
     return SummaryResult(None, effective_backend, error=f"unknown backend: {effective_backend}")
 
 
+def _ollama_model() -> str:
+    """Resolve the configured Ollama model (app-setting > env > 'llama3.2')."""
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.app_settings import get_ollama_model
+
+        return get_ollama_model(get_db())
+    except Exception:
+        return "llama3.2"
+
+
 def _run_ollama(text: str, *, max_sentences: int, timeout: int) -> SummaryResult:
-    """Call local Ollama HTTP API. Never raises — §6.6."""
+    """Call local Ollama HTTP API. Never raises — §6.6.
+
+    Distinguishes the failure modes so the board's `summary_failed` signal is
+    honest: server-down vs model-not-pulled vs other — instead of a blanket
+    'unreachable' (which previously masked a missing model as a dead server).
+    """
     import json as _json
 
+    model = _ollama_model()
     prompt = _build_topic_map_prompt(text, max_sentences)
-    payload = _json.dumps({"model": "llama3.2", "prompt": prompt, "stream": False}).encode()
+    payload = _json.dumps({"model": model, "prompt": prompt, "stream": False}).encode()
     try:
         req = urllib.request.Request(
             "http://127.0.0.1:11434/api/generate",
@@ -103,8 +120,19 @@ def _run_ollama(text: str, *, max_sentences: int, timeout: int) -> SummaryResult
             body = _json.loads(resp.read().decode())
             summary = body.get("response", "").strip() or None
             return SummaryResult(summary, "ollama")
-    except Exception as exc:
-        return SummaryResult(None, "ollama", error="ollama unreachable")
+    except urllib.error.HTTPError as exc:
+        # Ollama is UP but errored — most commonly the model isn't pulled.
+        if exc.code == 404:
+            msg = f"ollama model {model!r} not pulled — run `ollama pull {model}` (or change the model in settings)"
+        else:
+            msg = f"ollama error {exc.code} for model {model!r}"
+        return SummaryResult(None, "ollama", error=msg)
+    except urllib.error.URLError as exc:
+        return SummaryResult(
+            None, "ollama", error=f"ollama not running at 127.0.0.1:11434 ({exc.reason})"
+        )
+    except Exception as exc:  # noqa: BLE001 — summary must never raise
+        return SummaryResult(None, "ollama", error=f"ollama call failed: {exc}")
 
 
 def _run_haiku(text: str, *, max_sentences: int, timeout: int) -> SummaryResult:
@@ -124,7 +152,17 @@ def _run_haiku(text: str, *, max_sentences: int, timeout: int) -> SummaryResult:
         return SummaryResult(summary, "haiku", cost_usd=res.get("cost_usd", 0.0))
     except subprocess.TimeoutExpired:
         return SummaryResult(None, "haiku", error="haiku timeout")
-    except Exception as exc:
+    except FileNotFoundError:
+        # The Claude CLI isn't resolvable from the server process (common on
+        # Windows — npm shim not on the server PATH). In-process CLI spawning is
+        # the wrong transport for a background summary; use an API engine (ollama)
+        # or trigger a CLI engine through the terminal-spawn path instead.
+        return SummaryResult(
+            None,
+            "haiku",
+            error="claude CLI not found on the server PATH — use an API engine (ollama) or a terminal-spawned CLI engine",
+        )
+    except Exception as exc:  # noqa: BLE001 — summary must never raise
         return SummaryResult(None, "haiku", error=str(exc))
 
 

@@ -26,6 +26,21 @@ export const CLI_KEY_ANALYZE = 'pathly.notebook.cli.analyze'
 export const CLI_KEY_EVAL    = 'pathly.comms.cli.eval'
 export const CLI_KEY_GOAL    = 'pathly.comms.cli.goal'
 
+export const CLI_KEY_COMMENT = 'pathly.editor.cli.comment'
+
+// Preset name is persisted per action independently of the prompt text override.
+export const PRESET_KEY_SPLIT    = 'pathly.notebook.preset.split'
+export const PRESET_KEY_ANALYZE  = 'pathly.notebook.preset.analyze'
+export const PRESET_KEY_COMMENT  = 'pathly.editor.preset.comment'
+
+export function loadPreset(key: string, fallback = ''): string {
+  try { return localStorage.getItem(key) ?? fallback } catch { return fallback }
+}
+
+export function savePreset(key: string, name: string): void {
+  try { localStorage.setItem(key, name) } catch { /* ignore */ }
+}
+
 export function loadEditorCli(key: string): CliAdapter {
   try {
     const v = localStorage.getItem(key)

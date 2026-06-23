@@ -24,6 +24,44 @@ _init_once_done = False
 _global_write_lock = threading.RLock()
 
 
+class _WriteGuard:
+    """Context manager wrapping the process-wide write lock with commit-safety.
+
+    Acquires `_global_write_lock` on enter; on exit, if the body raised, it ROLLS
+    BACK the connection before releasing the lock. This is the critical safety net:
+    without it, any write that raises *after* sqlite3's implicit BEGIN but *before*
+    `conn.commit()` — a transient "database is locked", a constraint error, an
+    exception between two statements — leaves the connection in an OPEN transaction.
+    That connection then holds SQLite's single write slot indefinitely, so every
+    later writer (any thread/connection) fails with "database is locked" forever.
+    One transient error would otherwise cascade into a permanent lock.
+
+    Drop-in replacement for the previous bare-RLock return value: every existing
+    `with _get_write_lock(conn): conn.execute(...); conn.commit()` site now rolls
+    back on error with no change to the call site.
+    """
+
+    __slots__ = ("_conn",)
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn = conn
+
+    def __enter__(self) -> sqlite3.Connection:
+        _global_write_lock.acquire()
+        return self._conn
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        try:
+            if exc_type is not None:
+                try:
+                    self._conn.rollback()
+                except Exception:
+                    pass
+        finally:
+            _global_write_lock.release()
+        return False  # never suppress the original exception
+
+
 def _load_vec(conn: sqlite3.Connection) -> bool:
     """Try to load sqlite_vec into *conn*. Returns True on success."""
     try:
@@ -82,15 +120,24 @@ def _refresh_flows(conn: sqlite3.Connection) -> None:
 
 
 def _wal_checkpoint_loop(db_path: str) -> None:
-    """Run WAL checkpoint every 5 minutes in a background daemon thread."""
+    """Run WAL checkpoint every 5 minutes in a background daemon thread.
+
+    Holds `_global_write_lock` for the checkpoint so it never collides with an
+    in-process writer at the SQLite level. Such a collision can surface as a
+    transient "database is locked" on the writer — and is the one in-process writer
+    that bypasses the per-write lock, so serializing it here removes that trigger.
+    """
     import time
 
     while True:
         time.sleep(300)
         try:
             conn = sqlite3.connect(db_path, check_same_thread=True)
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            conn.close()
+            try:
+                with _global_write_lock:
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            finally:
+                conn.close()
         except Exception:
             pass
 
@@ -153,14 +200,16 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
     return conn
 
 
-def _get_write_lock(conn: sqlite3.Connection) -> "threading.RLock":  # noqa: ARG001
-    """Return the process-wide write lock.
+def _get_write_lock(conn: sqlite3.Connection) -> "_WriteGuard":
+    """Return a write guard for *conn* — the process-wide write lock plus
+    rollback-on-exception (see `_WriteGuard`).
 
     SQLite permits only one writer at a time, and every thread holds its own
     connection — so a per-connection lock never serializes cross-thread writers;
     they race on SQLite directly and intermittently hit "database is locked" or
-    drop a write. A single global lock serializes all writers in-process. The
-    *conn* argument is kept for call-site compatibility
-    (`with _get_write_lock(conn): conn.execute(...); conn.commit()`).
+    drop a write. A single global lock serializes all writers in-process. The guard
+    also rolls back on error so a failed write never leaks an open transaction that
+    would hold the write slot forever. Used as
+    `with _get_write_lock(conn): conn.execute(...); conn.commit()`.
     """
-    return _global_write_lock
+    return _WriteGuard(conn)

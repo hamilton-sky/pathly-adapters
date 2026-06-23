@@ -147,3 +147,30 @@ def set_summary_backend(conn: sqlite3.Connection, backend: str) -> None:
             f"Invalid summary backend {backend!r}. Must be one of: {sorted(_VALID_BACKENDS)}"
         )
     set_setting(conn, _INFERENCE_BACKEND_KEY, backend)
+
+
+_OLLAMA_MODEL_KEY = "inference:ollama_model"
+_DEFAULT_OLLAMA_MODEL = "llama3.2"
+
+
+def get_ollama_model(conn: sqlite3.Connection) -> str:
+    """Return the Ollama model used for summaries.
+
+    Precedence: app_settings row > PATHLY_OLLAMA_MODEL env var > "llama3.2".
+    Lets a user point the local summarizer at whatever model they have pulled
+    (e.g. 'deepseek-r1:1.5b') instead of the hardcoded default.
+    """
+    raw = get_setting(conn, _OLLAMA_MODEL_KEY)
+    if raw and raw.strip():
+        return raw.strip()
+    env = os.environ.get("PATHLY_OLLAMA_MODEL")
+    if env and env.strip():
+        return env.strip()
+    return _DEFAULT_OLLAMA_MODEL
+
+
+def set_ollama_model(conn: sqlite3.Connection, model: str) -> None:
+    """Persist the Ollama summary model (e.g. 'llama3.2', 'deepseek-r1:1.5b')."""
+    if not isinstance(model, str) or not model.strip():
+        raise ValueError("Ollama model must be a non-empty string")
+    set_setting(conn, _OLLAMA_MODEL_KEY, model.strip())

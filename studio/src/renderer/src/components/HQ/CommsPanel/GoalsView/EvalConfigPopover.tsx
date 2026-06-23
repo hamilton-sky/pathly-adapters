@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Sparkles, ArrowRight } from 'lucide-react'
-import CliSelect from '../.././../MarkdownEditor/EditorHeader/CliSelect/CliSelect'
+import { ArrowRight } from 'lucide-react'
 import { type EditorCli } from '../.././../MarkdownEditor/EditorHeader/editorCli'
-import { BoardSelect } from '../../../shared/BoardSelect/BoardSelect'
 import { PromptBanner, usePromptContent } from '../../../shared/PromptPreview/PromptPreview'
+import { PromptActionConfig } from '../../../shared/PromptActionConfig/PromptActionConfig'
 import { useSkillCatalog } from '../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
 import { useStore } from '../../../../store'
 import { useUiStore } from '../../../../store/uiStore'
@@ -35,16 +34,12 @@ interface Props {
 
 const POPOVER_WIDTH = 290
 
-const LENS_OPTIONS = EVAL_LENSES.map((l) => ({ value: l.name, label: l.label, hint: l.hint }))
-
 export function EvalConfigPopover({
   anchorEl, selectedLens, lensText, extraPrompt, selectedCli,
   running, onSelectLens, onLensTextChange, onExtraPromptChange, onCliChange,
   onReset, onRun, onClose,
 }: Props): JSX.Element | null {
   const ref = useRef<HTMLDivElement>(null)
-  const [top, setTop] = useState(0)
-  const [left, setLeft] = useState(0)
 
   const projectPath = useStore((st) => st.projectPath)
   const setMdEditorPath = useUiStore((st) => st.setMdEditorPath)
@@ -72,13 +67,13 @@ export function EvalConfigPopover({
 
   // Position below the anchor, right-aligned.
   useLayoutEffect(() => {
-    if (!anchorEl) return
+    if (!anchorEl || !ref.current) return
     const r = anchorEl.getBoundingClientRect()
     let l = r.right - POPOVER_WIDTH
     if (l < 8) l = 8
     if (l + POPOVER_WIDTH > window.innerWidth - 8) l = window.innerWidth - 8 - POPOVER_WIDTH
-    setTop(r.bottom + 6)
-    setLeft(l)
+    ref.current.style.setProperty('--pop-top', `${r.bottom + 6}px`)
+    ref.current.style.setProperty('--pop-left', `${l}px`)
   }, [anchorEl])
 
   // Outside-click and Escape close.
@@ -99,73 +94,47 @@ export function EvalConfigPopover({
     }
   }, [anchorEl, onClose])
 
+  const footerNote = (
+    <>
+      <ArrowRight size={12} className={s.redirectIcon} />
+      Need an agent or skill? Use <strong>Run on this board</strong>
+    </>
+  )
+
+  const bannerSlot = isDefaultLens ? (
+    <PromptBanner
+      content={evaluateContent}
+      mdEditorPath={evaluateMdPath}
+      onOpenMdEditor={openEvaluateSkill}
+    />
+  ) : undefined
+
   return createPortal(
     <div
       ref={ref}
       className={s.popover}
-      style={{ '--pop-top': `${top}px`, '--pop-left': `${left}px` } as React.CSSProperties}
       role="dialog"
       aria-label="Configure evaluator"
     >
-      <div className={s.heading}>Configure evaluator</div>
-
-      {/* Lens — shapes HOW the board is read (not which worker runs). */}
-      <section className={s.section}>
-        <label className={s.sectionLabel} htmlFor="eval-lens">LENS</label>
-        <BoardSelect
-          id="eval-lens"
-          ariaLabel="Evaluation lens"
-          value={selectedLens}
-          options={LENS_OPTIONS}
-          onChange={onSelectLens}
-          leadingIcon={<Sparkles size={13} />}
-        />
-        {isDefaultLens ? (
-          <PromptBanner
-            content={evaluateContent}
-            mdEditorPath={evaluateMdPath}
-            onOpenMdEditor={openEvaluateSkill}
-          />
-        ) : (
-          <PromptBanner editable editValue={lensText} onEditChange={onLensTextChange} />
-        )}
-      </section>
-
-      {/* Extra instructions */}
-      <section className={s.section}>
-        <label className={s.sectionLabel} htmlFor="eval-extra">EXTRA INSTRUCTIONS <span className={s.optional}>· optional</span></label>
-        <textarea
-          id="eval-extra"
-          className={s.textarea}
-          rows={3}
-          placeholder="Any extra context or instructions for this run…"
-          value={extraPrompt}
-          onChange={(e) => onExtraPromptChange(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onRun() }
-          }}
-        />
-      </section>
-
-      {/* Engine */}
-      <section className={s.section}>
-        <span className={s.sectionLabel}>ENGINE</span>
-        <CliSelect value={selectedCli} onChange={onCliChange} align="right" up />
-      </section>
-
-      {/* Redirect — agents & skills live in the full run modal, not here. */}
-      <div className={s.redirect}>
-        <ArrowRight size={12} className={s.redirectIcon} />
-        Need an agent or skill? Use <strong>Run on this board</strong>
-      </div>
-
-      <footer className={s.footer}>
-        <button type="button" className={s.resetBtn} onClick={onReset}>Reset</button>
-        <span className={s.spacer} />
-        <button type="button" className={s.runBtn} disabled={running} onClick={onRun}>
-          Run now
-        </button>
-      </footer>
+      <PromptActionConfig
+        heading="Configure evaluator"
+        presetLabel="LENS"
+        presets={EVAL_LENSES}
+        selectedPreset={selectedLens}
+        promptText={lensText}
+        extra={extraPrompt}
+        cli={selectedCli}
+        running={running}
+        primaryLabel="Run now"
+        onSelectPreset={onSelectLens}
+        onPromptTextChange={onLensTextChange}
+        onExtraChange={onExtraPromptChange}
+        onCliChange={onCliChange}
+        onReset={onReset}
+        onPrimary={onRun}
+        bannerSlot={bannerSlot}
+        footerNote={footerNote}
+      />
     </div>,
     document.body,
   )
