@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { Star, MessageSquare, Trash2 } from 'lucide-react'
-import type { BoardScope, Message } from '../types'
-import { agentMeta } from '../constants'
-import { MsgCard } from './cards/MsgCard/MsgCard'
-import { ConfirmModal } from '../../shared/ConfirmModal/ConfirmModal'
-import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
+import type { BoardScope, Message } from '../../types'
+import { agentMeta } from '../../constants'
+import { MsgCard } from '../cards/MsgCard/MsgCard'
+import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
+import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import s from './CommsMsgList.module.css'
 
 export interface CommsMsgListProps {

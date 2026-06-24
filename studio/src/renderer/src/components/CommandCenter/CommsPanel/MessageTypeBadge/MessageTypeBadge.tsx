@@ -1,6 +1,6 @@
 import React from 'react'
 import { Star, FileText } from 'lucide-react'
-import type { MessageType } from '../types'
+import type { MessageType } from '../../types'
 import s from './MessageTypeBadge.module.css'
 
 // Notebook-cell-style type chip — a tinted mono badge that carries the message

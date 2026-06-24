@@ -1,5 +1,5 @@
 import React from 'react'
-import { agentMeta } from '../constants'
+import { agentMeta } from '../../constants'
 import {
   SquareTerminal, Search, GitBranch, CircleCheck, History, Circle, User,
 } from 'lucide-react'

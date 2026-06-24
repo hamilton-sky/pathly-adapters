@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Send, Paperclip } from 'lucide-react'
-import type { BoardScope, Message, MessageType } from '../types'
-import { TypePicker } from './TypePicker'
+import type { BoardScope, Message, MessageType } from '../../types'
+import { TypePicker } from '../TypePicker/TypePicker'
 import s from './CommsInput.module.css'
 
 export interface CommsInputProps {

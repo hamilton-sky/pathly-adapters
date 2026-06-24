@@ -171,12 +171,13 @@ Every component does exactly one thing. If a component needs a comment to explai
 - Hard limit: ~150 lines per component file
 - If a file exceeds this, extract the next logical sub-section into its own file in the same folder
 
-**Folder rule:** each component lives in its own subfolder alongside its CSS module:
+**Folder rule (non-negotiable):** every component lives in its own subfolder alongside its CSS module. Flat `.tsx` + `.module.css` pairs at the feature-folder level are a violation — always create the subfolder:
 ```
 ComponentName/
   ComponentName.tsx
   ComponentName.module.css
 ```
+No exceptions for "small" or "simple" components. If a component is too small to warrant a folder, ask whether it should be inlined into its only consumer instead.
 
 **What to extract:**
 - A repeated render block → named sub-component in the same folder

@@ -90,6 +90,7 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
             className={s.evalBtn}
             data-state={runState !== 'idle' ? runState : undefined}
             disabled={running}
+            aria-label={label}
             onClick={handleRun}
           >
             <Sparkles size={13} />
@@ -99,7 +100,7 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
 
         {running ? (
           <Tooltip label="Stop the running agent" placement="bottom">
-            <button type="button" className={s.evalStop} onClick={() => stopBoard(boardKey)}>
+            <button type="button" className={s.evalStop} aria-label="Stop the running agent" onClick={() => stopBoard(boardKey)}>
               <Square size={11} />
             </button>
           </Tooltip>
@@ -109,6 +110,7 @@ export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
               ref={gearRef}
               type="button"
               className={s.evalGear}
+              aria-label="Configure evaluator"
               {...(configOpen ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
               onClick={() => setConfigOpen((v) => !v)}
             >
