@@ -628,9 +628,10 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
   })
 
   ipcMain.handle('terminal:kill', (event, tabId: string) => {
-    if (ptyOwners.get(tabId) !== event.sender.id) return
     const p = activePtys.get(tabId)
     if (p) {
+      // A live PTY exists — enforce ownership before force-killing it.
+      if (ptyOwners.get(tabId) !== event.sender.id) return
       if (runnerTabMeta.has(tabId)) {
         ptyKilledByRunner.add(tabId)
       }
@@ -638,8 +639,12 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       activePtys.delete(tabId)
       ptyOwners.delete(tabId)
       ptyWindows.delete(tabId)
+      releaseEngineSlot(tabId)
+      return
     }
-    // Free the concurrency slot whether it was running or still queued.
+    // No PTY yet — the spawn is still queued (the UI shows it as optimistically running).
+    // Cancel the queued slot so Stop works before the engine ever starts. Mirrors the
+    // unguarded queue-control 'cancel' path (queued items carry no ptyOwners entry).
     releaseEngineSlot(tabId)
   })
 
