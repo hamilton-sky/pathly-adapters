@@ -296,11 +296,17 @@ def test_route_feedback_human_wins(tmp_path):
 
 
 def _make_commit_flow() -> dict:
+    # auto_commit is opt-in now (default OFF). The flow/action enables it explicitly to
+    # exercise the commit path; the gated-off default is covered by its own test below.
     return {
         "storage_path": "pathly/plans/{topic}/",
         "transition_actions": {
             "BUILDING->REVIEWING": [
-                {"skill": "commit", "message": "feat: complete building stage"}
+                {
+                    "skill": "commit",
+                    "message": "feat: complete building stage",
+                    "auto_commit": True,
+                }
             ]
         },
     }
@@ -365,6 +371,30 @@ def test_run_transition_actions_git_nothing_to_commit(tmp_path):
         run_transition_actions(
             flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1
         )
+
+
+def test_run_transition_actions_commit_gated_off_by_default(tmp_path):
+    """Without an explicit opt-in (action auto_commit / app-setting), the commit action
+    is gated OFF — no `git commit` runs, so changes stay in the working tree."""
+    storage_path = tmp_path / "pathly" / "plans" / "my-topic"
+    storage_path.mkdir(parents=True)
+    flow = {
+        "storage_path": "pathly/plans/{topic}/",
+        "transition_actions": {
+            "BUILDING->REVIEWING": [
+                {"skill": "commit", "message": "feat: complete building stage"}
+            ]
+        },
+    }
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        run_transition_actions(
+            flow, "BUILDING", "REVIEWING", storage_path, "my-topic", 1
+        )
+    commit_calls = [
+        c for c in mock_run.call_args_list if c[0][0][:2] == ["git", "commit"]
+    ]
+    assert commit_calls == []
 
 
 def test_run_transition_actions_archive_artifacts(tmp_path):

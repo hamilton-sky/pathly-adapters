@@ -373,6 +373,51 @@ def _resolve_adapter(flow_config: dict, state_name: str) -> str:
     return adapter_map.get(state_name) or adapter_map.get("default") or ""
 
 
+def _exit_requirement(flow_config: dict | None, state_name: str) -> str | None:
+    """Human-readable summary of what an agent must produce to advance past
+    ``state_name`` — derived from the flow's ``gates`` and ``transition_rules`` so the
+    contract is told to the agent UP FRONT instead of discovered on a gate failure.
+
+    Returns None when the state has no declared forward requirement (e.g. an
+    unconditional transition).
+    """
+    if not flow_config or not state_name:
+        return None
+    lines: list[str] = []
+
+    for key, checks in (flow_config.get("gates") or {}).items():
+        if not key.startswith(f"{state_name}->"):
+            continue
+        target = key.split("->", 1)[1]
+        for chk in checks or []:
+            t = chk.get("type")
+            if t == "verify_gate":
+                lines.append(
+                    f"Write `{chk.get('artifact')}` with its FIRST LINE exactly "
+                    f"`{chk.get('pass_marker')}` (→ {target})."
+                )
+            elif t == "require_artifact":
+                lines.append(
+                    f"Produce `{chk.get('artifact')}` before advancing (→ {target})."
+                )
+            elif t == "scope_gate":
+                lines.append(
+                    f"Keep changes within the scope declared in `{chk.get('scope_file')}`."
+                )
+
+    rules = (flow_config.get("transition_rules") or {}).get(state_name) or {}
+    for rule in rules.get("on_content") or []:
+        lines.append(
+            f"`{rule.get('file')}` must contain `{rule.get('contains')}` "
+            f"(→ {rule.get('next')})."
+        )
+
+    if not lines:
+        return None
+    body = "\n".join(f"  - {ln}" for ln in lines)
+    return f"To advance past {state_name}:\n{body}"
+
+
 def _response_envelope(
     *,
     state_info: dict,
@@ -383,20 +428,32 @@ def _response_envelope(
     current_state_value: str | None = None,
     include_storage_path: bool = True,
     preferred_adapter: str = "",
+    flow: dict | None = None,
 ) -> dict:
+    state_name = current_state_value or state_info["current_state"]
+    # Proactive gate contract: inject the exit requirement into the prompt + brief so
+    # the agent cannot trip a gate it was never told about (e.g. VERIFY.md line-1 marker).
+    exit_req = _exit_requirement(flow, state_name)
+    if exit_req and instructions:
+        instructions = f"{instructions}\n\n## Exit requirement\n{exit_req}"
+    brief = _stage_brief(state_info, storage_path)
+    if exit_req:
+        brief["exit_requirement"] = exit_req
     result = {
         "schema_version": _SCHEMA_VERSION,
         "decision": "continue",
-        "current_state": current_state_value or state_info["current_state"],
+        "current_state": state_name,
         "conv": state_info["conv"],
         "role": agent,
         "agent": agent,
         "preferred_adapter": preferred_adapter,
         "agent_hint": _agent_hint(agent, instructions),
-        "stage_brief": _stage_brief(state_info, storage_path),
+        "stage_brief": brief,
         "warnings": [],
         "menu": menu,
     }
+    if exit_req:
+        result["exit_requirement"] = exit_req
     if include_storage_path:
         result["storage_path"] = str(storage_path)
     result["codex_subagent"] = _codex_subagent_hint(agent, instructions)
@@ -740,6 +797,7 @@ def next_action(args: dict) -> dict:
         instructions=instructions,
         menu=menu,
         preferred_adapter=_resolve_adapter(flow_config, state_info["current_state"]),
+        flow=flow_config,
     )
     result["limits"] = state_info["limits"]
     return result
@@ -961,6 +1019,7 @@ def complete_stage(args: dict) -> dict:
         menu=menu,
         current_state_value=next_state,
         preferred_adapter=_resolve_adapter(flow_config, next_state),
+        flow=flow_config,
     )
     result["limits"] = state_info["limits"]
     return result

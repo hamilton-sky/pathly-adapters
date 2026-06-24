@@ -384,6 +384,63 @@ def route_feedback(
     return None
 
 
+def _auto_commit_enabled(action: dict) -> bool:
+    """Resolve whether the commit transition-action may run.
+
+    Precedence: explicit ``action["auto_commit"]`` > app-setting ``pathly.auto_commit``
+    > default ``False``. Default OFF means an unattended FSM advance never commits — the
+    runner / Studio opts in by setting the flag; interactive/manual driving leaves changes
+    in the working tree for the user to review. Any lookup error ⇒ disabled (fail safe).
+    """
+    if "auto_commit" in action:
+        return bool(action["auto_commit"])
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.app_settings import get_setting
+
+        raw = get_setting(get_db(), "pathly.auto_commit", "false")
+        return str(raw).strip().lower() in ("1", "true", "yes", "on")
+    except Exception:
+        return False
+
+
+def _post_commit_skipped_note(
+    topic: str, prev_state: str, next_state: str, project_root: Path
+) -> None:
+    """Advisory board note when auto-commit is gated off. Best-effort; never raises."""
+    n = -1
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        n = len([ln for ln in status.stdout.splitlines() if ln.strip()])
+    except Exception:
+        pass
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.comms import post_message
+
+        count = f"{n} changed file(s)" if n >= 0 else "pending changes"
+        post_message(
+            get_db(),
+            board="feature",
+            scope=topic,
+            from_agent="orchestrator",
+            type="decision",
+            text=(
+                f"Stage {prev_state} → {next_state} complete — {count} ready to commit. "
+                "Auto-commit is OFF (pathly.auto_commit); commit when you've reviewed."
+            ),
+            stage=next_state,
+        )
+    except Exception:
+        pass
+
+
 def run_transition_actions(
     flow: dict,
     prev_state: str,
@@ -433,13 +490,27 @@ def run_transition_actions(
         skill = action.get("skill", "")
 
         if skill in ("commit", "git_commit"):
+            if not _auto_commit_enabled(action):
+                # Gated OFF by default — leave changes uncommitted for the user to review.
+                # Advisory board note only; never block or fail the transition.
+                _post_commit_skipped_note(topic, prev_state, next_state, project_root)
+                continue
             message = action.get(
                 "message", f"chore: transition {prev_state}->{next_state}"
             )
+            # Scope the stage: explicit action["paths"] (relative to project root) + the
+            # plan folder; fall back to `-A` only when no paths are declared. The blanket
+            # add is now reachable solely via an explicit opt-in, so it can no longer fire
+            # unattended and sweep unrelated working-tree changes.
+            _paths = action.get("paths")
+            if isinstance(_paths, list) and _paths:
+                add_cmd = ["git", "add", "--", str(storage_path), *[str(p) for p in _paths]]
+            else:
+                add_cmd = ["git", "add", "-A"]
             try:
                 try:
                     add_result = subprocess.run(
-                        ["git", "add", "-A"],
+                        add_cmd,
                         cwd=str(project_root),
                         capture_output=True,
                         text=True,
