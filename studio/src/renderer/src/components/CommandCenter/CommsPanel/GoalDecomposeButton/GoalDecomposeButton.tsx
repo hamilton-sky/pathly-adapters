@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Boxes } from 'lucide-react'
-import { Tooltip } from '../../../ui'
 import { BoardSelect } from '../../../shared/BoardSelect/BoardSelect'
+import { RunPill } from '../../../shared/RunPill/RunPill'
+import { useElapsedProgress } from '../../../shared/RunPill/progress'
 import { useCommsStore } from '../../../../store/commsStore'
 import type { DecomposeMode } from '../../../../store/commsApi'
 import s from './GoalDecomposeButton.module.css'
@@ -16,30 +17,25 @@ const MODE_OPTIONS = [
   { value: 'consultation', label: 'Consultation', hint: 'Deep · full team' },
 ]
 
-const LABEL: Record<RunState, string> = {
-  idle: 'Decompose',
-  running: 'Decomposing…',
-  busy: 'Board busy',
-  done: 'Done',
-}
-
 interface Props {
   goalId: string
 }
 
 // Shown on a goal that has no tasks yet — turns the goal into a task DAG via the
-// planner (fast) or the consultation flow (deep). One connected control: the mode
-// picker (left) and the Decompose action (right) share a single bordered frame so
-// they read as a single "decompose, this way" decision (mirrors the Evaluate control).
+// planner (fast) or the consultation flow (deep). Mode picker + the shared RunPill
+// (timer + stop), so this spawn control reads the same as the goal Run control.
 export function GoalDecomposeButton({ goalId }: Props): JSX.Element {
   const [mode, setMode] = useState<DecomposeMode>('planner')
   const goalRunState = useCommsStore((st) => st.goalRunState)
+  const goalRunStart = useCommsStore((st) => st.goalRunStart)
   const decomposeGoal = useCommsStore((st) => st.decomposeGoal)
+  const stopGoal = useCommsStore((st) => st.stopGoal)
 
   const runState: RunState = (goalRunState[goalId] as RunState | undefined) ?? 'idle'
+  const progress = useElapsedProgress(goalRunStart[goalId] || undefined)
 
   return (
-    <div className={s.root} data-state={runState !== 'idle' ? runState : undefined}>
+    <div className={s.controls}>
       <div className={s.modeZone}>
         <BoardSelect
           value={mode}
@@ -49,18 +45,14 @@ export function GoalDecomposeButton({ goalId }: Props): JSX.Element {
           triggerClassName={s.modeTrigger}
         />
       </div>
-      <Tooltip label="Decompose goal" description="Turn this goal into a task DAG the executors can run" placement="top">
-        <button
-          type="button"
-          className={s.btn}
-          disabled={runState === 'running'}
-          aria-label={`Decompose goal with the ${mode}`}
-          onClick={() => decomposeGoal(goalId, mode)}
-        >
-          <Boxes size={11} />
-          <span className={s.label}>{LABEL[runState]}</span>
-        </button>
-      </Tooltip>
+      <RunPill
+        idleLabel="Decompose"
+        icon={<Boxes size={11} />}
+        state={runState}
+        progress={progress}
+        onRun={() => decomposeGoal(goalId, mode)}
+        onStop={() => stopGoal(goalId)}
+      />
     </div>
   )
 }

@@ -14,7 +14,7 @@ import { apiFetch } from '../../../lib/config'
 import { STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE, getEffectivePrompt, buildSplitPrompt, buildAnalyzePrompt } from '../../Editor/commentUtils'
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import ExportMenu from './ExportMenu/ExportMenu'
-import ActionPill from './ActionPill/ActionPill'
+import ActionPill from '../../shared/ActionPill/ActionPill'
 import { loadEditorCli, saveEditorCli, EditorCli, cliLabel, CLI_KEY_SPLIT, CLI_KEY_ANALYZE, loadPreset, savePreset, PRESET_KEY_SPLIT, PRESET_KEY_ANALYZE } from './editorCli'
 import { SPLIT_PRESETS, ANALYZE_LENSES } from './actionPresets'
 import { useElapsedProgress } from './editorProgress'
@@ -276,7 +276,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
 
       {/* AI Split — one joined pill: run (title follows preset) │ gear │ Diff result */}
       <ActionPill
-        state={splitState}
+        state={splitState === 'success' ? 'done' : splitState}
         progress={splitProgress}
         hasPath={!!mdEditorPath}
         title={splitTitle}
@@ -318,7 +318,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
 
       {/* AI Analyze — one joined pill: run (title follows lens) │ gear │ Report result */}
       <ActionPill
-        state={analyzeState}
+        state={analyzeState === 'success' ? 'done' : analyzeState}
         progress={analyzeProgress}
         hasPath={!!mdEditorPath}
         title={analyzeTitle}

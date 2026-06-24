@@ -27,7 +27,8 @@
 .pill .main:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .pill .main:disabled { opacity: 0.45; cursor: not-allowed; }
 .pill .main[data-state='running'] { border-color: var(--yellow); color: var(--yellow); cursor: wait; }
-.pill .main[data-state='success'] { border-color: var(--green); color: var(--green); }
+.pill .main[data-state='busy']    { border-color: var(--yellow); color: var(--yellow); }
+.pill .main[data-state='done']    { border-color: var(--green); color: var(--green); }
 .pill .main[data-state='error']   { border-color: var(--red); color: var(--red); }
 
 /* Zone B — prompt gear (middle segment; opens the prompt/preset config). */
@@ -47,8 +48,14 @@
 .pill .gear:hover:not(:disabled) { background: var(--bg-surface1); color: var(--text-secondary); }
 .pill .gear:disabled { opacity: 0.35; cursor: not-allowed; }
 .pill .gear[data-state='running'] { border-color: var(--yellow); }
-.pill .gear[data-state='success'] { border-color: var(--green); }
+.pill .gear[data-state='busy']    { border-color: var(--yellow); }
+.pill .gear[data-state='done']    { border-color: var(--green); }
 .pill .gear[data-state='error']   { border-color: var(--red); }
+
+/* No result chip (e.g. Evaluate) — the gear/stop is the rightmost segment, so it
+   closes the pill with the right-hand radius instead of a square edge. */
+.pill:not([data-has-chip]) .gear,
+.pill:not([data-has-chip]) .stop { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
 
 /* Stop button — middle segment; replaces the gear while the engine is running. */
 .pill .stop {

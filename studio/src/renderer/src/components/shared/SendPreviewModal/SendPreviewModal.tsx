@@ -34,6 +34,9 @@ interface Props {
   onToggleItem?: (id: string) => void
   /** Primary button label, e.g. "Run Split" / "Send to Claude". */
   submitLabel?: string
+  /** Render the prompt as a read-only preview (no edit toggle). Use when the final prompt
+   *  is assembled elsewhere (e.g. server-side) and the modal is a confirm-and-preview gate. */
+  readOnly?: boolean
   /** Receives the (possibly edited) prompt — that exact text is what gets sent. */
   onSubmit: (prompt: string) => void
   onCancel: () => void
@@ -42,7 +45,7 @@ interface Props {
 // Confirm-before-send: a compact gate showing the target engine + summary, an optional
 // per-item selection list (comments), and the prompt in a collapsible banner (eye = preview ·
 // pencil = edit). Whatever the banner holds on submit is the exact text dispatched.
-export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', onSubmit, onCancel }: Props) {
+export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, onSubmit, onCancel }: Props) {
   const submitRef = useRef<HTMLButtonElement>(null)
   const [text, setText] = useState(prompt)
 
@@ -124,7 +127,9 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
         )}
 
         <div className={styles.bannerWrap}>
-          <PromptBanner editable editValue={text} onEditChange={setText} />
+          {readOnly
+            ? <PromptBanner content={text} />
+            : <PromptBanner editable editValue={text} onEditChange={setText} />}
         </div>
 
         <div className={styles.footer}>

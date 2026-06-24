@@ -515,21 +515,39 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   },
 
   decomposeGoal: (goal_id, mode) => {
-    set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' } }))
+    const now = Date.now()
+    // Stamp the start time immediately so the RunPill timer ticks at t0 (mirrors runGoal /
+    // runEvaluator) instead of waiting for the goal_decompose SSE 'running' phase.
+    set((s) => ({
+      goalRunState: { ...s.goalRunState, [goal_id]: 'running' },
+      goalRunStart: { ...s.goalRunStart, [goal_id]: now },
+    }))
 
     apiDecomposeGoal(goal_id, mode)
       .then((res) => {
         if (res === null || !res.ok) {
           // already_decomposed → the board reload will reveal the existing DAG;
-          // board_busy → flag busy; otherwise just clear.
+          // board_busy → flag busy; otherwise just clear. Surface each so the action
+          // isn't silent (the gap the unified spawn-controls pass closes).
           const next = res?.reason === 'board_busy' ? 'busy' : 'idle'
-          set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: next } }))
+          set((s) => ({
+            goalRunState: { ...s.goalRunState, [goal_id]: next },
+            goalRunStart: { ...s.goalRunStart, [goal_id]: 0 },
+          }))
+          if (res?.reason === 'board_busy') {
+            useToastStore.getState().push('Board busy — finish the running agent first', 'info', { category: 'runner_state' })
+          } else if (res?.reason === 'already_decomposed') {
+            useToastStore.getState().push('Goal already decomposed — showing the existing task DAG', 'info', { category: 'db_crud' })
+          } else {
+            useToastStore.getState().push('Decompose failed — could not start the planner', 'error', { category: 'runner_state' })
+          }
           return
         }
-        // ok=true: stay 'running'; the goal_decompose SSE phase drives done/idle.
+        // ok=true: stay 'running'; the goal_decompose SSE phase drives done/idle (+ done toast).
       })
       .catch(() => {
-        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
+        set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' }, goalRunStart: { ...s.goalRunStart, [goal_id]: 0 } }))
+        useToastStore.getState().push('Decompose failed — server unreachable', 'error', { category: 'runner_state' })
       })
   },
 }))

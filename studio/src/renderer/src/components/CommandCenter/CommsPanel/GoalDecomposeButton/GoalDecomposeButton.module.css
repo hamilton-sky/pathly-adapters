@@ -1,71 +1,29 @@
-/* One connected two-zone control: [ mode ▾ │ Decompose ] — the outer frame owns the
-   border; the mode picker and the action button are flattened into it so they read
-   as a single decision. Mirrors the Evaluate two-zone control (.evalRoot). */
-.root {
+/* Mode picker + shared RunPill, side by side — mirrors the goal Run control's layout
+   (GoalRunButton .controls) so every board spawn control reads the same. */
+.controls {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-width: 0;
-  border: var(--border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: var(--bg-surface0);
   flex-shrink: 0;
-  transition: border-color var(--transition-fast);
 }
 
-.root[data-state='running'] { border-color: var(--accent); }
-.root[data-state='busy']    { border-color: var(--yellow, #d8a657); }
-.root[data-state='done']    { border-color: var(--green, #4caf50); }
-
-/* Left zone — the mode picker (BoardSelect). Fixed width so the portaled menu is
-   wide enough to show each mode's hint line. */
+/* Mode picker (BoardSelect). Fixed width so the portaled menu is wide enough to show
+   each mode's hint line. */
 .modeZone {
   width: 150px;
   min-width: 0;
   display: flex;
 }
 
-/* Flatten the BoardSelect trigger so it dissolves into the shared frame. */
 .modeTrigger {
   height: 28px;
-  border: none;
-  border-radius: 0;
-  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface0);
   font-size: 11px;
   padding: 0 8px;
   gap: 5px;
 }
 
 .modeTrigger:hover { background: var(--bg-surface1); }
-
-/* Right zone — the Decompose action, divided from the mode zone by a single rule. */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  height: 28px;
-  padding: 0 11px;
-  border: none;
-  border-left: var(--border);
-  background: transparent;
-  color: var(--text-primary);
-  font: 11px/1 var(--font-family-sans, inherit);
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: color var(--transition-fast), background var(--transition-fast);
-}
-
-.btn:hover:not(:disabled) { color: var(--accent); background: var(--accent-bg); }
-.btn:disabled { opacity: 0.7; cursor: default; }
-
-.root[data-state='running'] .btn { color: var(--accent); }
-.root[data-state='busy'] .btn    { color: var(--yellow, #d8a657); }
-.root[data-state='done'] .btn    { color: var(--green, #4caf50); }
-
-.label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}

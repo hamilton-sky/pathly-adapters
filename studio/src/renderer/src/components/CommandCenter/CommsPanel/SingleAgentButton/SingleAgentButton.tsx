@@ -1,8 +1,9 @@
 import { useState, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Settings, Square, X, Bot, GitBranch } from 'lucide-react'
+import { Settings, X, Bot, GitBranch } from 'lucide-react'
 import { useCommsStore } from '../../../../store/commsStore'
-import { useElapsedProgress, fmtElapsed } from '../../../shared/RunPill/progress'
+import { useElapsedProgress } from '../../../shared/RunPill/progress'
+import { RunPill } from '../../../shared/RunPill/RunPill'
 import { AgentForm, type SingleAgentConfig } from './AgentForm'
 import { FlowForm } from './FlowForm'
 import s from './SingleAgentButton.module.css'
@@ -39,14 +40,7 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
   const boardRunStart = useCommsStore((st) => st.boardRunStart)
   const runState: RunState = (boardRunState[boardKey] as RunState | undefined) ?? 'idle'
   const running = runState === 'running'
-  const active = runState === 'running' || runState === 'busy'
   const progress = useElapsedProgress(boardRunStart[boardKey] || undefined)
-
-  const startLabel =
-    runState === 'running' ? (progress != null ? `Running… ${fmtElapsed(progress.elapsedS)}` : 'Running…')
-    : runState === 'busy' ? 'Board busy'
-    : runState === 'done' ? 'Done'
-    : 'Run'
 
   function backdrop(e: MouseEvent<HTMLDivElement>): void {
     if (e.target === e.currentTarget) setOpen(false)
@@ -55,30 +49,16 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
 
   return (
     <div className={s.row}>
-      <div className={s.group}>
-        <button
-          type="button"
-          className={s.startBtn}
-          data-state={runState !== 'idle' ? runState : undefined}
-          title="Run an agent or a flow on this board"
-          aria-label="Run an agent or a flow on this board"
-          {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-          onClick={() => setOpen(true)}
-        >
-          <Settings size={11} />
-          <span className={s.startLabel}>{startLabel}</span>
-        </button>
-        <button
-          type="button"
-          className={s.stopBtn}
-          title="Stop the running agent"
-          aria-label="Stop the running agent"
-          disabled={!active}
-          onClick={() => stopBoard(boardKey)}
-        >
-          <Square size={9} />
-        </button>
-      </div>
+      {/* The main button opens the run dialog (it doesn't run directly); the shared
+          RunPill gives it the same timer + stop as every other board spawn control. */}
+      <RunPill
+        idleLabel="Run"
+        icon={<Settings size={10} />}
+        state={runState}
+        progress={progress}
+        onRun={() => setOpen(true)}
+        onStop={() => stopBoard(boardKey)}
+      />
 
       {open && createPortal(
         <div className={s.backdrop} onClick={backdrop}>
