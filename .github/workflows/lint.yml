@@ -59,7 +59,10 @@ jobs:
       - name: Install package and audit deps
         run: |
           pip install -e .
-          pip install bandit pip-audit
+          # bandit is pinned so a new release can't add a check and break the job
+          # repo-wide (same drift that bit black/mypy). pip-audit stays unpinned so
+          # it always audits against the latest CVE database.
+          pip install bandit==1.9.4 pip-audit
           pip-audit
 
       - name: Security scan (bandit)
