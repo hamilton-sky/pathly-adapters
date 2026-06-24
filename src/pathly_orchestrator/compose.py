@@ -3,6 +3,7 @@
 from pathly_orchestrator.skills.compose import *  # noqa: F401, F403
 from pathly_orchestrator.skills.compose import (  # noqa: F401
     load_manifest,
+    load_effective_manifest,
     adapter_caps_for,
     resolve_block,
     compose_skill_with_block,

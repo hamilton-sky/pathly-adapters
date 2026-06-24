@@ -77,12 +77,29 @@ def skills_parse():
                 with open(composition_path, encoding="utf-8") as f:
                     comp = _yaml.safe_load(f)
                 skill_entry = (comp.get("skills") or {}).get(composition_key)
-                if skill_entry:
+                # Per-project DB override (skill editor) wins over the packaged YAML list.
+                override = None
+                try:
+                    from pathly_orchestrator.db import get_db
+                    from pathly_orchestrator.db.queries.skill_composition import (
+                        get_composition_overrides,
+                    )
+
+                    _pr = (data.get("project_root") or "").strip() or None
+                    override = get_composition_overrides(get_db(_pr), _pr).get(
+                        composition_key
+                    )
+                except Exception:
+                    override = None
+                if skill_entry or override is not None:
                     fragments_dir = comp.get("fragments_dir") or "fragments"
                     defaults = comp.get("defaults") or []
-                    all_fragment_names = list(defaults) + list(
-                        skill_entry.get("fragments") or []
+                    effective_frags = (
+                        override
+                        if override is not None
+                        else list((skill_entry or {}).get("fragments") or [])
                     )
+                    all_fragment_names = list(defaults) + list(effective_frags)
                     for frag in all_fragment_names:
                         if isinstance(frag, dict):
                             frag_name = frag.get("name", "")
@@ -298,16 +315,14 @@ def skills_save():
 
 @bp.route("/skills/export", methods=["PUT"])
 def skills_export():
-    """Update composition.yaml with a new fragment_order for a skill.
+    """Persist a skill's fragment order as a per-project composition OVERRIDE in the DB.
 
-    Body: {"skill": "team/build", "fragment_order": ["name1", "name2"]}
-    Returns: {"ok": True}
+    The packaged composition.yaml stays the version-controlled default; edits land in the
+    skill_composition table (merged over the YAML at read time by load_effective_manifest)
+    instead of rewriting the installed file — which would be wiped on reinstall or dirty
+    the repo. Body: {"skill": "team/build", "fragment_order": [...], "project_root"?: "..."}.
     """
     try:
-        import yaml
-        from importlib.resources import files as _res_files
-        from pathlib import Path as _Path
-
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
@@ -333,40 +348,15 @@ def skills_export():
                 400,
             )
 
-        skills_resource = _res_files("pathly_data").joinpath("core/skills")
-        composition_path = _Path(str(skills_resource)) / "composition.yaml"
+        project_root = (data.get("project_root") or "").strip() or None
+        from pathly_orchestrator.db import get_db
+        from pathly_orchestrator.db.queries.skill_composition import (
+            set_composition_override,
+        )
 
-        try:
-            from ruamel.yaml import YAML  # type: ignore
-
-            _ry = YAML()
-            _ry.preserve_quotes = True
-            with open(composition_path, encoding="utf-8") as f:
-                manifest = _ry.load(f) or {}
-            if manifest.get("skills") is None:
-                manifest["skills"] = {}
-            if manifest["skills"].get(skill) is None:
-                manifest["skills"][skill] = {}
-            manifest["skills"][skill]["fragments"] = fragment_order
-            with open(composition_path, "w", encoding="utf-8") as f:
-                _ry.dump(manifest, f)
-        except ImportError:
-            with open(composition_path, encoding="utf-8") as f:
-                manifest = yaml.safe_load(f) or {}
-            if "skills" not in manifest or manifest["skills"] is None:
-                manifest["skills"] = {}
-            if skill not in manifest["skills"] or manifest["skills"][skill] is None:
-                manifest["skills"][skill] = {}
-            manifest["skills"][skill]["fragments"] = fragment_order
-            with open(composition_path, "w", encoding="utf-8") as f:
-                yaml.dump(
-                    manifest,
-                    f,
-                    default_flow_style=False,
-                    allow_unicode=True,
-                    sort_keys=False,
-                )
-
+        set_composition_override(
+            get_db(project_root), project_root, skill, fragment_order
+        )
         return jsonify({"ok": True}), 200
     except Exception as e:
         logging.exception("skills_export error")

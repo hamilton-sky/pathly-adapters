@@ -148,6 +148,19 @@ CREATE TABLE IF NOT EXISTS agent_definitions (
     updated_at     TEXT NOT NULL
 );
 
+-- Per-project (or global, project_root IS NULL) fragment-composition OVERRIDES.
+-- The packaged composition.yaml is the version-controlled default/seed; edits from
+-- the skill editor land here instead of rewriting the installed YAML file (which is
+-- wiped on reinstall / dirties the repo). fragments_json is a JSON array of fragment
+-- names, merged over the YAML defaults at read time by compose.load_effective_manifest.
+CREATE TABLE IF NOT EXISTS skill_composition (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_root   TEXT,
+    skill_key      TEXT NOT NULL,
+    fragments_json TEXT NOT NULL,
+    updated_at     TEXT NOT NULL
+);
+
 INSERT OR IGNORE INTO schema_version VALUES (1, datetime('now'));
 
 CREATE TABLE IF NOT EXISTS feedback_items (
@@ -175,6 +188,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_def_role_global
     ON agent_definitions(role) WHERE project_root IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_def_role_proj
     ON agent_definitions(role, project_root) WHERE project_root IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_comp_global
+    ON skill_composition(skill_key) WHERE project_root IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_comp_proj
+    ON skill_composition(skill_key, project_root) WHERE project_root IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_nodes_def_node
     ON flow_nodes(flow_def_id, node_id);

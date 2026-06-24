@@ -55,9 +55,41 @@ def _skills_root():
 
 
 def load_manifest() -> dict:
-    """Read and parse ``core/skills/composition.yaml``."""
+    """Read and parse ``core/skills/composition.yaml`` (the version-controlled default)."""
     text = _skills_root().joinpath("composition.yaml").read_text(encoding="utf-8")
     return yaml.safe_load(text) or {}
+
+
+def load_effective_manifest(project_root: str | None = None) -> dict:
+    """The composition manifest with per-project DB overrides merged over the packaged
+    YAML defaults.
+
+    The YAML stays the source of truth; rows in ``skill_composition`` (written by the
+    skill editor) replace a skill's ``fragments`` list. **Fail-safe:** any DB error or
+    absent override layer returns the pure YAML manifest, so the runner / install path
+    never breaks because of this layer. With no overrides the result is identical to
+    :func:`load_manifest`.
+    """
+    base = load_manifest()
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.skill_composition import (
+            get_composition_overrides,
+        )
+
+        overrides = get_composition_overrides(get_db(project_root), project_root)
+    except Exception:
+        return base
+    if not overrides:
+        return base
+    merged = dict(base)
+    skills = dict(base.get("skills") or {})
+    for skill_key, fragments in overrides.items():
+        entry = dict(skills.get(skill_key) or {})
+        entry["fragments"] = list(fragments)
+        skills[skill_key] = entry
+    merged["skills"] = skills
+    return merged
 
 
 def _read_skill_body(skill: str) -> str:
