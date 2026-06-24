@@ -118,7 +118,10 @@ def _run_ollama(text: str, *, max_sentences: int, timeout: int) -> SummaryResult
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        # nosec B310 — URL is the fixed localhost Ollama literal above
+        # (http://127.0.0.1:11434), never user/network input, so no file:// or
+        # custom-scheme exposure. timeout is bounded.
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             body = _json.loads(resp.read().decode())
             summary = body.get("response", "").strip() or None
             return SummaryResult(summary, "ollama")
