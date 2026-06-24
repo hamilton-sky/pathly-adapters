@@ -650,8 +650,8 @@ def complete_task(
 
     with _get_write_lock(conn):
         conn.execute(
-            "UPDATE comms_messages SET task_status='done' WHERE id=?",
-            (message_id,),
+            "UPDATE comms_messages SET task_status='done', completed_at=? WHERE id=?",
+            (_now(), message_id),
         )
         conn.commit()
 

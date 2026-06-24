@@ -46,6 +46,16 @@ and read the returned `text` field (the full section — the advisory spec, e.g.
 cases / happy flow, for your phase). The `summary` is a pointer, not the spec — read
 `text`. If `anchor` is absent or null, omit it from the query to retrieve the whole file.
 
+If the task references material that is NOT in `context_refs`, you may pull more from
+the board catalog — you are scoped to your own board, so this is safe:
+```
+GET /comms/artifacts?board=feature&scope=$SCOPE          # list what's available
+GET /comms/artifacts/section?scope=$SCOPE&artifact=<path>&anchor=<anchor>&trail=<message_id>
+```
+The 📚 Catalog block in your context already lists the top artifacts inline — read that
+first and pull only the section you need. Append `&trail=<message_id>` (the task id) so
+the board records what you read. Pull narrowly; don't refetch the 📎 references above.
+
 Carry out the task: make the change, then verify it
 (run the relevant build/test/lint). Post brief progress to the board as you go so the
 human can follow (headless run — they can't see your terminal):

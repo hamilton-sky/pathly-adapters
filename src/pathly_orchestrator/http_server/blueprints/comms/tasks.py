@@ -41,6 +41,12 @@ def comms_tasks_get():
             tasks = _get_messages(
                 conn, board=board, scope=scope, type="task", status="pending"
             )
+        # Surface per-task claim→complete duration for the Goals & Tasks view
+        # (board-context-pull Solution B). Additive: None until both stamps exist.
+        from ._helpers import task_duration_seconds as _duration
+
+        for _t in tasks:
+            _t["duration_seconds"] = _duration(_t)
         return jsonify(tasks), 200
     except Exception as exc:
         logging.exception("comms_tasks_get error")

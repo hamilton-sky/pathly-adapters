@@ -109,6 +109,7 @@ def retrieve_board_context(
     task_description: str,
     board_scope: dict[str, bool] | None = None,
     task_id: str | None = None,
+    counts: dict[str, int] | None = None,
 ) -> str:
     """Return a `## Communication Board` markdown block, or '' when empty.
 
@@ -127,6 +128,11 @@ def retrieve_board_context(
         Optional task message ID. When set, reads context_refs from the task
         and emits the 📎 Referenced context channel (§5). Default None ⇒
         output byte-identical to today.
+    counts:
+        Optional mutable dict. When provided, it is populated with per-channel
+        counts (``governance``/``referenced``/``semantic``/``catalog``) as the
+        block is assembled — single source of truth for the preview endpoint
+        (board-context-pull Solution C), no re-querying or block parsing.
     """
     if board_scope is None:
         board_scope = {"feature": True, "project": True, "global": True}
@@ -256,6 +262,7 @@ def retrieve_board_context(
     # --- HYDRATE channel: context_refs from the task (§5.1) -----------------
     # Only runs when task_id is provided — otherwise byte-identical to today.
     hydrate_lines: list[str] = []
+    hydrate_count = 0
     if task_id is not None:
         try:
             task_row = conn.execute(
@@ -279,6 +286,7 @@ def retrieve_board_context(
                                 anc = ref.get("anchor")
                                 if not art:
                                     continue
+                                hydrate_count += 1
                                 result = _hydrate(
                                     conn,
                                     scope=task_scope,
@@ -317,8 +325,41 @@ def retrieve_board_context(
         except Exception:
             logger.debug("comms_context: task_id hydration failed", exc_info=True)
 
+    # --- CATALOG channel: index-first pull affordance (Solution A) ----------
+    # Scoped to the agent's PRIMARY board (feature > project > global, the order
+    # enabled_boards was built in) so the URL it is handed is already permission-
+    # bounded and it cannot enumerate another board's artifacts. Omitted when the
+    # catalog is empty so the block stays byte-identical on artifact-free boards.
+    catalog_lines: list[str] = []
+    catalog_count = 0
+    try:
+        from pathly_orchestrator.runner.comms_catalog import build_catalog_channel
+
+        primary_board, primary_scope, _ = enabled_boards[0]
+        catalog_lines, catalog_count = build_catalog_channel(
+            conn, primary_board, primary_scope
+        )
+    except Exception:
+        logger.debug("comms_context: catalog channel failed", exc_info=True)
+
+    if counts is not None:
+        counts.update(
+            {
+                "governance": len(decisions) + len(escalations),
+                "referenced": hydrate_count,
+                "semantic": len(context_msgs),
+                "catalog": catalog_count,
+            }
+        )
+
     # Nothing to show
-    if not decisions and not escalations and not context_msgs and not hydrate_lines:
+    if (
+        not decisions
+        and not escalations
+        and not context_msgs
+        and not hydrate_lines
+        and not catalog_lines
+    ):
         return ""
 
     # --- Build two-channel markdown block ------------------------------------
@@ -396,6 +437,14 @@ def retrieve_board_context(
             used += len(entry)
             shown += 1
 
+    # Catalog channel — index-first pull affordance (advisory, opt-in pull)
+    if catalog_lines:
+        if decisions or escalations or hydrate_lines or context_msgs:
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+        lines.extend(catalog_lines)
+
     return "\n".join(lines) + "\n"
 
 
@@ -405,6 +454,7 @@ def board_context_for(
     project_root: str,
     task_description: str = "",
     task_id: str | None = None,
+    counts: dict[str, int] | None = None,
 ) -> str:
     """Scope-aware board context for ANY execution surface.
 
@@ -438,4 +488,5 @@ def board_context_for(
         task_description=task_description or "",
         board_scope=bscope,
         task_id=task_id,
+        counts=counts,
     )
