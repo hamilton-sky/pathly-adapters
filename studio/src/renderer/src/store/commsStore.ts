@@ -185,7 +185,12 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     // project/global use their literal scope names.
     const isFeature = key !== 'project' && key !== 'global'
     const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
-    const params = scopeToParams(scope, key)
+    // The project board's backend scope is the (project-unique) root path — the SAME
+    // value loadBoard reads with — NOT the literal 'project'. Posting under 'project'
+    // lands the message in a scope the board never queries, so it vanishes on the next
+    // reload; the central DB is shared across projects, so 'project' would also collide.
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    const params = scopeToParams(scope, scope === 'project' ? projectRoot : key)
 
     apiPost(key, params.board, params.scope, type, text, stage).then((id) => {
       if (id) {
