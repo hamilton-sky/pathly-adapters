@@ -13,7 +13,7 @@ Repo root: `C:/Users/Yafit/pathly-adapters`. All paths under `studio/src/rendere
 **Goal:** Create a reusable, presentational configurator component modeled on the board Evaluate popover body (`EvalConfigPopover`), so Split / Analyze / Comments can all share one interaction model. **Do not touch Evaluate** — read it only as the reference.
 
 **Read (reference, do not edit):**
-- `components/HQ/CommsPanel/GoalsView/EvalConfigPopover.tsx` + `EvalConfigPopover.module.css` — the visual/interaction template to mirror.
+- `components/CommandCenter/CommsPanel/GoalsView/EvalConfigPopover.tsx` + `EvalConfigPopover.module.css` — the visual/interaction template to mirror.
 - `components/shared/BoardSelect/BoardSelect` (preset dropdown), `components/MarkdownEditor/EditorHeader/CliSelect/CliSelect` (engine dropdown; `EditorCli` type from `../editorCli`), `components/shared/PromptPreview/PromptPreview` (`PromptBanner`).
 
 **Create**

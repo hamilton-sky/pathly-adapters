@@ -73,7 +73,7 @@ Add `CLI_KEY_COMMENT = 'pathly.editor.cli.comment'`. Add preset-name keys: `PRES
 - `components/Editor/CommentsPanel/CommentConfigButton/CommentConfigButton.tsx` (+ `.module.css`) — panel-header config trigger
 
 **Untouched (reference only)**
-- `components/HQ/CommsPanel/GoalsView/EvalConfigPopover.tsx` + `agentFormData.ts` — the board Evaluate surface is the design reference and is NOT modified.
+- `components/CommandCenter/CommsPanel/GoalsView/EvalConfigPopover.tsx` + `agentFormData.ts` — the board Evaluate surface is the design reference and is NOT modified.
 
 **Modified**
 - `components/MarkdownEditor/EditorHeader/PromptPeekModal/PromptPeekModal.tsx` — host `PromptActionConfig` (preset dropdown)

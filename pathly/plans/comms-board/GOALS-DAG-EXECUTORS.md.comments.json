@@ -1,21 +1,30 @@
 {
   "comments": [
     {
-      "id": "c-mqrzv7z1-i7ao",
-      "lineNumber": 1,
-      "lineText": "light\tjust the task DAG, fast\nEither way the resulting tasks carry goal_id = <that goal> and depends_on edges among them",
-      "body": "hi there two?",
-      "resolved": false,
-      "createdAt": "2026-06-24T11:33:00.829Z",
-      "color": "blue"
-    },
-    {
       "id": "c-mqrzutw8-cztv",
       "lineNumber": 10,
       "lineText": "r-goal Task-DAG\nA board is a workspace that holds many goals. Each goal is a unit of work that gets decomposed into a DA",
-      "body": "hi there",
+      "body": "elabrat on this?",
       "resolved": false,
       "createdAt": "2026-06-24T11:32:42.584Z",
+      "color": "yellow"
+    },
+    {
+      "id": "c-mqs2bwtv-g0ct",
+      "lineNumber": 31,
+      "lineText": "Produces\nConsultation flow — PO → architect → design → planner\theavy\trich artifacts on the board + the task DAG (planner",
+      "body": "explain this ?",
+      "resolved": false,
+      "createdAt": "2026-06-24T12:41:58.771Z",
+      "color": "green"
+    },
+    {
+      "id": "c-mqs9sz0w-xchx",
+      "lineNumber": 64,
+      "lineText": "is task belongs to\nexecutor\tgoal\tsingle | loop | team",
+      "body": "what is this?",
+      "resolved": false,
+      "createdAt": "2026-06-24T16:11:12.080Z",
       "color": "yellow"
     }
   ]
