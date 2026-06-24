@@ -246,6 +246,31 @@ def comms_artifact_section(artifact_id: str | None = None):
             anchor=anchor,
             project_root=project_root,
         )
+
+        # Context-access trail (board-context-pull Solution B.2): when an agent
+        # pulls from the catalog it appends ?trail=<task_id>, so the board records
+        # WHAT each task read. Opt-in via the param keeps internal hydration (no
+        # trail) silent. Best-effort — a logging failure never breaks the pull.
+        trail = (request.args.get("trail") or "").strip()
+        if trail and scope and result.get("status") == 200:
+            try:
+                from pathly_orchestrator.db.queries.comms import (
+                    post_message as _post_message,
+                )
+
+                anchor_label = f" §{anchor}" if anchor else ""
+                target = artifact or artifact_id or "?"
+                _post_message(
+                    conn,
+                    board="feature",
+                    scope=scope,
+                    from_agent="agent",
+                    type="status",
+                    text=f"📚 context pull · {target}{anchor_label}",
+                )
+            except Exception:
+                logging.debug("context-access trail post failed", exc_info=True)
+
         return jsonify(result["body"]), result["status"]
     except Exception as exc:
         logging.exception("comms_artifact_section error")

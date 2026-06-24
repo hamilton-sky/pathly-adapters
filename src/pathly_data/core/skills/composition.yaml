@@ -50,6 +50,7 @@ skills:
       - scout-choreography
       - feedback-protocol
       - { name: spawn-rules, requires: can_spawn }
+      - catalog-pull
   team/review:
     fragments:
       - completion-report
@@ -57,6 +58,7 @@ skills:
       - feedback-protocol
       - { name: spawn-rules, requires: can_spawn }
       - comms-post
+      - catalog-pull
   team/test:
     fragments:
       - completion-report
@@ -68,11 +70,13 @@ skills:
       - completion-report
       - scout-choreography
       - { name: spawn-rules, requires: can_spawn }
+      - catalog-pull
   development/review:
     fragments:
       - scout-choreography
       - { name: spawn-rules, requires: can_spawn }
       - comms-post
+      - catalog-pull
   development/test:
     fragments:
       - scout-choreography
@@ -85,6 +89,7 @@ skills:
       - feedback-protocol
       - { name: spawn-rules, requires: can_spawn }
       - comms-post
+      - catalog-pull
 
   debug/verify:
     fragments:

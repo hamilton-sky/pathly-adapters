@@ -89,3 +89,25 @@ def guess_artifact_type(path: str) -> str | None:
 
 def norm_project_root(project_root: str) -> str:
     return project_root.replace("\\", "/").rstrip("/")
+
+
+def task_duration_seconds(task: dict) -> float | None:
+    """Wall-clock seconds from claim to completion for a task row.
+
+    Uses ``completed_at`` (done) or ``failed_at`` (failed) as the end stamp. Returns
+    ``None`` when either bound is missing (still pending/in_progress, or a legacy row
+    predating the columns). Negative deltas from clock skew clamp to 0.
+    """
+    from datetime import datetime
+
+    claimed = task.get("claimed_at")
+    completed = task.get("completed_at") or task.get("failed_at")
+    if not claimed or not completed:
+        return None
+    try:
+        start = datetime.fromisoformat(str(claimed).replace("Z", "+00:00"))
+        end = datetime.fromisoformat(str(completed).replace("Z", "+00:00"))
+        secs = (end - start).total_seconds()
+        return secs if secs > 0 else 0.0
+    except Exception:
+        return None
