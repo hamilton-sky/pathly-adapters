@@ -50,7 +50,10 @@ class _WriteGuard:
         _global_write_lock.acquire()
         return self._conn
 
-    def __exit__(self, exc_type, exc, tb) -> bool:
+    def __exit__(self, exc_type, exc, tb) -> None:
+        # Returns None (not False) so the original exception is never suppressed —
+        # mypy's [exit-return] check rejects `-> bool` here since a falsy literal is
+        # all this returns. None is falsy, so runtime behaviour is unchanged.
         try:
             if exc_type is not None:
                 try:
@@ -59,7 +62,6 @@ class _WriteGuard:
                     pass
         finally:
             _global_write_lock.release()
-        return False  # never suppress the original exception
 
 
 def _load_vec(conn: sqlite3.Connection) -> bool:
