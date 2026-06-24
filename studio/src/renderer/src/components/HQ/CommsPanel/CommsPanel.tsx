@@ -195,6 +195,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
         <GoalsView
           messages={messages}
           onEditGoal={(goalId, text) => editMessage(goalId, text)}
+          onDeleteGoal={(goalId) => del(goalId)}
         />
       )}
       {boardView === 'artifacts' && (

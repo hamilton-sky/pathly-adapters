@@ -36,14 +36,35 @@
   overflow: hidden;
 }
 
+/* Padding matches the message/artifact card (.msgCard: 11px 14px) so a goal card
+   reads as the same card primitive. */
 .header {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  padding: 9px 11px;
+  padding: 11px 14px;
   min-width: 0;
   flex-wrap: wrap;
 }
+
+/* Trash affordance — mirrors the message card's .msgDel (muted → red on hover). */
+.goalDel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.goalDel:hover { color: var(--red); background: var(--red-bg); }
 
 .collapse {
   display: inline-flex;

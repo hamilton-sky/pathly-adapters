@@ -10,16 +10,17 @@ interface Props {
   tasks: Message[]
   siblings: Message[]
   onEditGoal: (goalId: string, text: string) => void
+  onDeleteGoal: (goalId: string) => void
 }
 
 // A collapsible goal: header (with executor + Run) followed by its task DAG in
 // dependency order.
-export function GoalGroup({ goal, tasks, siblings, onEditGoal }: Props): JSX.Element {
+export function GoalGroup({ goal, tasks, siblings, onEditGoal, onDeleteGoal }: Props): JSX.Element {
   const [open, setOpen] = useState(true)
   const ordered = orderByDeps(tasks)
   return (
     <div className={s.group} data-type="goal">
-      <GoalGroupHeader goal={goal} tasks={tasks} open={open} onToggle={() => setOpen((o) => !o)} onEditGoal={onEditGoal} />
+      <GoalGroupHeader goal={goal} tasks={tasks} open={open} onToggle={() => setOpen((o) => !o)} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal} />
       {open && (
         <div className={s.tasks}>
           {ordered.length > 0

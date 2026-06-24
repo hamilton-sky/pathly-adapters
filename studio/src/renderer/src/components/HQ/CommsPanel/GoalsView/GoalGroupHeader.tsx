@@ -1,6 +1,8 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import type { Message } from '../../../CommandCenter/types'
 import { Tooltip } from '../../../ui'
+import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import { GoalRunButton } from '../GoalRunButton/GoalRunButton'
 import { GoalDecomposeButton } from '../GoalDecomposeButton/GoalDecomposeButton'
 import { EditableGoalTitle } from './EditableGoalTitle'
@@ -13,13 +15,16 @@ interface Props {
   open: boolean
   onToggle: () => void
   onEditGoal: (goalId: string, text: string) => void
+  onDeleteGoal: (goalId: string) => void
 }
 
 // Goal header: collapse toggle + goal text + a task rollup chip + the executor
 // selector / Run control (reused from GoalRunButton — the selector value is sent
-// as the executor override on Run, which persists it onto the goal).
-export function GoalGroupHeader({ goal, tasks, open, onToggle, onEditGoal }: Props): JSX.Element {
+// as the executor override on Run, which persists it onto the goal) + a delete
+// affordance (mirrors the message card's trash → confirm → remove).
+export function GoalGroupHeader({ goal, tasks, open, onToggle, onEditGoal, onDeleteGoal }: Props): JSX.Element {
   const r = computeRollup(tasks)
+  const [confirming, setConfirming] = useState(false)
   return (
     <div className={s.header}>
       <Tooltip label={open ? 'Collapse goal' : 'Expand goal'} placement="top">
@@ -44,6 +49,26 @@ export function GoalGroupHeader({ goal, tasks, open, onToggle, onEditGoal }: Pro
       {tasks.length === 0
         ? <GoalDecomposeButton goalId={goal.id} />
         : <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />}
+      <Tooltip label="Delete goal" placement="top">
+        <button
+          type="button"
+          className={s.goalDel}
+          aria-label="Delete goal"
+          onClick={() => setConfirming(true)}
+        >
+          <Trash2 size={13} />
+        </button>
+      </Tooltip>
+      {confirming && (
+        <ConfirmModal
+          title="Delete this goal?"
+          message={tasks.length > 0
+            ? `This goal has ${tasks.length} task${tasks.length === 1 ? '' : 's'}. The goal is removed from the board; its tasks become ungrouped.`
+            : 'It will be removed from the board and its memory.'}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => { setConfirming(false); onDeleteGoal(goal.id) }}
+        />
+      )}
     </div>
   )
 }

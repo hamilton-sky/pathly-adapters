@@ -20,6 +20,8 @@ interface Props {
   leadingIcon?: ReactNode
   /** Text shown in the trigger when no option matches the current value. */
   placeholder?: string
+  /** Extra class on the trigger button — lets a caller flatten it into a grouped control. */
+  triggerClassName?: string
 }
 
 interface Pos { top: number; left: number; width: number; up: boolean; maxH: number }
@@ -31,7 +33,7 @@ interface Pos { top: number; left: number; width: number; up: boolean; maxH: num
  * Escape, and single-key typeahead. The menu portals to <body> so an overflow:auto
  * modal body can't clip it; it closes on outside-click, scroll, and resize.
  */
-export function BoardSelect({ value, options, onChange, id, ariaLabel, leadingIcon, placeholder }: Props): JSX.Element {
+export function BoardSelect({ value, options, onChange, id, ariaLabel, leadingIcon, placeholder, triggerClassName }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<Pos | null>(null)
   const [activeIdx, setActiveIdx] = useState(0)
@@ -153,7 +155,7 @@ export function BoardSelect({ value, options, onChange, id, ariaLabel, leadingIc
         ref={triggerRef}
         type="button"
         id={id}
-        className={s.trigger}
+        className={triggerClassName ? `${s.trigger} ${triggerClassName}` : s.trigger}
         aria-haspopup="listbox"
         {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
         {...(ariaLabel ? { 'aria-label': ariaLabel } : {})}
