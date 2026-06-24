@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
-import type { MessageType } from '../../CommandCenter/types'
-import { COMPOSE_TYPES } from '../../CommandCenter/constants'
+import type { MessageType } from '../types'
+import { COMPOSE_TYPES } from '../constants'
 import s from './TypePicker.module.css'
 
 // Custom message-type dropdown that opens UPWARD (the compose bar sits at the

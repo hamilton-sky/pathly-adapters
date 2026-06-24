@@ -1,4 +1,4 @@
-import type { Message } from '../../../CommandCenter/types'
+import type { Message } from '../../types'
 
 // Order tasks so a task always appears after the tasks it depends on (a stable
 // DFS topological sort). Cycles are tolerated — the `visiting` guard prevents

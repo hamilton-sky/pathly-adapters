@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { MoreVertical } from 'lucide-react'
-import type { Message } from '../../../CommandCenter/types'
+import type { Message } from '../../types'
 import s from './SupersedeMenu.module.css'
 
 export function SupersedeMenu(

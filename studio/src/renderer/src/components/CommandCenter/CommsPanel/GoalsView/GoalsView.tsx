@@ -1,7 +1,7 @@
 import { Target } from 'lucide-react'
-import type { Message } from '../../../CommandCenter/types'
-import { GoalGroup } from './GoalGroup'
-import { TaskCard } from './TaskCard'
+import type { Message } from '../../types'
+import { GoalCard } from '../cards/GoalCard/GoalCard'
+import { TaskCard } from '../cards/TaskCard/TaskCard'
 import { orderByDeps } from './goalsViewUtils'
 import s from './GoalsView.module.css'
 
@@ -44,7 +44,7 @@ export function GoalsView({ messages, onEditGoal, onDeleteGoal }: Props): JSX.El
   return (
     <div className={s.view}>
       {goals.map((g) => (
-        <GoalGroup key={g.id} goal={g} tasks={tasksByGoal.get(g.id) ?? []} siblings={messages} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal} />
+        <GoalCard key={g.id} goal={g} tasks={tasksByGoal.get(g.id) ?? []} siblings={messages} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal} />
       ))}
       {ungrouped.length > 0 && (
         <div className={s.ungrouped}>

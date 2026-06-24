@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, SquarePen, FileText } from 'lucide-react'
-import type { Message } from '../../../CommandCenter/types'
+import type { Message } from '../../types'
 import { useFocusTrap } from '../../../../hooks/useFocusTrap'
 import { readFile } from '../../../../services/pathlyApi'
 import { fetchArtifacts, relativeTime, type ArtifactRow } from '../../../../store/commsApi'

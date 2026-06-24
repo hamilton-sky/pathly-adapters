@@ -1,8 +1,8 @@
 import { useState, type DragEvent, type ChangeEvent } from 'react'
 import { FileText, Upload } from 'lucide-react'
-import type { Message } from '../../../CommandCenter/types'
+import type { Message } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../../../types'
-import { CommsMsgCard } from '../CommsMsgCard'
+import { MsgCard } from '../cards/MsgCard/MsgCard'
 import s from './ArtifactsView.module.css'
 
 const LS_KEY = 'pathly.comms.uploadSummary'
@@ -96,7 +96,7 @@ export function ArtifactsView({ messages, onDelete, onSupersede, onDropFiles, on
         </div>
       ) : (
         artifacts.map((m) => (
-          <CommsMsgCard
+          <MsgCard
             key={m.id}
             message={m}
             flash={false}

@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Star, MessageSquare, Trash2 } from 'lucide-react'
-import type { BoardScope, Message } from '../../CommandCenter/types'
-import { agentMeta } from '../../CommandCenter/constants'
-import { CommsMsgCard } from './CommsMsgCard'
+import type { BoardScope, Message } from '../types'
+import { agentMeta } from '../constants'
+import { MsgCard } from './cards/MsgCard/MsgCard'
 import { ConfirmModal } from '../../shared/ConfirmModal/ConfirmModal'
 import MarkdownRenderer from '../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import s from './CommsMsgList.module.css'
@@ -32,7 +32,7 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
           {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for &ldquo;{searchTerm}&rdquo;
         </div>
         {searchResults.map((m) => (
-          <CommsMsgCard
+          <MsgCard
             key={m.id}
             message={m}
             flash={false}
@@ -86,7 +86,7 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
 
       {thread.length > 0
         ? thread.map((m) => (
-          <CommsMsgCard
+          <MsgCard
             key={m.id}
             message={m}
             flash={flashId === m.id}
