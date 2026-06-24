@@ -54,7 +54,7 @@ export function useEditorAgentActions(
 ) {
   const addTab  = useTerminalStore((s) => s.addTab)
   const openTab = useTerminalStore((s) => s.openTab)
-  const setMdEditorDraftPath     = useUiStore((s) => s.setMdEditorDraftPath)
+  const setMdEditorSplitDraftPath = useUiStore((s) => s.setMdEditorSplitDraftPath)
   const setMdEditorAnalysisPath  = useUiStore((s) => s.setMdEditorAnalysisPath)
   const setMdEditorViewMode      = useUiStore((s) => s.setMdEditorViewMode)
   const setMdEditorAction        = useUiStore((s) => s.setMdEditorAction)
@@ -89,15 +89,15 @@ export function useEditorAgentActions(
     [setMdEditorAction],
   )
 
-  const handleSplit = useCallback(async () => {
+  const handleSplit = useCallback(async (promptOverride?: string) => {
     const forFile = mdEditorPath
     if (!forFile) return
     if (useUiStore.getState().mdEditorActions[forFile]?.split?.status === 'running') return
-    const draftPath = forFile + '.draft'
+    const draftPath = forFile + '.split.draft'
     const norm = forFile.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `split-${Date.now().toString(36)}`
-    const prompt = splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, forFile)
+    const prompt = promptOverride ?? splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, forFile)
     addTab(tabId, `Split · ${fileName}`, 'left', splitCli as TerminalTab['kind'], undefined, undefined, prompt)
     // Optimistic running BEFORE the spawn await so startedAt is stamped at t0 (the elapsed
     // timer derives from tab.startedAt) and a quick navigate-away-and-back restores the pill.
@@ -118,7 +118,7 @@ export function useEditorAgentActions(
       if (!live || live.tabId !== tabId) return
       void pollForFile(draftPath).then((found) => {
         if (found) {
-          setMdEditorDraftPath(draftPath, forFile)
+          setMdEditorSplitDraftPath(draftPath, forFile)
           if (useUiStore.getState().mdEditorPath === forFile) setMdEditorViewMode('editor')
           useTerminalStore.getState().updateTabStatus(tabId, 'done')
           useTerminalStore.getState().closeTab(tabId)
@@ -153,9 +153,9 @@ export function useEditorAgentActions(
       toast(`AI Split failed · ${fileName} — could not launch ${cliLabel(splitCli)}`, 'error', 'agent_done')
       setTimeout(() => clearIfStill(forFile, 'split', tabId), 3000)
     }
-  }, [mdEditorPath, splitOncePrompt, onSplitOnceUsed, addTab, openTab, setMdEditorDraftPath, setMdEditorViewMode, setMdEditorAction, clearIfStill, splitCli])
+  }, [mdEditorPath, splitOncePrompt, onSplitOnceUsed, addTab, openTab, setMdEditorSplitDraftPath, setMdEditorViewMode, setMdEditorAction, clearIfStill, splitCli])
 
-  const handleAnalyze = useCallback(async () => {
+  const handleAnalyze = useCallback(async (promptOverride?: string) => {
     const forFile = mdEditorPath
     if (!forFile) return
     if (useUiStore.getState().mdEditorActions[forFile]?.analyze?.status === 'running') return
@@ -163,7 +163,7 @@ export function useEditorAgentActions(
     const norm = forFile.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `analyze-${Date.now().toString(36)}`
-    const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, forFile)
+    const prompt = promptOverride ?? analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, forFile)
     addTab(tabId, `Analyze · ${fileName}`, 'left', analyzeCli as TerminalTab['kind'], undefined, undefined, prompt)
     useTerminalStore.getState().updateTabStatus(tabId, 'running')
     setMdEditorAction(forFile, 'analyze', { status: 'running', tabId, stopping: false })

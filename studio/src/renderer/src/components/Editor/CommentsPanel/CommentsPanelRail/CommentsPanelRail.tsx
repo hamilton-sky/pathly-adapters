@@ -1,13 +1,16 @@
 import React from 'react'
+import { GitCompare } from 'lucide-react'
 import type { Comment } from '../../useComments'
 import styles from './CommentsPanelRail.module.css'
 
 interface Props {
   comments: Comment[]
+  /** A pending comment-revision draft exists — show the diff indicator. */
+  hasDraft?: boolean
   onExpand: () => void
 }
 
-export function CommentsPanelRail({ comments, onExpand }: Props): JSX.Element {
+export function CommentsPanelRail({ comments, hasDraft, onExpand }: Props): JSX.Element {
   const unresolved = comments.filter((c) => !c.resolved)
 
   return (
@@ -15,9 +18,12 @@ export function CommentsPanelRail({ comments, onExpand }: Props): JSX.Element {
       type="button"
       className={styles.rail}
       onClick={onExpand}
-      aria-label={`Open comments — ${unresolved.length} open`}
+      aria-label={`Open comments — ${unresolved.length} open${hasDraft ? ', revisions ready' : ''}`}
       aria-expanded="false"
     >
+      {/* Revisions-ready indicator — opens the panel where the Diff button lives */}
+      {hasDraft && <GitCompare className={styles.draftIcon} size={13} aria-hidden="true" />}
+
       {/* Count badge — always shown, "0" when no open comments */}
       <span className={styles.count} aria-hidden="true">
         {unresolved.length}

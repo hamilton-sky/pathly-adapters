@@ -25,6 +25,19 @@
 .rail:hover .count { transform: scale(1.1); }
 .rail:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 
+/* ── Revisions-ready indicator — pulsing green diff glyph at the top ─── */
+.draftIcon {
+  color: var(--green);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  animation: railDraftPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes railDraftPulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
 /* ── Count badge ──────────────────────────────────────────────────── */
 .count {
   min-width: 22px;

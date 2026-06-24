@@ -66,8 +66,9 @@ export interface UiState {
   mdEditorPath: string | null
   mdEditorViewMode: 'cells' | 'editor'
   mdEditorPreviewOpen: boolean
-  /** Draft paths per notebook file — keyed by mdEditorPath */
-  mdEditorDraftPaths: Record<string, string>
+  /** AI-Split draft paths per notebook file — keyed by mdEditorPath. Comment drafts
+   *  are tracked locally in the Editor, so the store carries only the split draft. */
+  mdEditorSplitDraftPaths: Record<string, string>
   /** Analysis file paths per notebook file — keyed by mdEditorPath */
   mdEditorAnalysisPaths: Record<string, string>
   mdEditorAnalysisPanelOpen: boolean
@@ -86,7 +87,7 @@ export interface UiState {
   setSidebarTab: (tab: 'library' | 'workspace') => void
   setMdEditorViewMode: (mode: 'cells' | 'editor') => void
   toggleMdEditorPreview: () => void
-  setMdEditorDraftPath: (p: string | null, forFile?: string) => void
+  setMdEditorSplitDraftPath: (p: string | null, forFile?: string) => void
   setMdEditorAnalysisPath: (p: string | null, forFile?: string) => void
   /** Merge a patch into a file's action slot; pass null to clear the slot. */
   setMdEditorAction: (filePath: string, action: 'split' | 'analyze', patch: Partial<MdEditorActionSlot> | null) => void
@@ -132,7 +133,7 @@ export const useUiStore = create<UiState>()(
       mdEditorPath: null,
       mdEditorViewMode: 'cells',
       mdEditorPreviewOpen: true,
-      mdEditorDraftPaths: {},
+      mdEditorSplitDraftPaths: {},
       mdEditorAnalysisPaths: {},
       mdEditorAnalysisPanelOpen: false,
       mdEditorActions: {},
@@ -146,15 +147,15 @@ export const useUiStore = create<UiState>()(
         set({ sidebarTab: tab })
       },
       toggleMdEditorPreview: () => set((s) => ({ mdEditorPreviewOpen: !s.mdEditorPreviewOpen })),
-      setMdEditorDraftPath: (p, forFile) => set((s) => {
+      setMdEditorSplitDraftPath: (p, forFile) => set((s) => {
         const key = forFile ?? s.mdEditorPath ?? ''
         if (!key) return {}
         if (p === null) {
-          const next = { ...s.mdEditorDraftPaths }
+          const next = { ...s.mdEditorSplitDraftPaths }
           delete next[key]
-          return { mdEditorDraftPaths: next }
+          return { mdEditorSplitDraftPaths: next }
         }
-        return { mdEditorDraftPaths: { ...s.mdEditorDraftPaths, [key]: p } }
+        return { mdEditorSplitDraftPaths: { ...s.mdEditorSplitDraftPaths, [key]: p } }
       }),
       setMdEditorAnalysisPath: (p, forFile) => set((s) => {
         const key = forFile ?? s.mdEditorPath ?? ''
@@ -249,8 +250,8 @@ export const useUiStore = create<UiState>()(
   )
 )
 
-export const selectMdEditorDraftPath = (s: UiState): string | null =>
-  s.mdEditorDraftPaths[s.mdEditorPath ?? ''] ?? null
+export const selectMdEditorSplitDraftPath = (s: UiState): string | null =>
+  s.mdEditorSplitDraftPaths[s.mdEditorPath ?? ''] ?? null
 
 export const selectMdEditorAnalysisPath = (s: UiState): string | null =>
   s.mdEditorAnalysisPaths[s.mdEditorPath ?? ''] ?? null

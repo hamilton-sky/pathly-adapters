@@ -1,0 +1,22 @@
+{
+  "comments": [
+    {
+      "id": "c-mqrzv7z1-i7ao",
+      "lineNumber": 1,
+      "lineText": "light\tjust the task DAG, fast\nEither way the resulting tasks carry goal_id = <that goal> and depends_on edges among them",
+      "body": "hi there two?",
+      "resolved": false,
+      "createdAt": "2026-06-24T11:33:00.829Z",
+      "color": "blue"
+    },
+    {
+      "id": "c-mqrzutw8-cztv",
+      "lineNumber": 10,
+      "lineText": "r-goal Task-DAG\nA board is a workspace that holds many goals. Each goal is a unit of work that gets decomposed into a DA",
+      "body": "hi there",
+      "resolved": false,
+      "createdAt": "2026-06-24T11:32:42.584Z",
+      "color": "yellow"
+    }
+  ]
+}

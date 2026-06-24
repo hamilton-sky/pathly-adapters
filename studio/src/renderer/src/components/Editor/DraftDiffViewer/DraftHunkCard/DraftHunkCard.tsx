@@ -52,6 +52,17 @@ export function DraftHunkCard({ hunk, onToggle, onMarkReviewed }: Props) {
 
       <div className={styles.title}>{displayHeading(hunk.heading)}</div>
 
+      {hunk.commentRefs && hunk.commentRefs.length > 0 && (
+        <div className={styles.commentRefs}>
+          {hunk.commentRefs.map((ref) => (
+            <span key={ref.index} className={styles.commentChip} title={ref.body}>
+              <span className={styles.commentDot} data-color={ref.color} />
+              comment {ref.index}
+            </span>
+          ))}
+        </div>
+      )}
+
       {!expanded && <div className={styles.preview}>{previewText(hunk).slice(0, 46)}…</div>}
 
       {expanded && (

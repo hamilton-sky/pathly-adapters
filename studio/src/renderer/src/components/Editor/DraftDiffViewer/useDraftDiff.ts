@@ -1,6 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 export type HunkStatus = 'unchanged' | 'changed' | 'added' | 'removed'
+
+/** A comment that maps onto a hunk, so the reviewer sees which request a change answers. */
+export interface CommentRef {
+  index: number   // 1-based, matching the comments panel's numbering
+  body: string
+  color: string
+}
+
+/** Minimal shape the diff needs from a comment — structurally satisfied by useComments' Comment. */
+export interface DiffComment {
+  lineNumber: number
+  body: string
+  color: string
+}
 
 export interface DiffHunk {
   id: string
@@ -10,6 +24,7 @@ export interface DiffHunk {
   status: HunkStatus
   accepted: boolean         // true = use draft version
   reviewed: boolean         // true after first card expand
+  commentRefs?: CommentRef[]  // comments whose line falls in this section (comment-revision diffs only)
 }
 
 interface Section {
@@ -46,6 +61,23 @@ function parseIntoSections(text: string): Section[] {
   }
 
   return sections
+}
+
+/**
+ * Map each 1-based original line to the `## ` heading that owns it (or '__preamble__'
+ * for content before the first heading). Lets us attach a comment to the hunk whose
+ * section contains the comment's line.
+ */
+function buildLineHeadingMap(text: string): string[] {
+  const lines = text.split('\n')
+  const map: string[] = []
+  let current = '__preamble__'
+  for (const line of lines) {
+    const m = /^##\s+(.+)$/.exec(line)
+    if (m) current = m[1].trim()
+    map.push(current)
+  }
+  return map
 }
 
 /** Rebuild the final document from the user's per-hunk accept/reject choices. */
@@ -86,8 +118,9 @@ export interface UseDraftDiff {
  * into section hunks, and tracks per-hunk accept/review state. Polls every
  * 3s so the viewer surfaces an error if the draft disappears while open.
  */
-export function useDraftDiff(originalPath: string, draftPath: string): UseDraftDiff {
+export function useDraftDiff(originalPath: string, draftPath: string, comments: DiffComment[] = []): UseDraftDiff {
   const [hunks, setHunks] = useState<DiffHunk[]>([])
+  const [originalText, setOriginalText] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
@@ -96,6 +129,7 @@ export function useDraftDiff(originalPath: string, draftPath: string): UseDraftD
     setError(false)
     Promise.all([window.pathly.fs.read(originalPath), window.pathly.fs.read(draftPath)])
       .then(([orig, draft]) => {
+        setOriginalText(orig ?? '')
         const origSections = parseIntoSections(orig ?? '')
         const draftSections = parseIntoSections(draft ?? '')
         const origMap = new Map(origSections.map((s) => [s.heading, s.content]))
@@ -155,13 +189,28 @@ export function useDraftDiff(originalPath: string, draftPath: string): UseDraftD
     )
   }
 
+  // Attach comment refs as a pure derivation so it never disturbs accept/review state.
+  const hunksWithRefs = useMemo<DiffHunk[]>(() => {
+    if (!comments || comments.length === 0) return hunks
+    const lineHeading = buildLineHeadingMap(originalText)
+    const byHeading = new Map<string, CommentRef[]>()
+    comments.forEach((c, i) => {
+      const clamped = Math.min(Math.max(c.lineNumber, 1), Math.max(lineHeading.length, 1)) - 1
+      const heading = lineHeading[clamped] ?? '__preamble__'
+      const refs = byHeading.get(heading) ?? []
+      refs.push({ index: i + 1, body: c.body, color: c.color })
+      byHeading.set(heading, refs)
+    })
+    return hunks.map((h) => (byHeading.has(h.heading) ? { ...h, commentRefs: byHeading.get(h.heading) } : h))
+  }, [hunks, comments, originalText])
+
   const nonUnchanged = hunks.filter((h) => h.status !== 'unchanged')
   const acceptedCount = nonUnchanged.filter((h) => h.accepted).length
   const totalChanged = nonUnchanged.length
   const unreviewedCount = nonUnchanged.filter((h) => !h.reviewed).length
 
   return {
-    hunks,
+    hunks: hunksWithRefs,
     loading,
     error,
     toggle,

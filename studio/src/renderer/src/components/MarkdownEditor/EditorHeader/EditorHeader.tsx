@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
-  ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen, GitCompare,
+  ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen,
   ScanText, FileSearch, SlidersHorizontal, Square, Scissors,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
@@ -11,14 +11,15 @@ import { useUiStore, selectMdEditorSplitDraftPath, selectMdEditorAnalysisPath, s
 import { useTerminalStore } from '../../../store/terminalStore'
 import { useEditorAgentActions } from './hooks/useEditorAgentActions'
 import { apiFetch } from '../../../lib/config'
-import { STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../Editor/commentUtils'
+import { STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE, getEffectivePrompt, buildSplitPrompt, buildAnalyzePrompt } from '../../Editor/commentUtils'
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import ExportMenu from './ExportMenu/ExportMenu'
 import SplitPill from './SplitPill/SplitPill'
-import { loadEditorCli, saveEditorCli, EditorCli, CLI_KEY_SPLIT, CLI_KEY_ANALYZE, loadPreset, savePreset, PRESET_KEY_SPLIT, PRESET_KEY_ANALYZE } from './editorCli'
+import { loadEditorCli, saveEditorCli, EditorCli, cliLabel, CLI_KEY_SPLIT, CLI_KEY_ANALYZE, loadPreset, savePreset, PRESET_KEY_SPLIT, PRESET_KEY_ANALYZE } from './editorCli'
 import { SPLIT_PRESETS, ANALYZE_LENSES } from './actionPresets'
 import { fmtElapsed, useElapsedProgress } from './editorProgress'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
+import SendPreviewModal from '../../shared/SendPreviewModal/SendPreviewModal'
 import styles from './EditorHeader.module.css'
 
 export type MdEditorViewMode = 'cells' | 'editor'
@@ -55,6 +56,8 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const [analyzeCli, setAnalyzeCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_ANALYZE))
   const [splitPreset,   setSplitPreset]   = useState<string>(() => loadPreset(PRESET_KEY_SPLIT))
   const [analyzePreset, setAnalyzePreset] = useState<string>(() => loadPreset(PRESET_KEY_ANALYZE))
+  // Confirm-before-send: holds the action + previewed prompt while the modal is open.
+  const [pendingRun, setPendingRun] = useState<{ kind: 'split' | 'analyze'; prompt: string; engine: string; action: string } | null>(null)
 
   const handleSplitCli   = (next: EditorCli) => { setSplitCli(next);   saveEditorCli(CLI_KEY_SPLIT, next) }
   const handleAnalyzeCli = (next: EditorCli) => { setAnalyzeCli(next); saveEditorCli(CLI_KEY_ANALYZE, next) }
@@ -75,6 +78,24 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
     splitCli,
     analyzeCli,
   )
+
+  // Open the confirm-preview for a run; the actual spawn fires only on submit.
+  const openSplitPreview = () => {
+    if (!mdEditorPath) return
+    const prompt = splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, mdEditorPath)
+    setPendingRun({ kind: 'split', prompt, engine: cliLabel(splitCli), action: splitTitle })
+  }
+  const openAnalyzePreview = () => {
+    if (!mdEditorPath) return
+    const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, mdEditorPath)
+    setPendingRun({ kind: 'analyze', prompt, engine: cliLabel(analyzeCli), action: analyzeTitle })
+  }
+  const submitPendingRun = (prompt: string) => {
+    const run = pendingRun
+    setPendingRun(null)
+    if (run?.kind === 'split') void handleSplit(prompt)
+    else if (run?.kind === 'analyze') void handleAnalyze(prompt)
+  }
 
   // Per-file run state — derived from the store so each open file shows only its own run.
   // A run that completes while the user is on another file updates that file's slot, never this one.
@@ -253,36 +274,19 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         </button>
       </Tooltip>
 
-      {/* AI Split cluster — run pill (title follows the selected preset) + its draft-diff chip */}
-      <div className={styles.cluster}>
-        <SplitPill
-          state={splitState}
-          progress={splitProgress}
-          hasPath={!!mdEditorPath}
-          title={splitTitle}
-          onAiSplit={() => void handleSplit()}
-          onStop={() => stopSplit()}
-          onTogglePrompt={() => setSplitPeekOpen(v => !v)}
-          compact={isCompact}
-        />
-        <Tooltip
-          label={mdEditorSplitDraftPath
-            ? 'AI Split draft ready — review the changes'
-            : 'No split draft yet — run AI Split to generate one'}
-          placement="bottom"
-        >
-          <button
-            type="button"
-            className={styles.draftBtn}
-            data-has-draft={!!mdEditorSplitDraftPath}
-            aria-disabled={!mdEditorSplitDraftPath}
-            onClick={mdEditorSplitDraftPath ? handleReviewDraft : undefined}
-          >
-            <GitCompare size={13} />
-            <span className={styles.btnLabel}>Diff</span>
-          </button>
-        </Tooltip>
-      </div>
+      {/* AI Split — one joined pill: run (title follows preset) │ gear │ Diff result */}
+      <SplitPill
+        state={splitState}
+        progress={splitProgress}
+        hasPath={!!mdEditorPath}
+        title={splitTitle}
+        draftReady={!!mdEditorSplitDraftPath}
+        onAiSplit={openSplitPreview}
+        onStop={() => stopSplit()}
+        onTogglePrompt={() => setSplitPeekOpen(v => !v)}
+        onReviewDraft={handleReviewDraft}
+        compact={isCompact}
+      />
       {splitPeekOpen && mdEditorPath && (
         <PromptPeekModal
           title="PROMPT — AI Split"
@@ -300,8 +304,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         />
       )}
 
-      {/* AI Analyze cluster — run pill (title follows the selected lens) + its Report chip */}
-      <div className={styles.cluster}>
+      {/* AI Analyze — one joined pill: run (title follows lens) │ gear │ Report result */}
       <div className={styles.agentPill}>
         <Tooltip
           label={analyzeState === 'running'
@@ -314,7 +317,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             className={styles.agentPillMain}
             data-state={analyzeState}
             disabled={analyzeState === 'running' || !mdEditorPath}
-            onClick={() => void handleAnalyze()}
+            onClick={openAnalyzePreview}
             aria-label="AI Analyze document for quality"
           >
             <ScanText size={13} />
@@ -350,6 +353,26 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             </button>
           </Tooltip>
         )}
+        {/* Report result segment (rightmost) */}
+        <Tooltip
+          label={
+            !mdEditorAnalysisPath ? 'No report yet — run Analyze first' :
+            mdEditorAnalysisPanelOpen ? 'Close report panel' :
+            'Quality report ready — click to open'
+          }
+          placement="bottom"
+        >
+          <button
+            type="button"
+            className={styles.agentPillResult}
+            data-has-analysis={!!mdEditorAnalysisPath}
+            aria-disabled={!mdEditorAnalysisPath}
+            onClick={mdEditorAnalysisPath ? () => setMdEditorAnalysisPanelOpen(!mdEditorAnalysisPanelOpen) : undefined}
+          >
+            <FileSearch size={13} />
+            <span className={styles.btnLabel}>Report</span>
+          </button>
+        </Tooltip>
         {analyzePeekOpen && mdEditorPath && (
           <PromptPeekModal
             title="PROMPT — AI Analyze"
@@ -366,28 +389,6 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             onPresetChange={handleAnalyzePreset}
           />
         )}
-      </div>
-
-      {/* View Analysis Report */}
-      <Tooltip
-        label={
-          !mdEditorAnalysisPath ? 'No report yet — run Analyze first' :
-          mdEditorAnalysisPanelOpen ? 'Close report panel' :
-          'Quality report ready — click to open'
-        }
-        placement="bottom"
-      >
-        <button
-          type="button"
-          className={styles.analysisBtn}
-          data-has-analysis={!!mdEditorAnalysisPath}
-          aria-disabled={!mdEditorAnalysisPath}
-          onClick={mdEditorAnalysisPath ? () => setMdEditorAnalysisPanelOpen(!mdEditorAnalysisPanelOpen) : undefined}
-        >
-          <FileSearch size={13} />
-          <span className={styles.btnLabel}>Report</span>
-        </button>
-      </Tooltip>
       </div>
 
       {/* Save — both modes, different handlers */}
@@ -450,6 +451,19 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             let lastId = cells[cells.length - 1]?.id ?? null
             for (const c of proposed) lastId = insertBodyCell(c.heading, c.content, lastId)
           }}
+        />
+      )}
+
+      {/* Confirm-before-send preview for AI Split / AI Analyze. */}
+      {pendingRun && (
+        <SendPreviewModal
+          title={pendingRun.action}
+          engineLabel={pendingRun.engine}
+          fileName={skillName + '.md'}
+          prompt={pendingRun.prompt}
+          submitLabel={pendingRun.kind === 'split' ? 'Run Split' : 'Run Analyze'}
+          onSubmit={submitPendingRun}
+          onCancel={() => setPendingRun(null)}
         />
       )}
     </div>

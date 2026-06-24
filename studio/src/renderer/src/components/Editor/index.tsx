@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GitCompare, Replace } from 'lucide-react'
 import { useStore } from '../../store'
-import { useUiStore } from '../../store/uiStore'
+import { useUiStore, selectMdEditorSplitDraftPath } from '../../store/uiStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useMarkdownEditorStore } from '../../store/markdownEditorStore'
 import { readFile, writeFile } from '../../services/pathlyApi'
@@ -96,7 +96,8 @@ function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
 export function Editor({ path: pathOverride, embedded }: { path?: string | null; embedded?: boolean } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
   const resetLastAppliedPath = useMarkdownEditorStore((s) => s.resetLastAppliedPath)
-  const setMdEditorDraftPath  = useUiStore(s => s.setMdEditorDraftPath)
+  const setMdEditorSplitDraftPath = useUiStore(s => s.setMdEditorSplitDraftPath)
+  const splitDraftPath            = useUiStore(selectMdEditorSplitDraftPath)
   const mdEditorSaveRequested = useUiStore(s => s.mdEditorSaveRequested)
   const mdEditorOpenDraftReq  = useUiStore(s => s.mdEditorOpenDraftRequested)
   const mdEditorUndoReq       = useUiStore(s => s.mdEditorUndoRequested)
@@ -117,8 +118,13 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
   const [pendingBody, setPendingBody]     = useState('')
   const [showHighlights, setShowHighlights] = useState(true)
   const [showPanel, setShowPanel] = useState(true)
-  const [draftPath, setDraftPath] = useState<string | null>(null)
-  const [draftViewerOpen, setDraftViewerOpen] = useState(false)
+  // Two independent draft slots so AI Split and comment-revisions never overwrite each other.
+  // Split drafts cross into the toolbar, so they live in the store; comment drafts are reviewed
+  // from the comments panel inside this subtree, so they stay local.
+  const [commentDraftPath, setCommentDraftPath] = useState<string | null>(null)
+  const [diffOpen, setDiffOpen]     = useState(false)
+  const [diffSource, setDiffSource] = useState<'split' | 'comments'>('comments')
+  const activeDraftPath = diffSource === 'split' ? (embedded ? splitDraftPath : null) : commentDraftPath
 
   const previewRef = useRef<CommentablePreviewHandle>(null)
   const [orphanedIds, setOrphanedIds] = useState<Set<string>>(new Set())
@@ -145,13 +151,13 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
       ? effectivePath.replace(/\\/g, '/').split('/').slice(-2).join(' › ').replace('.md', '')
       : ''
 
-  const findEnabled = (tab === 'edit' || tab === 'split') && !draftViewerOpen
+  const findEnabled = (tab === 'edit' || tab === 'split') && !diffOpen
   const find = useFindReplace(markdownEditorRef, findEnabled, effectivePath)
 
   useEffect(() => {
     if (!effectivePath) return
-    setDraftPath(null)
-    setDraftViewerOpen(false)
+    setCommentDraftPath(null)
+    setDiffOpen(false)
     setTab('preview')
     setPendingAnchor(null)
     setAnchorPos(null)
@@ -159,10 +165,17 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     setPendingBody('')
     setLoading(true)
     setSaveError(null)
-    const draft = effectivePath + '.draft'
-    void window.pathly.fs.read(draft).then((d) => {
-      if (d != null && d !== '') setDraftPath(draft)
+    // Restore any drafts left on disk so a pending review survives reloads.
+    const commentDraft = effectivePath + '.comments.draft'
+    void window.pathly.fs.read(commentDraft).then((d) => {
+      if (d != null && d !== '') setCommentDraftPath(commentDraft)
     })
+    if (embedded) {
+      const splitDraft = effectivePath + '.split.draft'
+      void window.pathly.fs.read(splitDraft).then((d) => {
+        if (d != null && d !== '') setMdEditorSplitDraftPath(splitDraft, effectivePath)
+      })
+    }
     readFile(effectivePath)
       .then((content) => {
         const parsed = parseFrontmatter(content ?? '')
@@ -171,7 +184,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
       })
       .catch(() => { setConfig({} as FrontmatterValues); setBody('') })
       .finally(() => setLoading(false))
-  }, [effectivePath])
+  }, [effectivePath, embedded])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -201,13 +214,6 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
   bodyRef.current   = body
   configRef.current = config
 
-  // ── Embedded: sync draft path into uiStore so EditorHeader can read it ───
-  useEffect(() => {
-    if (!embedded) return
-    setMdEditorDraftPath(draftPath)
-    return () => setMdEditorDraftPath(null)
-  }, [embedded, draftPath, setMdEditorDraftPath])
-
   // ── Embedded: save when EditorHeader's Save button is pressed ───────────
   const prevSaveReqRef = useRef(mdEditorSaveRequested)
   useEffect(() => {
@@ -217,22 +223,25 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     void performSave(bodyRef.current, configRef.current)
   }, [embedded, mdEditorSaveRequested, performSave])
 
-  // ── Embedded: open draft viewer when EditorHeader's Review Draft is pressed
-  const pendingOpenDraftRef   = useRef(false)
-  const prevOpenDraftReqRef   = useRef(mdEditorOpenDraftReq)
+  // ── Embedded: open the SPLIT diff viewer when EditorHeader's Diff chip is pressed.
+  //    Comment drafts are reviewed from the comments panel, not via this signal.
+  const pendingOpenSplitRef = useRef(false)
+  const prevOpenDraftReqRef = useRef(mdEditorOpenDraftReq)
   useEffect(() => {
     if (!embedded) return
     if (mdEditorOpenDraftReq === prevOpenDraftReqRef.current) return
     prevOpenDraftReqRef.current = mdEditorOpenDraftReq
-    if (draftPath) { setDraftViewerOpen(true) } else { pendingOpenDraftRef.current = true }
-  }, [embedded, mdEditorOpenDraftReq, draftPath])
+    setDiffSource('split')
+    if (splitDraftPath) { setDiffOpen(true) } else { pendingOpenSplitRef.current = true }
+  }, [embedded, mdEditorOpenDraftReq, splitDraftPath])
 
   useEffect(() => {
-    if (pendingOpenDraftRef.current && draftPath) {
-      setDraftViewerOpen(true)
-      pendingOpenDraftRef.current = false
+    if (pendingOpenSplitRef.current && splitDraftPath) {
+      setDiffSource('split')
+      setDiffOpen(true)
+      pendingOpenSplitRef.current = false
     }
-  }, [draftPath])
+  }, [splitDraftPath])
 
   // ── Embedded: undo/redo via CodeMirror when EditorHeader buttons pressed ─
   const prevUndoReqRef = useRef(mdEditorUndoReq)
@@ -295,15 +304,43 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     const tabId = `review-${Date.now().toString(36)}`
     addTab(tabId, `Review · ${fileName}`)
     openTab(tabId)
+    // Surface the revision draft once the engine exits, so the comments panel's Diff lights up.
+    const draftFile = norm + '.comments.draft'
+    const unsub = window.pathly.terminal.onExit((exitedTabId) => {
+      if (exitedTabId !== tabId) return
+      unsub()
+      let attempt = 0
+      const check = (): void => {
+        attempt++
+        void window.pathly.fs.read(draftFile).then((content) => {
+          if (content !== null && content.trim().length > 0) setCommentDraftPath(draftFile)
+          else if (attempt < 5) setTimeout(check, 600)
+        })
+      }
+      check()
+    })
     await window.pathly.terminal.spawn(tabId, getSpawnCwd(effectivePath), undefined, buildCliArgv(cli, prompt))
   }
+
+  const draftFileFor = (src: 'split' | 'comments'): string =>
+    (effectivePath ?? '') + (src === 'split' ? '.split.draft' : '.comments.draft')
+
+  const clearDraftSlot = (src: 'split' | 'comments'): void => {
+    if (src === 'split') setMdEditorSplitDraftPath(null, effectivePath ?? undefined)
+    else setCommentDraftPath(null)
+  }
+
+  const openCommentDiff = useCallback(() => {
+    setDiffSource('comments')
+    setDiffOpen(true)
+  }, [])
 
   async function handleDiffApply(newContent: string): Promise<void> {
     if (!effectivePath) return
     await window.pathly.fs.write(effectivePath, newContent)
-    await window.pathly.fs.delete(effectivePath + '.draft')
-    setDraftPath(null)
-    setDraftViewerOpen(false)
+    await window.pathly.fs.delete(draftFileFor(diffSource))
+    clearDraftSlot(diffSource)
+    setDiffOpen(false)
     const parsed = parseFrontmatter(newContent)
     setConfig(parsed.config)
     setBody(parsed.body)
@@ -312,9 +349,9 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
 
   async function handleDiffDiscard(): Promise<void> {
     if (!effectivePath) return
-    await window.pathly.fs.delete(effectivePath + '.draft')
-    setDraftPath(null)
-    setDraftViewerOpen(false)
+    await window.pathly.fs.delete(draftFileFor(diffSource))
+    clearDraftSlot(diffSource)
+    setDiffOpen(false)
   }
 
   const handleSelectionComment = useCallback((text: string, x: number, y: number) => {
@@ -376,12 +413,12 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
         {!embedded && (
           <div className={styles.actions}>
             {saveError && <span className={styles.error}>{saveError}</span>}
-            {draftPath && (
-              <Tooltip label="Agent draft is ready — click to review changes" placement="bottom">
+            {commentDraftPath && (
+              <Tooltip label="Comment revisions ready — click to review changes" placement="bottom">
                 <button
                   type="button"
                   className={styles.draftReadyBtn}
-                  onClick={() => setDraftViewerOpen(true)}
+                  onClick={openCommentDiff}
                 >
                   <GitCompare size={13} />
                   Review draft
@@ -456,6 +493,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
                 {!showPanel && (
                   <CommentsPanelRail
                     comments={comments}
+                    hasDraft={!!commentDraftPath}
                     onExpand={() => setShowPanel(true)}
                   />
                 )}
@@ -466,6 +504,8 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
                     comments={comments}
                     showHighlights={showHighlights}
                     orphanedIds={orphanedIds}
+                    commentDraftPath={commentDraftPath}
+                    onReviewDraft={openCommentDiff}
                     onToggleHighlights={() => setShowHighlights((v) => !v)}
                     onCollapse={() => setShowPanel(false)}
                     onClearAll={clearAllComments}
@@ -474,7 +514,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
                     onRemove={removeComment}
                     onEdit={editComment}
                     onScrollTo={(id) => previewRef.current?.scrollToComment(id)}
-                    onDraftReady={setDraftPath}
+                    onDraftReady={setCommentDraftPath}
                   />
                 )}
               </>
@@ -508,12 +548,14 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
         />
       )}
 
-      {draftPath && effectivePath && draftViewerOpen && (
+      {activeDraftPath && effectivePath && diffOpen && (
         <DraftDiffViewer
           originalPath={effectivePath}
-          draftPath={draftPath}
+          draftPath={activeDraftPath}
+          source={diffSource}
+          comments={diffSource === 'comments' ? comments.filter((c) => !c.resolved) : []}
           onApply={(content) => void handleDiffApply(content)}
-          onClose={() => setDraftViewerOpen(false)}
+          onClose={() => setDiffOpen(false)}
           onDiscard={() => void handleDiffDiscard()}
         />
       )}

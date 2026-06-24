@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useDraftDiff } from '../useDraftDiff'
+import type { DiffComment } from '../useDraftDiff'
 import { useViewMode } from '../useViewMode'
 import { ViewToggle } from '../ViewToggle/ViewToggle'
 import { DraftHunkList } from '../DraftHunkList/DraftHunkList'
@@ -14,11 +15,21 @@ import styles from './DraftDiffViewer.module.css'
 export interface DraftDiffViewerProps {
   originalPath: string
   draftPath: string
+  /** Provenance of the draft — drives the title and whether comment refs are shown. */
+  source?: 'split' | 'comments'
+  /** Unresolved comments to map onto hunks (comment-revision diffs only). */
+  comments?: DiffComment[]
   onApply: (newContent: string) => void
   onClose: () => void
   onDiscard: () => void
   /** Optional toast hook, e.g. pushToast={useToastStore((s) => s.push)} */
   pushToast?: (message: string, kind?: 'info' | 'success' | 'error') => void
+}
+
+function diffTitle(source?: 'split' | 'comments'): string {
+  if (source === 'split') return 'Reviewing AI Split'
+  if (source === 'comments') return 'Reviewing comment revisions'
+  return 'Reviewing draft'
 }
 
 function filename(path: string): string {
@@ -27,8 +38,8 @@ function filename(path: string): string {
 
 type ContentProps = DraftDiffViewerProps & { view: ViewMode; onRetry: () => void }
 
-function DiffContent({ originalPath, draftPath, onApply, onClose, onDiscard, pushToast, view, onRetry }: ContentProps) {
-  const diff = useDraftDiff(originalPath, draftPath)
+function DiffContent({ originalPath, draftPath, comments, onApply, onClose, onDiscard, pushToast, view, onRetry }: ContentProps) {
+  const diff = useDraftDiff(originalPath, draftPath, comments)
   // null = follow the per-section accept/reject choices; a string = the user's
   // manual edit of the result, which then wins on Apply.
   const [edited, setEdited] = useState<string | null>(null)
@@ -110,7 +121,7 @@ export function DraftDiffViewer(props: DraftDiffViewerProps) {
       <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="draft-diff-title" onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <div id="draft-diff-title" className={styles.title}>
-            Reviewing draft — <span className={styles.file}>{filename(props.draftPath)}</span>
+            {diffTitle(props.source)} — <span className={styles.file}>{filename(props.draftPath)}</span>
           </div>
           <span className={styles.spacer} />
           <ViewToggle value={view} onChange={setView} />

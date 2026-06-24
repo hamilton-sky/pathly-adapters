@@ -1,3 +1,6 @@
+---
+
+---
 # Goals, DAGs & Pluggable Executors — design note
 
 **Branch:** `feat/comms-board-dag-serial`
