@@ -1,11 +1,13 @@
-.splitPill {
+.pill {
   display: inline-flex;
   position: relative;
   flex-shrink: 0;
 }
+.pill[data-tone='green'] { --pill-tone: var(--green); }
+.pill[data-tone='amber'] { --pill-tone: var(--yellow); }
 
-/* Zone A — primary AI Split (mirrors .agentPillMain) */
-.splitPill .splitMain {
+/* Zone A — primary action button (run; label follows the selected preset). */
+.pill .main {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -22,14 +24,14 @@
   white-space: nowrap;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
-.splitPill .splitMain:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.splitPill .splitMain:disabled { opacity: 0.45; cursor: not-allowed; }
-.splitPill .splitMain[data-state='running'] { border-color: var(--yellow); color: var(--yellow); cursor: wait; }
-.splitPill .splitMain[data-state='success'] { border-color: var(--green); color: var(--green); }
-.splitPill .splitMain[data-state='error']   { border-color: var(--red); color: var(--red); }
+.pill .main:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.pill .main:disabled { opacity: 0.45; cursor: not-allowed; }
+.pill .main[data-state='running'] { border-color: var(--yellow); color: var(--yellow); cursor: wait; }
+.pill .main[data-state='success'] { border-color: var(--green); color: var(--green); }
+.pill .main[data-state='error']   { border-color: var(--red); color: var(--red); }
 
-/* Zone B — prompt gear (middle segment; opens the prompt/preset config) */
-.splitPill .splitGear {
+/* Zone B — prompt gear (middle segment; opens the prompt/preset config). */
+.pill .gear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -42,14 +44,14 @@
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
   flex-shrink: 0;
 }
-.splitPill .splitGear:hover:not(:disabled) { background: var(--bg-surface1); color: var(--text-secondary); }
-.splitPill .splitGear:disabled { opacity: 0.35; cursor: not-allowed; }
-.splitPill .splitGear[data-state='running'] { border-color: var(--yellow); }
-.splitPill .splitGear[data-state='success'] { border-color: var(--green); }
-.splitPill .splitGear[data-state='error']   { border-color: var(--red); }
+.pill .gear:hover:not(:disabled) { background: var(--bg-surface1); color: var(--text-secondary); }
+.pill .gear:disabled { opacity: 0.35; cursor: not-allowed; }
+.pill .gear[data-state='running'] { border-color: var(--yellow); }
+.pill .gear[data-state='success'] { border-color: var(--green); }
+.pill .gear[data-state='error']   { border-color: var(--red); }
 
 /* Stop button — middle segment; replaces the gear while the engine is running. */
-.splitPill .splitStop {
+.pill .stop {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -63,15 +65,11 @@
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
   flex-shrink: 0;
 }
-.splitPill .splitStop svg { fill: currentColor; }
-.splitPill .splitStop:hover {
-  background: var(--red);
-  border-color: var(--red);
-  color: var(--bg-mantle);
-}
+.pill .stop svg { fill: currentColor; }
+.pill .stop:hover { background: var(--red); border-color: var(--red); color: var(--bg-mantle); }
 
-/* Zone C — Diff result segment (rightmost). Dim until a split draft exists, then glows green. */
-.splitPill .splitChip {
+/* Zone C — result chip (rightmost). Dim until a result exists, then glows in the tone colour. */
+.pill .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -90,29 +88,29 @@
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 /* Disabled = dim content + not-allowed cursor (NOT faded opacity), so the segment
-   still reads as part of the pill — matching the Analyze pill's Report segment. */
-.splitPill .splitChip:disabled { color: var(--text-muted); cursor: not-allowed; }
-.splitPill .splitChip[data-has-draft='true'] {
-  background: color-mix(in srgb, var(--green) 12%, var(--bg-surface0));
-  color: var(--green);
+   still reads as part of the pill. */
+.pill .chip:disabled { color: var(--text-muted); cursor: not-allowed; }
+.pill .chip[data-has-result='true'] {
+  background: color-mix(in srgb, var(--pill-tone) 12%, var(--bg-surface0));
+  color: var(--pill-tone);
   cursor: pointer;
-  animation: splitChipPulse 2.2s ease-in-out infinite;
+  animation: chipPulse 2.2s ease-in-out infinite;
 }
-.splitPill .splitChip[data-has-draft='true']:hover {
-  background: color-mix(in srgb, var(--green) 22%, var(--bg-surface0));
+.pill .chip[data-has-result='true']:hover {
+  background: color-mix(in srgb, var(--pill-tone) 22%, var(--bg-surface0));
   animation: none;
 }
 
-@keyframes splitChipPulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 35%, transparent); }
+@keyframes chipPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-tone) 35%, transparent); }
   50%       { box-shadow: 0 0 0 4px transparent; }
 }
 
 /* Unified hover — hovering any segment lifts the whole pill border to accent.
-   The split-draft "ready" green wins because its rule is declared after this one. */
-.splitPill:hover .splitMain:not(:disabled),
-.splitPill:hover .splitGear:not(:disabled),
-.splitPill:hover .splitChip {
+   The result "ready" tone wins because its rule is declared after this one. */
+.pill:hover .main:not(:disabled),
+.pill:hover .gear:not(:disabled),
+.pill:hover .chip {
   border-color: var(--accent);
 }
 

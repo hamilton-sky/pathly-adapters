@@ -18,7 +18,7 @@ interface Props {
 }
 
 // Engine picker for the notebook's one-shot AI actions (AI Split, AI Analyze).
-// Mirrors the SplitPill drop-down idiom: trigger pill + click-outside menu.
+// Mirrors the ActionPill drop-down idiom: trigger pill + click-outside menu.
 export default function CliSelect({ value, onChange, compact, align = 'left', up = false }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)

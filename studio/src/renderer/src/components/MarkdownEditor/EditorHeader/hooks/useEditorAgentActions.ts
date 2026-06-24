@@ -3,7 +3,7 @@ import { useTerminalStore } from '../../../../store/terminalStore'
 import { useUiStore } from '../../../../store/uiStore'
 import type { TerminalTab } from '../../../../store/terminalStore'
 import { useToastStore } from '../../../../store/toastStore'
-import { buildSplitPrompt, buildAnalyzePrompt, getSpawnCwd, getEffectivePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE } from '../../../Editor/commentUtils'
+import { buildSplitPrompt, buildAnalyzePrompt, getSpawnCwd, getEffectivePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE, describeAgentFailure } from '../../../Editor/commentUtils'
 import { buildCliArgv, cliLabel, EditorCli } from '../editorCli'
 import { attachProgress } from '../editorProgress'
 
@@ -17,25 +17,6 @@ async function pollForFile(path: string): Promise<boolean> {
     if (content != null && content !== '') return true
   }
   return false
-}
-
-const snippet = (s: string, n = 160): string => (s.length > n ? s.slice(0, n - 1) + '…' : s)
-
-// Turn an opaque "no file" failure into a specific, actionable reason using the engine's
-// exit code and last output — so rate limits, auth errors, and "agent wrote nothing" are
-// distinguishable instead of all reading "no draft produced".
-function describeFailure(action: string, fileName: string, exitCode?: number, tail?: string): string {
-  const last = (tail ?? '').trim()
-  const low = last.toLowerCase()
-  if (/rate.?limit|usage limit|quota|429|too many requests|overloaded/.test(low))
-    return `${action} failed · ${fileName} — rate limit / quota${last ? `: ${snippet(last)}` : ''}`
-  if (/unauthor|not logged in|please log in|\blog ?in\b|api key|credential|forbidden|\b401\b|\b403\b/.test(low))
-    return `${action} failed · ${fileName} — auth / login needed${last ? `: ${snippet(last)}` : ''}`
-  if (typeof exitCode === 'number' && exitCode !== 0)
-    return `${action} failed · ${fileName} — engine exited (code ${exitCode})${last ? `: ${snippet(last)}` : ''}`
-  return last
-    ? `${action} failed · ${fileName} — no file written; engine said: ${snippet(last)}`
-    : `${action} failed · ${fileName} — no file produced (engine wrote nothing)`
 }
 
 // All run state lives in uiStore.mdEditorActions, keyed by the file that started the run.
@@ -129,7 +110,7 @@ export function useEditorAgentActions(
           useTerminalStore.getState().updateTabStatus(tabId, 'error')
           useTerminalStore.getState().closeTab(tabId)
           setMdEditorAction(forFile, 'split', { status: 'error', tabId, stopping: false })
-          toast(describeFailure('AI Split', fileName, exitCode, tail), 'error', 'agent_done')
+          toast(describeAgentFailure('AI Split', fileName, exitCode, tail), 'error', 'agent_done')
           setTimeout(() => clearIfStill(forFile, 'split', tabId), 3000)
         }
       })
@@ -189,7 +170,7 @@ export function useEditorAgentActions(
           useTerminalStore.getState().updateTabStatus(tabId, 'error')
           useTerminalStore.getState().closeTab(tabId)
           setMdEditorAction(forFile, 'analyze', { status: 'error', tabId, stopping: false })
-          toast(describeFailure('AI Analyze', fileName, exitCode, tail), 'error', 'agent_done')
+          toast(describeAgentFailure('AI Analyze', fileName, exitCode, tail), 'error', 'agent_done')
           setTimeout(() => clearIfStill(forFile, 'analyze', tabId), 3000)
         }
       })

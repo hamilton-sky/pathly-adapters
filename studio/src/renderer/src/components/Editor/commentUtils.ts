@@ -99,6 +99,26 @@ export function getEffectivePrompt(
   }
 }
 
+const snippet = (s: string, n = 160): string => (s.length > n ? s.slice(0, n - 1) + '…' : s)
+
+// Turn an opaque "no file" failure into a specific, actionable reason using the engine's
+// exit code and last output — so rate limits, auth errors, and "agent wrote nothing" are
+// distinguishable instead of all reading "no draft produced". Shared by AI Split/Analyze
+// (useEditorAgentActions) and the comments Send flow (CommentsPanel).
+export function describeAgentFailure(action: string, fileName: string, exitCode?: number, tail?: string): string {
+  const last = (tail ?? '').trim()
+  const low = last.toLowerCase()
+  if (/rate.?limit|usage limit|quota|429|too many requests|overloaded/.test(low))
+    return `${action} failed · ${fileName} — rate limit / quota${last ? `: ${snippet(last)}` : ''}`
+  if (/unauthor|not logged in|please log in|\blog ?in\b|api key|credential|forbidden|\b401\b|\b403\b/.test(low))
+    return `${action} failed · ${fileName} — auth / login needed${last ? `: ${snippet(last)}` : ''}`
+  if (typeof exitCode === 'number' && exitCode !== 0)
+    return `${action} failed · ${fileName} — engine exited (code ${exitCode})${last ? `: ${snippet(last)}` : ''}`
+  return last
+    ? `${action} failed · ${fileName} — no file written; engine said: ${snippet(last)}`
+    : `${action} failed · ${fileName} — no file produced (engine wrote nothing)`
+}
+
 export function buildSendPrompt(filePath: string, body: string, unresolved: Comment[], verb?: PromptPreset, extra?: string): string {
   const norm = filePath.replace(/\\/g, '/')
   const commentLines = unresolved

@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { SendHorizonal, Loader2, Eye, EyeOff, ChevronRight, Trash2, GitCompare } from 'lucide-react'
+import { SendHorizonal, Loader2, Square, Eye, EyeOff, ChevronRight, Trash2, GitCompare } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useToastStore } from '../../../store/toastStore'
 import { useTerminalStore } from '../../../store/terminalStore'
 import type { Comment } from '../useComments'
-import { buildSendPrompt, getSpawnCwd } from '../commentUtils'
+import { buildSendPrompt, getSpawnCwd, describeAgentFailure } from '../commentUtils'
 import {
   CLI_KEY_COMMENT,
   PRESET_KEY_COMMENT,
@@ -17,6 +17,7 @@ import {
   type EditorCli,
 } from '../../MarkdownEditor/EditorHeader/editorCli'
 import { COMMENT_VERBS } from '../commentVerbs'
+import { attachProgress, fmtElapsed, useElapsedProgress } from '../../shared/RunPill/progress'
 import { CommentItem } from './CommentItem/CommentItem'
 import { CommentConfigButton } from './CommentConfigButton/CommentConfigButton'
 import SendPreviewModal from '../../shared/SendPreviewModal/SendPreviewModal'
@@ -60,7 +61,10 @@ export function CommentsPanel({
   filePath, body, comments, showHighlights, orphanedIds, commentDraftPath, onReviewDraft, onToggleHighlights, onCollapse, onClearAll, onResolve, onReopen, onRemove, onEdit, onScrollTo, onDraftReady,
 }: Props): JSX.Element {
   const pushToast = useToastStore((s) => s.push)
-  const [isWorking, setIsWorking] = useState(false)
+  // Holds the running send's tab id (null when idle). Drives the elapsed timer + stop button,
+  // mirroring the toolbar's Analyze pill. isWorking is derived from it.
+  const [activeTabId, setActiveTabId] = useState<string | null>(null)
+  const isWorking = activeTabId !== null
   const [defaultCli, setDefaultCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_COMMENT))
   const [defaultPreset, setDefaultPreset] = useState(() => loadPreset(PRESET_KEY_COMMENT))
   // Confirm-before-send: holds the engine while the modal is open; sendSel tracks which
@@ -72,6 +76,11 @@ export function CommentsPanel({
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const initialWidth = useRef(getStoredWidth())
   const exitUnsubRef = useRef<(() => void) | null>(null)
+
+  // Elapsed timer derives from the running tab's startedAt — survives re-render for free,
+  // same pattern as the EditorHeader Analyze pill.
+  const sendStartedAt = useTerminalStore((s) => s.tabs.find((t) => t.id === activeTabId)?.startedAt)
+  const sendProgress = useElapsedProgress(isWorking ? sendStartedAt : undefined)
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -129,40 +138,78 @@ export function CommentsPanel({
   async function runSend(prompt: string, cli: EditorCli): Promise<void> {
     const norm = filePath.replace(/\\/g, '/')
     const cwd = getSpawnCwd(filePath)
+    const draftPath = norm + '.comments.draft'
+    const fileName = norm.split('/').pop() ?? 'file'
     const tabId = `review-${Date.now().toString(36)}`
-    const tabLabel = `Comments · ${filePath.split(/[\\/]/).pop() ?? 'file'}`
 
-    setIsWorking(true)
+    setActiveTabId(tabId)
+    // Visible terminal tab (like AI Split/Analyze) so the spawning CLI engine is on screen.
     // Tab kind is display-only ('claude'); the real engine is applied via buildCliArgv(cli) below.
-    useTerminalStore.getState().addTabSilent(tabId, tabLabel, 'claude', undefined, undefined, prompt)
+    useTerminalStore.getState().addTab(tabId, `Comments · ${fileName}`, 'left', 'claude', undefined, undefined, prompt)
+    // Stamp 'running' BEFORE the spawn await so startedAt is set at t0 — the elapsed timer
+    // derives from tab.startedAt (same trick as the toolbar's Analyze pill).
+    useTerminalStore.getState().updateTabStatus(tabId, 'running')
+    useTerminalStore.getState().openTab(tabId)
+    pushToast(`Comments sent · ${fileName} (${cliLabel(cli)})`, 'info', { category: 'phase_summary' })
+    // attachProgress drives the milestone toasts; the pill's timer is derived from tab.startedAt,
+    // so we discard the per-tick progress payload.
+    const stopProgress = attachProgress(tabId, () => {}, (line) => pushToast(`Comments: ${line}`, 'info', { category: 'phase_summary' }))
     exitUnsubRef.current?.()
-    exitUnsubRef.current = window.pathly.terminal.onExit((exitedTabId) => {
+    exitUnsubRef.current = window.pathly.terminal.onExit((exitedTabId, exitCode, tail) => {
       if (exitedTabId !== tabId) return
       exitUnsubRef.current = null
+      stopProgress()
       let attempt = 0
       const check = (): void => {
         attempt++
-        void window.pathly.fs.read(norm + '.comments.draft').then((content) => {
+        void window.pathly.fs.read(draftPath).then((content) => {
           if (content !== null && content.trim().length > 0) {
             useTerminalStore.getState().updateTabStatus(tabId, 'done')
             useTerminalStore.getState().closeTab(tabId)
-            setIsWorking(false)
-            onDraftReady(norm + '.comments.draft')
+            setActiveTabId(null)
+            pushToast(`Comment revisions ready · ${fileName} — review the diff`, 'success', { category: 'agent_done' })
+            onDraftReady(draftPath)
           } else if (attempt < 5) {
             setTimeout(check, 600)
           } else {
             useTerminalStore.getState().updateTabStatus(tabId, 'error')
             useTerminalStore.getState().closeTab(tabId)
-            setIsWorking(false)
-            pushToast('Agent finished but wrote no draft — check the terminal for errors', 'error')
+            setActiveTabId(null)
+            pushToast(describeAgentFailure('Send', fileName, exitCode, tail), 'error', { category: 'agent_done' })
           }
         })
       }
       check()
     })
 
-    await window.pathly.terminal.spawn(tabId, cwd, undefined, buildCliArgv(cli, prompt))
-    useTerminalStore.getState().updateTabStatus(tabId, 'running')
+    try {
+      await window.pathly.terminal.spawn(tabId, cwd, undefined, buildCliArgv(cli, prompt))
+    } catch (e) {
+      // Spawn rejected (e.g. queue cancel / over cap) — onExit will never fire, so clean up here.
+      exitUnsubRef.current?.()
+      exitUnsubRef.current = null
+      stopProgress()
+      useTerminalStore.getState().closeTab(tabId)
+      setActiveTabId(null)
+      if (!(e instanceof Error && /cancelled/i.test(e.message))) {
+        pushToast(`Send failed · ${fileName} — could not launch ${cliLabel(cli)}`, 'error', { category: 'agent_done' })
+      }
+    }
+  }
+
+  // Stop closes the tab immediately (a force-killed PTY may never deliver a clean exit) and
+  // unsubscribes onExit so the draft poll can't fire after cancel.
+  function stopSend(): void {
+    const tabId = activeTabId
+    if (!tabId) return
+    exitUnsubRef.current?.()
+    exitUnsubRef.current = null
+    void window.pathly.terminal.kill(tabId)
+    useTerminalStore.getState().updateTabStatus(tabId, 'done')
+    useTerminalStore.getState().closeTab(tabId)
+    setActiveTabId(null)
+    const fileName = filePath.replace(/\\/g, '/').split('/').pop() ?? 'file'
+    pushToast(`Send stopped · ${fileName}`, 'info', { category: 'phase_summary' })
   }
 
   // Live prompt for the modal — rebuilt whenever the comment selection changes.
@@ -269,18 +316,34 @@ export function CommentsPanel({
 
       {unresolved.length > 0 && (
         <div className={styles.footer}>
-          <button
-            type="button"
-            className={styles.sendBtn}
-            onClick={prepareSend}
-            disabled={isWorking}
-            aria-label={isWorking ? 'Agent is working…' : `Send comments to ${cliLabel(defaultCli)}`}
-          >
-            {isWorking
-              ? <Loader2 size={15} className={styles.spinning} />
-              : <SendHorizonal size={15} />}
-            {isWorking ? 'Working…' : `Send to ${cliLabel(defaultCli)}`}
-          </button>
+          {isWorking ? (
+            <div className={styles.sendPill}>
+              <span className={styles.sendBtnRunning}>
+                <Loader2 size={15} className={styles.spinning} />
+                {sendProgress ? `Sending… ${fmtElapsed(sendProgress.elapsedS)}` : 'Sending…'}
+              </span>
+              <Tooltip label="Stop the running engine" placement="top">
+                <button
+                  type="button"
+                  className={styles.sendStop}
+                  onClick={stopSend}
+                  aria-label="Stop send"
+                >
+                  <Square size={12} />
+                </button>
+              </Tooltip>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={styles.sendBtn}
+              onClick={prepareSend}
+              aria-label={`Send comments to ${cliLabel(defaultCli)}`}
+            >
+              <SendHorizonal size={15} />
+              {`Send to ${cliLabel(defaultCli)}`}
+            </button>
+          )}
         </div>
       )}
 

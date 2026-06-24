@@ -164,6 +164,49 @@
 .sendBtn:hover:not(:disabled) { opacity: 0.85; }
 .sendBtn:disabled { opacity: 0.65; cursor: default; }
 
+/* Running state — joined pill: live elapsed timer + a red stop segment.
+   Mirrors the toolbar's Analyze pill (main segment │ Stop). */
+.sendPill {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.sendBtnRunning {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px 0 0 6px;
+  color: #fff;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.sendStop {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--red);
+  border: none;
+  border-radius: 0 6px 6px 0;
+  color: #fff;
+  cursor: pointer;
+  padding: 0 11px;
+  transition: opacity 0.12s;
+}
+.sendStop svg { fill: currentColor; }
+.sendStop:hover { opacity: 0.85; }
+.sendStop:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
