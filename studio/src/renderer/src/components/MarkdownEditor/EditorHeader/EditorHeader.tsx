@@ -2,11 +2,12 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen, GitCompare,
-  ScanText, FileSearch, SlidersHorizontal, Square,
+  ScanText, FileSearch, SlidersHorizontal, Square, Scissors,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useMarkdownEditorStore, BodyCell } from '../../../store/markdownEditorStore'
-import { useUiStore, selectMdEditorDraftPath, selectMdEditorAnalysisPath, selectMdEditorSplit, selectMdEditorAnalyze } from '../../../store/uiStore'
+import { useProjectStore } from '../../../store/projectStore'
+import { useUiStore, selectMdEditorSplitDraftPath, selectMdEditorAnalysisPath, selectMdEditorSplit, selectMdEditorAnalyze } from '../../../store/uiStore'
 import { useTerminalStore } from '../../../store/terminalStore'
 import { useEditorAgentActions } from './hooks/useEditorAgentActions'
 import { apiFetch } from '../../../lib/config'
@@ -34,7 +35,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const setMdEditorPath      = useUiStore(s => s.setMdEditorPath)
   const setMdEditorViewMode  = useUiStore(s => s.setMdEditorViewMode)
   const dirtyItems                = useUiStore(s => s.dirtyItems)
-  const mdEditorDraftPath         = useUiStore(selectMdEditorDraftPath)
+  const mdEditorSplitDraftPath    = useUiStore(selectMdEditorSplitDraftPath)
   const requestMdEditorSave       = useUiStore(s => s.requestMdEditorSave)
   const requestMdEditorOpenDraft  = useUiStore(s => s.requestMdEditorOpenDraft)
   const requestMdEditorUndo       = useUiStore(s => s.requestMdEditorUndo)
@@ -60,6 +61,10 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
 
   const handleSplitPreset = (name: string) => { setSplitPreset(name); savePreset(PRESET_KEY_SPLIT, name) }
   const handleAnalyzePreset = (name: string) => { setAnalyzePreset(name); savePreset(PRESET_KEY_ANALYZE, name) }
+
+  // Pill titles follow the selected preset/lens, so the toolbar reflects what each run will do.
+  const splitTitle   = SPLIT_PRESETS.find((p) => p.name === splitPreset)?.label ?? 'AI Split'
+  const analyzeTitle = ANALYZE_LENSES.find((l) => l.name === analyzePreset)?.label ?? 'AI Analyze'
 
   const { handleSplit, handleAnalyze, stopSplit, stopAnalyze } = useEditorAgentActions(
     mdEditorPath,
@@ -119,7 +124,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
       const res = await apiFetch('/skills/export', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skill: skillKey, fragment_order: fragmentOrder }),
+        body: JSON.stringify({ skill: skillKey, fragment_order: fragmentOrder, project_root: useProjectStore.getState().projectPath }),
       })
       if (res.ok) { setExportState('success'); setTimeout(() => setExportState('idle'), 2000) }
       else        { setExportState('error');   setTimeout(() => setExportState('idle'), 3000) }
@@ -234,17 +239,50 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         </button>
       </Tooltip>
 
-      {/* Split — split-button: AI Split (primary) + caret menu (AI vs deterministic) + prompt gear */}
-      <SplitPill
-        state={splitState}
-        progress={splitProgress}
-        hasPath={!!mdEditorPath}
-        onAiSplit={() => void handleSplit()}
-        onStop={() => stopSplit()}
-        onSplitIntoCells={() => setSplitCellsOpen(true)}
-        onTogglePrompt={() => setSplitPeekOpen(v => !v)}
-        compact={isCompact}
-      />
+      {/* Deterministic "Split into cells" — standalone; parses structure (no AI, no draft). */}
+      <Tooltip label="Split into editable cells — parse structure (no AI)" placement="bottom">
+        <button
+          type="button"
+          className={styles.cellsBtn}
+          disabled={!mdEditorPath}
+          onClick={() => setSplitCellsOpen(true)}
+          aria-label="Split into cells"
+        >
+          <Scissors size={13} />
+          <span className={styles.btnLabel}>Split cells</span>
+        </button>
+      </Tooltip>
+
+      {/* AI Split cluster — run pill (title follows the selected preset) + its draft-diff chip */}
+      <div className={styles.cluster}>
+        <SplitPill
+          state={splitState}
+          progress={splitProgress}
+          hasPath={!!mdEditorPath}
+          title={splitTitle}
+          onAiSplit={() => void handleSplit()}
+          onStop={() => stopSplit()}
+          onTogglePrompt={() => setSplitPeekOpen(v => !v)}
+          compact={isCompact}
+        />
+        <Tooltip
+          label={mdEditorSplitDraftPath
+            ? 'AI Split draft ready — review the changes'
+            : 'No split draft yet — run AI Split to generate one'}
+          placement="bottom"
+        >
+          <button
+            type="button"
+            className={styles.draftBtn}
+            data-has-draft={!!mdEditorSplitDraftPath}
+            aria-disabled={!mdEditorSplitDraftPath}
+            onClick={mdEditorSplitDraftPath ? handleReviewDraft : undefined}
+          >
+            <GitCompare size={13} />
+            <span className={styles.btnLabel}>Diff</span>
+          </button>
+        </Tooltip>
+      </div>
       {splitPeekOpen && mdEditorPath && (
         <PromptPeekModal
           title="PROMPT — AI Split"
@@ -262,7 +300,8 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         />
       )}
 
-      {/* Analyze pill */}
+      {/* AI Analyze cluster — run pill (title follows the selected lens) + its Report chip */}
+      <div className={styles.cluster}>
       <div className={styles.agentPill}>
         <Tooltip
           label={analyzeState === 'running'
@@ -282,7 +321,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             <span className={styles.btnLabel}>
               {analyzeState === 'running'
                 ? (analyzeProgress ? `Analyzing… ${fmtElapsed(analyzeProgress.elapsedS)}` : 'Analyzing…')
-                : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : 'AI Analyze'}
+                : analyzeState === 'success' ? 'Done' : analyzeState === 'error' ? 'Error' : analyzeTitle}
             </span>
           </button>
         </Tooltip>
@@ -349,25 +388,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
           <span className={styles.btnLabel}>Report</span>
         </button>
       </Tooltip>
-
-      {/* Review Draft */}
-      <Tooltip
-        label={mdEditorDraftPath
-          ? 'Agent draft ready — click to review changes'
-          : 'No agent draft pending — activates when an agent edits this file'}
-        placement="bottom"
-      >
-        <button
-          type="button"
-          className={styles.draftBtn}
-          data-has-draft={!!mdEditorDraftPath}
-          aria-disabled={!mdEditorDraftPath}
-          onClick={mdEditorDraftPath ? handleReviewDraft : undefined}
-        >
-          <GitCompare size={13} />
-          <span className={styles.btnLabel}>Review draft</span>
-        </button>
-      </Tooltip>
+      </div>
 
       {/* Save — both modes, different handlers */}
       {viewMode === 'cells' ? (

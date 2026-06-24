@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useProjectStore } from './projectStore'
 
 export interface BodyCell {
   id: string
@@ -105,7 +106,7 @@ export const useMarkdownEditorStore = create<MarkdownEditorState>((set, get) => 
       const res = await apiFetch('/skills/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skill_path: skillPath }),
+        body: JSON.stringify({ skill_path: skillPath, project_root: useProjectStore.getState().projectPath }),
       })
       const data = await res.json() as {
         body_cells: Array<{ id: string; heading: string; headingLevel?: number; content: string }>

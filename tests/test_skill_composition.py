@@ -45,6 +45,17 @@ def test_project_override_wins_over_global():
     assert get_composition_overrides(c, "/other")["team/build"] == ["global"]
 
 
+def test_override_path_normalization_matches():
+    # The editor writes with forward slashes; the runner reads with OS-native
+    # backslashes. Both must resolve to the same per-project override.
+    c = _conn()
+    set_composition_override(c, "C:/Users/x/repo", "team/build", ["a"])
+    assert get_composition_overrides(c, "C:\\Users\\x\\repo")["team/build"] == ["a"]
+    # trailing slash is irrelevant too
+    set_composition_override(c, "C:/Users/x/repo/", "team/build", ["b"])
+    assert get_composition_overrides(c, "C:\\Users\\x\\repo")["team/build"] == ["b"]
+
+
 # ── load_effective_manifest merge ───────────────────────────────────────────────
 
 

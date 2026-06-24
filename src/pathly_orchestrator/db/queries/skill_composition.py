@@ -15,12 +15,21 @@ from datetime import datetime, timezone
 from ..connection import _get_write_lock
 
 
+def _norm_root(project_root: str | None) -> str | None:
+    """Canonicalize a project root so editor writes (forward slashes) and runtime reads
+    (OS-native — backslashes on Windows) resolve to the same DB key."""
+    if not project_root:
+        return None
+    return project_root.replace("\\", "/").rstrip("/") or None
+
+
 def get_composition_overrides(
     conn: sqlite3.Connection, project_root: str | None = None
 ) -> dict[str, list]:
     """Return ``{skill_key: fragments_list}`` merging global overrides
     (``project_root IS NULL``) with this project's, where the project-specific row
     wins on a shared key. Malformed rows are skipped, never raised."""
+    project_root = _norm_root(project_root)
     result: dict[str, list] = {}
     rows = conn.execute(
         "SELECT skill_key, fragments_json FROM skill_composition "
@@ -45,6 +54,7 @@ def set_composition_override(
 ) -> None:
     """Upsert a skill's fragment override (manual upsert — SQLite UNIQUE doesn't span
     NULL ``project_root``)."""
+    project_root = _norm_root(project_root)
     now = datetime.now(timezone.utc).isoformat()
     payload = json.dumps(list(fragments))
     with _get_write_lock(conn):
@@ -66,6 +76,7 @@ def delete_composition_override(
     conn: sqlite3.Connection, project_root: str | None, skill_key: str
 ) -> None:
     """Remove a skill's override → revert to the packaged YAML default."""
+    project_root = _norm_root(project_root)
     with _get_write_lock(conn):
         conn.execute(
             "DELETE FROM skill_composition "
