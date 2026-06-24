@@ -164,9 +164,15 @@ def comms_goals_stop():
             how = "board_run"
         else:
             from pathly_orchestrator.supervisor.registry import get_state
+
             st = get_state(scope)
-            if st is not None and st.status in ("running", "paused", "awaiting_decision"):
+            if st is not None and st.status in (
+                "running",
+                "paused",
+                "awaiting_decision",
+            ):
                 from pathly_orchestrator.supervisor.api import abort_run
+
                 abort_run(scope)
                 stopped = True
                 how = "fsm"
@@ -195,7 +201,10 @@ def comms_goals_stop():
                 )
             except Exception:
                 pass
-            return jsonify({"ok": True, "stopped": True, "how": how, "run_id": run_id}), 200
+            return (
+                jsonify({"ok": True, "stopped": True, "how": how, "run_id": run_id}),
+                200,
+            )
 
         return jsonify({"ok": True, "stopped": False, "reason": "not_running"}), 200
     except Exception as exc:

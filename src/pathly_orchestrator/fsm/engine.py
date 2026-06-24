@@ -504,7 +504,13 @@ def run_transition_actions(
             # unattended and sweep unrelated working-tree changes.
             _paths = action.get("paths")
             if isinstance(_paths, list) and _paths:
-                add_cmd = ["git", "add", "--", str(storage_path), *[str(p) for p in _paths]]
+                add_cmd = [
+                    "git",
+                    "add",
+                    "--",
+                    str(storage_path),
+                    *[str(p) for p in _paths],
+                ]
             else:
                 add_cmd = ["git", "add", "-A"]
             try:

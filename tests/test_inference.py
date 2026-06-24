@@ -138,7 +138,9 @@ def test_haiku_success(monkeypatch):
     monkeypatch.setattr(argv_mod, "resolve_argv", lambda *a, **k: ["claude", "-p", "x"])
     monkeypatch.setattr(inf.subprocess, "run", lambda *a, **k: _Out())
     monkeypatch.setattr(
-        out_mod, "parse_result", lambda adapter, raw: {"result": "Covers: X", "cost_usd": 0.001}
+        out_mod,
+        "parse_result",
+        lambda adapter, raw: {"result": "Covers: X", "cost_usd": 0.001},
     )
     r = inf.summarize_content("# Doc\n## Phase 1\nx", backend="haiku")
     assert r.backend == "haiku" and r.summary == "Covers: X" and r.cost_usd == 0.001
@@ -164,7 +166,12 @@ def _seed_artifact(conn, summary="seed"):
     from pathly_orchestrator.db.queries.comms import insert_artifact, post_message
 
     mid = post_message(
-        conn, board="feature", scope="s", from_agent="planner", type="artifact", text="seed"
+        conn,
+        board="feature",
+        scope="s",
+        from_agent="planner",
+        type="artifact",
+        text="seed",
     )
     aid = insert_artifact(
         conn, message_id=mid, path="pathly/plans/s/EDGE.md", type="md", summary=summary
@@ -179,7 +186,9 @@ def test_update_artifact_summary_writeback():
     conn = get_db()
     _mid, aid = _seed_artifact(conn)
     update_artifact_summary(conn, aid, "Covers: phase 1.")
-    row = conn.execute("SELECT summary FROM comms_artifacts WHERE id=?", (aid,)).fetchone()
+    row = conn.execute(
+        "SELECT summary FROM comms_artifacts WHERE id=?", (aid,)
+    ).fetchone()
     assert row["summary"] == "Covers: phase 1."
 
 
@@ -231,7 +240,9 @@ def test_summarize_async_minilm_does_not_overwrite(monkeypatch):
     mid, aid = _seed_artifact(conn, summary="original seed text")
     monkeypatch.setattr(inf.threading, "Thread", _SyncThread)
     inf.summarize_async(aid, mid, "# Doc\n## Phase 1\nbody", backend="minilm")
-    row = conn.execute("SELECT summary FROM comms_artifacts WHERE id=?", (aid,)).fetchone()
+    row = conn.execute(
+        "SELECT summary FROM comms_artifacts WHERE id=?", (aid,)
+    ).fetchone()
     assert row["summary"] == "original seed text"  # unchanged — minilm wrote nothing
 
 
@@ -244,8 +255,12 @@ def test_summarize_async_generative_writes(monkeypatch):
     mid, aid = _seed_artifact(conn, summary="seed")
     monkeypatch.setattr(inf.threading, "Thread", _SyncThread)
     monkeypatch.setattr(
-        inf, "summarize_content", lambda *a, **k: inf.SummaryResult("Covers: topic map.", "haiku")
+        inf,
+        "summarize_content",
+        lambda *a, **k: inf.SummaryResult("Covers: topic map.", "haiku"),
     )
     inf.summarize_async(aid, mid, "text", backend="haiku")
-    row = conn.execute("SELECT summary FROM comms_artifacts WHERE id=?", (aid,)).fetchone()
+    row = conn.execute(
+        "SELECT summary FROM comms_artifacts WHERE id=?", (aid,)
+    ).fetchone()
     assert row["summary"] == "Covers: topic map."

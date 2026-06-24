@@ -14,7 +14,6 @@ import time
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
@@ -25,12 +24,14 @@ def _no_async(monkeypatch):
     """Stub async indexing so tests stay synchronous."""
     try:
         import pathly_orchestrator.runner.embeddings as _emb_mod
+
         monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
         monkeypatch.setattr(_emb_mod, "embed", lambda text: None)
     except Exception:
         pass
     try:
         import pathly_orchestrator.runner.hydrate as _hyd_mod
+
         monkeypatch.setattr(_hyd_mod, "index_artifact_async", lambda *a, **k: None)
     except Exception:
         pass
@@ -153,9 +154,7 @@ class TestFix1Integration:
                 "text": "test traversal guard",
                 "board": "feature",
                 "scope": scope,
-                "context_refs": [
-                    {"artifact": "../../etc/passwd", "anchor": "intro"}
-                ],
+                "context_refs": [{"artifact": "../../etc/passwd", "anchor": "intro"}],
                 "project_root": str(tmp_path),
             },
         )
@@ -163,17 +162,17 @@ class TestFix1Integration:
         assert r.status_code == 200, r.data
 
         # Verify no comms_artifacts row points outside the plan tree
-        rows = conn.execute(
-            "SELECT path FROM comms_artifacts"
-        ).fetchall()
+        rows = conn.execute("SELECT path FROM comms_artifacts").fetchall()
         for row in rows:
             path_val = row["path"] or ""
             norm = path_val.replace("\\", "/")
-            assert "/pathly/plans/" in norm or path_val == "", (
-                f"Sentinel row with out-of-tree path created: {path_val}"
-            )
+            assert (
+                "/pathly/plans/" in norm or path_val == ""
+            ), f"Sentinel row with out-of-tree path created: {path_val}"
 
-    def test_section_endpoint_traversal_scope_returns_400(self, client, plan_dir, monkeypatch):
+    def test_section_endpoint_traversal_scope_returns_400(
+        self, client, plan_dir, monkeypatch
+    ):
         """A /section request with a traversal scope must return 400 path_out_of_scope."""
         base, scope, plan_root = plan_dir
 
@@ -241,9 +240,9 @@ class TestFix2StaleIndexWipe:
 
         # The section rows must still be present (not wiped)
         sections_after = get_artifact_sections(db, artifact_id)
-        assert len(sections_after) == 2, (
-            f"Section index was wiped on mtime-only bump: got {sections_after}"
-        )
+        assert (
+            len(sections_after) == 2
+        ), f"Section index was wiped on mtime-only bump: got {sections_after}"
         anchors_before = {s["anchor"] for s in sections_before}
         anchors_after = {s["anchor"] for s in sections_after}
         assert anchors_before == anchors_after
@@ -299,9 +298,9 @@ class TestFix3DuplicateExplicitAnchors:
 
         sections = parse_sections(text)
         assert len(sections) == 2
-        assert sections[0].anchor != sections[1].anchor, (
-            "Duplicate explicit anchors must be made unique by parse_sections"
-        )
+        assert (
+            sections[0].anchor != sections[1].anchor
+        ), "Duplicate explicit anchors must be made unique by parse_sections"
 
         section_dicts = [
             {

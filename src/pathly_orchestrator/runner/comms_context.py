@@ -274,11 +274,17 @@ def retrieve_board_context(
                 task_scope = task_row["scope"] or topic
                 if refs_raw:
                     try:
-                        refs = json.loads(refs_raw) if isinstance(refs_raw, str) else refs_raw
+                        refs = (
+                            json.loads(refs_raw)
+                            if isinstance(refs_raw, str)
+                            else refs_raw
+                        )
                     except (json.JSONDecodeError, TypeError):
                         refs = []
                     if refs:
-                        from pathly_orchestrator.runner.hydrate import hydrate_section as _hydrate
+                        from pathly_orchestrator.runner.hydrate import (
+                            hydrate_section as _hydrate,
+                        )
 
                         for ref in refs:
                             try:
@@ -297,13 +303,9 @@ def retrieve_board_context(
                                 if result.get("status") == 200:
                                     body = result["body"]
                                     anchor_label = f" §{anc}" if anc else ""
-                                    hydrate_lines.append(
-                                        f"**{art}{anchor_label}**"
-                                    )
+                                    hydrate_lines.append(f"**{art}{anchor_label}**")
                                     if body.get("heading"):
-                                        hydrate_lines.append(
-                                            f"_{body['heading']}_"
-                                        )
+                                        hydrate_lines.append(f"_{body['heading']}_")
                                     hydrate_lines.append("")
                                     hydrate_lines.append(body.get("text", ""))
                                     hydrate_lines.append("")
@@ -314,7 +316,9 @@ def retrieve_board_context(
                                     )
                             except Exception:
                                 logger.debug(
-                                    "hydrate_section failed for ref %r", ref, exc_info=True
+                                    "hydrate_section failed for ref %r",
+                                    ref,
+                                    exc_info=True,
                                 )
                                 art = ref.get("artifact", "?")
                                 anc = ref.get("anchor")
@@ -431,7 +435,9 @@ def retrieve_board_context(
             # Token budget: stop once the channel body would exceed the cap, so a large
             # board can't bloat the prompt (the k-cap bounds count; this bounds size).
             if used + len(entry) > _CONTEXT_CHAR_BUDGET and shown > 0:
-                lines.append(f"  • … ({len(context_msgs) - shown} more match(es) omitted — budget)")
+                lines.append(
+                    f"  • … ({len(context_msgs) - shown} more match(es) omitted — budget)"
+                )
                 break
             lines.append(entry)
             used += len(entry)

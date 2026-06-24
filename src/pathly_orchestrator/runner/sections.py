@@ -90,7 +90,14 @@ def parse_sections(text: str) -> list[Section]:
         if anchor_m:
             heading_m = _HEADING_RE.match(line)
             if heading_m:
-                raw.append((i, len(heading_m.group(1)), heading_m.group(2).strip(), anchor_m.group(1)))
+                raw.append(
+                    (
+                        i,
+                        len(heading_m.group(1)),
+                        heading_m.group(2).strip(),
+                        anchor_m.group(1),
+                    )
+                )
                 pending_anchor = None
             else:
                 pending_anchor = anchor_m.group(1)
@@ -98,7 +105,9 @@ def parse_sections(text: str) -> list[Section]:
 
         heading_m = _HEADING_RE.match(line)
         if heading_m:
-            raw.append((i, len(heading_m.group(1)), heading_m.group(2).strip(), pending_anchor))
+            raw.append(
+                (i, len(heading_m.group(1)), heading_m.group(2).strip(), pending_anchor)
+            )
             pending_anchor = None
         else:
             pending_anchor = None

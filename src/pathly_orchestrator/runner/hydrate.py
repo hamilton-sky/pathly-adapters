@@ -218,15 +218,22 @@ def _schedule_resummarize_async(
 
             def _signal(event: str, **extra) -> None:
                 """Log + (best-effort) broadcast a summarizer lifecycle event so the
-                board/console can show that summarization started / finished / failed."""
+                board/console can show that summarization started / finished / failed.
+                """
                 if event == "summary_failed":
                     logger.warning(
                         "summarize %s: artifact=%s backend=%s %s",
-                        event, artifact_id, eff_backend, extra.get("error", ""),
+                        event,
+                        artifact_id,
+                        eff_backend,
+                        extra.get("error", ""),
                     )
                 else:
                     logger.info(
-                        "summarize %s: artifact=%s backend=%s", event, artifact_id, eff_backend
+                        "summarize %s: artifact=%s backend=%s",
+                        event,
+                        artifact_id,
+                        eff_backend,
                     )
                 if broadcast_fn is None:
                     return
@@ -246,7 +253,9 @@ def _schedule_resummarize_async(
             _signal("summarizing")
 
             # Whole-artifact topic-map summary
-            result = summarize_content(text, artifact_type=artifact_type, backend=eff_backend)
+            result = summarize_content(
+                text, artifact_type=artifact_type, backend=eff_backend
+            )
             if result.summary is None:
                 _signal("summary_failed", error=result.error or "no summary produced")
                 return
@@ -262,7 +271,10 @@ def _schedule_resummarize_async(
                 if not sec_text.strip():
                     continue
                 sec_result = summarize_content(
-                    sec_text, artifact_type=artifact_type, max_sentences=1, backend=eff_backend
+                    sec_text,
+                    artifact_type=artifact_type,
+                    max_sentences=1,
+                    backend=eff_backend,
                 )
                 if sec_result.summary is not None:
                     update_section_summary(conn, sec["id"], sec_result.summary)
@@ -282,13 +294,17 @@ def _schedule_resummarize_async(
                     embed_async(message_id, new_text)
                 except Exception:
                     logger.debug(
-                        "embed-summary (upload) failed for %s", message_id, exc_info=True
+                        "embed-summary (upload) failed for %s",
+                        message_id,
+                        exc_info=True,
                     )
 
             _signal("summary_ready")
 
         except Exception:
-            logger.debug("_schedule_resummarize_async failed for %s", artifact_id, exc_info=True)
+            logger.debug(
+                "_schedule_resummarize_async failed for %s", artifact_id, exc_info=True
+            )
 
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
@@ -346,8 +362,10 @@ def hydrate_section(
             safe = safe_plan_path(scope, artifact, project_root)
             if safe is None:
                 return {
-                    "body": {"error": "path_out_of_scope",
-                             "detail": "scope or artifact fails traversal check"},
+                    "body": {
+                        "error": "path_out_of_scope",
+                        "detail": "scope or artifact fails traversal check",
+                    },
                     "status": 400,
                 }
 
@@ -367,8 +385,10 @@ def hydrate_section(
         if not _is_md(path):
             if anchor:
                 return {
-                    "body": {"error": "anchor required",
-                             "detail": "section anchoring is .md-only (§8)"},
+                    "body": {
+                        "error": "anchor required",
+                        "detail": "section anchoring is .md-only (§8)",
+                    },
                     "status": 400,
                 }
             text = _read_file_text(path)

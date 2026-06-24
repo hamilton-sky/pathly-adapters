@@ -69,9 +69,21 @@ def comms_post():
 
         if not check_write_permission(from_agent, board, perm_table=perm_table):
             allowed = sorted(
-                perm_table.get(board) or ({"director", "human"} if board == "global" else {
-                    "tester", "reviewer", "explorer", "architect", "planner", "designer", "director", "human"
-                })
+                perm_table.get(board)
+                or (
+                    {"director", "human"}
+                    if board == "global"
+                    else {
+                        "tester",
+                        "reviewer",
+                        "explorer",
+                        "architect",
+                        "planner",
+                        "designer",
+                        "director",
+                        "human",
+                    }
+                )
             )
             return (
                 jsonify(
@@ -111,7 +123,9 @@ def comms_post():
             or not all(isinstance(d, str) for d in depends_on)
         ):
             return (
-                jsonify({"error": "Field 'depends_on' must be a list of strings or null"}),
+                jsonify(
+                    {"error": "Field 'depends_on' must be a list of strings or null"}
+                ),
                 400,
             )
         if goal_id is not None and not isinstance(goal_id, str):
@@ -126,7 +140,9 @@ def comms_post():
         ):
             return (
                 jsonify(
-                    {"error": "Field 'summary_backend' must be one of minilm|ollama|haiku or null"}
+                    {
+                        "error": "Field 'summary_backend' must be one of minilm|ollama|haiku or null"
+                    }
                 ),
                 400,
             )
@@ -145,7 +161,14 @@ def comms_post():
                 for r in context_refs
             )
         ):
-            return jsonify({"error": "Field 'context_refs' must be a list of {artifact:str, anchor?:str} objects or null"}), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Field 'context_refs' must be a list of {artifact:str, anchor?:str} objects or null"
+                    }
+                ),
+                400,
+            )
 
         if context_refs:
             try:
@@ -183,7 +206,9 @@ def comms_post():
                             logging.warning(
                                 "context_refs validate-at-write: anchor %r not found in %s "
                                 "(scope=%s) — rewriting to whole-file",
-                                anc, art_name, scope,
+                                anc,
+                                art_name,
+                                scope,
                             )
                             try:
                                 _post_message(
@@ -237,6 +262,7 @@ def comms_post():
                 from pathly_orchestrator.db.queries.comms import (
                     insert_artifact as _insert_artifact,
                 )
+
                 art_id = _insert_artifact(
                     conn,
                     message_id=message_id,
@@ -249,6 +275,7 @@ def comms_post():
                     from pathly_orchestrator.runner.hydrate import (
                         index_artifact_async as _index_async,
                     )
+
                     _index_async(
                         art_id,
                         artifact_path,
@@ -364,14 +391,22 @@ def comms_search():
             results = _search_keyword(conn, query, [board], [scope], k)
         elif mode == "semantic":
             if embedding is not None:
-                results = _search(conn, embedding=embedding, boards=[board], scopes=[scope], k=k)
+                results = _search(
+                    conn, embedding=embedding, boards=[board], scopes=[scope], k=k
+                )
             else:
-                from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
+                from pathly_orchestrator.db.queries.comms import (
+                    get_messages as _get_messages,
+                )
+
                 results = _get_messages(conn, board=board, scope=scope, limit=k)
         else:
             results = _search_hybrid(conn, query, embedding, [board], [scope], k)
             if not results:
-                from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
+                from pathly_orchestrator.db.queries.comms import (
+                    get_messages as _get_messages,
+                )
+
                 results = _get_messages(conn, board=board, scope=scope, limit=k)
 
         return jsonify(results), 200
