@@ -15,7 +15,6 @@ import tempfile
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -365,7 +364,8 @@ def test_path_traversal_backslash_in_artifact_rejected(client, plan_dir):
 
 def test_section_by_path_uses_cwd_when_no_project_root(client, plan_dir, monkeypatch):
     """drain-dag (single executor) sends only scope+artifact+anchor (spec §4.1) — no
-    project_root. The route must fall back to the server CWD so hydration still works."""
+    project_root. The route must fall back to the server CWD so hydration still works.
+    """
     base, scope, plan_root = plan_dir
     _write_plan_file(
         plan_root, "EDGE_CASES.md", "## Phase 1 — setup\nedge body for phase 1\n"
@@ -428,13 +428,21 @@ def test_cached_index_returned_on_unchanged_file(plan_dir):
     conn = get_db()
     # First call — builds index
     result1 = hydrate_section(
-        conn, scope=scope, artifact="CACHED.md", anchor="phase-1", project_root=str(base)
+        conn,
+        scope=scope,
+        artifact="CACHED.md",
+        anchor="phase-1",
+        project_root=str(base),
     )
     assert result1["status"] == 200
 
     # Second call — should use cache
     result2 = hydrate_section(
-        conn, scope=scope, artifact="CACHED.md", anchor="phase-1", project_root=str(base)
+        conn,
+        scope=scope,
+        artifact="CACHED.md",
+        anchor="phase-1",
+        project_root=str(base),
     )
     assert result2["status"] == 200
     assert result2["body"]["stale_rebuilt"] is False
@@ -476,7 +484,10 @@ def test_catalog_scoped_to_board(client, conn, plan_dir):
 
 def test_catalog_null_summary_row_still_returned(conn, plan_dir):
     """A NULL summary row still appears in the catalog (§7, §5a.4)."""
-    from pathly_orchestrator.db.queries.comms import list_artifacts_catalog, post_message
+    from pathly_orchestrator.db.queries.comms import (
+        list_artifacts_catalog,
+        post_message,
+    )
     from pathly_orchestrator.db.connection import _get_write_lock
 
     _, scope, plan_root = plan_dir
@@ -532,7 +543,9 @@ def test_catalog_missing_path_returns_none(conn, plan_dir):
     from pathly_orchestrator.db.queries.comms import find_or_create_artifact_by_path
 
     _, scope, plan_root = plan_dir
-    result = find_or_create_artifact_by_path(conn, scope, str(plan_root / "NONEXISTENT.md"))
+    result = find_or_create_artifact_by_path(
+        conn, scope, str(plan_root / "NONEXISTENT.md")
+    )
     assert result is None
 
 
@@ -546,6 +559,7 @@ def _stub_embed(monkeypatch):
     """Force embed() to return None (recency fallback) for all context tests."""
     try:
         import pathly_orchestrator.runner.embeddings as _emb_mod
+
         monkeypatch.setattr(_emb_mod, "embed", lambda text: None)
     except Exception:
         pass

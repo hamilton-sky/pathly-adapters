@@ -59,9 +59,7 @@ def test_completed_task_has_duration(client):
     scope = "dur_done"
     tid = _post_task(client, scope)
 
-    r = client.post(
-        "/comms/tasks/claim", json={"message_id": tid, "run_id": "run-1"}
-    )
+    r = client.post("/comms/tasks/claim", json={"message_id": tid, "run_id": "run-1"})
     assert r.status_code == 200 and json.loads(r.data)["claimed"] is True
 
     r = client.post("/comms/tasks/complete", json={"message_id": tid, "scope": scope})
@@ -85,14 +83,10 @@ def test_failed_task_duration_from_failed_at(client):
     scope = "dur_failed"
     tid = _post_task(client, scope)
 
-    r = client.post(
-        "/comms/tasks/claim", json={"message_id": tid, "run_id": "run-2"}
-    )
+    r = client.post("/comms/tasks/claim", json={"message_id": tid, "run_id": "run-2"})
     assert r.status_code == 200 and json.loads(r.data)["claimed"] is True
 
-    r = client.post(
-        "/comms/tasks/fail", json={"message_id": tid, "reason": "boom"}
-    )
+    r = client.post("/comms/tasks/fail", json={"message_id": tid, "reason": "boom"})
     assert r.status_code == 200, r.data
 
     task = _get_task(client, scope, tid)

@@ -883,9 +883,7 @@ def get_artifact_sections(conn: sqlite3.Connection, artifact_id: str) -> list[di
     return [dict(r) for r in rows]
 
 
-def get_section(
-    conn: sqlite3.Connection, artifact_id: str, anchor: str
-) -> dict | None:
+def get_section(conn: sqlite3.Connection, artifact_id: str, anchor: str) -> dict | None:
     """Return the section row for (artifact_id, anchor), or None if absent."""
     row = conn.execute(
         "SELECT * FROM comms_artifact_sections WHERE artifact_id=? AND anchor=?",

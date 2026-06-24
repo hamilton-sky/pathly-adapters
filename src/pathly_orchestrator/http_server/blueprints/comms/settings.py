@@ -70,7 +70,9 @@ def comms_scope_set():
         if not updates:
             return (
                 jsonify(
-                    {"error": "Field 'scope' must contain at least one of: feature, project, global"}
+                    {
+                        "error": "Field 'scope' must contain at least one of: feature, project, global"
+                    }
                 ),
                 400,
             )
@@ -272,7 +274,9 @@ def comms_consolidate():
                     logging.debug("consolidate lifecycle post failed", exc_info=True)
 
             def _on_start(_run_id: str) -> None:
-                _board_post("🤖 reflector started synthesizing this board…", phase="running")
+                _board_post(
+                    "🤖 reflector started synthesizing this board…", phase="running"
+                )
 
             def _on_done(_run_id: str, res) -> None:
                 summary = ""
@@ -313,7 +317,10 @@ def comms_consolidate():
                 200,
             )
 
-        return jsonify({"ok": True, "superseded_count": len(pairs), "pairs": pairs}), 200
+        return (
+            jsonify({"ok": True, "superseded_count": len(pairs), "pairs": pairs}),
+            200,
+        )
     except Exception as exc:
         logging.exception("comms_consolidate error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

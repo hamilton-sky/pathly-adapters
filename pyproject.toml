@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = ["pyyaml>=6.0,<7", "flask>=2.3,<4", "sqlite-vec==0.1.6", "sentence-transformers>=2.7.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov>=5", "build", "twine", "jsonschema>=4", "black>=24", "mypy>=1.8"]
+dev = ["pytest>=8", "pytest-cov>=5", "build", "twine", "jsonschema>=4", "black==26.5.1", "mypy==2.1.0"]
 
 [project.scripts]
 pathly-setup = "install_cli.__main__:main"
@@ -28,6 +28,12 @@ pathly-ff   = "pathly_orchestrator.cli.ff:main"
 pathly-studio = "pathly_studio_cli.install:main"
 pathly-design = "pathly_data.core.design.cli:main"
 pathly-otel-export = "pathly_orchestrator.otel_export:cli_main"
+
+[tool.black]
+# Pin the formatting target to the project's minimum Python so `black --check`
+# is deterministic regardless of the runner's interpreter. The black version is
+# pinned exactly in the dev extra above so CI never drifts on a new release.
+target-version = ["py311"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

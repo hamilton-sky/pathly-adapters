@@ -42,7 +42,9 @@ def comms_attach():
         if not has_path and not has_url:
             return (
                 jsonify(
-                    {"error": "Provide at least one of 'artifact_path' or 'artifact_url'"}
+                    {
+                        "error": "Provide at least one of 'artifact_path' or 'artifact_url'"
+                    }
                 ),
                 400,
             )
@@ -84,6 +86,7 @@ def comms_attach():
                     from pathly_orchestrator.runner.hydrate import (
                         index_artifact_async as _index_async,
                     )
+
                     _ascope = row.get("scope", "")
                     _index_async(
                         art_id,
@@ -130,6 +133,7 @@ def comms_artifacts():
             from pathly_orchestrator.db.queries.comms import (
                 list_artifacts_for_message as _list_artifacts,
             )
+
             return (
                 jsonify({"ok": True, "artifacts": _list_artifacts(conn, message_id)}),
                 200,
@@ -139,6 +143,7 @@ def comms_artifacts():
             from pathly_orchestrator.db.queries.comms import (
                 list_artifacts_catalog as _list_catalog,
             )
+
             goal_id = (request.args.get("goal_id") or "").strip() or None
             order = (request.args.get("order") or "").strip() or None
             limit_raw = request.args.get("limit")
@@ -156,7 +161,12 @@ def comms_artifacts():
             )
             return jsonify({"ok": True, "artifacts": rows}), 200
 
-        return jsonify({"error": "Query param 'message_id' or 'board'+'scope' is required"}), 400
+        return (
+            jsonify(
+                {"error": "Query param 'message_id' or 'board'+'scope' is required"}
+            ),
+            400,
+        )
     except Exception as exc:
         logging.exception("comms_artifacts error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
@@ -180,14 +190,24 @@ def comms_artifact_summarize(artifact_id: str):
         data = request.get_json(silent=True) or {}
         engine = (data.get("engine") or "").strip().lower() or None
         if engine == "minilm":
-            return jsonify({"ok": False, "error": "engine 'minilm' is off — produces no summary"}), 400
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "engine 'minilm' is off — produces no summary",
+                    }
+                ),
+                400,
+            )
         if engine is not None and engine not in _API_SUMMARY_ENGINES:
             return (
-                jsonify({
-                    "ok": False,
-                    "error": f"engine {engine!r} is not an in-process API engine "
-                             f"(supported: {sorted(_API_SUMMARY_ENGINES)}; CLI engines use the terminal path)",
-                }),
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": f"engine {engine!r} is not an in-process API engine "
+                        f"(supported: {sorted(_API_SUMMARY_ENGINES)}; CLI engines use the terminal path)",
+                    }
+                ),
                 400,
             )
 
@@ -211,7 +231,14 @@ def comms_artifact_summarize(artifact_id: str):
             embed_summary=True,
         )
         return (
-            jsonify({"ok": True, "artifact_id": artifact_id, "engine": engine or "default", "status": "summarizing"}),
+            jsonify(
+                {
+                    "ok": True,
+                    "artifact_id": artifact_id,
+                    "engine": engine or "default",
+                    "status": "summarizing",
+                }
+            ),
             202,
         )
     except Exception as exc:
@@ -229,13 +256,9 @@ def comms_artifact_section(artifact_id: str | None = None):
         import os as _os
 
         anchor = (request.args.get("anchor") or "").strip() or None
-        scope = (
-            request.args.get("scope") or request.args.get("feature") or ""
-        ).strip()
+        scope = (request.args.get("scope") or request.args.get("feature") or "").strip()
         artifact = (request.args.get("artifact") or "").strip()
-        project_root = (
-            request.args.get("project_root") or ""
-        ).strip() or _os.getcwd()
+        project_root = (request.args.get("project_root") or "").strip() or _os.getcwd()
 
         conn = _get_db()
         result = _hydrate(

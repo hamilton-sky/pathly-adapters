@@ -54,13 +54,26 @@ def _superseded_by(conn, mid):
 
 def test_dedupe_supersedes_older_keeps_newest_protects_task(conn, monkeypatch):
     from pathly_orchestrator.db.connection import _VEC_AVAILABLE
+
     if not _VEC_AVAILABLE:
         pytest.skip("sqlite-vec unavailable")
     import pathly_orchestrator.db.queries.comms as cq
 
     scope = f"dedup-{uuid.uuid4().hex[:8]}"
-    old = _insert(conn, scope, "discovery", "API returns 500 on empty body", "2026-01-01T00:00:00Z")
-    new = _insert(conn, scope, "discovery", "API returns 500 on empty body", "2026-02-01T00:00:00Z")
+    old = _insert(
+        conn,
+        scope,
+        "discovery",
+        "API returns 500 on empty body",
+        "2026-01-01T00:00:00Z",
+    )
+    new = _insert(
+        conn,
+        scope,
+        "discovery",
+        "API returns 500 on empty body",
+        "2026-02-01T00:00:00Z",
+    )
     task = _insert(conn, scope, "task", "Phase 1 build", "2026-01-15T00:00:00Z")
 
     # old & new are near-identical; the task must never be offered or touched.
@@ -76,13 +89,14 @@ def test_dedupe_supersedes_older_keeps_newest_protects_task(conn, monkeypatch):
 
     assert len(pairs) == 1
     assert pairs[0]["superseded"] == old and pairs[0]["by"] == new
-    assert _superseded_by(conn, old) == new      # older collapsed into newer
-    assert not _superseded_by(conn, new)         # newest kept
-    assert not _superseded_by(conn, task)        # protected structural type untouched
+    assert _superseded_by(conn, old) == new  # older collapsed into newer
+    assert not _superseded_by(conn, new)  # newest kept
+    assert not _superseded_by(conn, task)  # protected structural type untouched
 
 
 def test_dedupe_idempotent(conn, monkeypatch):
     from pathly_orchestrator.db.connection import _VEC_AVAILABLE
+
     if not _VEC_AVAILABLE:
         pytest.skip("sqlite-vec unavailable")
     import pathly_orchestrator.db.queries.comms as cq
@@ -108,7 +122,10 @@ def test_dedupe_idempotent(conn, monkeypatch):
 
 
 def test_consolidate_route_empty_board(client):
-    r = client.post("/comms/consolidate", json={"board": "feature", "scope": f"empty-{uuid.uuid4().hex[:6]}"})
+    r = client.post(
+        "/comms/consolidate",
+        json={"board": "feature", "scope": f"empty-{uuid.uuid4().hex[:6]}"},
+    )
     assert r.status_code == 200, r.data
     body = json.loads(r.data)
     assert body["ok"] is True and body["superseded_count"] == 0
@@ -120,6 +137,7 @@ def test_consolidate_route_requires_scope(client):
 
 
 # ── mode="dedup" (default) — unchanged behaviour ──────────────────────────────
+
 
 def test_consolidate_mode_dedup_default_no_run_id(client):
     """Default mode must not spawn a board agent — no run_id in response."""
@@ -146,6 +164,7 @@ def test_consolidate_mode_dedup_explicit_no_run_id(client):
 
 
 # ── mode="full" / "reflect" — spawn path ─────────────────────────────────────
+
 
 def _fake_start_board_run(*args, **kwargs):
     """Stub for start_board_run: records calls and returns a canned success dict."""

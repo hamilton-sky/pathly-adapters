@@ -83,7 +83,9 @@ def summarize_content(
         return _run_haiku(text, max_sentences=max_sentences, timeout=timeout)
 
     # Unknown backend — treat as disabled
-    return SummaryResult(None, effective_backend, error=f"unknown backend: {effective_backend}")
+    return SummaryResult(
+        None, effective_backend, error=f"unknown backend: {effective_backend}"
+    )
 
 
 def _ollama_model() -> str:
@@ -129,7 +131,9 @@ def _run_ollama(text: str, *, max_sentences: int, timeout: int) -> SummaryResult
         return SummaryResult(None, "ollama", error=msg)
     except urllib.error.URLError as exc:
         return SummaryResult(
-            None, "ollama", error=f"ollama not running at 127.0.0.1:11434 ({exc.reason})"
+            None,
+            "ollama",
+            error=f"ollama not running at 127.0.0.1:11434 ({exc.reason})",
         )
     except Exception as exc:  # noqa: BLE001 — summary must never raise
         return SummaryResult(None, "ollama", error=f"ollama call failed: {exc}")

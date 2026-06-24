@@ -25,16 +25,28 @@ def test_weak_semantic_hit_is_dropped(monkeypatch):
 
     def fake_hybrid(conn, text, emb_vec, boards, scopes, k):
         return [
-            {"id": "strong", "text": "STRONG relevant match", "from_agent": "a",
-             "to_agent": "*", "_distance": 0.20},
-            {"id": "weak", "text": "WEAK unrelated match", "from_agent": "b",
-             "to_agent": "*", "_distance": 0.95},  # > 0.75 cutoff → dropped
+            {
+                "id": "strong",
+                "text": "STRONG relevant match",
+                "from_agent": "a",
+                "to_agent": "*",
+                "_distance": 0.20,
+            },
+            {
+                "id": "weak",
+                "text": "WEAK unrelated match",
+                "from_agent": "b",
+                "to_agent": "*",
+                "_distance": 0.95,
+            },  # > 0.75 cutoff → dropped
         ]
 
     monkeypatch.setattr(cq, "search_by_hybrid", fake_hybrid)
 
     block = cc.retrieve_board_context(
-        "feat", "C:/p", "find the thing",
+        "feat",
+        "C:/p",
+        "find the thing",
         board_scope={"feature": True, "project": False, "global": False},
     )
     assert "STRONG relevant match" in block
@@ -47,12 +59,20 @@ def test_keyword_hit_without_distance_is_kept(monkeypatch):
     import pathly_orchestrator.runner.comms_context as cc
 
     def fake_hybrid(conn, text, emb_vec, boards, scopes, k):
-        return [{"id": "kw", "text": "keyword lexical match", "from_agent": "a",
-                 "to_agent": "*"}]  # no _distance key
+        return [
+            {
+                "id": "kw",
+                "text": "keyword lexical match",
+                "from_agent": "a",
+                "to_agent": "*",
+            }
+        ]  # no _distance key
 
     monkeypatch.setattr(cq, "search_by_hybrid", fake_hybrid)
     block = cc.retrieve_board_context(
-        "feat", "C:/p", "q",
+        "feat",
+        "C:/p",
+        "q",
         board_scope={"feature": True, "project": False, "global": False},
     )
     assert "keyword lexical match" in block
@@ -64,14 +84,21 @@ def test_context_char_budget_truncates(monkeypatch):
 
     big = "x" * 900
     rows = [
-        {"id": f"m{i}", "text": f"{big}-{i}", "from_agent": "a", "to_agent": "*",
-         "_distance": 0.2}
+        {
+            "id": f"m{i}",
+            "text": f"{big}-{i}",
+            "from_agent": "a",
+            "to_agent": "*",
+            "_distance": 0.2,
+        }
         for i in range(3)
     ]
     monkeypatch.setattr(cq, "search_by_hybrid", lambda *a, **k: rows)
 
     block = cc.retrieve_board_context(
-        "feat", "C:/p", "q",
+        "feat",
+        "C:/p",
+        "q",
         board_scope={"feature": True, "project": False, "global": False},
     )
     assert "omitted" in block, "channel body should be capped by _CONTEXT_CHAR_BUDGET"

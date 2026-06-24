@@ -38,18 +38,28 @@ def _no_index_daemon(monkeypatch):
 def _artifact_id_for(message_id):
     from pathly_orchestrator.db.connection import get_db
 
-    row = get_db().execute(
-        "SELECT id FROM comms_artifacts WHERE message_id=?", (message_id,)
-    ).fetchone()
+    row = (
+        get_db()
+        .execute("SELECT id FROM comms_artifacts WHERE message_id=?", (message_id,))
+        .fetchone()
+    )
     return row["id"] if row else None
 
 
 def _post_artifact(client, scope, md):
-    r = client.post("/comms/post", json={
-        "feature": scope, "from": "human", "type": "artifact",
-        "text": "Added DOC.md", "board": "feature", "scope": scope,
-        "artifact_path": str(md).replace("\\", "/"), "artifact_type": "md",
-    })
+    r = client.post(
+        "/comms/post",
+        json={
+            "feature": scope,
+            "from": "human",
+            "type": "artifact",
+            "text": "Added DOC.md",
+            "board": "feature",
+            "scope": scope,
+            "artifact_path": str(md).replace("\\", "/"),
+            "artifact_type": "md",
+        },
+    )
     assert r.status_code == 200, r.data
     return json.loads(r.data)["message_id"]
 
@@ -61,7 +71,9 @@ def test_summarize_route_invokes_summarizer(client, tmp_path, monkeypatch):
 
     calls = []
     monkeypatch.setattr(
-        hyd, "_schedule_resummarize_async", lambda art_id, **kw: calls.append((art_id, kw))
+        hyd,
+        "_schedule_resummarize_async",
+        lambda art_id, **kw: calls.append((art_id, kw)),
     )
 
     scope = f"sum-{uuid.uuid4().hex[:8]}"
@@ -85,7 +97,9 @@ def test_summarize_route_omitted_engine_uses_default(client, tmp_path, monkeypat
 
     calls = []
     monkeypatch.setattr(
-        hyd, "_schedule_resummarize_async", lambda art_id, **kw: calls.append((art_id, kw))
+        hyd,
+        "_schedule_resummarize_async",
+        lambda art_id, **kw: calls.append((art_id, kw)),
     )
     scope = f"def-{uuid.uuid4().hex[:8]}"
     md = tmp_path / "DOC.md"
@@ -103,9 +117,24 @@ def test_summarize_route_rejects_off_and_cli_engines(client, tmp_path):
     md.write_text("# Doc\n## A\nbody\n", encoding="utf-8")
     art_id = _artifact_id_for(_post_artifact(client, scope, md))
 
-    assert client.post(f"/comms/artifacts/{art_id}/summarize", json={"engine": "minilm"}).status_code == 400
-    assert client.post(f"/comms/artifacts/{art_id}/summarize", json={"engine": "claude"}).status_code == 400
-    assert client.post("/comms/artifacts/does-not-exist/summarize", json={"engine": "ollama"}).status_code == 404
+    assert (
+        client.post(
+            f"/comms/artifacts/{art_id}/summarize", json={"engine": "minilm"}
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            f"/comms/artifacts/{art_id}/summarize", json={"engine": "claude"}
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            "/comms/artifacts/does-not-exist/summarize", json={"engine": "ollama"}
+        ).status_code
+        == 404
+    )
 
 
 def test_ollama_model_setting(monkeypatch):
