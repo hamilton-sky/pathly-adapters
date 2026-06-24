@@ -29,6 +29,7 @@ from .blueprints.ops.telemetry import bp as telemetry_bp
 from .blueprints.ops.menu import bp as menu_bp
 from .blueprints.ops.db_api import bp as db_api_bp
 from .blueprints.ops.chat import bp as chat_bp
+from .blueprints.ops.export import bp as export_bp
 
 app = Flask(__name__)
 
@@ -48,6 +49,7 @@ app.register_blueprint(menu_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(streams_bp)
 app.register_blueprint(db_api_bp)
+app.register_blueprint(export_bp)
 for _comms_bp in comms_blueprints:
     app.register_blueprint(_comms_bp)
 
