@@ -5,6 +5,8 @@ import { COMMENT_COLORS } from '../useComments'
 import type { CommentColor } from '../useComments'
 import { PromptActionConfig } from '../../shared/PromptActionConfig/PromptActionConfig'
 import { COMMENT_VERBS } from '../commentVerbs'
+import { CommentAnchor } from './CommentAnchor'
+import { useDraggable } from './hooks/useDraggable'
 import {
   type EditorCli,
   CLI_KEY_COMMENT,
@@ -34,10 +36,9 @@ export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, 
   const [selectedColor, setSelectedColor] = useState<CommentColor>('yellow')
   const [cli, setCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_COMMENT))
   const [verb, setVerb] = useState(() => loadPreset(PRESET_KEY_COMMENT))
-  const [extra, setExtra] = useState('')
   const canSubmit = body.trim().length > 0
   const ref = useRef<HTMLDivElement>(null)
-  const preview = anchorText.length > 120 ? anchorText.slice(0, 120).trimEnd() + '…' : anchorText.trim()
+  const { onHandleMouseDown } = useDraggable(ref)
 
   useEffect(() => {
     const el = ref.current
@@ -86,14 +87,14 @@ export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, 
 
   return (
     <div ref={ref} className={styles.modal} onMouseDown={(e) => e.stopPropagation()}>
-      <div className={styles.header}>
+      <div className={styles.header} onMouseDown={onHandleMouseDown}>
         <span className={styles.title}>Comment</span>
         <button type="button" className={styles.closeBtn} onClick={handleCancel} aria-label="Close">
           <X size={14} />
         </button>
       </div>
 
-      {anchorText && <div className={styles.anchor}>"{preview}"</div>}
+      {anchorText && <CommentAnchor text={anchorText} />}
 
       <div className={styles.swatchRow}>
         <span className={styles.srOnly}>Comment color</span>
@@ -126,15 +127,16 @@ export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, 
         presets={COMMENT_VERBS}
         selectedPreset={verb}
         promptText=""
-        extra={extra}
+        extra=""
         cli={cli}
         primaryLabel=""
         onSelectPreset={handleVerbChange}
         onPromptTextChange={() => { /* banner hidden */ }}
-        onExtraChange={setExtra}
+        onExtraChange={() => { /* extra-instructions box hidden */ }}
         onCliChange={handleCliChange}
         onReset={() => { /* footer hidden */ }}
         onPrimary={() => { /* footer hidden */ }}
+        showExtra={false}
         showBanner={false}
         showFooter={false}
       />
@@ -144,7 +146,7 @@ export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, 
           type="button"
           className={styles.sendBtn}
           disabled={!canSubmit}
-          onClick={() => { if (canSubmit) onSendNow(body.trim(), selectedColor, cli, verb, extra.trim()) }}
+          onClick={() => { if (canSubmit) onSendNow(body.trim(), selectedColor, cli, verb, '') }}
         >
           Send to {cliLabel(cli)}
         </button>

@@ -1,0 +1,62 @@
+/* ── Collapsible anchor banner ────────────────────────────────── */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* ── Toggle row (collapsed banner) ────────────────────────────── */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  background: var(--bg-mantle);
+  border: none;
+  border-left: 3px solid var(--modal-accent, var(--accent));
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-secondary);
+  transition: border-color var(--transition-snappy), color var(--transition-fast);
+}
+.toggle:hover { color: var(--text-primary); }
+.toggle:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+.toggle[aria-expanded='true'] .chevron { transform: rotate(90deg); }
+
+.preview {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  line-height: 1.45;
+  font-family: var(--font-family-mono);
+  font-style: italic;
+}
+
+/* ── Expanded full selection ──────────────────────────────────── */
+.full {
+  max-height: 160px;
+  overflow-y: auto;
+  background: var(--bg-mantle);
+  border-left: 3px solid var(--modal-accent, var(--accent));
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: 6px 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  font-family: var(--font-family-mono);
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
