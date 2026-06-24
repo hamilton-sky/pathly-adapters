@@ -1,0 +1,82 @@
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 9px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface1);
+  min-width: 0;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+
+.dot[data-status='pending']     { background: var(--text-muted); }
+.dot[data-status='in_progress'] { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.dot[data-status='done']        { background: var(--green, #4caf50); }
+.dot[data-status='blocked']     { background: var(--yellow, #d8a657); }
+.dot[data-status='failed']      { background: var(--red, #e05a5a); }
+
+.taskMain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Text + optional in-progress RunPill side-by-side */
+.taskRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.taskText {
+  font-size: 12px;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.taskArtifact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.artName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deps {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.depBadge {
+  font: 9px/1 var(--font-family-mono, monospace);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface2, var(--bg-surface0));
+  color: var(--text-muted);
+}
+
+.depBadge[data-status='done']   { color: var(--green, #4caf50); }
+.depBadge[data-status='failed'],
+.depBadge[data-status='blocked']{ color: var(--red, #e05a5a); }
