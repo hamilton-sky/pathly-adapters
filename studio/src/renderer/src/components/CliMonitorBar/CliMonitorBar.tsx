@@ -20,7 +20,15 @@ function fmtAgo(ms: number): string {
 function SessionRow({ session, expanded, onToggle }: { session: CliSession; expanded: boolean; onToggle: () => void }): JSX.Element {
   const { tab, elapsedS, lastLines } = session
   const adapter = (tab.kind ?? 'claude') as CliAdapter
-  const handleStop = () => { void window.pathly.terminal.kill(tab.id) }
+  // Mirror the MD-editor pill's stopRun: close the tab synchronously rather than wait for onExit —
+  // a force-killed PTY (taskkill /T /F) may never deliver a clean exit event, so without this the
+  // tab stays status:'running' and the row (plus its timer and the editor pill) spins forever.
+  // updateTabStatus('done') must precede closeTab so the run is snapshotted into RECENT.
+  const handleStop = () => {
+    void window.pathly.terminal.kill(tab.id)
+    useTerminalStore.getState().updateTabStatus(tab.id, 'done')
+    useTerminalStore.getState().closeTab(tab.id)
+  }
   const handleOpen = () => { useTerminalStore.getState().openTab(tab.id) }
 
   return (
