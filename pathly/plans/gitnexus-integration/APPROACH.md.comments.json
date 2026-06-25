@@ -1,0 +1,31 @@
+{
+  "comments": [
+    {
+      "id": "c-mqsh5r0j-9iqy",
+      "lineNumber": 1,
+      "lineText": "GitNexus (https://github.com/abhigyanpatwari/GitNexus) is a codebase knowledge graph that parses any repo with Tree-sitt",
+      "body": "hi there",
+      "resolved": false,
+      "createdAt": "2026-06-24T19:37:05.539Z",
+      "color": "blue"
+    },
+    {
+      "id": "c-mqsh6sk9-0qk8",
+      "lineNumber": 1,
+      "lineText": "scout, quick, explorer) structural codebase awareness without the token cost of repeated grep/read cycles. GitNexus is p",
+      "body": "sdfssaeaersd",
+      "resolved": false,
+      "createdAt": "2026-06-24T19:37:54.201Z",
+      "color": "yellow"
+    },
+    {
+      "id": "c-mqsh77zz-xkf1",
+      "lineNumber": 1,
+      "lineText": "uery\tGrep\nUnderstand a function (callers, callees, deps)\tgitnexus_get_context\tRead + Grep\nTrace execution path end-to-en",
+      "body": "n n n n n n n",
+      "resolved": false,
+      "createdAt": "2026-06-24T19:38:14.207Z",
+      "color": "purple"
+    }
+  ]
+}
