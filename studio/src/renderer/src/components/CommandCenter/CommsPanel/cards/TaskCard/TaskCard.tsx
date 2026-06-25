@@ -39,7 +39,9 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
       />
       <div className={s.taskMain}>
         <div className={s.taskRow}>
-          <MarkdownRenderer content={t.text} className={s.taskText} />
+          <div className={s.taskText} title={t.text}>
+            <MarkdownRenderer content={t.text} className={s.taskMd} />
+          </div>
           {status === 'in_progress' && (
             <RunPill size="sm" state="running" idleLabel="In progress" disabled />
           )}

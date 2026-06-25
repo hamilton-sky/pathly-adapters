@@ -42,7 +42,9 @@ export function EditableGoalTitle({ text, onSave }: Props): JSX.Element {
 
   return (
     <div className={s.titleView}>
-      <MarkdownRenderer content={text} className={s.goalText} />
+      <div className={s.goalText} title={text}>
+        <MarkdownRenderer content={text} className={s.goalMd} />
+      </div>
       <Tooltip label="Edit goal" placement="top">
         <button
           type="button"

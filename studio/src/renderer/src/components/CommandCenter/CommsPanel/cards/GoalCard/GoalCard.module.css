@@ -5,17 +5,49 @@
   background: var(--bg-surface0);
   min-width: 0;
   overflow: hidden;
+  /* overflow:hidden collapses a flex item's auto min-height to 0, which let the
+     parent scroll column SHRINK this card to fit and clip its own tasks instead
+     of overflowing. flex-shrink:0 keeps the card at full height so the board
+     scrolls (matching the messages/artifacts views). */
+  flex-shrink: 0;
 }
 
 /* Padding matches the message/artifact card (.msgCard: 11px 14px) so a goal card
    reads as the same card primitive. */
 .header {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
   padding: 11px 14px;
   min-width: 0;
+}
+
+/* Row 1: collapse chevron + clamped title + delete. The title gets the full
+   width so it can never be squeezed by the controls (which now live on row 2). */
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Row 2: task rollup (left) + executor/Run controls (right). Wraps when narrow
+   instead of crushing the title. */
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 10px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 /* Trash affordance — mirrors the message card's .msgDel (muted → red on hover). */
@@ -50,24 +82,13 @@
 
 .collapse:hover { color: var(--text-primary); }
 
-.headerMain {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.goalText {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  min-width: 0;
-}
-
 .rollup {
   font: 10.5px/1.3 var(--font-family-mono, monospace);
   color: var(--text-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Task list ──────────────────────────────────────────── */
@@ -91,6 +112,34 @@
   align-items: flex-start;
   gap: 5px;
   min-width: 0;
+  flex: 1;
+}
+
+/* The goal title: clamp to 2 lines so a long description never becomes a wall of
+   text. Full text stays available via the native tooltip (title attr) and edit. */
+.goalText {
+  flex: 1;
+  min-width: 0;
+  font: 600 13px/1.4 var(--font-family-base);
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+
+/* Neutralize markdown block spacing and inline the content so -webkit-line-clamp
+   counts wrapped lines correctly (Chromium / Electron). */
+.goalMd,
+.goalText p {
+  display: inline;
+}
+
+.goalText p {
+  margin: 0;
 }
 
 .titleEditBtn {

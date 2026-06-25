@@ -40,10 +40,30 @@
   min-width: 0;
 }
 
+/* Clamp the task text to 2 lines so a long phase description stays a compact row
+   (full text on hover via title attr). Keeps the DAG browsable / scrollable. */
 .taskText {
-  font-size: 12px;
-  color: var(--text-primary);
+  flex: 1;
   min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+
+.taskMd,
+.taskText p {
+  display: inline;
+}
+
+.taskText p {
+  margin: 0;
 }
 
 .taskArtifact {

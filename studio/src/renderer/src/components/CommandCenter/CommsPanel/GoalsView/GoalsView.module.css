@@ -7,6 +7,26 @@
   min-height: 0;
   overflow-y: auto;
   flex: 1;
+  /* Make the scroll affordance discoverable (was effectively invisible). */
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-disabled) transparent;
+}
+
+.view::-webkit-scrollbar {
+  width: 8px;
+}
+
+.view::-webkit-scrollbar-thumb {
+  background: var(--text-disabled);
+  border-radius: 4px;
+}
+
+.view::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.view::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .empty {

@@ -27,38 +27,44 @@ export function GoalCardHeader({ goal, tasks, open, onToggle, onEditGoal, onDele
   const [confirming, setConfirming] = useState(false)
   return (
     <div className={s.header}>
-      <Tooltip label={open ? 'Collapse goal' : 'Expand goal'} placement="top">
-        <button
-          type="button"
-          className={s.collapse}
-          onClick={onToggle}
-          {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-          aria-label={open ? 'Collapse goal' : 'Expand goal'}
-        >
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
-      </Tooltip>
-      <div className={s.headerMain}>
+      {/* Row 1 — collapse + title (full width) + delete */}
+      <div className={s.titleRow}>
+        <Tooltip label={open ? 'Collapse goal' : 'Expand goal'} placement="top">
+          <button
+            type="button"
+            className={s.collapse}
+            onClick={onToggle}
+            {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+            aria-label={open ? 'Collapse goal' : 'Expand goal'}
+          >
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+        </Tooltip>
         <EditableGoalTitle text={goal.text} onSave={(t) => onEditGoal(goal.id, t)} />
-        <div className={s.rollup}>
+        <Tooltip label="Delete goal" placement="top">
+          <button
+            type="button"
+            className={s.goalDel}
+            aria-label="Delete goal"
+            onClick={() => setConfirming(true)}
+          >
+            <Trash2 size={13} />
+          </button>
+        </Tooltip>
+      </div>
+      {/* Row 2 — task rollup + executor/Run controls (wrap, never crush the title) */}
+      <div className={s.metaRow}>
+        <span className={s.rollup}>
           {r.total} task{r.total !== 1 ? 's' : ''} · {r.done} done · {r.ready} ready
           {r.failed > 0 ? ` · ${r.failed} blocked` : ''}
+        </span>
+        <div className={s.controls}>
+          {/* No tasks yet → Decompose the goal into a DAG; once it has tasks → Run it. */}
+          {tasks.length === 0
+            ? <GoalDecomposeButton goalId={goal.id} />
+            : <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />}
         </div>
       </div>
-      {/* No tasks yet → Decompose the goal into a DAG; once it has tasks → Run it. */}
-      {tasks.length === 0
-        ? <GoalDecomposeButton goalId={goal.id} />
-        : <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />}
-      <Tooltip label="Delete goal" placement="top">
-        <button
-          type="button"
-          className={s.goalDel}
-          aria-label="Delete goal"
-          onClick={() => setConfirming(true)}
-        >
-          <Trash2 size={13} />
-        </button>
-      </Tooltip>
       {confirming && (
         <ConfirmModal
           title="Delete this goal?"
