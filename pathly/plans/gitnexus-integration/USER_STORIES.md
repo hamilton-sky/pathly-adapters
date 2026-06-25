@@ -7,11 +7,11 @@
 **Why:** Avoids repeated Grep/Read cycles for symbol lookups and call-chain traces, reducing token cost and increasing structural accuracy.
 
 **Acceptance criteria:**
-- `src/pathly_data/core/agents/research/scout.md` contains a `## Tool preference — GitNexus first, Grep/Read fallback` section positioned after `## Output format` and before `## Hard constraints — READ ONLY`.
+- `src/pathly_data/core/agents/research/scout.md` contains a `## Code intelligence — preferred tools, Grep/Read fallback` section positioned after `## Output format` and before `## Hard constraints — READ ONLY`.
 - That section lists the three tools (`gitnexus_query`, `gitnexus_get_context`, `gitnexus_get_call_chain`) and their native fallbacks (`Grep`, `Read + Grep`, `Read chains`) in the exact format specified in `APPROACH.md`.
 - `src/pathly_data/adapters/claude/_meta/scout.yaml` `tools:` list is `[Read, Glob, Grep, gitnexus_query, gitnexus_get_context, gitnexus_get_call_chain]`.
 - Running `pathly-setup claude --apply` succeeds without error after the changes.
-- The installed agent file at `~/.claude/agents/scout.md` contains the `## Tool preference` section and the updated `tools:` frontmatter.
+- The installed agent file at `~/.claude/agents/scout.md` contains the `## Code intelligence` section and the updated `tools:` frontmatter.
 
 **Delivered by:** Conversation 1, Phase 1.
 
@@ -24,7 +24,7 @@
 **Why:** GitNexus lookups count as one tool call each, fitting within the quick agent's 2-call budget while returning richer structural context.
 
 **Acceptance criteria:**
-- `src/pathly_data/core/agents/support/quick.md` contains a `## Tool preference — GitNexus first, Grep/Read fallback` section positioned after `## Role lens` and before `## Called by skill orchestrators`.
+- `src/pathly_data/core/agents/support/quick.md` contains a `## Code intelligence — preferred tools, Grep/Read fallback` section positioned after `## Role lens` and before `## Called by skill orchestrators`.
 - That section explicitly notes that each GitNexus call counts as 1 tool call and lists `gitnexus_query` and `gitnexus_get_context` with their fallbacks.
 - `src/pathly_data/adapters/claude/_meta/quick.yaml` `tools:` list is `[Read, Glob, Grep, gitnexus_query, gitnexus_get_context]`.
 - Running `pathly-setup claude --apply` succeeds without error.
@@ -41,7 +41,7 @@
 **Why:** Explorer is the only role that performs blast-radius analysis; `gitnexus_impact_analysis` gives it graph-based change impact that Grep alone cannot provide.
 
 **Acceptance criteria:**
-- `src/pathly_data/core/agents/research/explorer.md` contains a `## Tool preference — GitNexus first, Grep/Read fallback` section positioned after `## Output format` and before `## Information gathering — sub-agents`.
+- `src/pathly_data/core/agents/research/explorer.md` contains a `## Code intelligence — preferred tools, Grep/Read fallback` section positioned after `## Output format` and before `## Information gathering — sub-agents`.
 - The section lists all four tools, notes that `gitnexus_impact_analysis` is explorer-only, and includes the scout-inheritance note.
 - `src/pathly_data/adapters/claude/_meta/explorer.yaml` `tools:` list is `[Read, Glob, Grep, Write, gitnexus_query, gitnexus_get_context, gitnexus_get_call_chain, gitnexus_impact_analysis]`.
 - Running `pathly-setup claude --apply` succeeds without error.

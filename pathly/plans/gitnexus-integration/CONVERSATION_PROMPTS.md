@@ -27,7 +27,7 @@ triple-backtick on the "Ambiguities" block) and the `## Hard constraints — REA
 Do not modify any existing content.
 
 ```
-## Tool preference — GitNexus first, Grep/Read fallback
+## Code intelligence — preferred tools, Grep/Read fallback
 
 When GitNexus MCP tools are available, prefer them over native tools:
 - Find a symbol or pattern         → gitnexus_query          (fallback: Grep)
@@ -51,7 +51,7 @@ Insert the following new section between the closing line of the `## Role lens` 
 closing table row for `tester`) and the `## Called by skill orchestrators` heading.
 
 ```
-## Tool preference — GitNexus first, Grep/Read fallback
+## Code intelligence — preferred tools, Grep/Read fallback
 
 Prefer GitNexus tools when available — they count as 1 tool call each:
 - Symbol lookup    → gitnexus_query or gitnexus_get_context  (fallback: Grep or Read)
@@ -74,7 +74,7 @@ table (line 101 in the current file) and the `## Information gathering — sub-a
 (line 103). Insert AFTER the `---` divider on line 101.
 
 ```
-## Tool preference — GitNexus first, Grep/Read fallback
+## Code intelligence — preferred tools, Grep/Read fallback
 
 When GitNexus MCP tools are available, prefer them over Read/Grep for:
 - Symbol and pattern search         → gitnexus_query
@@ -100,9 +100,9 @@ pathly-setup claude --apply
 ```
 
 Then verify:
-1. Open `~/.claude/agents/scout.md`. The YAML frontmatter must contain all six tools. The body must contain the `## Tool preference` section.
-2. Open `~/.claude/agents/quick.md`. The YAML frontmatter must contain five tools. The body must contain the `## Tool preference` section.
-3. Open `~/.claude/agents/explorer.md`. The YAML frontmatter must contain all eight tools. The body must contain the `## Tool preference` section.
+1. Open `~/.claude/agents/scout.md`. The YAML frontmatter must contain all six tools. The body must contain the `## Code intelligence` section.
+2. Open `~/.claude/agents/quick.md`. The YAML frontmatter must contain five tools. The body must contain the `## Code intelligence` section.
+3. Open `~/.claude/agents/explorer.md`. The YAML frontmatter must contain all eight tools. The body must contain the `## Code intelligence` section.
 4. Run `python -m pytest tests/ -q` and confirm it passes.
 
 ### Constraints

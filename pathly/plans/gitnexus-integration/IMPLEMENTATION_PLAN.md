@@ -23,7 +23,7 @@ Files:
 - `src/pathly_data/adapters/claude/_meta/scout.yaml`
 
 Changes:
-1. In `scout.md`, insert a new `## Tool preference — GitNexus first, Grep/Read fallback` section between the closing line of `## Output format` and the `## Hard constraints — READ ONLY` heading. Use the exact block from `APPROACH.md`:
+1. In `scout.md`, insert a new `## Code intelligence — preferred tools, Grep/Read fallback` section between the closing line of `## Output format` and the `## Hard constraints — READ ONLY` heading. Use the exact block from `APPROACH.md`:
    - `gitnexus_query` → fallback: Grep
    - `gitnexus_get_context` → fallback: Read + Grep
    - `gitnexus_get_call_chain` → fallback: Read chains
@@ -38,7 +38,7 @@ Files:
 - `src/pathly_data/adapters/claude/_meta/quick.yaml`
 
 Changes:
-1. In `quick.md`, insert a new `## Tool preference — GitNexus first, Grep/Read fallback` section between the closing line of `## Role lens` table and the `## Called by skill orchestrators` heading. Content from `APPROACH.md`:
+1. In `quick.md`, insert a new `## Code intelligence — preferred tools, Grep/Read fallback` section between the closing line of `## Role lens` table and the `## Called by skill orchestrators` heading. Content from `APPROACH.md`:
    - Note that GitNexus calls count as 1 tool call each.
    - `gitnexus_query` or `gitnexus_get_context` → fallback: Grep or Read
    - Closing note: if not available, proceed with Grep and Read as normal.
@@ -52,7 +52,7 @@ Files:
 - `src/pathly_data/adapters/claude/_meta/explorer.yaml`
 
 Changes:
-1. In `explorer.md`, insert a new `## Tool preference — GitNexus first, Grep/Read fallback` section between the closing `---` divider after `## Output format` and the `## Information gathering — sub-agents` heading. Content from `APPROACH.md`:
+1. In `explorer.md`, insert a new `## Code intelligence — preferred tools, Grep/Read fallback` section between the closing `---` divider after `## Output format` and the `## Information gathering — sub-agents` heading. Content from `APPROACH.md`:
    - `gitnexus_query` for symbol/pattern search
    - `gitnexus_get_context` for understanding a function
    - `gitnexus_get_call_chain` for tracing execution paths
@@ -70,9 +70,9 @@ pathly-setup claude --apply
 ```
 
 Verify:
-- `~/.claude/agents/scout.md` frontmatter contains all six tool names and body contains `## Tool preference` section.
-- `~/.claude/agents/quick.md` frontmatter contains five tool names and body contains `## Tool preference` section.
-- `~/.claude/agents/explorer.md` frontmatter contains all eight tool names and body contains `## Tool preference` section.
+- `~/.claude/agents/scout.md` frontmatter contains all six tool names and body contains `## Code intelligence` section.
+- `~/.claude/agents/quick.md` frontmatter contains five tool names and body contains `## Code intelligence` section.
+- `~/.claude/agents/explorer.md` frontmatter contains all eight tool names and body contains `## Code intelligence` section.
 - `python -m pytest tests/ -q` passes.
 
 **Note on codex/copilot/antigravity:** These adapters do NOT use `tools:` lists in their `_meta/` YAMLs. Do not add GitNexus tools to those adapters in this conversation — the core prompt change propagates to all adapters via their agent files, but tool exposure is Claude-only.
