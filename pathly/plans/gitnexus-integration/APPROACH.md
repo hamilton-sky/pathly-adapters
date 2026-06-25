@@ -15,12 +15,14 @@ Give Pathly's read-only research agents (scout, quick, explorer) structural code
 without the token cost of repeated grep/read cycles. GitNexus is preferred when available;
 agents fall back to native tools (Grep, Read) when it is not.
 
-> **MCP-delivery fork.** This plan is **Approach A** — register an MCP server in the host CLI
-> and let the agent call it (tool-level, agent-driven; works in interactive + runner; relies on
-> host MCP support). The complementary **Approach B** — Pathly queries the code-intel backend
-> itself and injects the result into runner-mode prompts (host-agnostic, deterministic) — lives
-> in [`../code-context-injection/APPROACH.md`](../code-context-injection/APPROACH.md). They
-> compose; A is required for interactive mode.
+> **MCP-delivery fork (three surfaces).** This plan is **Approach A** — register an MCP server in
+> the host CLI and let the agent call it (agent-driven; interactive + runner; relies on host MCP
+> support; no Pathly dependency). The complements:
+> **B** — Pathly injects code context into runner prompts (deterministic, host-agnostic, runner-only):
+> [`../code-context-injection/APPROACH.md`](../code-context-injection/APPROACH.md).
+> **C** — agent asks Pathly over HTTP and Pathly proxies the query (adaptive, interactive + runner,
+> all roles): [`../code-intel-proxy/APPROACH.md`](../code-intel-proxy/APPROACH.md).
+> B and C share one backend; A is independent. They compose; A is one way to get interactive.
 
 ---
 

@@ -27,9 +27,11 @@ are wired here.)
 
 ## Goal
 
-> **MCP-delivery fork.** Like gitnexus-integration, this is **Approach A** (host MCP install,
-> agent-driven). The complementary **Approach B** (Pathly-native context injection, host-agnostic)
-> is in [`../code-context-injection/APPROACH.md`](../code-context-injection/APPROACH.md).
+> **MCP-delivery fork (three surfaces).** Like gitnexus-integration, this is **Approach A** (host
+> MCP install, agent-driven). Complements: **B** Pathly-native context injection (runner,
+> deterministic) — [`../code-context-injection/APPROACH.md`](../code-context-injection/APPROACH.md);
+> **C** Pathly HTTP proxy gateway (interactive + runner, adaptive, all roles) —
+> [`../code-intel-proxy/APPROACH.md`](../code-intel-proxy/APPROACH.md). B and C share one backend.
 
 Give Pathly's read-only research agents (scout, quick, explorer) **precise, always-fresh**
 structural code awareness via LSP. LSP is the right tool when correctness on a *specific

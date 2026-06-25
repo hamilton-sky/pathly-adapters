@@ -2,13 +2,21 @@
 
 ## What this is
 
-This is **Approach B** of the MCP-delivery fork. The other two plans
-([gitnexus-integration](../gitnexus-integration/APPROACH.md),
-[lsp-integration](../lsp-integration/APPROACH.md)) are **Approach A**: register an MCP server
-in each host CLI's config and let the *agent* decide to call it. This plan is the complement:
-**Pathly itself queries a code-intelligence backend during runner-mode prompt assembly and
-injects the structural facts (blast radius, call chains, references) directly into the agent
-prompt** — the agent receives pre-computed context instead of a tool to call.
+This is **Approach B** of the MCP-delivery fork. The plans
+[gitnexus-integration](../gitnexus-integration/APPROACH.md) and
+[lsp-integration](../lsp-integration/APPROACH.md) are **Approach A**: register an MCP server
+in each host CLI's config and let the *agent* decide to call it.
+[code-intel-proxy](../code-intel-proxy/APPROACH.md) is **Approach C**: the agent asks Pathly over
+HTTP and Pathly proxies the query. This plan (B) is the third surface: **Pathly itself queries a
+code-intelligence backend during runner-mode prompt assembly and injects the structural facts
+(blast radius, call chains, references) directly into the agent prompt** — the agent receives
+pre-computed context instead of a tool to call.
+
+> **B and C share one backend.** Both consume the `runner/code_context` provider defined here
+> (`none | cli | mcp-client` + content-hash cache + backend routing). B *pre-injects* its output
+> into the prompt (deterministic, runner-only); C *serves* it on demand over HTTP (adaptive,
+> interactive + runner, all roles). Building this backend serves both — see
+> [code-intel-proxy](../code-intel-proxy/APPROACH.md).
 
 ```
 APPROACH A — host MCP install (gitnexus/lsp plans)     "tool-level / agent-driven"
@@ -43,6 +51,12 @@ context is present and works even on hosts with no MCP support.
 This plan is the concrete answer to gitnexus-integration's open question *"Antigravity MCP
 support needs verification"* — under Approach B, antigravity needs no MCP support at all.
 
+**Approach C ([code-intel-proxy](../code-intel-proxy/APPROACH.md))** adds the one thing B can't do:
+serve this same backend *on demand over HTTP*, so the agent gets adaptive code intelligence in
+**interactive** mode too, for **all** roles. B (deterministic pre-injection) and C (adaptive proxy)
+are two outlets of the same backend; A (host MCP, no Pathly dependency) is the third, independent
+path. Pick per need; they compose.
+
 ---
 
 ## Goal
@@ -71,10 +85,12 @@ SOLID file rules (one concern per file, ≤400 lines).
                                                                      gitnexus/serena (reuse A's servers)
 ```
 
-- **`runner/code_context.py` (NEW)** — owns the one concern: "given files in scope, return an
-  advisory structure block." Pure orchestration: pick backend → query → summarize → budget.
-  Mirrors `comms_context.retrieve_board_context`'s contract: **never raises; returns `""` on any
-  failure** (the "never break the prompt" idiom, F9 in the context-retrieval spec).
+- **`runner/code_context.py` (NEW — the shared backend)** — owns the one concern: "given files in
+  scope, return an advisory structure block." Pure orchestration: pick backend → query → summarize
+  → budget. Mirrors `comms_context.retrieve_board_context`'s contract: **never raises; returns `""`
+  on any failure** (the "never break the prompt" idiom, F9 in the context-retrieval spec).
+  **Approach C consumes this same module** through its `POST /code/query` route — B pre-injects its
+  output, C serves it on demand.
 - **`CodeContextProvider` interface** with three backends:
   - `none` — default; returns `""`. Pathly ships safe-off.
   - `cli` — shells out to the tool's CLI (e.g. `serena find_referencing_symbols --name X`,
