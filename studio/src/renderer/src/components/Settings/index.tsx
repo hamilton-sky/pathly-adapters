@@ -6,7 +6,6 @@ import { paletteLabels } from '../../theme'
 import { PaletteSwatch } from './PaletteSwatch'
 import { RadioCard } from './RadioCard'
 import { NotificationSettings } from './NotificationSettings'
-import { SummarySettings } from './SummarySettings'
 import { ExportSettings } from './ExportSettings'
 import s from './Settings.module.css'
 
@@ -161,7 +160,6 @@ export function Settings(): JSX.Element {
           </div>
         </div>
 
-        <SummarySettings />
         <ExportSettings />
         <NotificationSettings />
 

@@ -82,12 +82,15 @@ def comms_attach():
                     summary=row["text"],
                     created_by=row["from_agent"],
                 )
+                _ascope = row.get("scope", "") or ""
                 try:
+                    # Section indexing STAYS (server-side, no inference). Summarization
+                    # is CLIENT-side (unified-ai-routing), so pass summarize=False —
+                    # no in-process inference fires here.
                     from pathly_orchestrator.runner.hydrate import (
                         index_artifact_async as _index_async,
                     )
 
-                    _ascope = row.get("scope", "")
                     _index_async(
                         art_id,
                         artifact_path,
@@ -96,6 +99,27 @@ def comms_attach():
                     )
                 except Exception:
                     logging.debug("index_artifact_async (attach) failed", exc_info=True)
+
+                # Emit a summary_request over the comms SSE so the subscribed renderer
+                # runs aiRouter + writes the result back. Server runs no inference.
+                try:
+                    from ._summary_request import (
+                        emit_summary_request as _emit_summary_req,
+                    )
+
+                    _emit_summary_req(
+                        conn,
+                        artifact_id=art_id,
+                        artifact_path=artifact_path,
+                        artifact_type=artifact_type
+                        if isinstance(artifact_type, str)
+                        else None,
+                        scope=_ascope,
+                        summary_backend=None,
+                        broadcast_fn=lambda _p: _broadcast_comms(_ascope, _p),
+                    )
+                except Exception:
+                    logging.debug("emit_summary_request (attach) failed", exc_info=True)
             except Exception:
                 logging.debug("comms_artifacts insert (attach) failed", exc_info=True)
 
@@ -169,80 +193,6 @@ def comms_artifacts():
         )
     except Exception as exc:
         logging.exception("comms_artifacts error")
-        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
-
-
-# API summary engines run in-process (async, silent). CLI engines (claude/codex/…)
-# need the terminal-spawn path and are not driven through this route yet.
-_API_SUMMARY_ENGINES = {"ollama", "haiku"}
-
-
-@bp.route("/comms/artifacts/<artifact_id>/summarize", methods=["POST"])
-def comms_artifact_summarize(artifact_id: str):
-    """Trigger an on-demand summary of an artifact with a chosen engine (manual
-    per-card Summarize). Async + best-effort: returns 202 immediately; the
-    `summarizing` / `summary_ready` / `summary_failed` COMMS_UPDATE signals carry
-    the outcome. `engine` is optional — omit to use the global default backend."""
-    try:
-        from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.runner.hydrate import _schedule_resummarize_async
-
-        data = request.get_json(silent=True) or {}
-        engine = (data.get("engine") or "").strip().lower() or None
-        if engine == "minilm":
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "engine 'minilm' is off — produces no summary",
-                    }
-                ),
-                400,
-            )
-        if engine is not None and engine not in _API_SUMMARY_ENGINES:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": f"engine {engine!r} is not an in-process API engine "
-                        f"(supported: {sorted(_API_SUMMARY_ENGINES)}; CLI engines use the terminal path)",
-                    }
-                ),
-                400,
-            )
-
-        conn = _get_db()
-        row = conn.execute(
-            "SELECT a.id, m.scope FROM comms_artifacts a "
-            "JOIN comms_messages m ON m.id = a.message_id "
-            "WHERE a.id=? AND m.deleted_at IS NULL",
-            (artifact_id,),
-        ).fetchone()
-        if row is None:
-            return jsonify({"ok": False, "error": "artifact not found"}), 404
-        scope = row["scope"] or ""
-
-        # embed_summary=True so a successful summary also feeds the 💡 channel (§3a),
-        # matching the upload path. The async worker emits the lifecycle signals.
-        _schedule_resummarize_async(
-            artifact_id,
-            backend=engine,  # None ⇒ global default
-            broadcast_fn=lambda _p: _broadcast_comms(scope, _p),
-            embed_summary=True,
-        )
-        return (
-            jsonify(
-                {
-                    "ok": True,
-                    "artifact_id": artifact_id,
-                    "engine": engine or "default",
-                    "status": "summarizing",
-                }
-            ),
-            202,
-        )
-    except Exception as exc:
-        logging.exception("comms_artifact_summarize error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

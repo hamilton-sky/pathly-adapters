@@ -154,8 +154,7 @@ pathly_orchestrator/
     embeddings.py          # warm()/embed() — local embedding model for comms hybrid search
     comms_context.py       # assembles board context (🔒 governance + 📎 referenced + 💡 semantic, relevance-gated)
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
-    hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager)
-    inference.py           # offline artifact summarizer (minilm/ollama/haiku) — fills INDEX-tier summaries (opt-in)
+    hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses

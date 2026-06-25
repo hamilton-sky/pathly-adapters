@@ -289,7 +289,7 @@ CREATE INDEX IF NOT EXISTS idx_comms_artifacts_path ON comms_artifacts(path);
 -- Section index: one row per heading-delimited section of a .md artifact.
 -- anchor is the slug (§3.1 algorithm) or explicit pathly:anchor id.
 -- line_start/line_end are 1-based inclusive; rebuilt on content change (§3.4).
--- summary is INDEX-tier (filled by inference service, Phase 4); stays NULL until then.
+-- summary is filled CLIENT-side via the AI Router (unified-ai-routing); NULL until summarized.
 CREATE TABLE IF NOT EXISTS comms_artifact_sections (
     id            TEXT PRIMARY KEY,
     artifact_id   TEXT NOT NULL,
@@ -427,6 +427,10 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("comms_artifacts", "indexed_mtime", "REAL"),
         ("comms_artifacts", "indexed_hash", "TEXT"),
         ("comms_artifacts", "indexed_structure_key", "TEXT"),
+        # unified-ai-routing (Conv 3): per-artifact AI target for client-side
+        # summarization. JSON-encoded AiSelection {"type":"model"|"engine","id":...}.
+        # Nullable → the artifact falls back to the app-default selection.
+        ("comms_artifacts", "summary_selection", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

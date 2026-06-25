@@ -1,0 +1,82 @@
+// aiRouter — the single dispatch point that turns an AiSelection (a model or a
+// CLI engine) plus an AiJob into an AiResult. It is the layer above the two leaf
+// services: modelManager (local models / Brightsky) and cliEngine (headless CLI
+// argv). UI consumers (HQ, ArtifactsView) call runJob and never touch the
+// transports directly.
+//
+// Plain service module — no React. Engine dispatch reuses the exact PTY one-shot
+// mechanism proven in MarkdownEditor/.../useEditorAgentActions.ts: subscribe to
+// terminal.onExit BEFORE spawning, only react to our own tabId, unsubscribe once.
+
+import { runModel } from './modelManager'
+import { buildHeadlessArgv, type CliAdapter } from './cliEngine'
+import { useProjectStore } from '../store/projectStore'
+
+export type AiSelection = { type: 'model' | 'engine'; id: string }
+export interface AiJob {
+  kind: 'summarize' | 'generic'
+  prompt: string
+  cwd?: string
+}
+export interface AiResult {
+  text: string
+  cost_usd?: number
+}
+
+/**
+ * Sentinel meaning "no AI target". AiTargetSelector emits this when allowOff is
+ * on and the user picks "Off". runJob does NOT accept it — consumers must check
+ * for it and skip the run. Exported so consumers compare against one value.
+ */
+export const AI_SELECTION_OFF: AiSelection = { type: 'model', id: '__off__' }
+export const isOff = (sel: AiSelection | null): boolean =>
+  sel != null && sel.type === AI_SELECTION_OFF.type && sel.id === AI_SELECTION_OFF.id
+
+/** Project root used as the spawn cwd when the job doesn't pin its own. */
+function defaultCwd(): string {
+  return useProjectStore.getState().projectPath || '.'
+}
+
+/**
+ * Spawn a CLI engine headless one-shot and resolve with its stdout tail.
+ * Mirrors the lifecycle care in useEditorAgentActions: the onExit subscription
+ * is installed before spawn, ignores other tabs' exits, and is torn down exactly
+ * once on either the exit path or a spawn-time throw.
+ */
+function runEngine(adapter: CliAdapter, prompt: string, cwd: string): Promise<AiResult> {
+  const argv = buildHeadlessArgv(adapter, prompt)
+  const tabId = `airouter-${adapter}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+  return new Promise<AiResult>((resolve, reject) => {
+    let settled = false
+    const unsubscribe = window.pathly.terminal.onExit(
+      (exitedTabId: string, exitCode?: number, tail?: string) => {
+        if (exitedTabId !== tabId || settled) return
+        settled = true
+        unsubscribe()
+        if (exitCode && exitCode !== 0) {
+          reject(new Error(tail?.trim() || `${adapter} exited with code ${exitCode}`))
+        } else {
+          resolve({ text: tail ?? '' })
+        }
+      },
+    )
+    window.pathly.terminal.spawn(tabId, cwd, undefined, argv).catch((e: unknown) => {
+      if (settled) return
+      settled = true
+      unsubscribe()
+      reject(e instanceof Error ? e : new Error(String(e)))
+    })
+  })
+}
+
+/** Dispatch a job to either a local model or a CLI engine, per the selection. */
+export async function runJob(job: AiJob, selection: AiSelection): Promise<AiResult> {
+  if (isOff(selection)) {
+    throw new Error('aiRouter.runJob called with the Off sentinel; consumers must skip Off')
+  }
+  if (selection.type === 'model') {
+    return runModel(selection.id, job.prompt)
+  }
+  return runEngine(selection.id as CliAdapter, job.prompt, job.cwd ?? defaultCwd())
+}

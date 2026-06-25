@@ -143,6 +143,8 @@ export interface ArtifactRow {
   last_edit_by: string | null
   version: number | null
   supersedes: string | null
+  /** JSON-encoded AiSelection {type,id} — the saved per-artifact summary target. */
+  summary_selection?: string | null
 }
 
 /** Fetch the artifacts linked to a message. Returns [] on any failure. */
@@ -239,25 +241,72 @@ export async function apiPostArtifact(
   }
 }
 
-/** Fetch the global summary backend setting. Returns 'minilm' (Off) on any error. */
-export async function apiGetSummaryBackend(): Promise<string> {
+// ── unified-ai-routing (Conv 3): client-side summary + per-artifact target ──
+
+/** AiSelection mirror — kept structural so commsApi doesn't import the service layer. */
+export interface AiSelectionDto {
+  type: 'model' | 'engine'
+  id: string
+}
+
+/**
+ * Write a CLIENT-computed summary back to comms_artifacts (the renderer runs
+ * aiRouter, then posts the text here — the server runs no inference). Pass
+ * `selection` to also persist the target that produced it. Returns true on 2xx.
+ */
+export async function apiSetArtifactSummary(
+  artifactId: string,
+  summary: string,
+  selection?: AiSelectionDto,
+): Promise<boolean> {
   try {
-    const r = await apiFetch('/comms/summary-backend')
-    if (!r.ok) return 'minilm'
-    const json = await r.json() as { backend?: string }
-    return json.backend ?? 'minilm'
+    const r = await apiFetch(`/comms/artifacts/${encodeURIComponent(artifactId)}/summary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary, ...(selection ? { selection } : {}) }),
+    })
+    return r.ok
   } catch {
-    return 'minilm'
+    return false
   }
 }
 
-/** Persist the global summary backend setting. Returns true on success. */
-export async function apiSetSummaryBackend(backend: string): Promise<boolean> {
+/** Persist a per-artifact AI target (so Re-summarize reuses it). Returns true on 2xx. */
+export async function apiSetArtifactSelection(
+  artifactId: string,
+  selection: AiSelectionDto,
+): Promise<boolean> {
   try {
-    const r = await apiFetch('/comms/summary-backend', {
+    const r = await apiFetch(`/comms/artifacts/${encodeURIComponent(artifactId)}/selection`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ backend }),
+      body: JSON.stringify({ selection }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+/** Fetch the app-default summary AiSelection, or null when unset / on error. */
+export async function apiGetDefaultSelection(): Promise<AiSelectionDto | null> {
+  try {
+    const r = await apiFetch('/comms/default-selection')
+    if (!r.ok) return null
+    const json = (await r.json()) as { selection?: AiSelectionDto | null }
+    return json.selection ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Persist the app-default summary AiSelection. Returns true on 2xx. */
+export async function apiSetDefaultSelection(selection: AiSelectionDto): Promise<boolean> {
+  try {
+    const r = await apiFetch('/comms/default-selection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selection }),
     })
     return r.ok
   } catch {

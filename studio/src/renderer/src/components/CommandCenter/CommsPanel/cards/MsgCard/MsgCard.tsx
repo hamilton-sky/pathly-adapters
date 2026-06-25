@@ -5,6 +5,7 @@ import { agentMeta } from '../../../constants'
 import { Avatar } from '../../Avatar/Avatar'
 import { MessageTypeBadge } from '../../MessageTypeBadge/MessageTypeBadge'
 import { CardBody } from './CardBody'
+import { ResummarizeButton } from './ResummarizeButton/ResummarizeButton'
 import { SupersedeMenu } from '../../SupersedeMenu/SupersedeMenu'
 import { ConfirmModal } from '../../../../shared/ConfirmModal/ConfirmModal'
 import { ArtifactModal } from '../../ArtifactModal/ArtifactModal'
@@ -91,6 +92,7 @@ export function MsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSu
               {SUMMARY_LABEL[summaryState]}
             </span>
           )}
+          {m.type === 'artifact' && <ResummarizeButton messageId={m.id} />}
           {m.stage && (
             <span className={s.msgStage} data-stage={m.stage}>{m.stage}</span>
           )}

@@ -7,6 +7,7 @@ export type BoardScope = 'feature' | 'project' | 'global'
 export type MessageType =
   | 'nudge' | 'decision' | 'question' | 'answer' | 'status'
   | 'discovery' | 'warning' | 'escalation' | 'task' | 'artifact' | 'goal'
+  | 'phase'
 
 export type Stage =
   | 'PLANNING' | 'BUILDING' | 'REVIEWING' | 'TESTING' | 'RETRO' | 'DONE'

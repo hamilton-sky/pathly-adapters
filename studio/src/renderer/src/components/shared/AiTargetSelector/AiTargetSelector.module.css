@@ -1,0 +1,71 @@
+/* AiTargetSelector — a grouped native <select> listing Models and CLI Engines.
+   Reuses Studio tokens; data-state drives the availability decoration per
+   DESIGN.md (ready / unavailable / loading). Responsive: width:100%, min-width:0,
+   label truncates with ellipsis. */
+
+.wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.select {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 28px 0 10px;
+  box-sizing: border-box;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font: 400 12.5px/1 var(--font-family-base);
+  cursor: pointer;
+  text-overflow: ellipsis;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+/* Chevron drawn as an inline SVG background so we keep zero inline styles. */
+.wrap::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  width: 10px;
+  height: 6px;
+  pointer-events: none;
+  background: var(--text-muted);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.select:hover {
+  border-color: var(--accent-border, var(--accent));
+}
+
+.select:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.select:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Availability states (DESIGN.md). 'loading' mutes the control during an
+   availability check / in-flight run; 'unavailable' is reserved for callers that
+   pass it through once availability wiring lands. */
+.wrap[data-state='loading'] {
+  opacity: 0.7;
+}
+
+.wrap[data-state='unavailable'] .select {
+  color: var(--text-muted);
+}
+
+.select option:disabled {
+  color: var(--text-muted);
+}

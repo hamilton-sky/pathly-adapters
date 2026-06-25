@@ -3,6 +3,7 @@ import type { BoardScope, Message, MessageType } from '../../types'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useProjectStore } from '../../../../store/projectStore'
 import { PATHLY_API_BASE } from '../../../../lib/config'
+import { handleSummaryRequest } from '../ArtifactsView/handleSummaryRequest'
 
 // Per-section binding: messages for one board scope + send/answer/resolve handlers
 // + a one-shot flash for freshly-posted messages.
@@ -35,8 +36,19 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
       es = new EventSource(`${PATHLY_API_BASE}/events/comms?scope=${encodeURIComponent(key)}`)
       es.onmessage = (e: MessageEvent) => {
         try {
-          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string; goal_id?: string; message_id?: string; error?: string }
+          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string; goal_id?: string; message_id?: string; error?: string; artifact_id?: string; artifact_path?: string; selection?: { type?: string; id?: string } }
           if (data.type === 'COMMS_UPDATE') {
+            // Server-initiated summary handoff (Conv 4): the server emits this
+            // instead of running inference. Run the resolved target client-side and
+            // POST the result back. Best-effort — handleSummaryRequest never throws.
+            if (data.event === 'summary_request') {
+              void handleSummaryRequest({
+                artifact_id: data.artifact_id,
+                artifact_path: data.artifact_path,
+                selection: data.selection,
+              })
+              return
+            }
             // Drive the agent control's run state from the run lifecycle so it stays
             // green (and Stop stays enabled) until the agent actually finishes.
             if (data.event === 'board_run' && data.phase) {

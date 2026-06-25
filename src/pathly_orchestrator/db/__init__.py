@@ -36,8 +36,6 @@ from .queries.catalog_items import (
 from .queries.app_settings import (
     get_board_scope,
     set_board_scope,
-    get_summary_backend,
-    set_summary_backend,
 )
 from .queries.comms import (
     complete_task,
@@ -51,7 +49,6 @@ from .queries.comms import (
     find_or_create_artifact_by_path,
     list_artifacts_catalog,
     update_artifact_summary,
-    update_section_summary,
 )
 
 __all__ = [
@@ -87,8 +84,6 @@ __all__ = [
     "read_catalog_item_by_path",
     "get_board_scope",
     "set_board_scope",
-    "get_summary_backend",
-    "set_summary_backend",
     "complete_task",
     "get_ready_tasks",
     "claim_task",
@@ -100,5 +95,4 @@ __all__ = [
     "find_or_create_artifact_by_path",
     "list_artifacts_catalog",
     "update_artifact_summary",
-    "update_section_summary",
 ]

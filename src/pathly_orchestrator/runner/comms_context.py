@@ -202,6 +202,10 @@ def retrieve_board_context(
             return False
         if msg.get("type", "") == "escalation":
             return False
+        # Conv 6: phase-boundary markers are board observability only — never
+        # inject them into agent prompts (keeps headless CLI-engine prompts lean).
+        if msg.get("type", "") == "phase":
+            return False
         if msg.get("superseded_by"):
             return False
         return True

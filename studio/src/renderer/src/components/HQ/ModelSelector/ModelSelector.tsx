@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { WEB_LLM_MODELS } from '../../../data/models'
+import { MODEL_CATALOG } from '../../../services/modelManager'
 import { useModelStore } from '../../../store/modelStore'
 import { abortLlm, getCachedModelIds, pullOllamaModel, deleteOllamaModel, downloadModel, deleteModel } from '../../../lib/llmBridge'
 import { useBrightskyStore } from '../../../store/brightskyStore'
@@ -37,7 +37,7 @@ export function ModelSelector(): JSX.Element {
   const brightskyAuthError = useBrightskyStore((s) => s.authError)
   const clearBrightskyAuth = useBrightskyStore((s) => s.clearAuth)
 
-  const selectedModel = WEB_LLM_MODELS.find((m) => m.id === selectedModelId)
+  const selectedModel = MODEL_CATALOG.find((m) => m.id === selectedModelId)
   const isBrightsky = selectedModelId === 'brightsky'
   const shortName = isBrightsky ? 'Brightsky' : (selectedModel?.name ?? selectedModelId)
   const ollamaTag = selectedModel?.ollamaId ?? ''
@@ -111,7 +111,7 @@ export function ModelSelector(): JSX.Element {
   }
 
   async function handleCacheToggle(modelId: string): Promise<void> {
-    const model = WEB_LLM_MODELS.find((m) => m.id === modelId)
+    const model = MODEL_CATALOG.find((m) => m.id === modelId)
     const tag = model?.ollamaId ?? ''
     const tagBase = tag.split(':')[0]
     const isGgufCached = cachedModelIds.includes(modelId)
@@ -244,7 +244,7 @@ export function ModelSelector(): JSX.Element {
             onDisconnect={() => { clearBrightskyAuth(); brightskyClient.disconnect() }}
           />
 
-          {WEB_LLM_MODELS.map((model) => {
+          {MODEL_CATALOG.map((model) => {
             const tag = model.ollamaId
             const tagBase = tag.split(':')[0]
             const isGgufCached = cachedModelIds.includes(model.id)

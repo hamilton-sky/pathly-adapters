@@ -1034,8 +1034,8 @@ def update_artifact_summary(
 ) -> None:
     """Overwrite comms_artifacts.summary (and optionally token_count) for artifact_id.
 
-    Called by summarize_async after a generative backend produces a non-None summary.
-    Only fires when summary is non-None — minilm callers never reach this function.
+    The canonical summary writer. Called by the client writeback route
+    (set_artifact_summary in comms_summary.py) after the renderer runs aiRouter.
     """
     with _get_write_lock(conn):
         if token_count is not None:
@@ -1051,19 +1051,3 @@ def update_artifact_summary(
         conn.commit()
 
 
-def update_section_summary(
-    conn: sqlite3.Connection,
-    section_id: str,
-    summary: str,
-) -> None:
-    """Overwrite comms_artifact_sections.summary for section_id.
-
-    Called by _schedule_resummarize_async per-section when a generative backend
-    produces a non-None per-section summary (≤1 sentence).
-    """
-    with _get_write_lock(conn):
-        conn.execute(
-            "UPDATE comms_artifact_sections SET summary=? WHERE id=?",
-            (summary, section_id),
-        )
-        conn.commit()

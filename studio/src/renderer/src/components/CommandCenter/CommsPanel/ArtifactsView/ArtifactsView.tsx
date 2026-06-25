@@ -1,15 +1,11 @@
-import { useState, type DragEvent, type ChangeEvent } from 'react'
+import { useState, type DragEvent } from 'react'
 import { FileText, Upload } from 'lucide-react'
 import type { Message } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../../../types'
+import { AiTargetSelector } from '../../../shared/AiTargetSelector/AiTargetSelector'
+import type { AiSelection } from '../../../../services/aiRouter'
 import { MsgCard } from '../cards/MsgCard/MsgCard'
 import s from './ArtifactsView.module.css'
-
-const LS_KEY = 'pathly.comms.uploadSummary'
-
-function readStoredBackend(): string {
-  try { return localStorage.getItem(LS_KEY) ?? '' } catch { return '' }
-}
 
 interface Props {
   messages: Message[]
@@ -19,6 +15,9 @@ interface Props {
   onDropFiles?: (files: File[]) => void
   /** Project files dragged from the workspace tree — referenced in place (no copy). */
   onDropPaths?: (items: { path: string; name: string }[]) => void
+  /** The AI target used to summarize dropped artifacts (app-default, persisted upstream). */
+  summarySelection: AiSelection | null
+  onSummarySelectionChange: (sel: AiSelection) => void
 }
 
 // The "Artifacts" board view: type='artifact' messages as a filtered card list,
@@ -26,17 +25,16 @@ interface Props {
 // card — board content the evaluator can then read. Two drag sources:
 //   • OS files (from Explorer/Finder) → copied into the feature's artifacts/.
 //   • Workspace-tree files (internal drag, PATHLY_DRAG_MIME) → referenced in place.
-export function ArtifactsView({ messages, onDelete, onSupersede, onDropFiles, onDropPaths }: Props): JSX.Element {
+// The toolbar selector picks the AI target that summarizes each dropped artifact
+// (client-side via aiRouter); "Off" skips summarization. Conv 3 replaced the old
+// localStorage backend dropdown with this unified AiTargetSelector.
+export function ArtifactsView({
+  messages, onDelete, onSupersede, onDropFiles, onDropPaths,
+  summarySelection, onSummarySelectionChange,
+}: Props): JSX.Element {
   const artifacts = messages.filter((m) => m.type === 'artifact')
   const [dragOver, setDragOver] = useState(false)
-  const [uploadBackend, setUploadBackend] = useState<string>(readStoredBackend)
   const canDrop = Boolean(onDropFiles || onDropPaths)
-
-  function handleBackendChange(e: ChangeEvent<HTMLSelectElement>): void {
-    const val = e.target.value
-    setUploadBackend(val)
-    try { localStorage.setItem(LS_KEY, val) } catch { /* storage unavailable */ }
-  }
 
   function handleDrop(e: DragEvent<HTMLDivElement>): void {
     if (!canDrop) return
@@ -75,19 +73,14 @@ export function ArtifactsView({ messages, onDelete, onSupersede, onDropFiles, on
       onDragLeave={handleDragLeave}
     >
       <div className={s.toolbar}>
-        <label className={s.toolbarLabel} htmlFor="av-upload-backend">Upload summary:</label>
-        <select
-          id="av-upload-backend"
-          className={s.backendSelect}
-          aria-label="Per-upload summary backend"
-          value={uploadBackend}
-          onChange={handleBackendChange}
-        >
-          <option value="">Use default</option>
-          <option value="minilm">Off</option>
-          <option value="ollama">Local</option>
-          <option value="haiku">Haiku</option>
-        </select>
+        <label className={s.toolbarLabel} htmlFor="av-summary-target">Summarize with:</label>
+        <AiTargetSelector
+          id="av-summary-target"
+          ariaLabel="Artifact summary AI target"
+          value={summarySelection}
+          onChange={onSummarySelectionChange}
+          allowOff
+        />
       </div>
       {artifacts.length === 0 ? (
         <div className={s.empty}>

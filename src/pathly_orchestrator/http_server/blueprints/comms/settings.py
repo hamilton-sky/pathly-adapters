@@ -108,37 +108,44 @@ def comms_permissions():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
-@bp.route("/comms/summary-backend", methods=["GET"])
-def comms_get_summary_backend():
-    """Return the global offline-summarizer backend."""
+@bp.route("/comms/default-selection", methods=["GET"])
+def comms_get_default_selection():
+    """Return the app-default AI summary target (AiSelection {type,id}) or null.
+
+    unified-ai-routing Conv 3: the client uses this to seed the ArtifactsView
+    AiTargetSelector. null ⇒ the renderer falls back to its built-in default."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import get_summary_backend
+        from pathly_orchestrator.db.queries.app_settings import (
+            get_default_summary_selection,
+        )
 
-        return jsonify({"backend": get_summary_backend(_get_db())}), 200
+        return jsonify({"selection": get_default_summary_selection(_get_db())}), 200
     except Exception as exc:
-        logging.exception("comms_get_summary_backend error")
+        logging.exception("comms_get_default_selection error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
-@bp.route("/comms/summary-backend", methods=["POST"])
-def comms_set_summary_backend():
-    """Set the global offline-summarizer backend."""
+@bp.route("/comms/default-selection", methods=["POST"])
+def comms_set_default_selection():
+    """Persist the app-default AI summary target. Body: {selection: {type,id}}."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import set_summary_backend
+        from pathly_orchestrator.db.queries.app_settings import (
+            set_default_summary_selection,
+        )
 
-        data = request.get_json() or {}
-        backend = data.get("backend", "")
-        if not isinstance(backend, str) or not backend.strip():
-            return jsonify({"error": "Field 'backend' is required"}), 400
+        data = request.get_json(silent=True) or {}
+        selection = data.get("selection")
+        if not isinstance(selection, dict):
+            return jsonify({"error": "Field 'selection' must be an object"}), 400
         try:
-            set_summary_backend(_get_db(), backend)
+            set_default_summary_selection(_get_db(), selection)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        return jsonify({"ok": True, "backend": backend}), 200
+        return jsonify({"ok": True, "selection": selection}), 200
     except Exception as exc:
-        logging.exception("comms_set_summary_backend error")
+        logging.exception("comms_set_default_selection error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 

@@ -1,0 +1,36 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 8px;
+  margin: 1px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-left: 2px solid var(--border);
+  opacity: 0.8;
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.author {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.time {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

@@ -388,6 +388,18 @@ def record_phase_endpoint():
 
         eventlog.append_event(str(feature_dir), event)
 
+        # Conv 6 (unified-ai-routing): mirror the phase boundary onto the feature
+        # board so the Command Center shows live progress in both interactive
+        # (team-http) and headless (supervisor) runs. Best-effort — never blocks.
+        try:
+            from ._phase_board import post_phase_to_board
+
+            post_phase_to_board(
+                feature, data["agent"], phase, event_type, data.get("conv")
+            )
+        except Exception:
+            logging.debug("phase board post failed", exc_info=True)
+
         return jsonify({"status": "recorded"}), 200
     except Exception as e:
         logging.exception("record_phase error")

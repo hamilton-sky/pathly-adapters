@@ -3,6 +3,7 @@ import { Star, MessageSquare, Trash2 } from 'lucide-react'
 import type { BoardScope, Message } from '../../types'
 import { agentMeta } from '../../constants'
 import { MsgCard } from '../cards/MsgCard/MsgCard'
+import { PhaseRow } from '../cards/PhaseRow/PhaseRow'
 import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import s from './CommsMsgList.module.css'
@@ -86,16 +87,20 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
 
       {thread.length > 0
         ? thread.map((m) => (
-          <MsgCard
-            key={m.id}
-            message={m}
-            flash={flashId === m.id}
-            onAnswer={onAnswer}
-            onResolve={onResolve}
-            onDelete={onDelete}
-            onSupersede={onSupersede}
-            siblings={messages}
-          />
+          m.type === 'phase' ? (
+            <PhaseRow key={m.id} message={m} />
+          ) : (
+            <MsgCard
+              key={m.id}
+              message={m}
+              flash={flashId === m.id}
+              onAnswer={onAnswer}
+              onResolve={onResolve}
+              onDelete={onDelete}
+              onSupersede={onSupersede}
+              siblings={messages}
+            />
+          )
         ))
         : (
           <div className={s.empty}>

@@ -4,7 +4,11 @@ hydrate_section  — the primary entry point: resolve/create artifact row,
                    staleness check (mtime→hash→structure_key), ensure index,
                    slice the file, return a {body, status} dict.
 ensure_indexed   — lazy index build (called by hydrate_section and by /section route).
-index_artifact_async — daemon-thread eager indexer, mirrors embed_async.
+index_artifact_async — daemon-thread eager section indexer, mirrors embed_async.
+
+Summarization is CLIENT-side (unified-ai-routing): this module runs NO inference —
+it only builds/refreshes the markdown section index. The stored summary is written by
+the client writeback route and persists across re-indexing.
 
 NEVER raises to the caller — returns a result/status dict for every path.
 .md ONLY (§8 item 0): early-return for non-.md before parsing.
@@ -81,7 +85,8 @@ def ensure_indexed(
     - Non-.md paths: early-return, no parse.
     - Path not on disk: return artifact_not_found.
     - First-time index: find_or_create_artifact_by_path, then parse + store.
-    - Stale (mtime changed): re-parse; schedule async re-derive only on structure_key change.
+    - Stale (mtime changed): re-parse the section index. The stored summary persists
+      until the next client-driven summarize (no server-side re-summarization).
     - Fresh (mtime unchanged): no-op.
 
     Staleness per §3.4: mtime → hash → structure_key, three independent gates.
@@ -111,7 +116,6 @@ def ensure_indexed(
     artifact_id = artifact["id"]
     stored_mtime = artifact.get("indexed_mtime")
     stored_hash = artifact.get("indexed_hash")
-    stored_struct = artifact.get("indexed_structure_key")
 
     try:
         cur_mtime, cur_hash = file_fingerprint(path)
@@ -154,160 +158,7 @@ def ensure_indexed(
     except Exception as exc:
         return {"ok": False, "error": "stale_index", "detail": str(exc)}
 
-    if stored_struct is not None and cur_struct != stored_struct:
-        _schedule_resummarize_async(artifact_id)
-
     return {"ok": True, "artifact_id": artifact_id, "stale_rebuilt": True}
-
-
-def _schedule_resummarize_async(
-    artifact_id: str,
-    backend: str | None = None,
-    broadcast_fn=None,
-    embed_summary: bool = False,
-) -> None:
-    """Schedule async re-summarize of an artifact and its sections on structure change.
-
-    `backend` overrides the summary backend for THIS run (per-upload choice); None
-    falls back to the global app-setting. With the default (minilm/off) summarize
-    returns None → no writeback → behavior byte-identical.
-
-    Called when structure_key changes (heading added/removed/renamed). Fires a daemon
-    thread that reads the artifact row, calls summarize_content for the whole artifact
-    (topic-map) and each section (≤1 sentence), and writes back only when a non-None
-    summary is returned. With backend=minilm (default) summarize_content returns None
-    → no writeback → behavior byte-identical to the Phase 3 stub.
-    """
-
-    def _worker() -> None:
-        try:
-            from pathly_orchestrator.db.connection import get_db
-            from pathly_orchestrator.db.queries.comms import (
-                get_artifact_sections,
-                update_artifact_summary,
-                update_section_summary,
-            )
-            from pathly_orchestrator.runner.inference import (
-                _resolve_backend,
-                summarize_content,
-            )
-
-            conn = get_db()
-            row = conn.execute(
-                "SELECT message_id, path, type FROM comms_artifacts WHERE id=?",
-                (artifact_id,),
-            ).fetchone()
-            if row is None:
-                return
-            message_id = row["message_id"]
-            path = row["path"]
-            artifact_type = row["type"] or "md"
-
-            if not _is_md(path):
-                return
-
-            # Resolve the effective backend up-front. Off (minilm) ⇒ no work and no
-            # signals — keeps the default byte-identical and silent.
-            eff_backend = _resolve_backend(backend)
-            if eff_backend == "minilm":
-                return
-
-            text = _read_file_text(path)
-            if text is None:
-                return
-
-            def _signal(event: str, **extra) -> None:
-                """Log + (best-effort) broadcast a summarizer lifecycle event so the
-                board/console can show that summarization started / finished / failed.
-                """
-                if event == "summary_failed":
-                    logger.warning(
-                        "summarize %s: artifact=%s backend=%s %s",
-                        event,
-                        artifact_id,
-                        eff_backend,
-                        extra.get("error", ""),
-                    )
-                else:
-                    logger.info(
-                        "summarize %s: artifact=%s backend=%s",
-                        event,
-                        artifact_id,
-                        eff_backend,
-                    )
-                if broadcast_fn is None:
-                    return
-                try:
-                    broadcast_fn(
-                        {
-                            "type": "COMMS_UPDATE",
-                            "event": event,
-                            "artifact_id": artifact_id,
-                            "message_id": message_id,
-                            **extra,
-                        }
-                    )
-                except Exception:
-                    logger.debug("summarize signal broadcast failed", exc_info=True)
-
-            _signal("summarizing")
-
-            # Whole-artifact topic-map summary
-            result = summarize_content(
-                text, artifact_type=artifact_type, backend=eff_backend
-            )
-            if result.summary is None:
-                _signal("summary_failed", error=result.error or "no summary produced")
-                return
-            update_artifact_summary(conn, artifact_id, result.summary)
-
-            # Per-section summaries (≤1 sentence each) — best-effort
-            sections = get_artifact_sections(conn, artifact_id)
-            file_lines = text.splitlines(keepends=True)
-            for sec in sections or []:
-                ls = max(1, sec["line_start"]) - 1
-                le = min(len(file_lines), sec["line_end"])
-                sec_text = "".join(file_lines[ls:le])
-                if not sec_text.strip():
-                    continue
-                sec_result = summarize_content(
-                    sec_text,
-                    artifact_type=artifact_type,
-                    max_sentences=1,
-                    backend=eff_backend,
-                )
-                if sec_result.summary is not None:
-                    update_section_summary(conn, sec["id"], sec_result.summary)
-
-            # §3a — UPLOAD path only: feed the generated summary into the message's
-            # search vector (and its display text) so the doc surfaces in the 💡 semantic
-            # channel / retrieve_board_context, not just the catalog. Agent-created
-            # artifacts keep their thin note (embed_summary stays False for them).
-            if embed_summary and message_id:
-                try:
-                    import os as _os
-                    from pathly_orchestrator.db.queries.comms import update_message_text
-                    from pathly_orchestrator.runner.embeddings import embed_async
-
-                    new_text = f"{_os.path.basename(path)}: {result.summary}"
-                    update_message_text(conn, message_id, new_text)
-                    embed_async(message_id, new_text)
-                except Exception:
-                    logger.debug(
-                        "embed-summary (upload) failed for %s",
-                        message_id,
-                        exc_info=True,
-                    )
-
-            _signal("summary_ready")
-
-        except Exception:
-            logger.debug(
-                "_schedule_resummarize_async failed for %s", artifact_id, exc_info=True
-            )
-
-    t = threading.Thread(target=_worker, daemon=True)
-    t.start()
 
 
 def hydrate_section(
@@ -517,17 +368,17 @@ def index_artifact_async(
     artifact_id: str,
     path: str,
     scope: str = "",
-    backend: str | None = None,
     broadcast_fn=None,
-    embed_summary: bool = False,
 ) -> None:
     """Daemon-thread eager indexer, mirrors embed_async.
 
-    Parses sections and writes the index for path. .md ONLY (§8 item 0) —
+    Parses sections and writes the section index for path. .md ONLY (§8 item 0) —
     early-returns for non-.md before parsing. Best-effort: never raises to caller.
 
-    `backend` is the per-upload summary-backend override (None ⇒ global app-setting),
-    used when this index triggers a (re)summarize.
+    Summarization is CLIENT-side (unified-ai-routing): the server emits a
+    ``summary_request`` over the comms SSE and the renderer runs aiRouter, so this
+    indexer runs NO inference. `scope`/`broadcast_fn` are accepted for call-site
+    compatibility; only section (re)indexing happens here.
     """
     if not _is_md(path):
         return
@@ -548,7 +399,7 @@ def index_artifact_async(
             conn = get_db()
 
             existing = conn.execute(
-                "SELECT indexed_hash, indexed_structure_key FROM comms_artifacts WHERE id=?",
+                "SELECT indexed_hash FROM comms_artifacts WHERE id=?",
                 (artifact_id,),
             ).fetchone()
 
@@ -579,22 +430,9 @@ def index_artifact_async(
                 for sec in sections
             ]
 
-            old_struct = existing["indexed_structure_key"] if existing else None
             reindex_artifact_sections(
                 conn, artifact_id, section_dicts, cur_mtime, cur_hash, cur_struct
             )
-
-            # Summarize on FIRST index (old_struct is None) or a structural change.
-            # No-op when the effective backend is minilm/off (summarize returns None),
-            # so the default stays behavior-identical; with a backend on, new uploads
-            # and agent-created .md actually get summarized.
-            if old_struct is None or cur_struct != old_struct:
-                _schedule_resummarize_async(
-                    artifact_id,
-                    backend=backend,
-                    broadcast_fn=broadcast_fn,
-                    embed_summary=embed_summary,
-                )
 
         except Exception:
             logger.debug("index_artifact_async failed for %s", path, exc_info=True)

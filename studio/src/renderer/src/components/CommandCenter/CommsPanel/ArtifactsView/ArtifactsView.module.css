@@ -16,16 +16,11 @@
   flex-shrink: 0;
 }
 
-.backendSelect {
-  min-width: 0;
+/* The AiTargetSelector is width:100% internally; its wrapper is the toolbar's only
+   div child, so give it room to grow while still shrinking below content width. */
+.toolbar > div {
   flex: 1;
-  font-size: 11px;
-  background: var(--bg-mantle);
-  border: 1px solid var(--bg-surface0);
-  border-radius: 4px;
-  color: var(--text-primary);
-  padding: 2px 4px;
-  cursor: pointer;
+  min-width: 0;
 }
 
 .view {

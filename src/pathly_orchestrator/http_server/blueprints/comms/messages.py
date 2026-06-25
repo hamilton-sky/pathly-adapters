@@ -132,25 +132,18 @@ def comms_post():
             return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
         if executor is not None and not isinstance(executor, str):
             return jsonify({"error": "Field 'executor' must be a string or null"}), 400
+        # summary_backend is now ONLY the client-drop suppression signal consumed by
+        # emit_summary_request: 'minilm' ⇒ suppress the summary_request (the Conv-3
+        # client-drop path already summarized inline). Any other string|null is
+        # accepted and means "emit" — the server runs no inference, so legacy values
+        # (ollama/haiku) no longer error. Coerced to None for non-string inputs.
         summary_backend = data.get("summary_backend")
-        if summary_backend is not None and summary_backend not in (
-            "minilm",
-            "ollama",
-            "haiku",
-        ):
-            return (
-                jsonify(
-                    {
-                        "error": "Field 'summary_backend' must be one of minilm|ollama|haiku or null"
-                    }
-                ),
-                400,
-            )
-        # embed_summary (§3a): when an UPLOADED .md is summarized, feed the generated
-        # summary into the message's search vector + display text so it surfaces in the
-        # 💡 semantic channel / retrieve_board_context. Set by the upload UI; agent
-        # posts leave it false (their summary stays catalog-only).
-        embed_summary = bool(data.get("embed_summary"))
+        if not isinstance(summary_backend, str):
+            summary_backend = None
+        # embed_summary (§3a): accepted as a no-op for request-contract compatibility.
+        # The server-side inference path that consumed it is gone — the client writeback
+        # route (/comms/artifacts/<id>/summary) owns the summary now.
+        _ = bool(data.get("embed_summary"))
         context_refs = data.get("context_refs")
         if context_refs is not None and (
             not isinstance(context_refs, list)
@@ -272,6 +265,9 @@ def comms_post():
                     created_by=from_agent,
                 )
                 try:
+                    # Section indexing STAYS (server-side, no inference). The
+                    # summarizer is CLIENT-side (unified-ai-routing): the emit below
+                    # requests it; index_artifact_async only builds the section index.
                     from pathly_orchestrator.runner.hydrate import (
                         index_artifact_async as _index_async,
                     )
@@ -280,12 +276,29 @@ def comms_post():
                         art_id,
                         artifact_path,
                         scope=scope,
-                        backend=summary_backend,
                         broadcast_fn=lambda _p: _broadcast_comms(scope, _p),
-                        embed_summary=embed_summary,
                     )
                 except Exception:
                     logging.debug("index_artifact_async (post) failed", exc_info=True)
+
+                # Conv 4: instead of running inference, emit a summary_request over
+                # the comms SSE and let the subscribed renderer run aiRouter + write
+                # the result back. Resolves the target server-side (per-artifact →
+                # app default → none); suppressed for summary_backend='minilm' (the
+                # Conv-3 client-drop path summarizes inline). Best-effort, never raises.
+                from ._summary_request import emit_summary_request as _emit_summary_req
+
+                _emit_summary_req(
+                    conn,
+                    artifact_id=art_id,
+                    artifact_path=artifact_path,
+                    artifact_type=artifact_type
+                    if isinstance(artifact_type, str)
+                    else None,
+                    scope=scope,
+                    summary_backend=summary_backend,
+                    broadcast_fn=lambda _p: _broadcast_comms(scope, _p),
+                )
             except Exception:
                 logging.debug("comms_artifacts insert (post) failed", exc_info=True)
 

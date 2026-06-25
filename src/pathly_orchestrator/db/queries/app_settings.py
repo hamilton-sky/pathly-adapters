@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 from datetime import datetime, timezone
 
@@ -121,56 +120,44 @@ def set_write_permissions(
     set_setting(conn, key, json.dumps(overrides))
 
 
-_INFERENCE_BACKEND_KEY = "inference:summary_backend"
-_VALID_BACKENDS = {"minilm", "ollama", "haiku"}
+# unified-ai-routing (Conv 3): app-default AI target for artifact summarization.
+# JSON-encoded AiSelection {"type":"model"|"engine","id":...}. The summarizer is
+# CLIENT-side — the renderer runs aiRouter against this target.
+_DEFAULT_SUMMARY_SELECTION_KEY = "ai_routing:default_summary_selection"
 
 
-def get_summary_backend(conn: sqlite3.Connection) -> str:
-    """Return the active summary backend.
+def get_default_summary_selection(conn: sqlite3.Connection) -> dict | None:
+    """Return the app-default summary AiSelection ({"type","id"}), or None if unset.
 
-    Precedence: app_settings row > PATHLY_SUMMARY_BACKEND env var > "minilm".
-    Always returns a member of {"minilm", "ollama", "haiku"}.
+    A malformed stored value degrades to None so the client falls back to its
+    built-in default rather than crashing.
     """
-    raw = get_setting(conn, _INFERENCE_BACKEND_KEY)
-    if raw in _VALID_BACKENDS:
-        return raw
-    env = os.environ.get("PATHLY_SUMMARY_BACKEND")
-    if env in _VALID_BACKENDS:
-        return env
-    return "minilm"
+    raw = get_setting(conn, _DEFAULT_SUMMARY_SELECTION_KEY)
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if (
+        isinstance(parsed, dict)
+        and parsed.get("type") in ("model", "engine")
+        and isinstance(parsed.get("id"), str)
+    ):
+        return {"type": parsed["type"], "id": parsed["id"]}
+    return None
 
 
-def set_summary_backend(conn: sqlite3.Connection, backend: str) -> None:
-    """Persist the summary backend choice. Raises ValueError on invalid value."""
-    if backend not in _VALID_BACKENDS:
+def set_default_summary_selection(conn: sqlite3.Connection, selection: dict) -> None:
+    """Persist the app-default summary AiSelection. Raises ValueError if malformed."""
+    if (
+        not isinstance(selection, dict)
+        or selection.get("type") not in ("model", "engine")
+        or not isinstance(selection.get("id"), str)
+        or not selection["id"].strip()
+    ):
         raise ValueError(
-            f"Invalid summary backend {backend!r}. Must be one of: {sorted(_VALID_BACKENDS)}"
+            "selection must be {'type': 'model'|'engine', 'id': <non-empty str>}"
         )
-    set_setting(conn, _INFERENCE_BACKEND_KEY, backend)
-
-
-_OLLAMA_MODEL_KEY = "inference:ollama_model"
-_DEFAULT_OLLAMA_MODEL = "llama3.2"
-
-
-def get_ollama_model(conn: sqlite3.Connection) -> str:
-    """Return the Ollama model used for summaries.
-
-    Precedence: app_settings row > PATHLY_OLLAMA_MODEL env var > "llama3.2".
-    Lets a user point the local summarizer at whatever model they have pulled
-    (e.g. 'deepseek-r1:1.5b') instead of the hardcoded default.
-    """
-    raw = get_setting(conn, _OLLAMA_MODEL_KEY)
-    if raw and raw.strip():
-        return raw.strip()
-    env = os.environ.get("PATHLY_OLLAMA_MODEL")
-    if env and env.strip():
-        return env.strip()
-    return _DEFAULT_OLLAMA_MODEL
-
-
-def set_ollama_model(conn: sqlite3.Connection, model: str) -> None:
-    """Persist the Ollama summary model (e.g. 'llama3.2', 'deepseek-r1:1.5b')."""
-    if not isinstance(model, str) or not model.strip():
-        raise ValueError("Ollama model must be a non-empty string")
-    set_setting(conn, _OLLAMA_MODEL_KEY, model.strip())
+    payload = {"type": selection["type"], "id": selection["id"]}
+    set_setting(conn, _DEFAULT_SUMMARY_SELECTION_KEY, json.dumps(payload))

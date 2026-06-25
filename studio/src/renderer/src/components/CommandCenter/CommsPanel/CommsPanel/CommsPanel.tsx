@@ -10,9 +10,12 @@ import { GoalsView } from '../GoalsView/GoalsView'
 import { NewGoalButton } from '../GoalsView/NewGoalButton'
 import { EvaluateBoardButton } from '../GoalsView/EvaluateBoardButton'
 import { ArtifactsView } from '../ArtifactsView/ArtifactsView'
+import { summarizeArtifact } from '../ArtifactsView/summarizeArtifact'
+import { useArtifactSummaryTarget } from '../hooks/useArtifactSummaryTarget'
 import { useCommsPanel } from '../hooks/useCommsPanel'
 import { useStore } from '../../../../store'
 import { apiStartFlow, apiPostArtifact, resolveFeaturePath, scopeToParams } from '../../../../store/commsApi'
+import { isOff } from '../../../../services/aiRouter'
 import { useToastStore } from '../../../../store/toastStore'
 import s from './CommsPanel.module.css'
 
@@ -68,6 +71,8 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   const [composeText, setComposeText] = useState('')
   const [boardView, setBoardView] = useState<BoardView>('messages')
   const projectPath = useStore((st) => st.projectPath)
+  // The AI target that summarizes dropped artifacts (app-default, persisted).
+  const { selection: summarySelection, setSelection: setSummarySelection } = useArtifactSummaryTarget()
 
   const boardKey = scope === 'feature' ? mainFeature : scope
 
@@ -90,13 +95,17 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
     void apiStartFlow(boardKey, flow, { projectRoot, interactive: opts.interactive })
   }
 
-  // Read the per-upload summary backend override from localStorage.
-  // Returns undefined when absent/empty so apiPostArtifact uses the global default.
-  function getUploadBackend(): string | undefined {
-    try {
-      const v = localStorage.getItem('pathly.comms.uploadSummary') ?? ''
-      return (v === 'minilm' || v === 'ollama' || v === 'haiku') ? v : undefined
-    } catch { return undefined }
+  // The project root is the spawn cwd for CLI-engine summary targets.
+  const projectRoot = projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+
+  // After an artifact is posted, summarize it CLIENT-side via aiRouter (the chosen
+  // target) and write the result back. The artifact was posted with
+  // summary_backend:'minilm', so the SERVER summarizer never fires for this path
+  // (the haiku path is broken on the server, and GGUF/Brightsky aren't reachable
+  // there). Off ⇒ skip — filename/title only. Best-effort; never blocks the drop.
+  const summarizePosted = async (messageId: string, path: string, atype: string): Promise<void> => {
+    if (isOff(summarySelection)) return
+    await summarizeArtifact({ messageId, path, atype, selection: summarySelection, cwd: projectRoot })
   }
 
   // Drop files onto the Artifacts view → copy each into the feature's artifacts/
@@ -105,14 +114,12 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // evaluator can read. Feature boards copy into the feature; project/global into a
   // shared uploads dir.
   const handleDropFiles = async (files: File[]): Promise<void> => {
-    const projectRoot = projectPath.replace(/\\/g, '/').replace(/\/$/, '')
     if (!projectRoot || !files.length) return
     const params = scopeToParams(scope, boardKey)
     const base = scope === 'feature'
       ? await resolveFeaturePath(projectRoot, boardKey)
       : `${projectRoot}/pathly/.uploads/${boardKey}`
     const dir = `${base}/artifacts`
-    const uploadBackend = getUploadBackend()
     // Dedupe against files already in the dest dir + names taken earlier this drop.
     const taken = new Set<string>(await window.pathly.fs.list(dir).catch(() => []))
     let posted = 0
@@ -122,10 +129,12 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
       if (!src) { failed += 1; continue }
       const name = dedupeName(file.name, taken)
       taken.add(name)
+      const atype = inferAtype(name)
+      const dest = `${dir}/${name}`
       try {
-        await window.pathly.fs.copy(src, `${dir}/${name}`)
-        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${name}`, `${dir}/${name}`, inferAtype(name), uploadBackend, true)
-        if (id) posted += 1
+        await window.pathly.fs.copy(src, dest)
+        const id = await apiPostArtifact(boardKey, params.board, params.scope, `Uploaded ${name}`, dest, atype, 'minilm')
+        if (id) { posted += 1; void summarizePosted(id, dest, atype) }
         else failed += 1
       } catch { failed += 1 }
     }
@@ -138,13 +147,13 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   const handleDropPaths = async (items: { path: string; name: string }[]): Promise<void> => {
     if (!items.length) return
     const params = scopeToParams(scope, boardKey)
-    const uploadBackend = getUploadBackend()
     let posted = 0
     let failed = 0
     for (const it of items) {
       const path = it.path.replace(/\\/g, '/')
-      const id = await apiPostArtifact(boardKey, params.board, params.scope, `Added ${it.name}`, path, inferAtype(it.name), uploadBackend, true)
-      if (id) posted += 1
+      const atype = inferAtype(it.name)
+      const id = await apiPostArtifact(boardKey, params.board, params.scope, `Added ${it.name}`, path, atype, 'minilm')
+      if (id) { posted += 1; void summarizePosted(id, path, atype) }
       else failed += 1
     }
     notifyDrop(posted, failed)
@@ -199,7 +208,15 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
         />
       )}
       {boardView === 'artifacts' && (
-        <ArtifactsView messages={messages} onDelete={del} onSupersede={supersede} onDropFiles={handleDropFiles} onDropPaths={handleDropPaths} />
+        <ArtifactsView
+          messages={messages}
+          onDelete={del}
+          onSupersede={supersede}
+          onDropFiles={handleDropFiles}
+          onDropPaths={handleDropPaths}
+          summarySelection={summarySelection}
+          onSummarySelectionChange={setSummarySelection}
+        />
       )}
 
       <div className={s.foot}>
