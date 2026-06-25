@@ -27,6 +27,10 @@ are wired here.)
 
 ## Goal
 
+> **MCP-delivery fork.** Like gitnexus-integration, this is **Approach A** (host MCP install,
+> agent-driven). The complementary **Approach B** (Pathly-native context injection, host-agnostic)
+> is in [`../code-context-injection/APPROACH.md`](../code-context-injection/APPROACH.md).
+
 Give Pathly's read-only research agents (scout, quick, explorer) **precise, always-fresh**
 structural code awareness via LSP. LSP is the right tool when correctness on a *specific
 symbol* matters (exact references, exact callers) and especially **after code has been
@@ -38,9 +42,7 @@ edited**, where a pre-built graph index can be stale. Agents fall back to native
 ## Relationship to `gitnexus-integration` (read this first)
 
 This plan is the **second** code-intelligence integration and is deliberately small because
-it **reuses the rails the gitnexus-integration plan builds**:
-
-1. **MCP-stitching machinery** — `gitnexus-integration` Story 5 adds `_run_mcp` to
+it **reuses the rails the gitnexus-integration plan builds**:1. **MCP-stitching machinery** — `gitnexus-integration` Story 5 adds `_run_mcp` to
    `src/install_cli/orchestrate.py` and an `mcp:` key to each adapter's `install.yaml`,
    deep-merging `_mcp/*.json` templates into the host MCP config. This plan only **adds one
    more template file** (`_mcp/serena.json`) — no new install machinery.

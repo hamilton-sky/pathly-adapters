@@ -15,6 +15,13 @@ Give Pathly's read-only research agents (scout, quick, explorer) structural code
 without the token cost of repeated grep/read cycles. GitNexus is preferred when available;
 agents fall back to native tools (Grep, Read) when it is not.
 
+> **MCP-delivery fork.** This plan is **Approach A** — register an MCP server in the host CLI
+> and let the agent call it (tool-level, agent-driven; works in interactive + runner; relies on
+> host MCP support). The complementary **Approach B** — Pathly queries the code-intel backend
+> itself and injects the result into runner-mode prompts (host-agnostic, deterministic) — lives
+> in [`../code-context-injection/APPROACH.md`](../code-context-injection/APPROACH.md). They
+> compose; A is required for interactive mode.
+
 ---
 
 ## What it touches
