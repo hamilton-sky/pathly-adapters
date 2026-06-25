@@ -633,11 +633,13 @@ export type DecomposeMode = 'planner' | 'consultation'
 export async function apiDecomposeGoal(
   goal_id: string,
   mode: DecomposeMode,
-  opts: { adapter?: string } = {},
+  opts: { adapter?: string; projectRoot?: string; model?: string } = {},
 ): Promise<{ ok: boolean; reason?: string } | null> {
   try {
     const body: Record<string, unknown> = { goal_id, mode }
     if (opts.adapter) body.adapter = opts.adapter
+    if (opts.projectRoot) body.project_root = opts.projectRoot
+    if (opts.model) body.model = opts.model
     const r = await apiFetch('/comms/goals/decompose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

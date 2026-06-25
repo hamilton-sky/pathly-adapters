@@ -12,6 +12,7 @@
 import { runJob, isOff, type AiSelection } from '../../../../services/aiRouter'
 import { buildSummarizePrompt } from '../../../../services/summaryPrompt'
 import { readFile } from '../../../../services/pathlyApi'
+import { useToastStore } from '../../../../store/toastStore'
 import {
   fetchArtifacts,
   apiSetArtifactSummary,
@@ -65,7 +66,12 @@ export async function summarizeArtifactById(
     if (!summary) return false
 
     return apiSetArtifactSummary(artifactId, summary, selection as AiSelectionDto)
-  } catch {
+  } catch (err) {
+    // Surface the reason instead of failing silently — the most common cause is a
+    // model target that isn't installed locally (Ollama not running / not pulled).
+    // The engine default avoids this, but a user-picked model can still hit it.
+    const msg = err instanceof Error ? err.message : String(err)
+    useToastStore.getState().push(`Summary failed: ${msg}`, 'error', { category: 'agent_done' })
     return false
   }
 }

@@ -91,7 +91,7 @@ export interface CommsState {
   goalRunStart: Record<string, number>
   runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
   /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
-  decomposeGoal: (goal_id: string, mode: DecomposeMode) => void
+  decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string }) => void
   /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
   markGoalRunPhase: (goal_id: string, phase: string) => void
   stopGoal: (goal_id: string) => void
@@ -514,16 +514,21 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     }
   },
 
-  decomposeGoal: (goal_id, mode) => {
+  decomposeGoal: (goal_id, mode, opts = {}) => {
     const now = Date.now()
-    // Stamp the start time immediately so the RunPill timer ticks at t0 (mirrors runGoal /
+    // Stamp the start time immediately so the ActionPill timer ticks at t0 (mirrors runGoal /
     // runEvaluator) instead of waiting for the goal_decompose SSE 'running' phase.
     set((s) => ({
       goalRunState: { ...s.goalRunState, [goal_id]: 'running' },
       goalRunStart: { ...s.goalRunStart, [goal_id]: now },
     }))
 
-    apiDecomposeGoal(goal_id, mode)
+    // Capture the project root (the PTY's working directory) and forward the chosen CLI
+    // engine + optional model, mirroring runGoal / runEvaluator. Without the project root
+    // the decompose agent spawned with an empty cwd and the PTY failed silently.
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+
+    apiDecomposeGoal(goal_id, mode, { ...opts, projectRoot })
       .then((res) => {
         if (res === null || !res.ok) {
           // already_decomposed → the board reload will reveal the existing DAG;
