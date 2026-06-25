@@ -5,22 +5,22 @@ agent "code intelligence" prompt section this plan extends). See `APPROACH.md`.
 
 ---
 
-## Story 1 — The agent prompt section becomes toolset-neutral and lists LSP
+## Story 1 — The agent code-intelligence section gains LSP rows
 
 **Who:** Developer maintaining the research agent prompts.
-**What:** The `## Tool preference — GitNexus first, Grep/Read fallback` section in `scout.md`,
-`quick.md`, and `explorer.md` is renamed to `## Code intelligence — preferred tools,
-Grep/Read fallback` and gains LSP (Serena) rows alongside the existing GitNexus rows.
-**Why:** One coherent code-intelligence section per agent, not two competing ones; agents get
-a single routing rule covering LSP, GitNexus, and Grep.
+**What:** The existing `## Code intelligence — preferred tools, Grep/Read fallback` section
+(shipped by gitnexus-integration) in `scout.md`, `quick.md`, and `explorer.md` gains LSP
+(Serena) rows alongside the existing GitNexus rows.
+**Why:** One coherent code-intelligence section per agent; agents get a single routing rule
+covering LSP, GitNexus, and Grep.
 
 **Acceptance criteria:**
 - `src/pathly_data/core/agents/research/scout.md`, `support/quick.md`, and
   `research/explorer.md` each contain exactly one `## Code intelligence — preferred tools,
-  Grep/Read fallback` section and no remaining `## Tool preference — GitNexus first…` heading.
+  Grep/Read fallback` section.
 - Each section lists the role's LSP tools and GitNexus tools with native fallbacks, matching
   the per-agent blocks in `APPROACH.md`, and states the "after edits, prefer LSP" rule.
-- `pathly-setup claude --apply` succeeds; installed `~/.claude/agents/*.md` reflect the rename.
+- `pathly-setup claude --apply` succeeds; installed `~/.claude/agents/*.md` reflect the rows.
 
 **Delivered by:** Conversation 1.
 

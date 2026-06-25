@@ -44,11 +44,10 @@ it **reuses the rails the gitnexus-integration plan builds**:
    `src/install_cli/orchestrate.py` and an `mcp:` key to each adapter's `install.yaml`,
    deep-merging `_mcp/*.json` templates into the host MCP config. This plan only **adds one
    more template file** (`_mcp/serena.json`) — no new install machinery.
-2. **The agent prompt "code intelligence" section** — `gitnexus-integration` adds a
-   `## Tool preference — GitNexus first, Grep/Read fallback` section to `scout.md`,
-   `quick.md`, `explorer.md`. This plan **renames that section to a neutral
-   `## Code intelligence — preferred tools, Grep/Read fallback`** and adds LSP rows, so both
-   integrations live in one coherent section instead of two competing ones.
+2. **The agent prompt "code intelligence" section** — `gitnexus-integration` already ships a
+   neutral `## Code intelligence — preferred tools, Grep/Read fallback` section in `scout.md`,
+   `quick.md`, `explorer.md` (GitNexus rows only). This plan **adds the LSP rows** to that
+   existing section, so both integrations live in one coherent section — no rename needed.
 
 **Sequencing:** ship `gitnexus-integration` first (it builds the rails). This plan layers on
 top. If gitnexus has NOT shipped, this plan must create the `_run_mcp` machinery itself —
@@ -94,8 +93,9 @@ stays GitNexus's job; LSP confirms precise callers symbol-by-symbol via
 
 ## Per-agent changes
 
-The agent prompt section is the same neutral `## Code intelligence — preferred tools,
-Grep/Read fallback` heading introduced/renamed here. Each role lists the subset it uses.
+The agent prompt section is the neutral `## Code intelligence — preferred tools,
+Grep/Read fallback` heading already shipped by `gitnexus-integration`. This plan adds the LSP
+rows to it. Each role lists the subset it uses.
 
 ### scout
 **Core prompt (`scout.md`), in the renamed section:**
@@ -207,9 +207,9 @@ sitting alongside `gitnexus.json` means **both** servers land in the host config
 1. **Verify Serena's contract** — confirm the four tool names (`find_symbol`,
    `get_symbols_overview`, `find_referencing_symbols`, `search_for_pattern`) and the
    `start-mcp-server` launch args against the current Serena release.
-2. **Rename the prompt section** in `scout.md`, `quick.md`, `explorer.md` from
-   `## Tool preference — GitNexus first…` to `## Code intelligence — preferred tools…` and
-   add the LSP rows (per-agent blocks above).
+2. **Add the LSP rows** to the existing `## Code intelligence — preferred tools, Grep/Read
+   fallback` section in `scout.md`, `quick.md`, `explorer.md` (per-agent blocks above). The
+   section already exists (shipped by gitnexus-integration) — no rename needed.
 3. **Update Claude adapter `_meta` YAMLs** — add the Serena tool names to the `tools:` lists.
 4. **Create `_mcp/serena.json`** for each adapter (claude, codex, copilot).
 5. **Propagate** — `pathly-setup claude --apply` (reuses gitnexus's `_run_mcp`).

@@ -34,9 +34,9 @@ Each agent uses a subset of GitNexus tools matched to the kind of query it perfo
 
 ### scout
 **Core prompt addition (`scout.md`):**
-Add a "Tool preference" section after the Scope rules block:
+Add a "Code intelligence" section after the Scope rules block:
 ```
-## Tool preference — GitNexus first, Grep/Read fallback
+## Code intelligence — preferred tools, Grep/Read fallback
 When GitNexus MCP tools are available, prefer them over native tools:
 - Find a symbol or pattern         → gitnexus_query          (fallback: Grep)
 - Understand callers / callees     → gitnexus_get_context     (fallback: Read + Grep)
@@ -56,7 +56,7 @@ tools: [Read, Glob, Grep, gitnexus_query, gitnexus_get_context, gitnexus_get_cal
 **Core prompt addition (`quick.md`):**
 Add after the "2 tool call" constraint:
 ```
-## Tool preference — GitNexus first, Grep/Read fallback
+## Code intelligence — preferred tools, Grep/Read fallback
 Prefer GitNexus tools when available — they count as 1 tool call each:
 - Symbol lookup    → gitnexus_query or gitnexus_get_context  (fallback: Grep or Read)
 If GitNexus tools are not available, proceed with Grep and Read as normal.
@@ -72,9 +72,9 @@ tools: [Read, Glob, Grep, gitnexus_query, gitnexus_get_context]
 
 ### explorer
 **Core prompt addition (`explorer.md`):**
-Add a "Tool preference" section in the Information gathering block:
+Add a "Code intelligence" section in the Information gathering block:
 ```
-## Tool preference — GitNexus first, Grep/Read fallback
+## Code intelligence — preferred tools, Grep/Read fallback
 When GitNexus MCP tools are available, prefer them over Read/Grep for:
 - Symbol and pattern search         → gitnexus_query
 - Understanding a function          → gitnexus_get_context
