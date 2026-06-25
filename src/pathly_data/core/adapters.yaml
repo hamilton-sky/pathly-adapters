@@ -16,3 +16,11 @@ copilot:
   autonomy_flag: null
   resume: null
   parse: null
+antigravity:
+  terminal_kind: shell
+  # agy (Antigravity / Gemini CLI) has no verified one-shot/exec mode — leave headless
+  # null until a real template is confirmed. The selector shows it as "(no headless)".
+  headless: null
+  autonomy_flag: null
+  resume: null
+  parse: null

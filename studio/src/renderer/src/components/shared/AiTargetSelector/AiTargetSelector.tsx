@@ -1,34 +1,20 @@
-import { MODEL_CATALOG, BRIGHTSKY_ID } from '../../../services/modelManager'
-import { ADAPTER_META } from '../../../services/cliEngine'
-import { AI_SELECTION_OFF, isOff, type AiSelection } from '../../../services/aiRouter'
+import { useState, useRef, useEffect } from 'react'
+import { ChevronDown } from 'lucide-react'
+import { type AiSelection } from '../../../services/aiRouter'
+import { buildGroups, encode, decode, labelForValue } from './options'
 import s from './AiTargetSelector.module.css'
 
-// One grouped <select> that emits an AiSelection (a local model or a CLI engine).
-// Native <select>/<optgroup> is keyboard-native and accessible, and keeps this
-// component well under the 150-line cap — DESIGN.md allows it over a custom
-// listbox. Lives in shared/ so the Conv-3 ArtifactsView toolbar/per-artifact
-// chips and HQ can all consume the same control.
-
-const OFF_VALUE = 'off'
-
-/** Encode an AiSelection as the <select> option value ('model:<id>' | 'engine:<id>' | 'off'). */
-function encode(sel: AiSelection | null): string {
-  if (!sel) return ''
-  if (isOff(sel)) return OFF_VALUE
-  return `${sel.type}:${sel.id}`
-}
-
-/** Parse a <select> value back into an AiSelection (or the Off sentinel). */
-function decode(value: string): AiSelection {
-  if (value === OFF_VALUE) return AI_SELECTION_OFF
-  const [type, ...rest] = value.split(':')
-  return { type: type === 'engine' ? 'engine' : 'model', id: rest.join(':') }
-}
+// Custom dropdown (button trigger + panel) emitting an AiSelection — a local model
+// or a CLI engine. Replaces the old native <select>; matches Studio's house dropdown
+// style (HQ/ModelSelector): outside-click + Escape to close, chevron, grouped
+// Models / CLI-Engines headers, greyed-out noHeadless engines with their reason, and
+// an optional Off row. Public props/value/onChange API and the AI_SELECTION_OFF
+// encoding are unchanged so ArtifactsView + Settings keep working. Lives in shared/.
 
 interface Props {
   value: AiSelection | null
   onChange: (sel: AiSelection) => void
-  /** When true, adds an "Off" option that emits AI_SELECTION_OFF (consumers skip the run). */
+  /** When true, adds an "Off" row that emits AI_SELECTION_OFF (consumers skip the run). */
   allowOff?: boolean
   id?: string
   ariaLabel?: string
@@ -44,48 +30,85 @@ export function AiTargetSelector({
   ariaLabel = 'AI target',
   disabled = false,
 }: Props): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const groups = buildGroups(allowOff)
   const current = encode(value)
-  // Engines that have a headless one-shot mode (skip noHeadless ones per DESIGN.md).
-  const engines = ADAPTER_META.filter((m) => !m.noHeadless)
+  const triggerLabel = current === '' ? 'Select AI target…' : labelForValue(current, groups)
+
+  // Close on outside click or Escape (mirrors ModelSelector).
+  useEffect(() => {
+    if (!open) return
+    function onMouseDown(e: MouseEvent): void {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  function pick(optValue: string): void {
+    setOpen(false)
+    onChange(decode(optValue))
+  }
 
   return (
-    <div className={s.wrap} data-state={disabled ? 'loading' : 'ready'}>
-      <select
+    <div className={s.wrap} ref={ref} data-state={disabled ? 'loading' : 'ready'}>
+      <button
+        type="button"
         id={id}
-        className={s.select}
+        className={s.trigger}
         aria-label={ariaLabel}
-        value={current}
+        aria-haspopup="listbox"
+        {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
         disabled={disabled}
-        onChange={(e) => onChange(decode(e.target.value))}
+        onClick={() => setOpen((v) => !v)}
       >
-        {current === '' && (
-          <option value="" disabled>
-            Select AI target…
-          </option>
-        )}
-        {allowOff && <option value={OFF_VALUE}>Off</option>}
-        <optgroup label="Models">
-          {MODEL_CATALOG.map((m) => (
-            <option key={m.id} value={`model:${m.id}`}>
-              {m.name}
-            </option>
+        <span className={s.triggerLabel} data-placeholder={current === '' ? '' : undefined}>
+          {triggerLabel}
+        </span>
+        <ChevronDown size={13} className={open ? s.chevronOpen : s.chevron} />
+      </button>
+
+      {open && (
+        <div className={s.panel} role="listbox" aria-label={ariaLabel}>
+          {groups.map((group, gi) => (
+            <div key={group.heading || `off-${gi}`} className={s.group}>
+              {group.heading && <div className={s.groupHeading}>{group.heading}</div>}
+              {group.options.map((opt) => {
+                const isDisabled = Boolean(opt.disabledReason)
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="option"
+                    {...(opt.value === current
+                      ? { 'aria-selected': 'true' }
+                      : { 'aria-selected': 'false' })}
+                    className={s.option}
+                    data-selected={opt.value === current ? '' : undefined}
+                    disabled={isDisabled}
+                    title={opt.disabledReason}
+                    onClick={() => !isDisabled && pick(opt.value)}
+                  >
+                    <span className={s.optionLabel}>{opt.label}</span>
+                    {opt.disabledReason && (
+                      <span className={s.optionReason}>{opt.disabledReason}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           ))}
-          <option value={`model:${BRIGHTSKY_ID}`}>Brightsky</option>
-        </optgroup>
-        <optgroup label="CLI Engines">
-          {engines.map((e) => (
-            <option key={e.id} value={`engine:${e.id}`}>
-              {e.label}
-            </option>
-          ))}
-          {/* Headless-incapable engines listed disabled so the user sees why. */}
-          {ADAPTER_META.filter((m) => m.noHeadless).map((e) => (
-            <option key={e.id} value={`engine:${e.id}`} disabled>
-              {e.label} (no headless)
-            </option>
-          ))}
-        </optgroup>
-      </select>
+        </div>
+      )}
     </div>
   )
 }

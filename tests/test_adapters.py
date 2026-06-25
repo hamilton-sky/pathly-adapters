@@ -21,7 +21,7 @@ def test_adapters_yaml_loads():
         files("pathly_data").joinpath("core/adapters.yaml").read_text(encoding="utf-8")
     )
     data = yaml.safe_load(text)
-    assert set(data.keys()) == {"claude", "codex", "copilot"}
+    assert set(data.keys()) == {"claude", "codex", "copilot", "antigravity"}
 
 
 def test_adapters_yaml_required_keys():

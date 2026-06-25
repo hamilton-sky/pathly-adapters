@@ -11,6 +11,7 @@
 import { runModel } from './modelManager'
 import { buildHeadlessArgv, type CliAdapter } from './cliEngine'
 import { useProjectStore } from '../store/projectStore'
+import { useTerminalStore, type TerminalTab } from '../store/terminalStore'
 
 export type AiSelection = { type: 'model' | 'engine'; id: string }
 export interface AiJob {
@@ -42,21 +43,38 @@ function defaultCwd(): string {
  * Mirrors the lifecycle care in useEditorAgentActions: the onExit subscription
  * is installed before spawn, ignores other tabs' exits, and is torn down exactly
  * once on either the exit path or a spawn-time throw.
+ *
+ * The run is registered as a terminal tab (addTab + updateTabStatus 'running') so
+ * it surfaces in the CLI tab list / monitor bar — a background summary should be
+ * visible but must NOT steal focus, so we deliberately do NOT call openTab. On
+ * exit (or a spawn throw) the tab status is set 'done'/'error' and the tab closed,
+ * which snapshots it into the session history.
  */
 function runEngine(adapter: CliAdapter, prompt: string, cwd: string): Promise<AiResult> {
   const argv = buildHeadlessArgv(adapter, prompt)
   const tabId = `airouter-${adapter}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  const term = useTerminalStore.getState()
+  // Register quietly (no openTab) and stamp 'running' before spawn so startedAt is at t0.
+  term.addTab(tabId, `Summary · ${adapter}`, 'left', adapter as TerminalTab['kind'], undefined, undefined, prompt)
+  term.updateTabStatus(tabId, 'running')
 
   return new Promise<AiResult>((resolve, reject) => {
     let settled = false
+    const finish = (status: 'done' | 'error'): void => {
+      const t = useTerminalStore.getState()
+      t.updateTabStatus(tabId, status)
+      t.closeTab(tabId)
+    }
     const unsubscribe = window.pathly.terminal.onExit(
       (exitedTabId: string, exitCode?: number, tail?: string) => {
         if (exitedTabId !== tabId || settled) return
         settled = true
         unsubscribe()
         if (exitCode && exitCode !== 0) {
+          finish('error')
           reject(new Error(tail?.trim() || `${adapter} exited with code ${exitCode}`))
         } else {
+          finish('done')
           resolve({ text: tail ?? '' })
         }
       },
@@ -65,6 +83,7 @@ function runEngine(adapter: CliAdapter, prompt: string, cwd: string): Promise<Ai
       if (settled) return
       settled = true
       unsubscribe()
+      finish('error')
       reject(e instanceof Error ? e : new Error(String(e)))
     })
   })

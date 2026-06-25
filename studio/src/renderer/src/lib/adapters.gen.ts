@@ -27,4 +27,10 @@ export const ADAPTERS: Record<string, AdapterMeta> = {
     headless: false,
     color: "#7C3AED",
   },
+  "antigravity": {
+    terminalKind: "shell",
+    supportsResume: false,
+    headless: false,
+    color: "#6B7280",
+  },
 };

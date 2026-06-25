@@ -1,7 +1,7 @@
-/* AiTargetSelector — a grouped native <select> listing Models and CLI Engines.
-   Reuses Studio tokens; data-state drives the availability decoration per
-   DESIGN.md (ready / unavailable / loading). Responsive: width:100%, min-width:0,
-   label truncates with ellipsis. */
+/* AiTargetSelector — a custom dropdown (button trigger + panel) listing Models
+   and CLI Engines. Matches Studio's house dropdown style (HQ/ModelSelector):
+   token-driven colors, chevron, grouped headings, greyed disabled rows.
+   Responsive: width:100%, min-width:0, label truncates with ellipsis. */
 
 .wrap {
   position: relative;
@@ -11,11 +11,14 @@
   min-width: 0;
 }
 
-.select {
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   min-width: 0;
   height: 32px;
-  padding: 0 28px 0 10px;
+  padding: 0 10px;
   box-sizing: border-box;
   background: var(--bg-surface0);
   border: var(--border);
@@ -23,49 +26,136 @@
   color: var(--text-primary);
   font: 400 12.5px/1 var(--font-family-base);
   cursor: pointer;
-  text-overflow: ellipsis;
-  appearance: none;
-  -webkit-appearance: none;
+  text-align: left;
   transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
-/* Chevron drawn as an inline SVG background so we keep zero inline styles. */
-.wrap::after {
-  content: '';
-  position: absolute;
-  right: 10px;
-  width: 10px;
-  height: 6px;
-  pointer-events: none;
-  background: var(--text-muted);
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-}
-
-.select:hover {
+.trigger:hover:not(:disabled) {
   border-color: var(--accent-border, var(--accent));
 }
 
-.select:focus-visible {
+.trigger:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 1px;
 }
 
-.select:disabled {
+.trigger:disabled {
   cursor: default;
   opacity: 0.55;
 }
 
-/* Availability states (DESIGN.md). 'loading' mutes the control during an
-   availability check / in-flight run; 'unavailable' is reserved for callers that
-   pass it through once availability wiring lands. */
+.triggerLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.triggerLabel[data-placeholder] {
+  color: var(--text-muted);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.chevronOpen {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transform: rotate(180deg);
+  transition: transform var(--transition-fast);
+}
+
+/* Loading state mutes the control during an availability check / in-flight run. */
 .wrap[data-state='loading'] {
   opacity: 0.7;
 }
 
-.wrap[data-state='unavailable'] .select {
+.panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  min-width: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-base);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  padding: 4px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.groupHeading {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 6px 8px 2px;
+}
+
+.option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font: 400 12.5px/1.2 var(--font-family-base);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.option:hover:not(:disabled) {
+  background: var(--bg-surface0);
+}
+
+.option:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.option[data-selected] {
+  background: var(--bg-surface1);
+  color: var(--accent);
+}
+
+.option:disabled {
+  cursor: default;
   color: var(--text-muted);
 }
 
-.select option:disabled {
+.optionLabel {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.optionReason {
+  flex-shrink: 0;
+  font-size: 10px;
   color: var(--text-muted);
+  white-space: nowrap;
 }

@@ -12,6 +12,14 @@ vi.mock('./cliEngine', async () => {
 vi.mock('../store/projectStore', () => ({
   useProjectStore: { getState: () => ({ projectPath: 'C:/proj' }) },
 }))
+// terminalStore — aiRouter registers a tab (addTab/updateTabStatus/closeTab) so the
+// engine run is visible in the CLI bar. Mock getState() to capture those calls.
+const addTab = vi.fn()
+const updateTabStatus = vi.fn()
+const closeTab = vi.fn()
+vi.mock('../store/terminalStore', () => ({
+  useTerminalStore: { getState: () => ({ addTab, updateTabStatus, closeTab }) },
+}))
 
 import * as modelManager from './modelManager'
 import * as cliEngine from './cliEngine'
@@ -64,10 +72,19 @@ describe('aiRouter.runJob', () => {
     expect(argv[0]).toBe('claude')
     expect(runModelMock).not.toHaveBeenCalled()
 
+    // The run registers a terminal tab and is marked running before exit (visible in the bar).
+    expect(addTab).toHaveBeenCalledTimes(1)
+    expect(addTab.mock.calls[0][0]).toBe(tabId)
+    expect(addTab.mock.calls[0][3]).toBe('claude') // kind = adapter
+    expect(updateTabStatus).toHaveBeenCalledWith(tabId, 'running')
+
     // Resolve only when OUR tabId exits 0; tail becomes the result text.
     exitCb?.('some-other-tab', 0, 'ignored')
     exitCb?.(tabId, 0, 'engine summary text')
     await expect(p).resolves.toEqual({ text: 'engine summary text' })
+    // On success the tab is marked done and closed.
+    expect(updateTabStatus).toHaveBeenCalledWith(tabId, 'done')
+    expect(closeTab).toHaveBeenCalledWith(tabId)
   })
 
   it('engine selection honours an explicit job.cwd', async () => {
@@ -83,8 +100,12 @@ describe('aiRouter.runJob', () => {
 
   it('engine selection rejects on a non-zero exit with the tail', async () => {
     const p = runJob({ kind: 'generic', prompt: 'x' }, { type: 'engine', id: 'claude' })
-    exitCb?.(spawn.mock.calls[0][0], 1, 'boom')
+    const tabId = spawn.mock.calls[0][0]
+    exitCb?.(tabId, 1, 'boom')
     await expect(p).rejects.toThrow('boom')
+    // A failed run marks the tab error and closes it.
+    expect(updateTabStatus).toHaveBeenCalledWith(tabId, 'error')
+    expect(closeTab).toHaveBeenCalledWith(tabId)
   })
 
   it('the Off sentinel is recognised and rejected by runJob', async () => {

@@ -7,6 +7,8 @@ import { PaletteSwatch } from './PaletteSwatch'
 import { RadioCard } from './RadioCard'
 import { NotificationSettings } from './NotificationSettings'
 import { ExportSettings } from './ExportSettings'
+import { AiTargetSelector } from '../shared/AiTargetSelector/AiTargetSelector'
+import { useDefaultSummaryTarget } from './hooks/useDefaultSummaryTarget'
 import s from './Settings.module.css'
 
 const DARK_PALETTES: ThemeName[] = ['dark', 'nord', 'mocha', 'solarized', 'dracula', 'rose-pine']
@@ -28,6 +30,8 @@ export function Settings(): JSX.Element {
 
   const [costInput, setCostInput] = useState(String(maxCostUsd))
   const [iterInput, setIterInput] = useState(String(maxIterations))
+
+  const { selection: summarySelection, setSelection: setSummarySelection } = useDefaultSummaryTarget()
 
   function saveRunConfig(): void {
     const cost = parseFloat(costInput)
@@ -157,6 +161,22 @@ export function Settings(): JSX.Element {
             <button data-testid="settings-runner-save-btn" type="button" className={s.saveBtn} onClick={saveRunConfig}>
               Save
             </button>
+          </div>
+        </div>
+
+        <div className={s.section}>
+          <div className={s.sectionTitle}>Summaries</div>
+          <div className={s.hint}>
+            Default model or CLI engine used to summarize .md artifacts added to boards.
+          </div>
+          <div className={s.summaryTarget}>
+            <AiTargetSelector
+              id="settings-summary-target"
+              ariaLabel="Default summary AI target"
+              value={summarySelection}
+              onChange={setSummarySelection}
+              allowOff
+            />
           </div>
         </div>
 
