@@ -1,5 +1,20 @@
 # GitNexus Integration — Approach
 
+## ▶ Build sequence — code-intel initiative
+
+Dependency order: **① B-core → ② C → ③ A**.
+- ① [`code-context-injection`](../code-context-injection/APPROACH.md) — shared backend (foundation)
+- ② [`code-intel-proxy`](../code-intel-proxy/APPROACH.md) — endpoint + role allowlist (all-roles coverage)
+- ③ **`gitnexus-integration` (this)** + [`lsp-integration`](../lsp-integration/APPROACH.md) — host-MCP rollout
+
+**This plan = Step ③ (A).**  ◀ Prev: [`code-intel-proxy`](../code-intel-proxy/APPROACH.md) (C).  ▶ **Next:** [`lsp-integration`](../lsp-integration/APPROACH.md).
+
+> ⚠ The gitnexus **binary** (`install` + `analyze`) is a **Step ①** prerequisite — it is B-core's `cli`-backend data source. Only the full host-MCP rollout is Step ③. The all-roles tool tiering once drafted here now lives in **C** (`code_intel.roles` + per-op routing); this plan stays scoped to research agents (scout, quick, explorer).
+
+Live DAG: comms board → **project** board, scope **`code-intel`**.
+
+---
+
 ## What is GitNexus
 
 GitNexus (https://github.com/abhigyanpatwari/GitNexus) is a codebase knowledge graph that

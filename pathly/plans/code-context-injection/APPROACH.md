@@ -1,5 +1,20 @@
 # Code Context Injection (Approach B) — Pathly-native code intelligence
 
+## ▶ Build sequence — code-intel initiative
+
+Dependency order: **① B-core → ② C → ③ A**.
+- ① **`code-context-injection` (this)** — shared backend (foundation)
+- ② [`code-intel-proxy`](../code-intel-proxy/APPROACH.md) — endpoint + role allowlist
+- ③ [`gitnexus-integration`](../gitnexus-integration/APPROACH.md) + [`lsp-integration`](../lsp-integration/APPROACH.md) — host-MCP rollout
+
+**This plan = Step ① (the foundation).** Build the shared backend (`runner/code_context.py`, `none|cli`) first — both B and C consume it.  ▶ **Next:** [`code-intel-proxy`](../code-intel-proxy/APPROACH.md).
+
+> ⓘ This plan has two halves. **B-core (the backend) = Step ①.** **B-inject** (the deterministic 🧭 prompt channel) is **deferred to Step ③**, alongside A — built only once C has proven the on-demand surface.
+
+Live DAG: comms board → **project** board, scope **`code-intel`**.
+
+---
+
 ## What this is
 
 This is **Approach B** of the MCP-delivery fork. The plans

@@ -1,5 +1,18 @@
 # LSP Integration (Serena MCP) — Approach
 
+## ▶ Build sequence — code-intel initiative
+
+Dependency order: **① B-core → ② C → ③ A**.
+- ① [`code-context-injection`](../code-context-injection/APPROACH.md) — shared backend (foundation)
+- ② [`code-intel-proxy`](../code-intel-proxy/APPROACH.md) — endpoint + role allowlist
+- ③ [`gitnexus-integration`](../gitnexus-integration/APPROACH.md) + **`lsp-integration` (this)** — host-MCP rollout
+
+**This plan = Step ③ (A), built after gitnexus.**  ◀ Prev: [`gitnexus-integration`](../gitnexus-integration/APPROACH.md) (reuses its `_run_mcp` rails).  ▶ **Next:** — final layer of the initiative.
+
+Live DAG: comms board → **project** board, scope **`code-intel`**.
+
+---
+
 ## What is LSP / Serena
 
 **LSP (Language Server Protocol)** is a standard where a per-language *language server*

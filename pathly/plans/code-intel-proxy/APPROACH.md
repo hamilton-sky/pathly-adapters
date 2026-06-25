@@ -1,5 +1,21 @@
 # Code Intel Proxy (Approach C) — Pathly as the code-intelligence gateway
 
+## ▶ Build sequence — code-intel initiative
+
+Dependency order: **① B-core → ② C → ③ A**.
+- ① [`code-context-injection`](../code-context-injection/APPROACH.md) — shared backend (foundation)
+- ② **`code-intel-proxy` (this)** — endpoint + role allowlist (delivers all-roles coverage)
+- ③ [`gitnexus-integration`](../gitnexus-integration/APPROACH.md) + [`lsp-integration`](../lsp-integration/APPROACH.md) — host-MCP rollout
+
+**This plan = Step ② — the payoff surface.**  ◀ Prev: [`code-context-injection`](../code-context-injection/APPROACH.md) (B-core backend).  ▶ **Next:** [`gitnexus-integration`](../gitnexus-integration/APPROACH.md) + [`lsp-integration`](../lsp-integration/APPROACH.md) (A), plus B-inject.
+
+> ⓘ **The all-roles tool tiering lives here**, as `code_intel.roles` + per-op routing (not as per-agent host tool-lists in A):
+> full (impact+callers+chain): **architect, builder, reviewer, explorer** · chain: **scout, tester** · lookup (symbol+context): **quick, director, planner, designer, po** · excluded: **web-researcher, orchestrator, evaluator, human**.
+
+Live DAG: comms board → **project** board, scope **`code-intel`**.
+
+---
+
 ## What this is
 
 **Approach C** of the MCP-delivery fork. Instead of each host CLI connecting to gitnexus/serena
