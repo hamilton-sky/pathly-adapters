@@ -109,6 +109,48 @@ Follows the layer rule (`db → runner → supervisor → http_server`) and the 
 
 ---
 
+## Capability control (settings & permission)
+
+The user decides whether agents get code intelligence *at all*, and how. **One setting group gates
+all three surfaces** — but the gate differs by surface because Pathly is in the call loop for B/C
+and **not** for A.
+
+**Setting model** (written by the install/export choice flow; stored in central config, e.g.
+`~/.pathly`):
+- `code_intel.enabled` — master on/off
+- `code_intel.surfaces` — `{ host_mcp (A), inject (B), proxy (C) }`, each on/off
+- `code_intel.roles` — optional allowlist of agent roles permitted to use B/C (e.g. only
+  `explorer, reviewer, builder`)
+- `code_intel.backend` / `code_intel.tool` — `cli|mcp` / `gitnexus|serena` (from Approach B)
+
+**Two gates, exactly the two mechanisms you described:**
+
+1. **Prompt fragment — "tell the agent it has the ability."** The `## Code intelligence` section is
+   delivered as a **conditional fragment** (Pathly already composes skills from
+   `core/skills/fragments/` via `compose.py` / `fsm_ops.py`). When a surface is disabled,
+   `pathly-setup --repair` re-materializes agents/skills **without** the fragment — the agent is
+   never told the ability exists. *Install-time* gate (applies on next apply/repair).
+
+2. **Runtime permission — "actually allow the call."**
+   - **B:** `backend=off` → `build_block` returns `""` → nothing injected. Instant.
+   - **C:** `POST /code/query` checks `enabled` + `surfaces.proxy` + the **caller's role** against
+     `roles`; if not permitted it returns `{ "ok": true, "result": null, "reason": "disabled" }`
+     (or `403`). Instant — **no reinstall**. This is the literal "condition that does not give
+     permission to call the MCP through Pathly."
+
+**The asymmetry (why C is the strongest control point):**
+- **A is install-time-only.** Once gitnexus/serena sits in the host's `mcp.json` and the agent's
+  tool list, the **host** offers the tool to the model — Pathly is not in that path, so it cannot
+  refuse at runtime or per role. Disabling A = drop the server from `mcp.json` + remove the fragment,
+  then reinstall.
+- **B and C pass through Pathly**, so they are runtime-gated. **Only C supports per-role permission**,
+  because every call crosses its checkpoint.
+
+Net: for a real-time on/off the user flips, rely on **C's endpoint check**; the **fragment** is the
+"don't even mention it" cleanup applied on the next `--repair`.
+
+---
+
 ## Critical prerequisite (Conversation 1)
 
 The whole approach hinges on **agents being able to reach the FSM HTTP endpoint in both modes.**
@@ -126,6 +168,8 @@ session can both successfully `POST /code/query` and get a result, before anythi
 | Shared backend (reused from B) | `runner/code_context.py` | Python (runner) | (shared with B) |
 | Agent CLI shim `code-query` | `fsm.http_client` / `pathly-fsm-call` entry | Python | Edit |
 | Comms-board logging of queries | existing `/comms` post path (lazy call) | Python | Edit |
+| `## Code intelligence` section as a conditional **fragment** | `core/skills/fragments/` + `compose.py` wiring | data + Python | New/Edit |
+| Capability setting + endpoint permission check | install choice flow + `code/query` handler | Python/config | Edit |
 | (Optional, deferred) `pathly-code` MCP shim + install template | `adapters/*/_mcp/pathly-code.json` | data | New |
 
 No FSM state-machine change, no DB schema change (cache reuses B's content-hash store; logging

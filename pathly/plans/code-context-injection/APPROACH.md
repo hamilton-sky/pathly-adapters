@@ -110,6 +110,12 @@ SOLID file rules (one concern per file, ≤400 lines).
 
 ## Configuration — ties into the existing install choice flow
 
+The full enable/disable + per-role permission model (one setting group gating all three surfaces,
+plus the conditional `## Code intelligence` **fragment** that `pathly-setup --repair` adds/removes)
+is specified once in [code-intel-proxy → "Capability control"](../code-intel-proxy/APPROACH.md).
+For B specifically, "disabled" = `backend off` ⇒ `build_block` returns `""` ⇒ nothing injected.
+
+
 The backend is a single setting: `code_context.backend = off | cli | mcp` (default `off`) plus
 `code_context.tool = gitnexus | serena`. This rides the **same install/export selection** the app
 already presents (the user chooses which adapters receive skills/agents; this adds "enable

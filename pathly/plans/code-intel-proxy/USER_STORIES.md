@@ -89,6 +89,29 @@ Pathly via `code-query`" row, and it is added to the relevant agent prompts beyo
 
 ---
 
+## Story 7 — User can enable/disable the capability (settings + permission)
+
+**Who:** User who wants to decide whether agents have code intelligence at all.
+**What:** A setting group (`code_intel.enabled`, `code_intel.surfaces`, `code_intel.roles`) gates
+the capability. Disabling it (a) removes the `## Code intelligence` prompt fragment on the next
+`pathly-setup --repair` so agents are never told the ability exists, and (b) makes
+`POST /code/query` refuse at runtime.
+**Why:** The user — not the plan — owns whether agents get this ability, with a real runtime switch.
+
+**Acceptance criteria:**
+- The `## Code intelligence` section is delivered as a **fragment** under
+  `core/skills/fragments/` (composed via `compose.py`), not a hard-coded edit — so it can be
+  included/excluded by the setting.
+- With the capability disabled and `pathly-setup --repair` run, materialized agents/skills contain
+  **no** `## Code intelligence` section.
+- With the capability disabled at runtime, `POST /code/query` returns
+  `{"ok": true, "result": null, "reason": "disabled"}` (or `403`) without invoking any backend.
+- The `code_intel.roles` allowlist is enforced by `/code/query`: a call from a role not on the list
+  is refused; a call from a permitted role succeeds.
+- Default is disabled (no behavior change for existing installs).
+
+---
+
 ## Story 6 — (Optional) `pathly-code` MCP shim republishing typed tools
 
 **Who:** User on a host that prefers real MCP tool affordances.

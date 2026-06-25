@@ -23,6 +23,10 @@ agents fall back to native tools (Grep, Read) when it is not.
 > **C** — agent asks Pathly over HTTP and Pathly proxies the query (adaptive, interactive + runner,
 > all roles): [`../code-intel-proxy/APPROACH.md`](../code-intel-proxy/APPROACH.md).
 > B and C share one backend; A is independent. They compose; A is one way to get interactive.
+> User enable/disable + per-role permission is specified in
+> [code-intel-proxy → "Capability control"](../code-intel-proxy/APPROACH.md); for A, "disabled"
+> means dropping the server from `mcp.json` + removing the prompt fragment, then reinstalling
+> (A is install-time-only — the host, not Pathly, offers the tool at runtime).
 
 ---
 
