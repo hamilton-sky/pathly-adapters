@@ -202,6 +202,127 @@ sitting alongside `gitnexus.json` means **both** servers land in the host config
 
 ---
 
+## What it touches + how it works
+
+Scope note: the table below covers **both** code-intelligence plans combined
+(gitnexus-integration + lsp-integration), since they share the same touch surface. The
+headline: across both plans there is exactly **one real code function** (`_run_mcp`, added by
+gitnexus-integration). Everything else is data/config — markdown prompts, YAML, JSON. **Nothing
+in Studio (React/Electron), nothing in the FSM/orchestrator HTTP server, nothing in the DB.**
+
+| # | What | Files | Kind | New/Edit |
+|---|---|---|---|---|
+| A | Agent prompts — the `## Code intelligence` section | `core/agents/research/scout.md`, `research/explorer.md`, `support/quick.md` | Markdown (data) | Edit |
+| B | Claude tool-lists — `tools:` entries | `adapters/claude/_meta/{scout,quick,explorer}.yaml` | YAML (data) | Edit |
+| C | Install config — `mcp:` destination block | `adapters/{claude,codex,copilot,antigravity}/_meta/install.yaml` | YAML (data) | Edit |
+| D | MCP server templates | `adapters/*/_mcp/gitnexus.json` (×4), `adapters/*/_mcp/serena.json` (×3) | JSON (data) | **New** |
+| E | **The only executable code** — `_run_mcp()` stitcher (~40 lines) | `src/install_cli/orchestrate.py` | Python (install CLI) | Edit |
+
+So: ~13 data/config files + 1 small Python function. Frontend: untouched. Runtime orchestrator:
+untouched.
+
+**Why no frontend / FSM / DB changes.** The actual code intelligence (call chains, references,
+impact) runs **inside the MCP servers** (GitNexus, Serena) — external processes the **CLI host**
+(Claude Code / codex) talks to directly. Pathly never calls those tools itself; it just (1) tells
+the agent to prefer them via the prompt, and (2) writes the server into the host's `mcp.json` at
+install time. The agent↔MCP conversation happens one layer below Pathly.
+
+### Layer touch map
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  STUDIO  (Electron / React / TypeScript)                                   │
+│  FlowControlBar · terminal.ts spawn gate · Command Center · IPC            │
+│                          ✗ UNTOUCHED                                        │
+├──────────────────────────────────────────────────────────────────────────┤
+│  ORCHESTRATOR  (Python: http_server / supervisor / runner / db)            │
+│  FSM · /comms/* · goal_run · embeddings · DB schema                        │
+│                          ✗ UNTOUCHED                                        │
+├──────────────────────────────────────────────────────────────────────────┤
+│  INSTALL CLI  (src/install_cli/)                                            │
+│  orchestrate.py  ──►  + _run_mcp()        ◄── ✎ THE ONE CODE CHANGE         │
+├──────────────────────────────────────────────────────────────────────────┤
+│  DATA / ADAPTERS  (src/pathly_data/)                                        │
+│  core/agents/*.md (+ section)   _meta/*.yaml (+ tools)                      │
+│  _meta/install.yaml (+ mcp:)    _mcp/{gitnexus,serena}.json   ◄── ✎ DATA    │
+└──────────────────────────────────────────────────────────────────────────┘
+                                   │  pathly-setup <host> --apply
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│  HOST INSTALL DIR  (~/.claude/)                                            │
+│  agents/*.md   +   mcp.json   ◄── written by install; READ by the CLI host │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Phase 1 — install time (`pathly-setup claude --apply`)
+
+`_run_mcp()` is the only added step; everything else already exists.
+
+```
+ src/pathly_data/                              ~/.claude/
+ ────────────────                              ─────────
+ core/agents/scout.md ─┐
+ _meta/scout.yaml ─────┼─ stitch (existing) ─► agents/scout.md
+                       │                        (frontmatter: tools + body: §Code intelligence)
+                       │
+ _mcp/gitnexus.json ──┐│
+ _mcp/serena.json ────┼┼─ _run_mcp (NEW) ────► mcp.json
+ _meta/install.yaml ──┘│   deep-merge          {
+   (mcp: dest)         │   *.json by glob        "mcpServers": {
+                       │                            "gitnexus": {...},   ◄─ both land
+                       │                            "serena":   {...}    ◄─ in one run
+                       │                          }
+                       │                        }   (pre-existing servers preserved)
+```
+
+### Phase 2 — run time (an agent answers a code question)
+
+```
+ user: /pathly explore "who calls stitch_agent, and what breaks if I change it?"
+        │
+        ▼
+ Claude Code CLI ── reads ──► ~/.claude/agents/explorer.md
+        │                       • tools: [...gitnexus_*, find_symbol, find_referencing_symbols]
+        │                       • body: "## Code intelligence — preferred tools, Grep/Read fallback"
+        │
+        │  CLI connects to MCP servers listed in ~/.claude/mcp.json
+        ▼
+ ┌─────────────── the agent's routing decision ───────────────┐
+ │                                                             │
+ │  "exact callers of ONE symbol?"      ─► find_referencing_symbols  (LSP/Serena)
+ │       precise · always fresh                                │      ↳ live, compiler-exact
+ │                                                             │
+ │  "blast radius across the whole repo?"─► gitnexus_impact_analysis (GitNexus)
+ │       graph-wide in one call                                │      ↳ pre-built graph
+ │                                                             │
+ │  after an edit? ─────────────────────► prefer LSP (GitNexus may be stale)
+ │                                                             │
+ │  neither server present? ────────────► Grep / Read         │      ↳ graceful fallback
+ └─────────────────────────────────────────────────────────────┘
+        │
+        ▼
+ explorer writes TRACE.md  (cites the tool evidence it used)
+```
+
+### Same wire, both delivery modes
+
+```
+ INTERACTIVE (/pathly explore)        RUNNER (Studio Start button)
+ ───────────────────────────         ────────────────────────────
+ CLI reads agents/explorer.md         supervisor injects prompt via -p argv
+        │                                    │
+        └────────────┬───────────────────────┘
+                     ▼
+        CLI host connects to mcp.json servers   ◄─ identical from here down
+                     ▼
+        gitnexus / serena tools available → agent uses them → TRACE.md
+```
+
+The tool-call layer is the CLI host's job in **both** modes, so the MCP servers work whether the
+user types `/pathly explore` or hits Studio's Start button — no Studio code involved either way.
+
+---
+
 ## Rollout order
 
 1. **Verify Serena's contract** — confirm the four tool names (`find_symbol`,
