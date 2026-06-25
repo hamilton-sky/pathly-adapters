@@ -17,6 +17,16 @@ agents fall back to native tools (Grep, Read) when it is not.
 
 ---
 
+## What it touches
+
+This plan is config-as-feature: agent prompts + `_meta` tool-lists + `_mcp/*.json` templates,
+plus one Python function (`_run_mcp`) in `src/install_cli/orchestrate.py`. **No frontend (Studio),
+no FSM/orchestrator, no DB changes.** A full touch-surface table and ASCII diagrams (install-time
+stitching + run-time tool routing, covering this plan and lsp-integration together) live in
+[`../lsp-integration/APPROACH.md`](../lsp-integration/APPROACH.md) → "What it touches + how it works".
+
+---
+
 ## Tool-by-query-type mapping
 
 Each agent uses a subset of GitNexus tools matched to the kind of query it performs:
