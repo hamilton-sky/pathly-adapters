@@ -22,7 +22,7 @@ import {
 } from '../../../../store/commsApi'
 
 /** Only Markdown/plain-text artifacts are summarized (mirrors the server's .md-only rule). */
-function isSummarizable(atype: string | undefined, name: string): boolean {
+export function isSummarizable(atype: string | undefined, name: string): boolean {
   if (atype === 'md') return true
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
   return ext === 'md' || ext === 'markdown' || ext === 'txt'
@@ -107,7 +107,7 @@ export async function summarizeArtifact(args: SummarizeArtifactArgs): Promise<bo
 }
 
 /** Parse a stored summary_selection JSON string into an AiSelection, or null. */
-function parseSelection(raw: string | null | undefined): AiSelection | null {
+export function parseSelection(raw: string | null | undefined): AiSelection | null {
   if (!raw) return null
   try {
     const p = JSON.parse(raw) as { type?: string; id?: string }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, SquarePen, FileText } from 'lucide-react'
 import type { Message } from '../../types'
+import { ArtifactSummarizePill } from './ArtifactSummarizePill'
 import { useFocusTrap } from '../../../../hooks/useFocusTrap'
 import { readFile } from '../../../../services/pathlyApi'
 import { fetchArtifacts, relativeTime, type ArtifactRow } from '../../../../store/commsApi'
@@ -137,6 +138,7 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
         </div>
 
         <footer className={s.foot}>
+          <ArtifactSummarizePill messageId={m.id} hasPath={Boolean(m.artifactPath)} />
           <span className={s.spacer} />
           <button type="button" className={s.btnQuiet} onClick={onClose}>Close</button>
           {m.artifactPath && (
