@@ -155,7 +155,7 @@ def comms_goals_stop():
                 run = get_run(run_id)
                 if run is not None:
                     run.mark_pty_result(
-                        {"exit_code": 0, "result": {"result": "stopped by user"}}
+                        {"exit_code": 130, "result": {"result": "stopped by user"}}
                     )
             except Exception:
                 pass
@@ -271,6 +271,8 @@ def comms_goals_decompose():
             _board_post(f"🧩 decomposing goal via {mode}…", phase="running")
 
         def _on_done(_run_id: str, res) -> None:
+            if isinstance(res, dict) and res.get("error"):
+                return  # run was killed or errored — don't post false-positive success
             _board_post("✅ decomposition finished — task DAG seeded", phase="done")
 
         result = start_goal_decompose(

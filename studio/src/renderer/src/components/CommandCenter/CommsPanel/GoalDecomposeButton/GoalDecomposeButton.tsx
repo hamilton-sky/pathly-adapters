@@ -30,7 +30,7 @@ export function GoalDecomposeButton({ goalId, goalText }: Props): JSX.Element {
         state={d.runState}
         progress={d.progress}
         hasPath
-        title="Decompose"
+        title={modeLabel}
         runningVerb="Decomposing"
         mainIcon={<Boxes size={13} />}
         idleTip={`Decompose goal — ${modeLabel.toLowerCase()} (${d.mode})`}

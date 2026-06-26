@@ -366,7 +366,6 @@ def _run_team(
 
 # ── Decompose bridge: turn a chosen goal into a task DAG ──────────────────────
 _CONSULTATION_FLOW = "consultation"
-_PLAN_SKILL = "planning/plan"
 
 
 def start_goal_decompose(
@@ -477,17 +476,36 @@ def _decompose_planner(
     spawn_fn,
     block: bool,
 ) -> dict:
-    """Light decomposer: one planner run on the goal's scope. The directive tells the
-    planner the goal ALREADY exists, so it posts tasks under this goal_id (plan.md
-    Step 6) without creating a second goal."""
+    """Light decomposer: one planner run posts 3-7 tasks under the existing goal.
+
+    No planning skill is loaded — the instructions are fully self-contained so the
+    agent skips the feature-planning workflow and goes straight to POSTing tasks.
+    """
     from pathly_orchestrator.supervisor.board_run import start_board_run
 
+    post_url = "http://127.0.0.1:8765/comms/post"
     instructions = (
-        f"Decompose the EXISTING goal into a task DAG. goal_id={goal_id!r}, scope={scope!r}.\n"
-        f"Goal: {goal_text}\n\n"
-        "Produce the plan files, then execute plan.md Step 6 to post one type=task per "
-        f"phase — but the goal already exists, so do NOT post a new type=goal; stamp every "
-        f"task with goal_id={goal_id!r}. The posted tasks are this goal's DAG."
+        f"Analyze the goal below and break it into 3-7 concrete, actionable tasks.\n\n"
+        f"**Goal:** {goal_text}\n\n"
+        "For each task make an HTTP POST request:\n\n"
+        f"  POST {post_url}\n"
+        "  Content-Type: application/json\n\n"
+        "  {\n"
+        f'    "board": "{board}",\n'
+        f'    "scope": "{scope}",\n'
+        '    "from": "planner",\n'
+        '    "type": "task",\n'
+        f'    "goal_id": "{goal_id}",\n'
+        '    "text": "<one-line task title>",\n'
+        '    "stage": "implement",\n'
+        '    "status": "pending"\n'
+        "  }\n\n"
+        "Rules:\n"
+        "- POST all tasks before doing anything else — that is your entire job\n"
+        "- Do NOT create plan files, run the planning workflow, or read any skill files\n"
+        "- Do NOT post a new goal (goal_id already exists)\n"
+        "- Each task title must be actionable and specific (e.g. 'Set up DB schema')\n"
+        f"- Stamp every task with goal_id={goal_id!r}"
     )
     result = start_board_run(
         board,
@@ -497,7 +515,7 @@ def _decompose_planner(
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
         adapter=adapter or "claude",
-        skill=_PLAN_SKILL,
+        skill="",  # no skill — instructions are self-contained
         agent="planner",
         progress=progress,
         broadcast_fn=broadcast_fn,
