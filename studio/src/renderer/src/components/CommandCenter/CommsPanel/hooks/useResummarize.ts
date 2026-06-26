@@ -6,7 +6,7 @@ import type { AiSelection } from '../../../../services/aiRouter'
 import { runJobWithAbort, isOff } from '../../../../services/aiRouter'
 import { buildSummarizePrompt } from '../../../../services/summaryPrompt'
 import { readFile } from '../../../../services/pathlyApi'
-import { useToastStore } from '../../../../store/toastStore'
+import { useCommsStore } from '../../../../store/commsStore'
 import {
   fetchArtifacts,
   apiGetDefaultSelection,
@@ -75,6 +75,10 @@ export function useResummarize(messageId: string): ResummarizeHook {
     if (pillState === 'running') return
     setPillState('running')
     setStartedAt(Date.now())
+    // Drive the per-artifact badge + toast (📝 ready / ⚠ failed). markSummaryStatus owns
+    // the toasts, so this hook never pushes its own — one feedback source, no double toast.
+    const markStatus = useCommsStore.getState().markSummaryStatus
+    markStatus(messageId, 'summarizing')
 
     void (async () => {
       try {
@@ -103,8 +107,12 @@ export function useResummarize(messageId: string): ResummarizeHook {
         abortRef.current = null
 
         const summary = (result.text ?? '').trim()
-        if (summary) await apiSetArtifactSummary(row.id, summary, selection as AiSelectionDto)
+        // Empty output is a failure, not a silent success — otherwise the pill says
+        // "done" but nothing is saved and the card looks unchanged.
+        if (!summary) throw new Error('the engine returned no summary text')
+        await apiSetArtifactSummary(row.id, summary, selection as AiSelectionDto)
 
+        markStatus(messageId, 'ready')
         setPillState('done')
         setStartedAt(undefined)
         window.setTimeout(() => setPillState((s) => (s === 'done' ? 'idle' : s)), 2000)
@@ -115,7 +123,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
           setPillState('idle')
           setStartedAt(undefined)
         } else {
-          useToastStore.getState().push(`Re-summarize failed: ${msg}`, 'error', { category: 'agent_done' })
+          markStatus(messageId, 'failed', msg)
           setPillState('error')
           setStartedAt(undefined)
           window.setTimeout(() => setPillState((s) => (s === 'error' ? 'idle' : s)), 2500)

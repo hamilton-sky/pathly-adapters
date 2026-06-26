@@ -18,6 +18,15 @@ interface Props {
 
 const PREVIEW_LINES = 24
 
+/** " · <engine>" suffix for the AI-summary heading, parsed from the stored selection JSON. */
+function summaryEngineSuffix(raw: string | null | undefined): string {
+  if (!raw) return ''
+  try {
+    const p = JSON.parse(raw) as { id?: string }
+    return p.id ? ` · ${p.id}` : ''
+  } catch { return '' }
+}
+
 /**
  * Artifact details modal — metadata for the artifact message plus a live preview
  * read from the file, and an "Open in editor" action. Stored fields (stored
@@ -114,9 +123,16 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
             <span className={s.metaLabel}>Path</span><span className={s.metaPath}>{m.artifactPath ?? '—'}</span>
           </div>
 
+          {meta?.summary && (
+            <>
+              <span className={s.sectionLabel}>AI Summary{summaryEngineSuffix(meta.summary_selection)}</span>
+              <div className={s.summary}>{meta.summary}</div>
+            </>
+          )}
+
           {m.text && (
             <>
-              <span className={s.sectionLabel}>Summary</span>
+              <span className={s.sectionLabel}>{meta?.summary ? 'Description' : 'Summary'}</span>
               <div className={s.summary}>{m.text}</div>
             </>
           )}
