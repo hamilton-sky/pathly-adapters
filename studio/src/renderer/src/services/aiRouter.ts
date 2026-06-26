@@ -40,12 +40,19 @@ function defaultCwd(): string {
 
 /**
  * Spawn a CLI engine headless one-shot and resolve with its stdout tail.
- * Returns both the promise and an abort function that kills the PTY immediately.
+ * Returns both the promise and an abort function.
  *
- * Registered as a terminal tab (addTab + updateTabStatus 'running') so it surfaces
- * in the CLI tab list / monitor bar — a background summary should be visible but
- * must NOT steal focus, so we deliberately do NOT call openTab. On exit (or a spawn
- * throw) the tab status is set 'done'/'error' and the tab closed.
+ * The run opens a real terminal tab (addTab + updateTabStatus 'running' + openTab) so
+ * it is visible in the CLI tab list / monitor bar exactly like every other CLI-engine
+ * spawn. On natural exit (or a spawn throw) the tab status is set 'done'/'error' and the
+ * tab is closed.
+ *
+ * abort() does NOT just call terminal.kill and wait for onExit: on Windows the PTY is
+ * force-killed via `taskkill /F`, which does NOT fire node-pty's onExit, so the renderer
+ * would never receive terminal:exit and the monitor would show the run as ACTIVE forever.
+ * Instead abort settles the promise and closes the tab itself (so the monitor clears
+ * immediately), then kills the PTY. The onExit listener is unsubscribed + guarded by
+ * `settled`, so a late real exit is ignored.
  */
 function runEngineCancellable(
   adapter: CliAdapter,
@@ -57,15 +64,20 @@ function runEngineCancellable(
   const term = useTerminalStore.getState()
   term.addTab(tabId, `Summary · ${adapter}`, 'left', adapter as TerminalTab['kind'], undefined, undefined, prompt)
   term.updateTabStatus(tabId, 'running')
+  term.openTab(tabId)   // reveal it like every other CLI-engine spawn
+
+  let settled = false
+  let unsubscribe = (): void => {}
+  let rejectPromise: (e: Error) => void = () => {}
+  const finish = (status: 'done' | 'error'): void => {
+    const t = useTerminalStore.getState()
+    t.updateTabStatus(tabId, status)
+    t.closeTab(tabId)
+  }
 
   const promise = new Promise<AiResult>((resolve, reject) => {
-    let settled = false
-    const finish = (status: 'done' | 'error'): void => {
-      const t = useTerminalStore.getState()
-      t.updateTabStatus(tabId, status)
-      t.closeTab(tabId)
-    }
-    const unsubscribe = window.pathly.terminal.onExit(
+    rejectPromise = reject
+    unsubscribe = window.pathly.terminal.onExit(
       (exitedTabId: string, exitCode?: number, tail?: string) => {
         if (exitedTabId !== tabId || settled) return
         settled = true
@@ -88,7 +100,16 @@ function runEngineCancellable(
     })
   })
 
-  return { promise, abort: () => { void window.pathly.terminal.kill(tabId) } }
+  const abort = (): void => {
+    if (settled) return
+    settled = true
+    unsubscribe()
+    finish('error')                          // closes the tab → monitor clears at once
+    void window.pathly.terminal.kill(tabId)  // kill the PTY (main also frees the scheduler slot)
+    rejectPromise(new Error('aborted'))       // useResummarize treats 'aborted' as a clean stop
+  }
+
+  return { promise, abort }
 }
 
 function runEngine(adapter: CliAdapter, prompt: string, cwd: string): Promise<AiResult> {
