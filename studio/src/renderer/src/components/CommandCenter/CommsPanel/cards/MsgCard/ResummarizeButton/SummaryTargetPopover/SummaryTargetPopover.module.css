@@ -1,0 +1,28 @@
+/* Gear-anchored popover for per-artifact AI target selection. */
+.popover {
+  position: fixed;
+  top: var(--pop-top);
+  left: var(--pop-left);
+  width: 220px;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.heading {
+  font: 600 10px/1 var(--font-family-base);
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 8px 10px 7px;
+  border-bottom: var(--border);
+}
+
+.body {
+  padding: 8px 10px;
+}

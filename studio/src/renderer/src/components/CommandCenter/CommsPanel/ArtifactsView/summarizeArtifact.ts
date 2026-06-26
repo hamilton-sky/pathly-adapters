@@ -12,6 +12,7 @@
 import { runJob, isOff, type AiSelection } from '../../../../services/aiRouter'
 import { buildSummarizePrompt } from '../../../../services/summaryPrompt'
 import { readFile } from '../../../../services/pathlyApi'
+import { useToastStore } from '../../../../store/toastStore'
 import {
   fetchArtifacts,
   apiSetArtifactSummary,
@@ -21,7 +22,7 @@ import {
 } from '../../../../store/commsApi'
 
 /** Only Markdown/plain-text artifacts are summarized (mirrors the server's .md-only rule). */
-function isSummarizable(atype: string | undefined, name: string): boolean {
+export function isSummarizable(atype: string | undefined, name: string): boolean {
   if (atype === 'md') return true
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
   return ext === 'md' || ext === 'markdown' || ext === 'txt'
@@ -65,7 +66,12 @@ export async function summarizeArtifactById(
     if (!summary) return false
 
     return apiSetArtifactSummary(artifactId, summary, selection as AiSelectionDto)
-  } catch {
+  } catch (err) {
+    // Surface the reason instead of failing silently — the most common cause is a
+    // model target that isn't installed locally (Ollama not running / not pulled).
+    // The engine default avoids this, but a user-picked model can still hit it.
+    const msg = err instanceof Error ? err.message : String(err)
+    useToastStore.getState().push(`Summary failed: ${msg}`, 'error', { category: 'agent_done' })
     return false
   }
 }
@@ -101,7 +107,7 @@ export async function summarizeArtifact(args: SummarizeArtifactArgs): Promise<bo
 }
 
 /** Parse a stored summary_selection JSON string into an AiSelection, or null. */
-function parseSelection(raw: string | null | undefined): AiSelection | null {
+export function parseSelection(raw: string | null | undefined): AiSelection | null {
   if (!raw) return null
   try {
     const p = JSON.parse(raw) as { type?: string; id?: string }

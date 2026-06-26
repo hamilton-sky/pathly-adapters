@@ -61,7 +61,7 @@ export function GoalCardHeader({ goal, tasks, open, onToggle, onEditGoal, onDele
         <div className={s.controls}>
           {/* No tasks yet → Decompose the goal into a DAG; once it has tasks → Run it. */}
           {tasks.length === 0
-            ? <GoalDecomposeButton goalId={goal.id} />
+            ? <GoalDecomposeButton goalId={goal.id} goalText={goal.text} />
             : <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />}
         </div>
       </div>

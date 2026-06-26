@@ -379,6 +379,9 @@ def test_decompose_consultation_routes_to_consultation_flow():
     assert result["ok"] is True
     assert result["mode"] == "consultation"
     assert captured["flow"] == "consultation"
+    # A board-context decompose has no human at a terminal, so the consultation flow
+    # must run headless — an interactive PTY would block waiting for input.
+    assert captured["interactive"] is False
 
 
 def test_decompose_already_decomposed():

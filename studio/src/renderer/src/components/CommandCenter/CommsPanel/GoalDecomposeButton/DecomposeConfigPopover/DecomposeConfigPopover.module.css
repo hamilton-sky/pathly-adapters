@@ -1,0 +1,63 @@
+/* Gear-anchored popover shell — mirrors EvalConfigPopover's portal/positioning idiom. */
+.popover {
+  position: fixed;
+  top: var(--pop-top);
+  left: var(--pop-left);
+  width: 260px;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.heading {
+  font: 600 11px/1 var(--font-family-base);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 10px 12px 8px;
+  border-bottom: var(--border);
+}
+
+.section {
+  padding: 8px 12px;
+  border-bottom: var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sectionLabel {
+  font: 600 9px/1 var(--font-family-base);
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 12px;
+  min-width: 0;
+}
+
+.runBtn {
+  padding: 4px 12px;
+  font: 600 11px/1 var(--font-family-base);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--accent-fg, #fff);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.runBtn:hover:not(:disabled) { opacity: 0.85; }
+.runBtn:disabled { opacity: 0.45; cursor: not-allowed; }

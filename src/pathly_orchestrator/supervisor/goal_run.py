@@ -552,12 +552,17 @@ def _decompose_consultation(
         from pathly_orchestrator.supervisor.api import start_run as _start
 
     try:
+        # Headless: a board-context decompose has no human at a terminal, so the
+        # consultation flow must run non-interactively (interactive=True would spawn a
+        # PTY that blocks waiting for input and hangs the run). Mirrors how board runs
+        # default to interactive=False.
         state = _start(
             topic=scope,
             flow=_CONSULTATION_FLOW,
             project_root=project_root or "",
             model=model or _DEFAULT_MODEL,
             broadcast_fn=broadcast_fn,
+            interactive=False,
         )
     except ValueError as exc:
         return {"ok": False, "reason": "board_busy", "error": str(exc)}

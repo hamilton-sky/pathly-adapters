@@ -40,25 +40,25 @@ function defaultCwd(): string {
 
 /**
  * Spawn a CLI engine headless one-shot and resolve with its stdout tail.
- * Mirrors the lifecycle care in useEditorAgentActions: the onExit subscription
- * is installed before spawn, ignores other tabs' exits, and is torn down exactly
- * once on either the exit path or a spawn-time throw.
+ * Returns both the promise and an abort function that kills the PTY immediately.
  *
- * The run is registered as a terminal tab (addTab + updateTabStatus 'running') so
- * it surfaces in the CLI tab list / monitor bar — a background summary should be
- * visible but must NOT steal focus, so we deliberately do NOT call openTab. On
- * exit (or a spawn throw) the tab status is set 'done'/'error' and the tab closed,
- * which snapshots it into the session history.
+ * Registered as a terminal tab (addTab + updateTabStatus 'running') so it surfaces
+ * in the CLI tab list / monitor bar — a background summary should be visible but
+ * must NOT steal focus, so we deliberately do NOT call openTab. On exit (or a spawn
+ * throw) the tab status is set 'done'/'error' and the tab closed.
  */
-function runEngine(adapter: CliAdapter, prompt: string, cwd: string): Promise<AiResult> {
+function runEngineCancellable(
+  adapter: CliAdapter,
+  prompt: string,
+  cwd: string,
+): { promise: Promise<AiResult>; abort: () => void } {
   const argv = buildHeadlessArgv(adapter, prompt)
   const tabId = `airouter-${adapter}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
   const term = useTerminalStore.getState()
-  // Register quietly (no openTab) and stamp 'running' before spawn so startedAt is at t0.
   term.addTab(tabId, `Summary · ${adapter}`, 'left', adapter as TerminalTab['kind'], undefined, undefined, prompt)
   term.updateTabStatus(tabId, 'running')
 
-  return new Promise<AiResult>((resolve, reject) => {
+  const promise = new Promise<AiResult>((resolve, reject) => {
     let settled = false
     const finish = (status: 'done' | 'error'): void => {
       const t = useTerminalStore.getState()
@@ -87,6 +87,12 @@ function runEngine(adapter: CliAdapter, prompt: string, cwd: string): Promise<Ai
       reject(e instanceof Error ? e : new Error(String(e)))
     })
   })
+
+  return { promise, abort: () => { void window.pathly.terminal.kill(tabId) } }
+}
+
+function runEngine(adapter: CliAdapter, prompt: string, cwd: string): Promise<AiResult> {
+  return runEngineCancellable(adapter, prompt, cwd).promise
 }
 
 /** Dispatch a job to either a local model or a CLI engine, per the selection. */
@@ -98,4 +104,27 @@ export async function runJob(job: AiJob, selection: AiSelection): Promise<AiResu
     return runModel(selection.id, job.prompt)
   }
   return runEngine(selection.id as CliAdapter, job.prompt, job.cwd ?? defaultCwd())
+}
+
+/**
+ * Like runJob but returns an abort function alongside the promise. For CLI-engine
+ * targets abort kills the PTY immediately; for model targets it marks the result as
+ * discarded (the promise rejects with 'aborted'). Callers must check isOff first.
+ */
+export function runJobWithAbort(
+  job: AiJob,
+  selection: AiSelection,
+): { promise: Promise<AiResult>; abort: () => void } {
+  if (isOff(selection)) {
+    throw new Error('runJobWithAbort called with the Off sentinel; consumers must skip Off')
+  }
+  if (selection.type === 'model') {
+    let aborted = false
+    const promise = runModel(selection.id, job.prompt).then((r) => {
+      if (aborted) throw new Error('aborted')
+      return r
+    })
+    return { promise, abort: () => { aborted = true } }
+  }
+  return runEngineCancellable(selection.id as CliAdapter, job.prompt, job.cwd ?? defaultCwd())
 }
