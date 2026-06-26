@@ -155,6 +155,64 @@ phase is **P3 — parallel** (across-goal lanes → worktree fan-in).
 
 ---
 
+## 5.1 Board context control — the system's attention
+
+The board accumulates **unbounded** knowledge; an agent has a **finite** context
+window. `retrieve_board_context()` (`runner/comms_context.py`) is the valve between
+them — it decides *what slice of everything the system knows* enters **this** agent's
+mind for **this** task, and injects it as a `## Communication Board` block in the
+prompt. It is the system's **selective attention** — the steersman's discipline of
+reading only the instruments the current maneuver needs.
+
+```
+   THE BOARD (unbounded memory)              AGENT PROMPT (finite window)
+   ┌──────────────────────────┐             ┌────────────────────────────┐
+   │ decisions · artifacts ·   │   GATE      │ ## Communication Board     │
+   │ questions · escalations · │ ─────────▶  │ 🔒 GOVERNANCE  always,     │
+   │ DAG tasks                 │             │    deterministic, FIRST    │
+   │ × 3 tiers                 │             │ 📎 REFERENCED  context_refs│
+   │ feature / project / global│             │    → hydrate sections      │
+   └──────────────────────────┘             │ 💡 SEMANTIC  k=3/2/1, gated│
+   controls:                                 │ empty → prompt unchanged   │
+   • governance computed BEFORE semantic ──▶ └────────────────────────────┘
+   • _SEMANTIC_MAX_DISTANCE = 0.75 (drop weak)
+   • _CONTEXT_CHAR_BUDGET = 2000 (cap 💡)
+   • k = 3/2/1 slots per board tier
+```
+
+**Three controls, three design statements:** governance-first guarantees a safety
+signal can never be crowded out by relevance noise (priority-inversion guard); the
+0.75 cosine gate drops weak semantic hits; the 2000-char budget stops a long board
+bloating the prompt or the bill. It returns `""` when there is nothing — the prompt is
+then byte-identical to before, so the layer never adds noise just to add something.
+
+**Why it connects to everything.** Post = *write*; `retrieve_board_context` = *read*;
+consolidation = *curate*. Together they turn the board from a log into a **working
+memory**, and this layer is the **recall** half — where most agent systems quietly
+fail. It is also the **prerequisite for the parallel fleet (P3)**: when `k>1` agents
+run at once, the only thing keeping them coherent is that each one's view of "what the
+team decided" is assembled from the *same board through the same gate*. Coordination at
+scale is a retrieval problem, not an orchestration problem.
+
+### Known limits → solutions (roadmap notes for contributors)
+
+| # | Limit | Solution |
+|---|---|---|
+| 1 | **Controls are global constants, not adaptive.** `0.75`, `2000` chars, `k=3/2/1` are fixed regardless of task size or model. A 200k-context model could swallow far more; a trivial task needs far less. 2000 chars for the *entire* semantic channel is small — at fleet scale that budget is plausibly the coordination bottleneck. | **Make the budget a function of (model context window × share) and task complexity.** Add a `context_window` column to the model table (sits next to `MODEL_PRICING`); resolve `budget = clamp(ctx_window × ~8%, floor, ceiling)` and scale `k` from it. Relax the distance gate when the budget is large (take more, weaker hits), tighten it when small. Expose per-stage overrides via the existing `stage_configs` table. |
+| 2 | **Retrieval precision capped by the embedding model (MiniLM-384).** The gate can only be as smart as the vectors under it. | **Pluggable embedding backend + a rerank pass.** Route embeddings through the existing AI-Router with an Off/Local/Strong selector (the *same pattern the summarizer backend already uses*). Over-fetch candidates, then add a lightweight cross-encoder or single Haiku rerank call before applying the gate — a cheap precision boost without re-embedding the corpus. Lean harder on the hybrid (semantic + keyword) path already present. |
+| 3 | **Tiered locality bias (feature ≫ project ≫ global) is static.** Hard `k=3/2/1` slots mean there is no way for "this *global* decision is unusually relevant to *this* feature" to surface. Governance-first covers urgent cases; advisory cross-tier relevance is flattened. | **Replace fixed slots with a relevance-weighted blended pool + promotion rule.** Score each hit as `distance + tier_prior`, sort one global pool, fill to budget — so a global hit far below the feature average can claim a slot. Keep governance-first as the absolute floor. Tier becomes a *prior*, not a *quota*. |
+```
+  LIMIT 1            LIMIT 2                  LIMIT 3
+  static budget      MiniLM-only             k=3/2/1 quota
+      │                  │                        │
+      ▼                  ▼                        ▼
+  budget = f(model,  pluggable embed +       blended pool:
+  task) + per-stage  rerank pass (AI-Router  score = dist + tier_prior,
+  override           Off/Local/Strong)       promote cross-tier hits
+```
+
+---
+
 ## 6. How this approach helps — coding *and* beyond
 
 The pattern is **a configurable feedback graph over a roster of specialist agents,
