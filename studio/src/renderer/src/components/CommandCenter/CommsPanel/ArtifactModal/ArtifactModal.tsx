@@ -8,6 +8,7 @@ import { readFile } from '../../../../services/pathlyApi'
 import { fetchArtifacts, relativeTime, type ArtifactRow } from '../../../../store/commsApi'
 import { useUiStore } from '../../../../store/uiStore'
 import { useProjectStore } from '../../../../store/projectStore'
+import { resolveArtifactPath } from '../artifactPath'
 import s from './ArtifactModal.module.css'
 
 interface Props {
@@ -16,15 +17,6 @@ interface Props {
 }
 
 const PREVIEW_LINES = 24
-
-/** Resolve a possibly-relative artifact path to absolute against the project root.
- *  Agents post project-relative paths, but fs:read does NOT resolve them, so the
- *  preview would fail. Already-absolute paths (drive / posix / UNC) pass through. */
-function resolveArtifactPath(p: string, root: string | null | undefined): string {
-  if (/^([a-zA-Z]:[\\/]|\/|\\\\)/.test(p)) return p
-  const base = (root ?? '').replace(/[\\/]+$/, '')
-  return base ? `${base}/${p.replace(/^[\\/]+/, '')}` : p
-}
 
 /**
  * Artifact details modal — metadata for the artifact message plus a live preview

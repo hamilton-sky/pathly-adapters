@@ -12,12 +12,11 @@
 import { runJob, isOff, type AiSelection } from '../../../../services/aiRouter'
 import { buildSummarizePrompt } from '../../../../services/summaryPrompt'
 import { readFile } from '../../../../services/pathlyApi'
+import { resolveArtifactPath } from '../artifactPath'
 import { useToastStore } from '../../../../store/toastStore'
 import {
   fetchArtifacts,
   apiSetArtifactSummary,
-  apiGetDefaultSelection,
-  type ArtifactRow,
   type AiSelectionDto,
 } from '../../../../store/commsApi'
 
@@ -55,7 +54,7 @@ export async function summarizeArtifactById(
   if (!isSummarizable(undefined, name)) return false
 
   try {
-    const text = await readFile(artifactPath)
+    const text = await readFile(resolveArtifactPath(artifactPath, cwd))
     if (!text || !text.trim()) return false
 
     const result = await runJob(
@@ -118,33 +117,3 @@ export function parseSelection(raw: string | null | undefined): AiSelection | nu
   return null
 }
 
-export type ResummarizeOutcome = 'ok' | 'skipped' | 'failed'
-
-/**
- * Re-run the summary for an existing artifact (the per-card Re-summarize button).
- * Target precedence: the artifact's saved summary_selection → the app default. If
- * neither resolves (or it is Off), returns 'skipped'. Writes the result back and
- * persists the effective selection on the artifact. Never throws.
- */
-export async function resummarizeArtifactByMessage(
-  messageId: string,
-  cwd?: string,
-): Promise<ResummarizeOutcome> {
-  try {
-    const rows = await fetchArtifacts(messageId)
-    const row: ArtifactRow | undefined = rows[0]
-    if (!row) return 'failed'
-
-    const selection =
-      parseSelection(row.summary_selection) ?? (await apiGetDefaultSelection())
-    if (!selection || isOff(selection)) return 'skipped'
-
-    const name = row.path.split(/[/\\]/).pop() ?? row.path
-    if (!isSummarizable(row.type ?? undefined, name)) return 'skipped'
-
-    const ok = await summarizeArtifactById(row.id, row.path, selection, cwd)
-    return ok ? 'ok' : 'failed'
-  } catch {
-    return 'failed'
-  }
-}

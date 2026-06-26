@@ -16,6 +16,7 @@ import {
   type AiSelectionDto,
 } from '../../../../store/commsApi'
 import { parseSelection, isSummarizable } from '../ArtifactsView/summarizeArtifact'
+import { resolveArtifactPath } from '../artifactPath'
 
 // Shared hook for both ResummarizeButton (compact card pill) and ArtifactSummarizePill
 // (full modal pill). Owns: per-artifact selection (seeded from artifact row → app default),
@@ -86,8 +87,10 @@ export function useResummarize(messageId: string): ResummarizeHook {
           setPillState('idle'); setStartedAt(undefined); return
         }
 
-        const text = await readFile(row.path)
-        if (!text?.trim()) throw new Error('File is empty')
+        const abs = resolveArtifactPath(row.path, projectPath)
+        const text = await readFile(abs)
+        if (text == null) throw new Error(`File not found: ${abs}`)
+        if (!text.trim()) throw new Error('File is empty')
 
         const cwd = projectPath.replace(/\\/g, '/').replace(/\/$/, '') || undefined
         const { promise, abort } = runJobWithAbort(

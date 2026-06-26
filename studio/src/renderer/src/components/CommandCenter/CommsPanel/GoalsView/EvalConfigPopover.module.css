@@ -11,7 +11,9 @@
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* visible (not hidden): the CliSelect engine dropdown opens upward and would be
+     clipped at the popover's top edge by overflow:hidden. */
+  overflow: visible;
 }
 
 /* Used by the footerNote JSX rendered in EvalConfigPopover */
