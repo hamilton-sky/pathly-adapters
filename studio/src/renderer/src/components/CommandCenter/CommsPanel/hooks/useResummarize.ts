@@ -18,8 +18,8 @@ import {
 import { parseSelection, isSummarizable } from '../ArtifactsView/summarizeArtifact'
 import { resolveArtifactPath } from '../artifactPath'
 
-// Shared hook for both ResummarizeButton (compact card pill) and ArtifactSummarizePill
-// (full modal pill). Owns: per-artifact selection (seeded from artifact row → app default),
+// State for the ResummarizeButton pill (used on artifact cards and in the ArtifactModal
+// footer). Owns: per-artifact selection (seeded from artifact row → app default),
 // PillState, elapsed-progress timer, abort handle, and gear popover toggle.
 
 const BUILTIN_DEFAULT: AiSelection = { type: 'engine', id: 'claude' }

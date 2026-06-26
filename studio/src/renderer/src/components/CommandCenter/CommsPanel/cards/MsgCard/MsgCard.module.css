@@ -51,13 +51,16 @@
   color: var(--text-muted);
 }
 
-/* Ticket footer: stage + time, bottom-right of the card. */
+/* Ticket footer: stage + time, bottom-right of the card. Wraps so the full
+   Summarize pill never overflows a narrow card (responsiveness rule). */
 .cardFoot {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+  min-width: 0;
 }
 
 .msgDel {

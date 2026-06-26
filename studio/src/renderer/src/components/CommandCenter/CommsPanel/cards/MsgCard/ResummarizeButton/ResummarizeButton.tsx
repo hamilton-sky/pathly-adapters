@@ -6,22 +6,26 @@ import { useResummarize } from '../../../hooks/useResummarize'
 interface Props {
   /** The artifact message id (resolves to its comms_artifacts row + saved target). */
   messageId: string
+  /** False when the artifact has no path — disables the run button. Defaults true
+   *  (artifact cards always have a path; the modal passes the computed value). */
+  hasPath?: boolean
 }
 
-// Compact [↻|⚙↔■] ActionPill on artifact cards. The gear opens a per-artifact
-// AiTargetSelector; while running ⚙ becomes ■ (stop). Full-label variant lives
-// in ArtifactSummarizePill (ArtifactModal footer).
-export function ResummarizeButton({ messageId }: Props): JSX.Element {
+// The one summarize pill used everywhere (artifact cards + ArtifactModal footer):
+// a full [↻ Summarize · timer][⚙↔■] ActionPill, matching the Decompose/Evaluate
+// pills for a single consistent style. The gear opens a per-artifact AiTargetSelector;
+// while running ⚙ becomes ■ (stop). State + abort live in useResummarize.
+export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Element {
   const r = useResummarize(messageId)
   return (
     <>
       <ActionPill
         state={r.pillState}
         progress={r.progress}
-        hasPath
+        hasPath={hasPath}
         title="Summarize"
         runningVerb="Summarizing"
-        mainIcon={<RotateCw size={12} />}
+        mainIcon={<RotateCw size={13} />}
         idleTip="Re-summarize this artifact"
         runningTip="Running the AI summary…"
         ariaName="Re-summarize"
@@ -30,7 +34,6 @@ export function ResummarizeButton({ messageId }: Props): JSX.Element {
         configTip="Choose AI target for this artifact"
         onToggleConfig={() => r.setConfigOpen((v) => !v)}
         gearRef={r.gearRef}
-        compact
       />
       {r.configOpen && (
         <SummaryTargetPopover

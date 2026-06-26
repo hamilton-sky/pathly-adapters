@@ -94,6 +94,13 @@
   gap: 2px;
 }
 
+/* Flipped above the trigger when there's no room below (set by JS measuring the
+   viewport). Anchors to the trigger's top edge instead of its bottom. */
+.panel[data-drop='up'] {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .group {
   display: flex;
   flex-direction: column;

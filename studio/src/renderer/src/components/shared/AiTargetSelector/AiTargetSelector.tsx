@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { type AiSelection } from '../../../services/aiRouter'
 import { buildGroups, encode, decode, labelForValue } from './options'
@@ -31,11 +31,28 @@ export function AiTargetSelector({
   disabled = false,
 }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
+  const [dropUp, setDropUp] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   const groups = buildGroups(allowOff)
   const current = encode(value)
   const triggerLabel = current === '' ? 'Select AI target…' : labelForValue(current, groups)
+
+  // Flip the panel above the trigger when it would overflow the viewport bottom
+  // and there is more room above (e.g. the selector sits in a popover near the
+  // screen edge). Runs before paint so there is no visible jump.
+  useLayoutEffect(() => {
+    if (!open) { setDropUp(false); return }
+    const t = triggerRef.current
+    const p = panelRef.current
+    if (!t || !p) return
+    const tr = t.getBoundingClientRect()
+    const panelH = p.offsetHeight
+    const spaceBelow = window.innerHeight - tr.bottom
+    setDropUp(spaceBelow < panelH + 8 && tr.top > spaceBelow)
+  }, [open])
 
   // Close on outside click or Escape (mirrors ModelSelector).
   useEffect(() => {
@@ -62,6 +79,7 @@ export function AiTargetSelector({
   return (
     <div className={s.wrap} ref={ref} data-state={disabled ? 'loading' : 'ready'}>
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         className={s.trigger}
@@ -78,7 +96,7 @@ export function AiTargetSelector({
       </button>
 
       {open && (
-        <div className={s.panel} role="listbox" aria-label={ariaLabel}>
+        <div ref={panelRef} className={s.panel} data-drop={dropUp ? 'up' : 'down'} role="listbox" aria-label={ariaLabel}>
           {groups.map((group, gi) => (
             <div key={group.heading || `off-${gi}`} className={s.group}>
               {group.heading && <div className={s.groupHeading}>{group.heading}</div>}
