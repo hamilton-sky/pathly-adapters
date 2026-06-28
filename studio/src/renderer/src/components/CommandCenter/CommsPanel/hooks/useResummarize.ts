@@ -5,6 +5,7 @@ import type { PillState } from '../../../shared/RunPill/RunPill'
 import type { AiSelection } from '../../../../services/aiRouter'
 import { runJobWithAbort, isOff } from '../../../../services/aiRouter'
 import { buildSummarizePrompt } from '../../../../services/summaryPrompt'
+import { composeClientSkill } from '../../../../services/skillCompose'
 import { readFile } from '../../../../services/pathlyApi'
 import { useCommsStore } from '../../../../store/commsStore'
 import {
@@ -23,6 +24,17 @@ import { resolveArtifactPath } from '../artifactPath'
 // PillState, elapsed-progress timer, abort handle, and gear popover toggle.
 
 const BUILTIN_DEFAULT: AiSelection = { type: 'engine', id: 'claude' }
+
+// The CLI engine writes its summary to a sibling file (the file-based capture contract);
+// we poll for it after the engine exits. Mirrors the editor's pollForFile cadence.
+async function pollSummaryFile(path: string, tries = 5, delayMs = 600): Promise<string | null> {
+  for (let i = 0; i < tries; i++) {
+    if (i > 0) await new Promise<void>((r) => setTimeout(r, delayMs))
+    const c = await readFile(path)
+    if (c != null && c.trim()) return c
+  }
+  return null
+}
 
 export interface ResummarizeHook {
   pillState: PillState
@@ -97,16 +109,52 @@ export function useResummarize(messageId: string): ResummarizeHook {
         if (!text.trim()) throw new Error('File is empty')
 
         const cwd = projectPath.replace(/\\/g, '/').replace(/\/$/, '') || undefined
-        const { promise, abort } = runJobWithAbort(
-          { kind: 'summarize', prompt: buildSummarizePrompt(text), cwd },
-          selection,
-        )
-        abortRef.current = abort
 
-        const result = await promise
-        abortRef.current = null
+        // Bare path: send buildSummarizePrompt and read the result text. Used for MODEL
+        // targets (they return clean text directly — left untouched, their own plan) and
+        // as the fallback when the /skills/compose endpoint is unreachable.
+        const runBare = async (): Promise<string> => {
+          const { promise, abort } = runJobWithAbort(
+            { kind: 'summarize', prompt: buildSummarizePrompt(text), cwd },
+            selection,
+          )
+          abortRef.current = abort
+          const result = await promise
+          abortRef.current = null
+          return (result.text ?? '').trim()
+        }
 
-        const summary = (result.text ?? '').trim()
+        let summary: string
+        if (selection.type === 'engine') {
+          // CLI ENGINE: compose the fragment-based prompt and have the engine WRITE its
+          // summary to a sibling file, then read that file — no stdout-tail scraping (that
+          // was the codex-chrome / claude-flattening bug). Falls back to bare on null.
+          const outAbs = `${abs}.summary`
+          const composed = await composeClientSkill(
+            'development/summarize',
+            selection.id,
+            { source_path: abs, out_path: outAbs, kind: 'summary' },
+            { projectRoot: cwd },
+          )
+          if (composed) {
+            const { promise, abort } = runJobWithAbort({ kind: 'summarize', prompt: composed, cwd }, selection)
+            abortRef.current = abort
+            await promise // ignore the stdout tail — the file is the result
+            abortRef.current = null
+            const fileText = await pollSummaryFile(outAbs)
+            if (fileText == null) throw new Error('the engine did not write the summary file')
+            const trimmed = fileText.trim()
+            if (/^ERROR:/i.test(trimmed)) {
+              throw new Error(trimmed.replace(/^ERROR:\s*/i, '') || 'the engine reported an error')
+            }
+            summary = trimmed
+          } else {
+            summary = await runBare()
+          }
+        } else {
+          summary = await runBare()
+        }
+
         // Empty output is a failure, not a silent success — otherwise the pill says
         // "done" but nothing is saved and the card looks unchanged.
         if (!summary) throw new Error('the engine returned no summary text')
