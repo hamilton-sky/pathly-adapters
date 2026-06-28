@@ -3,20 +3,52 @@ import { useTerminalStore } from '../../../../store/terminalStore'
 import { useUiStore } from '../../../../store/uiStore'
 import type { TerminalTab } from '../../../../store/terminalStore'
 import { useToastStore } from '../../../../store/toastStore'
-import { buildSplitPrompt, buildAnalyzePrompt, getSpawnCwd, getEffectivePrompt, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE, describeAgentFailure } from '../../../Editor/commentUtils'
+import { buildSplitPrompt, buildAnalyzePrompt, getSpawnCwd, STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE, describeAgentFailure } from '../../../Editor/commentUtils'
 import { buildCliArgv, cliLabel, EditorCli } from '../editorCli'
+import { composeClientSkill } from '../../../../services/skillCompose'
 import { attachProgress } from '../editorProgress'
+
+// Resolve an editor action's prompt. Precedence: explicit one-time prompt > stored override
+// (the user's customization) > composed fragment skill (the new default — same fragments the
+// board actions use) > bare builder (fallback when /skills/compose is unreachable).
+async function resolveActionPrompt(
+  once: string | null | undefined,
+  storageKey: string,
+  builder: (p: string) => string,
+  skill: string,
+  cli: EditorCli,
+  source: string,
+  outPath: string,
+  kind: 'analysis' | 'split',
+): Promise<string> {
+  if (once) return once
+  let stored: string | null = null
+  try { stored = localStorage.getItem(storageKey) } catch { stored = null }
+  if (stored) return stored
+  const composed = await composeClientSkill(
+    skill,
+    cli,
+    { source_path: source.replace(/\\/g, '/'), out_path: outPath.replace(/\\/g, '/'), kind },
+    { projectRoot: getSpawnCwd(source) },
+  )
+  return composed ?? builder(source)
+}
+
+// True when the agent wrote an `ERROR:`-prefixed file (the client-file-output failure contract).
+function isErrorResult(content: string | null): boolean {
+  return content != null && /^ERROR:/i.test(content.trim())
+}
 
 const toast = (msg: string, variant: 'info' | 'success' | 'error', category: 'phase_summary' | 'agent_done') =>
   useToastStore.getState().push(msg, variant, { category })
 
-async function pollForFile(path: string): Promise<boolean> {
+async function pollForFile(path: string): Promise<string | null> {
   for (let i = 0; i < 5; i++) {
     if (i > 0) await new Promise<void>((r) => setTimeout(r, 600))
     const content = await window.pathly.fs.read(path)
-    if (content != null && content !== '') return true
+    if (content != null && content !== '') return content
   }
-  return false
+  return null
 }
 
 // All run state lives in uiStore.mdEditorActions, keyed by the file that started the run.
@@ -78,7 +110,10 @@ export function useEditorAgentActions(
     const norm = forFile.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `split-${Date.now().toString(36)}`
-    const prompt = promptOverride ?? splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, forFile)
+    const prompt = await resolveActionPrompt(
+      promptOverride ?? splitOncePrompt, STORAGE_KEY_SPLIT, buildSplitPrompt,
+      'development/split', splitCli, forFile, draftPath, 'split',
+    )
     addTab(tabId, `Split · ${fileName}`, 'left', splitCli as TerminalTab['kind'], undefined, undefined, prompt)
     // Optimistic running BEFORE the spawn await so startedAt is stamped at t0 (the elapsed
     // timer derives from tab.startedAt) and a quick navigate-away-and-back restores the pill.
@@ -97,8 +132,8 @@ export function useEditorAgentActions(
       // and clears the slot synchronously — this exit was already handled. No-op.
       const live = useUiStore.getState().mdEditorActions[forFile]?.split
       if (!live || live.tabId !== tabId) return
-      void pollForFile(draftPath).then((found) => {
-        if (found) {
+      void pollForFile(draftPath).then((content) => {
+        if (content != null && !isErrorResult(content)) {
           setMdEditorSplitDraftPath(draftPath, forFile)
           if (useUiStore.getState().mdEditorPath === forFile) setMdEditorViewMode('editor')
           useTerminalStore.getState().updateTabStatus(tabId, 'done')
@@ -110,7 +145,11 @@ export function useEditorAgentActions(
           useTerminalStore.getState().updateTabStatus(tabId, 'error')
           useTerminalStore.getState().closeTab(tabId)
           setMdEditorAction(forFile, 'split', { status: 'error', tabId, stopping: false })
-          toast(describeAgentFailure('AI Split', fileName, exitCode, tail), 'error', 'agent_done')
+          // An ERROR:-prefixed file carries the agent's own reason; otherwise it never wrote one.
+          const reason = content != null && isErrorResult(content)
+            ? content.trim().replace(/^ERROR:\s*/i, '') || 'the agent reported an error'
+            : null
+          toast(reason ? `AI Split failed · ${fileName} — ${reason}` : describeAgentFailure('AI Split', fileName, exitCode, tail), 'error', 'agent_done')
           setTimeout(() => clearIfStill(forFile, 'split', tabId), 3000)
         }
       })
@@ -144,7 +183,10 @@ export function useEditorAgentActions(
     const norm = forFile.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'skill'
     const tabId = `analyze-${Date.now().toString(36)}`
-    const prompt = promptOverride ?? analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, forFile)
+    const prompt = await resolveActionPrompt(
+      promptOverride ?? analyzeOncePrompt, STORAGE_KEY_ANALYZE, buildAnalyzePrompt,
+      'development/analyze', analyzeCli, forFile, analysisPath, 'analysis',
+    )
     addTab(tabId, `Analyze · ${fileName}`, 'left', analyzeCli as TerminalTab['kind'], undefined, undefined, prompt)
     useTerminalStore.getState().updateTabStatus(tabId, 'running')
     setMdEditorAction(forFile, 'analyze', { status: 'running', tabId, stopping: false })
@@ -158,8 +200,8 @@ export function useEditorAgentActions(
       // If this run's slot is gone or replaced (e.g. the user hit Stop), it was already handled. No-op.
       const live = useUiStore.getState().mdEditorActions[forFile]?.analyze
       if (!live || live.tabId !== tabId) return
-      void pollForFile(analysisPath).then((found) => {
-        if (found) {
+      void pollForFile(analysisPath).then((content) => {
+        if (content != null && !isErrorResult(content)) {
           setMdEditorAnalysisPath(analysisPath, forFile)
           useTerminalStore.getState().updateTabStatus(tabId, 'done')
           useTerminalStore.getState().closeTab(tabId)
@@ -170,7 +212,10 @@ export function useEditorAgentActions(
           useTerminalStore.getState().updateTabStatus(tabId, 'error')
           useTerminalStore.getState().closeTab(tabId)
           setMdEditorAction(forFile, 'analyze', { status: 'error', tabId, stopping: false })
-          toast(describeAgentFailure('AI Analyze', fileName, exitCode, tail), 'error', 'agent_done')
+          const reason = content != null && isErrorResult(content)
+            ? content.trim().replace(/^ERROR:\s*/i, '') || 'the agent reported an error'
+            : null
+          toast(reason ? `AI Analyze failed · ${fileName} — ${reason}` : describeAgentFailure('AI Analyze', fileName, exitCode, tail), 'error', 'agent_done')
           setTimeout(() => clearIfStill(forFile, 'analyze', tabId), 3000)
         }
       })
