@@ -40,6 +40,8 @@ Fragments (`src/pathly_data/core/skills/fragments/*.md`) are reusable prompt blo
 
 Composition contract (`compose.py:232-261`): `assembled = strip_frontmatter(skill body) + defaults + per-skill fragments (gated by adapter caps)`. **DB-overridable** per project via the `skill_composition` table. A skill **absent** from the manifest is loaded **raw** (no fragments).
 
+> **Terminology (settled downstream):** *fragment* = atomic block · *skill* = task body · *profile* = the context-selected fragment bundle (`standalone-transform` vs `goal-backed`). The design renames the manifest's `blocks:` → `profiles:` and selects the profile by `goal_id` presence rather than a code branch. See [ORCHESTRATION_MODEL.md](ORCHESTRATION_MODEL.md) › Vocabulary and [DESIGN.md](DESIGN.md) › Architecture › Naming.
+
 **Coverage today:** 19 of ~52 skills converted; **33 raw.** The raw skills that *write to the board but compose nothing* are the real gaps: `development/drain-dag`, `team/architect`, `team/research`.
 
 ---

@@ -63,6 +63,8 @@ The dividing line is whether the action mutates board lifecycle state (tasks, go
 
 **The goal-execute loop executor gets board-I/O conversion only**, never the loop body. The frontier control flow (`_run_loop` / `scheduler_loop`) stays Python-owned. Same carve-out as drain-dag: a polling loop has no single AGENT_DONE moment and no feedback-file gate, so the one-shot fragments (`completion-report`, `scout-choreography`, `feedback-protocol`) must not be composed onto it.
 
+**Naming: fragment · skill · profile.** Three layers, one word each. A **fragment** is an atomic reusable prompt block (`fragments/*.md`); a **skill** is the task body ("what to do"); a **profile** is the context-selected fragment bundle ("how it connects to Pathly") — `standalone-transform` (the P0 pure-transform set) vs `goal-backed` (the P1 board set). The composed prompt is `skill body + defaults + profile[context] + skill's own fragments` (deduped, cap-gated). This promotes today's `blocks:` manifest key to `profiles:` and turns the standalone/goal-backed choice into a manifest lookup keyed by `goal_id` presence rather than a code branch — see Architecture › Naming. Fragments cluster by role (board / capture / lifecycle / delegate) as a documented convention; a role-prefix file rename is deferred (the fragment set still grows through P1).
+
 ### In scope
 
 - A server-side composition seam reachable from client actions, so Summary, Analyze, Split, and Decompose all assemble their prompt through the same fragment-composition primitive as server/FSM actions.
@@ -148,6 +150,28 @@ POST http://127.0.0.1:8765/comms/post
 
 Matches the hand-coded shape in `_decompose_planner` (`goal_run.py:493-508`); `parent_id`/`depends` are the DAG edges read by `get_ready_tasks`. **Skip-if-down:** posts fail individually; a failed post does not corrupt the board, and re-decompose is guarded by the `already_decomposed` check (`goal_run.py:420-425`).
 
+### Naming: fragment · skill · profile (and the `profiles:` refactor)
+
+| Layer | Name | Means | Example |
+|---|---|---|---|
+| atomic block | **fragment** | one reusable prompt block (`fragments/*.md`) | `comms-post`, `client-file-output` |
+| task body | **skill** | "what to do" — the agent's task | `development/summarize`, `team/build` |
+| context bundle | **profile** | "how it connects to Pathly" — fragments chosen by spawn context | `standalone-transform`, `goal-backed` |
+
+One equation governs every spawn:
+
+```
+composed = skill (body)
+         + defaults              (always: progress-logging)
+         + profile[context]      (the wiring, selected by goal_id presence)
+         + skill's own fragments (intrinsic extras)
+           └─ dedup, then drop cap-gated (e.g. spawn-rules if !can_spawn)
+```
+
+**`blocks:` → `profiles:`.** Today the manifest carries a `blocks:` map (`full-build`, `lite-build`, `review-strict`) resolved by `compose_skill_with_block`; it *also* copy-pastes `[client-file-output, artifact-transform]` across all five transform skills; and the goal-backed fragment set lives in a `goal_id` code branch. These are the same concept three times. Rename `blocks:` → `profiles:`, add `standalone-transform` + `goal-backed` as first-class entries, and have each transform skill reference `profile: standalone-transform` instead of repeating the list. The resolver then selects the profile by context — `goal-backed` when `goal_id` is present, else the skill's declared profile — one lookup, no scattered `if goal_id:`. Backward-compatible: `compose.py` reads `profiles:` and still accepts `blocks:` as an alias for one release.
+
+**Fragment role convention** (naming only; file rename deferred): `board` (comms-post, catalog-pull, board-start-context, task-dag-post) · `capture` (client-file-output, artifact-transform, completion-report) · `lifecycle` (progress-logging, feedback-protocol) · `delegate` (spawn-rules, scout-choreography).
+
 ### Manifest keys & disk bodies
 
 `compose_skill`/`validate_composition` require a real `core/skills/<key>.md` to exist (`validate_composition:299`). Therefore:
@@ -186,7 +210,7 @@ This is already the de-facto standard (editor Analyze/Split, board Evaluate, Goa
 
 ### Per-action surface
 
-| Action | Progress | Result | Terminal tab visible? |
+| Action | Progress | Result | Tab = primary feedback? (tab is always visible; pill is primary) |
 |---|---|---|---|
 | artifact Summary | RunPill on Re-summarize + inline pill on the drop/upload card, keyed by `artifactId`, live clock | Summary prose re-renders on the `comms_artifacts` row (existing writeback) — that IS the result, no chip. `agent_done` toast "Summary ready". | No |
 | editor Analyze | ActionPill on Analyze control, clock from `tab.startedAt`, gear→Stop (unchanged reference impl) | Pill→success + **Report** chip opening the `.analysis` view. Echo toast only. | No |
@@ -200,7 +224,7 @@ This is already the de-facto standard (editor Analyze/Split, board Evaluate, Goa
 
 - **The running clock is the canonical progress signal** and MUST derive from `tab.startedAt`, stamped optimistically BEFORE the spawn await (as `useEditorAgentActions` already does at lines 85/149) so navigate-away-and-back restores accurate elapsed time. Never hold per-run elapsed in React or recompute from `onExit`.
 - **Result-as-chip vs result-as-surface:** an openable derived file (Analyze→Report, Split→Diff) gets a result chip; in-place data (Summary→card prose, Decompose/Run→board rows) gets NO chip — the re-rendered surface IS the result. Never invent a chip that opens a modal duplicating the board.
-- **No CLI action opens a visible terminal TAB as its feedback surface.** Every converted action spawns its PTY headlessly (revealed in the monitor bar for power users + Stop), but the user is never expected to read raw stdout. This is *why* fixing Summary's stdout-tail is also a UX fix — stdout was leaking codex chrome into the user-visible result.
+- **The PTY tab is ALWAYS visible — it is just never the *primary* feedback surface.** Every converted action opens a real, visible PTY tab (`aiRouter.ts` reveals it via `openTab`, "like every other CLI-engine spawn", and runner/board stages open one via `TERMINAL_SPAWN`); there is **no hidden/background spawn**. "Headless" here means *app-driven, the PTY exits when the agent finishes* (vs interactive = the human can type and the shell stays open) — it does **not** mean invisible. The user watches the in-place pill, not raw stdout, but the tab is always there (revealed in the monitor bar + as a tab, with Stop). This is *why* fixing Summary's stdout-tail is also a UX fix — stdout was leaking codex chrome into the user-visible result.
 - **Uniform error contract across all seven.** Pill→error (red `Error`) + ONE `agent_done` error toast with the reason (`describeAgentFailure` for editor; `"Summary failed: <reason>"`; `"Goal decompose failed: <reason>"`). The `client-file-output` `ERROR:`-line convention must be parsed by the host poller and routed through this SAME path. **This is a required code change:** today `pollForFile` (`useEditorAgentActions.ts:13-20`) treats any non-empty file as success; it must detect a leading `ERROR:` and route to pill-error + the error toast instead of opening a broken result. Do not add a second error UI.
 - **Stop** swaps the running segment to a Square (ActionPill) or uses the dedicated Stop (RunPill); stopping closes the tab immediately and resets the pill to idle with a `phase_summary` "stopped" echo. Keep the stale-run reconciliation effect (`useEditorAgentActions.ts:49-59`) for every pill-backed action so a lost exit can't hang the pill.
 - **Pill state is keyed by the artifact/goal it ran for** (`forFile` / `goalId` / `artifactId`), never a shared React instance — replicate the existing `mdEditorActions[forFile]` pattern for Summary (key by `artifactId`) and goal runs (key by `goalId`).
@@ -239,6 +263,12 @@ This is already the de-facto standard (editor Analyze/Split, board Evaluate, Goa
 ### P1c — drain-dag + loop board-I/O surface
 1. Add `development/drain-dag` manifest entry `[comms-post, task-dag-post, catalog-pull]` (NO one-shot fragments).
 2. Add a `loop-board-io` block under `blocks:` and inject `compose_block(['board-start-context','task-dag-post','comms-post'], adapter)` into `_run_loop`'s Python-built per-task prompt. Loop body unchanged.
+
+### P1d — Profiles refactor (`blocks:` → `profiles:`)
+1. Rename the manifest `blocks:` key to `profiles:`; add `standalone-transform` (`[client-file-output, artifact-transform]`) and `goal-backed` (`[comms-post, catalog-pull, board-start-context, task-dag-post]`).
+2. Point the five transform skills at `profile: standalone-transform` (drop the repeated per-skill lists).
+3. Teach `compose.py` to resolve a skill's `profile:` and to select `goal-backed` by `ctx.goal_id`; keep reading `blocks:` as an alias for one release (no breaking change).
+4. `validate_composition` + `pathly-setup claude --apply --repair` + `python -m build`.
 
 ### Verify
 - `node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json`

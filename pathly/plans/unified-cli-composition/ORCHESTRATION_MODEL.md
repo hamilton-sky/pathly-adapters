@@ -47,7 +47,7 @@ feedback surface — so the same machinery serves every cell of the grid:
 
 ```
    spawn(skill, ctx)
-        ctx = { goal_id?, scope, executor, kind:'transform'|'agent', visible }
+        ctx = { goal_id?, scope, executor, kind:'transform'|'agent', driver }
                               │
               ┌───────────────┴────────────────┐
          goal_id PRESENT                   goal_id ABSENT
@@ -81,12 +81,61 @@ No surface "wins" — the context decides how an agent is wired.
   ONE spawn primitive
      knobs ─┬─ goal context?   (goal_id present → board-wired)   ← the flag
             ├─ execution shape (single | loop | team | flow)
-            ├─ visible | headless
+            ├─ driver          (headless [default] | interactive — both VISIBLE PTYs)
             └─ kind            (transform | agent)
 ```
 
+**Visibility is not a knob — it is a constant.** Every CLI-engine spawn opens a *visible*
+PTY tab (`aiRouter.ts` reveals it via `openTab`, "like every other CLI-engine spawn"); there
+is no hidden/background spawn. The headless↔interactive split is the **loop driver**, not
+visibility: **headless** (default) injects the prompt and the PTY **exits when the agent
+finishes** (queued through the spawn gate); **interactive** lets the human type and the shell
+**stays open** (rejected over cap). Both run in a visible tab — the in-place pill is just the
+primary feedback layered on top of it.
+
 (This is the same "unify the knobs" direction already recorded for the runner/interactive
 primitive — the "on a goal" flag is simply another knob.)
+
+---
+
+## Vocabulary: fragment · skill · profile
+
+Keep three layers, three names — never blur them:
+
+| Layer | Name | Means | Example |
+|---|---|---|---|
+| atomic block | **fragment** | one reusable prompt block (`fragments/*.md`) | `comms-post`, `client-file-output` |
+| task body | **skill** | "what to do" — the agent's task | `development/summarize`, `team/build` |
+| context bundle | **profile** | "how it connects to Pathly" — the fragments chosen by context | `standalone-transform`, `goal-backed` |
+
+> **Composition is keyed by skill, not flow.** The manifest comment says it plainly: a skill
+> reused across flows composes *identically*. What varies by context is the **profile**.
+
+One equation, every cell of the grid:
+
+```
+composed prompt = skill (body)
+                + defaults              (always: progress-logging)
+                + profile[context]      (the wiring — selected by goal_id presence)
+                + skill's own fragments (intrinsic extras)
+                  └─ dedup, then drop cap-gated (e.g. spawn-rules if !can_spawn)
+```
+
+**The profile is selected, not branched.** This is the `goal_id`-as-flag idea from the keystone
+made concrete: instead of an `if goal_id:` in code AND the transform fragment list copy-pasted
+across five skills, the standalone/goal-backed bundles live in a manifest `profiles:` map
+(renamed from today's `blocks:`) and the resolver looks one up by context. That single change is
+BOTH the P1 "spawn-context flag" work AND the DRY of the five transform skills.
+
+Fragments themselves cluster by what they wire — a naming **convention** now; a role-prefix file
+rename is deferred (the fragment set is still growing through P1):
+
+```
+  board      comms-post · catalog-pull · board-start-context · task-dag-post
+  capture    client-file-output · artifact-transform · completion-report
+  lifecycle  progress-logging · feedback-protocol
+  delegate   spawn-rules · scout-choreography
+```
 
 ---
 
@@ -111,9 +160,13 @@ primitive — the "on a goal" flag is simply another knob.)
 
 ## Naming fixes (cheap; do alongside C — flagged by the blind-scout audit)
 
-- `start_run(interactive=True)` **default** misleads: "interactive" means a
-  supervisor-managed *visible PTY*, not human-in-the-loop. Rename the param (e.g.
-  `visible_pty=` / `attach=`) or flip + rename so the default doesn't imply a human drives.
+- `start_run(interactive=True)` **default** is the bug — the *name* is fine. The code
+  (`terminal.py:205-227`) shows `interactive` correctly selects the **driver**: `True` →
+  `resolve_interactive_argv` (human can type; requires `PATHLY_RUNNER_EARLY_ADVANCE=1`),
+  `False` → headless one-shot. **Both are visible PTYs**, so do NOT rename it to `visible_pty=`
+  (visibility is a constant, not a knob). The fix is to **flip the default to `False`** so the
+  headless-primary framing holds — the current `True` default even raises without the
+  early-advance flag (so callers already pass `interactive=False` everywhere).
 - The **FSM is named like an orchestrator but is passive** (it never spawns). Document
   loudly, or rename: FSM = "transition engine"; the **supervisor** is the orchestrator/driver.
 - `runnerStore` defaults to `'interactive'` → align with the headless-primary framing.
