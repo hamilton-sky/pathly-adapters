@@ -144,15 +144,19 @@ pathly_orchestrator/
       runner_state.py      # write_runner_state, read_runner_state, mark_stale_runners
       flow_defs.py / skill_defs.py / agent_defs.py / invocations.py / overrides.py / feedback_items.py
       otel_spans.py / run_history.py / stage_configs.py / catalog_items.py / trends.py / app_settings.py
-      comms.py             # comms_messages (board) + comms_artifacts (per-task artifact metadata); goal_id/executor columns back the Goals->Task-DAG model
+      comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings (import from domain modules for new code)
+      comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
+      comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
+      comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim)
+      comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
     output.py              # parse_result, _extract_json_payload
     events.py              # read_last_agent_done, _patch_last_agent_done, tail_agent_done
     history.py             # build_pipeline_history_block
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
-    embeddings.py          # warm()/embed() — local embedding model for comms hybrid search
-    comms_context.py       # assembles board context (🔒 governance + 📎 referenced + 💡 semantic, relevance-gated)
+    embeddings.py          # embed()/warm() — local embedding model; chunk_summary() splits a summary into child chunks (per-bullet for topic-map, per-### for detailed, none for gist); embed_artifact_async() stores one PARENT vector (whole message text + summary) in comms_embeddings + CHILD vectors per chunk in comms_chunk_embeddings
+    comms_context.py       # assembles board context (🔒 governance + 📎 referenced + 💡 semantic, relevance-gated); _matched_chunk surfaced as "↳ matched topic: …" via comms_formatters.py
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
     hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
@@ -188,7 +192,9 @@ pathly_orchestrator/
       runner.py            # 13 /runner/* routes (start, pause, resume, advance, decision,
                            #   agent-answer, reroute, retry, abort, event, status, terminal/started, terminal/result)
       telemetry.py         # POST /record_activity|/record_phase|/record_phase_summary, GET /telemetry/trends|/telemetry/pricing
-      skills.py            # /flows/* (list, graph, CRUD), /catalog/* (item + category CRUD), /skills/catalog|parse|preview|save|export
+      skills/              # skills blueprint package (editor.py is a re-export shim)
+        editor_render.py   # /skills/catalog, /skills/parse, /skills/preview, /skills/compose, /skills/summary-format/<style>
+        editor_io.py       # /skills/save, /skills/export
       flows.py             # GET/POST/DELETE /flows/stage-config (per-stage agent/model overrides)
       menu.py              # GET /menu/<name>, GET /metrics, GET /metrics/json
       db_api.py            # /db/* read API: stats, features, features/<f>/{events,agents,otel,runs}, stats/trends, query, settings

@@ -37,6 +37,9 @@ core/
                           FEATURE_INDEX, PROGRESS, EDGE_CASES, FLOW_DIAGRAM,
                           HAPPY_FLOW, ARCHITECTURE_PROPOSAL, MERMAID_DIAGRAM
                   pipeline-walkthrough/   01-PIPELINE-FLOW, 02-TOKEN-USAGE, 03-ARTIFACT-MAP
+                  summary/   gist.md, topic-map.md, detailed.md — depth-format contracts
+                             injected as <summary_format> by POST /skills/compose;
+                             also served raw by GET /skills/summary-format/<style>
 
   flows/        flow YAML files read by the FSM:
                   team.flow.yaml      full pipeline (STORMING→PLANNING→DESIGNING→BUILDING→REVIEWING→TESTING→RETRO→DONE)
@@ -91,6 +94,7 @@ assembled = _strip_leading_frontmatter(skill body) + defaults fragments + per-sk
 
 - `defaults` applies to every skill listed in the `skills:` map (currently `progress-logging`).
 - A skill **absent** from `skills:` is returned **raw and unchanged** — no fragments, no defaults. Skills are converted incrementally; not all are in the map yet.
+- `no_defaults: true` on a skill entry opts it out of the global defaults entirely. Used on the five pure-transform skills (`development/summarize`, `development/summarize-gist`, `development/summarize-detailed`, `development/analyze`, `development/split`) — one-shot file derivations with no pipeline phases, so `progress-logging` is dead weight in their prompt.
 - A fragment entry is a bare name (`feedback-protocol`) or a gated object (`{ name: spawn-rules, requires: can_spawn }`). Gated entries are dropped when the adapter's capability flag is false.
 - `blocks:` is an optional top-level key for named fragment lists (`full-build`, `lite-build`, `review-strict`) — callers resolve these via `compose_skill_with_block()`. *(The unified-cli-composition plan renames `blocks:` → `profiles:` — a profile being a named, context-selected fragment bundle — but that rename is plan P1d, not yet built; `blocks:` remains the live manifest key and helper name.)*
 

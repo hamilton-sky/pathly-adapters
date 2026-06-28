@@ -21,6 +21,18 @@
   contract. Models left on their own path (deferred — [[project_models_separate_from_cli]]).
 
 **Summary sub-features added on top of P0 (also built):**
+- **Chunked / hierarchical embeddings:** `embed_artifact_async(message_id, parent_text, summary)`
+  (in `runner/embeddings.py`) stores two tiers. A **parent** vector (whole `description + summary`)
+  lands in the `comms_embeddings` vec0 table (one row per message, `message_id` PK). **Child**
+  vectors — one per `###` section for detailed, one per bullet for topic-map, none for gist — are
+  produced by `chunk_summary()` and stored in `comms_chunk_embeddings` (a regular table:
+  `chunk_id TEXT PK, message_id, embedding BLOB, chunk_text`; regular so DELETE-by-message and
+  multiple rows per message are both possible). `search_by_embedding()` merges parent and child
+  result sets, dedupes by `message_id`, and returns the best-distance row; the winning
+  `_matched_chunk` is surfaced by `_format_context_line()` (`runner/comms_formatters.py`) as
+  `↳ matched topic: …` so an agent can hydrate that specific section.
+  Both the `/comms/post` author-summary path and the `/comms/artifacts/<id>/summary` writeback
+  call `embed_artifact_async` — the same two-tier embedding is triggered from both entry points.
 - **Retrieval:** the summary is now embedded (`description + summary`), agents post BOTH a real
   description and a section summary (`comms-post` fragment + `/comms/post` accept a `summary`).
 - **Depth styles** Gist / Topic-map / Detailed — 3 `development/summarize*` skills, per-artifact
@@ -35,6 +47,18 @@
   skill); `GET /skills/summary-format/<style>` serves the same file to the Studio depth-picker
   preview (rendered via `MarkdownRenderer`, with a style-name header) — so the shape every CLI fills
   and the shape the user previews can't drift.
+- **`no_defaults` composition opt-out:** all five transform skills (`development/summarize`,
+  `development/summarize-gist`, `development/summarize-detailed`, `development/analyze`,
+  `development/split`) set `no_defaults: true` in `composition.yaml`, dropping the global defaults
+  (e.g. `progress-logging`) from their composed prompt. These skills are one-shot file derivations
+  with no pipeline phases, so the phase-telemetry default is dead weight. `compose_skill()` in
+  `skills/compose.py` reads this flag and substitutes an empty default list.
+- **Server-initiated summary path convergence:** the `summary_request` SSE event (emitted by
+  `http_server/blueprints/comms/_summary_request.py` on `type:'artifact'` post) routes through the
+  same `aiRouter` → `summarizeArtifact` → `composeClientSkill` → `/skills/compose` path as the
+  user-initiated Re-summarize action. Both paths POST back to `/comms/artifacts/<id>/summary`,
+  which calls `embed_artifact_async` — so drop/upload and manual re-summarize both produce
+  identical two-tier embeddings.
 - **Description rewrite:** summarize emits a structured `## Description` + `## Summary`. The
   Description (1–2 sentence context) overwrites the artifact's **message text** (the card's
   Description; `apiEditMessage` → `/comms/edit`); the Summary body → `comms_artifacts.summary`
@@ -66,7 +90,7 @@
 
 | Class | Actions | Product | Composes |
 |---|---|---|---|
-| **Pure transform** | artifact Summary, editor Analyze, editor Split | A derived file the user opens | `client-file-output` + `artifact-transform` (+ `progress-logging` default) |
+| **Pure transform** | artifact Summary, editor Analyze, editor Split | A derived file the user opens | `client-file-output` + `artifact-transform` (`no_defaults: true` — no `progress-logging`) |
 | **Board agent** | goal Decompose, goal-execute loop, drain-dag | Board rows other agents consume | board-I/O fragments only (see Architecture) |
 
 The dividing line is whether the action mutates board lifecycle state (tasks, goal frontier, queue) or merely derives a sibling file. This is settled — `_decompose_planner` (`goal_run.py:486-509`) literally POSTs `type=task` rows under a `goal_id`; Summary/Analyze/Split each emit exactly one derived file with no stage/queue/AGENT_DONE notion.
@@ -104,7 +128,7 @@ The dividing line is whether the action mutates board lifecycle state (tasks, go
 ### Acceptance criteria
 
 1. Each of the four converted client actions (Summary, Analyze, Split, Decompose) obtains its prompt by calling `compose_skill` against a manifest entry — **zero** remaining call-sites send a bare hand-built prompt string to the CLI for these actions.
-2. The three pure transforms compose **exactly** `client-file-output` + `artifact-transform` (plus the `progress-logging` default) and do NOT compose `comms-post`; verified by inspecting each composed prompt.
+2. The three pure transforms compose **exactly** `client-file-output` + `artifact-transform` and do NOT compose `comms-post`; `no_defaults: true` opts them out of `progress-logging` (one-shot file derivations have no pipeline phases); verified by inspecting each composed prompt.
 3. All three pure transforms capture via file-write-then-poll using the naming + ready-trigger defined in `client-file-output`; the stdout-tail path for Summary is removed and the codex/claude summary-quality bug is no longer reproducible.
 4. Summary's derived output remains discoverable via the existing `comms_artifacts` summary writeback (no new orphan board message).
 5. Goal Decompose composes the narrow decompose skill + `board-start-context` + `task-dag-post`; the hand-coded POST template in `goal_run.py` is removed; a decompose run shows board context in its prompt and posts standard `type=task` rows under the `goal_id`, preserving the existing "do not run the planning workflow" tightness.
@@ -119,7 +143,7 @@ The dividing line is whether the action mutates board lifecycle state (tasks, go
 
 ### Composition seam — server-side endpoint, no TS mirror
 
-**Decision: add `POST /skills/compose` to the skills blueprint**, sibling to the existing `/skills/preview` (`blueprints/skills.py`) which already calls `compose_skill` server-side. No TypeScript mirror of `compose.py`.
+**Decision: add `POST /skills/compose` to the skills blueprint**, sibling to the existing `/skills/preview` (`blueprints/skills/editor_render.py` — the blueprint was split; `editor.py` is now a re-export shim, routes live in `editor_render.py` + `editor_io.py`) which already calls `compose_skill` server-side. No TypeScript mirror of `compose.py`.
 
 Rationale (resolving PO's deferred Q1): the manifest is DB-overridable via `load_effective_manifest` + the `skill_composition` table (`compose.py:63-92`); a TS mirror would have to re-read those rows over HTTP anyway, buys nothing, and forks a second source of truth. Fragment bodies, `_strip_leading_frontmatter`, and adapter-caps gating live only in Python — mirroring them is the exact three-copy maintenance trap CLAUDE.md flags for dash-safety. The renderer already round-trips to `127.0.0.1:8765` constantly, so one more POST is free. The renderer keeps `dashSafePrompt` as a belt-and-suspenders client guard only.
 
@@ -313,7 +337,7 @@ This is already the de-facto standard (editor Analyze/Split, board Evaluate, Goa
 Source files for the implementer (all absolute):
 - Composition core: `C:/Users/Yafit/pathly-adapters/src/pathly_orchestrator/skills/compose.py` (`compose_skill`, `compose_skill_with_block`/`resolve_block`, `load_effective_manifest`, `validate_composition`)
 - Manifest: `C:/Users/Yafit/pathly-adapters/src/pathly_data/core/skills/composition.yaml` (+ `fragments/` dir alongside)
-- Endpoint home: `C:/Users/Yafit/pathly-adapters/src/pathly_orchestrator/http_server/blueprints/skills.py` (next to `/skills/preview`)
+- Endpoint home: `C:/Users/Yafit/pathly-adapters/src/pathly_orchestrator/http_server/blueprints/skills/editor_render.py` (blueprint split — `editor.py` is a re-export shim; render routes incl. `/skills/preview` + `/skills/compose` + `/skills/summary-format/<style>` live here; save/export routes in `editor_io.py`)
 - Decompose: `C:/Users/Yafit/pathly-adapters/src/pathly_orchestrator/supervisor/goal_run.py` (`_decompose_planner`, lines 463-519; `already_decomposed` guard 415-425)
 - Editor capture reference: `C:/Users/Yafit/pathly-adapters/studio/src/renderer/src/components/MarkdownEditor/EditorHeader/hooks/useEditorAgentActions.ts` (`pollForFile`, optimistic `startedAt`, reconciliation effect)
 - Summary: `C:/Users/Yafit/pathly-adapters/studio/src/renderer/src/components/CommandCenter/CommsPanel/ArtifactsView/summarizeArtifact.ts`
