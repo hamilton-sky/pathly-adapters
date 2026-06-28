@@ -53,13 +53,35 @@ export function buildSummarizePrompt(text: string, style: SummaryStyle = 'topic-
 }
 
 /**
+ * Fallback 1–2 sentence description derived from the summary text, used when the model
+ * didn't emit an explicit `## Description` section. Collapses whitespace, keeps the first
+ * one or two sentences, and caps the length so the card's Description stays a short context
+ * line rather than a copy of the whole summary.
+ */
+function deriveDescription(summary: string): string | null {
+  const flat = summary.replace(/\s+/g, ' ').trim()
+  if (!flat) return null
+  const sentences = flat.match(/[^.!?]+[.!?]+/g)
+  let out = (sentences ? sentences.slice(0, 2).map((s) => s.trim()).join(' ') : flat).trim()
+  if (out.length > 300) out = `${out.slice(0, 299).trimEnd()}…`
+  return out || null
+}
+
+/**
  * Split a summarize result into its `## Description` and `## Summary` sections. The ONE parser
  * for every summary path (Re-summarize, drop/upload, server-initiated SUMMARY_REQUEST) so the
- * contract can't fork. If the structure is absent (a model/offline path that didn't follow it,
- * or legacy output), the whole thing is the summary and the description is left untouched (null).
+ * contract can't fork. When the structure is absent (a model/offline path that didn't follow it,
+ * or legacy output) the whole thing is the summary and a short description is DERIVED from its
+ * first sentences — so a successful summary always refreshes the description instead of leaving
+ * the agent's stub title. `description` is null only when there is no summary text at all.
  */
 export function parseStructuredSummary(raw: string): { description: string | null; summary: string } {
   const m = raw.match(/#{2,4}\s+Description\s*\n([\s\S]*?)\n#{2,4}\s+Summary\s*\n([\s\S]*)$/i)
-  if (m && m[2].trim()) return { description: m[1].trim() || null, summary: m[2].trim() }
-  return { description: null, summary: raw.trim() }
+  if (m && m[2].trim()) {
+    const summary = m[2].trim()
+    // Explicit Description wins; if the model left it empty, derive one from the summary.
+    return { description: m[1].trim() || deriveDescription(summary), summary }
+  }
+  const summary = raw.trim()
+  return { description: deriveDescription(summary), summary }
 }
