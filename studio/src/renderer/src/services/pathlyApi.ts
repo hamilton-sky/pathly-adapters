@@ -2,6 +2,7 @@ import type { FlowYaml } from '../types'
 
 export const readFile        = (path: string): Promise<string | null>                                         => window.pathly.fs.read(path)
 export const writeFile       = (path: string, content: string): Promise<void>                                 => window.pathly.fs.write(path, content)
+export const deleteFile      = (path: string): Promise<void>                                                  => window.pathly.fs.delete(path)
 export const listDir         = (dir: string): Promise<string[]>                                               => window.pathly.fs.list(dir)
 export const listDirs        = (dir: string): Promise<string[]>                                               => window.pathly.fs.listDirs(dir)
 export const getAppRoot      = (): Promise<string>                                                            => window.pathly.fs.appRoot()

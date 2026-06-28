@@ -6,7 +6,7 @@ import type { AiSelection } from '../../../../services/aiRouter'
 import { runJobWithAbort, isOff } from '../../../../services/aiRouter'
 import { buildSummarizePrompt } from '../../../../services/summaryPrompt'
 import { composeClientSkill } from '../../../../services/skillCompose'
-import { readFile } from '../../../../services/pathlyApi'
+import { readFile, deleteFile } from '../../../../services/pathlyApi'
 import { useCommsStore } from '../../../../store/commsStore'
 import {
   fetchArtifacts,
@@ -248,6 +248,11 @@ export function useResummarize(messageId: string): ResummarizeHook {
             abortRef.current = null
             const fileText = await pollSummaryFile(outAbs)
             if (fileText == null) throw new Error('the engine did not write the summary file')
+            // The .summary file is a transient capture handoff — we've read it into memory and
+            // the comms_artifacts row is the record. Delete it best-effort so capture files
+            // don't accumulate on disk (the editor's .analysis/.draft are user-facing and keep
+            // their own accept/reject lifecycle, so this applies to summaries only).
+            void deleteFile(outAbs).catch(() => {})
             const trimmed = fileText.trim()
             if (/^ERROR:/i.test(trimmed)) {
               throw new Error(trimmed.replace(/^ERROR:\s*/i, '') || 'the engine reported an error')

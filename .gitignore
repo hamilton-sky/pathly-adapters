@@ -26,6 +26,8 @@ pathly/plans/**/*.db-shm
 *.db-shm
 # EVENTS.jsonl — events go to central DB; per-feature files are transient fallbacks only
 pathly/plans/**/EVENTS.jsonl
-# Markdown Editor AI outputs — transient per-file artifacts from AI Split (.draft) / AI Analyze (.analysis)
+# Transient per-file AI capture artifacts (file-based result capture, read into the DB then dead):
+#   AI Summary (.summary) · AI Split (.draft) · AI Analyze (.analysis)
+*.summary
 *.md.draft
 *.md.analysis
