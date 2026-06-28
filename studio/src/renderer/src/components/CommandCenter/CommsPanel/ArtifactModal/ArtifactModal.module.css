@@ -95,30 +95,26 @@
   word-break: break-all;
 }
 
-.sectionLabel {
-  font: 600 10px/1 var(--font-family-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-
-.summary {
-  font: 12.5px/1.5 var(--font-family-base);
-  color: var(--text-body);
-}
-
-.preview {
-  margin: 0;
-  max-height: 240px;
+/* Rendered-markdown body shared by every banner (AI Summary / Description /
+   Preview). Bounded height with its own scroll so expanding one banner never
+   shoves the others off-screen. Stylish formatted output — not raw md source. */
+.mdBody {
+  max-height: 300px;
   overflow: auto;
-  padding: 10px 12px;
-  border: var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface0);
-  color: var(--text-secondary);
-  font: 11px/1.5 var(--font-family-mono);
-  white-space: pre-wrap;
+  overscroll-behavior: contain;
+  padding: 6px 12px 10px;
   word-break: break-word;
+}
+.mdBody::-webkit-scrollbar { width: 8px; }
+.mdBody::-webkit-scrollbar-thumb { background: var(--text-disabled); border-radius: 4px; }
+.mdBody::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.mdBody::-webkit-scrollbar-track { background: transparent; }
+
+/* Loading / error placeholder inside the Preview banner. */
+.previewMsg {
+  padding: 10px 12px;
+  font: 12px/1.5 var(--font-family-base);
+  color: var(--text-muted);
 }
 
 .foot {

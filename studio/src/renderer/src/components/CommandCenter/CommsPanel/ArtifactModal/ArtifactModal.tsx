@@ -9,6 +9,8 @@ import { fetchArtifacts, relativeTime, type ArtifactRow } from '../../../../stor
 import { useUiStore } from '../../../../store/uiStore'
 import { useProjectStore } from '../../../../store/projectStore'
 import { resolveArtifactPath } from '../artifactPath'
+import { CollapsibleSection } from './CollapsibleSection/CollapsibleSection'
+import MarkdownRenderer from '../../../shared/MarkdownRenderer/MarkdownRenderer'
 import s from './ArtifactModal.module.css'
 
 interface Props {
@@ -16,14 +18,12 @@ interface Props {
   onClose: () => void
 }
 
-const PREVIEW_LINES = 24
-
-/** " · <engine>" suffix for the AI-summary heading, parsed from the stored selection JSON. */
-function summaryEngineSuffix(raw: string | null | undefined): string {
+/** Engine id (e.g. "codex") parsed from the stored summary-selection JSON, for the AI-summary banner hint. */
+function summaryEngineId(raw: string | null | undefined): string {
   if (!raw) return ''
   try {
     const p = JSON.parse(raw) as { id?: string }
-    return p.id ? ` · ${p.id}` : ''
+    return p.id ?? ''
   } catch { return '' }
 }
 
@@ -68,7 +68,6 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
   const bytes = content != null ? new Blob([content]).size : null
   const tokenEst = content != null ? Math.ceil(content.length / 4) : null
   const lines = content != null ? content.split('\n').length : null
-  const preview = content != null ? content.split('\n').slice(0, PREVIEW_LINES).join('\n') : ''
   // Prefer the stored exact token_count; fall back to the live estimate.
   const storedTokens = meta?.token_count ?? null
   const tokenText = storedTokens != null
@@ -124,25 +123,31 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
           </div>
 
           {meta?.summary && (
-            <>
-              <span className={s.sectionLabel}>AI Summary{summaryEngineSuffix(meta.summary_selection)}</span>
-              <div className={s.summary}>{meta.summary}</div>
-            </>
+            <CollapsibleSection label="AI Summary" hint={summaryEngineId(meta.summary_selection)} defaultOpen={false} copyText={meta.summary}>
+              <MarkdownRenderer content={meta.summary} className={s.mdBody} />
+            </CollapsibleSection>
           )}
 
           {m.text && (
-            <>
-              <span className={s.sectionLabel}>{meta?.summary ? 'Description' : 'Summary'}</span>
-              <div className={s.summary}>{m.text}</div>
-            </>
+            <CollapsibleSection label={meta?.summary ? 'Description' : 'Summary'} defaultOpen={false} copyText={m.text}>
+              <MarkdownRenderer content={m.text} className={s.mdBody} />
+            </CollapsibleSection>
           )}
 
-          <span className={s.sectionLabel}>
-            Preview{lines != null ? ` · first ${Math.min(PREVIEW_LINES, lines)} of ${lines.toLocaleString()} lines` : ''}
-          </span>
-          <pre className={s.preview}>
-            {loadErr ? 'Could not read the file.' : content == null ? 'Loading…' : preview}
-          </pre>
+          <CollapsibleSection
+            label="Preview"
+            hint={lines != null ? `${lines.toLocaleString()} lines` : undefined}
+            defaultOpen={false}
+            copyText={content ?? undefined}
+          >
+            {loadErr ? (
+              <div className={s.previewMsg}>Could not read the file.</div>
+            ) : content == null ? (
+              <div className={s.previewMsg}>Loading…</div>
+            ) : (
+              <MarkdownRenderer content={content} className={s.mdBody} />
+            )}
+          </CollapsibleSection>
         </div>
 
         <footer className={s.foot}>
