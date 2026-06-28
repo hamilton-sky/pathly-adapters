@@ -6,6 +6,7 @@ import { Avatar } from '../../Avatar/Avatar'
 import { MessageTypeBadge } from '../../MessageTypeBadge/MessageTypeBadge'
 import { CardBody } from './CardBody'
 import { ResummarizeButton } from './ResummarizeButton/ResummarizeButton'
+import { CopyArtifactButton } from './CopyArtifactButton/CopyArtifactButton'
 import { SupersedeMenu } from '../../SupersedeMenu/SupersedeMenu'
 import { ConfirmModal } from '../../../../shared/ConfirmModal/ConfirmModal'
 import { ArtifactModal } from '../../ArtifactModal/ArtifactModal'
@@ -61,6 +62,9 @@ export function MsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSu
             </span>
           )}
           <span className={s.cardActions}>
+            {m.type === 'artifact' && m.artifactPath && (
+              <CopyArtifactButton path={m.artifactPath} name={m.artifact ?? 'artifact'} />
+            )}
             {onSupersede && !m.supersededBy && (
               <SupersedeMenu
                 message={m}

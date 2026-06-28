@@ -1,0 +1,21 @@
+/* Header copy-to-clipboard icon button — mirrors the delete button's size/idiom. */
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.copyBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface1);
+}
