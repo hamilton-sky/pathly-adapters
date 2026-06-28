@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { Check, History, FileText, Search, Eye, ChevronRight } from 'lucide-react'
 import type { Message } from '../../../types'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
-import { fetchArtifacts } from '../../../../../store/commsApi'
+import { fetchArtifacts, type SummaryStyle } from '../../../../../store/commsApi'
 import s from './MsgCard.module.css'
+
+const STYLE_LABEL: Record<string, string> = {
+  gist: 'Gist',
+  'topic-map': 'Topic map',
+  detailed: 'Detailed',
+}
 
 export interface CardBodyProps {
   message: Message
@@ -16,10 +22,15 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
   // The AI summary lives on the comms_artifacts row (not the message) — fetch it lazily
   // when an artifact card is expanded so it shows inline, not only in the Details modal.
   const [summary, setSummary] = useState<string | null>(null)
+  const [summaryStyle, setSummaryStyle] = useState<SummaryStyle | null>(null)
   useEffect(() => {
     if (m.type !== 'artifact' || !expanded) return
     let alive = true
-    void fetchArtifacts(m.id).then((rows) => { if (alive) setSummary(rows[0]?.summary ?? null) })
+    void fetchArtifacts(m.id).then((rows) => {
+      if (!alive) return
+      setSummary(rows[0]?.summary ?? null)
+      setSummaryStyle(rows[0]?.summary_style ?? null)
+    })
     return () => { alive = false }
   }, [m.type, m.id, expanded])
   const supersededBanner = m.supersededBy
@@ -47,7 +58,10 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
           <>
             {summary && (
               <>
-                <div className={s.artSummaryLabel}>AI Summary</div>
+                <div className={s.artSummaryLabel}>
+                  AI Summary
+                  {summaryStyle && <span className={s.artDepth}>Depth: {STYLE_LABEL[summaryStyle] ?? summaryStyle}</span>}
+                </div>
                 <div className={s.artExcerpt}><MarkdownRenderer content={summary} /></div>
                 <div className={s.artSummaryLabel}>Description</div>
               </>
