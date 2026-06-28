@@ -1,9 +1,7 @@
 {
-  "feature": "editor-notebook-enhancements",
-  "status": "PLANNING",
-  "current_state": "PLAN",
-  "rigor": "standard",
-  "current_conversation": null,
-  "total_conversations": 3,
-  "completed_conversations": 0
+  "convs_total": 3,
+  "convs_done": 0,
+  "current": "PO_DISCUSSING",
+  "updated_at": "2026-06-28T17:16:54Z",
+  "conv_start_sha": "623970e43e506c96859aaa9bb339b39a483b97b5"
 }
