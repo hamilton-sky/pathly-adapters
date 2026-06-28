@@ -283,8 +283,20 @@ start the server or retry in a loop just to post.
 - One post per finding, not one per file line.
 - `text` must be self-contained — other agents read this without opening your file.
 - Post `warning` items **before** writing the feedback file, so Studio shows them in real time.
-- Post an `artifact` **after** the file is written, with the file path inside `text`.
-- Never paste full file content — summarize in ≤ 3 sentences.
+- Post an `artifact` **after** the file is written. Provide TWO fields so it is both readable
+  and findable:
+  - `text` — a real **1–2 sentence description**: what the artifact is and why it matters. NOT a
+    bare label like "Design doc: X".
+  - `summary` — a compact **topic map of the file's sections**: one line per heading with a short
+    gloss. This is the catalog entry other agents scan, and it is embedded for **semantic
+    retrieval**, so make it cover the real section topics.
+  ```bash
+  curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
+    "feature": "<feature>", "from": "<your-role>", "type": "artifact", "board": "feature",
+    "text": "<1-2 sentence description>", "summary": "<topic map, one line per section>",
+    "artifact_path": "<path to the file>", "artifact_type": "md"}'
+  ```
+- Never paste full file content — keep `text` to 1–2 sentences and `summary` to one line per section.
 - Only `feature`-scope writes are unrestricted. `project`/`global` writes are role-gated and may
   return 403 — that is expected; keep your post at `"board": "feature"` unless you are `director`/`human`.
 

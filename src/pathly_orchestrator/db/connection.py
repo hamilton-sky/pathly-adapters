@@ -15,6 +15,12 @@ _FTS_AVAILABLE: bool = False  # set on first connection, after migrations
 _local = threading.local()  # per-thread connection storage
 _init_lock = threading.Lock()  # guards one-time initialization
 _init_once_done = False
+# db paths whose schema/seed have been prepared. Keyed by PATH, not by a process-global
+# flag, so a connection opened against an un-prepared db is always brought up exactly once
+# (and never repeats the work). In production this holds a single entry; under test isolation
+# each per-test db gets one entry. This is what makes preparation correct AND contention-free
+# when the db path is swapped per test — see get_db().
+_prepared_paths: set[str] = set()
 # Process-wide write serialization. SQLite allows a single writer at a time, and
 # every thread holds its OWN connection, so a per-connection lock never serializes
 # cross-thread writers — they race on SQLite directly and intermittently hit
@@ -167,19 +173,42 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
 
     conn = _local.conn
 
-    # One-time initialization -- runs exactly once across all threads.
+    # Initialization is split into two scopes, deliberately:
+    #
+    #  • PROCESS-ONCE (vec-extension probe + WAL checkpoint thread) — truly global, gated by
+    #    `_init_once_done`.
+    #  • PER-DB-PATH (migrate + seed + catalog/flow refresh) — gated by membership in
+    #    `_prepared_paths`, NOT by a process-global flag.
+    #
+    # The per-PATH gate is what makes preparation correct under test isolation, where every
+    # test swaps ~/.pathly to a fresh file. With the old single global flag, a leftover daemon
+    # thread's get_db() (still pointing at the previous test's path) could win the lock and set
+    # the flag, after which the next test's connection — to a brand-new, un-migrated db — would
+    # skip migration and hit "no such table". Keying on the db path closes that race AND avoids
+    # the contention/perf cost of re-migrating per connection: a path is prepared exactly once.
+    # In production this set holds a single entry, so this is a cheap membership check.
     if not _init_once_done:
         with _init_lock:
             if not _init_once_done:
+                if _load_vec(conn):
+                    _VEC_AVAILABLE = True
+                else:
+                    _VEC_AVAILABLE = False
+                    logging.warning(
+                        "sqlite-vec unavailable - comms board uses recency-only retrieval"
+                    )
+                threading.Thread(
+                    target=_wal_checkpoint_loop,
+                    args=(db_path,),
+                    daemon=True,
+                    name="pathly-wal-checkpoint",
+                ).start()
+                _init_once_done = True
+
+    if db_path not in _prepared_paths:
+        with _init_lock:
+            if db_path not in _prepared_paths:
                 try:
-                    # Determine vec availability on this first connection.
-                    if _load_vec(conn):
-                        _VEC_AVAILABLE = True
-                    else:
-                        _VEC_AVAILABLE = False
-                        logging.warning(
-                            "sqlite-vec unavailable - comms board uses recency-only retrieval"
-                        )
                     _run_migrations(conn, vec_available=_VEC_AVAILABLE)
                     # Probe for FTS5 table AFTER migrations — comms_fts is created there.
                     try:
@@ -190,14 +219,8 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
                     _seed_if_empty(conn)
                     _refresh_catalog(conn)
                     _refresh_flows(conn)
-                    threading.Thread(
-                        target=_wal_checkpoint_loop,
-                        args=(db_path,),
-                        daemon=True,
-                        name="pathly-wal-checkpoint",
-                    ).start()
                 finally:
-                    _init_once_done = True
+                    _prepared_paths.add(db_path)
 
     return conn
 
