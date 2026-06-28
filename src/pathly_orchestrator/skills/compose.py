@@ -250,7 +250,11 @@ def compose_skill(
     caps = _coerce_caps(adapter_caps)
     fragments_dir = manifest.get("fragments_dir", "fragments")
     spec = skills_map[skill] or {}
-    entries = list(manifest.get("defaults") or []) + list(spec.get("fragments") or [])
+    # `no_defaults: true` on a skill opts it out of the global defaults (e.g. progress-logging).
+    # Pure client transforms (summarize/analyze/split) are one-shot file derivations with no
+    # pipeline phases, so the phase-telemetry default is dead weight in their prompt.
+    default_frags = [] if spec.get("no_defaults") else list(manifest.get("defaults") or [])
+    entries = default_frags + list(spec.get("fragments") or [])
 
     parts = [_strip_leading_frontmatter(raw).rstrip("\n")]
     for entry in entries:

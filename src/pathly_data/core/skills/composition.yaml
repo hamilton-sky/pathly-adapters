@@ -151,22 +151,27 @@ skills:
   # composition primitive as server actions while writing their result to a file the
   # host polls. See pathly/plans/unified-cli-composition/DESIGN.md.
   development/summarize:
+    no_defaults: true
     fragments:
       - client-file-output
       - artifact-transform
   development/summarize-gist:
+    no_defaults: true
     fragments:
       - client-file-output
       - artifact-transform
   development/summarize-detailed:
+    no_defaults: true
     fragments:
       - client-file-output
       - artifact-transform
   development/analyze:
+    no_defaults: true
     fragments:
       - client-file-output
       - artifact-transform
   development/split:
+    no_defaults: true
     fragments:
       - client-file-output
       - artifact-transform
