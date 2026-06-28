@@ -41,5 +41,13 @@ const STYLE_INSTRUCTION: Record<SummaryStyle, string> = {
 export function buildSummarizePrompt(text: string, style: SummaryStyle = 'topic-map'): string {
   const truncated = text.length > MAX_CHARS ? text.slice(0, MAX_CHARS) : text
   const instruction = STYLE_INSTRUCTION[style] ?? STYLE_INSTRUCTION['topic-map']
-  return `${instruction}\n\nDocument:\n${truncated}`
+  // Two sections — Description (1-2 sentence context → the artifact's message text) + Summary
+  // (the depth body). Mirrors the composed development/summarize* contract so the host parses
+  // both paths identically.
+  return (
+    `Output these two sections and nothing else.\n\n` +
+    `## Description\n1-2 sentences of context: what this document is and why it matters.\n\n` +
+    `## Summary\n${instruction}\n\n` +
+    `Document:\n${truncated}`
+  )
 }

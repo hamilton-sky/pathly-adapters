@@ -12,6 +12,7 @@ import {
   fetchArtifacts,
   apiGetDefaultSelection,
   apiSetArtifactSummary,
+  apiEditMessage,
   apiSetArtifactSelection,
   apiSetArtifactStyle,
   apiSetArtifactNote,
@@ -56,6 +57,17 @@ function stripAnsi(text: string): string {
     .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
     .replace(/\x1b[@-Z\\-_]/g, '')
     .trim()
+}
+
+// The summarize skills emit a structured result: a "## Description" section (1-2 sentence
+// context → refreshes the artifact's message text, i.e. the card's Description) and a
+// "## Summary" section (the depth-styled body → comms_artifacts.summary). Split them. If the
+// structure is absent (a model/offline path that didn't follow it, or legacy output), the whole
+// thing is the summary and the description is left untouched.
+function parseStructuredSummary(raw: string): { description: string | null; summary: string } {
+  const m = raw.match(/#{2,4}\s+Description\s*\n([\s\S]*?)\n#{2,4}\s+Summary\s*\n([\s\S]*)$/i)
+  if (m && m[2].trim()) return { description: m[1].trim() || null, summary: m[2].trim() }
+  return { description: null, summary: raw.trim() }
 }
 
 export interface ResummarizeHook {
@@ -269,7 +281,12 @@ export function useResummarize(messageId: string): ResummarizeHook {
         // treat empty output as a failure — not a silent "done" with nothing saved.
         summary = stripAnsi(summary)
         if (!summary) throw new Error('the engine returned no summary text')
-        await apiSetArtifactSummary(row.id, summary, selection as AiSelectionDto)
+        // Split the structured result: Description refreshes the artifact's message text (the
+        // card's "Description"); the Summary body goes to comms_artifacts.summary. Edit the
+        // description FIRST so the summary write's re-embed (description + summary) sees it.
+        const { description, summary: summaryBody } = parseStructuredSummary(summary)
+        if (description) await apiEditMessage(messageId, description)
+        await apiSetArtifactSummary(row.id, summaryBody, selection as AiSelectionDto)
 
         markStatus(messageId, 'ready')
         setPillState('done')
