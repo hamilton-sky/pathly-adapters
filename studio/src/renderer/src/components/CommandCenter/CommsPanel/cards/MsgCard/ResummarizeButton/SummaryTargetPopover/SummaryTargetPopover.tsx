@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { AiTargetSelector } from '../../../../../../shared/AiTargetSelector/AiTargetSelector'
 import type { AiSelection } from '../../../../../../../services/aiRouter'
 import type { SummaryStyle } from '../../../../../../../store/commsApi'
+import { fetchSummaryFormat } from '../../../../../../../services/summaryFormat'
 import s from './SummaryTargetPopover.module.css'
 
 interface Props {
@@ -19,6 +20,8 @@ interface Props {
 const POPOVER_WIDTH = 220
 
 // Summary DEPTH options — gist (precision) → topic-map (balanced) → detailed (recall).
+// The output-shape PREVIEW is not hardcoded here — it is fetched from the depth's template
+// file (the same one compose injects into the prompt), see formatPreview below.
 const STYLE_OPTIONS: { value: SummaryStyle; label: string; hint: string }[] = [
   { value: 'gist', label: 'Gist', hint: 'One sentence — the core point (precision)' },
   { value: 'topic-map', label: 'Topic map', hint: 'One line per section (balanced)' },
@@ -32,6 +35,15 @@ export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyle
   const ref = useRef<HTMLDivElement>(null)
   // Local draft — persist on blur (one POST per edit, not per keystroke).
   const [noteDraft, setNoteDraft] = useState(note)
+  const activeStyle = STYLE_OPTIONS.find((o) => o.value === style) ?? STYLE_OPTIONS[1]
+  // The output-format preview is the SAME contract the agent receives — fetched from the depth's
+  // template file (core/templates/summary/<style>.md), never hardcoded, so they can't drift.
+  const [formatPreview, setFormatPreview] = useState('')
+  useEffect(() => {
+    let alive = true
+    void fetchSummaryFormat(style).then((f) => { if (alive) setFormatPreview(f) })
+    return () => { alive = false }
+  }, [style])
 
   useLayoutEffect(() => {
     if (!anchorEl || !ref.current) return
@@ -78,6 +90,11 @@ export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyle
           </button>
         ))}
       </div>
+      {formatPreview && (
+        <pre className={s.formatPreview} aria-label={`${activeStyle.label} output format`}>
+          {formatPreview}
+        </pre>
+      )}
       <div className={s.heading}>AI target for this artifact</div>
       <div className={s.body}>
         <AiTargetSelector value={value} onChange={(sel) => { onChange(sel) }} allowOff />

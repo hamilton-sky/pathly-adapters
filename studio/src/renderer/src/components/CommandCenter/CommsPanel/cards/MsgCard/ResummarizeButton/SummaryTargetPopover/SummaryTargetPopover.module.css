@@ -64,6 +64,23 @@
   color: var(--accent);
 }
 
+/* Output-shape preview — mirrors the selected depth's skill template so the user
+   sees the exact contract every CLI engine will fill. Literal text (markdown chars
+   shown as-is), not rendered markdown. */
+.formatPreview {
+  margin: 0 10px 8px;
+  padding: 6px 8px;
+  font: 400 10px/1.5 var(--font-family-mono);
+  color: var(--text-secondary);
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 104px;
+  overflow: auto;
+}
+
 .note {
   width: 100%;
   min-width: 0;

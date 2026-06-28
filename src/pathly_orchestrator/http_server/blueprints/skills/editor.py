@@ -16,6 +16,36 @@ bp = Blueprint("skills", __name__)
 # stray UI value can never inject a bogus key into the hand-maintained manifest.
 _SKILL_KEY_RE = re.compile(r"[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*")
 
+# Summary DEPTH style → its output-format contract file in core/templates/summary/.
+# The contract is single-sourced there: compose substitutes <summary_format> from it, and the
+# Studio depth picker fetches the same file (GET /skills/summary-format/<style>) — so the prompt
+# the agent fills and the shape the user previews can never drift.
+_SUMMARY_STYLES = {"gist", "topic-map", "detailed"}
+_SUMMARY_FORMAT_BY_SKILL = {
+    "development/summarize": "topic-map",
+    "development/summarize-gist": "gist",
+    "development/summarize-detailed": "detailed",
+}
+
+
+def _read_summary_format(style: str) -> str:
+    """Read the output-format contract for a summary DEPTH style. Returns '' on an unknown
+    style or a missing file, so the caller leaves <summary_format> empty rather than breaking
+    the prompt."""
+    if style not in _SUMMARY_STYLES:
+        return ""
+    try:
+        from importlib.resources import files as _res_files
+
+        return (
+            _res_files("pathly_data")
+            .joinpath(f"core/templates/summary/{style}.md")
+            .read_text(encoding="utf-8")
+            .strip()
+        )
+    except Exception:
+        return ""
+
 
 @bp.route("/skills/catalog", methods=["GET"])
 def skills_catalog():
@@ -315,10 +345,32 @@ def skills_compose():
             )
         )
 
+        # Single-sourced summary output-format: substitute <summary_format> from the depth's
+        # template file (core/templates/summary/<style>.md), keyed off the skill name.
+        if "<summary_format>" in prompt:
+            prompt = prompt.replace(
+                "<summary_format>",
+                _read_summary_format(_SUMMARY_FORMAT_BY_SKILL.get(skill, "")),
+            )
+
         return jsonify({"prompt": prompt, "skill": skill, "composed": composed}), 200
     except Exception as e:
         logging.exception("skills_compose error")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
+@bp.route("/skills/summary-format/<style>", methods=["GET"])
+def skills_summary_format(style: str):
+    """Return the output-format contract for a summary DEPTH style (gist|topic-map|detailed).
+
+    Single source for both the composed prompt (the ``<summary_format>`` substitution in
+    ``/skills/compose``) and the Studio depth-picker preview, so the contract the agent fills
+    and the shape the user previews can never drift.
+    """
+    fmt = _read_summary_format(style)
+    if not fmt:
+        return jsonify({"error": f"unknown summary style {style!r}"}), 404
+    return jsonify({"style": style, "format": fmt}), 200
 
 
 @bp.route("/skills/save", methods=["POST"])
