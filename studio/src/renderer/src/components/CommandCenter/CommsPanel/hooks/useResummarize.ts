@@ -170,7 +170,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
         }
         if (prompt == null) {
           const text = await readFile(abs)
-          prompt = buildSummarizePrompt(text ?? '')
+          prompt = buildSummarizePrompt(text ?? '', style)
         }
         setPreview({ prompt: prompt + noteSuffix, fileName: name })
         setConfirmOpen(true)
@@ -220,7 +220,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
         // as the fallback when the /skills/compose endpoint is unreachable.
         const runBare = async (): Promise<string> => {
           const { promise, abort } = runJobWithAbort(
-            { kind: 'summarize', prompt: buildSummarizePrompt(text) + noteSuffix, cwd },
+            { kind: 'summarize', prompt: buildSummarizePrompt(text, style) + noteSuffix, cwd },
             selection,
           )
           abortRef.current = abort

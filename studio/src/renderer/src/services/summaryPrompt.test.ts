@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildSummarizePrompt } from './summaryPrompt'
 
 describe('buildSummarizePrompt', () => {
-  it('asks for a topic map with the default item cap and includes the text', () => {
+  it('defaults to a topic map and includes the text', () => {
     const p = buildSummarizePrompt('# Doc\n## Storage\nWAL.')
     expect(p).toContain('compact topic map')
     expect(p).toContain('Maximum 3 items')
@@ -10,8 +10,24 @@ describe('buildSummarizePrompt', () => {
     expect(p).toContain('# Doc\n## Storage\nWAL.')
   })
 
-  it('honours a custom maxSentences cap', () => {
-    expect(buildSummarizePrompt('x', 5)).toContain('Maximum 5 items')
+  it('produces a one-sentence gist prompt for the gist depth', () => {
+    const p = buildSummarizePrompt('x', 'gist')
+    expect(p).toContain('ONE-SENTENCE gist')
+    expect(p).not.toContain('topic map')
+  })
+
+  it('produces a section-level prompt for the detailed depth', () => {
+    const p = buildSummarizePrompt('x', 'detailed')
+    expect(p).toContain('DETAILED summary')
+    expect(p).toContain('key points or decisions')
+  })
+
+  it('emits a distinct prompt for each depth', () => {
+    const text = '# Doc\n## A\nfoo'
+    const gist = buildSummarizePrompt(text, 'gist')
+    const topic = buildSummarizePrompt(text, 'topic-map')
+    const detailed = buildSummarizePrompt(text, 'detailed')
+    expect(new Set([gist, topic, detailed]).size).toBe(3)
   })
 
   it('truncates very long input to 8000 chars before the document body', () => {
