@@ -94,7 +94,13 @@ export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyle
       {formatPreview && (
         <div className={s.formatBox} aria-label={`${activeStyle.label} output format`}>
           <div className={s.formatTitle}>{activeStyle.label}</div>
-          <MarkdownRenderer content={formatPreview} className={s.formatMd} />
+          <MarkdownRenderer
+            content={
+              `**Description** — a 1–2 sentence “what it is & why it matters” ` +
+              `(refreshes the card’s Description).\n\n**Summary**\n${formatPreview}`
+            }
+            className={s.formatMd}
+          />
         </div>
       )}
       <div className={s.heading}>AI target for this artifact</div>
