@@ -65,6 +65,8 @@ The dividing line is whether the action mutates board lifecycle state (tasks, go
 
 **Naming: fragment · skill · profile.** Three layers, one word each. A **fragment** is an atomic reusable prompt block (`fragments/*.md`); a **skill** is the task body ("what to do"); a **profile** is the context-selected fragment bundle ("how it connects to Pathly") — `standalone-transform` (the P0 pure-transform set) vs `goal-backed` (the P1 board set). The composed prompt is `skill body + defaults + profile[context] + skill's own fragments` (deduped, cap-gated). This promotes today's `blocks:` manifest key to `profiles:` and turns the standalone/goal-backed choice into a manifest lookup keyed by `goal_id` presence rather than a code branch — see Architecture › Naming. Fragments cluster by role (board / capture / lifecycle / delegate) as a documented convention; a role-prefix file rename is deferred (the fragment set still grows through P1).
 
+**Skills are agnostic; ALL Pathly connection lives in fragments.** A skill body is the task ("what to do") with ZERO board/FSM/endpoint references; the profile's fragments are the *only* thing that wires an agent to Pathly. Audit (2026-06-28) of skill bodies carrying concrete board calls — the active violators are the three RAW stage skills: `development/drain-dag` (entire loop body is `/comms/*` — handled by P1c: board-I/O → fragments, loop body stays raw), and `team/architect` + `team/research` (each bakes ONE `curl POST /comms/post` artifact post in-body → small `comms-post` extraction, P1e). In-manifest stage skills were already body-reduced when converted (the atomic rule), and utility/control skills (`log-*`, `fsm-call`, `commit`, `go`, `pause`) are operational scripts whose job IS the call — both out of scope. Deeper note: architect/research also carry FSM-stage orchestration (`complete-stage`, `log-phase`, `spawn`, pause) in-body; making FSM-*stage* skills fully FSM-agnostic is a larger architectural change tracked separately (P3+), NOT P1.
+
 ### In scope
 
 - A server-side composition seam reachable from client actions, so Summary, Analyze, Split, and Decompose all assemble their prompt through the same fragment-composition primitive as server/FSM actions.
@@ -269,6 +271,11 @@ This is already the de-facto standard (editor Analyze/Split, board Evaluate, Goa
 2. Point the five transform skills at `profile: standalone-transform` (drop the repeated per-skill lists).
 3. Teach `compose.py` to resolve a skill's `profile:` and to select `goal-backed` by `ctx.goal_id`; keep reading `blocks:` as an alias for one release (no breaking change).
 4. `validate_composition` + `pathly-setup claude --apply --repair` + `python -m build`.
+
+### P1e — Agnostic-skill cleanup (consultation stage skills)
+1. Add `team/architect` + `team/research` to the manifest with `[comms-post]` (+ `completion-report` if they should report); delete the in-body `curl POST /comms/post` block so the board post comes ONLY from the fragment — matching the Gap-1 silent-skill pattern (explore/debug/retro).
+2. Leave the FSM-stage orchestration (`complete-stage`/`log-phase`/`spawn`/pause) in-body for now — full FSM-agnosticism of stage skills is a separate, larger track (P3+).
+3. `validate_composition` + `pathly-setup claude --apply --repair` + `python -m build`.
 
 ### Verify
 - `node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json`

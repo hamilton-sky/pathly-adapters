@@ -81,6 +81,8 @@ Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that 
 
 **Manifest:** `core/skills/composition.yaml` is the authoritative map. Keys are core-skills-relative paths without `.md` (e.g. `team/build`, `development/build`).
 
+**Agnosticism principle — skill = *what*, fragments = *how it connects to Pathly*.** A skill `.md` body must be the agnostic TASK: no board endpoints, no `/comms/*` or `/runner/*` calls, no FSM transitions baked in. ALL connection to Pathly comes from fragments (selected by the skill's work-kind + the spawn context — together its *profile*). Operational/utility skills (`log-*`, `fsm-call`, `commit`, and the control skills) are the deliberate exception: their job IS the call. Known violators to migrate: `development/drain-dag`, `team/architect`, `team/research` (they POST to the board from the body). See `pathly/plans/unified-cli-composition/DESIGN.md`.
+
 **Composition contract:**
 
 ```
