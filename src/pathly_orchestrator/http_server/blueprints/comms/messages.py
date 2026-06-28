@@ -144,6 +144,13 @@ def comms_post():
         # The server-side inference path that consumed it is gone — the client writeback
         # route (/comms/artifacts/<id>/summary) owns the summary now.
         _ = bool(data.get("embed_summary"))
+        # §3 (author provides both at creation): an agent that just wrote the artifact may
+        # supply `summary` (a section topic-map for the catalog) alongside `text` (the
+        # description). When present we store it as the artifact summary, embed
+        # description+summary, and SKIP the client summary_request — the author knows it best.
+        artifact_summary = data.get("summary")
+        if not isinstance(artifact_summary, str) or not artifact_summary.strip():
+            artifact_summary = None
         context_refs = data.get("context_refs")
         if context_refs is not None and (
             not isinstance(context_refs, list)
@@ -261,7 +268,7 @@ def comms_post():
                     message_id=message_id,
                     path=artifact_path,
                     type=artifact_type if isinstance(artifact_type, str) else None,
-                    summary=text,
+                    summary=artifact_summary or text,
                     created_by=from_agent,
                 )
                 try:
@@ -296,14 +303,24 @@ def comms_post():
                     if isinstance(artifact_type, str)
                     else None,
                     scope=scope,
-                    summary_backend=summary_backend,
+                    # An author-provided summary suppresses the client request ('minilm'
+                    # is the existing suppress signal) — the summary is already stored.
+                    summary_backend="minilm" if artifact_summary else summary_backend,
                     broadcast_fn=lambda _p: _broadcast_comms(scope, _p),
                 )
             except Exception:
                 logging.debug("comms_artifacts insert (post) failed", exc_info=True)
 
         if msg_type in _EMBED_TYPES:
-            _embed_async(message_id, text)
+            # Embed description + author summary when given, so retrieval matches on the
+            # rich content from the start (otherwise the summary is embedded later, on the
+            # /summary writeback). Non-artifact types embed their text as before.
+            embed_text = (
+                f"{text}\n\n{artifact_summary}".strip()
+                if (msg_type == "artifact" and artifact_summary)
+                else text
+            )
+            _embed_async(message_id, embed_text)
 
         _broadcast_comms(
             scope,

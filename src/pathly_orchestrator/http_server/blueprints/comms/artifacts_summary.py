@@ -94,6 +94,28 @@ def comms_artifact_set_summary(artifact_id: str):
 
         _set_summary(conn, artifact_id, summary, selection_json=selection_json)
 
+        # Re-embed the artifact's message on description + summary so SEMANTIC retrieval
+        # matches on the rich topic-map, not just the terse description. The post-time
+        # embedding used only the description; the summary (the best signal) was never
+        # embedded until now. Best-effort, async, never blocks the writeback.
+        try:
+            if summary.strip():
+                row = conn.execute(
+                    "SELECT a.message_id, m.text FROM comms_artifacts a "
+                    "JOIN comms_messages m ON m.id = a.message_id "
+                    "WHERE a.id=? AND m.deleted_at IS NULL",
+                    (artifact_id,),
+                ).fetchone()
+                if row is not None:
+                    from pathly_orchestrator.runner.embeddings import (
+                        embed_async as _embed_async,
+                    )
+
+                    desc = row["text"] or ""
+                    _embed_async(row["message_id"], f"{desc}\n\n{summary}".strip())
+        except Exception:
+            logging.debug("re-embed on summary set failed", exc_info=True)
+
         _broadcast_comms(
             scope,
             {

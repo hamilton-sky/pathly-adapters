@@ -265,11 +265,14 @@ def start_board_run(
         f"{cadence} Keep each post to one or two sentences — the board is the human's "
         "window into this run.\n\n"
         f"{where_line}"
-        "If you CREATE A FILE (an artifact), post it as an artifact AND link the path so "
-        "the human can open it from the board — include artifact_path (and artifact_type "
-        'like "md" or "code"):\n'
+        "If you CREATE A FILE (an artifact), post it as an artifact AND link the path so the "
+        "human can open it from the board. Provide TWO fields: text = a real 1-2 sentence "
+        "description (what it is and why it matters, NOT a bare label); summary = a topic map of "
+        "the file's sections (one line per heading) — this is the catalog entry other agents scan "
+        "and is embedded for semantic retrieval. Include artifact_path and artifact_type:\n"
         f'  {{"feature": "{scope}", "from": "{_from}", "board": "{board}", "scope": "{scope}", '
-        '"type": "artifact", "text": "<one-line summary of the file>", '
+        '"type": "artifact", "text": "<1-2 sentence description>", '
+        '"summary": "<topic map of the file sections, one line per heading>", '
         '"artifact_path": "<relative or absolute path to the file you wrote>", '
         '"artifact_type": "md"}'
     )
