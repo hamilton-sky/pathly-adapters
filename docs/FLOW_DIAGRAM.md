@@ -3,9 +3,17 @@
 How a user invokes Pathly from each supported host, what install produces, and
 where files land.
 
+> **Primary runtime is headless, board-driven orchestration.** Pathly's design center is the
+> Studio **Start** button: `POST /runner/start` → the supervisor drives the FSM and spawns each
+> pipeline stage as a **visible PTY tab**, agent-by-agent, with no human in the per-step loop,
+> while a human supervises through the Command Center board (goals → task-DAG → executors). The
+> per-host `/pathly` invocations below are the **interactive (secondary)** affordance. See
+> [WHAT_IS_PATHLY.md](WHAT_IS_PATHLY.md).
+
 ## Host Entry Points
 
-Pathly has four runtime entry points:
+The interactive entry points below are the **secondary** affordance — the primary path is the
+headless Studio runner above. Pathly exposes four interactive entry points:
 
 - Claude Code: via the `/pathly` dispatcher (`/pathly go`, `/pathly build`, etc.) or direct skill invocations (`/go`, `/build`, `/start`, etc.)
 - Codex: `Use Pathly ...` (natural language)

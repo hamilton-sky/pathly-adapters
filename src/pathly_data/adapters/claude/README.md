@@ -1,5 +1,10 @@
 # Claude Code Adapter
 
+> **Note:** the `/pathly` slash-commands + `pathly-setup` install path described here are
+> Pathly's **interactive (secondary)** mode. The **primary** runtime is headless — Studio's
+> runner injects the full composed prompt into Claude via argv at spawn time (no installed skill
+> file is read). See the repo `README.md` / `docs/WHAT_IS_PATHLY.md`.
+
 Claude Code should expose the cross-framework Pathly entry points:
 
 ```text

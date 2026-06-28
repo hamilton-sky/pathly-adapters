@@ -84,6 +84,17 @@ are placeholders until live model availability is verified against the installed
 | **Format** | Markdown behavior contract | SKILL.md (YAML frontmatter + instructions) |
 | **Example** | builder, reviewer, scout | /team, /explore, /review |
 
+## Skill Delivery — Two Modes
+
+How a skill's prompt reaches the CLI depends on which runtime drives it:
+
+| Mode | Trigger | How the prompt reaches the CLI | Skill files on disk? |
+|---|---|---|---|
+| **Runner (primary)** | Studio **Start** / a goal run | the supervisor assembles the full composed prompt (skill body + fragments) and injects it via `-p` argv | No — assembled in Python at runtime |
+| **Interactive (secondary)** | user types `/pathly build` | the host reads the installed `~/.claude/skills/pathly-*.md` | Yes — `pathly-setup claude --apply` |
+
+In runner mode Pathly is the single source of truth for skill content; the CLI receives the complete prompt as an argument and exits when done.
+
 ## Stitch Pipeline
 
 `core/` is content, not runtime code. `src/install_cli/` stitches `core/` content
@@ -220,6 +231,8 @@ Current major panes:
 | Monitor | `pathly-fsm-http` SSE stream from `/events/stream` |
 | Conductor | chat target routing for Claude, Codex, and shell terminals |
 | Terminal | Electron PTY IPC exposed through `window.pathly.terminal` |
+| Runner / HQ | FlowControlBar **Start** → `POST /runner/start` → the supervisor drives the FSM headlessly, spawning each stage as a **visible PTY tab** (the primary runtime surface) |
+| Command Center / Board | the supervisory board — goals → per-goal task-DAG → pluggable executors (`single`/`loop`/`team`); a human sets goals and adjudicates while the app drives agents headlessly |
 
 Terminal ownership is shared by `studio/src/renderer/src/components/Terminal/xtermRegistry.ts`.
 The full bottom terminal and Conductor mini terminal card reparent one xterm
@@ -276,7 +289,7 @@ The runtime orchestration layer now extends beyond `transition_actions` auto-spa
 - **Memory consolidation** (`/comms/consolidate`) deduplicates and merges near-duplicate notes.
 - **Goal-stop** (`POST /comms/goals/stop`) terminates an in-progress goal run.
 
-All of these are shipped as of v2.16.2. `transition_actions` auto-spawning remains the baseline for flow-driven pipelines; the Board executor model is the layer above it for interactive and multi-goal orchestration.
+All of these are shipped as of v2.16.2. `transition_actions` auto-spawning remains the baseline for flow-driven pipelines; the Board executor model is the layer above it for board-driven (headless-supervised) and multi-goal orchestration.
 
 ## Source of Truth
 

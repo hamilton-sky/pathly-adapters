@@ -6,6 +6,11 @@ packaged for Claude Code, Codex, the Python CLI, and future hosts.
 Pathly Studio is the local desktop surface over the same project files and FSM
 HTTP runtime; it is not a separate workflow source of truth.
 
+> **Primary runtime is headless, board-driven orchestration** — the Studio Start button /
+> supervisor drives each host headlessly, injecting the composed prompt via argv. The per-host
+> **User invocation** column below is the **interactive (secondary)** affordance, not Pathly's
+> design center. See [WHAT_IS_PATHLY.md](WHAT_IS_PATHLY.md).
+
 ## Current Structure
 
 ```text
@@ -41,7 +46,9 @@ metadata, and expose the host-native invocation style.
 
 ## Current Adapters
 
-| Adapter | User invocation | Files |
+Each adapter exposes a host-native **interactive** invocation (below). In the **primary** runner mode the supervisor injects the composed prompt via argv instead — the user does not type these.
+
+| Adapter | User invocation (interactive/secondary) | Files |
 |---|---|---|
 | Claude Code | `/pathly <request>` or `/path <request>` (slash commands) | `src/pathly_data/adapters/claude/` |
 | Codex | `Use Pathly <request>` or `Pathly <request>` (natural language) plus `pathly-fsm-call` for HTTP lifecycle steps | `src/pathly_data/adapters/codex/` |

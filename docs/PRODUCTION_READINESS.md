@@ -5,6 +5,11 @@
 Release criteria for pathly-adapters. Until these gates are met, describe
 pathly-adapters publicly as a public beta / technical preview.
 
+> **Framing:** Pathly's primary surface is **board-driven headless orchestration** (Studio Start
+> → supervisor drives the FSM / goal executors; interactive `/pathly` slash-commands are
+> secondary). The install/adapter gates below are necessary but not sufficient — readiness of
+> the primary runner/board path is tracked in *Runner / Board Readiness* below.
+
 ## Release Position
 
 pathly-adapters is currently at **version 2.16.2**:
@@ -87,6 +92,16 @@ Required before production-ready:
 - `--force` overwrites all files, including non-Pathly-owned.
 - `--uninstall` removes all Pathly-owned files with no orphan residue.
 - Unsupported or missing hosts produce useful next steps, not a crash.
+
+## Runner / Board Readiness (primary surface)
+
+The headless runner + Command Center board is Pathly's primary runtime; release gates for it:
+
+- Studio **Start** drives a flow end-to-end headlessly (`/runner/start` → supervisor → visible PTY per stage → `/complete_stage`), with Pause/Resume/Abort working.
+- A goal **decompose → executor run** (`single`/`loop`/`team`) completes and writes task rows + artifacts to the board.
+- Every stage prompt is composed server-side (skill body + fragments) and injected via argv — no reliance on disk-installed skill files for runner mode.
+- `goal-stop` (`POST /comms/goals/stop`) cleanly terminates an in-progress goal run.
+- Clean-machine smoke run: Studio launches, starts the FSM server, and drives one full pipeline.
 
 ## Package Build and Publish
 

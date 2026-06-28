@@ -1,6 +1,6 @@
 # Studio — Frontend Layer
 
-Electron + React + Vite desktop app. Visual flow builder and AI chat panel.
+Electron + React + Vite desktop app. **Studio is the board-driven Command Center**: a human supervises *headless* multi-agent runs while the app drives CLI engines step-by-step. The visual flow builder and AI chat panel are surfaces within it.
 
 ## Directory structure
 

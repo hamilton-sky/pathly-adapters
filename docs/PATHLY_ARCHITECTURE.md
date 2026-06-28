@@ -26,6 +26,12 @@ provides:
 The user installs Pathly once. After that, they interact with their AI coding
 tool normally — the tool reads Pathly's agents and skills transparently.
 
+> **This doc covers the install/package layer only — not Pathly's purpose.** Pathly's primary
+> runtime is **board-driven headless orchestration**: a human supervises through the Studio
+> board (the Command Center) while the app drives agents headlessly, step by step. The
+> install / transparent-augmentation path described here is the **interactive (secondary)**
+> affordance. See [WHAT_IS_PATHLY.md](WHAT_IS_PATHLY.md).
+
 ---
 
 ## Folder Structure
@@ -200,6 +206,13 @@ Spawn Agent(subagent_type="reviewer") for review.
 ```
 
 This keeps `core/` host-neutral. A new host adapter only needs new `_meta/` files.
+
+> **The fragments layer (the Pathly connection).** Skill bodies in `core/skills/` are the
+> **agnostic task** ("what to do"). ALL connection to Pathly — board CRUD, context retrieval,
+> progress logging, completion reporting, delegation — lives in the un-editable **fragments**
+> (`core/skills/fragments/`), composed onto skill bodies by `composition.yaml` + `compose.py`.
+> `_meta/*.yaml` adds host-specific invocation; the fragments add the board connection. See
+> `src/pathly_data/CLAUDE.md` › Skill composition.
 
 ---
 

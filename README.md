@@ -53,6 +53,8 @@ All commands go through `/pathly`. See [docs/FLOW_DIAGRAM.md](docs/FLOW_DIAGRAM.
 
 > **Tip:** `/start` and `/pathly start` are equivalent. `/pathly` dispatches to the same skill; direct invocation skips the dispatcher.
 
+> **Primary mode — headless:** the `/pathly` commands above are the *interactive* path. The design center is the board — launch Studio (`pathly-studio`), set a goal, and hit **Start**; the app drives the pipeline agent-by-agent (each stage a visible terminal) while you supervise. See [docs/WHAT_IS_PATHLY.md](docs/WHAT_IS_PATHLY.md).
+
 ## All commands
 
 ```bash

@@ -92,7 +92,7 @@ assembled = _strip_leading_frontmatter(skill body) + defaults fragments + per-sk
 - `defaults` applies to every skill listed in the `skills:` map (currently `progress-logging`).
 - A skill **absent** from `skills:` is returned **raw and unchanged** — no fragments, no defaults. Skills are converted incrementally; not all are in the map yet.
 - A fragment entry is a bare name (`feedback-protocol`) or a gated object (`{ name: spawn-rules, requires: can_spawn }`). Gated entries are dropped when the adapter's capability flag is false.
-- `blocks:` is an optional top-level key for named fragment lists (`full-build`, `lite-build`, `review-strict`) — callers resolve these via `compose_skill_with_block()`.
+- `blocks:` is an optional top-level key for named fragment lists (`full-build`, `lite-build`, `review-strict`) — callers resolve these via `compose_skill_with_block()`. *(The unified-cli-composition plan renames `blocks:` → `profiles:` — a profile being a named, context-selected fragment bundle — but that rename is plan P1d, not yet built; `blocks:` remains the live manifest key and helper name.)*
 
 **Skills currently in the manifest (converted):** `team/build`, `team/review`, `team/test`, `team/plan`, `team/design`, `team/retro`, `development/build`, `development/review`, `development/test`, `development/design`, `development/explore`, `development/debug`, `debug/build`, `debug/verify`, `fix/build`, `planning/plan`, `planning/evaluate`, `planning/consolidate`, `planning/retro`. (`development/drain-dag` is intentionally **raw/unconverted** — the `single` executor's self-loop skill, no fragments.)
 
