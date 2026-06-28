@@ -1,7 +1,7 @@
 {
   "name": "pathly-studio",
-  "version": "2.18.0",
-  "description": "Pathly Studio â€” desktop app for configuring and monitoring the Pathly pipeline",
+  "version": "2.18.1",
+  "description": "Pathly Studio \u00e2\u20ac\u201d desktop app for configuring and monitoring the Pathly pipeline",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
