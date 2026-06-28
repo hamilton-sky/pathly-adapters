@@ -63,7 +63,10 @@ export function MsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSu
           )}
           <span className={s.cardActions}>
             {m.type === 'artifact' && m.artifactPath && (
-              <CopyArtifactButton path={m.artifactPath} name={m.artifact ?? 'artifact'} />
+              <>
+                <CopyArtifactButton path={m.artifactPath} name={m.artifact ?? 'artifact'} kind="content" />
+                <CopyArtifactButton path={m.artifactPath} name={m.artifact ?? 'artifact'} kind="path" />
+              </>
             )}
             {onSupersede && !m.supersededBy && (
               <SupersedeMenu

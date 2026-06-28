@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Link2, Check } from 'lucide-react'
 import { useProjectStore } from '../../../../../../store/projectStore'
 import { useToastStore } from '../../../../../../store/toastStore'
 import { readFile } from '../../../../../../services/pathlyApi'
@@ -11,41 +11,53 @@ interface Props {
   path: string
   /** Display name, used in the confirmation toast. */
   name: string
+  /** 'content' copies the file's text; 'path' copies the resolved absolute path. */
+  kind?: 'content' | 'path'
 }
 
-// Copies the artifact's FILE CONTENT to the clipboard. Resolves a project-relative path
-// against the project root (same helper the summary/preview use), reads the file, and
-// writes it via the clipboard IPC. Shows a transient ✓ and a toast.
-export function CopyArtifactButton({ path, name }: Props): JSX.Element {
+// Copies either the artifact's FILE CONTENT or its absolute PATH to the clipboard.
+// Resolves a project-relative path against the project root (same helper the summary/
+// preview use). Shows a transient ✓ and a toast.
+export function CopyArtifactButton({ path, name, kind = 'content' }: Props): JSX.Element {
   const [copied, setCopied] = useState(false)
   const projectPath = useProjectStore((st) => st.projectPath)
 
   async function copy(): Promise<void> {
     const toast = useToastStore.getState().push
+    const abs = resolveArtifactPath(path, projectPath)
     try {
-      const text = await readFile(resolveArtifactPath(path, projectPath))
-      if (text == null) {
-        toast(`Could not read ${name}`, 'error', { category: 'db_crud' })
-        return
+      if (kind === 'path') {
+        await window.pathly.clipboard.write(abs)
+        setCopied(true)
+        toast(`Copied path: ${name}`, 'success', { category: 'db_crud' })
+      } else {
+        const text = await readFile(abs)
+        if (text == null) {
+          toast(`Could not read ${name}`, 'error', { category: 'db_crud' })
+          return
+        }
+        await window.pathly.clipboard.write(text)
+        setCopied(true)
+        toast(`Copied ${name} to clipboard`, 'success', { category: 'db_crud' })
       }
-      await window.pathly.clipboard.write(text)
-      setCopied(true)
-      toast(`Copied ${name} to clipboard`, 'success', { category: 'db_crud' })
       window.setTimeout(() => setCopied(false), 1500)
     } catch {
-      toast(`Could not copy ${name}`, 'error', { category: 'db_crud' })
+      toast(`Could not copy ${kind === 'path' ? 'path' : name}`, 'error', { category: 'db_crud' })
     }
   }
+
+  const tip = kind === 'path' ? 'Copy file path' : 'Copy artifact to clipboard'
+  const Icon = kind === 'path' ? Link2 : Copy
 
   return (
     <button
       type="button"
       className={s.copyBtn}
-      title="Copy artifact to clipboard"
-      aria-label="Copy artifact to clipboard"
+      title={tip}
+      aria-label={tip}
       onClick={() => { void copy() }}
     >
-      {copied ? <Check size={12} /> : <Copy size={12} />}
+      {copied ? <Check size={12} /> : <Icon size={12} />}
     </button>
   )
 }
