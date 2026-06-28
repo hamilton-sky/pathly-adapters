@@ -431,6 +431,10 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # summarization. JSON-encoded AiSelection {"type":"model"|"engine","id":...}.
         # Nullable → the artifact falls back to the app-default selection.
         ("comms_artifacts", "summary_selection", "TEXT"),
+        # summary-style: per-artifact summary DEPTH ('gist'|'topic-map'|'detailed').
+        # Selects which development/summarize* skill the client composes. Nullable →
+        # falls back to the default ('topic-map').
+        ("comms_artifacts", "summary_style", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

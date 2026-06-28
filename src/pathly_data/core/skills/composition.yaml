@@ -154,6 +154,14 @@ skills:
     fragments:
       - client-file-output
       - artifact-transform
+  development/summarize-gist:
+    fragments:
+      - client-file-output
+      - artifact-transform
+  development/summarize-detailed:
+    fragments:
+      - client-file-output
+      - artifact-transform
   development/analyze:
     fragments:
       - client-file-output

@@ -54,6 +54,24 @@ def set_artifact_summary(
         set_artifact_summary_selection(conn, artifact_id, selection_json)
 
 
+def set_artifact_summary_style(
+    conn: sqlite3.Connection,
+    artifact_id: str,
+    style: str,
+) -> None:
+    """Persist the per-artifact summary DEPTH style for artifact_id.
+
+    style is one of 'gist' | 'topic-map' | 'detailed' — it selects which
+    development/summarize* skill the client composes on the next re-summarize.
+    """
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_artifacts SET summary_style=? WHERE id=?",
+            (style, artifact_id),
+        )
+        conn.commit()
+
+
 def get_artifact_summary_selection(
     conn: sqlite3.Connection,
     artifact_id: str,

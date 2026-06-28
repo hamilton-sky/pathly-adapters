@@ -180,3 +180,53 @@ def comms_artifact_set_selection(artifact_id: str):
     except Exception as exc:
         logging.exception("comms_artifact_set_selection error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+_VALID_STYLES = frozenset({"gist", "topic-map", "detailed"})
+
+
+@bp.route("/comms/artifacts/<artifact_id>/style", methods=["POST"])
+def comms_artifact_set_style(artifact_id: str):
+    """Persist the per-artifact summary DEPTH style.
+
+    Body: {style: 'gist'|'topic-map'|'detailed'}. Selects which development/summarize*
+    skill the client composes on the next re-summarize. Stored next to summary_selection."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms_summary import (
+            set_artifact_summary_style as _set_style,
+        )
+
+        data = request.get_json(silent=True) or {}
+        style = data.get("style")
+        if style not in _VALID_STYLES:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Field 'style' must be 'gist'|'topic-map'|'detailed'",
+                    }
+                ),
+                400,
+            )
+
+        conn = _get_db()
+        scope = _artifact_scope(conn, artifact_id)
+        if scope is None:
+            return jsonify({"ok": False, "error": "artifact not found"}), 404
+
+        _set_style(conn, artifact_id, style)
+
+        _broadcast_comms(
+            scope,
+            {
+                "type": "COMMS_UPDATE",
+                "event": "artifact_style",
+                "artifact_id": artifact_id,
+                "scope": scope,
+            },
+        )
+        return jsonify({"ok": True, "artifact_id": artifact_id}), 200
+    except Exception as exc:
+        logging.exception("comms_artifact_set_style error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
