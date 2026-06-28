@@ -42,6 +42,8 @@ export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Ele
           onChange={(sel) => { r.setSelection(sel); r.setConfigOpen(false) }}
           style={r.style}
           onStyleChange={r.setStyle}
+          note={r.note}
+          onNoteChange={r.setNote}
           onClose={() => r.setConfigOpen(false)}
         />
       )}

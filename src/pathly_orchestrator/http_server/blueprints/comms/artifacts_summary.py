@@ -230,3 +230,46 @@ def comms_artifact_set_style(artifact_id: str):
     except Exception as exc:
         logging.exception("comms_artifact_set_style error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+_MAX_NOTE_LEN = 2000
+
+
+@bp.route("/comms/artifacts/<artifact_id>/note", methods=["POST"])
+def comms_artifact_set_note(artifact_id: str):
+    """Persist the per-artifact free-text 'special request'.
+
+    Body: {note: str}. Appended to the summary prompt on the next re-summarize.
+    An empty string clears it. Capped at 2000 chars."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms_summary import (
+            set_artifact_summary_note as _set_note,
+        )
+
+        data = request.get_json(silent=True) or {}
+        note = data.get("note", "")
+        if not isinstance(note, str):
+            return jsonify({"ok": False, "error": "Field 'note' must be a string"}), 400
+        note = note.strip()[:_MAX_NOTE_LEN]
+
+        conn = _get_db()
+        scope = _artifact_scope(conn, artifact_id)
+        if scope is None:
+            return jsonify({"ok": False, "error": "artifact not found"}), 404
+
+        _set_note(conn, artifact_id, note)
+
+        _broadcast_comms(
+            scope,
+            {
+                "type": "COMMS_UPDATE",
+                "event": "artifact_note",
+                "artifact_id": artifact_id,
+                "scope": scope,
+            },
+        )
+        return jsonify({"ok": True, "artifact_id": artifact_id}), 200
+    except Exception as exc:
+        logging.exception("comms_artifact_set_note error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

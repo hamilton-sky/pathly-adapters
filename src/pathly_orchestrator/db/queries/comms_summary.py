@@ -72,6 +72,23 @@ def set_artifact_summary_style(
         conn.commit()
 
 
+def set_artifact_summary_note(
+    conn: sqlite3.Connection,
+    artifact_id: str,
+    note: str,
+) -> None:
+    """Persist the per-artifact free-text 'special request' for artifact_id.
+
+    Appended to the summary prompt on the next re-summarize. Empty string clears it.
+    """
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_artifacts SET summary_note=? WHERE id=?",
+            (note or None, artifact_id),
+        )
+        conn.commit()
+
+
 def get_artifact_summary_selection(
     conn: sqlite3.Connection,
     artifact_id: str,

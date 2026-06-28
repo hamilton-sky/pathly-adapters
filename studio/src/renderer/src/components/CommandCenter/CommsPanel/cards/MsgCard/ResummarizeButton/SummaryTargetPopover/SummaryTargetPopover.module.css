@@ -63,3 +63,25 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+.note {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 6px 8px;
+  font: 400 12px/1.4 var(--font-family-base);
+  color: var(--text-primary);
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.note:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.note::placeholder {
+  color: var(--text-muted);
+}

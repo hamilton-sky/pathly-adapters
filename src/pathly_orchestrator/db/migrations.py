@@ -435,6 +435,9 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # Selects which development/summarize* skill the client composes. Nullable →
         # falls back to the default ('topic-map').
         ("comms_artifacts", "summary_style", "TEXT"),
+        # summary-note: per-artifact free-text "special request" appended to the summary
+        # prompt (e.g. "focus on security"). Nullable → no extra instruction.
+        ("comms_artifacts", "summary_note", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

@@ -147,6 +147,8 @@ export interface ArtifactRow {
   summary_selection?: string | null
   /** Per-artifact summary DEPTH style; null → the default ('topic-map'). */
   summary_style?: SummaryStyle | null
+  /** Per-artifact free-text "special request" appended to the summary prompt; null → none. */
+  summary_note?: string | null
 }
 
 /** Summary DEPTH style — selects which development/summarize* skill the client composes. */
@@ -304,6 +306,23 @@ export async function apiSetArtifactStyle(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ style }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+/** Persist a per-artifact free-text "special request" (appended to the summary prompt). */
+export async function apiSetArtifactNote(
+  artifactId: string,
+  note: string,
+): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/comms/artifacts/${encodeURIComponent(artifactId)}/note`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note }),
     })
     return r.ok
   } catch {

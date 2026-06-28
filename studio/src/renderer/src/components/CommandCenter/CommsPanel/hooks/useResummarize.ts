@@ -14,6 +14,7 @@ import {
   apiSetArtifactSummary,
   apiSetArtifactSelection,
   apiSetArtifactStyle,
+  apiSetArtifactNote,
   SUMMARY_STYLE_DEFAULT,
   type ArtifactRow,
   type AiSelectionDto,
@@ -54,6 +55,8 @@ export interface ResummarizeHook {
   setSelection: (sel: AiSelection) => void
   style: SummaryStyle
   setStyle: (style: SummaryStyle) => void
+  note: string
+  setNote: (note: string) => void
   configOpen: boolean
   setConfigOpen: Dispatch<SetStateAction<boolean>>
   gearRef: React.RefObject<HTMLButtonElement>
@@ -67,6 +70,10 @@ export function useResummarize(messageId: string): ResummarizeHook {
   const [configOpen, setConfigOpen] = useState(false)
   const [selection, setSelectionState] = useState<AiSelection>(BUILTIN_DEFAULT)
   const [style, setStyleState] = useState<SummaryStyle>(SUMMARY_STYLE_DEFAULT)
+  const [note, setNoteState] = useState('')
+  // run() reads the note from a ref so a value set on the textarea's blur (which fires on
+  // the same click that triggers Summarize) is never missed by a stale closure.
+  const noteRef = useRef('')
   const abortRef = useRef<(() => void) | null>(null)
   const gearRef = useRef<HTMLButtonElement>(null)
   const projectPath = useProjectStore((st) => st.projectPath)
@@ -79,6 +86,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
       const row: ArtifactRow | undefined = rows[0]
       if (!row) return
       if (row.summary_style) setStyleState(row.summary_style)
+      if (row.summary_note) { setNoteState(row.summary_note); noteRef.current = row.summary_note }
       const saved = parseSelection(row.summary_selection)
       if (saved) { setSelectionState(saved); return }
       const def = await apiGetDefaultSelection()
@@ -104,6 +112,16 @@ export function useResummarize(messageId: string): ResummarizeHook {
     void fetchArtifacts(messageId).then((rows) => {
       const row: ArtifactRow | undefined = rows[0]
       if (row) void apiSetArtifactStyle(row.id, next)
+    })
+  }, [messageId])
+
+  // Persist the per-artifact "special request" note (debounced by the popover's blur/run).
+  const setNote = useCallback((next: string) => {
+    setNoteState(next)
+    noteRef.current = next
+    void fetchArtifacts(messageId).then((rows) => {
+      const row: ArtifactRow | undefined = rows[0]
+      if (row) void apiSetArtifactNote(row.id, next)
     })
   }, [messageId])
 
@@ -134,12 +152,19 @@ export function useResummarize(messageId: string): ResummarizeHook {
 
         const cwd = projectPath.replace(/\\/g, '/').replace(/\/$/, '') || undefined
 
+        // The per-artifact "special request" is appended to whatever prompt runs (composed
+        // or bare). It lands mid-prompt, after the dash-safe composed body, so it can never
+        // break argv parsing.
+        const noteSuffix = noteRef.current.trim()
+          ? `\n\n## Additional request from the user\n${noteRef.current.trim()}`
+          : ''
+
         // Bare path: send buildSummarizePrompt and read the result text. Used for MODEL
         // targets (they return clean text directly — left untouched, their own plan) and
         // as the fallback when the /skills/compose endpoint is unreachable.
         const runBare = async (): Promise<string> => {
           const { promise, abort } = runJobWithAbort(
-            { kind: 'summarize', prompt: buildSummarizePrompt(text), cwd },
+            { kind: 'summarize', prompt: buildSummarizePrompt(text) + noteSuffix, cwd },
             selection,
           )
           abortRef.current = abort
@@ -161,7 +186,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
             { projectRoot: cwd },
           )
           if (composed) {
-            const { promise, abort } = runJobWithAbort({ kind: 'summarize', prompt: composed, cwd }, selection)
+            const { promise, abort } = runJobWithAbort({ kind: 'summarize', prompt: composed + noteSuffix, cwd }, selection)
             abortRef.current = abort
             await promise // ignore the stdout tail — the file is the result
             abortRef.current = null
@@ -211,5 +236,5 @@ export function useResummarize(messageId: string): ResummarizeHook {
     setStartedAt(undefined)
   }
 
-  return { pillState, progress, selection, setSelection, style, setStyle, configOpen, setConfigOpen, gearRef, run, stop }
+  return { pillState, progress, selection, setSelection, style, setStyle, note, setNote, configOpen, setConfigOpen, gearRef, run, stop }
 }

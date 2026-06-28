@@ -1,4 +1,4 @@
-import { useEffect, useRef, useLayoutEffect } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AiTargetSelector } from '../../../../../../shared/AiTargetSelector/AiTargetSelector'
 import type { AiSelection } from '../../../../../../../services/aiRouter'
@@ -11,6 +11,8 @@ interface Props {
   onChange: (sel: AiSelection) => void
   style: SummaryStyle
   onStyleChange: (style: SummaryStyle) => void
+  note: string
+  onNoteChange: (note: string) => void
   onClose: () => void
 }
 
@@ -26,8 +28,10 @@ const STYLE_OPTIONS: { value: SummaryStyle; label: string; hint: string }[] = [
 // Gear-anchored popover for the per-artifact AI target selector. Portals to body,
 // positioned relative to the gear button (above or below depending on viewport space).
 // Outside-click + Escape to close, matching DecomposeConfigPopover's idiom.
-export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyleChange, onClose }: Props): JSX.Element | null {
+export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyleChange, note, onNoteChange, onClose }: Props): JSX.Element | null {
   const ref = useRef<HTMLDivElement>(null)
+  // Local draft — persist on blur (one POST per edit, not per keystroke).
+  const [noteDraft, setNoteDraft] = useState(note)
 
   useLayoutEffect(() => {
     if (!anchorEl || !ref.current) return
@@ -77,6 +81,17 @@ export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyle
       <div className={s.heading}>AI target for this artifact</div>
       <div className={s.body}>
         <AiTargetSelector value={value} onChange={(sel) => { onChange(sel) }} allowOff />
+      </div>
+      <div className={s.heading}>Special request (optional)</div>
+      <div className={s.body}>
+        <textarea
+          className={s.note}
+          value={noteDraft}
+          rows={3}
+          placeholder="e.g. focus on the security parts; write for a non-technical reader"
+          onChange={(e) => setNoteDraft(e.target.value)}
+          onBlur={() => { if (noteDraft !== note) onNoteChange(noteDraft) }}
+        />
       </div>
     </div>,
     document.body,
