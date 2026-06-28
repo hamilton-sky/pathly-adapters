@@ -29,6 +29,20 @@
   appended to the prompt.
 - **Confirm-preview modal** on Summarize (Cancel/Run), like Decompose; SVG summary badge; AI summary
   shown in the expanded card; copy-content + copy-path icons; ANSI-escape strip on the fallback path.
+- **Output-format contracts (single-sourced):** each depth's exact output shape lives in
+  `core/templates/summary/{gist,topic-map,detailed}.md`; the `development/summarize*` bodies are
+  agnostic intent + a `<summary_format>` placeholder that `/skills/compose` substitutes (keyed by
+  skill); `GET /skills/summary-format/<style>` serves the same file to the Studio depth-picker
+  preview (rendered via `MarkdownRenderer`, with a style-name header) — so the shape every CLI fills
+  and the shape the user previews can't drift.
+- **Description rewrite:** summarize emits a structured `## Description` + `## Summary`. The
+  Description (1–2 sentence context) overwrites the artifact's **message text** (the card's
+  Description; `apiEditMessage` → `/comms/edit`); the Summary body → `comms_artifacts.summary`
+  (`useResummarize` parses + dual-saves, description edited first so the summary re-embed sees it).
+  Always-overwrite policy; non-compliant output (no `## Description`) leaves the message text alone.
+- **Capture cleanup:** the `.summary` file-capture handoff is `.gitignore`d (`*.summary`) and
+  deleted after the host reads it into the DB (delete-after-read — summaries only; the editor's
+  user-facing `.analysis`/`.draft` keep their own accept/reject lifecycle).
 
 **NOT yet built (the next work):**
 - **P1 — goal-backed profile:** fragments `board-start-context` + `task-dag-post`; convert goal
