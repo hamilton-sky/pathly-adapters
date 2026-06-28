@@ -13,8 +13,11 @@ import {
   apiGetDefaultSelection,
   apiSetArtifactSummary,
   apiSetArtifactSelection,
+  apiSetArtifactStyle,
+  SUMMARY_STYLE_DEFAULT,
   type ArtifactRow,
   type AiSelectionDto,
+  type SummaryStyle,
 } from '../../../../store/commsApi'
 import { parseSelection, isSummarizable } from '../ArtifactsView/summarizeArtifact'
 import { resolveArtifactPath } from '../artifactPath'
@@ -24,6 +27,14 @@ import { resolveArtifactPath } from '../artifactPath'
 // PillState, elapsed-progress timer, abort handle, and gear popover toggle.
 
 const BUILTIN_DEFAULT: AiSelection = { type: 'engine', id: 'claude' }
+
+// Summary DEPTH style → which development/summarize* skill the client composes. The format
+// is owned by the skill (Pathly), so it is identical no matter which CLI engine runs it.
+const STYLE_SKILL: Record<SummaryStyle, string> = {
+  gist: 'development/summarize-gist',
+  'topic-map': 'development/summarize',
+  detailed: 'development/summarize-detailed',
+}
 
 // The CLI engine writes its summary to a sibling file (the file-based capture contract);
 // we poll for it after the engine exits. Mirrors the editor's pollForFile cadence.
@@ -41,6 +52,8 @@ export interface ResummarizeHook {
   progress: ActionProgress | null
   selection: AiSelection
   setSelection: (sel: AiSelection) => void
+  style: SummaryStyle
+  setStyle: (style: SummaryStyle) => void
   configOpen: boolean
   setConfigOpen: Dispatch<SetStateAction<boolean>>
   gearRef: React.RefObject<HTMLButtonElement>
@@ -53,6 +66,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
   const [startedAt, setStartedAt] = useState<number | undefined>()
   const [configOpen, setConfigOpen] = useState(false)
   const [selection, setSelectionState] = useState<AiSelection>(BUILTIN_DEFAULT)
+  const [style, setStyleState] = useState<SummaryStyle>(SUMMARY_STYLE_DEFAULT)
   const abortRef = useRef<(() => void) | null>(null)
   const gearRef = useRef<HTMLButtonElement>(null)
   const projectPath = useProjectStore((st) => st.projectPath)
@@ -64,6 +78,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
       if (!alive) return
       const row: ArtifactRow | undefined = rows[0]
       if (!row) return
+      if (row.summary_style) setStyleState(row.summary_style)
       const saved = parseSelection(row.summary_selection)
       if (saved) { setSelectionState(saved); return }
       const def = await apiGetDefaultSelection()
@@ -80,6 +95,15 @@ export function useResummarize(messageId: string): ResummarizeHook {
     void fetchArtifacts(messageId).then((rows) => {
       const row: ArtifactRow | undefined = rows[0]
       if (row) void apiSetArtifactSelection(row.id, sel as AiSelectionDto)
+    })
+  }, [messageId])
+
+  // Persist per-artifact summary DEPTH style immediately when the user changes it.
+  const setStyle = useCallback((next: SummaryStyle) => {
+    setStyleState(next)
+    void fetchArtifacts(messageId).then((rows) => {
+      const row: ArtifactRow | undefined = rows[0]
+      if (row) void apiSetArtifactStyle(row.id, next)
     })
   }, [messageId])
 
@@ -131,7 +155,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
           // was the codex-chrome / claude-flattening bug). Falls back to bare on null.
           const outAbs = `${abs}.summary`
           const composed = await composeClientSkill(
-            'development/summarize',
+            STYLE_SKILL[style],
             selection.id,
             { source_path: abs, out_path: outAbs, kind: 'summary' },
             { projectRoot: cwd },
@@ -187,5 +211,5 @@ export function useResummarize(messageId: string): ResummarizeHook {
     setStartedAt(undefined)
   }
 
-  return { pillState, progress, selection, setSelection, configOpen, setConfigOpen, gearRef, run, stop }
+  return { pillState, progress, selection, setSelection, style, setStyle, configOpen, setConfigOpen, gearRef, run, stop }
 }

@@ -145,7 +145,13 @@ export interface ArtifactRow {
   supersedes: string | null
   /** JSON-encoded AiSelection {type,id} — the saved per-artifact summary target. */
   summary_selection?: string | null
+  /** Per-artifact summary DEPTH style; null → the default ('topic-map'). */
+  summary_style?: SummaryStyle | null
 }
+
+/** Summary DEPTH style — selects which development/summarize* skill the client composes. */
+export type SummaryStyle = 'gist' | 'topic-map' | 'detailed'
+export const SUMMARY_STYLE_DEFAULT: SummaryStyle = 'topic-map'
 
 /** Fetch the artifacts linked to a message. Returns [] on any failure. */
 export async function fetchArtifacts(messageId: string): Promise<ArtifactRow[]> {
@@ -281,6 +287,23 @@ export async function apiSetArtifactSelection(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ selection }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+/** Persist a per-artifact summary DEPTH style (so Re-summarize reuses it). Returns true on 2xx. */
+export async function apiSetArtifactStyle(
+  artifactId: string,
+  style: SummaryStyle,
+): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/comms/artifacts/${encodeURIComponent(artifactId)}/style`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ style }),
     })
     return r.ok
   } catch {

@@ -31,7 +31,7 @@ export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Ele
         ariaName="Re-summarize"
         onRun={r.run}
         onStop={r.stop}
-        configTip="Choose AI target for this artifact"
+        configTip="Choose summary depth + AI target"
         onToggleConfig={() => r.setConfigOpen((v) => !v)}
         gearRef={r.gearRef}
       />
@@ -40,6 +40,8 @@ export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Ele
           anchorEl={r.gearRef.current}
           value={r.selection}
           onChange={(sel) => { r.setSelection(sel); r.setConfigOpen(false) }}
+          style={r.style}
+          onStyleChange={r.setStyle}
           onClose={() => r.setConfigOpen(false)}
         />
       )}

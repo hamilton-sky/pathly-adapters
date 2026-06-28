@@ -2,21 +2,31 @@ import { useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AiTargetSelector } from '../../../../../../shared/AiTargetSelector/AiTargetSelector'
 import type { AiSelection } from '../../../../../../../services/aiRouter'
+import type { SummaryStyle } from '../../../../../../../store/commsApi'
 import s from './SummaryTargetPopover.module.css'
 
 interface Props {
   anchorEl: HTMLButtonElement | null
   value: AiSelection
   onChange: (sel: AiSelection) => void
+  style: SummaryStyle
+  onStyleChange: (style: SummaryStyle) => void
   onClose: () => void
 }
 
 const POPOVER_WIDTH = 220
 
+// Summary DEPTH options — gist (precision) → topic-map (balanced) → detailed (recall).
+const STYLE_OPTIONS: { value: SummaryStyle; label: string; hint: string }[] = [
+  { value: 'gist', label: 'Gist', hint: 'One sentence — the core point (precision)' },
+  { value: 'topic-map', label: 'Topic map', hint: 'One line per section (balanced)' },
+  { value: 'detailed', label: 'Detailed', hint: 'Section + key points (recall)' },
+]
+
 // Gear-anchored popover for the per-artifact AI target selector. Portals to body,
 // positioned relative to the gear button (above or below depending on viewport space).
 // Outside-click + Escape to close, matching DecomposeConfigPopover's idiom.
-export function SummaryTargetPopover({ anchorEl, value, onChange, onClose }: Props): JSX.Element | null {
+export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyleChange, onClose }: Props): JSX.Element | null {
   const ref = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -48,7 +58,22 @@ export function SummaryTargetPopover({ anchorEl, value, onChange, onClose }: Pro
   }, [anchorEl, onClose])
 
   return createPortal(
-    <div ref={ref} className={s.popover} role="dialog" aria-label="Choose AI target">
+    <div ref={ref} className={s.popover} role="dialog" aria-label="Choose AI target and summary depth">
+      <div className={s.heading}>Summary depth</div>
+      <div className={s.styleRow}>
+        {STYLE_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            className={s.styleBtn}
+            {...(style === opt.value ? { 'data-active': '' } : {})}
+            onClick={() => onStyleChange(opt.value)}
+            title={opt.hint}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
       <div className={s.heading}>AI target for this artifact</div>
       <div className={s.body}>
         <AiTargetSelector value={value} onChange={(sel) => { onChange(sel) }} allowOff />
