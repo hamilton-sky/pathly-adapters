@@ -143,3 +143,22 @@ skills:
   team/retro:
     fragments:
       - comms-post
+
+  # ── Unified CLI composition: client-side pure-transform actions ──────────────
+  # Summary / Analyze / Split are pure transforms (read a source artifact → derive a
+  # file). They compose ONLY the two transform fragments (+ the progress-logging
+  # default) — never comms-post — so they connect to Pathly through the SAME
+  # composition primitive as server actions while writing their result to a file the
+  # host polls. See pathly/plans/unified-cli-composition/DESIGN.md.
+  development/summarize:
+    fragments:
+      - client-file-output
+      - artifact-transform
+  development/analyze:
+    fragments:
+      - client-file-output
+      - artifact-transform
+  development/split:
+    fragments:
+      - client-file-output
+      - artifact-transform
