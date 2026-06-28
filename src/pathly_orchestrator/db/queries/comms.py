@@ -161,7 +161,8 @@ def search_by_embedding(
         # nearest of (parent, any chunk). Guarded so an older DB without the table still works.
         try:
             child_sql = (
-                "SELECT m.*, vec_distance_cosine(c.embedding, ?) AS _distance "  # nosec B608
+                "SELECT m.*, vec_distance_cosine(c.embedding, ?) AS _distance, "  # nosec B608
+                "c.chunk_text AS _matched_chunk "
                 "FROM comms_messages m JOIN comms_chunk_embeddings c ON c.message_id = m.id "
                 f"WHERE m.board IN ({board_ph}) AND m.scope IN ({scope_ph}) "
                 "AND m.deleted_at IS NULL ORDER BY _distance ASC LIMIT ?"

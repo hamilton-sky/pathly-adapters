@@ -58,7 +58,17 @@ def _format_context_line(msg: dict) -> str:
 
     header = ", ".join(parts)
     text = msg.get("text", "")
-    return f"- [{header}] {text}"
+    line = f"- [{header}] {text}"
+    # When a per-topic CHILD chunk (not the whole-artifact vector) matched, surface WHICH topic
+    # so the agent can act on the specific part — and hydrate that section on demand via
+    # /comms/artifacts/<id>/section. Only present on semantic chunk hits.
+    matched = (msg.get("_matched_chunk") or "").strip()
+    if matched:
+        snippet = " ".join(matched.split())
+        if len(snippet) > 200:
+            snippet = snippet[:200] + "…"
+        line += f"\n    ↳ matched topic: {snippet}"
+    return line
 
 
 def _format_question(msg: dict) -> str:
