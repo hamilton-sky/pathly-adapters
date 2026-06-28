@@ -34,6 +34,9 @@
 .msgStage[data-stage='DONE']      { color: var(--state-done); }
 
 .summaryBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font: 600 9px/1 var(--font-family-mono);
   letter-spacing: 0.04em;
   padding: 2px 5px;
@@ -41,9 +44,13 @@
   background: var(--bg-surface1);
   white-space: nowrap;
 }
+.summaryBadge svg { flex-shrink: 0; }
 .summaryBadge[data-summary='summarizing'] { color: var(--text-muted); }
+.summaryBadge[data-summary='summarizing'] svg { animation: summaryBadgeSpin 1s linear infinite; }
 .summaryBadge[data-summary='ready']       { color: var(--state-done); }
 .summaryBadge[data-summary='failed']      { color: var(--red); }
+
+@keyframes summaryBadgeSpin { to { transform: rotate(360deg); } }
 
 .msgTime {
   font-family: var(--font-family-mono);
@@ -310,6 +317,15 @@
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
+
+.artSummaryLabel {
+  font: 600 9px/1 var(--font-family-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+}
+.artSummaryLabel:first-of-type { color: var(--state-done); }
 
 .artExcerpt {
   color: var(--text-secondary);

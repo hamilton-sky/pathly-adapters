@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, Trash2, Info } from 'lucide-react'
+import { Check, Trash2, Info, ScrollText, Loader2, TriangleAlert } from 'lucide-react'
 import type { Message } from '../../../types'
 import { agentMeta } from '../../../constants'
 import { Avatar } from '../../Avatar/Avatar'
@@ -15,8 +15,16 @@ import s from './MsgCard.module.css'
 
 const SUMMARY_LABEL = {
   summarizing: 'summarizing…',
-  ready: '📝 summary',
-  failed: '⚠ summary failed',
+  ready: 'summary',
+  failed: 'summary failed',
+} as const
+
+// SVG icons (Lucide) for the summary badge — consistent with every other icon in Pathly,
+// no emoji. summarizing spins (see .summaryBadge CSS).
+const SUMMARY_ICON = {
+  summarizing: Loader2,
+  ready: ScrollText,
+  failed: TriangleAlert,
 } as const
 
 export interface MsgCardProps {
@@ -87,11 +95,15 @@ export function MsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSu
               </button>
             </Tooltip>
           )}
-          {m.type === 'artifact' && summaryState && (
-            <span className={s.summaryBadge} data-summary={summaryState}>
-              {SUMMARY_LABEL[summaryState]}
-            </span>
-          )}
+          {m.type === 'artifact' && summaryState && (() => {
+            const SummaryIcon = SUMMARY_ICON[summaryState]
+            return (
+              <span className={s.summaryBadge} data-summary={summaryState}>
+                <SummaryIcon size={11} />
+                {SUMMARY_LABEL[summaryState]}
+              </span>
+            )
+          })()}
           {m.type === 'artifact' && <ResummarizeButton messageId={m.id} />}
           {m.stage && (
             <span className={s.msgStage} data-stage={m.stage}>{m.stage}</span>

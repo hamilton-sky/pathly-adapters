@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Check, History, FileText, Search, Eye, ChevronRight } from 'lucide-react'
 import type { Message } from '../../../types'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
+import { fetchArtifacts } from '../../../../../store/commsApi'
 import s from './MsgCard.module.css'
 
 export interface CardBodyProps {
@@ -12,6 +13,15 @@ export interface CardBodyProps {
 
 export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
   const [expanded, setExpanded] = useState(false)
+  // The AI summary lives on the comms_artifacts row (not the message) — fetch it lazily
+  // when an artifact card is expanded so it shows inline, not only in the Details modal.
+  const [summary, setSummary] = useState<string | null>(null)
+  useEffect(() => {
+    if (m.type !== 'artifact' || !expanded) return
+    let alive = true
+    void fetchArtifacts(m.id).then((rows) => { if (alive) setSummary(rows[0]?.summary ?? null) })
+    return () => { alive = false }
+  }, [m.type, m.id, expanded])
   const supersededBanner = m.supersededBy
     ? <div className={s.supersededNote}>superseded — see newer message</div>
     : null
@@ -35,6 +45,13 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
         </button>
         {expanded && (
           <>
+            {summary && (
+              <>
+                <div className={s.artSummaryLabel}>AI Summary</div>
+                <div className={s.artExcerpt}><MarkdownRenderer content={summary} /></div>
+                <div className={s.artSummaryLabel}>Description</div>
+              </>
+            )}
             <div className={s.artExcerpt}><MarkdownRenderer content={m.text} /></div>
             <div className={s.artQ}><Search size={11} />agents can query this by content</div>
           </>
