@@ -1,5 +1,7 @@
 # Pathly Adapters Architecture
 
+> **New here? Read [WHAT_IS_PATHLY.md](WHAT_IS_PATHLY.md) first** — it states Pathly's primary goal (board-driven *headless* multi-agent orchestration) and the board concept, with diagrams. This document covers only the **install/adapter surface**, which is one layer of the product, not its purpose.
+>
 > Scope: runtime adapter surfaces and install pipeline. For package layout and install/publish details see `PATHLY_ARCHITECTURE.md`. Version: **2.16.2**.
 
 pathly-adapters installs Pathly agent and skill files into AI host tools (Claude

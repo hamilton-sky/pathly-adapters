@@ -1,6 +1,18 @@
-# pathly-adapters
+# Pathly
 
-Stitches Pathly agent files and installs them into AI host tools (Claude Code, Codex, Copilot, Antigravity).
+**Pathly is a board-driven control plane for orchestrating *headless* multi-agent software development.** You set goals on a visual board; an application drives AI coding agents (Claude Code, Codex, Copilot, Antigravity) through a governed pipeline — one step at a time, **no human in the per-step loop** — while you supervise, answer questions, and adjudicate decisions.
+
+```
+   HUMAN (supervisor)         THE BOARD                 APP            CLI AGENTS
+   sets goals / decisions ──►  goals → task-DAG ──►  orchestrates ──►  claude / codex
+        ▲                      artifacts/decisions     headlessly        / copilot / …
+        └──────────────────────  context  ◄───────  results, progress, artifacts
+                                              (agents connect back via "fragments")
+```
+
+Typing `/pathly` commands into a single CLI by hand is a **secondary** mode — handy, but not the design center. **New here? Read [docs/WHAT_IS_PATHLY.md](docs/WHAT_IS_PATHLY.md) first** — it explains the board concept and how a headless run works, with diagrams.
+
+This repository (`pathly-adapters`) is two things in one package: the **installer/stitcher** that deploys agent + skill files into your AI host tools, *and* the **local orchestration engine** (FSM HTTP server + SQLite board) that the Pathly Studio desktop app drives.
 
 ## Install (end users)
 

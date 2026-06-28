@@ -9,6 +9,14 @@
 
 Features move through: **STORM → PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO → DONE**
 
+## Primary goal — read this first
+
+**Pathly is a board-driven control plane for orchestrating *headless* multi-agent software development.** A human supervises through the visual **board** (the Command Center) — setting goals, answering questions, adjudicating decisions — while the **app drives agents headlessly**, one step at a time, with **no human in the per-step loop** (`human` target in headless mode is an error). Interactive `/pathly` slash-commands are a **secondary** affordance, not the design center.
+
+The board is the substrate (goals → task-DAG → artifacts/decisions → context, read back into every prompt). Agents connect to Pathly through **fragments** — the un-editable system-prompt layer (`core/skills/fragments/`) that owns all board CRUD, context retrieval, progress logging, and completion. The standing direction is that **every prompt Pathly sends to a CLI should flow through fragments**.
+
+Full narrative + diagrams: [docs/WHAT_IS_PATHLY.md](docs/WHAT_IS_PATHLY.md). When writing docs/READMEs, lead with this headless-board framing, not the installer/interactive framing.
+
 ---
 
 ## Layer files — read these for layer-specific detail
