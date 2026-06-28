@@ -14,22 +14,30 @@ vi.mock('../../../../services/aiRouter', async () => {
 })
 vi.mock('../../../../services/pathlyApi', () => ({
   readFile: vi.fn().mockResolvedValue('# Doc\n## Storage\nWAL.\n## API\nroutes.\n'),
+  deleteFile: vi.fn().mockResolvedValue(true),
+}))
+vi.mock('../../../../services/skillCompose', () => ({
+  // Default: compose unreachable → the engine path falls back to the bare prompt.
+  composeClientSkill: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('../../../../store/commsApi', () => ({
   fetchArtifacts: vi.fn().mockResolvedValue([{ id: 'art-1', path: '/p/DOC.md', type: 'md' }]),
   apiEditMessage: vi.fn().mockResolvedValue(true),
   apiSetArtifactSummary: vi.fn().mockResolvedValue(true),
   apiGetDefaultSelection: vi.fn().mockResolvedValue(null),
+  SUMMARY_STYLE_DEFAULT: 'topic-map',
 }))
 
 import * as aiRouter from '../../../../services/aiRouter'
 import * as pathlyApi from '../../../../services/pathlyApi'
 import * as commsApi from '../../../../store/commsApi'
+import * as skillCompose from '../../../../services/skillCompose'
 import { AI_SELECTION_OFF } from '../../../../services/aiRouter'
 import { summarizeArtifact } from './summarizeArtifact'
 
 const runJob = aiRouter.runJob as ReturnType<typeof vi.fn>
 const readFile = pathlyApi.readFile as ReturnType<typeof vi.fn>
+const composeClientSkill = skillCompose.composeClientSkill as ReturnType<typeof vi.fn>
 const fetchArtifacts = commsApi.fetchArtifacts as ReturnType<typeof vi.fn>
 const apiEditMessage = commsApi.apiEditMessage as ReturnType<typeof vi.fn>
 const apiSetArtifactSummary = commsApi.apiSetArtifactSummary as ReturnType<typeof vi.fn>
@@ -40,6 +48,7 @@ beforeEach(() => {
   fetchArtifacts.mockResolvedValue([{ id: 'art-1', path: '/p/DOC.md', type: 'md' }])
   apiEditMessage.mockResolvedValue(true)
   apiSetArtifactSummary.mockResolvedValue(true)
+  composeClientSkill.mockResolvedValue(null)
 })
 
 describe('summarizeArtifact', () => {
@@ -57,6 +66,27 @@ describe('summarizeArtifact', () => {
     expect(sel).toEqual(selection)
     expect(apiEditMessage).toHaveBeenCalledWith('msg-1', 'What it is. Why it matters.')
     expect(apiSetArtifactSummary).toHaveBeenCalledWith('art-1', '- Storage\n- API', selection)
+  })
+
+  it('engine target composes the depth skill and reads the file-captured summary', async () => {
+    composeClientSkill.mockResolvedValueOnce('COMPOSED PROMPT')
+    // Source text for the doc; the structured result is read from the sibling .summary file.
+    readFile.mockImplementation((p: string) =>
+      Promise.resolve(
+        String(p).endsWith('.summary')
+          ? '## Description\nEngine-written desc.\n\n## Summary\n- topic A\n- topic B'
+          : '# Doc\n## Storage\nWAL.\n',
+      ),
+    )
+    const selection = { type: 'engine' as const, id: 'claude' }
+    const ok = await summarizeArtifact({
+      messageId: 'msg-1', path: '/p/DOC.md', atype: 'md', selection, cwd: 'C:/proj',
+    })
+    expect(ok).toBe(true)
+    expect(composeClientSkill).toHaveBeenCalledTimes(1)
+    // Writeback uses the FILE content, not runJob's stdout tail.
+    expect(apiEditMessage).toHaveBeenCalledWith('msg-1', 'Engine-written desc.')
+    expect(apiSetArtifactSummary).toHaveBeenCalledWith('art-1', '- topic A\n- topic B', selection)
   })
 
   it('skips summarization when the selection is Off', async () => {

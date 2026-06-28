@@ -21,7 +21,7 @@ import {
   type AiSelectionDto,
   type SummaryStyle,
 } from '../../../../store/commsApi'
-import { parseSelection, isSummarizable } from '../ArtifactsView/summarizeArtifact'
+import { parseSelection, isSummarizable, STYLE_SKILL, pollSummaryFile, stripAnsi } from '../ArtifactsView/summarizeArtifact'
 import { resolveArtifactPath } from '../artifactPath'
 
 // State for the ResummarizeButton pill (used on artifact cards and in the ArtifactModal
@@ -29,35 +29,6 @@ import { resolveArtifactPath } from '../artifactPath'
 // PillState, elapsed-progress timer, abort handle, and gear popover toggle.
 
 const BUILTIN_DEFAULT: AiSelection = { type: 'engine', id: 'claude' }
-
-// Summary DEPTH style → which development/summarize* skill the client composes. The format
-// is owned by the skill (Pathly), so it is identical no matter which CLI engine runs it.
-const STYLE_SKILL: Record<SummaryStyle, string> = {
-  gist: 'development/summarize-gist',
-  'topic-map': 'development/summarize',
-  detailed: 'development/summarize-detailed',
-}
-
-// The CLI engine writes its summary to a sibling file (the file-based capture contract);
-// we poll for it after the engine exits. Mirrors the editor's pollForFile cadence.
-async function pollSummaryFile(path: string, tries = 5, delayMs = 600): Promise<string | null> {
-  for (let i = 0; i < tries; i++) {
-    if (i > 0) await new Promise<void>((r) => setTimeout(r, delayMs))
-    const c = await readFile(path)
-    if (c != null && c.trim()) return c
-  }
-  return null
-}
-
-// Strip terminal escape codes that leak through the stdout-tail fallback capture (e.g.
-// \x1b[>4m, \x1b[<u — private-mode CSI). The clean file/model paths are unaffected.
-function stripAnsi(text: string): string {
-  return text
-    .replace(/\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]/g, '')
-    .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
-    .replace(/\x1b[@-Z\\-_]/g, '')
-    .trim()
-}
 
 export interface ResummarizeHook {
   pillState: PillState
