@@ -11,6 +11,39 @@
 
 ---
 
+## Implementation status (2026-06-28)
+
+**P0 — BUILT and merged to master.** The standalone-transform half of the design is live:
+- `POST /skills/compose` endpoint + `services/skillCompose.ts` client seam.
+- Fragments `client-file-output` + `artifact-transform`; skills `development/{summarize,analyze,split}`.
+- artifact **Summary** → composed prompt + **file-based capture** (the codex/claude stdout-tail bug
+  is fixed at the source); editor **Analyze/Split** route through composition + honor the `ERROR:`
+  contract. Models left on their own path (deferred — [[project_models_separate_from_cli]]).
+
+**Summary sub-features added on top of P0 (also built):**
+- **Retrieval:** the summary is now embedded (`description + summary`), agents post BOTH a real
+  description and a section summary (`comms-post` fragment + `/comms/post` accept a `summary`).
+- **Depth styles** Gist / Topic-map / Detailed — 3 `development/summarize*` skills, per-artifact
+  (`summary_style` column + `/style` endpoint), selectable in the gear.
+- **Special request** free-text note, per-artifact (`summary_note` column + `/note` endpoint),
+  appended to the prompt.
+- **Confirm-preview modal** on Summarize (Cancel/Run), like Decompose; SVG summary badge; AI summary
+  shown in the expanded card; copy-content + copy-path icons; ANSI-escape strip on the fallback path.
+
+**NOT yet built (the next work):**
+- **P1 — goal-backed profile:** fragments `board-start-context` + `task-dag-post`; convert goal
+  **Decompose** to a composed `development/decompose` skill; convert `drain-dag` + loop **board-I/O
+  surface** only.
+- **Solution C (two-lane boundary) + the spawn-context flag** (`goal_id` present → board-backed
+  profile) + the naming fixes (`interactive=True` default, passive-FSM-named-as-orchestrator).
+- **Plan-type-agnostic decomposer** (planner/consultation produce generic DAGs: coding, research, …).
+- P2/P3: migrate server/FSM actions to file capture; `context-limit-contract`; `agent-output-redirect`.
+
+> ⚠️ Live only after the FSM server is restarted with this code (the client falls back to the old
+> path until then) + `pathly-setup claude --apply --repair` to sync the new fragments into adapters.
+
+---
+
 ## Scope
 
 ### Decisions
