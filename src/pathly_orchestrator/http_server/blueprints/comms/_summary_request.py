@@ -90,6 +90,13 @@ def emit_summary_request(
         if not _is_md(artifact_path, artifact_type):
             return
 
+        row = conn.execute(
+            "SELECT message_id FROM comms_artifacts WHERE id=?",
+            (artifact_id,),
+        ).fetchone()
+        if row is None:
+            return
+
         selection = resolve_summary_selection(conn, artifact_id)
         if not selection:
             return
@@ -103,6 +110,7 @@ def emit_summary_request(
                 "type": "COMMS_UPDATE",
                 "event": "summary_request",
                 "artifact_id": artifact_id,
+                "message_id": row["message_id"],
                 "artifact_path": artifact_path,
                 "scope": scope,
                 "selection": selection,

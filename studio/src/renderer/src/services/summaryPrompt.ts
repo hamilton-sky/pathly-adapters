@@ -51,3 +51,15 @@ export function buildSummarizePrompt(text: string, style: SummaryStyle = 'topic-
     `Document:\n${truncated}`
   )
 }
+
+/**
+ * Split a summarize result into its `## Description` and `## Summary` sections. The ONE parser
+ * for every summary path (Re-summarize, drop/upload, server-initiated SUMMARY_REQUEST) so the
+ * contract can't fork. If the structure is absent (a model/offline path that didn't follow it,
+ * or legacy output), the whole thing is the summary and the description is left untouched (null).
+ */
+export function parseStructuredSummary(raw: string): { description: string | null; summary: string } {
+  const m = raw.match(/#{2,4}\s+Description\s*\n([\s\S]*?)\n#{2,4}\s+Summary\s*\n([\s\S]*)$/i)
+  if (m && m[2].trim()) return { description: m[1].trim() || null, summary: m[2].trim() }
+  return { description: null, summary: raw.trim() }
+}

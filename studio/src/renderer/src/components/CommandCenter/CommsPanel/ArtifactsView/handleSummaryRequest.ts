@@ -18,6 +18,7 @@ import { summarizeArtifactById } from './summarizeArtifact'
 /** Shape of the server's summary_request SSE payload (loosely typed at the boundary). */
 export interface SummaryRequestEvent {
   artifact_id?: string
+  message_id?: string
   artifact_path?: string
   selection?: { type?: string; id?: string }
 }
@@ -46,16 +47,17 @@ function asSelection(sel: SummaryRequestEvent['selection']): AiSelection | null 
  */
 export async function handleSummaryRequest(data: SummaryRequestEvent): Promise<void> {
   const artifactId = data.artifact_id
+  const messageId = data.message_id
   const artifactPath = data.artifact_path
   const selection = asSelection(data.selection)
-  if (!artifactId || !artifactPath || !selection) return
+  if (!artifactId || !messageId || !artifactPath || !selection) return
   if (isOff(selection)) return
   if (handled.has(artifactId)) return
   handled.add(artifactId)
 
   try {
     const cwd = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '') || undefined
-    await summarizeArtifactById(artifactId, artifactPath, selection, cwd)
+    await summarizeArtifactById(messageId, artifactId, artifactPath, selection, cwd)
   } catch (err) {
     // Best-effort: a summary failure must not break the SSE loop. Release the
     // dedup guard so a later summary_request (or manual retry) can re-run instead

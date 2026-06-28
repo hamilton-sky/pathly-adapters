@@ -10,12 +10,13 @@
 // button share one implementation; kept out of JSX per the UI rules.
 
 import { runJob, isOff, type AiSelection } from '../../../../services/aiRouter'
-import { buildSummarizePrompt } from '../../../../services/summaryPrompt'
+import { buildSummarizePrompt, parseStructuredSummary } from '../../../../services/summaryPrompt'
 import { readFile } from '../../../../services/pathlyApi'
 import { resolveArtifactPath } from '../artifactPath'
 import { useToastStore } from '../../../../store/toastStore'
 import {
   fetchArtifacts,
+  apiEditMessage,
   apiSetArtifactSummary,
   type AiSelectionDto,
 } from '../../../../store/commsApi'
@@ -44,6 +45,7 @@ async function artifactIdForMessage(messageId: string): Promise<string | null> {
  * before calling — runJob throws on the Off sentinel).
  */
 export async function summarizeArtifactById(
+  messageId: string,
   artifactId: string,
   artifactPath: string,
   selection: AiSelection,
@@ -61,9 +63,13 @@ export async function summarizeArtifactById(
       { kind: 'summarize', prompt: buildSummarizePrompt(text), cwd },
       selection,
     )
-    const summary = (result.text ?? '').trim()
+    // ONE parser shared with the Re-summarize path (summaryPrompt.parseStructuredSummary):
+    // markdown ## Description / ## Summary. The description is optional — when present it
+    // refreshes the artifact's message text (the card's Description); the summary always saves.
+    const { description, summary } = parseStructuredSummary(result.text ?? '')
     if (!summary) return false
 
+    if (description) await apiEditMessage(messageId, description)
     return apiSetArtifactSummary(artifactId, summary, selection as AiSelectionDto)
   } catch (err) {
     // Surface the reason instead of failing silently — the most common cause is a
@@ -102,7 +108,7 @@ export async function summarizeArtifact(args: SummarizeArtifactArgs): Promise<bo
   const artifactId = await artifactIdForMessage(messageId)
   if (!artifactId) return false
 
-  return summarizeArtifactById(artifactId, path, selection, cwd)
+  return summarizeArtifactById(messageId, artifactId, path, selection, cwd)
 }
 
 /** Parse a stored summary_selection JSON string into an AiSelection, or null. */

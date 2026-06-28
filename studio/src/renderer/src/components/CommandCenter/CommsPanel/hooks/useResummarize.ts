@@ -4,7 +4,7 @@ import { useElapsedProgress, type ActionProgress } from '../../../shared/RunPill
 import type { PillState } from '../../../shared/RunPill/RunPill'
 import type { AiSelection } from '../../../../services/aiRouter'
 import { runJobWithAbort, isOff } from '../../../../services/aiRouter'
-import { buildSummarizePrompt } from '../../../../services/summaryPrompt'
+import { buildSummarizePrompt, parseStructuredSummary } from '../../../../services/summaryPrompt'
 import { composeClientSkill } from '../../../../services/skillCompose'
 import { readFile, deleteFile } from '../../../../services/pathlyApi'
 import { useCommsStore } from '../../../../store/commsStore'
@@ -57,17 +57,6 @@ function stripAnsi(text: string): string {
     .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
     .replace(/\x1b[@-Z\\-_]/g, '')
     .trim()
-}
-
-// The summarize skills emit a structured result: a "## Description" section (1-2 sentence
-// context → refreshes the artifact's message text, i.e. the card's Description) and a
-// "## Summary" section (the depth-styled body → comms_artifacts.summary). Split them. If the
-// structure is absent (a model/offline path that didn't follow it, or legacy output), the whole
-// thing is the summary and the description is left untouched.
-function parseStructuredSummary(raw: string): { description: string | null; summary: string } {
-  const m = raw.match(/#{2,4}\s+Description\s*\n([\s\S]*?)\n#{2,4}\s+Summary\s*\n([\s\S]*)$/i)
-  if (m && m[2].trim()) return { description: m[1].trim() || null, summary: m[2].trim() }
-  return { description: null, summary: raw.trim() }
 }
 
 export interface ResummarizeHook {

@@ -5,13 +5,19 @@ vi.mock('../../../../services/aiRouter', async () => {
   const actual = await vi.importActual<typeof import('../../../../services/aiRouter')>(
     '../../../../services/aiRouter',
   )
-  return { ...actual, runJob: vi.fn().mockResolvedValue({ text: '- Storage\n- API' }) }
+  return {
+    ...actual,
+    runJob: vi.fn().mockResolvedValue({
+      text: '## Description\nWhat it is. Why it matters.\n\n## Summary\n- Storage\n- API',
+    }),
+  }
 })
 vi.mock('../../../../services/pathlyApi', () => ({
   readFile: vi.fn().mockResolvedValue('# Doc\n## Storage\nWAL.\n## API\nroutes.\n'),
 }))
 vi.mock('../../../../store/commsApi', () => ({
   fetchArtifacts: vi.fn().mockResolvedValue([{ id: 'art-1', path: '/p/DOC.md', type: 'md' }]),
+  apiEditMessage: vi.fn().mockResolvedValue(true),
   apiSetArtifactSummary: vi.fn().mockResolvedValue(true),
   apiGetDefaultSelection: vi.fn().mockResolvedValue(null),
 }))
@@ -25,17 +31,19 @@ import { summarizeArtifact } from './summarizeArtifact'
 const runJob = aiRouter.runJob as ReturnType<typeof vi.fn>
 const readFile = pathlyApi.readFile as ReturnType<typeof vi.fn>
 const fetchArtifacts = commsApi.fetchArtifacts as ReturnType<typeof vi.fn>
+const apiEditMessage = commsApi.apiEditMessage as ReturnType<typeof vi.fn>
 const apiSetArtifactSummary = commsApi.apiSetArtifactSummary as ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   vi.clearAllMocks()
   readFile.mockResolvedValue('# Doc\n## Storage\nWAL.\n')
   fetchArtifacts.mockResolvedValue([{ id: 'art-1', path: '/p/DOC.md', type: 'md' }])
+  apiEditMessage.mockResolvedValue(true)
   apiSetArtifactSummary.mockResolvedValue(true)
 })
 
 describe('summarizeArtifact', () => {
-  it('reads the file, runs the chosen target, and writes the summary + selection back', async () => {
+  it('reads the file, runs the chosen target, and writes description + summary back', async () => {
     const selection = { type: 'model' as const, id: 'phi-4-mini' }
     const ok = await summarizeArtifact({
       messageId: 'msg-1', path: '/p/DOC.md', atype: 'md', selection, cwd: 'C:/proj',
@@ -47,6 +55,7 @@ describe('summarizeArtifact', () => {
     expect(job.kind).toBe('summarize')
     expect(job.cwd).toBe('C:/proj')
     expect(sel).toEqual(selection)
+    expect(apiEditMessage).toHaveBeenCalledWith('msg-1', 'What it is. Why it matters.')
     expect(apiSetArtifactSummary).toHaveBeenCalledWith('art-1', '- Storage\n- API', selection)
   })
 
@@ -57,6 +66,7 @@ describe('summarizeArtifact', () => {
     expect(ok).toBe(false)
     expect(runJob).not.toHaveBeenCalled()
     expect(apiSetArtifactSummary).not.toHaveBeenCalled()
+    expect(apiEditMessage).not.toHaveBeenCalled()
   })
 
   it('skips non-markdown artifacts (no summary attempted)', async () => {

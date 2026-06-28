@@ -23,11 +23,13 @@ describe('handleSummaryRequest', () => {
   it('runs the resolved target for a valid summary_request', async () => {
     await handleSummaryRequest({
       artifact_id: 'art-9',
+      message_id: 'msg-9',
       artifact_path: '/p/DOC.md',
       selection: { type: 'model', id: 'phi-4-mini' },
     })
     expect(summarizeArtifactById).toHaveBeenCalledTimes(1)
-    const [id, path, sel, cwd] = summarizeArtifactById.mock.calls[0]
+    const [messageId, id, path, sel, cwd] = summarizeArtifactById.mock.calls[0]
+    expect(messageId).toBe('msg-9')
     expect(id).toBe('art-9')
     expect(path).toBe('/p/DOC.md')
     expect(sel).toEqual({ type: 'model', id: 'phi-4-mini' })
@@ -37,6 +39,7 @@ describe('handleSummaryRequest', () => {
   it('skips when the selection is the Off sentinel', async () => {
     await handleSummaryRequest({
       artifact_id: 'art-off',
+      message_id: 'msg-off',
       artifact_path: '/p/DOC.md',
       selection: { type: 'model', id: '__off__' },
     })
@@ -46,14 +49,15 @@ describe('handleSummaryRequest', () => {
   it('skips when the event is missing fields', async () => {
     await handleSummaryRequest({ artifact_path: '/p/DOC.md', selection: { type: 'model', id: 'x' } })
     await handleSummaryRequest({ artifact_id: 'a', selection: { type: 'model', id: 'x' } })
-    await handleSummaryRequest({ artifact_id: 'a', artifact_path: '/p/DOC.md' })
-    await handleSummaryRequest({ artifact_id: 'a', artifact_path: '/p/DOC.md', selection: { type: 'bogus', id: 'x' } })
+    await handleSummaryRequest({ artifact_id: 'a', message_id: 'm', artifact_path: '/p/DOC.md' })
+    await handleSummaryRequest({ artifact_id: 'a', message_id: 'm', artifact_path: '/p/DOC.md', selection: { type: 'bogus', id: 'x' } })
     expect(summarizeArtifactById).not.toHaveBeenCalled()
   })
 
   it('dedupes: the same artifact is summarized at most once', async () => {
     const evt = {
       artifact_id: 'art-dup',
+      message_id: 'msg-dup',
       artifact_path: '/p/DOC.md',
       selection: { type: 'model' as const, id: 'phi-4-mini' },
     }
@@ -67,6 +71,7 @@ describe('handleSummaryRequest', () => {
     await expect(
       handleSummaryRequest({
         artifact_id: 'art-throw',
+        message_id: 'msg-throw',
         artifact_path: '/p/DOC.md',
         selection: { type: 'model', id: 'phi-4-mini' },
       }),
