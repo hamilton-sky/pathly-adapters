@@ -4,6 +4,7 @@ import { AiTargetSelector } from '../../../../../../shared/AiTargetSelector/AiTa
 import type { AiSelection } from '../../../../../../../services/aiRouter'
 import type { SummaryStyle } from '../../../../../../../store/commsApi'
 import { fetchSummaryFormat } from '../../../../../../../services/summaryFormat'
+import MarkdownRenderer from '../../../../../../shared/MarkdownRenderer/MarkdownRenderer'
 import s from './SummaryTargetPopover.module.css'
 
 interface Props {
@@ -91,9 +92,10 @@ export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyle
         ))}
       </div>
       {formatPreview && (
-        <pre className={s.formatPreview} aria-label={`${activeStyle.label} output format`}>
-          {formatPreview}
-        </pre>
+        <div className={s.formatBox} aria-label={`${activeStyle.label} output format`}>
+          <div className={s.formatTitle}>{activeStyle.label}</div>
+          <MarkdownRenderer content={formatPreview} className={s.formatMd} />
+        </div>
       )}
       <div className={s.heading}>AI target for this artifact</div>
       <div className={s.body}>

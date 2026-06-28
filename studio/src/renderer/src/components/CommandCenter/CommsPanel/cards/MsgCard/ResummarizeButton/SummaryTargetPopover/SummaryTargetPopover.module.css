@@ -64,22 +64,54 @@
   color: var(--accent);
 }
 
-/* Output-shape preview — mirrors the selected depth's skill template so the user
-   sees the exact contract every CLI engine will fill. Literal text (markdown chars
-   shown as-is), not rendered markdown. */
-.formatPreview {
+/* Output-shape preview — renders the selected depth's template (the SAME contract compose
+   injects) as formatted markdown, with a small style-name header. */
+.formatBox {
   margin: 0 10px 8px;
-  padding: 6px 8px;
-  font: 400 10px/1.5 var(--font-family-mono);
-  color: var(--text-secondary);
+  padding: 7px 9px 3px;
   background: var(--bg-surface0);
   border: var(--border);
   border-radius: var(--radius-md);
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 104px;
+  max-height: 138px;
   overflow: auto;
 }
+
+.formatTitle {
+  font: 700 9px/1 var(--font-family-base);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 3px;
+}
+
+/* Compact overrides for the rendered template — two classes deep to defeat
+   MarkdownRenderer's default (larger) element sizes. */
+.formatBox .formatMd p {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 2px 0 5px;
+}
+.formatBox .formatMd ul {
+  padding-left: 15px;
+  margin: 2px 0 5px;
+}
+.formatBox .formatMd li {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  margin: 1px 0;
+}
+.formatBox .formatMd h3 {
+  font-size: 11px;
+  color: var(--text-primary);
+  margin: 4px 0 2px;
+}
+.formatBox .formatMd code {
+  font-size: 10.5px;
+}
+.formatBox .formatMd > :first-child { margin-top: 0; }
+.formatBox .formatMd > :last-child { margin-bottom: 3px; }
 
 .note {
   width: 100%;
