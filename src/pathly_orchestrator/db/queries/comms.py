@@ -116,6 +116,12 @@ def get_messages(
     return [dict(r) for r in rows]
 
 
+def _dist_of(row: dict) -> float:
+    """Cosine distance of a search row, or a large sentinel when it carries no semantic score."""
+    d = row.get("_distance")
+    return d if d is not None else 9e9
+
+
 def search_by_embedding(
     conn: sqlite3.Connection,
     embedding: list[float],
@@ -123,7 +129,14 @@ def search_by_embedding(
     scopes: list[str],
     k: int = 6,
 ) -> list[dict]:
-    """Return up to k messages ordered by semantic similarity (or recency when vec unavailable)."""
+    """Return up to k messages ordered by semantic similarity (or recency when vec unavailable).
+
+    Merges two vector channels and dedups by message (each artifact appears once, ranked by its
+    BEST match): the PARENT vector (whole summary/message, in comms_embeddings) and the CHILD
+    chunk vectors (per-bullet / per-section, in comms_chunk_embeddings) — so a query matching one
+    subtopic of a multi-topic artifact still retrieves it. Messages with no chunks rank by their
+    parent vector exactly as before.
+    """
     if not boards or not scopes:
         return []
     if _VEC_AVAILABLE:
@@ -132,32 +145,46 @@ def search_by_embedding(
         import struct
 
         embedding_bytes = struct.pack(f"{len(embedding)}f", *embedding)
-        # Expose the cosine distance as `_distance` so callers can apply a relevance
-        # threshold (the alias is referenced by ORDER BY). Keyword/recency rows carry
-        # no `_distance` key → callers treat that as "no semantic score".
-        sql = (
+        base: list[Any] = [embedding_bytes] + list(boards) + list(scopes)
+        # `_distance` is the raw cosine distance (aliased for ORDER BY + caller thresholding).
+        # PARENT vectors: one whole-summary/message vector each (the existing channel).
+        parent_sql = (
             "SELECT m.*, vec_distance_cosine(e.embedding, ?) AS _distance "  # nosec B608
-            "FROM comms_messages m "
-            "JOIN comms_embeddings e ON e.message_id = m.id "
+            "FROM comms_messages m JOIN comms_embeddings e ON e.message_id = m.id "
             f"WHERE m.board IN ({board_ph}) AND m.scope IN ({scope_ph}) "
-            "AND m.deleted_at IS NULL "
-            "ORDER BY _distance ASC "
-            "LIMIT ?"
+            "AND m.deleted_at IS NULL ORDER BY _distance ASC LIMIT ?"
         )
-        params: list[Any] = [embedding_bytes] + list(boards) + list(scopes) + [k]
-        rows = conn.execute(sql, params).fetchall()
-    else:
-        board_ph = ",".join("?" * len(boards))
-        scope_ph = ",".join("?" * len(scopes))
-        sql = (
-            "SELECT * FROM comms_messages "  # nosec B608
-            f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
-            "AND deleted_at IS NULL "
-            "ORDER BY ts DESC LIMIT ?"
-        )
-        params = list(boards) + list(scopes) + [k]
-        rows = conn.execute(sql, params).fetchall()
-    return [dict(r) for r in rows]
+        best: dict[str, dict] = {}
+        for r in conn.execute(parent_sql, base + [k * 2]).fetchall():
+            best[r["id"]] = dict(r)
+        # CHILD vectors: per-chunk recall on multi-topic artifacts; dedup by message, keep the
+        # nearest of (parent, any chunk). Guarded so an older DB without the table still works.
+        try:
+            child_sql = (
+                "SELECT m.*, vec_distance_cosine(c.embedding, ?) AS _distance "  # nosec B608
+                "FROM comms_messages m JOIN comms_chunk_embeddings c ON c.message_id = m.id "
+                f"WHERE m.board IN ({board_ph}) AND m.scope IN ({scope_ph}) "
+                "AND m.deleted_at IS NULL ORDER BY _distance ASC LIMIT ?"
+            )
+            for r in conn.execute(child_sql, base + [k * 3]).fetchall():
+                d = dict(r)
+                prev = best.get(d["id"])
+                if prev is None or _dist_of(d) < _dist_of(prev):
+                    best[d["id"]] = d
+        except sqlite3.OperationalError:
+            pass  # chunk table absent (older DB) → parents only
+        return sorted(best.values(), key=_dist_of)[:k]
+
+    board_ph = ",".join("?" * len(boards))
+    scope_ph = ",".join("?" * len(scopes))
+    sql = (
+        "SELECT * FROM comms_messages "  # nosec B608
+        f"WHERE board IN ({board_ph}) AND scope IN ({scope_ph}) "
+        "AND deleted_at IS NULL "
+        "ORDER BY ts DESC LIMIT ?"
+    )
+    params = list(boards) + list(scopes) + [k]
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
 
 
 _RRF_K = 60
@@ -537,6 +564,35 @@ def store_embedding(
             "VALUES (?, ?, ?, ?)",
             (message_id, embedding_bytes, chunk_index, chunk_text),
         )
+        conn.commit()
+
+
+def store_chunk_embeddings(
+    conn: sqlite3.Connection,
+    message_id: str,
+    chunks: list[tuple[str, list[float]]],
+) -> None:
+    """Replace the child-chunk embeddings for *message_id* (re-summarize replaces them).
+
+    ``chunks`` is ``[(chunk_text, vector), …]`` — one per summary bullet/section. Always clears
+    the message's existing chunks first so stale ones from a previous (longer) summary can't
+    linger. No-op when vec is unavailable (vec_distance_cosine would be missing at search time).
+    """
+    if not _VEC_AVAILABLE:
+        return
+    import struct
+
+    with _get_write_lock(conn):
+        conn.execute(
+            "DELETE FROM comms_chunk_embeddings WHERE message_id=?", (message_id,)
+        )
+        for i, (text, vector) in enumerate(chunks):
+            eb = struct.pack(f"{len(vector)}f", *vector)
+            conn.execute(
+                "INSERT OR REPLACE INTO comms_chunk_embeddings "
+                "(chunk_id, message_id, embedding, chunk_text) VALUES (?, ?, ?, ?)",
+                (f"{message_id}:{i + 1}", message_id, eb, text),
+            )
         conn.commit()
 
 

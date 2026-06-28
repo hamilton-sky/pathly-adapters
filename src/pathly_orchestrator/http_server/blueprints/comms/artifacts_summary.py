@@ -108,11 +108,15 @@ def comms_artifact_set_summary(artifact_id: str):
                 ).fetchone()
                 if row is not None:
                     from pathly_orchestrator.runner.embeddings import (
-                        embed_async as _embed_async,
+                        embed_artifact_async as _embed_artifact_async,
                     )
 
                     desc = row["text"] or ""
-                    _embed_async(row["message_id"], f"{desc}\n\n{summary}".strip())
+                    # Parent vector = description + whole summary (thematic recall); CHILD vectors
+                    # = the summary's bullets/sections (subtopic recall, deduped at search time).
+                    _embed_artifact_async(
+                        row["message_id"], f"{desc}\n\n{summary}".strip(), summary
+                    )
         except Exception:
             logging.debug("re-embed on summary set failed", exc_info=True)
 

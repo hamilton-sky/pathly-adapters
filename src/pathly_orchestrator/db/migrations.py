@@ -303,6 +303,20 @@ CREATE TABLE IF NOT EXISTS comms_artifact_sections (
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_sections_artifact
     ON comms_artifact_sections(artifact_id);
+
+-- Child-chunk embeddings: per-bullet (topic-map) / per-section (detailed) vectors for an
+-- artifact summary, so a query matching ONE subtopic still retrieves the artifact. A REGULAR
+-- table (not vec0): vec_distance_cosine() works over the BLOB just like the existing brute-force
+-- scan, and a normal table supports DELETE-by-message + multiple rows per message (vec0's
+-- message_id PRIMARY KEY does not). The whole-summary "parent" vector stays in comms_embeddings.
+CREATE TABLE IF NOT EXISTS comms_chunk_embeddings (
+    chunk_id    TEXT PRIMARY KEY,
+    message_id  TEXT NOT NULL,
+    embedding   BLOB,
+    chunk_text  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_chunk_emb_message
+    ON comms_chunk_embeddings(message_id);
 """)
     conn.commit()
     if vec_available:

@@ -27,7 +27,10 @@ def comms_post():
             get_write_permissions as _get_write_perms,
         )
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
-        from pathly_orchestrator.runner.embeddings import embed_async as _embed_async
+        from pathly_orchestrator.runner.embeddings import (
+            embed_artifact_async as _embed_artifact_async,
+            embed_async as _embed_async,
+        )
 
         data = request.get_json()
         if not data:
@@ -312,15 +315,16 @@ def comms_post():
                 logging.debug("comms_artifacts insert (post) failed", exc_info=True)
 
         if msg_type in _EMBED_TYPES:
-            # Embed description + author summary when given, so retrieval matches on the
-            # rich content from the start (otherwise the summary is embedded later, on the
-            # /summary writeback). Non-artifact types embed their text as before.
-            embed_text = (
-                f"{text}\n\n{artifact_summary}".strip()
-                if (msg_type == "artifact" and artifact_summary)
-                else text
-            )
-            _embed_async(message_id, embed_text)
+            # Embed description + author summary when given, so retrieval matches on the rich
+            # content from the start (otherwise the summary is embedded later, on the /summary
+            # writeback). An author-summarized artifact ALSO gets per-bullet/section child
+            # chunks; everything else embeds its text as a single vector.
+            if msg_type == "artifact" and artifact_summary:
+                _embed_artifact_async(
+                    message_id, f"{text}\n\n{artifact_summary}".strip(), artifact_summary
+                )
+            else:
+                _embed_async(message_id, text)
 
         _broadcast_comms(
             scope,
