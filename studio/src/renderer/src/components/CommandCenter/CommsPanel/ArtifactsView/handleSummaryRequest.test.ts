@@ -8,6 +8,9 @@ vi.mock('./summarizeArtifact', () => ({
 vi.mock('../../../../store/projectStore', () => ({
   useProjectStore: { getState: () => ({ projectPath: 'C:/proj' }) },
 }))
+vi.mock('../../../../store/commsApi', () => ({
+  apiGetDefaultStyle: vi.fn().mockResolvedValue(null),
+}))
 
 import * as core from './summarizeArtifact'
 import { handleSummaryRequest } from './handleSummaryRequest'

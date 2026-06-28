@@ -1,0 +1,40 @@
+/* Segmented summary-depth control (Gist / Topic map / Detailed). Sizes to its container. */
+.row {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.btn {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 4px;
+  font: 500 11px/1 var(--font-family-base);
+  color: var(--text-secondary);
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.btn:hover {
+  border-color: var(--accent-border, var(--accent));
+  color: var(--text-primary);
+}
+
+.btn[data-active] {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
