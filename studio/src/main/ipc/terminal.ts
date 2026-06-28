@@ -28,8 +28,12 @@ const ptyOutput = new Map<string, string[]>()
 function tailMeaningfulOutput(chunks: string[]): string {
   const text = chunks
     .join('')
-    .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')
+    // CSI sequences INCLUDING private-mode prefixes (< = > ?) and intermediates — e.g.
+    // \x1b[>4m, \x1b[<u, \x1b[?25h. The old [0-9;?] class missed < > = and let them leak.
+    .replace(/\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]/g, '')
+    // OSC sequences (\x1b] ... BEL/ST) and any other ESC-prefixed control.
     .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+    .replace(/\x1b[@-Z\\-_]/g, '')
     .replace(/\r/g, '\n')
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
   return lines.slice(-6).join(' | ').slice(-600)

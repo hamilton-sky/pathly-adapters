@@ -48,6 +48,16 @@ async function pollSummaryFile(path: string, tries = 5, delayMs = 600): Promise<
   return null
 }
 
+// Strip terminal escape codes that leak through the stdout-tail fallback capture (e.g.
+// \x1b[>4m, \x1b[<u — private-mode CSI). The clean file/model paths are unaffected.
+function stripAnsi(text: string): string {
+  return text
+    .replace(/\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]/g, '')
+    .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+    .replace(/\x1b[@-Z\\-_]/g, '')
+    .trim()
+}
+
 export interface ResummarizeHook {
   pillState: PillState
   progress: ActionProgress | null
@@ -204,8 +214,9 @@ export function useResummarize(messageId: string): ResummarizeHook {
           summary = await runBare()
         }
 
-        // Empty output is a failure, not a silent success — otherwise the pill says
-        // "done" but nothing is saved and the card looks unchanged.
+        // Strip any leaked terminal escape codes (the stdout-tail fallback path), then
+        // treat empty output as a failure — not a silent "done" with nothing saved.
+        summary = stripAnsi(summary)
         if (!summary) throw new Error('the engine returned no summary text')
         await apiSetArtifactSummary(row.id, summary, selection as AiSelectionDto)
 
