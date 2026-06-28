@@ -70,6 +70,12 @@ export interface ResummarizeHook {
   configOpen: boolean
   setConfigOpen: Dispatch<SetStateAction<boolean>>
   gearRef: React.RefObject<HTMLButtonElement>
+  /** The confirm-before-send preview ({ prompt, fileName }) — null until prepared. */
+  preview: { prompt: string; fileName: string } | null
+  confirmOpen: boolean
+  setConfirmOpen: Dispatch<SetStateAction<boolean>>
+  /** Build the preview and open the confirm modal (does NOT spawn — run() does). */
+  prepareRun: () => void
   run: () => void
   stop: () => void
 }
@@ -78,6 +84,8 @@ export function useResummarize(messageId: string): ResummarizeHook {
   const [pillState, setPillState] = useState<PillState>('idle')
   const [startedAt, setStartedAt] = useState<number | undefined>()
   const [configOpen, setConfigOpen] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [preview, setPreview] = useState<{ prompt: string; fileName: string } | null>(null)
   const [selection, setSelectionState] = useState<AiSelection>(BUILTIN_DEFAULT)
   const [style, setStyleState] = useState<SummaryStyle>(SUMMARY_STYLE_DEFAULT)
   const [note, setNoteState] = useState('')
@@ -134,6 +142,44 @@ export function useResummarize(messageId: string): ResummarizeHook {
       if (row) void apiSetArtifactNote(row.id, next)
     })
   }, [messageId])
+
+  // Build the exact prompt that run() will send and open the confirm modal — the
+  // preview→Cancel/Submit gate, matching Decompose/Evaluate. Does NOT spawn; run() does.
+  function prepareRun(): void {
+    if (pillState === 'running') return
+    void (async () => {
+      try {
+        const rows = await fetchArtifacts(messageId)
+        const row: ArtifactRow | undefined = rows[0]
+        if (!row || isOff(selection)) return
+        const name = row.path.split(/[/\\]/).pop() ?? row.path
+        if (!isSummarizable(row.type ?? undefined, name)) return
+        const abs = resolveArtifactPath(row.path, projectPath)
+        const cwd = projectPath.replace(/\\/g, '/').replace(/\/$/, '') || undefined
+        const noteSuffix = noteRef.current.trim()
+          ? `\n\n## Additional request from the user\n${noteRef.current.trim()}`
+          : ''
+        let prompt: string | null = null
+        if (selection.type === 'engine') {
+          prompt = await composeClientSkill(
+            STYLE_SKILL[style],
+            selection.id,
+            { source_path: abs, out_path: `${abs}.summary`, kind: 'summary' },
+            { projectRoot: cwd },
+          )
+        }
+        if (prompt == null) {
+          const text = await readFile(abs)
+          prompt = buildSummarizePrompt(text ?? '')
+        }
+        setPreview({ prompt: prompt + noteSuffix, fileName: name })
+        setConfirmOpen(true)
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        useCommsStore.getState().markSummaryStatus(messageId, 'failed', msg)
+      }
+    })()
+  }
 
   function run(): void {
     if (pillState === 'running') return
@@ -247,5 +293,5 @@ export function useResummarize(messageId: string): ResummarizeHook {
     setStartedAt(undefined)
   }
 
-  return { pillState, progress, selection, setSelection, style, setStyle, note, setNote, configOpen, setConfigOpen, gearRef, run, stop }
+  return { pillState, progress, selection, setSelection, style, setStyle, note, setNote, configOpen, setConfigOpen, gearRef, preview, confirmOpen, setConfirmOpen, prepareRun, run, stop }
 }

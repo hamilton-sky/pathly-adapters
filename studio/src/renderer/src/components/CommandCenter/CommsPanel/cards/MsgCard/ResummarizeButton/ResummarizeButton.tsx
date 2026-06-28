@@ -1,7 +1,15 @@
 import { RotateCw } from 'lucide-react'
 import ActionPill from '../../../../../shared/ActionPill/ActionPill'
+import SendPreviewModal from '../../../../../shared/SendPreviewModal/SendPreviewModal'
+import { cliLabel, type EditorCli } from '../../../../../MarkdownEditor/EditorHeader/editorCli'
 import { SummaryTargetPopover } from './SummaryTargetPopover/SummaryTargetPopover'
 import { useResummarize } from '../../../hooks/useResummarize'
+
+const STYLE_LABEL: Record<string, string> = {
+  gist: 'Gist',
+  'topic-map': 'Topic map',
+  detailed: 'Detailed',
+}
 
 interface Props {
   /** The artifact message id (resolves to its comms_artifacts row + saved target). */
@@ -17,6 +25,9 @@ interface Props {
 // while running ⚙ becomes ■ (stop). State + abort live in useResummarize.
 export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Element {
   const r = useResummarize(messageId)
+  const engineLabel = r.selection.type === 'engine'
+    ? cliLabel(r.selection.id as EditorCli)
+    : r.selection.id
   return (
     <>
       <ActionPill
@@ -29,7 +40,7 @@ export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Ele
         idleTip="Re-summarize this artifact"
         runningTip="Running the AI summary…"
         ariaName="Re-summarize"
-        onRun={r.run}
+        onRun={r.prepareRun}
         onStop={r.stop}
         configTip="Choose summary depth + AI target"
         onToggleConfig={() => r.setConfigOpen((v) => !v)}
@@ -45,6 +56,19 @@ export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Ele
           note={r.note}
           onNoteChange={r.setNote}
           onClose={() => r.setConfigOpen(false)}
+        />
+      )}
+      {r.confirmOpen && r.preview && (
+        <SendPreviewModal
+          title="Summarize"
+          engineLabel={engineLabel}
+          fileName={r.preview.fileName}
+          prompt={r.preview.prompt}
+          readOnly
+          meta={[{ label: 'Depth', value: STYLE_LABEL[r.style] ?? r.style }]}
+          submitLabel="Run summary"
+          onSubmit={() => { r.setConfirmOpen(false); r.run() }}
+          onCancel={() => r.setConfirmOpen(false)}
         />
       )}
     </>
