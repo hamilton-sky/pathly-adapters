@@ -367,7 +367,11 @@ def test_current_state_key_on_complete_stage(tmp_path):
     storage = _storage_path(tmp_path)
     state_file = storage / "STATE.json"
     state_file.write_text(json.dumps({"current": "PLANNING"}), encoding="utf-8")
-    (storage / "IMPLEMENTATION_PLAN.md").write_text("plan content", encoding="utf-8")
+    # Must contain the PLANNING->DESIGNING on_content marker ('## Conversation'), otherwise the
+    # rule falls through to default:PLANNING and this is a no-op self-loop rather than an advance.
+    (storage / "IMPLEMENTATION_PLAN.md").write_text(
+        "## Conversation 1\nplan content", encoding="utf-8"
+    )
 
     result = complete_stage(
         {
@@ -376,8 +380,12 @@ def test_current_state_key_on_complete_stage(tmp_path):
             "project_root": str(tmp_path),
         }
     )
+    # A successful advance reports BOTH the new current_state and an explicit next_state
+    # (the advance signal the supervisor/runner driver loops gate on). They are equal: the
+    # FSM has already transitioned, so current_state == next_state == the state advanced into.
     assert "current_state" in result
-    assert "next_state" not in result
+    assert result["current_state"] == "DESIGNING"
+    assert result["next_state"] == "DESIGNING"
 
 
 def test_escalate_decision_when_target_is_human(tmp_path):

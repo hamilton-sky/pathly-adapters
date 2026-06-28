@@ -1030,4 +1030,11 @@ def complete_stage(args: dict) -> dict:
         flow=flow_config,
     )
     result["limits"] = state_info["limits"]
+    # Advance contract: a successful transition reports the state it advanced INTO via a
+    # top-level `next_state` key. Both driver loops (supervisor/orchestrator.py and
+    # runner/cli.py) gate "continue to the next stage" on result.get("next_state"); without
+    # it they treat a clean advance as an "Unexpected result" and stop after one transition.
+    # `current_state` already equals next_state here (current_state_value=next_state); this is
+    # the explicit advance signal. next_action() does NOT carry this key — only an advance does.
+    result["next_state"] = next_state
     return result
