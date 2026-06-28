@@ -3,7 +3,9 @@ import { FileText, Upload } from 'lucide-react'
 import type { Message } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../../../types'
 import { AiTargetSelector } from '../../../shared/AiTargetSelector/AiTargetSelector'
+import { StylePicker } from '../../../shared/StylePicker/StylePicker'
 import type { AiSelection } from '../../../../services/aiRouter'
+import type { SummaryStyle } from '../../../../store/commsApi'
 import { MsgCard } from '../cards/MsgCard/MsgCard'
 import s from './ArtifactsView.module.css'
 
@@ -18,6 +20,9 @@ interface Props {
   /** The AI target used to summarize dropped artifacts (app-default, persisted upstream). */
   summarySelection: AiSelection | null
   onSummarySelectionChange: (sel: AiSelection) => void
+  /** The depth used to summarize dropped artifacts (app-default, persisted upstream). */
+  summaryStyle: SummaryStyle
+  onSummaryStyleChange: (style: SummaryStyle) => void
 }
 
 // The "Artifacts" board view: type='artifact' messages as a filtered card list,
@@ -30,7 +35,7 @@ interface Props {
 // localStorage backend dropdown with this unified AiTargetSelector.
 export function ArtifactsView({
   messages, onDelete, onSupersede, onDropFiles, onDropPaths,
-  summarySelection, onSummarySelectionChange,
+  summarySelection, onSummarySelectionChange, summaryStyle, onSummaryStyleChange,
 }: Props): JSX.Element {
   const artifacts = messages.filter((m) => m.type === 'artifact')
   const [dragOver, setDragOver] = useState(false)
@@ -73,14 +78,24 @@ export function ArtifactsView({
       onDragLeave={handleDragLeave}
     >
       <div className={s.toolbar}>
-        <label className={s.toolbarLabel} htmlFor="av-summary-target">Summarize with:</label>
-        <AiTargetSelector
-          id="av-summary-target"
-          ariaLabel="Artifact summary AI target"
-          value={summarySelection}
-          onChange={onSummarySelectionChange}
-          allowOff
-        />
+        <div className={s.toolbarRow}>
+          <label className={s.toolbarLabel} htmlFor="av-summary-target">Summarize with:</label>
+          <div className={s.toolbarControl}>
+            <AiTargetSelector
+              id="av-summary-target"
+              ariaLabel="Artifact summary AI target"
+              value={summarySelection}
+              onChange={onSummarySelectionChange}
+              allowOff
+            />
+          </div>
+        </div>
+        <div className={s.toolbarRow}>
+          <span className={s.toolbarLabel}>Depth:</span>
+          <div className={s.toolbarControl}>
+            <StylePicker value={summaryStyle} onChange={onSummaryStyleChange} ariaLabel="Artifact summary depth" />
+          </div>
+        </div>
       </div>
       {artifacts.length === 0 ? (
         <div className={s.empty}>

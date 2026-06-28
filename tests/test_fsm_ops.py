@@ -633,7 +633,7 @@ def test_build_prompt_includes_pipeline_history(tmp_path):
     }
 
     with patch(
-        "pathly_orchestrator.fsm_ops._load_agent_text", return_value="base agent text"
+        "pathly_orchestrator.fsm_compose._load_agent_text", return_value="base agent text"
     ):
         result = build_prompt(flow_config, "BUILDING", storage_path)
 

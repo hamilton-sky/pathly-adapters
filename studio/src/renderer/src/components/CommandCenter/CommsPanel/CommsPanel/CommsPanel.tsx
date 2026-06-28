@@ -72,7 +72,10 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   const [boardView, setBoardView] = useState<BoardView>('messages')
   const projectPath = useStore((st) => st.projectPath)
   // The AI target that summarizes dropped artifacts (app-default, persisted).
-  const { selection: summarySelection, setSelection: setSummarySelection } = useArtifactSummaryTarget()
+  const {
+    selection: summarySelection, setSelection: setSummarySelection,
+    style: summaryStyle, setStyle: setSummaryStyle,
+  } = useArtifactSummaryTarget()
 
   const boardKey = scope === 'feature' ? mainFeature : scope
 
@@ -105,7 +108,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // there). Off ⇒ skip — filename/title only. Best-effort; never blocks the drop.
   const summarizePosted = async (messageId: string, path: string, atype: string): Promise<void> => {
     if (isOff(summarySelection)) return
-    await summarizeArtifact({ messageId, path, atype, selection: summarySelection, cwd: projectRoot })
+    await summarizeArtifact({ messageId, path, atype, selection: summarySelection, cwd: projectRoot, style: summaryStyle })
   }
 
   // Drop files onto the Artifacts view → copy each into the feature's artifacts/
@@ -216,6 +219,8 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
           onDropPaths={handleDropPaths}
           summarySelection={summarySelection}
           onSummarySelectionChange={setSummarySelection}
+          summaryStyle={summaryStyle}
+          onSummaryStyleChange={setSummaryStyle}
         />
       )}
 

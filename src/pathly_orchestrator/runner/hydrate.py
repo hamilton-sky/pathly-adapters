@@ -21,56 +21,9 @@ import os
 import threading
 import uuid
 
+from .hydrate_helpers import _is_md, _read_file_text, _resolve_plan_root, safe_plan_path  # noqa: F401
+
 logger = logging.getLogger(__name__)
-
-
-def _is_md(path: str) -> bool:
-    """Return True when path has a .md extension (case-insensitive)."""
-    return path.lower().endswith(".md")
-
-
-def safe_plan_path(scope: str, artifact: str, project_root: str | None) -> str | None:
-    """Resolve <project_root>/pathly/plans/<scope>/<artifact> and return the
-    absolute path ONLY if it stays inside the plan-folder tree. Returns None on
-    any traversal attempt. Rejects scope/artifact that contain a path separator,
-    a '..' segment, or are absolute. Uses realpath + normcase containment."""
-    if not project_root:
-        return None
-    for part, label in ((scope, "scope"), (artifact, "artifact")):
-        if not part or not part.strip():
-            return None
-        if os.path.isabs(part):
-            return None
-        normalized = part.replace("\\", "/")
-        if "/" in normalized or os.sep in normalized:
-            return None
-        if any(seg == ".." for seg in normalized.split("/")):
-            return None
-    root = os.path.realpath(os.path.join(project_root, "pathly", "plans", scope))
-    candidate = os.path.realpath(os.path.join(root, artifact))
-    root_nc = os.path.normcase(root)
-    candidate_nc = os.path.normcase(candidate)
-    if candidate_nc == root_nc or candidate_nc.startswith(root_nc + os.sep):
-        return candidate
-    return None
-
-
-def _resolve_plan_root(scope: str, project_root: str | None = None) -> str:
-    """Return the absolute path to pathly/plans/<scope>/.
-
-    project_root is the repo root. Falls back to cwd-relative when absent.
-    """
-    base = project_root or os.getcwd()
-    return os.path.normpath(os.path.join(base, "pathly", "plans", scope))
-
-
-def _read_file_text(path: str) -> str | None:
-    """Return file text, or None when unreadable."""
-    try:
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            return fh.read()
-    except OSError:
-        return None
 
 
 def ensure_indexed(

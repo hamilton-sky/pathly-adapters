@@ -1,24 +1,31 @@
-/* ── Upload summary toolbar ── */
+/* ── Upload summary toolbar (two rows: AI target + depth) ── */
 .toolbar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
-  flex-wrap: wrap;
   min-width: 0;
   padding: 0 2px 6px;
   flex-shrink: 0;
 }
 
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .toolbarLabel {
+  width: 96px;
   font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-/* The AiTargetSelector is width:100% internally; its wrapper is the toolbar's only
-   div child, so give it room to grow while still shrinking below content width. */
-.toolbar > div {
+/* The control wrapper (AiTargetSelector is width:100% internally; StylePicker fills too) —
+   grow to fill the row while still shrinking below content width. */
+.toolbarControl {
   flex: 1;
   min-width: 0;
 }

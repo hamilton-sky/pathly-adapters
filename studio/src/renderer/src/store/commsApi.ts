@@ -356,6 +356,32 @@ export async function apiSetDefaultSelection(selection: AiSelectionDto): Promise
   }
 }
 
+/** Fetch the app-default summary depth style, or null when unset / on error. */
+export async function apiGetDefaultStyle(): Promise<SummaryStyle | null> {
+  try {
+    const r = await apiFetch('/comms/default-style')
+    if (!r.ok) return null
+    const json = (await r.json()) as { style?: SummaryStyle | null }
+    return json.style ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Persist the app-default summary depth style. Returns true on 2xx. */
+export async function apiSetDefaultStyle(style: SummaryStyle): Promise<boolean> {
+  try {
+    const r = await apiFetch('/comms/default-style', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ style }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 export async function apiAnswer(
   questionId: string,
   answer: string,

@@ -13,6 +13,7 @@
 
 import { isOff, type AiSelection } from '../../../../services/aiRouter'
 import { useProjectStore } from '../../../../store/projectStore'
+import { apiGetDefaultStyle } from '../../../../store/commsApi'
 import { summarizeArtifactById } from './summarizeArtifact'
 
 /** Shape of the server's summary_request SSE payload (loosely typed at the boundary). */
@@ -57,7 +58,9 @@ export async function handleSummaryRequest(data: SummaryRequestEvent): Promise<v
 
   try {
     const cwd = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '') || undefined
-    await summarizeArtifactById(messageId, artifactId, artifactPath, selection, cwd)
+    // Honour the app-default depth (same setting the drop toolbar persists); null ⇒ topic-map.
+    const style = (await apiGetDefaultStyle()) ?? undefined
+    await summarizeArtifactById(messageId, artifactId, artifactPath, selection, cwd, style)
   } catch (err) {
     // Best-effort: a summary failure must not break the SSE loop. Release the
     // dedup guard so a later summary_request (or manual retry) can re-run instead

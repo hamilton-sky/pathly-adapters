@@ -58,6 +58,7 @@ def test_dedupe_supersedes_older_keeps_newest_protects_task(conn, monkeypatch):
     if not _VEC_AVAILABLE:
         pytest.skip("sqlite-vec unavailable")
     import pathly_orchestrator.db.queries.comms as cq
+    import pathly_orchestrator.db.queries.comms_embeddings as cq_emb
 
     scope = f"dedup-{uuid.uuid4().hex[:8]}"
     old = _insert(
@@ -83,7 +84,7 @@ def test_dedupe_supersedes_older_keeps_newest_protects_task(conn, monkeypatch):
             {"id": old, "ts": "2026-01-01T00:00:00Z", "_distance": 0.01},
         ]
 
-    monkeypatch.setattr(cq, "search_by_embedding", fake_search)
+    monkeypatch.setattr(cq_emb, "search_by_embedding", fake_search)
 
     pairs = cq.dedupe_board(conn, "feature", scope, embed_fn=lambda t: [1.0] * 384)
 
@@ -100,6 +101,7 @@ def test_dedupe_idempotent(conn, monkeypatch):
     if not _VEC_AVAILABLE:
         pytest.skip("sqlite-vec unavailable")
     import pathly_orchestrator.db.queries.comms as cq
+    import pathly_orchestrator.db.queries.comms_embeddings as cq_emb
 
     scope = f"dedup2-{uuid.uuid4().hex[:8]}"
     old = _insert(conn, scope, "discovery", "dup", "2026-01-01T00:00:00Z")
@@ -113,7 +115,7 @@ def test_dedupe_idempotent(conn, monkeypatch):
                 out.append({"id": mid, "ts": ts, "_distance": 0.0})
         return out
 
-    monkeypatch.setattr(cq, "search_by_embedding", fake_search)
+    monkeypatch.setattr(cq_emb, "search_by_embedding", fake_search)
 
     first = cq.dedupe_board(conn, "feature", scope, embed_fn=lambda t: [1.0] * 384)
     second = cq.dedupe_board(conn, "feature", scope, embed_fn=lambda t: [1.0] * 384)

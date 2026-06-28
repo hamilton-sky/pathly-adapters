@@ -1,0 +1,331 @@
+"""CRUD message board endpoints — GET /comms, search, ack, answer, edit, delete, trash, restore."""
+
+from __future__ import annotations
+
+import logging
+
+from flask import jsonify, request
+
+from ._messages_bp import bp
+
+
+@bp.route("/comms", methods=["GET"])
+def comms_get():
+    """Fetch messages for a feature board."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
+
+        feature = request.args.get("feature", "").strip()
+        if not feature:
+            return jsonify({"error": "Query parameter 'feature' is required"}), 400
+
+        board = (request.args.get("board") or "feature").strip() or "feature"
+        if board not in ("feature", "project", "global"):
+            board = "feature"
+        scope = (request.args.get("scope") or feature).strip() or feature
+        msg_type = request.args.get("type") or None
+        status = request.args.get("status") or None
+        try:
+            limit = int(request.args.get("limit", "50"))
+        except ValueError:
+            limit = 50
+
+        conn = _get_db()
+        messages = _get_messages(
+            conn,
+            board=board,
+            scope=scope,
+            type=msg_type,
+            status=status,
+            limit=limit,
+        )
+        return jsonify(messages), 200
+    except Exception as exc:
+        logging.exception("comms_get error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/search", methods=["POST"])
+def comms_search():
+    """Semantic search across boards."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import search_by_embedding as _search
+        from pathly_orchestrator.db.queries.comms import (
+            search_by_hybrid as _search_hybrid,
+        )
+        from pathly_orchestrator.db.queries.comms import (
+            search_by_keyword as _search_keyword,
+        )
+        from pathly_orchestrator.runner.embeddings import embed as _embed
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        query = data.get("query", "")
+        feature = data.get("feature", "")
+        if not isinstance(query, str) or not query.strip():
+            return jsonify({"error": "Field 'query' must be a non-empty string"}), 400
+        if not isinstance(feature, str) or not feature.strip():
+            return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
+
+        board = data.get("board", "feature")
+        if board not in ("feature", "project", "global"):
+            board = "feature"
+        scope = data.get("scope") or feature
+        k = data.get("k", 5)
+        if not isinstance(k, int) or k <= 0:
+            k = 5
+
+        mode = data.get("mode", "hybrid")
+        if mode not in ("hybrid", "semantic", "keyword"):
+            mode = "hybrid"
+
+        embedding = _embed(query)
+        conn = _get_db()
+
+        if mode == "keyword":
+            results = _search_keyword(conn, query, [board], [scope], k)
+        elif mode == "semantic":
+            if embedding is not None:
+                results = _search(
+                    conn, embedding=embedding, boards=[board], scopes=[scope], k=k
+                )
+            else:
+                from pathly_orchestrator.db.queries.comms import (
+                    get_messages as _get_messages,
+                )
+
+                results = _get_messages(conn, board=board, scope=scope, limit=k)
+        else:
+            results = _search_hybrid(conn, query, embedding, [board], [scope], k)
+            if not results:
+                from pathly_orchestrator.db.queries.comms import (
+                    get_messages as _get_messages,
+                )
+
+                results = _get_messages(conn, board=board, scope=scope, limit=k)
+
+        return jsonify(results), 200
+    except Exception as exc:
+        logging.exception("comms_search error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/acknowledge", methods=["POST"])
+def comms_acknowledge():
+    """Mark a message as acknowledged by an agent."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import acknowledge_message as _ack
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        agent = data.get("agent", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
+        if not isinstance(agent, str) or not agent.strip():
+            return jsonify({"error": "Field 'agent' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        _ack(conn, message_id=message_id, agent=agent)
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("comms_acknowledge error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/answer", methods=["POST"])
+def comms_answer():
+    """Answer a pending question message."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import answer_question as _answer
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        question_id = data.get("question_id", "")
+        answer_text = data.get("answer", "")
+        if not isinstance(question_id, str) or not question_id.strip():
+            return (
+                jsonify({"error": "Field 'question_id' must be a non-empty string"}),
+                400,
+            )
+        if not isinstance(answer_text, str) or not answer_text.strip():
+            return jsonify({"error": "Field 'answer' must be a non-empty string"}), 400
+
+        option_id = data.get("option_id")
+        conn = _get_db()
+        answer_id = _answer(
+            conn, question_id=question_id, answer_text=answer_text, option_id=option_id
+        )
+        return jsonify({"ok": True, "answer_id": answer_id}), 200
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        logging.exception("comms_answer error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/edit", methods=["POST"])
+def comms_edit():
+    """Edit a message's text in place."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import (
+            update_message_text as _update_text,
+        )
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
+        text = data.get("text", "")
+        if not isinstance(text, str) or not text.strip():
+            return jsonify({"error": "Field 'text' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        result = _update_text(conn, message_id, text.strip())
+        if result == "not_found":
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("comms_edit error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/delete", methods=["POST"])
+def comms_delete():
+    """Retract (soft-delete) a message."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import (
+            soft_delete_message as _soft_delete,
+        )
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
+
+        force = bool(data.get("force", False))
+        conn = _get_db()
+        result = _soft_delete(conn, message_id, force=force)
+        if result == "not_found":
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+        if result == "locked":
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Message already read by an agent — cannot retract",
+                    }
+                ),
+                409,
+            )
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("comms_delete error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/supersede", methods=["POST"])
+def comms_supersede():
+    """Mark a decision as superseded by a newer one."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import supersede_message as _supersede
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        old_id = data.get("old_id", "")
+        new_id = data.get("new_id", "")
+        if not isinstance(old_id, str) or not old_id.strip():
+            return jsonify({"error": "Field 'old_id' must be a non-empty string"}), 400
+        if not isinstance(new_id, str) or not new_id.strip():
+            return jsonify({"error": "Field 'new_id' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        result = _supersede(conn, old_id=old_id, new_id=new_id)
+        if result == "not_found":
+            return jsonify({"ok": False, "error": "Message not found"}), 404
+        if result == "already_superseded":
+            return jsonify({"ok": False, "error": "Message already superseded"}), 409
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        logging.exception("comms_supersede error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/trash", methods=["GET"])
+def comms_trash():
+    """List trashed messages for a scope."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import get_trash as _get_trash
+
+        scope = request.args.get("scope", "").strip()
+        if not scope:
+            return jsonify({"error": "Query parameter 'scope' is required"}), 400
+
+        conn = _get_db()
+        messages = _get_trash(conn, scope=scope)
+        return jsonify(messages), 200
+    except Exception as exc:
+        logging.exception("comms_trash error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/restore", methods=["POST"])
+def comms_restore():
+    """Restore trashed messages."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import restore_messages as _restore
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message_ids = data.get("message_ids")
+        if not isinstance(message_ids, list) or not message_ids:
+            return (
+                jsonify({"error": "Field 'message_ids' must be a non-empty list"}),
+                400,
+            )
+        if not all(isinstance(i, str) for i in message_ids):
+            return (
+                jsonify({"error": "Field 'message_ids' must be a list of strings"}),
+                400,
+            )
+
+        conn = _get_db()
+        _restore(conn, message_ids=message_ids)
+        return jsonify({"ok": True, "restored": len(message_ids)}), 200
+    except Exception as exc:
+        logging.exception("comms_restore error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

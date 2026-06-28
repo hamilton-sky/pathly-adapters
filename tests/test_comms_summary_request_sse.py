@@ -46,20 +46,21 @@ def _no_index_daemon(monkeypatch):
 
 @pytest.fixture()
 def spy(monkeypatch):
-    """Spy on the comms SSE broadcast (as imported into messages.py).
+    """Spy on the comms SSE broadcast (as imported into messages_write.py).
 
     The post route builds broadcast_fn = lambda _p: _broadcast_comms(scope, _p),
-    which resolves messages._broadcast_comms at call time — so patching the name in
-    messages captures BOTH the message-posted COMMS_UPDATE and the summary_request
-    emit that _summary_request.emit_summary_request fires through broadcast_fn."""
-    import pathly_orchestrator.http_server.blueprints.comms.messages as messages
+    which resolves messages_write._broadcast_comms at call time — so patching the
+    name in messages_write captures BOTH the message-posted COMMS_UPDATE and the
+    summary_request emit that _summary_request.emit_summary_request fires through
+    broadcast_fn."""
+    import pathly_orchestrator.http_server.blueprints.comms.messages_write as mw
 
     events: list[dict] = []
 
     def _record(scope, payload):
         events.append(payload)
 
-    monkeypatch.setattr(messages, "_broadcast_comms", _record)
+    monkeypatch.setattr(mw, "_broadcast_comms", _record)
     return events
 
 

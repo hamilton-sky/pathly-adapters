@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -267,25 +266,6 @@ def rename_catalog_category(
     return {"oldName": old_name, "newName": safe_new, "updatedItems": len(rows)}
 
 
-def rebuild_catalog(conn: sqlite3.Connection) -> None:
-    """Walk pathly_data/core and (re)index agents, fragments, skills, templates.
-
-    Uses INSERT OR REPLACE so re-runs are fully idempotent.
-    """
-    data_root = _find_data_root()
-    if data_root is None:
-        return
-
-    core = data_root / "core"
-    _index_agents(conn, core)
-    _index_fragments(conn, core)
-    _index_skills(conn, core, data_root)
-    _index_templates(conn, core, data_root)
-
-
-# ── private helpers ───────────────────────────────────────────────────────────
-
-
 def _find_data_root() -> Path | None:
     """Locate the pathly_data package root by walking up from this file."""
     this_dir = Path(__file__).resolve().parent
@@ -298,7 +278,6 @@ def _find_data_root() -> Path | None:
         candidate = parent / "pathly_data" / "core"
         if candidate.exists():
             return parent / "pathly_data"
-    # Fallback: importlib.resources
     try:
         from importlib.resources import files as _res_files
 
@@ -310,97 +289,6 @@ def _find_data_root() -> Path | None:
     return None
 
 
-def _index_agents(conn: sqlite3.Connection, core: Path) -> None:
-    agents_dir = core / "agents"
-    if not agents_dir.exists():
-        return
-    for f in sorted(agents_dir.rglob("*.md")):
-        if "README" in f.name:
-            continue
-        parts = f.relative_to(agents_dir).parts
-        category = parts[0] if len(parts) > 1 else ""
-        content = f.read_text(encoding="utf-8")
-        upsert_catalog_item(
-            conn,
-            item_type="agent",
-            name=f.stem,
-            rel_path=_rel(f, core.parent.parent),
-            abs_path=str(f).replace("\\", "/"),
-            category=category,
-            description=_first_line(f),
-            content=content,
-        )
-
-
-def _index_fragments(conn: sqlite3.Connection, core: Path) -> None:
-    fragments_dir = core / "skills" / "fragments"
-    if not fragments_dir.exists():
-        return
-    for f in sorted(fragments_dir.rglob("*.md")):
-        parts = f.relative_to(fragments_dir).parts
-        subdir_category = parts[0] if len(parts) > 1 else ""
-        content = f.read_text(encoding="utf-8")
-        name, description, _, _ = _parse_frontmatter(content, f.stem)
-        item_name = f"{subdir_category}/{f.stem}" if subdir_category else name
-        upsert_catalog_item(
-            conn,
-            item_type="fragment",
-            name=item_name,
-            rel_path=_rel(f, core.parent.parent),
-            abs_path=str(f).replace("\\", "/"),
-            category=subdir_category or "fragments",
-            description=description,
-            content=content,
-        )
-
-
-def _index_skills(conn: sqlite3.Connection, core: Path, _data_root: Path) -> None:
-    skills_dir = core / "skills"
-    if not skills_dir.exists():
-        return
-    for f in sorted(skills_dir.rglob("*.md")):
-        parts = f.relative_to(skills_dir).parts
-        # Skip fragments/ subdirectory — handled separately
-        if parts and parts[0] == "fragments":
-            continue
-        rel_to_skills = f.relative_to(skills_dir)
-        skill_name = str(rel_to_skills.with_suffix("")).replace(os.sep, "/")
-        category = parts[0] if len(parts) > 1 else ""
-        content = f.read_text(encoding="utf-8")
-        upsert_catalog_item(
-            conn,
-            item_type="skill",
-            name=skill_name,
-            rel_path=_rel(f, core.parent.parent),
-            abs_path=str(f).replace("\\", "/"),
-            category=category,
-            description=_first_line(f),
-            content=content,
-        )
-
-
-def _index_templates(conn: sqlite3.Connection, core: Path, _data_root: Path) -> None:
-    templates_dir = core / "templates"
-    if not templates_dir.exists():
-        return
-    for f in sorted(templates_dir.rglob("*.md")):
-        rel_to_templates = f.relative_to(templates_dir)
-        parts = rel_to_templates.parts
-        tmpl_name = str(rel_to_templates.with_suffix("")).replace(os.sep, "/")
-        category = parts[0] if len(parts) > 1 else ""
-        content = f.read_text(encoding="utf-8")
-        upsert_catalog_item(
-            conn,
-            item_type="template",
-            name=tmpl_name,
-            rel_path=_rel(f, core.parent.parent),
-            abs_path=str(f).replace("\\", "/"),
-            category=category,
-            description=_first_line(f),
-            content=content,
-        )
-
-
 def _rel(path: Path, base: Path) -> str:
     """Return path relative to base, with forward slashes."""
     try:
@@ -409,47 +297,5 @@ def _rel(path: Path, base: Path) -> str:
         return str(path).replace("\\", "/")
 
 
-def _first_line(path: Path) -> str:
-    """Return the first non-heading, non-blank line as a short description."""
-    try:
-        text = path.read_text(encoding="utf-8")
-        # Skip YAML frontmatter
-        if text.startswith("---"):
-            end = text.find("\n---", 3)
-            if end != -1:
-                text = text[end + 4 :]
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            return line[:200]
-    except OSError:
-        pass
-    return ""
-
-
-def _parse_frontmatter(
-    text: str, fallback_name: str
-) -> tuple[str, str, str, str | None]:
-    """Extract (name, description, category, requires) from YAML frontmatter."""
-    name = fallback_name
-    description = ""
-    category = ""
-    requires: str | None = None
-    match = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
-    if not match:
-        return name, description, category, requires
-    for line in match.group(1).splitlines():
-        m = re.match(r"^(\w+):\s*(.*)$", line)
-        if not m:
-            continue
-        key, value = m.group(1), m.group(2).strip().strip("\"'")
-        if key == "name":
-            name = value or fallback_name
-        elif key == "description":
-            description = value
-        elif key == "category":
-            category = value
-        elif key == "requires":
-            requires = value or None
-    return name, description, category, requires
+# Indexer + rebuild live in catalog_indexers.py to keep this file under 400 lines.
+from .catalog_indexers import rebuild_catalog  # noqa: E402, F401

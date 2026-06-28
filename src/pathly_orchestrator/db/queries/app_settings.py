@@ -161,3 +161,23 @@ def set_default_summary_selection(conn: sqlite3.Connection, selection: dict) -> 
         )
     payload = {"type": selection["type"], "id": selection["id"]}
     set_setting(conn, _DEFAULT_SUMMARY_SELECTION_KEY, json.dumps(payload))
+
+
+_DEFAULT_SUMMARY_STYLE_KEY = "ai_routing:default_summary_style"
+_VALID_SUMMARY_STYLES = ("gist", "topic-map", "detailed")
+
+
+def get_default_summary_style(conn: sqlite3.Connection) -> str | None:
+    """Return the app-default summary DEPTH style ('gist'|'topic-map'|'detailed'), or None.
+
+    A missing or unrecognised value degrades to None so the client falls back to its
+    built-in default (topic-map)."""
+    raw = get_setting(conn, _DEFAULT_SUMMARY_STYLE_KEY)
+    return raw if raw in _VALID_SUMMARY_STYLES else None
+
+
+def set_default_summary_style(conn: sqlite3.Connection, style: str) -> None:
+    """Persist the app-default summary DEPTH style. Raises ValueError if invalid."""
+    if style not in _VALID_SUMMARY_STYLES:
+        raise ValueError("style must be one of 'gist', 'topic-map', 'detailed'")
+    set_setting(conn, _DEFAULT_SUMMARY_STYLE_KEY, style)

@@ -1,4 +1,4 @@
-"""Shim — re-exports from pathly_orchestrator.fsm_http_client for backward compat."""
+"""Shim — re-exports from fsm_http_client + fsm_cli for backward compat."""
 
 from pathly_orchestrator.fsm_http_client import *  # noqa: F401, F403
 from pathly_orchestrator.fsm_http_client import (  # noqa: F401
@@ -15,7 +15,6 @@ from pathly_orchestrator.fsm_http_client import (  # noqa: F401
     record_activity,
     record_phase,
     ensure_server_running,
-    main,
     _base_url,
     _request_raw,
     _request_json,
@@ -23,9 +22,12 @@ from pathly_orchestrator.fsm_http_client import (  # noqa: F401
     _pid_file,
     _start_server,
     _filter_none,
+)
+from pathly_orchestrator.fsm_cli import (  # noqa: F401
     _add_common_net_args,
     _main_next_action,
     _main_complete_stage,
     _main_record_activity,
     _main_record_phase,
+    main,
 )

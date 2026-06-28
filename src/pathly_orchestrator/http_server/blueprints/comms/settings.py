@@ -149,6 +149,47 @@ def comms_set_default_selection():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/default-style", methods=["GET"])
+def comms_get_default_style():
+    """Return the app-default summary DEPTH style ('gist'|'topic-map'|'detailed') or null.
+
+    The client seeds the ArtifactsView depth picker from this; null ⇒ the renderer
+    falls back to its built-in default (topic-map)."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import (
+            get_default_summary_style,
+        )
+
+        return jsonify({"style": get_default_summary_style(_get_db())}), 200
+    except Exception as exc:
+        logging.exception("comms_get_default_style error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/default-style", methods=["POST"])
+def comms_set_default_style():
+    """Persist the app-default summary DEPTH style. Body: {style: 'gist'|'topic-map'|'detailed'}."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import (
+            set_default_summary_style,
+        )
+
+        data = request.get_json(silent=True) or {}
+        style = data.get("style")
+        if not isinstance(style, str):
+            return jsonify({"error": "Field 'style' must be a string"}), 400
+        try:
+            set_default_summary_style(_get_db(), style)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": True, "style": style}), 200
+    except Exception as exc:
+        logging.exception("comms_set_default_style error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/agent-context", methods=["POST"])
 def comms_agent_context():
     """Return board context in BOARD-INFO mode."""
@@ -225,7 +266,11 @@ def comms_consolidate():
             mode = "dedup"
 
         conn = _get_db()
-        pairs = _dedupe(conn, board, scope, max_distance=float(max_distance))
+        try:
+            from pathly_orchestrator.runner.embeddings import embed as _embed_fn
+        except Exception:
+            _embed_fn = None
+        pairs = _dedupe(conn, board, scope, max_distance=float(max_distance), embed_fn=_embed_fn)
 
         if pairs:
             try:
