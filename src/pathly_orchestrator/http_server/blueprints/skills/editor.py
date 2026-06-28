@@ -249,6 +249,78 @@ def skills_preview():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+@bp.route("/skills/compose", methods=["POST"])
+def skills_compose():
+    """Compose a skill into ONE complete, dash-safe prompt for a client-side action.
+
+    The seam that lets client actions (artifact Summary, editor Analyze/Split) assemble
+    their prompt through the SAME fragment system as server/FSM actions, instead of
+    sending a bare hand-built string. Mirrors /skills/preview but returns a single
+    assembled prompt rather than split sections.
+
+    Body: {
+        "skill": "development/summarize",   # manifest key (required)
+        "adapter": "claude",                 # resolves capability gating; default "claude"
+        "transform": {                        # optional — keys injected as prompt vars
+            "source_path": "...", "out_path": "...", "kind": "summary|analysis|split"
+        },
+        "project_root": "...",               # optional — applies per-project DB overrides
+        "feature": "...", "agent_role": "..." # optional context for standard vars
+    }
+    Returns: {"prompt": "<composed markdown>", "skill": "...", "composed": bool}
+    `composed` is false when the skill is absent from the manifest (raw body returned).
+    """
+    try:
+        from pathly_orchestrator.compose import compose_skill, load_effective_manifest
+        from pathly_orchestrator.fsm_ops import _inject_prompt_vars
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        skill = (data.get("skill") or "").strip()
+        if not skill or not _SKILL_KEY_RE.fullmatch(skill):
+            return jsonify({"error": "Field 'skill' must be a valid skill key"}), 400
+
+        adapter = (data.get("adapter") or "claude").strip() or "claude"
+        project_root = (data.get("project_root") or "").strip()
+        transform = data.get("transform")
+        if not isinstance(transform, dict):
+            transform = {}
+
+        manifest = load_effective_manifest(project_root or None)
+        composed = skill in (manifest.get("skills") or {})
+        try:
+            prompt = compose_skill(skill, adapter, manifest=manifest)
+        except Exception:
+            return jsonify({"error": f"unknown or unreadable skill {skill!r}"}), 404
+
+        # Standard pipeline vars (empty/no-op for a pure transform that passes none).
+        feature = (data.get("feature") or "").strip()
+        agent_role = (data.get("agent_role") or skill.split("/")[-1]).strip()
+        prompt = _inject_prompt_vars(
+            prompt,
+            feature=feature,
+            project_root=project_root,
+            agent_role=agent_role,
+        )
+
+        # Transform vars — <source_path>, <out_path>, <transform_kind>.
+        prompt = (
+            prompt.replace("<source_path>", str(transform.get("source_path") or ""))
+            .replace("<out_path>", str(transform.get("out_path") or ""))
+            .replace(
+                "<transform_kind>",
+                str(transform.get("kind") or transform.get("transform_kind") or ""),
+            )
+        )
+
+        return jsonify({"prompt": prompt, "skill": skill, "composed": composed}), 200
+    except Exception as e:
+        logging.exception("skills_compose error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
 @bp.route("/skills/save", methods=["POST"])
 def skills_save():
     """Save skill body cells back to disk and upsert to DB.
