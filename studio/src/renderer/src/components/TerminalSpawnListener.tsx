@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useRunnerStore } from '../store/runnerStore'
 import { useTerminalStore } from '../store/terminalStore'
 import { useToastStore } from '../store/toastStore'
+import { attachProgress } from './shared/RunPill/progress'
 import type { TerminalTab } from '../types/terminal'
 import { apiFetch } from '../lib/config'
 import * as xtermRegistry from './Terminal/xtermRegistry'
@@ -24,6 +25,23 @@ export function TerminalSpawnListener(): null {
     let retry = 0
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
 
+    // Unified per-spawn progress: every headless board/runner agent gets the SAME start →
+    // per-line → done toasts the Markdown Editor already shows (via the shared attachProgress),
+    // instead of a separate ad-hoc mechanism. Keyed by tab so onExit can finish + clean up.
+    const progressByTab = new Map<string, { stop: () => void; label: string }>()
+    const exitUnsub = window.pathly.terminal.onExit((tabId: string, exitCode?: number) => {
+      const entry = progressByTab.get(tabId)
+      if (!entry) return
+      entry.stop()
+      progressByTab.delete(tabId)
+      const ok = !exitCode
+      useToastStore.getState().push(
+        ok ? `Agent done · ${entry.label}` : `Agent failed · ${entry.label} (exit ${exitCode})`,
+        ok ? 'success' : 'error',
+        { category: 'agent_done' },
+      )
+    })
+
     const openTerminal = (data: Record<string, unknown>): void => {
       const tab_id = data.tab_id as string
       const run_id = data.run_id as string
@@ -39,10 +57,16 @@ export function TerminalSpawnListener(): null {
       if (!cwd) console.warn('[spawn] no working directory for', tab_id, '— PTY may fail to start')
       useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'], undefined, undefined, prompt)
       useTerminalStore.getState().openTab(tab_id)
-      // Progress parity with the Markdown Editor: board/executor agent spawns now also
-      // surface a toast. Board agents were previously silent unless they posted to the board
-      // (and loop-executor agents posted nothing) — this gives every board spawn a start signal.
-      useToastStore.getState().push(`Agent started · ${label}`, 'info', { category: 'phase_summary' })
+      // Unified progress toasts for HEADLESS board/runner agents (the silent ones) — the same
+      // attachProgress the Markdown Editor uses: start now, per-line milestones while it runs,
+      // and a done/failed toast on exit (handled by onExit above). Interactive REPLs are visible,
+      // so skip them.
+      if (!isInteractive) {
+        useToastStore.getState().push(`Agent started · ${label}`, 'info', { category: 'phase_summary' })
+        const stopProgress = attachProgress(tab_id, () => {}, (line) =>
+          useToastStore.getState().push(`${label}: ${line}`, 'info', { category: 'phase_summary' }))
+        progressByTab.set(tab_id, { stop: stopProgress, label })
+      }
       useTerminalStore.setState((st) => ({
         tabs: st.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
       }))
@@ -101,6 +125,9 @@ export function TerminalSpawnListener(): null {
     return () => {
       if (reconnectTimeout !== null) clearTimeout(reconnectTimeout)
       es?.close()
+      exitUnsub()
+      progressByTab.forEach((e) => e.stop())
+      progressByTab.clear()
     }
   }, [])
 
